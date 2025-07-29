@@ -2,21 +2,26 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>HTMX + REST API</title>
+  <title>Minimal Flask chat app</title>
   <script src="{{url_for('static', filename='js/htmx.min.js')}}"></script>
+  <style>
+    .bot { color: blue }
+    .user { color: navy }
+  </style>
 </head>
 <body>
-  <h1>HTMX with REST APIs</h1>
+  <h1>Chat</h1>
 
-  <button
-    hx-get="/messages"
-    hx-target="#message-box"
-    hx-swap="innerHTML">
-    Load Messages
-  </button>
-
-  <div id="message-box">
-    <p>Messages will appear here...</p>
+  <div id="chat-box">
+    {% for msg in messages %}
+    <div class="{{ msg['role'] }}">{{ msg.text }}</div>
+    {% endfor %}
   </div>
+
+  <form id="chat-form" hx-post="/messages" hx-target="#chat-box" hx-swap="beforeend">
+    <textarea name="message" rows="3" cols="40" required></textarea><br>
+    <button type="submit">Send</button>
+  </form>
+
 </body>
 </html>
