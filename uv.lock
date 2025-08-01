@@ -379,6 +379,7 @@ dependencies = [
     { name = "langchain-community" },
     { name = "langchain-core" },
     { name = "llama-cpp-python" },
+    { name = "python-dotenv" },
     { name = "python-lsp-server" },
     { name = "requests" },
 ]
@@ -392,6 +393,7 @@ requires-dist = [
     { name = "langchain-community", specifier = ">=0.3.27" },
     { name = "langchain-core", specifier = ">=0.3.72" },
     { name = "llama-cpp-python", git = "https://github.com/inference-sh/llama-cpp-python.git?branch=main" },
+    { name = "python-dotenv", specifier = ">=1.1.1" },
     { name = "python-lsp-server", specifier = ">=1.13.0" },
     { name = "requests", specifier = ">=2.32.4" },
 ]

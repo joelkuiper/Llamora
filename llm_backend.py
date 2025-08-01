@@ -1,14 +1,18 @@
+import os
 from langchain_community.llms import LlamaCpp
 from langchain.chains import LLMChain
 from langchain.prompts import ChatPromptTemplate
 from langchain_core.callbacks import CallbackManager, StreamingStdOutCallbackHandler
 from langchain_core.runnables import RunnableSequence
 
+from dotenv import load_dotenv
+load_dotenv()
+
 # Callbacks support token-wise streaming
 callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
 
 llm = LlamaCpp(
-    model_path="/home/joelkuiper/Downloads/Phi-3.5-mini-instruct.Q5_K_M.gguf",
+    model_path=os.environ["MODEL_GUFF"],
     temperature=0.8,
     verbose=True,
     streaming=True,
