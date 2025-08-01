@@ -13,6 +13,7 @@ dependencies = [
     "langchain-core>=0.3.72",
     "python-lsp-server>=1.13.0",
     "requests>=2.32.4",
+    "ipython>=9.4.0",
 ]
 [tool.uv.sources]
 llama-cpp-python = { git = "https://github.com/inference-sh/llama-cpp-python.git", branch = "main" }

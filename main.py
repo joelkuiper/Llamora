@@ -1,10 +1,10 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, Response, stream_with_context
 from markupsafe import Markup
 import requests
 import uuid
 import time
 
-from llm_backend import generate_response
+from llm_backend import stream_response
 
 app = Flask(__name__)
 
@@ -16,41 +16,43 @@ def index():
     return render_template("index.html", messages=messages)
 
 
-@app.route("/messages", methods=['POST'])
+@app.route("/messages", methods=["POST"])
 def send_message():
-    user_text = request.form.get('message', '').strip()
+    user_text = request.form.get("message", "").strip()
     if user_text:
-        messages.append({'role': 'user', 'text': user_text})
+        msg_id = str(uuid.uuid4())
+        chat_sessions[msg_id] = {"user": user_text, "bot": None}
+        messages.append({"role": "user", "text": user_text})
 
-        # Generate a unique ID for this bot response
-        msg_id = str(uuid.uuid4().hex)
-        chat_sessions[msg_id] = {'user': user_text, 'bot': None}
-
-        # Add a placeholder in the frontend for the bot's response
         placeholder_html = f'''
             <div class="user">{user_text}</div>
-            <div id="{msg_id}" class="bot"
-                 hx-get="/bot-reply/{msg_id}"
-                 hx-trigger="load"
-                 hx-swap="outerHTML">Bot is typing...</div>
+            <div id="bot-{msg_id}" class="bot"
+                 hx-ext="sse" sse-close="done"
+                 sse-connect="/sse-reply/{msg_id}">
+                <div sse-swap="message" hx-swap="beforeend"></div>
+            </div>
         '''
         return Markup(placeholder_html)
-    return '', 204
+    return "", 204
 
-@app.route('/bot-reply/<msg_id>')
-def bot_reply(msg_id):
+
+@app.route("/sse-reply/<msg_id>")
+def sse_reply(msg_id):
     entry = chat_sessions.get(msg_id)
     if not entry:
-        return Markup(f'<div class="bot">[Error: Unknown message ID]</div>')
+        return Response("event: error\ndata: Invalid ID\n\n", mimetype="text/event-stream")
 
-    # Stub bot response based on user text
-    user_msg = entry['user']
-    bot_response = generate_response(user_msg)
+    user_msg = entry["user"]
 
-    # Save bot response
-    entry['bot'] = bot_response
-    messages.append({'role': 'bot', 'text': bot_response, 'id': msg_id})
+    def event_stream():
+        yield "retry: 300\n\n"
+        full_response = ""
+        for chunk in stream_response(user_msg):
+            full_response += chunk
+            yield f"data: {chunk}\n\n"
 
-    del chat_sessions[msg_id]
+        yield "event: done\ndata: end\n\n"  # This triggers sse-close="done"
+        messages.append({"role": "bot", "text": full_response, "id": msg_id})
+        del chat_sessions[msg_id]
 
-    return Markup(f'<div class="bot" id="{msg_id}">{bot_response}</div>')
+    return Response(stream_with_context(event_stream()), mimetype="text/event-stream")
