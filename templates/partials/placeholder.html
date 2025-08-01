@@ -1,0 +1,6 @@
+<div class="user">{{user_text}}</div>
+<div id="bot-{{msg_id}}" class="bot"
+     hx-ext="sse" sse-close="done"
+     sse-connect="/sse-reply/{{msg_id}}">
+  <div sse-swap="message" hx-swap="beforeend"></div>
+</div>

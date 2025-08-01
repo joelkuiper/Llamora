@@ -1,10 +1,17 @@
 from flask import Flask, render_template, request, Response, stream_with_context
-from markupsafe import Markup
 import requests
 import uuid
 import time
+import html
+
+from dotenv import load_dotenv
+load_dotenv()
 
 from llm_backend import stream_response
+
+
+def html_encode_whitespace(text): # SSE ignores whitespace, hence this hack
+    return html.escape(text).replace(" ", "&nbsp;").replace("\n", "<br>")
 
 app = Flask(__name__)
 
@@ -24,15 +31,9 @@ def send_message():
         chat_sessions[msg_id] = {"user": user_text, "bot": None}
         messages.append({"role": "user", "text": user_text})
 
-        placeholder_html = f'''
-            <div class="user">{user_text}</div>
-            <div id="bot-{msg_id}" class="bot"
-                 hx-ext="sse" sse-close="done"
-                 sse-connect="/sse-reply/{msg_id}">
-                <div sse-swap="message" hx-swap="beforeend"></div>
-            </div>
-        '''
-        return Markup(placeholder_html)
+        return render_template("partials/placeholder.html",
+                               user_text=user_text,
+                               msg_id=msg_id)
     return "", 204
 
 
@@ -49,7 +50,7 @@ def sse_reply(msg_id):
         full_response = ""
         for chunk in stream_response(user_msg):
             full_response += chunk
-            yield f"data: {chunk}\n\n"
+            yield f"data: {html_encode_whitespace(chunk)}\n\n"
 
         yield "event: done\ndata: end\n\n"  # This triggers sse-close="done"
         messages.append({"role": "bot", "text": full_response, "id": msg_id})

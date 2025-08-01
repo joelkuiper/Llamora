@@ -5,9 +5,6 @@ from langchain.prompts import ChatPromptTemplate
 from langchain_core.callbacks import CallbackManager, StreamingStdOutCallbackHandler
 from langchain_core.runnables import RunnableSequence
 
-from dotenv import load_dotenv
-load_dotenv()
-
 # Callbacks support token-wise streaming
 callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
 
@@ -19,7 +16,12 @@ llm = LlamaCpp(
     callback_manager=callback_manager
 )
 
-prompt = ChatPromptTemplate.from_template("<|system|>You are a helpful assistant.<|end|>\n<|user|>{user_input}<|end|>\n<|assistant|>")
+prompt = ChatPromptTemplate.from_template("""
+<|system|>
+You are a helpful assistant.<|end|>
+<|user|>
+{user_input}<|end|>
+<|assistant|>""")
 
 chain = prompt | llm
 
