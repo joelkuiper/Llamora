@@ -6,7 +6,13 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "flask>=3.1.1",
+    "llama-cpp-python",
     "flask-htmx>=0.4.0",
+    "langchain>=0.3.27",
+    "langchain-community>=0.3.27",
+    "langchain-core>=0.3.72",
     "python-lsp-server>=1.13.0",
     "requests>=2.32.4",
 ]
+[tool.uv.sources]
+llama-cpp-python = { git = "https://github.com/inference-sh/llama-cpp-python.git", branch = "main" }

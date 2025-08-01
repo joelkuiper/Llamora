@@ -4,6 +4,8 @@ import requests
 import uuid
 import time
 
+from llm_backend import generate_response
+
 app = Flask(__name__)
 
 messages = []
@@ -41,12 +43,9 @@ def bot_reply(msg_id):
     if not entry:
         return Markup(f'<div class="bot">[Error: Unknown message ID]</div>')
 
-    # Simulate thinking time
-    time.sleep(1)
-
     # Stub bot response based on user text
     user_msg = entry['user']
-    bot_response = f"You said: '{user_msg}'. Interesting!"
+    bot_response = generate_response(user_msg)
 
     # Save bot response
     entry['bot'] = bot_response
