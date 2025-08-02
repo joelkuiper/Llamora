@@ -3,8 +3,7 @@
      hx-ext="sse" sse-close="done"
      sse-connect="/sse-reply/{{msg_id}}">
   <span sse-swap="message" hx-swap="beforeend"></span>
-  <span class="typing-indicator"
-        id="typing-{{msg_id}}"
+  <span id="typing-indicator"
         sse-swap="done"
         hx-swap="outerHTML">
     <span class="cursor">❚</span>

@@ -11,7 +11,7 @@
 
 body {
   background: var(--color-bg);
-  font-family: "Segoe UI", sans-serif;
+  font-family: sans-serif;
   padding: 2rem;
   color: var(--color-text);
 }
@@ -115,6 +115,7 @@ form#chat-form {
 }
 
 form textarea {
+  font-family: sans-serif;
   width: 100%;
   max-width: 600px;
   padding: 1rem;
@@ -148,7 +149,7 @@ form button:hover {
 }
 
 /* Typing indicator */
-.typing-indicator {
+#typing-indicator {
   display: inline-block;
   animation: blink 1s step-start infinite;
   font-weight: bold;
