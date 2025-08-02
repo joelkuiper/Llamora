@@ -33,8 +33,8 @@ def format_phi_history(history: list[dict]) -> str:
     """Convert chat history into Phi-compatible text block."""
     formatted = ""
     for msg in history:
-        role = "assistant" if msg["role"] == "bot" else "user"
-        content = msg["text"]
+        role = msg["role"]
+        content = msg["content"]
         formatted += f"<|{role}|>\n{content}<|end|>\n"
     return formatted
 
@@ -42,19 +42,25 @@ def format_phi_history(history: list[dict]) -> str:
 MAX_TOKENS = llm.n_ctx
 
 
-def trim_history_to_fit(history: list[dict]) -> list[dict]:
-    """Trim oldest user/bot message pairs to stay within context."""
-    trimmed = history[:]
-    while trimmed:
-        formatted = format_phi_history(trimmed)
+def trim_history_to_fit(
+    history: list[dict],
+    max_tokens=MAX_TOKENS,
+    max_response_tokens=MAX_RESPONSE_LENGTH,
+) -> list[dict]:
+    """Trim the oldest entries in history to fit within context window."""
+    trimmed = []
+
+    # Work backwards so we prioritize the most recent context
+    for message in reversed(history):
+        # Temporarily prepend to a copy to test the size
+        temp = [message] + trimmed
+        formatted = format_phi_history(temp)
         token_count = llm.get_num_tokens(prompt.format(history=formatted))
-        if token_count + MAX_RESPONSE_LENGTH <= MAX_TOKENS:
+
+        if token_count + max_response_tokens > max_tokens:
             break
-        # Remove the oldest user+bot pair (2 messages)
-        if len(trimmed) >= 2:
-            trimmed = trimmed[2:]
-        else:
-            trimmed = trimmed[1:]
+        trimmed = temp
+
     return trimmed
 
 

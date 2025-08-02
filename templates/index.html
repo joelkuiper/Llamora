@@ -14,7 +14,7 @@
 
     <div id="chat-box">
       {% for msg in messages %}
-      <div class="{{ msg['role'] }}">{{ msg.text }}</div>
+      <div class="{{ 'bot' if msg['role'] != 'user' else 'user'}}">{{ msg.content }}</div>
       {% endfor %}
     </div>
 

@@ -95,7 +95,6 @@ h1 {
   line-height: 1.5;
   font-size: var(--font-size);
   background: var(--color-bg);
-  box-shadow: var(--inset-shadow);
 }
 
 .user {
@@ -108,6 +107,7 @@ h1 {
 
 .bot, .bot-stream {
   align-self: flex-start;
+  box-shadow: var(--inset-shadow);
   color: var(--color-bot-text);
 }
 

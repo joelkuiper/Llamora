@@ -28,9 +28,9 @@ class SessionStore:
         self.data = {}
         self.lock = Lock()
 
-    def append(self, sid, role, text):
+    def append(self, sid, role, content):
         with self.lock:
-            self.data.setdefault(sid, []).append({"role": role, "text": text})
+            self.data.setdefault(sid, []).append({"role": role, "content": content})
 
     def get(self, sid):
         with self.lock:
@@ -96,6 +96,6 @@ def sse_reply(msg_id, session_id):
 
         yield "event: done\ndata: \n\n"  # This triggers sse-close="done"
 
-        session_store.append(session_id, "bot", full_response)
+        session_store.append(session_id, "assistant", full_response)
 
     return Response(stream_with_context(event_stream()), mimetype="text/event-stream")
