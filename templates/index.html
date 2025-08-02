@@ -13,7 +13,7 @@
     <h1>Chat</h1>
 
     <div id="chat-box">
-      {% for msg in messages %}
+      {% for msg in history %}
       <div class="{{ 'bot' if msg['role'] != 'user' else 'user'}}">{{ msg.content }}</div>
       {% endfor %}
     </div>

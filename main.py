@@ -8,8 +8,8 @@ from flask import (
 )
 import uuid
 import html
-from threading import Lock
 import llm_backend as llm
+from db import HistoryDB
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -21,23 +21,7 @@ def html_encode_whitespace(text):
 
 
 app = Flask(__name__)
-
-
-class SessionStore:
-    def __init__(self):
-        self.data = {}
-        self.lock = Lock()
-
-    def append(self, sid, role, content):
-        with self.lock:
-            self.data.setdefault(sid, []).append({"role": role, "content": content})
-
-    def get(self, sid):
-        with self.lock:
-            return list(self.data.get(sid, []))  # defensive copy
-
-
-session_store = SessionStore()
+db = HistoryDB()
 
 
 @app.route("/")
@@ -46,8 +30,8 @@ def index(session_id=None):
     if not session_id:
         session_id = uuid.uuid4().hex
 
-    messages = session_store.get(session_id)
-    return render_template("index.html", messages=messages, session_id=session_id)
+    history = db.get_session(session_id)
+    return render_template("index.html", history=history, session_id=session_id)
 
 
 @app.route("/messages/<session_id>", methods=["POST"])
@@ -59,7 +43,7 @@ def send_message(session_id):
 
     msg_id = uuid.uuid4().hex
 
-    session_store.append(session_id, "user", user_text)
+    db.append(session_id, "user", user_text)
 
     html = render_template(
         "partials/placeholder.html",
@@ -75,7 +59,7 @@ def send_message(session_id):
 
 @app.route("/sse-reply/<session_id>/<msg_id>")
 def sse_reply(msg_id, session_id):
-    history = session_store.get(session_id)
+    history = db.get_session(session_id)
 
     if not history:
         return Response(
@@ -96,6 +80,6 @@ def sse_reply(msg_id, session_id):
 
         yield "event: done\ndata: \n\n"  # This triggers sse-close="done"
 
-        session_store.append(session_id, "assistant", full_response)
+        db.append(session_id, "assistant", full_response)
 
     return Response(stream_with_context(event_stream()), mimetype="text/event-stream")

@@ -11,7 +11,7 @@ callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
 MAX_RESPONSE_LENGTH = 1024
 
 llm = LlamaCpp(
-    model_path=os.environ["MODEL_GGUF"],
+    model_path=os.environ["CHAT_MODEL_GGUF"],
     temperature=0.8,
     max_tokens=MAX_RESPONSE_LENGTH,
     verbose=True,
