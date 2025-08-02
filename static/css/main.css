@@ -171,7 +171,50 @@ form button:disabled {
   padding-left: 4px;
 }
 
+/* Animations */
+
 @keyframes blink {
   0%, 100% { opacity: 0; }
   50% { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.user, .bot, .bot-stream {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.97); }
+  100% { transform: scale(1); }
+}
+
+.input-wrapper button:active {
+  animation: pulse 0.2s ease-in-out;
+}
+
+form textarea, form button {
+  transition: opacity 0.3s ease, box-shadow 0.3s ease;
+}
+
+.input-wrapper textarea {
+  transition: box-shadow 0.3s ease-in-out;
+}
+
+.input-wrapper textarea:focus {
+  box-shadow:
+    inset 1px 1px 3px var(--shadow-dark),
+    inset -1px -1px 3px var(--shadow-light),
+    0 0 6px 2px rgba(0, 0, 0, 0.1);
+  outline: none;
 }
