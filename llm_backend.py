@@ -19,7 +19,7 @@ llm = LlamaCpp(
 )
 
 template = """<|system|>
-You are a helpful assistant.<|end|>
+You are a helpful assistant. Keep your replies short, clear, and to the point.<|end|>
 {history}
 <|assistant|>"""
 

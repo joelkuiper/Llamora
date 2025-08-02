@@ -2,5 +2,11 @@
 <div id="bot-{{msg_id}}" class="bot-stream"
      hx-ext="sse" sse-close="done"
      sse-connect="/sse-reply/{{msg_id}}">
-  <div sse-swap="message" hx-swap="beforeend"></div>
+  <span sse-swap="message" hx-swap="beforeend"></span>
+  <span class="typing-indicator"
+        id="typing-{{msg_id}}"
+        sse-swap="done"
+        hx-swap="outerHTML">
+    <span class="cursor">❚</span>
+  </span>
 </div>

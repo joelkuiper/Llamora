@@ -1,10 +1,18 @@
-.bot-stream {
-  color: blue;
+.bot-stream, .bot {
+  word-wrap: break-word;
+  word-break: break-word;
 }
+
 .bot {
-  color: blue;
-  white-space: pre-line;
+  white-space: pre-wrap;  /* optional: to support explicit newlines */
 }
-.user {
-  color: navy
+
+.typing-indicator {
+  display: inline-block;
+  animation: blink 1s step-start infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
 }

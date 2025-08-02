@@ -12,7 +12,7 @@ from llm_backend import stream_response
 
 def html_encode_whitespace(text):
     """Encode text for safe streaming via SSE (preserve whitespace)."""
-    return html.escape(text).replace(" ", "&nbsp;").replace("\n", "<br>")
+    return html.escape(text).replace("\n", "<br>")
 
 app = Flask(__name__)
 
@@ -70,9 +70,9 @@ def sse_reply(msg_id):
                 first = False
 
             full_response += chunk
-            yield f"data: {html_encode_whitespace(chunk)}\n\n"
+            yield f"data: <span>{html_encode_whitespace(chunk)}</span>\n\n"
 
-        yield "event: done\ndata: end\n\n"  # This triggers sse-close="done"
+        yield "event: done\ndata: \n\n"  # This triggers sse-close="done"
 
         session_history[session_id].append({"role": "bot", "text": full_response})
         del chat_sessions[msg_id]
