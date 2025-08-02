@@ -1,0 +1,10 @@
+.bot-stream {
+  color: blue;
+}
+.bot {
+  color: blue;
+  white-space: pre-line;
+}
+.user {
+  color: navy
+}

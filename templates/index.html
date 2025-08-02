@@ -5,19 +5,7 @@
   <title>Minimal Flask chat app</title>
   <script src="{{url_for('static', filename='js/htmx.min.js')}}"></script>
   <script src="{{url_for('static', filename='js/htmx-ext-sse.js')}}"></script>
-
-  <style>
-    .bot-stream {
-      color: blue;
-    }
-    .bot {
-      color: blue;
-      white-space: pre
-    }
-    .user {
-      color: navy
-    }
-  </style>
+  <link rel="stylesheet" href="{{url_for('static', filename='css/main.css')}}">
 </head>
 <body>
   <h1>Chat</h1>
@@ -28,9 +16,17 @@
     {% endfor %}
   </div>
 
-  <form id="chat-form" hx-post="/messages" hx-target="#chat-box" hx-swap="beforeend">
-    <textarea name="message" rows="3" cols="40" required></textarea><br>
-    <input type="hidden" name="session_id" value="{{ session_id }}">
+  <form id="chat-form"
+        hx-post="/messages/{{ session_id }}"
+        hx-target="#chat-box"
+        hx-on::after-request="this.reset()"
+        hx-swap="beforeend">
+    <textarea
+      onkeydown="if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); this.form.requestSubmit(); }"
+      name="message"
+      rows="3"
+      cols="40"
+      required></textarea><br>
     <button type="submit">Send</button>
   </form>
 
