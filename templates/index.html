@@ -21,13 +21,15 @@
         hx-target="#chat-box"
         hx-on::after-request="this.reset()"
         hx-swap="beforeend">
-    <textarea
-      onkeydown="if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); this.form.requestSubmit(); }"
-      name="message"
-      rows="3"
-      cols="40"
-      required></textarea><br>
-    <button type="submit">Send</button>
+    <div class="input-wrapper">
+      <textarea
+        onkeydown="if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); this.form.requestSubmit(); }"
+        name="message"
+        rows="3"
+        cols="40"
+        required></textarea><br>
+      <button type="submit">➤</button>
+    </div>
   </form>
 
 </body>

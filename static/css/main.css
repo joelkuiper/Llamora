@@ -1,15 +1,158 @@
+:root {
+  --color-bg: #f2f2f2;
+  --color-text: #444;
+  --color-heading: #555;
+  --color-shadow-dark: #d1d1d1;
+  --color-shadow-light: #ffffff;
+  --color-user-text: #555;
+  --color-user-bg: #f9f9f9;
+  --color-bot-text: #555;
+}
+
+body {
+  background: var(--color-bg);
+  font-family: "Segoe UI", sans-serif;
+  padding: 2rem;
+  color: var(--color-text);
+}
+
+h1 {
+  text-align: center;
+  font-weight: 500;
+  margin-bottom: 2rem;
+  color: var(--color-heading);
+}
+
+/* Chat container */
+#chat-box {
+  max-width: 600px;
+  margin: 0 auto 2rem auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 600px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.input-wrapper textarea {
+  flex: 1;
+  padding: 1rem;
+  border: none;
+  border-radius: 1rem;
+  resize: none;
+  font-size: 1rem;
+  background: var(--color-bg);
+  box-shadow: inset 2px 2px 5px var(--color-shadow-dark),
+              inset -2px -2px 5px var(--color-shadow-light);
+  outline: none;
+}
+
+.input-wrapper button {
+  padding: 0.75rem 1.25rem;
+  border: none;
+  border-radius: 1rem;
+  font-size: 1.2rem;
+  background: var(--color-bg);
+  box-shadow: 4px 4px 8px var(--color-shadow-dark),
+              -4px -4px 8px var(--color-shadow-light);
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.input-wrapper button:hover {
+  box-shadow: inset 2px 2px 5px var(--color-shadow-dark),
+              inset -2px -2px 5px var(--color-shadow-light);
+}
+
+/* User and bot message bubbles */
+.user, .bot, .bot-stream {
+  padding: 1rem 1.2rem;
+  border-radius: 1.2rem;
+  max-width: 90%;
+  line-height: 1.5;
+  font-size: 1rem;
+  box-shadow: inset 2px 2px 5px var(--color-shadow-dark),
+              inset -2px -2px 5px var(--color-shadow-light);
+  background: var(--color-bg);
+}
+
+.user {
+  align-self: flex-end;
+  text-align: right;
+  color: var(--color-user-text);
+  background: var(--color-user-bg);
+  box-shadow: 4px 4px 8px var(--color-shadow-dark),
+              -4px -4px 8px var(--color-shadow-light);
+}
+
+.bot, .bot-stream {
+  align-self: flex-start;
+  color: var(--color-bot-text);
+}
+
+/* Message streaming support */
 .bot-stream, .bot {
   word-wrap: break-word;
   word-break: break-word;
 }
 
 .bot {
-  white-space: pre-wrap;  /* optional: to support explicit newlines */
+  white-space: pre-wrap;
 }
 
+/* Form */
+form#chat-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+form textarea {
+  width: 100%;
+  max-width: 600px;
+  padding: 1rem;
+  border: none;
+  border-radius: 1rem;
+  resize: none;
+  font-size: 1rem;
+  background: var(--color-bg);
+  box-shadow: inset 2px 2px 5px var(--color-shadow-dark),
+              inset -2px -2px 5px var(--color-shadow-light);
+  outline: none;
+}
+
+form button {
+  margin-top: 1rem;
+  padding: 0.6rem 2rem;
+  border: none;
+  border-radius: 1rem;
+  font-size: 1rem;
+  color: var(--color-text);
+  background: var(--color-bg);
+  box-shadow: 4px 4px 8px var(--color-shadow-dark),
+              -4px -4px 8px var(--color-shadow-light);
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+form button:hover {
+  box-shadow: inset 2px 2px 5px var(--color-shadow-dark),
+              inset -2px -2px 5px var(--color-shadow-light);
+}
+
+/* Typing indicator */
 .typing-indicator {
   display: inline-block;
   animation: blink 1s step-start infinite;
+  font-weight: bold;
+  padding-left: 4px;
 }
 
 @keyframes blink {
