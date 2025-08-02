@@ -8,11 +8,14 @@ from langchain_core.runnables import RunnableSequence
 # Callbacks support token-wise streaming
 callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
 
+MAX_RESPONSE_LENGTH = 1024
+
 llm = LlamaCpp(
     model_path=os.environ["MODEL_GGUF"],
     temperature=0.8,
+    max_tokens=MAX_RESPONSE_LENGTH,
     verbose=True,
-    n_ctx=8192,
+    n_ctx=1024*9,
     streaming=True,
     n_gpu_layers=-1,
     callback_manager=callback_manager
@@ -35,7 +38,6 @@ def format_phi_history(history: list[dict]) -> str:
     return formatted
 
 MAX_TOKENS = llm.n_ctx
-RESERVED_FOR_RESPONSE = 512  # Conservative budget for the LLM output
 
 def trim_history_to_fit(history: list[dict]) -> list[dict]:
     """Trim oldest user/bot message pairs to stay within context."""
@@ -43,7 +45,7 @@ def trim_history_to_fit(history: list[dict]) -> list[dict]:
     while trimmed:
         formatted = format_phi_history(trimmed)
         token_count = llm.get_num_tokens(prompt.format(history=formatted))
-        if token_count + RESERVED_FOR_RESPONSE <= MAX_TOKENS:
+        if token_count + MAX_RESPONSE_LENGTH <= MAX_TOKENS:
             break
         # Remove the oldest user+bot pair (2 messages)
         if len(trimmed) >= 2:
