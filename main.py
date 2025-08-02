@@ -1,23 +1,29 @@
-from flask import Flask, render_template, request, Response, stream_with_context, make_response
-import requests
+from flask import (
+    Flask,
+    render_template,
+    request,
+    Response,
+    stream_with_context,
+    make_response,
+)
 import uuid
-import time
 import html
-
-from dotenv import load_dotenv
-load_dotenv()
-
 from llm_backend import stream_response
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 def html_encode_whitespace(text):
     """Encode text for safe streaming via SSE (preserve whitespace)."""
     return html.escape(text).replace("\n", "<br>")
 
+
 app = Flask(__name__)
 
 session_history = {}  # session_id -> [{"role": "user"/"bot", "text": ...}, ...]
 chat_sessions = {}  # uuid -> {'session_id': ...}
+
 
 @app.route("/")
 @app.route("/<session_id>")
@@ -27,6 +33,7 @@ def index(session_id=None):
 
     messages = session_history.get(session_id, [])
     return render_template("index.html", messages=messages, session_id=session_id)
+
 
 @app.route("/messages/<session_id>", methods=["POST"])
 def send_message(session_id):
@@ -38,13 +45,13 @@ def send_message(session_id):
     msg_id = uuid.uuid4().hex
     chat_sessions[msg_id] = {"session_id": session_id}
 
-    session_history.setdefault(session_id, []).append({
-        "role": "user",
-        "text": user_text})
+    session_history.setdefault(session_id, []).append(
+        {"role": "user", "text": user_text}
+    )
 
-    html = render_template("partials/placeholder.html",
-                            user_text=user_text,
-                            msg_id=msg_id)
+    html = render_template(
+        "partials/placeholder.html", user_text=user_text, msg_id=msg_id
+    )
 
     response = make_response(html)
     response.headers["HX-Push-Url"] = f"/{session_id}"
@@ -57,9 +64,12 @@ def sse_reply(msg_id):
     session_id = entry["session_id"]
 
     if not entry:
-        return Response("event: error\ndata: Invalid ID\n\n", mimetype="text/event-stream")
+        return Response(
+            "event: error\ndata: Invalid ID\n\n", mimetype="text/event-stream"
+        )
 
     history = session_history[session_id]
+
     def event_stream():
         full_response = ""
         first = True
