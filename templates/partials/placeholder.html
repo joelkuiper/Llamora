@@ -2,7 +2,7 @@
 <div id="bot-{{msg_id}}" class="bot-stream"
      hx-ext="sse" sse-close="done"
      sse-connect="/sse-reply/{{msg_id}}">
-  <span sse-swap="message" hx-swap="beforeend"></span>
+  <span sse-swap="message, done" hx-swap="beforeend"></span>
   <span id="typing-indicator"
         sse-swap="done"
         hx-swap="outerHTML">

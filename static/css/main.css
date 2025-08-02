@@ -148,6 +148,15 @@ form button:hover {
               inset -2px -2px 5px var(--color-shadow-light);
 }
 
+
+form textarea:disabled,
+form button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: inset 1px 1px 3px #bebebe,
+              inset -1px -1px 3px #ffffff;
+}
+
 /* Typing indicator */
 #typing-indicator {
   display: inline-block;

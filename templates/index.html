@@ -3,8 +3,10 @@
   <head>
     <meta charset="UTF-8">
     <title>Minimal Flask chat app</title>
-    <script src="{{url_for('static', filename='js/htmx.min.js')}}"></script>
-    <script src="{{url_for('static', filename='js/htmx-ext-sse.js')}}"></script>
+    <script src="{{url_for('static', filename='js/vendor/htmx.min.js')}}"></script>
+    <script src="{{url_for('static', filename='js/vendor/htmx-ext-sse.js')}}"></script>
+
+
     <link rel="stylesheet" href="{{url_for('static', filename='css/main.css')}}">
   </head>
   <body>
@@ -32,63 +34,6 @@
       </div>
     </form>
 
-    <script>
-      let autoScrollEnabled = true;
-      const SCROLL_THRESHOLD = 10;
-      let lastScrollY = window.scrollY;
-
-      function isUserNearBottom() {
-          const distanceFromBottom =
-                document.documentElement.scrollHeight - window.innerHeight - window.scrollY;
-          return distanceFromBottom < SCROLL_THRESHOLD;
-      }
-
-      function scrollToBottom() {
-          if (autoScrollEnabled) {
-              window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
-          }
-      }
-
-      function disableAutoScrollIfScrollingUp(currentY) {
-          if (currentY < lastScrollY - 2) {
-              autoScrollEnabled = false;
-          } else if (isUserNearBottom()) {
-              autoScrollEnabled = true;
-          }
-          lastScrollY = currentY;
-      }
-
-      // Listen to scroll position
-      window.addEventListener("scroll", () => {
-          disableAutoScrollIfScrollingUp(window.scrollY);
-      });
-
-      // Listen to mouse wheel up (trackpad or wheel)
-      window.addEventListener("wheel", (e) => {
-          if (e.deltaY < 0) {
-              autoScrollEnabled = false;
-          }
-      }, { passive: true });
-
-      // Touch devices
-      window.addEventListener("touchmove", () => {
-          if (window.scrollY < lastScrollY) {
-              autoScrollEnabled = false;
-          }
-          lastScrollY = window.scrollY;
-      }, { passive: true });
-
-      // Scroll on SSE updates
-      document.body.addEventListener("htmx:sseMessage", (evt) => {
-          if (evt.detail.type === "message") {
-              scrollToBottom();
-          }
-      });
-
-      // Scroll after user submits a message
-      document.getElementById("chat-box").addEventListener("htmx:afterSwap", () => {
-          scrollToBottom();
-      });
-    </script>
+    <script src="{{url_for('static', filename='js/main.js')}}"></script>
   </body>
 </html>

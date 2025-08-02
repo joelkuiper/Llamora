@@ -70,7 +70,7 @@ def sse_reply(msg_id):
                 first = False
 
             full_response += chunk
-            yield f"data: <span>{html_encode_whitespace(chunk)}</span>\n\n"
+            yield f"event: message\ndata: <span>{html_encode_whitespace(chunk)}</span>\n\n"
 
         yield "event: done\ndata: \n\n"  # This triggers sse-close="done"
 
