@@ -57,7 +57,7 @@ chain = prompt | llm
 def stream_response(history):
     """Call the LLM chain with user input and return the response."""
     trimmed_history = trim_history_to_fit(history)
-    formatted_history = format_phi_history(history)
+    formatted_history = format_phi_history(trimmed_history)
     print(formatted_history)
     for token in chain.stream({"history": formatted_history}):
         yield token
