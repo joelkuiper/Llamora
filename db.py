@@ -30,6 +30,10 @@ class HistoryDB:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
                 );
+
+                CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages(session_id);
+                CREATE INDEX IF NOT EXISTS idx_messages_session_time ON messages(session_id, created_at);
+                CREATE INDEX IF NOT EXISTS idx_sessions_session_id ON sessions(id);
                 """
             )
 
