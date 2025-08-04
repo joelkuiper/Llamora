@@ -29,11 +29,11 @@
   --inset-shadow-disabled: inset 1px 1px 3px #bebebe,
                            inset -1px -1px 3px #ffffff;
 }
-
 body {
   background: var(--color-bg);
   font-family: var(--font-base);
   padding: var(--spacing-xl);
+  margin-bottom: 3em;
   color: var(--color-text);
 }
 
@@ -119,6 +119,53 @@ h1 {
 .bot {
   white-space: pre-wrap;
 }
+
+.button-bar {
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  max-width: 600px;
+  margin: 0 auto var(--spacing-md);
+}
+
+.button-bar a,
+.button-bar button {
+  display: block;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  box-shadow: var(--raised-shadow);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--color-text);
+}
+
+.button-bar a svg,
+.button-bar button svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  display: block;
+}
+
+
+.button-bar a:hover,
+.button-bar button:hover {
+  box-shadow: var(--inset-shadow);
+}
+
+.button-bar a:active,
+.button-bar button:active {
+  animation: pulse 0.2s ease-in-out;
+}
+
+.button-bar a[disabled] {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: default;
+}
+
+
 
 form#chat-form {
   display: flex;

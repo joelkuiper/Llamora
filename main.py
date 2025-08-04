@@ -2,6 +2,7 @@ from flask import (
     Flask,
     render_template,
     request,
+    redirect,
     Response,
     stream_with_context,
     make_response,
@@ -31,10 +32,38 @@ db = HistoryDB()
 @app.route("/<session_id>")
 def index(session_id=None):
     if not session_id:
-        session_id = uuid.uuid4().hex
+        return redirect(f"/{db.create_session()}", code=302)
 
     history = db.get_session(session_id)
-    return render_template("index.html", history=history, session_id=session_id)
+
+    prev_id = db.get_adjacent_session(session_id, "prev")
+    next_id = db.get_adjacent_session(session_id, "next")
+
+    html = render_template(
+        "index.html",
+        history=history,
+        session_id=session_id,
+        prev_id=prev_id,
+        next_id=next_id,
+    )
+
+    response = make_response(html)
+    return response
+
+
+@app.route("/session/delete/<session_id>", methods=["DELETE"])
+def delete_session(session_id):
+    response = make_response()
+    next_url = "/" + (
+        db.get_adjacent_session(session_id, "prev")
+        or db.get_adjacent_session("next")
+        or db.create_session()
+    )
+
+    db.delete_session(session_id)
+
+    response.headers["HX-Location"] = next_url
+    return response
 
 
 @app.route("/messages/<session_id>", methods=["POST"])

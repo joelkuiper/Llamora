@@ -73,7 +73,7 @@ class LLMEngine:
             self.done = threading.Event()
 
     def format_history(self, history: list[dict]) -> str:
-        """Convert chat history into LLM-compatible formatted prompt string."""
+        """Convert chat history into Phi instruct-compatible prompt string."""
         return "".join(
             f"<|{msg['role']}|>\n{msg['content']}<|end|>\n" for msg in history
         )
@@ -84,7 +84,8 @@ class LLMEngine:
         for message in reversed(history):
             temp = [message] + trimmed
             formatted = self.format_history(temp)
-            token_count = self.llm.get_num_tokens(self.prompt.format(history=formatted))
+            prompt = self.prompt.format(history=formatted)
+            token_count = self.llm.get_num_tokens(prompt)
             if token_count + self.MAX_RESPONSE_LENGTH > self.MAX_TOKENS:
                 break
             trimmed = temp

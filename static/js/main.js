@@ -1,80 +1,77 @@
-// Disable form after submit
-const form = document.getElementById("chat-form");
-const textarea = form.querySelector("textarea");
-const button = form.querySelector("button");
+if (!window.chatAppInitialized) {
+  window.chatAppInitialized = true;
 
-function setFormEnabled(enabled) {
-  textarea.disabled = !enabled;
-  button.disabled = !enabled;
-  if (enabled) textarea.focus();
-}
+  // Disable form after submit
+  const form = document.getElementById("chat-form");
+  const textarea = form.querySelector("textarea");
+  const button = form.querySelector("button");
 
-// Disable on request
-form.addEventListener("htmx:afterRequest", () => {
-  setFormEnabled(false);
-});
-
-// Re-enable on SSE close (streaming finished)
-document.body.addEventListener("htmx:sseMessage", (evt) => {
-  if(evt.detail.type === "done") {
-    setFormEnabled(true);
+  function setFormEnabled(enabled) {
+    textarea.disabled = !enabled;
+    button.disabled = !enabled;
+    if (enabled) textarea.focus();
   }
-});
 
-// Scroll to bottom logic
-let autoScrollEnabled = true;
-const SCROLL_THRESHOLD = 10;
-let lastScrollY = window.scrollY;
+  form.addEventListener("htmx:afterRequest", () => {
+    setFormEnabled(false);
+  });
 
-function isUserNearBottom() {
-  const distanceFromBottom =
-        document.documentElement.scrollHeight - window.innerHeight - window.scrollY;
-  return distanceFromBottom < SCROLL_THRESHOLD;
-}
+  document.body.addEventListener("htmx:sseMessage", (evt) => {
+    if (evt.detail.type === "done") {
+      setFormEnabled(true);
+    }
+  });
 
-function scrollToBottom() {
-  if (autoScrollEnabled) {
-    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
+  // Scroll logic
+  let autoScrollEnabled = true;
+  const SCROLL_THRESHOLD = 10;
+  let lastScrollY = window.scrollY;
+
+  function isUserNearBottom() {
+    const distanceFromBottom =
+      document.documentElement.scrollHeight - window.innerHeight - window.scrollY;
+    return distanceFromBottom < SCROLL_THRESHOLD;
   }
-}
 
-function disableAutoScrollIfScrollingUp(currentY) {
-  if (currentY < lastScrollY - 2) {
-    autoScrollEnabled = false;
-  } else if (isUserNearBottom()) {
-    autoScrollEnabled = true;
+  function scrollToBottom() {
+    if (autoScrollEnabled) {
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
+    }
   }
-  lastScrollY = currentY;
-}
 
-// Listen to scroll position
-window.addEventListener("scroll", () => {
-  disableAutoScrollIfScrollingUp(window.scrollY);
-});
-
-// Listen to mouse wheel up (trackpad or wheel)
-window.addEventListener("wheel", (e) => {
-  if (e.deltaY < 0) {
-    autoScrollEnabled = false;
+  function disableAutoScrollIfScrollingUp(currentY) {
+    if (currentY < lastScrollY - 2) {
+      autoScrollEnabled = false;
+    } else if (isUserNearBottom()) {
+      autoScrollEnabled = true;
+    }
+    lastScrollY = currentY;
   }
-}, { passive: true });
 
-// Touch devices
-window.addEventListener("touchmove", () => {
-  if (window.scrollY < lastScrollY) {
-    autoScrollEnabled = false;
-  }
-  lastScrollY = window.scrollY;
-}, { passive: true });
+  window.addEventListener("scroll", () => {
+    disableAutoScrollIfScrollingUp(window.scrollY);
+  });
 
-// Scroll on SSE updates
-document.body.addEventListener("htmx:sseMessage", (evt) => {
-  if (evt.detail.type === "message") {
+  window.addEventListener("wheel", (e) => {
+    if (e.deltaY < 0) {
+      autoScrollEnabled = false;
+    }
+  }, { passive: true });
+
+  window.addEventListener("touchmove", () => {
+    if (window.scrollY < lastScrollY) {
+      autoScrollEnabled = false;
+    }
+    lastScrollY = window.scrollY;
+  }, { passive: true });
+
+  document.body.addEventListener("htmx:sseMessage", (evt) => {
+    if (evt.detail.type === "message") {
+      scrollToBottom();
+    }
+  });
+
+  document.getElementById("chat-box").addEventListener("htmx:afterSwap", () => {
     scrollToBottom();
-  }
-});
-
-// Scroll after user submits a message
-document.getElementById("chat-box").addEventListener("htmx:afterSwap", () => {
-  scrollToBottom();
-});
+  });
+}
