@@ -11,7 +11,7 @@
 
 This project was built as a **hands-on experiment** in combining:
 
-- 🧠 A local **LLM backend** (via [llama.cpp](https://github.com/ggml-org/llama.cpp) and [LangChain](https://www.langchain.com/)
+- 🧠 A local **LLM backend** (via [llama.cpp](https://github.com/ggml-org/llama.cpp) and [LangChain](https://www.langchain.com/))
 - ⚡ **HTMX** for seamless front-end interactivity without JavaScript frameworks
 - 🌐 **Flask** for backend routing and SSE streaming
 - 💅 A **Neumorphic UI** for minimal styling
@@ -19,21 +19,23 @@ This project was built as a **hands-on experiment** in combining:
 It’s a **prototype**, intended for exploring techniques like:
 
 - Streaming LLM output over Server-Sent Events (SSE)
-- Managing chat history by session
+- Managing chat history by session (in SQLite)
 - Coordinating LLM calls with a safe in-process queue
 - Building interactive web apps with minimal frontend JavaScript using [htmx](https://htmx.org/)
-
+ 
 ---
 
-## ❌ Not for Production
+## 🚫 Not for Production
 
-**Please note:**
+**This project is *not* suitable for deployment.**
 
-- There is **no authentication**
-- Error handling is **minimal and cosmetic**
-- The LLM call pipeline is **single-threaded and blocking**
-- The design is optimized for learning, **not scalability**
-- The security model is **nonexistent** (e.g., arbitrary input is accepted)
+- ❌ No authentication or session protection
+- ❌ Very basic error handling
+- ❌ Blocking, single-threaded queue for LLM calls
+- ❌ Input is not sanitized or restricted
+- ❌ SSE and stream parsing is naive
+
+It’s meant for educational use only.
 
 ---
 
@@ -42,14 +44,14 @@ It’s a **prototype**, intended for exploring techniques like:
 ### Requirements
 
 - [uv](https://docs.astral.sh/uv/)
-- a compatible GGUF LLM model
+- a compatible GGUF LLM model (e.g. Phi-3.5)
 - a relatively fast computer (ideally with a strong GPU)
 
 ### Run
 Download [Phi-3.5-mini-instruct-GGUF](https://huggingface.co/MaziyarPanahi/Phi-3.5-mini-instruct-GGUF) (tested with the [Q5_K_M](https://huggingface.co/MaziyarPanahi/Phi-3.5-mini-instruct-GGUF/blob/main/Phi-3.5-mini-instruct.Q5_K_M.gguf) quantization).
-Set the `CHAT_MODEL_GGUF`environment variable to the model path (or update the .env file).
+Set the `CHAT_MODEL_GGUF` environment variable to the full path of the `.gguf` file. Or edit the `.env` file to include: `CHAT_MODEL_GGUF=/path/to/your/model.gguf`
 
-Install [uv](https://docs.astral.sh/uv/#installation).
+Install [uv](https://docs.astral.sh/uv/#installation). Then run:
 
 ```bash
 uv run flask --app main run
