@@ -33,7 +33,6 @@ It’s a **prototype**, intended for exploring techniques like:
 - ❌ Very basic error handling
 - ❌ Blocking, single-threaded queue for LLM calls
 - ❌ Input is not sanitized or restricted
-- ❌ SSE and stream parsing is naive
 
 It’s meant for educational use only.
 
@@ -59,7 +58,7 @@ uv run flask --app main run
 
 Set `FLASK_DEBUG=1` for automatic reloading on code changes.
 
-For CUDA support (Nvidia GPU) you must reinstall the [llama-cpp-python](https://github.com/inference-sh/llama-cpp-python) library:
+For CUDA support (Nvidia GPU) you must reinstall the [llama-cpp-python](https://github.com/inference-sh/llama-cpp-python) library (and have the CUDA toolkit installed):
 
 ``` bash
 CMAKE_ARGS="\
