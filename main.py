@@ -6,13 +6,16 @@ from flask import (
     stream_with_context,
     make_response,
 )
+import os
 import uuid
 import html
-import llm_backend as llm
+from llm_backend import LLMEngine
 from db import HistoryDB
 from dotenv import load_dotenv
 
 load_dotenv()
+
+llm = LLMEngine(model_path=os.environ["CHAT_MODEL_GGUF"])
 
 
 def html_encode_whitespace(text):

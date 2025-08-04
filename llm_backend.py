@@ -1,75 +1,105 @@
-import os
+import threading
+import textwrap
+import queue
 from langchain_community.llms import LlamaCpp
 from langchain.chains import LLMChain
 from langchain_core.prompts import PromptTemplate
 from langchain_core.callbacks import CallbackManager, StreamingStdOutCallbackHandler
-from langchain_core.runnables import RunnableSequence
-
-# Callbacks support token-wise streaming
-callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
-
-MAX_RESPONSE_LENGTH = 1024
-
-llm = LlamaCpp(
-    model_path=os.environ["CHAT_MODEL_GGUF"],
-    temperature=0.8,
-    max_tokens=MAX_RESPONSE_LENGTH,
-    verbose=True,
-    n_ctx=1024 * 9,  # 9216
-    streaming=True,
-    n_gpu_layers=-1,
-    callback_manager=callback_manager,
-)
-
-template = """<|system|>
-You are a helpful assistant. Keep your replies short, clear, and to the point.<|end|>
-{history}
-<|assistant|>"""
-
-prompt = PromptTemplate.from_template(template)
 
 
-def format_phi_history(history: list[dict]) -> str:
-    """Convert chat history into Phi-compatible text block."""
-    formatted = ""
-    for msg in history:
-        role = msg["role"]
-        content = msg["content"]
-        formatted += f"<|{role}|>\n{content}<|end|>\n"
-    return formatted
+class LLMEngine:
+    """Handles queuing, streaming, and history formatting for an LLM chat interface."""
 
+    def __init__(self, model_path: str, max_workers: int = 1):
+        self.MAX_RESPONSE_LENGTH = 1024
+        self.model_path = model_path
+        self.llm = self._load_model()
+        self.MAX_TOKENS = self.llm.n_ctx
+        self.prompt = self._build_prompt()
+        self.chain = self.prompt | self.llm
 
-MAX_TOKENS = llm.n_ctx
+        self._request_queue = queue.Queue()
+        self._start_workers(max_workers)
 
+    def _load_model(self):
+        return LlamaCpp(
+            model_path=self.model_path,
+            temperature=0.8,
+            max_tokens=self.MAX_RESPONSE_LENGTH,
+            verbose=True,
+            n_ctx=1024 * 9,
+            streaming=True,
+            n_gpu_layers=-1,
+            callback_manager=CallbackManager([StreamingStdOutCallbackHandler()]),
+        )
 
-def trim_history_to_fit(
-    history: list[dict],
-    max_tokens=MAX_TOKENS,
-    max_response_tokens=MAX_RESPONSE_LENGTH,
-) -> list[dict]:
-    """Trim the oldest entries in history to fit within context window."""
-    trimmed = []
+    def _build_prompt(self):
+        template = textwrap.dedent(
+            """\
+            <|system|>
+            You are a helpful assistant. Keep your replies short, clear, and to the point.<|end|>
+            {history}
+            <|assistant|>"""
+        )
 
-    # Work backwards so we prioritize the most recent context
-    for message in reversed(history):
-        # Temporarily prepend to a copy to test the size
-        temp = [message] + trimmed
-        formatted = format_phi_history(temp)
-        token_count = llm.get_num_tokens(prompt.format(history=formatted))
+        return PromptTemplate.from_template(template)
 
-        if token_count + max_response_tokens > max_tokens:
-            break
-        trimmed = temp
+    def _start_workers(self, count: int):
+        for _ in range(count):
+            t = threading.Thread(target=self._worker_loop, daemon=True)
+            t.start()
 
-    return trimmed
+    def _worker_loop(self):
+        while True:
+            req = self._request_queue.get()
+            if req is None:
+                break
+            try:
+                trimmed = self._trim_history(req.history)
+                formatted = self.format_history(trimmed)
+                for token in self.chain.stream({"history": formatted}):
+                    req.output_queue.put(token)
+            except Exception as e:
+                req.output_queue.put(f"[Error: {str(e)}]")
+            finally:
+                req.output_queue.put(None)
+                req.done.set()
+                self._request_queue.task_done()
 
+    class Request:
+        def __init__(self, history):
+            self.history = history
+            self.output_queue = queue.Queue()
+            self.done = threading.Event()
 
-chain = prompt | llm
+    def format_history(self, history: list[dict]) -> str:
+        """Convert chat history into LLM-compatible formatted prompt string."""
+        return "".join(
+            f"<|{msg['role']}|>\n{msg['content']}<|end|>\n" for msg in history
+        )
 
+    def _trim_history(self, history: list[dict]) -> list[dict]:
+        """Trim oldest messages to fit within context window."""
+        trimmed = []
+        for message in reversed(history):
+            temp = [message] + trimmed
+            formatted = self.format_history(temp)
+            token_count = self.llm.get_num_tokens(self.prompt.format(history=formatted))
+            if token_count + self.MAX_RESPONSE_LENGTH > self.MAX_TOKENS:
+                break
+            trimmed = temp
+        return trimmed
 
-def stream_response(history):
-    """Call the LLM chain with user input and return the response."""
-    trimmed_history = trim_history_to_fit(history)
-    formatted_history = format_phi_history(trimmed_history)
-    for token in chain.stream({"history": formatted_history}):
-        yield token
+    def stream_response(self, history: list[dict]):
+        """Submit a request to the queue and return a generator for its output."""
+        req = self.Request(history)
+        self._request_queue.put(req)
+
+        def generator():
+            while True:
+                token = req.output_queue.get()
+                if token is None:
+                    break
+                yield token
+
+        return generator()
