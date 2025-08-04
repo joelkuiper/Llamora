@@ -22,7 +22,7 @@ It’s a **prototype**, intended for exploring techniques like:
 - Managing chat history by session (in SQLite)
 - Coordinating LLM calls with a safe in-process queue
 - Building interactive web apps with minimal frontend JavaScript using [htmx](https://htmx.org/)
- 
+
 ---
 
 ## 🚫 Not for Production
@@ -58,3 +58,14 @@ uv run flask --app main run
 ```
 
 Set `FLASK_DEBUG=1` for automatic reloading on code changes.
+
+For CUDA support (Nvidia GPU) you must reinstall the [llama-cpp-python](https://github.com/inference-sh/llama-cpp-python) library:
+
+``` bash
+CMAKE_ARGS="\
+ -DGGML_CUDA=on \
+ -DLLAMA_BUILD_TESTS=OFF \
+ -DLLAMA_BUILD_EXAMPLES=OFF \
+ -DLLAMA_BUILD_TOOLS=OFF \
+uv add --force-reinstall --no-cache-dir llama-cpp-python
+```
