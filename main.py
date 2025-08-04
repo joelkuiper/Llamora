@@ -84,9 +84,7 @@ def send_message(session_id):
         session_id=session_id,
     )
 
-    response = make_response(html)
-    response.headers["HX-Push-Url"] = f"/{session_id}"
-    return response
+    return make_response(html)
 
 
 @app.route("/sse-reply/<session_id>/<msg_id>")
