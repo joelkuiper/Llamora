@@ -17,7 +17,7 @@
   --spacing-sm: 0.6rem;
   --spacing-md: 0.75rem;
   --spacing-lg: 1rem;
-  --spacing-xl: 1.2rem;
+  --spacing-xl: 1.5rem;
 
   --font-base: sans-serif;
   --font-size: 1rem;
@@ -120,93 +120,131 @@ h1 {
   white-space: pre-wrap;
 }
 
+.chat-controls {
+  max-width: 600px;
+  margin: 0 auto var(--spacing-xl);
+  background: var(--color-bg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--raised-shadow);
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  transition: box-shadow 0.3s ease;
+}
+
+/* Unified button bar inside .chat-controls */
 .button-bar {
   display: flex;
-  justify-content: center;
-  gap: var(--spacing-xs);
-  max-width: 600px;
-  margin: 0 auto var(--spacing-md);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-bg);
+  box-shadow: none;
+  margin: 0;
 }
 
+/* Buttons styled as a group */
 .button-bar a,
 .button-bar button {
-  display: block;
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border: none;
-  border-radius: var(--radius-sm);
-  background: var(--color-bg);
-  box-shadow: var(--raised-shadow);
-  cursor: pointer;
-  transition: all 0.2s ease;
+  all: unset;
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: var(--spacing-sm);
+  font-size: 1rem;
   color: var(--color-text);
+  background: var(--color-bg);
+  transition: background 0.2s ease;
+  cursor: pointer;
+  border-right: 1px solid var(--shadow-dark);
 }
 
-.button-bar a svg,
-.button-bar button svg {
-  width: 1.1rem;
-  height: 1.1rem;
-  display: block;
+.button-bar a:last-child,
+.button-bar button:last-child {
+  border-right: none;
 }
 
+.button-bar a:first-child,
+.button-bar button:first-child {
+  border-top-left-radius: var(--radius-sm);
+  border-bottom-left-radius: var(--radius-sm);
+}
+
+.button-bar a:last-child,
+.button-bar button:last-child {
+  border-top-right-radius: var(--radius-sm);
+  border-bottom-right-radius: var(--radius-sm);
+}
 
 .button-bar a:hover,
 .button-bar button:hover {
-  box-shadow: var(--inset-shadow);
+  background: #e0e0e0;
 }
 
-.button-bar a:active,
-.button-bar button:active {
-  animation: pulse 0.2s ease-in-out;
+.button-bar .delete:hover {
+  color: #a00;
 }
 
-.button-bar a[disabled] {
-  opacity: 0.5;
+.button-bar a[disabled],
+.button-bar button[disabled] {
+  opacity: 0.4;
   pointer-events: none;
   cursor: default;
 }
 
-
-
-form#chat-form {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+.button-bar svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  stroke: currentColor;
+  fill: none;
 }
 
-form textarea {
-  font-family: var(--font-base);
-  width: 100%;
-  max-width: 600px;
+/* Input field + send button */
+.input-wrapper {
+  display: flex;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-sm);
+}
+
+.input-wrapper textarea {
+  flex: 1;
   padding: var(--spacing-lg);
+  font-size: var(--font-size);
+  background: var(--color-bg);
   border: none;
   border-radius: var(--radius-md);
   resize: none;
-  font-size: var(--font-size);
-  background: var(--color-bg);
-  box-shadow: var(--inset-shadow);
   outline: none;
+  box-shadow: var(--inset-shadow);
+  transition: box-shadow 0.3s ease-in-out;
 }
 
-form button {
-  margin-top: var(--spacing-md);
-  padding: var(--spacing-sm) var(--spacing-lg);
+.input-wrapper textarea:focus {
+  box-shadow:
+    inset 1px 1px 3px var(--shadow-dark),
+    inset -1px -1px 3px var(--shadow-light),
+    0 0 4px rgba(0, 0, 0, 0.05);
+}
+
+.input-wrapper button {
+  padding: var(--spacing-md) var(--spacing-lg);
+  font-size: 1.2rem;
+  background: var(--color-bg);
   border: none;
   border-radius: var(--radius-md);
-  font-size: var(--font-size);
-  color: var(--color-text);
-  background: var(--color-bg);
-  box-shadow: var(--raised-shadow);
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-}
-
-form button:hover {
   box-shadow: var(--inset-shadow);
+  cursor: pointer;
+  transition: box-shadow 0.2s ease-in-out, opacity 0.2s ease;
 }
 
-form textarea:disabled,
-form button:disabled {
-  opacity: 0.6;
+.input-wrapper button:hover {
+  box-shadow: var(--inset-shadow-disabled);
+}
+
+.input-wrapper button:disabled,
+.input-wrapper textarea:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
   box-shadow: var(--inset-shadow-disabled);
 }
