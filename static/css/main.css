@@ -33,8 +33,8 @@ body {
   background: var(--color-bg);
   font-family: var(--font-base);
   padding: var(--spacing-xl);
-  margin-bottom: 3em;
   color: var(--color-text);
+  padding: 0;
 }
 
 h1 {
@@ -50,6 +50,10 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
+}
+
+#chat-box .error {
+  color: darkred;
 }
 
 .input-wrapper {
@@ -254,6 +258,22 @@ h1 {
   animation: blink 1s step-start infinite;
   font-weight: bold;
   padding-left: 4px;
+}
+
+/* Errors */
+.error-box {
+  background-color: #ffe5e5;
+  color: #a00000;
+  padding: var(--spacing-sm) var(--spacing-md);
+  text-align: center;
+  font-weight: bold;
+  border-bottom: 2px solid #a00000;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  font-family: var(--font-base);
+  margin: -0.5em;
 }
 
 /* Animations */

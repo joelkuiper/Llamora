@@ -60,7 +60,9 @@ class LLMEngine:
                 for token in self.chain.stream({"history": formatted}):
                     req.output_queue.put(token)
             except Exception as e:
-                req.output_queue.put(f"[Error: {str(e)}]")
+                error_msg = f"⚠️ Error: {str(e)}"
+                req.output_queue.put({"type": "error", "data": error_msg})
+
             finally:
                 req.output_queue.put(None)
                 req.done.set()

@@ -1,6 +1,7 @@
 from flask import (
     Flask,
     render_template,
+    render_template_string,
     request,
     redirect,
     Response,
@@ -53,6 +54,7 @@ def index(session_id=None):
 
 @app.route("/session/delete/<session_id>", methods=["DELETE"])
 def delete_session(session_id):
+
     next_url = "/" + (
         db.get_adjacent_session(session_id, "next")
         or db.get_adjacent_session("prev")
@@ -99,17 +101,35 @@ def sse_reply(msg_id, session_id):
     def event_stream():
         full_response = ""
         first = True
+        error_occurred = False
 
-        for chunk in llm.stream_response(history):
-            if first:
-                chunk = chunk.lstrip()
-                first = False
+        try:
+            for chunk in llm.stream_response(history):
+                if isinstance(chunk, dict) and chunk.get("type") == "error":
+                    yield f"event: message\ndata: <span class='error'>{chunk['data']}</span>\n\n"
+                    error_occurred = True
+                    break
 
-            full_response += chunk
-            yield f"event: message\ndata: <span>{html_encode_whitespace(chunk)}</span>\n\n"
+                if first:
+                    chunk = chunk.lstrip()
+                    first = False
 
-        yield "event: done\ndata: \n\n"  # This triggers sse-close="done"
-
-        db.append(session_id, "assistant", full_response)
+                full_response += chunk
+                yield f"event: message\ndata: <span>{html_encode_whitespace(chunk)}</span>\n\n"
+        except Exception as e:
+            yield f"event: message\ndata: <span class='error'>⚠️ {str(e)}</span>\n\n"
+            error_occurred = True
+        finally:
+            yield "event: done\ndata: \n\n"
+            if not error_occurred and full_response.strip():
+                db.append(session_id, "assistant", full_response)
 
     return Response(stream_with_context(event_stream()), mimetype="text/event-stream")
+
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    return (
+        render_template_string("<div class='error-box'>Something went wrong.</div>"),
+        500,
+    )
