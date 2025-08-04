@@ -16,7 +16,7 @@
   --spacing-xs: 0.5rem;
   --spacing-sm: 0.6rem;
   --spacing-md: 0.75rem;
-  --spacing-lg: 1rem;
+  --spacing-lg: 1.1rem;
   --spacing-xl: 1.5rem;
 
   --font-base: sans-serif;
@@ -186,7 +186,7 @@ h1 {
   color: #a00;
 }
 
-.button-bar a[disabled],
+.button-bar a.disabled,
 .button-bar button[disabled] {
   opacity: 0.4;
   pointer-events: none;

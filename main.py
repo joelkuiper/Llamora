@@ -53,17 +53,15 @@ def index(session_id=None):
 
 @app.route("/session/delete/<session_id>", methods=["DELETE"])
 def delete_session(session_id):
-    response = make_response()
     next_url = "/" + (
-        db.get_adjacent_session(session_id, "prev")
-        or db.get_adjacent_session("next")
+        db.get_adjacent_session(session_id, "next")
+        or db.get_adjacent_session("prev")
         or db.create_session()
     )
 
     db.delete_session(session_id)
 
-    response.headers["HX-Location"] = next_url
-    return response
+    return "", 204, {"HX-Redirect": next_url}
 
 
 @app.route("/messages/<session_id>", methods=["POST"])
