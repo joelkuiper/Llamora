@@ -1,16 +1,58 @@
-CMAKE_ARGS="-DGGML_CUDA=on -DLLAVA_BUILD=off \
-            -DLLAMA_BUILD_EXAMPLES=OFF \
-            -DLLAMA_BUILD_TESTS=OFF" FORCE_CMAKE=1 CUDA_TOOLKIT_ROOT_DIR=/usr/lib/cuda \
-uv pip install llama-cpp-python
+# ⚠️ Streaming Chatbot UI
+**A minimal Flask + HTMX + LangChain interface for learning purposes only**
 
-FLASK_DEBUG=1 uv run flask --app main run 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
+> ❗ **This project is a personal learning experiment. It is not production-ready. Do not deploy this without major modifications.**
+
+![./doc/screenshot.png]
+
+---
+
+## About
+
+This project was built as a **hands-on experiment** in combining:
+
+- 🧠 A local **LLM backend** (via llama.cpp and LangChain)
+- ⚡ **HTMX** for seamless front-end interactivity without JavaScript frameworks
+- 🌐 **Flask** for backend routing and SSE streaming
+- 💅 A **Neumorphic UI** for minimal styling
+
+It’s a **prototype**, intended for exploring techniques like:
+
+- Streaming LLM output over Server-Sent Events (SSE)
+- Managing chat history by session
+- Coordinating LLM calls with a safe in-process queue
+- Building interactive web apps with minimal frontend JavaScript
+
+---
+
+## ❌ Not for Production
+
+**Please note:**
+
+- There is **no authentication**
+- Error handling is **minimal and cosmetic**
+- The LLM call pipeline is **single-threaded and blocking**
+- The design is optimized for learning and clarity, **not scalability**
+- The security model is **nonexistent** (e.g., arbitrary input is accepted)
+
+---
+
+## Running the App
+
+### Requirements
+
+- [uv](https://docs.astral.sh/uv/)
+- a compatible model
+- a relatively fast computer (ideally with a strong GPU)
+
+### Run
+Download [Phi-3.5-mini-instruct-GGUF](https://huggingface.co/MaziyarPanahi/Phi-3.5-mini-instruct-GGUF) (tested with the [Q5_K_M](https://huggingface.co/MaziyarPanahi/Phi-3.5-mini-instruct-GGUF/blob/main/Phi-3.5-mini-instruct.Q5_K_M.gguf) quantization).
+Set the `CHAT_MODEL_GGUF`environment variable to the model path (or update the .env file).
+
+Install [uv](https://docs.astral.sh/uv/#installation).
+
+```bash
+uv run flask --app main run
+```
+
+Set `FLASK_DEBUG=1` for automatic reloading on code changes.
