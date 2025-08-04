@@ -1,9 +1,9 @@
-# ⚠️ Streaming Chatbot UI
-**A minimal Flask + HTMX + LangChain interface for learning purposes only**
+# ⚠️ Minimal chatbot
+**A minimal Flask + HTMX + LangChain (with llama.cpp) interface for learning purposes only**
 
 > ❗ **This project is a personal learning experiment. It is not production-ready. Do not deploy this without major modifications.**
 
-![./doc/screenshot.png]
+![screenshot](./doc/screenshot.png)
 
 ---
 
@@ -11,7 +11,7 @@
 
 This project was built as a **hands-on experiment** in combining:
 
-- 🧠 A local **LLM backend** (via llama.cpp and LangChain)
+- 🧠 A local **LLM backend** (via [llama.cpp](https://github.com/ggml-org/llama.cpp) and [LangChain](https://www.langchain.com/)
 - ⚡ **HTMX** for seamless front-end interactivity without JavaScript frameworks
 - 🌐 **Flask** for backend routing and SSE streaming
 - 💅 A **Neumorphic UI** for minimal styling
@@ -21,7 +21,7 @@ It’s a **prototype**, intended for exploring techniques like:
 - Streaming LLM output over Server-Sent Events (SSE)
 - Managing chat history by session
 - Coordinating LLM calls with a safe in-process queue
-- Building interactive web apps with minimal frontend JavaScript
+- Building interactive web apps with minimal frontend JavaScript using [htmx](https://htmx.org/)
 
 ---
 
@@ -32,7 +32,7 @@ It’s a **prototype**, intended for exploring techniques like:
 - There is **no authentication**
 - Error handling is **minimal and cosmetic**
 - The LLM call pipeline is **single-threaded and blocking**
-- The design is optimized for learning and clarity, **not scalability**
+- The design is optimized for learning, **not scalability**
 - The security model is **nonexistent** (e.g., arbitrary input is accepted)
 
 ---
@@ -42,7 +42,7 @@ It’s a **prototype**, intended for exploring techniques like:
 ### Requirements
 
 - [uv](https://docs.astral.sh/uv/)
-- a compatible model
+- a compatible GGUF LLM model
 - a relatively fast computer (ideally with a strong GPU)
 
 ### Run
