@@ -57,7 +57,7 @@ def delete_session(session_id):
 
     next_url = "/" + (
         db.get_adjacent_session(session_id, "next")
-        or db.get_adjacent_session("prev")
+        or db.get_adjacent_session(session_id, "prev")
         or db.create_session()
     )
 
