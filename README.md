@@ -33,7 +33,6 @@ It’s a **prototype**, intended for exploring techniques like:
 - ❌ Very basic error handling
 - ❌ Blocking, single-threaded queue for LLM calls
 - ❌ Input is not sanitized or restricted
-- ❌ SSE and stream parsing is naive
 
 It’s meant for educational use only.
 
