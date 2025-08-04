@@ -1,4 +1,4 @@
-# ⚠️ Minimal chatbot
+# Minimal chatbot
 **A minimal Flask + HTMX + LangChain (with llama.cpp) interface for learning purposes only**
 
 > ❗ **This project is a personal learning experiment. It is not production-ready. Do not deploy this without major modifications.**
