@@ -1,6 +1,6 @@
 import os
 import base64
-from flask import request
+from flask import request, redirect
 from functools import wraps
 from nacl import secret
 from app import db

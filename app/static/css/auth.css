@@ -48,7 +48,8 @@
   background: var(--color-bg);
   box-shadow: var(--raised-shadow);
   cursor: pointer;
-  transition: all 0.2s ease-in-out;
+  transition: box-shadow 0.2s ease-in-out;
+  margin-top: 1em;
 }
 
 .login-container button:hover {

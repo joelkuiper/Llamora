@@ -1,5 +1,6 @@
 from flask import Flask
 from dotenv import load_dotenv
+from flask_wtf import CSRFProtect
 import os
 from db import LocalDB
 
@@ -9,6 +10,9 @@ db = LocalDB()
 
 def create_app():
     app = Flask(__name__)
+    app.secret_key = os.getenv("CHAT_SECRET_KEY")
+
+    csrf = CSRFProtect(app)
 
     from .routes.auth import auth_bp
     from .routes.chat import chat_bp
