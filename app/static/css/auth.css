@@ -1,0 +1,76 @@
+/* Login form styling */
+.login-container {
+  max-width: 400px;
+  margin: 10vh auto;
+  padding: var(--spacing-xl);
+  background: var(--color-bg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--raised-shadow);
+  font-family: var(--font-base);
+}
+
+.login-container h1 {
+  text-align: center;
+  color: var(--color-heading);
+  margin-bottom: var(--spacing-lg);
+}
+
+.login-container form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.login-container input {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size);
+  background: var(--color-bg);
+  box-shadow: var(--inset-shadow);
+  transition: box-shadow 0.3s ease-in-out;
+}
+
+.login-container input:focus {
+  outline: none;
+  box-shadow:
+    inset 1px 1px 3px var(--shadow-dark),
+    inset -1px -1px 3px var(--shadow-light),
+    0 0 6px 2px rgba(0, 0, 0, 0.05);
+}
+
+.login-container button {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  font-weight: bold;
+  background: var(--color-bg);
+  box-shadow: var(--raised-shadow);
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.login-container button:hover {
+  box-shadow: var(--inset-shadow);
+}
+
+.login-container .error {
+  background-color: #ffe5e5;
+  color: #a00000;
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  font-weight: bold;
+  margin-bottom: var(--spacing-sm);
+}
+
+.login-container p {
+  text-align: center;
+  margin-top: var(--spacing-sm);
+}
+
+.login-container a {
+  color: var(--color-text);
+  text-decoration: underline;
+}

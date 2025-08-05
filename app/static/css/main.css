@@ -44,6 +44,36 @@ h1 {
   color: var(--color-heading);
 }
 
+.user-info {
+  position: absolute;
+  top: var(--spacing-sm);
+  right: var(--spacing-sm);
+  background: var(--color-bg);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  color: var(--color-text);
+  font-family: var(--font-base);
+  z-index: 100;
+  opacity: 0.8;
+  transition: opacity 0.3s ease;
+}
+
+.user-info a {
+  color: var(--color-text);
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.user-info a:hover {
+  text-decoration: underline;
+}
+
+.user-info:hover {
+  opacity: 1;
+}
+
+
 #chat-box {
   max-width: 600px;
   margin: 0 auto var(--spacing-xl) auto;
