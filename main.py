@@ -30,11 +30,12 @@ db = HistoryDB()
 
 
 @app.route("/")
-@app.route("/<session_id>")
-def index(session_id=None):
-    if not session_id:
-        return redirect(f"/{db.create_session()}", code=302)
+def index():
+    return redirect(f"/s/{db.create_session()}", code=302)
 
+
+@app.route("/s/<session_id>")
+def session(session_id):
     if not db.session_exists(session_id):
         return render_template("partials/error.html", message="Session not found."), 404
 
@@ -55,12 +56,12 @@ def index(session_id=None):
     return response
 
 
-@app.route("/session/delete/<session_id>", methods=["DELETE"])
+@app.route("/s/<session_id>", methods=["DELETE"])
 def delete_session(session_id):
     if not db.session_exists(session_id):
         return render_template("partials/error.html", message="Session not found."), 404
 
-    next_url = "/" + (
+    next_url = "/s/" + (
         db.get_adjacent_session(session_id, "next")
         or db.get_adjacent_session(session_id, "prev")
         or db.create_session()
@@ -71,7 +72,7 @@ def delete_session(session_id):
     return "", 204, {"HX-Redirect": next_url}
 
 
-@app.route("/messages/<session_id>", methods=["POST"])
+@app.route("/s/<session_id>/message", methods=["POST"])
 def send_message(session_id):
     user_text = request.form.get("message", "").strip()
 
@@ -92,7 +93,7 @@ def send_message(session_id):
     return make_response(html)
 
 
-@app.route("/sse-reply/<session_id>/<msg_id>")
+@app.route("/s/<session_id>/sse-reply/<msg_id>")
 def sse_reply(msg_id, session_id):
     history = db.get_session(session_id)
 
