@@ -35,6 +35,9 @@ def index(session_id=None):
     if not session_id:
         return redirect(f"/{db.create_session()}", code=302)
 
+    if not db.session_exists(session_id):
+        return render_template("partials/error.html", message="Session not found."), 404
+
     history = db.get_session(session_id)
 
     prev_id = db.get_adjacent_session(session_id, "prev")
@@ -54,6 +57,8 @@ def index(session_id=None):
 
 @app.route("/session/delete/<session_id>", methods=["DELETE"])
 def delete_session(session_id):
+    if not db.session_exists(session_id):
+        return render_template("partials/error.html", message="Session not found."), 404
 
     next_url = "/" + (
         db.get_adjacent_session(session_id, "next")
@@ -128,6 +133,6 @@ def sse_reply(msg_id, session_id):
 @app.errorhandler(Exception)
 def handle_exception(e):
     return (
-        render_template_string("<div class='error-box'>Something went wrong.</div>"),
+        render_template("partials/error.html", message="Something went wrong"),
         500,
     )

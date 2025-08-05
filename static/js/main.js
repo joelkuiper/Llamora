@@ -11,7 +11,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   form.addEventListener("htmx:afterRequest", () => {
-    console.log("Disable");
     setFormEnabled(false);
   });
 

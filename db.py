@@ -50,6 +50,13 @@ class HistoryDB:
             finally:
                 conn.close()
 
+    def session_exists(self, session_id):
+        with self.get_conn() as conn:
+            result = conn.execute(
+                "SELECT 1 FROM sessions WHERE id = ? LIMIT 1", (session_id,)
+            ).fetchone()
+            return result is not None
+
     def append(self, session_id, role, content):
         with self.get_conn() as conn:
             conn.execute(
@@ -64,7 +71,6 @@ class HistoryDB:
         return session_id
 
     def delete_session(self, session_id):
-        print(f"Deleting... {session_id}")
         with self.get_conn() as conn:
             conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
 

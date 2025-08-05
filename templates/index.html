@@ -9,7 +9,9 @@
 
     <link rel="stylesheet" href="{{url_for('static', filename='css/main.css')}}">
   </head>
-  <body hx-ext="response-targets">
+  <body
+    hx-ext="response-targets"
+    hx-target-5*="#errors">
 
     <div id="errors"></div>
 
@@ -75,7 +77,6 @@
             hx-post="/messages/{{ session_id }}"
             hx-target="#chat-box"
             hx-on::after-request="this.reset()"
-            hx-target-5*="#errors"
             hx-swap="beforeend">
         <div class="input-wrapper">
           <textarea
