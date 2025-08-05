@@ -129,7 +129,7 @@ def sse_reply(msg_id, session_id):
                     first = False
 
                 full_response += chunk
-                yield f"event: message\ndata: <span>{html_encode_whitespace(chunk)}</span>\n\n"
+                yield f"event: message\ndata: {html_encode_whitespace(chunk)}\n\n"
         except Exception as e:
             yield f"event: message\ndata: <span class='error'>⚠️ {str(e)}</span>\n\n"
             error_occurred = True
