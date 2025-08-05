@@ -20,6 +20,25 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // Hacky way of re-enabling the form after error, this is the only I could find that works!
+  document.getElementById("errors").addEventListener("htmx:afterSwap", function () {
+    requestAnimationFrame(() => {
+      if (document.querySelector("#errors .error-box")) {
+        setFormEnabled(true);
+      }
+    });
+  });
+
+
+  // Client-side validation before sending HTMX request
+  // Checks if not-empty
+  form.addEventListener("htmx:configRequest", (event) => {
+    if (!textarea.value.trim()) {
+      event.preventDefault();
+      textarea.focus();
+    }
+  });
+
   // Scroll logic
   let autoScrollEnabled = true;
   const SCROLL_THRESHOLD = 10;

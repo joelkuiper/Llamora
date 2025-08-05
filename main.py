@@ -74,7 +74,17 @@ def delete_session(session_id):
 
 @app.route("/s/<session_id>/message", methods=["POST"])
 def send_message(session_id):
-    user_text = request.form.get("message", "").strip()
+    user_text = request.form.get("message", "")
+    user_text = user_text.strip()
+
+    if not user_text or not session_id or not db.session_exists(session_id):
+        # Return partial with error message (will render in #errors div)
+        return (
+            render_template(
+                "partials/error.html", message="Message is empty or session is invalid."
+            ),
+            400,
+        )
 
     if not user_text or not session_id:
         return "", 204
