@@ -86,9 +86,6 @@ def send_message(session_id):
             400,
         )
 
-    if not user_text or not session_id:
-        return "", 204
-
     msg_id = uuid.uuid4().hex
 
     db.append(session_id, "user", user_text)
