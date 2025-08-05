@@ -1,12 +1,10 @@
 from flask import Flask
 from dotenv import load_dotenv
 import os
-from llm_backend import LLMEngine
 from db import LocalDB
 
 load_dotenv()
 
-llm = LLMEngine(model_path=os.environ["CHAT_MODEL_GGUF"])
 db = LocalDB()
 
 def create_app():

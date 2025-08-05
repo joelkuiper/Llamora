@@ -1,10 +1,16 @@
 from flask import Blueprint, render_template, redirect, request, make_response, Response, stream_with_context
 import uuid
 import html
-from app import db, llm
+import os
+from llm_backend import LLMEngine
+
+from app import db
 from app.services.auth_helpers import login_required, get_current_user
 
 chat_bp = Blueprint("chat", __name__)
+
+
+llm = LLMEngine(model_path=os.environ["CHAT_MODEL_GGUF"])
 
 def html_encode_whitespace(text):
     return html.escape(text).replace("\n", "<br>")
@@ -41,6 +47,13 @@ def session(session_id):
         next_id=next_id,
     ))
 
+@chat_bp.route("/s/create", methods=["POST"])
+@login_required
+def create_session():
+    user = get_current_user()
+    uid = user["id"]
+    session_id = db.create_session(uid)
+    return "", 204, {"HX-Redirect": session_id}
 
 @chat_bp.route("/s/<session_id>", methods=["DELETE"])
 @login_required
