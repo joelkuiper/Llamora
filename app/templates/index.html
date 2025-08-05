@@ -15,7 +15,7 @@
     hx-target-4*="#errors">
 
     <div id="errors"></div>
-
+    <p>Logged in as {{ user.username }} | <a href="{{ url_for('auth.logout') }}">Logout</a></p>
     <h1>Chat</h1>
 
     <div id="chat-box">
