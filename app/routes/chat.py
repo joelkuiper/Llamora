@@ -1,4 +1,10 @@
-from flask import Blueprint, render_template, redirect, request, make_response, Response, stream_with_context
+from flask import (
+    Blueprint,
+    render_template,
+    redirect,
+    request,
+    Response,
+)
 import uuid
 import html
 import os
@@ -11,6 +17,7 @@ chat_bp = Blueprint("chat", __name__)
 
 
 llm = LLMEngine(model_path=os.environ["CHAT_MODEL_GGUF"])
+
 
 def html_encode_whitespace(text):
     return html.escape(text).replace("\n", "<br>")
@@ -38,14 +45,15 @@ def session(session_id):
     prev_id = db.get_adjacent_session(uid, session_id, "prev")
     next_id = db.get_adjacent_session(uid, session_id, "next")
 
-    return make_response(render_template(
+    return render_template(
         "index.html",
         user=user,
         history=history,
         session_id=session_id,
         prev_id=prev_id,
         next_id=next_id,
-    ))
+    )
+
 
 @chat_bp.route("/s/create", methods=["POST"])
 @login_required
@@ -54,6 +62,7 @@ def create_session():
     uid = user["id"]
     session_id = db.create_session(uid)
     return "", 204, {"HX-Redirect": session_id}
+
 
 @chat_bp.route("/s/<session_id>", methods=["DELETE"])
 @login_required
@@ -65,9 +74,9 @@ def delete_session(session_id):
         return render_template("partials/error.html", message="Session not found."), 404
 
     next_url = "/s/" + (
-        db.get_adjacent_session(uid, session_id, "next") or
-        db.get_adjacent_session(uid, session_id, "prev") or
-        db.create_session(uid)
+        db.get_adjacent_session(uid, session_id, "next")
+        or db.get_adjacent_session(uid, session_id, "prev")
+        or db.create_session(uid)
     )
 
     db.delete_session(uid, session_id)
@@ -82,17 +91,22 @@ def send_message(session_id):
     uid = user["id"]
 
     if not user_text or not db.session_exists(uid, session_id):
-        return render_template("partials/error.html", message="Message is empty or session is invalid."), 400
+        return (
+            render_template(
+                "partials/error.html", message="Message is empty or session is invalid."
+            ),
+            400,
+        )
 
     msg_id = uuid.uuid4().hex
     db.append(uid, session_id, "user", user_text)
 
-    return make_response(render_template(
+    return render_template(
         "partials/placeholder.html",
         user_text=user_text,
         msg_id=msg_id,
         session_id=session_id,
-    ))
+    )
 
 
 @chat_bp.route("/s/<session_id>/sse-reply/<msg_id>")
@@ -103,7 +117,9 @@ def sse_reply(msg_id, session_id):
     history = db.get_session(uid, session_id)
 
     if not history:
-        return Response("event: error\ndata: Invalid ID\n\n", mimetype="text/event-stream")
+        return Response(
+            "event: error\ndata: Invalid ID\n\n", mimetype="text/event-stream"
+        )
 
     def event_stream():
         full_response = ""
@@ -131,4 +147,4 @@ def sse_reply(msg_id, session_id):
             if not error_occurred and full_response.strip():
                 db.append(uid, session_id, "assistant", full_response)
 
-    return Response(stream_with_context(event_stream()), mimetype="text/event-stream")
+    return Response(event_stream(), mimetype="text/event-stream")
