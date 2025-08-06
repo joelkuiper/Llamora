@@ -1,4 +1,4 @@
-let sseListenerBound = false;
+let currentSSEListener = null;
 
 export function initChatUI(root = document) {
   const form = root.querySelector("#chat-form");
@@ -17,8 +17,8 @@ export function initChatUI(root = document) {
 
   const scrollToBottom = setupScrollHandler(setFormEnabled);
 
-  // Form behavior
   form.addEventListener("htmx:afterRequest", () => setFormEnabled(false));
+
   form.addEventListener("htmx:configRequest", (event) => {
     if (!textarea.value.trim()) {
       event.preventDefault();
@@ -26,7 +26,6 @@ export function initChatUI(root = document) {
     }
   });
 
-  // Error handling
   errors?.addEventListener("htmx:afterSwap", () => {
     requestAnimationFrame(() => {
       if (document.querySelector("#errors .error-box")) {
@@ -35,19 +34,13 @@ export function initChatUI(root = document) {
     });
   });
 
-  // Auto-scroll after chat box updates
   chatBox.addEventListener("htmx:afterSwap", scrollToBottom);
 
-  // Initial scroll and focus
   scrollToBottom();
   textarea.focus();
 }
 
-
-/**
- * Sets up scroll and SSE behavior for the chat panel.
- */
-function setupScrollHandler(setFormEnabled, containerSelector = ".chat-panel") {
+function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrapper") {
   const container = document.querySelector(containerSelector);
   if (!container) return () => {};
 
@@ -66,7 +59,7 @@ function setupScrollHandler(setFormEnabled, containerSelector = ".chat-panel") {
 
   const isUserNearBottom = () => {
     const distanceFromBottom =
-      container.scrollHeight - container.clientHeight - container.scrollTop;
+          container.scrollHeight - container.clientHeight - container.scrollTop;
     return distanceFromBottom < SCROLL_THRESHOLD;
   };
 
@@ -92,19 +85,21 @@ function setupScrollHandler(setFormEnabled, containerSelector = ".chat-panel") {
     lastScrollTop = container.scrollTop;
   }, { passive: true });
 
-  // Bind SSE listener once per page load
-  if (!sseListenerBound) {
-    document.body.addEventListener("htmx:sseMessage", (evt) => {
-      if (evt.detail.type === "done") {
-        setFormEnabled(true);
-      } else if (evt.detail.type === "message") {
-        scrollToBottom();
-      }
-    });
-    sseListenerBound = true;
+  // Remove previous SSE listener if any
+  if (currentSSEListener) {
+    document.body.removeEventListener("htmx:sseMessage", currentSSEListener);
   }
 
-  // Initial scroll
+  // Add new listener with current setFormEnabled closure
+  currentSSEListener = (evt) => {
+    if (evt.detail.type === "done") {
+      setFormEnabled(true);
+    } else if (evt.detail.type === "message") {
+      scrollToBottom();
+    }
+  };
+  document.body.addEventListener("htmx:sseMessage", currentSSEListener);
+
   container.scrollTop = container.scrollHeight;
   return scrollToBottom;
 }
