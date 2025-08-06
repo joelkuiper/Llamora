@@ -1,4 +1,6 @@
 <div id="chat-box">
+  <div id="session-marker" data-session-id="{{ session_id }}"></div>
+
   <div class="bot">Hello there! Say anything you want, I'm a helpful assistant.</div>
   {% for msg in history %}
   <div class="{{ 'bot' if msg['role'] != 'user' else 'user'}}">{{ msg.content }}</div>

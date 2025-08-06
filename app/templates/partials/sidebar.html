@@ -1,10 +1,11 @@
 <aside id="sidebar" class="sidebar">
   <ul>
     {% for s in sessions %}
-    <li class="{% if s.id == current_id %}active{% endif %}">
+    <li class="{% if s.id == session_id %}active{% endif %}">
       <a
         href="/s/{{ s.id }}"
         hx-get="/s/{{ s.id }}/chat"
+        data-session-id="{{ s.id }}"
         hx-target="#chatbox-wrapper"
         hx-swap="innerHTML">
         {{ s.name or 'Untitled' }}
