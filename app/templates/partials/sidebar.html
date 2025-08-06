@@ -13,4 +13,7 @@
     </li>
     {% endfor %}
   </ul>
+  <div class="user-info"> {{ user.username }} | <a href="{{ url_for('auth.logout') }}">Logout</a></div>
+
+
 </aside>
