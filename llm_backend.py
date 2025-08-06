@@ -88,7 +88,7 @@ class LLMEngine:
             formatted = self.format_history(temp)
             prompt = self.prompt.format(history=formatted)
             token_count = self.llm.get_num_tokens(prompt)
-            if token_count + self.MAX_RESPONSE_LENGTH > self.MAX_TOKENS:
+            if token_count + MAX_RESPONSE_TOKENS > self.MAX_TOKENS:
                 break
             trimmed = temp
         return trimmed

@@ -1,10 +1,4 @@
-from flask import (
-    Blueprint,
-    render_template,
-    redirect,
-    request,
-    Response,
-)
+from flask import Blueprint, render_template, redirect, request, Response, current_app
 import uuid
 import html
 import os
