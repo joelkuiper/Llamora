@@ -90,10 +90,15 @@ def send_message(session_id):
     user = get_current_user()
     uid = user["id"]
 
-    if not user_text or not db.session_exists(uid, session_id):
+    max_len = current_app.config["MAX_MESSAGE_LENGTH"]
+
+    if not (
+        user_text or len(user_text) > max_len or not db.session_exists(uid, session_id)
+    ):
         return (
             render_template(
-                "partials/error.html", message="Message is empty or session is invalid."
+                "partials/error.html",
+                message="Message is empty, too long, or session is invalid.",
             ),
             400,
         )

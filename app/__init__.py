@@ -8,9 +8,11 @@ load_dotenv()
 
 db = LocalDB()
 
+
 def create_app():
     app = Flask(__name__)
     app.secret_key = os.getenv("CHAT_SECRET_KEY")
+    app.config.from_object("config")
 
     csrf = CSRFProtect(app)
 
@@ -21,6 +23,7 @@ def create_app():
     app.register_blueprint(chat_bp)
 
     from .services.auth_helpers import load_user
+
     app.before_request(load_user)
 
     return app

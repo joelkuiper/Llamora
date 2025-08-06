@@ -3,6 +3,7 @@ import sqlite3
 from contextlib import contextmanager
 from threading import Lock
 import secrets
+from config import MAX_USERNAME_LENGTH
 
 
 class LocalDB:
@@ -17,10 +18,10 @@ class LocalDB:
             if is_new:
                 print("Creating new database...")
             conn.executescript(
-                """
+                f"""
                 CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username TEXT UNIQUE NOT NULL,
+                    username TEXT UNIQUE NOT NULL CHECK(length(username) <= {MAX_USERNAME_LENGTH}),
                     password_hash TEXT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
@@ -84,8 +85,7 @@ class LocalDB:
 
     def _owns_session(self, conn, user_id, session_id):
         row = conn.execute(
-            "SELECT 1 FROM sessions WHERE id = ? AND user_id = ?",
-            (session_id, user_id)
+            "SELECT 1 FROM sessions WHERE id = ? AND user_id = ?", (session_id, user_id)
         ).fetchone()
         return row is not None
 
@@ -97,10 +97,9 @@ class LocalDB:
         with self.get_conn() as conn:
             row = conn.execute(
                 "SELECT id FROM sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
-                (user_id,)
+                (user_id,),
             ).fetchone()
         return row["id"] if row else None
-
 
     def append(self, user_id, session_id, role, content):
         with self.get_conn() as conn:
@@ -115,8 +114,10 @@ class LocalDB:
     def create_session(self, user_id):
         session_id = secrets.token_urlsafe(32)
         with self.get_conn() as conn:
-            conn.execute("INSERT INTO sessions (id, user_id) VALUES (?, ?)",
-                         (session_id, user_id))
+            conn.execute(
+                "INSERT INTO sessions (id, user_id) VALUES (?, ?)",
+                (session_id, user_id),
+            )
         return session_id
 
     def delete_session(self, user_id, session_id):
@@ -124,7 +125,10 @@ class LocalDB:
             if not self._owns_session(conn, user_id, session_id):
                 raise ValueError("User does not own session")
 
-            conn.execute("DELETE FROM sessions WHERE id = ? AND user_id = ?", (session_id, user_id))
+            conn.execute(
+                "DELETE FROM sessions WHERE id = ? AND user_id = ?",
+                (session_id, user_id),
+            )
 
     def get_session(self, user_id, session_id):
         with self.get_conn() as conn:

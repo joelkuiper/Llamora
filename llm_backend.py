@@ -1,6 +1,7 @@
 import threading
 import textwrap
 import queue
+from config import MAX_RESPONSE_TOKENS
 from langchain_community.llms import LlamaCpp
 from langchain.chains import LLMChain
 from langchain_core.prompts import PromptTemplate
@@ -11,7 +12,6 @@ class LLMEngine:
     """Handles queuing, streaming, and history formatting for an LLM chat interface."""
 
     def __init__(self, model_path: str, max_workers: int = 1):
-        self.MAX_RESPONSE_LENGTH = 1024
         self.model_path = model_path
         self.llm = self._load_model()
         self.MAX_TOKENS = self.llm.n_ctx
@@ -25,7 +25,7 @@ class LLMEngine:
         return LlamaCpp(
             model_path=self.model_path,
             temperature=0.8,
-            max_tokens=self.MAX_RESPONSE_LENGTH,
+            max_tokens=MAX_RESPONSE_TOKENS,
             verbose=True,
             n_ctx=1024 * 9,
             streaming=True,
