@@ -17,10 +17,13 @@
     <div id="errors"></div>
     <div class="user-info">Logged in as {{ user.username }} | <a href="{{ url_for('auth.logout') }}">Logout</a></div>
 
-    <h1>Chat</h1>
-    <div id="chatbox-wrapper">
-      {% include "partials/chat.html" %}
+    <div class="app-container">
+      {% include "partials/sidebar.html" %}
+      <main id="chatbox-wrapper" class="chat-panel">
+        {% include "partials/chat.html" %}
+      </main>
     </div>
+
     <script>
       document.body.addEventListener('htmx:configRequest', (event) => {
         event.detail.headers['X-CSRFToken'] = '{{ csrf_token() }}';

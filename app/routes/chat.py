@@ -26,9 +26,7 @@ def index():
     return redirect(f"/s/{session_id}", code=302)
 
 
-@chat_bp.route("/s/<session_id>")
-@login_required
-def session(session_id):
+def render_session(session_id, template="index.html", push_url=False):
     user = get_current_user()
     uid = user["id"]
 
@@ -36,17 +34,35 @@ def session(session_id):
         return render_template("partials/error.html", message="Session not found."), 404
 
     history = db.get_session(uid, session_id)
+    sessions = db.get_all_sessions(uid)
     prev_id = db.get_adjacent_session(uid, session_id, "prev")
     next_id = db.get_adjacent_session(uid, session_id, "next")
 
-    return render_template(
-        "index.html",
+    html = render_template(
+        template,
         user=user,
         history=history,
         session_id=session_id,
+        sessions=sessions,
         prev_id=prev_id,
         next_id=next_id,
     )
+
+    if push_url:
+        return html, 200, {"HX-Push-Url": f"/s/{session_id}"}
+    return html
+
+
+@chat_bp.route("/s/<session_id>")
+@login_required
+def session(session_id):
+    return render_session(session_id)
+
+
+@chat_bp.route("/s/<session_id>/chat")
+@login_required
+def chat_ui(session_id):
+    return render_session(session_id, template="partials/chat.html", push_url=True)
 
 
 @chat_bp.route("/s/create", methods=["POST"])

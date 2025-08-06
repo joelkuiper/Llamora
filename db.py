@@ -29,6 +29,7 @@ class LocalDB:
                 CREATE TABLE IF NOT EXISTS sessions (
                     id TEXT PRIMARY KEY,
                     user_id INTEGER NOT NULL,
+                    name TEXT DEFAULT 'Untitled',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 );
@@ -138,6 +139,14 @@ class LocalDB:
             rows = conn.execute(
                 "SELECT role, content FROM messages WHERE session_id = ? ORDER BY id ASC",
                 (session_id,),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def get_all_sessions(self, user_id):
+        with self.get_conn() as conn:
+            rows = conn.execute(
+                "SELECT id, name, created_at FROM sessions WHERE user_id = ? ORDER BY created_at DESC",
+                (user_id,),
             ).fetchall()
             return [dict(row) for row in rows]
 

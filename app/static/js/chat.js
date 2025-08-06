@@ -1,22 +1,23 @@
-let chatUIInitialized = false;
+let sseListenerBound = false;
 
 export function initChatUI(root = document) {
   const form = root.querySelector("#chat-form");
   const textarea = form?.querySelector("textarea");
   const button = form?.querySelector("button");
   const chatBox = root.querySelector("#chat-box");
-
-  console.log("initialized?", chatUIInitialized);
+  const errors = document.getElementById("errors");
 
   if (!form || !textarea || !button || !chatBox) return;
 
-  // Prevent reinitialization of global listeners
-  if (!chatUIInitialized) {
-    setupGlobalListeners();
-    chatUIInitialized = true;
-  }
+  const setFormEnabled = (enabled) => {
+    textarea.disabled = !enabled;
+    button.disabled = !enabled;
+    if (enabled) textarea.focus();
+  };
 
-  // Handle form state
+  const scrollToBottom = setupScrollHandler(setFormEnabled);
+
+  // Form behavior
   form.addEventListener("htmx:afterRequest", () => setFormEnabled(false));
   form.addEventListener("htmx:configRequest", (event) => {
     if (!textarea.value.trim()) {
@@ -25,7 +26,7 @@ export function initChatUI(root = document) {
     }
   });
 
-  const errors = document.getElementById("errors");
+  // Error handling
   errors?.addEventListener("htmx:afterSwap", () => {
     requestAnimationFrame(() => {
       if (document.querySelector("#errors .error-box")) {
@@ -34,79 +35,76 @@ export function initChatUI(root = document) {
     });
   });
 
-  chatBox.addEventListener("htmx:afterSwap", () => {
-    scrollToBottom();
-  });
+  // Auto-scroll after chat box updates
+  chatBox.addEventListener("htmx:afterSwap", scrollToBottom);
 
-  window.scrollTo({ top: document.documentElement.scrollHeight });
+  // Initial scroll and focus
+  scrollToBottom();
   textarea.focus();
-
-  function setFormEnabled(enabled) {
-    textarea.disabled = !enabled;
-    button.disabled = !enabled;
-    if (enabled) textarea.focus();
-  }
 }
 
-// ---------------------------
-// GLOBAL STATE (initialized once)
-// ---------------------------
-let autoScrollEnabled = true;
-let lastScrollY = window.scrollY;
-const SCROLL_THRESHOLD = 10;
 
-function setupGlobalListeners() {
-  // SSE message scroll
-  document.body.addEventListener("htmx:sseMessage", (evt) => {
-    if (evt.detail.type === "done") {
-      enableChatForm();
-    } else if (evt.detail.type === "message") {
-      scrollToBottom();
+/**
+ * Sets up scroll and SSE behavior for the chat panel.
+ */
+function setupScrollHandler(setFormEnabled, containerSelector = ".chat-panel") {
+  const container = document.querySelector(containerSelector);
+  if (!container) return () => {};
+
+  let autoScrollEnabled = true;
+  let lastScrollTop = container.scrollTop;
+  const SCROLL_THRESHOLD = 10;
+
+  const scrollToBottom = () => {
+    if (autoScrollEnabled) {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: "smooth",
+      });
     }
+  };
+
+  const isUserNearBottom = () => {
+    const distanceFromBottom =
+      container.scrollHeight - container.clientHeight - container.scrollTop;
+    return distanceFromBottom < SCROLL_THRESHOLD;
+  };
+
+  const updateScrollState = (currentTop) => {
+    if (currentTop < lastScrollTop - 2) {
+      autoScrollEnabled = false;
+    } else if (isUserNearBottom()) {
+      autoScrollEnabled = true;
+    }
+    lastScrollTop = currentTop;
+  };
+
+  container.addEventListener("scroll", () => {
+    updateScrollState(container.scrollTop);
   });
 
-  // Scroll logic
-  window.addEventListener("scroll", () => {
-    disableAutoScrollIfScrollingUp(window.scrollY);
-  });
-
-  window.addEventListener("wheel", (e) => {
+  container.addEventListener("wheel", (e) => {
     if (e.deltaY < 0) autoScrollEnabled = false;
   }, { passive: true });
 
-  window.addEventListener("touchmove", () => {
-    if (window.scrollY < lastScrollY) autoScrollEnabled = false;
-    lastScrollY = window.scrollY;
+  container.addEventListener("touchmove", () => {
+    if (container.scrollTop < lastScrollTop) autoScrollEnabled = false;
+    lastScrollTop = container.scrollTop;
   }, { passive: true });
-}
 
-function scrollToBottom() {
-  if (autoScrollEnabled) {
-    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
+  // Bind SSE listener once per page load
+  if (!sseListenerBound) {
+    document.body.addEventListener("htmx:sseMessage", (evt) => {
+      if (evt.detail.type === "done") {
+        setFormEnabled(true);
+      } else if (evt.detail.type === "message") {
+        scrollToBottom();
+      }
+    });
+    sseListenerBound = true;
   }
-}
 
-function disableAutoScrollIfScrollingUp(currentY) {
-  if (currentY < lastScrollY - 2) {
-    autoScrollEnabled = false;
-  } else if (isUserNearBottom()) {
-    autoScrollEnabled = true;
-  }
-  lastScrollY = currentY;
-}
-
-function isUserNearBottom() {
-  const distanceFromBottom =
-    document.documentElement.scrollHeight - window.innerHeight - window.scrollY;
-  return distanceFromBottom < SCROLL_THRESHOLD;
-}
-
-function enableChatForm() {
-  const form = document.getElementById("chat-form");
-  if (!form) return;
-  const textarea = form.querySelector("textarea");
-  const button = form.querySelector("button");
-  if (textarea) textarea.disabled = false;
-  if (button) button.disabled = false;
-  textarea?.focus();
+  // Initial scroll
+  container.scrollTop = container.scrollHeight;
+  return scrollToBottom;
 }

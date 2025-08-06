@@ -29,13 +29,78 @@
   --inset-shadow-disabled: inset 1px 1px 3px #bebebe,
                            inset -1px -1px 3px #ffffff;
 }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
 body {
   background: var(--color-bg);
   font-family: var(--font-base);
-  padding: var(--spacing-xl);
   color: var(--color-text);
+}
+
+.app-container {
+  display: flex;
+  height: 100vh; /* fill full viewport height */
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 240px;
+  height: 100%;
+  background: var(--color-bg);
+  padding: var(--spacing-md);
+  box-shadow: var(--inset-shadow);
+  border-right: 1px solid var(--shadow-dark);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  /* Removed: position: fixed; top, left, z-index */
+}
+
+.sidebar ul {
+  list-style: none;
+  margin: 0;
   padding: 0;
 }
+
+.sidebar li {
+  margin-bottom: var(--spacing-sm);
+}
+
+.sidebar a {
+  display: block;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  box-shadow: var(--inset-shadow);
+  font-size: 0.95rem;
+  color: var(--color-text);
+  text-decoration: none;
+  transition: box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.sidebar a:hover {
+  background: #e4e4e4;
+  box-shadow: var(--inset-shadow-disabled);
+}
+
+.sidebar li.active a {
+  background: #dadada;
+  font-weight: bold;
+  box-shadow: inset 2px 2px 4px #bcbcbc, inset -2px -2px 4px #ffffff;
+}
+
+.chat-panel {
+  padding: var(--spacing-xl);
+  flex: 1;
+  overflow-y: auto;
+  min-width: 0; /* <- important to prevent overflow in flex layouts */
+}
+
 
 h1 {
   text-align: center;
@@ -75,7 +140,7 @@ h1 {
 
 
 #chat-box {
-  max-width: 600px;
+  max-width: 60rem;
   margin: 0 auto var(--spacing-xl) auto;
   display: flex;
   flex-direction: column;
@@ -90,7 +155,7 @@ h1 {
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
-  max-width: 600px;
+  max-width: 60rem;
   width: 100%;
   margin: 0 auto;
 }
@@ -156,7 +221,7 @@ h1 {
 }
 
 .chat-controls {
-  max-width: 600px;
+  max-width: 60rem;
   margin: 0 auto var(--spacing-xl);
   background: var(--color-bg);
   border-radius: var(--radius-lg);
