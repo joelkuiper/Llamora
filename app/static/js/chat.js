@@ -1,5 +1,29 @@
 let currentSSEListener = null;
 
+// Set options
+marked.use({
+  gfm: true
+});
+
+function renderMarkdown(text) {
+  return marked.parse(text, {"breaks": true});
+}
+
+function renderMarkdownInElement(el, text) {
+  if (!el) return;
+  const src = text !== undefined ? text : el.textContent;
+  el.innerHTML = renderMarkdown(src);
+  el.dataset.rendered = 'true';
+}
+
+function renderAllMarkdown(root) {
+  root.querySelectorAll('.user, .bot').forEach(el => {
+    if (el.dataset.rendered !== 'true') {
+      renderMarkdownInElement(el);
+    }
+  });
+}
+
 export function initChatUI(root = document) {
   const form = root.querySelector("#chat-form");
   const textarea = form?.querySelector("textarea");
@@ -34,7 +58,12 @@ export function initChatUI(root = document) {
     });
   });
 
-  chat.addEventListener("htmx:afterSwap", scrollToBottom);
+  chat.addEventListener("htmx:afterSwap", () => {
+    scrollToBottom();
+    renderAllMarkdown(chat);
+  });
+
+  renderAllMarkdown(chat);
 
   scrollToBottom();
   textarea.focus();
@@ -90,12 +119,11 @@ function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrappe
     document.body.removeEventListener("htmx:sseMessage", currentSSEListener);
   }
 
-  // Add new listener with current setFormEnabled closure
   currentSSEListener = (evt) => {
-    if (evt.detail.type === "done") {
-      setFormEnabled(true);
-    } else if (evt.detail.type === "message") {
+    if (evt.detail.type === "message") {
       scrollToBottom();
+    } else if (evt.detail.type === "done") {
+      setFormEnabled(true);
     }
   };
   document.body.addEventListener("htmx:sseMessage", currentSSEListener);

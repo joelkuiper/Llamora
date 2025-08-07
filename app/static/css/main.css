@@ -292,13 +292,23 @@ h1 {
   box-shadow: var(--inset-shadow);
 }
 
-.user, .bot, .bot-stream {
+.message {
   padding: var(--spacing-lg) var(--spacing-xl);
   border-radius: var(--radius-lg);
   max-width: 90%;
   line-height: 1.5;
   font-size: var(--font-size);
   background: var(--color-bg);
+}
+
+.message > p {
+  padding: 0;
+  margin: 0;
+  display: inline-block;
+}
+
+.message code {
+  white-space: pre-line;
 }
 
 .user {
