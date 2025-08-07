@@ -89,16 +89,10 @@ def create_session():
         session=new_session,
         session_id=new_session_id,
     )
-    sidebar_html = f"""
-    <ul hx-swap-oob="afterbegin" id="sidebar-inner">
-      {sidebar_html}
-    </ul>
-    """
-
     chat_html = render_chat(new_session_id, oob=True)
 
     return (
-        f"{chat_html}{sidebar_html}<span>test</span>",
+        f"{chat_html}{sidebar_html}",
         200,
         {"HX-Push-Url": f"/s/{new_session_id}"},
     )
@@ -135,7 +129,7 @@ def delete_session(session_id):
             session_id=new_session_id,
         )
         sidebar_html = f"""
-        <ul hx-swap-oob="beforeend" id="sidebar-inner">
+        <ul hx-swap-oob="beforeend" id="sesssions-list">
           {sidebar_html}
         </ul>
         """
