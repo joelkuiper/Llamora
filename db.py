@@ -86,11 +86,12 @@ class LocalDB:
 
     def _owns_session(self, conn, user_id, session_id):
         row = conn.execute(
-            "SELECT 1 FROM sessions WHERE id = ? AND user_id = ?", (session_id, user_id)
+            "SELECT * FROM sessions WHERE id = ? AND user_id = ? LIMIT 1",
+            (session_id, user_id),
         ).fetchone()
-        return row is not None
+        return dict(row) if row else None
 
-    def session_exists(self, user_id, session_id):
+    def get_session(self, user_id, session_id):
         with self.get_conn() as conn:
             return self._owns_session(conn, user_id, session_id)
 
@@ -131,7 +132,7 @@ class LocalDB:
                 (session_id, user_id),
             )
 
-    def get_session(self, user_id, session_id):
+    def get_history(self, user_id, session_id):
         with self.get_conn() as conn:
             if not self._owns_session(conn, user_id, session_id):
                 raise ValueError("User does not own session")

@@ -30,10 +30,10 @@ def render_session(session_id, template="index.html", push_url=False):
     user = get_current_user()
     uid = user["id"]
 
-    if not db.session_exists(uid, session_id):
+    if not db.get_session(uid, session_id):
         return render_template("partials/error.html", message="Session not found."), 404
 
-    history = db.get_session(uid, session_id)
+    history = db.get_history(uid, session_id)
     sessions = db.get_all_sessions(uid)
     prev_id = db.get_adjacent_session(uid, session_id, "prev")
     next_id = db.get_adjacent_session(uid, session_id, "next")
@@ -80,17 +80,60 @@ def delete_session(session_id):
     user = get_current_user()
     uid = user["id"]
 
-    if not db.session_exists(uid, session_id):
+    if not db.get_session(uid, session_id):
         return render_template("partials/error.html", message="Session not found."), 404
 
-    next_url = "/s/" + (
-        db.get_adjacent_session(uid, session_id, "next")
-        or db.get_adjacent_session(uid, session_id, "prev")
-        or db.create_session(uid)
-    )
+    next_id = db.get_adjacent_session(uid, session_id, "next")
+    prev_id = db.get_adjacent_session(uid, session_id, "prev")
+
+    new_session_id = next_id or prev_id
+    new_session_was_created = False
+
+    if not new_session_id:
+        new_session_id = db.create_session(uid)
+        new_session_was_created = True
 
     db.delete_session(uid, session_id)
-    return "", 204, {"HX-Redirect": next_url}
+
+    if request.args.get("htmx") == "true":
+        history = db.get_history(uid, new_session_id)
+        new_session = db.get_session(uid, new_session_id)
+
+        sidebar_html = ""
+        if new_session_was_created:
+            sidebar_html = render_template(
+                "partials/sidebar_session.html",
+                session=new_session,
+                session_id=new_session_id,
+            )
+            sidebar_html = f"""
+            <ul hx-swap-oob="beforeend" id="sidebar-inner">
+              {sidebar_html}
+            </ul>
+            """
+
+        chat_html = render_template(
+            "partials/chat.html",
+            user=user,
+            history=history,
+            session_id=new_session_id,
+            prev_id=db.get_adjacent_session(uid, new_session_id, "prev"),
+            next_id=db.get_adjacent_session(uid, new_session_id, "next"),
+        )
+
+        chat_html = f"""
+        <main hx-swap-oob="true" id="chatbox-wrapper">
+          {chat_html}
+        </main>
+        """
+
+        return (
+            f"{chat_html}{sidebar_html}",
+            200,
+            {"HX-Push-Url": f"/s/{new_session_id}"},
+        )
+
+    return "", 204, {"HX-Redirect": f"/s/{new_session_id}"}
 
 
 @chat_bp.route("/s/<session_id>/message", methods=["POST"])
@@ -103,7 +146,7 @@ def send_message(session_id):
     max_len = current_app.config["MAX_MESSAGE_LENGTH"]
 
     if not (
-        user_text or len(user_text) > max_len or not db.session_exists(uid, session_id)
+        user_text or len(user_text) > max_len or not db.get_session(uid, session_id)
     ):
         return (
             render_template(
@@ -129,7 +172,7 @@ def send_message(session_id):
 def sse_reply(msg_id, session_id):
     user = get_current_user()
     uid = user["id"]
-    history = db.get_session(uid, session_id)
+    history = db.get_history(uid, session_id)
 
     if not history:
         return Response(

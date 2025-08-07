@@ -31,6 +31,7 @@
       /* Update the active session in the sidebar */
       window.updateActiveSession = function () {
           const marker = document.getElementById("session-marker");
+
           if (!marker) return;
 
           const newSessionId = marker.dataset.sessionId;
@@ -44,6 +45,11 @@
               }
           });
       };
+      document.body.addEventListener("htmx:oobAfterSwap", (evt) => {
+        if (evt.detail?.target?.id === "chatbox-wrapper") {
+          window.updateActiveSession?.();
+        }
+      });
     </script>
   </body>
 </html>
