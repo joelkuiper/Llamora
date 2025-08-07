@@ -81,8 +81,9 @@
     </form>
     <script type="module">
       import { initChatUI } from "{{ url_for('static', filename='js/chat.js') }}";
+      import { updateActiveSession } from "{{ url_for('static', filename='js/session.js') }}";
       initChatUI();
-      window.updateActiveSession();
+      updateActiveSession();
     </script>
   </div>
 </main>

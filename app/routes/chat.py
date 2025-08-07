@@ -125,6 +125,7 @@ def delete_session(session_id):
             """
 
         chat_html = chat_ui(new_session_id, oob=True)
+
         return (
             f"{chat_html}{sidebar_html}",
             200,

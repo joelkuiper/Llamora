@@ -24,25 +24,6 @@
       document.body.addEventListener('htmx:configRequest', (event) => {
         event.detail.headers['X-CSRFToken'] = '{{ csrf_token() }}';
       });
-
-      /* Update the active session in the sidebar */
-      window.updateActiveSession = function () {
-        console.log("Update")
-        const marker = document.getElementById("chat-box");
-
-        if (!marker) return;
-
-        const newSessionId = marker.dataset.sessionId;
-
-        document.querySelectorAll("#sidebar li").forEach((li) => {
-          const link = li.querySelector("a");
-          if (link?.dataset.sessionId === newSessionId) {
-            li.classList.add("active");
-          } else {
-            li.classList.remove("active");
-          }
-        });
-      };
     </script>
   </body>
 </html>
