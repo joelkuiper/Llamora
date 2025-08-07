@@ -126,7 +126,6 @@ def delete_session(session_id):
         sidebar_html = render_template(
             "partials/sidebar_session.html",
             session=new_session,
-            session_id=new_session_id,
         )
         sidebar_html = f"""
         <ul hx-swap-oob="beforeend" id="sesssions-list">

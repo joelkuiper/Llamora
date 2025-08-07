@@ -1,7 +1,7 @@
 <main
   id="chatbox-wrapper"
   {% if oob %} hx-swap-oob="true" {% endif %}>
-  <div id="chat-box" data-session-id="{{ session.id }}">
+  <div id="chat" data-session-id="{{ session.id }}">
     <div class="bot">Hello there! Say anything you want, I'm a helpful assistant.</div>
     {% for msg in history %}
     <div class="{{ 'bot' if msg['role'] != 'user' else 'user'}}">{{ msg.content }}</div>
@@ -11,7 +11,7 @@
   <div class="chat-controls">
     <form id="chat-form"
           hx-post="/s/{{ session.id }}/message"
-          hx-target="#chat-box"
+          hx-target="#chat"
           hx-on::after-request="this.reset()"
           hx-swap="beforeend">
 

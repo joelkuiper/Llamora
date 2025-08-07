@@ -4,10 +4,10 @@ export function initChatUI(root = document) {
   const form = root.querySelector("#chat-form");
   const textarea = form?.querySelector("textarea");
   const button = form?.querySelector("button");
-  const chatBox = root.querySelector("#chat-box");
+  const chat = root.querySelector("#chat");
   const errors = document.getElementById("errors");
 
-  if (!form || !textarea || !button || !chatBox) return;
+  if (!form || !textarea || !button || !chat) return;
 
   const setFormEnabled = (enabled) => {
     textarea.disabled = !enabled;
@@ -34,7 +34,7 @@ export function initChatUI(root = document) {
     });
   });
 
-  chatBox.addEventListener("htmx:afterSwap", scrollToBottom);
+  chat.addEventListener("htmx:afterSwap", scrollToBottom);
 
   scrollToBottom();
   textarea.focus();

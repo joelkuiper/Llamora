@@ -211,7 +211,7 @@ h1 {
 }
 
 
-#chat-box {
+#chat {
   max-width: 60rem;
   margin: 0 auto var(--spacing-xl) auto;
   display: flex;
@@ -219,7 +219,7 @@ h1 {
   gap: var(--spacing-lg);
 }
 
-#chat-box .error {
+#chat .error {
   color: darkred;
 }
 
