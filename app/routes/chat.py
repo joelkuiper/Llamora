@@ -37,8 +37,6 @@ def session(session_id):
 
     history = db.get_history(uid, session_id)
     sessions = db.get_all_sessions(uid)
-    prev_id = db.get_adjacent_session(uid, session_id, "prev")
-    next_id = db.get_adjacent_session(uid, session_id, "next")
 
     html = render_template(
         "index.html",
@@ -46,8 +44,6 @@ def session(session_id):
         history=history,
         session_id=session_id,
         sessions=sessions,
-        prev_id=prev_id,
-        next_id=next_id,
     )
 
     return html
@@ -63,15 +59,10 @@ def chat_ui(session_id, oob=False):
         return render_template("partials/error.html", message="Session not found."), 404
 
     history = db.get_history(uid, session_id)
-    prev_id = db.get_adjacent_session(uid, session_id, "prev")
-    next_id = db.get_adjacent_session(uid, session_id, "next")
-
     html = render_template(
         "partials/chat.html",
         session_id=session_id,
         history=history,
-        prev_id=prev_id,
-        next_id=next_id,
         oob=oob,
     )
 
