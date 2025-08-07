@@ -48,7 +48,7 @@ class LocalDB:
                 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
                 CREATE INDEX IF NOT EXISTS idx_sessions_user_id_id ON sessions(user_id, id);
                 CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages(session_id);
-                CREATE INDEX IF NOT EXISTS idx_sessions_user_id_created ON sessions(user_id, created_at);
+                CREATE INDEX IF NOT EXISTS idx_sessions_user_id_created ON sessions(user_id, ulid);
                 """
             )
 
@@ -98,10 +98,20 @@ class LocalDB:
         with self.get_conn() as conn:
             return self._owns_session(conn, user_id, session_id)
 
+    def rename_session(self, user_id, session_id, name):
+        with self.get_conn() as conn:
+            if not self._owns_session(conn, user_id, session_id):
+                raise ValueError("User does not own session")
+
+            conn.execute(
+                "UPDATE sessions SET name = ? WHERE id = ? AND user_id = ?",
+                (name, session_id, user_id),
+            )
+
     def get_latest_session(self, user_id):
         with self.get_conn() as conn:
             row = conn.execute(
-                "SELECT id FROM sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+                "SELECT id FROM sessions WHERE user_id = ? ORDER BY ulid DESC LIMIT 1",
                 (user_id,),
             ).fetchone()
         return row["id"] if row else None

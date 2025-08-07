@@ -1,0 +1,19 @@
+<li
+  id="session-{{ session.id }}"
+  class="{% if session.id == session_id %}active{% endif %}">
+  <div class="session-item">
+    <input
+      type="text"
+      name="name"
+      value="{{ session.name or 'Untitled' }}"
+      maxlength="{{ config.MAX_SESSION_NAME_LENGTH }}"
+      minlength="2"
+      hx-put="/s/{{ session.id }}/rename"
+      onkeyup="if (event.key === 'Enter') this.blur()"
+      hx-target="#session-{{ session.id }}"
+      hx-swap="outerHTML"
+      hx-trigger="blur"
+      class="session-name-input"
+      autofocus>
+  </div>
+</li>

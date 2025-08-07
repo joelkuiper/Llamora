@@ -98,6 +98,47 @@ def create_session():
     )
 
 
+@chat_bp.route("/s/<session_id>/rename", methods=["GET"])
+@login_required
+def edit_session_name(session_id):
+    user = get_current_user()
+    uid = user["id"]
+    session = db.get_session(uid, session_id)
+
+    if not session:
+        return render_template("partials/error.html", message="Session not found."), 404
+
+    return render_template(
+        "partials/sidebar_session_edit.html", session=session, session_id=session_id
+    )
+
+
+@chat_bp.route("/s/<session_id>/rename", methods=["PUT"])
+@login_required
+def rename_session(session_id):
+    user = get_current_user()
+    uid = user["id"]
+    new_name = request.form.get("name", "").strip()
+    max_len = current_app.config["MAX_SESSION_NAME_LENGTH"]
+    active_session_id = request.headers.get("X-Active-Session")
+
+    if not db.get_session(uid, session_id) or not new_name or len(new_name) > max_len:
+        return (
+            render_template(
+                "partials/error.html",
+                message="Error",
+            ),
+            400,
+        )
+
+    db.rename_session(uid, session_id, new_name)
+    session = db.get_session(uid, session_id)
+
+    return render_template(
+        "partials/sidebar_session.html", session=session, session_id=active_session_id
+    )
+
+
 @chat_bp.route("/s/<session_id>", methods=["DELETE"])
 @login_required
 def delete_session(session_id):
@@ -109,7 +150,6 @@ def delete_session(session_id):
 
     active_session_id = request.headers.get("X-Active-Session")
     is_active = active_session_id == session_id
-    print(f"{session_id} {active_session_id}")
 
     if not is_active:
 

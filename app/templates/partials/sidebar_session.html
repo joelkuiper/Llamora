@@ -10,6 +10,19 @@
       hx-swap="outerHTML">
       {{ session.name or 'Untitled' }}
     </a>
+    <div class="session-actions">
+      <button
+        class="edit-btn"
+        hx-get="/s/{{ session.id }}/rename"
+        hx-target="#session-{{ session.id }}"
+        hx-swap="outerHTML"
+        title="Edit session name"
+        aria-label="Edit">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 20h9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M16.5 3.5a2.121 2.121 0 113 3L7 19.5 3 20.5 4 16.5 16.5 3.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
     <button
       class="delete-btn"
       hx-delete="/s/{{ session.id }}"
@@ -27,5 +40,6 @@
               stroke-linejoin="round"/>
       </svg>
     </button>
+    </div>
   </div>
 </li>
