@@ -31,8 +31,9 @@ def index():
 def session(session_id):
     user = get_current_user()
     uid = user["id"]
+    session = db.get_session(uid, session_id)
 
-    if not db.get_session(uid, session_id):
+    if not session:
         return render_template("partials/error.html", message="Session not found."), 404
 
     history = db.get_history(uid, session_id)
@@ -42,7 +43,7 @@ def session(session_id):
         "index.html",
         user=user,
         history=history,
-        session_id=session_id,
+        session=session,
         sessions=sessions,
     )
 
@@ -68,7 +69,7 @@ def render_chat(session_id, oob=False):
     return html
 
 
-@chat_bp.route("/s/<session_id>/chat", methods=["GET"])
+@chat_bp.route("/s/<session_id>/chat")
 @login_required
 def chat_htmx(session_id):
     html = render_chat(session_id, False)
