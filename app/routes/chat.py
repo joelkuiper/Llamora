@@ -49,19 +49,18 @@ def session(session_id):
     return html
 
 
-@chat_bp.route("/s/<session_id>/chat")
-@login_required
-def chat_ui(session_id, oob=False):
+def render_chat(session_id, oob=False):
     user = get_current_user()
     uid = user["id"]
+    session = db.get_session(uid, session_id)
 
-    if not db.get_session(uid, session_id):
+    if not session:
         return render_template("partials/error.html", message="Session not found."), 404
 
     history = db.get_history(uid, session_id)
     html = render_template(
         "partials/chat.html",
-        session_id=session_id,
+        session=session,
         history=history,
         oob=oob,
     )
@@ -69,13 +68,39 @@ def chat_ui(session_id, oob=False):
     return html
 
 
+@chat_bp.route("/s/<session_id>/chat", methods=["GET"])
+@login_required
+def chat_htmx(session_id):
+    html = render_chat(session_id, False)
+    return html, 200, {"HX-Push-Url": f"/s/{session_id}"}
+
+
 @chat_bp.route("/s/create", methods=["POST"])
 @login_required
 def create_session():
     user = get_current_user()
     uid = user["id"]
-    session_id = db.create_session(uid)
-    return "", 204, {"HX-Redirect": session_id}
+    new_session_id = db.create_session(uid)
+    new_session = db.get_session(uid, new_session_id)
+
+    sidebar_html = render_template(
+        "partials/sidebar_session.html",
+        session=new_session,
+        session_id=new_session_id,
+    )
+    sidebar_html = f"""
+    <ul hx-swap-oob="afterbegin" id="sidebar-inner">
+      {sidebar_html}
+    </ul>
+    """
+
+    chat_html = render_chat(new_session_id, oob=True)
+
+    return (
+        f"{chat_html}{sidebar_html}<span>test</span>",
+        200,
+        {"HX-Push-Url": f"/s/{new_session_id}"},
+    )
 
 
 @chat_bp.route("/s/<session_id>", methods=["DELETE"])
@@ -99,31 +124,28 @@ def delete_session(session_id):
 
     db.delete_session(uid, session_id)
 
-    if request.args.get("htmx") == "true":
-        new_session = db.get_session(uid, new_session_id)
+    new_session = db.get_session(uid, new_session_id)
 
-        sidebar_html = ""
-        if new_session_was_created:
-            sidebar_html = render_template(
-                "partials/sidebar_session.html",
-                session=new_session,
-                session_id=new_session_id,
-            )
-            sidebar_html = f"""
-            <ul hx-swap-oob="beforeend" id="sidebar-inner">
-              {sidebar_html}
-            </ul>
-            """
-
-        chat_html = chat_ui(new_session_id, oob=True)
-
-        return (
-            f"{chat_html}{sidebar_html}",
-            200,
-            {"HX-Push-Url": f"/s/{new_session_id}"},
+    sidebar_html = ""
+    if new_session_was_created:
+        sidebar_html = render_template(
+            "partials/sidebar_session.html",
+            session=new_session,
+            session_id=new_session_id,
         )
+        sidebar_html = f"""
+        <ul hx-swap-oob="beforeend" id="sidebar-inner">
+          {sidebar_html}
+        </ul>
+        """
 
-    return "", 204, {"HX-Redirect": f"/s/{new_session_id}"}
+    chat_html = render_chat(new_session_id, oob=True)
+
+    return (
+        f"{chat_html}{sidebar_html}",
+        200,
+        {"HX-Push-Url": f"/s/{new_session_id}"},
+    )
 
 
 @chat_bp.route("/s/<session_id>/message", methods=["POST"])
