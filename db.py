@@ -151,19 +151,42 @@ class LocalDB:
             ).fetchall()
             return [dict(row) for row in rows]
 
+    def get_all_sessions(self, user_id):
+        with self.get_conn() as conn:
+            rows = conn.execute(
+                "SELECT id, name, created_at FROM sessions WHERE user_id = ? ORDER BY created_at DESC, ROWID DESC",
+                (user_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def get_adjacent_session(self, user_id, session_id, direction="next"):
         op = ">" if direction == "next" else "<"
         order = "ASC" if direction == "next" else "DESC"
+
         with self.get_conn() as conn:
+            # Get the current session's created_at and ROWID
+            current = conn.execute(
+                "SELECT created_at, ROWID FROM sessions WHERE id = ? AND user_id = ?",
+                (session_id, user_id),
+            ).fetchone()
+
+            if not current:
+                return None
+
+            created_at, rowid = current["created_at"], current["ROWID"]
+
+            # Find the adjacent session
             row = conn.execute(
                 f"""
-                SELECT id FROM sessions
-                WHERE user_id = ? AND created_at {op} (
-                    SELECT created_at FROM sessions WHERE id = ? AND user_id = ?
-                )
-                ORDER BY created_at {order}
-                LIMIT 1
-                """,
-                (user_id, session_id, user_id),
+              SELECT id FROM sessions
+              WHERE user_id = ? AND (
+                  created_at {op} ?
+                  OR (created_at = ? AND ROWID {op} ?)
+              )
+              ORDER BY created_at {order}, ROWID {order}
+              LIMIT 1
+              """,
+                (user_id, created_at, created_at, rowid),
             ).fetchone()
+
             return row["id"] if row else None
