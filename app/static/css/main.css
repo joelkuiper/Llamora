@@ -71,13 +71,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--spacing-sm) var(--spacing-md);
   margin: var(--spacing-sm) 0;
   background: #f6f6f6;
   box-shadow: var(--inset-shadow);
   border-radius: var(--radius-md);
   transition: background 0.2s ease, box-shadow 0.2s ease;
   position: relative;
+  padding-right: var(--spacing-md);
 }
 
 /* Make list item match active/inactive state */
@@ -92,7 +92,6 @@ body {
   box-shadow: inset 2px 2px 4px #bcbcbc, inset -2px -2px 4px #ffffff;
 }
 
-/* Anchor fills space */
 .session-item a {
   flex-grow: 1;
   text-decoration: none;
@@ -101,7 +100,12 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+
+  display: block;          /* Make it block level */
+  height: 100%;            /* Fill height of parent */
+  padding: var(--spacing-sm) var(--spacing-md); /* Match .session-item padding */
 }
+
 
 /* Delete button aligned right, padded */
 .delete-btn {

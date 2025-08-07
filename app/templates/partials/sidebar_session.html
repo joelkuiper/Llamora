@@ -14,6 +14,7 @@
       class="delete-btn"
       hx-delete="/s/{{ session.id }}?htmx=true"
       hx-target="#session-{{ session.id }}"
+      hx-confirm="Are sure you want to delete this session?"
       hx-swap="outerHTML"
       aria-label="Delete">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
