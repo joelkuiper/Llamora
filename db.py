@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from threading import Lock
 import secrets
 from config import MAX_USERNAME_LENGTH
+from ulid import ULID
 
 
 class LocalDB:
@@ -20,7 +21,7 @@ class LocalDB:
             conn.executescript(
                 f"""
                 CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id TEXT PRIMARY KEY,
                     username TEXT UNIQUE NOT NULL CHECK(length(username) <= {MAX_USERNAME_LENGTH}),
                     password_hash TEXT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -28,6 +29,7 @@ class LocalDB:
 
                 CREATE TABLE IF NOT EXISTS sessions (
                     id TEXT PRIMARY KEY,
+                    ulid TEXT UNIQUE NOT NULL,
                     user_id INTEGER NOT NULL,
                     name TEXT DEFAULT 'Untitled',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -35,7 +37,7 @@ class LocalDB:
                 );
 
                 CREATE TABLE IF NOT EXISTS messages (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id TEXT PRIMARY KEY,
                     session_id TEXT NOT NULL,
                     role TEXT NOT NULL,
                     content TEXT NOT NULL,
@@ -65,9 +67,10 @@ class LocalDB:
     # user helpers
     def create_user(self, username, password_hash):
         with self.get_conn() as conn:
+            ulid = str(ULID())
             conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, password_hash),
+                "INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)",
+                (ulid, username, password_hash),
             )
 
     def get_user_by_username(self, username):
@@ -105,20 +108,22 @@ class LocalDB:
 
     def append(self, user_id, session_id, role, content):
         with self.get_conn() as conn:
+            ulid = str(ULID())
             if not self._owns_session(conn, user_id, session_id):
                 raise ValueError("User does not own session")
 
             conn.execute(
-                "INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)",
-                (session_id, role, content),
+                "INSERT INTO messages (id, session_id, role, content) VALUES (?, ?, ?, ?)",
+                (ulid, session_id, role, content),
             )
 
     def create_session(self, user_id):
         session_id = secrets.token_urlsafe(32)
+        ulid = str(ULID())
         with self.get_conn() as conn:
             conn.execute(
-                "INSERT INTO sessions (id, user_id) VALUES (?, ?)",
-                (session_id, user_id),
+                "INSERT INTO sessions (id, ulid, user_id) VALUES (?, ?, ?)",
+                (session_id, ulid, user_id),
             )
         return session_id
 
@@ -154,7 +159,7 @@ class LocalDB:
     def get_all_sessions(self, user_id):
         with self.get_conn() as conn:
             rows = conn.execute(
-                "SELECT id, name, created_at FROM sessions WHERE user_id = ? ORDER BY created_at DESC, ROWID DESC",
+                "SELECT id, name, created_at FROM sessions WHERE user_id = ? ORDER BY ulid DESC",
                 (user_id,),
             ).fetchall()
         return [dict(row) for row in rows]
@@ -164,29 +169,26 @@ class LocalDB:
         order = "ASC" if direction == "next" else "DESC"
 
         with self.get_conn() as conn:
-            # Get the current session's created_at and ROWID
+            # Get the ULID of the current session
             current = conn.execute(
-                "SELECT created_at, ROWID FROM sessions WHERE id = ? AND user_id = ?",
+                "SELECT ulid FROM sessions WHERE id = ? AND user_id = ?",
                 (session_id, user_id),
             ).fetchone()
 
             if not current:
                 return None
 
-            created_at, rowid = current["created_at"], current["ROWID"]
+            ulid = current["ulid"]
 
-            # Find the adjacent session
+            # Find the adjacent session by ULID
             row = conn.execute(
                 f"""
-              SELECT id FROM sessions
-              WHERE user_id = ? AND (
-                  created_at {op} ?
-                  OR (created_at = ? AND ROWID {op} ?)
-              )
-              ORDER BY created_at {order}, ROWID {order}
-              LIMIT 1
-              """,
-                (user_id, created_at, created_at, rowid),
+                SELECT id FROM sessions
+                WHERE user_id = ? AND ulid {op} ?
+                ORDER BY ulid {order}
+                LIMIT 1
+                """,
+                (user_id, ulid),
             ).fetchone()
 
             return row["id"] if row else None
