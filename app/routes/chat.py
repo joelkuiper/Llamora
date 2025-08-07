@@ -107,39 +107,49 @@ def delete_session(session_id):
     if not db.get_session(uid, session_id):
         return render_template("partials/error.html", message="Session not found."), 404
 
-    next_id = db.get_adjacent_session(uid, session_id, "next")
-    prev_id = db.get_adjacent_session(uid, session_id, "prev")
+    active_session_id = request.headers.get("X-Active-Session")
+    is_active = active_session_id == session_id
+    print(f"{session_id} {active_session_id}")
 
-    new_session_id = next_id or prev_id
-    new_session_was_created = False
+    if not is_active:
 
-    if not new_session_id:
-        new_session_id = db.create_session(uid)
-        new_session_was_created = True
+        db.delete_session(uid, session_id)
+        return ""  # Deletes it from the DOM
 
-    db.delete_session(uid, session_id)
+    else:
+        next_id = db.get_adjacent_session(uid, session_id, "next")
+        prev_id = db.get_adjacent_session(uid, session_id, "prev")
 
-    new_session = db.get_session(uid, new_session_id)
+        new_session_id = next_id or prev_id
+        new_session_was_created = False
 
-    sidebar_html = ""
-    if new_session_was_created:
-        sidebar_html = render_template(
-            "partials/sidebar_session.html",
-            session=new_session,
+        if not new_session_id:
+            new_session_id = db.create_session(uid)
+            new_session_was_created = True
+
+        db.delete_session(uid, session_id)
+
+        new_session = db.get_session(uid, new_session_id)
+
+        sidebar_html = ""
+        if new_session_was_created:
+            sidebar_html = render_template(
+                "partials/sidebar_session.html",
+                session=new_session,
+            )
+            sidebar_html = f"""
+          <ul hx-swap-oob="beforeend" id="sessions-list">
+            {sidebar_html}
+          </ul>
+          """
+
+        chat_html = render_chat(new_session_id, oob=True)
+
+        return (
+            f"{chat_html}{sidebar_html}",
+            200,
+            {"HX-Push-Url": f"/s/{new_session_id}"},
         )
-        sidebar_html = f"""
-        <ul hx-swap-oob="beforeend" id="sesssions-list">
-          {sidebar_html}
-        </ul>
-        """
-
-    chat_html = render_chat(new_session_id, oob=True)
-
-    return (
-        f"{chat_html}{sidebar_html}",
-        200,
-        {"HX-Push-Url": f"/s/{new_session_id}"},
-    )
 
 
 @chat_bp.route("/s/<session_id>/message", methods=["POST"])
