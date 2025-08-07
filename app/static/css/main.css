@@ -307,6 +307,10 @@ h1 {
   display: inline-block;
 }
 
+.message-content * {
+  display: inline;
+}
+
 .message code {
   white-space: pre-line;
 }
