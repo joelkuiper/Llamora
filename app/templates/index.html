@@ -17,39 +17,32 @@
     <div id="errors"></div>
     <div class="app-container">
       {% include "partials/sidebar.html" %}
-      <main id="chatbox-wrapper"
-            hx-on::after-swap="window.updateActiveSession()">
-        {% include "partials/chat.html" %}
-      </main>
+      {% include "partials/chat.html" %}
     </div>
 
     <script>
       document.body.addEventListener('htmx:configRequest', (event) => {
-          event.detail.headers['X-CSRFToken'] = '{{ csrf_token() }}';
+        event.detail.headers['X-CSRFToken'] = '{{ csrf_token() }}';
       });
 
       /* Update the active session in the sidebar */
       window.updateActiveSession = function () {
-          const marker = document.getElementById("session-marker");
+        console.log("Update")
+        const marker = document.getElementById("chat-box");
 
-          if (!marker) return;
+        if (!marker) return;
 
-          const newSessionId = marker.dataset.sessionId;
+        const newSessionId = marker.dataset.sessionId;
 
-          document.querySelectorAll("#sidebar li").forEach((li) => {
-              const link = li.querySelector("a");
-              if (link?.dataset.sessionId === newSessionId) {
-                  li.classList.add("active");
-              } else {
-                  li.classList.remove("active");
-              }
-          });
+        document.querySelectorAll("#sidebar li").forEach((li) => {
+          const link = li.querySelector("a");
+          if (link?.dataset.sessionId === newSessionId) {
+            li.classList.add("active");
+          } else {
+            li.classList.remove("active");
+          }
+        });
       };
-      document.body.addEventListener("htmx:oobAfterSwap", (evt) => {
-        if (evt.detail?.target?.id === "chatbox-wrapper") {
-          window.updateActiveSession?.();
-        }
-      });
     </script>
   </body>
 </html>

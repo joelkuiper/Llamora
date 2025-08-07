@@ -26,7 +26,9 @@ def index():
     return redirect(f"/s/{session_id}", code=302)
 
 
-def render_session(session_id, template="index.html", push_url=False):
+@chat_bp.route("/s/<session_id>")
+@login_required
+def session(session_id):
     user = get_current_user()
     uid = user["id"]
 
@@ -39,7 +41,7 @@ def render_session(session_id, template="index.html", push_url=False):
     next_id = db.get_adjacent_session(uid, session_id, "next")
 
     html = render_template(
-        template,
+        "index.html",
         user=user,
         history=history,
         session_id=session_id,
@@ -48,21 +50,32 @@ def render_session(session_id, template="index.html", push_url=False):
         next_id=next_id,
     )
 
-    if push_url:
-        return html, 200, {"HX-Push-Url": f"/s/{session_id}"}
     return html
-
-
-@chat_bp.route("/s/<session_id>")
-@login_required
-def session(session_id):
-    return render_session(session_id)
 
 
 @chat_bp.route("/s/<session_id>/chat")
 @login_required
-def chat_ui(session_id):
-    return render_session(session_id, template="partials/chat.html", push_url=True)
+def chat_ui(session_id, oob=False):
+    user = get_current_user()
+    uid = user["id"]
+
+    if not db.get_session(uid, session_id):
+        return render_template("partials/error.html", message="Session not found."), 404
+
+    history = db.get_history(uid, session_id)
+    prev_id = db.get_adjacent_session(uid, session_id, "prev")
+    next_id = db.get_adjacent_session(uid, session_id, "next")
+
+    html = render_template(
+        "partials/chat.html",
+        session_id=session_id,
+        history=history,
+        prev_id=prev_id,
+        next_id=next_id,
+        oob=oob,
+    )
+
+    return html
 
 
 @chat_bp.route("/s/create", methods=["POST"])
@@ -96,7 +109,6 @@ def delete_session(session_id):
     db.delete_session(uid, session_id)
 
     if request.args.get("htmx") == "true":
-        history = db.get_history(uid, new_session_id)
         new_session = db.get_session(uid, new_session_id)
 
         sidebar_html = ""
@@ -112,21 +124,7 @@ def delete_session(session_id):
             </ul>
             """
 
-        chat_html = render_template(
-            "partials/chat.html",
-            user=user,
-            history=history,
-            session_id=new_session_id,
-            prev_id=db.get_adjacent_session(uid, new_session_id, "prev"),
-            next_id=db.get_adjacent_session(uid, new_session_id, "next"),
-        )
-
-        chat_html = f"""
-        <main hx-swap-oob="true" id="chatbox-wrapper">
-          {chat_html}
-        </main>
-        """
-
+        chat_html = chat_ui(new_session_id, oob=True)
         return (
             f"{chat_html}{sidebar_html}",
             200,
