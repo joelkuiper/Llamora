@@ -59,6 +59,12 @@ body {
   box-shadow: none;
 }
 
+#sidebar .sidebar-header {
+  border-bottom: 1px solid var(--shadow-light);
+  padding-bottom: var(--spacing-sm);
+  padding-top: var(--spacing-xl);
+}
+
 #sidebar ul {
   flex: 1;
   overflow-y: auto;
@@ -82,7 +88,7 @@ body {
 }
 
 .session-item.new-session {
-  margin: var(--spacing-sm) var(--spacing-md);
+  margin: 0 var(--spacing-md);
   background: #f6f6f6;
   border-radius: var(--radius-md);
   box-shadow: var(--inset-shadow);
