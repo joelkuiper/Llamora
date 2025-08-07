@@ -161,14 +161,6 @@ class LocalDB:
     def get_all_sessions(self, user_id):
         with self.get_conn() as conn:
             rows = conn.execute(
-                "SELECT id, name, created_at FROM sessions WHERE user_id = ? ORDER BY created_at DESC",
-                (user_id,),
-            ).fetchall()
-            return [dict(row) for row in rows]
-
-    def get_all_sessions(self, user_id):
-        with self.get_conn() as conn:
-            rows = conn.execute(
                 "SELECT id, name, created_at FROM sessions WHERE user_id = ? ORDER BY ulid DESC",
                 (user_id,),
             ).fetchall()
