@@ -48,7 +48,7 @@ body {
   overflow: hidden;
 }
 
-.sidebar {
+#sidebar {
   width: 240px;
   height: 100vh;
   display: flex;
@@ -59,7 +59,7 @@ body {
   box-shadow: none;
 }
 
-.sidebar ul {
+#sidebar ul {
   flex: 1;
   overflow-y: auto;
   list-style: none;
@@ -113,12 +113,12 @@ body {
   height: 1rem;
 }
 
-.sidebar li:not(.active) .session-item:hover {
+#sidebar li:not(.active) .session-item:hover {
   background: #e4e4e4;
   box-shadow: var(--inset-shadow-disabled);
 }
 
-.sidebar li.active .session-item {
+#sidebar li.active .session-item {
   background: #dadada;
   font-weight: bold;
   box-shadow: inset 2px 2px 4px #bcbcbc, inset -2px -2px 4px #ffffff;
@@ -154,7 +154,7 @@ body {
 }
 
 /* Show on hover */
-.sidebar li:hover .delete-btn {
+#sidebar li:hover .delete-btn {
   opacity: 1;
 }
 
@@ -164,7 +164,7 @@ body {
 }
 
 
-.sidebar .user-info {
+#sidebar .user-info {
   padding: var(--spacing-xl);
   font-size: 0.85rem;
   border-top: 1px solid var(--shadow-dark);
