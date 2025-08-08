@@ -1,17 +1,5 @@
 let currentSSEListener = null;
 
-// From https://stackoverflow.com/questions/5499078/fastest-method-to-escape-html-tags-as-html-entities
-var escape = document.createElement('textarea');
-function escapeHTML(html) {
-    escape.textContent = html;
-    return escape.innerHTML;
-}
-
-function unescapeHTML(html) {
-    escape.innerHTML = html;
-    return escape.textContent;
-}
-
 function renderMarkdown(text) {
   const rawHtml = marked.parse(text, { gfm: true, breaks: true });
 
@@ -19,7 +7,7 @@ function renderMarkdown(text) {
 }
 
 function renderAllMarkdown(root) {
-  root.querySelectorAll('.user, .bot').forEach(el => {
+  root.querySelectorAll('.bot').forEach(el => {
     if (el.dataset.rendered !== 'true') {
       let text = el.textContent;
       renderMarkdownInElement(el, text);
