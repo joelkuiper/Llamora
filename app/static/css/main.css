@@ -145,7 +145,7 @@ body {
 
   display: block;
   height: 100%;
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: var(--spacing-sm) 0 var(--spacing-sm) var(--spacing-md);
 }
 
 .session-name-input {
