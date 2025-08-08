@@ -140,22 +140,18 @@ function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrappe
   function insertTypingIndicator(container, indicator) {
     if (!indicator) return;
 
-    const last = container.lastElementChild;
-    if (!last) {
-      container.appendChild(indicator);
-      return;
+    let node = container;
+
+    // Traverse to the deepest lastElementChild
+    while (node.lastElementChild) {
+      node = node.lastElementChild;
     }
 
-    const tag = last.tagName.toLowerCase();
-
-    const inlineTags = ["p", "li", "blockquote", "pre", "code"];
-
-    if (inlineTags.includes(tag)) {
-      last.appendChild(indicator);
-    } else if (last.lastElementChild && inlineTags.includes(last.lastElementChild.tagName.toLowerCase())) {
-      last.lastElementChild.appendChild(indicator);
+    // If the deepest node is text-like, insert after it
+    if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE) {
+      node.appendChild(indicator);
     } else {
-      // fallback
+      // fallback: just append to the container
       container.appendChild(indicator);
     }
   }
