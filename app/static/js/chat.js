@@ -4,25 +4,6 @@ function renderMarkdown(text) {
   return DOMPurify.sanitize(marked.parse(text, {"breaks": true, "gfm": true}));
 }
 
-function renderMarkdownInElement(el, text) {
-  if (!el) return;
-  const src = text !== undefined ? text : el.textContent || "";
-
-  // Render Markdown to safe HTML
-  const markdownHtml = renderMarkdown(src);
-
-  // Create a wrapper with display: contents
-  const wrapper = document.createElement("div");
-  wrapper.className = "markdown-body";
-  wrapper.innerHTML = markdownHtml;
-
-  // Clear target and inject the wrapper
-  el.innerHTML = "";
-  el.appendChild(wrapper);
-
-  el.dataset.rendered = "true";
-}
-
 function renderAllMarkdown(root) {
   root.querySelectorAll('.user, .bot').forEach(el => {
     if (el.dataset.rendered !== 'true') {
@@ -30,6 +11,24 @@ function renderAllMarkdown(root) {
     }
   });
 }
+
+function renderMarkdownInElement(el, text) {
+  if (!el) return;
+  const src = text !== undefined ? text : el.textContent || "";
+
+
+  const markdownHtml = renderMarkdown(src);
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "markdown-body";
+  wrapper.innerHTML = markdownHtml;
+
+  el.innerHTML = "";
+  el.appendChild(wrapper);
+
+  el.dataset.rendered = "true";
+}
+
 
 export function initChatUI(root = document) {
   const form = root.querySelector("#chat-form");
@@ -149,8 +148,23 @@ function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrappe
 
     const renderNow = () => {
       let text = (sink.textContent || "").replace(/\[newline\]/g, "\n");
+
+      const typing = wrap.querySelector("#typing-indicator");
       contentDiv.innerHTML = renderMarkdown(text);
+
+
+      if (typing) {
+        // Move it into the last paragraph/inline node if possible
+        const lastChild = contentDiv.lastElementChild;
+
+        if (lastChild && lastChild.tagName.match(/^(P|LI|SPAN|STRONG|EM|CODE)$/)) {
+          lastChild.appendChild(typing);
+        } else {
+          contentDiv.appendChild(typing); // fallback
+        }
+      }
     };
+
 
     if (type === "message") {
       scheduleRender(wrap, () => { renderNow(); scrollToBottom(); });
@@ -158,6 +172,8 @@ function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrappe
       const rid = sseRenders.get(wrap);
       if (rid) { cancelAnimationFrame(rid); sseRenders.delete(wrap); }
       renderNow();
+
+      wrap.querySelector("#typing-indicator")?.remove();
       if (type === "done") setFormEnabled(true);
       scrollToBottom();
     }

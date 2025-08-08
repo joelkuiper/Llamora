@@ -334,6 +334,13 @@ h1 {
   word-break: break-word;
 }
 
+#typing-indicator {
+  display: inline-block;
+  animation: blink 1s step-start infinite;
+  font-weight: bold;
+  padding-left: 4px;
+}
+
 .chat-controls {
   max-width: 60rem;
   margin: 0 auto var(--spacing-xl);
@@ -395,13 +402,6 @@ h1 {
   opacity: 0.5;
   cursor: not-allowed;
   box-shadow: var(--inset-shadow-disabled);
-}
-
-#typing-indicator {
-  display: inline-block;
-  animation: blink 1s step-start infinite;
-  font-weight: bold;
-  padding-left: 4px;
 }
 
 /* Errors */
