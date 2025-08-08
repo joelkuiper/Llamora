@@ -192,7 +192,7 @@ def delete_session(session_id):
 @chat_bp.route("/s/<session_id>/message", methods=["POST"])
 @login_required
 def send_message(session_id):
-    user_text = request.form.get("message", "").strip()
+    user_text = escape(request.form.get("message", "").strip())
     user = get_current_user()
     uid = user["id"]
 
@@ -251,7 +251,7 @@ def sse_reply(msg_id, session_id):
                     first = False
 
                 full_response += chunk
-                yield f"event: message\ndata: {replace_newline(chunk)}\n\n"
+                yield f"event: message\ndata: {replace_newline(escape(chunk))}\n\n"
         except Exception as e:
             yield f"event: message\ndata: <span class='error'>⚠️ {str(e)}</span>\n\n"
             error_occurred = True
