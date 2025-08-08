@@ -21,12 +21,7 @@ function renderMarkdown(text) {
 function renderAllMarkdown(root) {
   root.querySelectorAll('.user, .bot').forEach(el => {
     if (el.dataset.rendered !== 'true') {
-      const isUser = el.classList.contains("user");
       let text = el.textContent;
-      if(isUser) {
-        // Escape again so Marked can’t treat raw HTML like <img> as HTML
-        text = escapeHTML(text);
-      }
       renderMarkdownInElement(el, text);
     }
   });
