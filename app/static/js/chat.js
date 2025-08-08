@@ -137,6 +137,30 @@ function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrappe
     sseRenders.set(container, id);
   }
 
+  function insertTypingIndicator(container, indicator) {
+    if (!indicator) return;
+
+    const last = container.lastElementChild;
+    if (!last) {
+      container.appendChild(indicator);
+      return;
+    }
+
+    const tag = last.tagName.toLowerCase();
+
+    const inlineTags = ["p", "li", "blockquote", "pre", "code"];
+
+    if (inlineTags.includes(tag)) {
+      last.appendChild(indicator);
+    } else if (last.lastElementChild && inlineTags.includes(last.lastElementChild.tagName.toLowerCase())) {
+      last.lastElementChild.appendChild(indicator);
+    } else {
+      // fallback
+      container.appendChild(indicator);
+    }
+  }
+
+
   currentSSEListener = (evt) => {
     const { type } = evt.detail;
     const wrap = evt.target.closest('.bot-stream');
@@ -152,17 +176,8 @@ function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrappe
       const typing = wrap.querySelector("#typing-indicator");
       contentDiv.innerHTML = renderMarkdown(text);
 
+      insertTypingIndicator(contentDiv, typing);
 
-      if (typing) {
-        // Move it into the last paragraph/inline node if possible
-        const lastChild = contentDiv.lastElementChild;
-
-        if (lastChild && lastChild.tagName.match(/^(P|LI|SPAN|STRONG|EM|CODE)$/)) {
-          lastChild.appendChild(typing);
-        } else {
-          contentDiv.appendChild(typing); // fallback
-        }
-      }
     };
 
 
