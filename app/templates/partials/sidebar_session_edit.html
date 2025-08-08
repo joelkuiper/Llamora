@@ -13,7 +13,7 @@
         value="{{ session.name or 'Untitled' }}"
         maxlength="{{ config.MAX_SESSION_NAME_LENGTH }}"
         minlength="2"
-        require
+        required
         autofocus
         class="session-name-input"
         onfocus="this.select()"
