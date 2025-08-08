@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, request, Response, current_app
 import uuid
-import html
+from html import escape
 import os
 import re
 from llm_backend import LLMEngine
@@ -218,13 +218,8 @@ def send_message(session_id):
     )
 
 
-def html_encode_whitespace(text):
-    return html.escape(text).replace("\n", "<br>")
-
-
-def to_ls(s: str) -> str:
-    # Replace all newlines with U+2028 (Line Separator)
-    return re.sub(r"\r\n|\r|\n", "\u2028", s)
+def replace_newline(s: str) -> str:
+    return re.sub(r"\r\n|\r|\n", "[newline]", s)
 
 
 @chat_bp.route("/s/<session_id>/sse-reply/<msg_id>")
@@ -254,9 +249,10 @@ def sse_reply(msg_id, session_id):
                 if first:
                     chunk = chunk.lstrip()
                     first = False
+                safe = replace_newline(escape(chunk))
 
-                full_response += chunk
-                yield f"event: message\ndata: {to_ls(chunk)}\n\n"
+                full_response += safe
+                yield f"event: message\ndata: {safe}\n\n"
         except Exception as e:
             yield f"event: message\ndata: <span class='error'>⚠️ {str(e)}</span>\n\n"
             error_occurred = True

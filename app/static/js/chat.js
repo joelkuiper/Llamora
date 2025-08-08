@@ -3,16 +3,18 @@ let currentSSEListener = null;
 // Set options
 marked.use({
   gfm: true,
-  breaks: true
+  breaks: false
 });
 
 function renderMarkdown(text) {
+  text = text.replace(/\[newline\]/g, "\n");
   return DOMPurify.sanitize(marked.parse(text));
 }
 
 function renderMarkdownInElement(el, text) {
   if (!el) return;
-  const src = text !== undefined ? text : el.textContent;
+  let src = text !== undefined ? text : el.textContent;
+
   el.innerHTML = renderMarkdown(src);
   el.dataset.rendered = 'true';
 }
@@ -142,8 +144,7 @@ currentSSEListener = (evt) => {
   if (!sink || !contentDiv) return;
 
   const renderNow = () => {
-    const text = (sink.textContent || "").replace(/\u2028/g, "\n");
-    contentDiv.innerHTML = renderMarkdown(text);
+    contentDiv.innerHTML = renderMarkdown(sink.textContent || "");
   };
 
   if (type === "message") {
