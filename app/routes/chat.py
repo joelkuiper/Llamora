@@ -13,7 +13,7 @@ chat_bp = Blueprint("chat", __name__)
 
 llm = LLMEngine(
     model_path=os.environ["CHAT_MODEL_GGUF"],
-    verbose=str_to_bool(os.environ["FLASK_DEBUG"]),
+    verbose=str_to_bool(os.getenv("FLASK_DEBUG", "False")),
 )
 
 

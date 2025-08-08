@@ -17,11 +17,11 @@ It’s meant for educational use only.
 ![Registration screenshot](./doc/20250808_registration.png)
 ---
 
-## Features 
+## Features
 
 - **Local LLM Backend** Runs a llama.cpp model locally via [**llama-cpp-python**](https://github.com/abetlen/llama-cpp-python), using [LangChain](https://www.langchain.com/) to manage prompts. No cloud or API keys needed -- your data and queries stay on your machine. You just provide a GGUF model file, and the app will load it at startup.
 
-- **Streaming Responses** Utilizes **Server-Sent Events (SSE)** to stream the AI's response token by token. The user sees the answer appear as it's being generated, similar to ChatGPT's interface. 
+- **Streaming Responses** Utilizes **Server-Sent Events (SSE)** to stream the AI's response token by token. The user sees the answer appear as it's being generated, similar to ChatGPT's interface.
 
 - **HTMX-Powered UI** Leverages [**HTMX**](https://htmx.org/) for dynamic content updates without writing custom JS for every interaction. For example:
 
@@ -31,14 +31,14 @@ It’s meant for educational use only.
 - **Multi-Session Chat** Supports multiple chat sessions per user. Users can have several conversations (sessions) with the assistant and switch between them. Each session's message history is stored in a local SQLite database and retrieved when you revisit that session. You can create new sessions (they start blank with a greeting), rename sessions, or delete sessions.
 
 - **User Accounts**  Includes a basic username/password authentication system:
-  
+
   - Users can register and login. Passwords are stored securely (hashed with Argon2id + salt).
   - Logged-in users can only access their own chat sessions and data (isolated per account).
   - The app uses encrypted cookies to keep users logged in without server-side sessions. (Cookies are encrypted with a secret key so they can't be tampered with.)
 
 - **Neumorphic UI Design** The interface has a clean, modern look with soft shadows. It's mobile-responsive (the layout is simple enough to work on different screen sizes). There's virtually no JavaScript in the frontend beyond handling the streamed messages and some minor UX tweaks (like auto-scrolling the chat window).
 
-- **Markdown Support** The assistant's responses (and user messages) can include Markdown formatting. The client will render Markdown into HTML (for example, **bold text**, *italics*, `code blocks`, lists, etc.). The app uses **Marked** (Markdown parser) and **DOMPurify** (to sanitize output) on the client side to render any Markdown content from the LLM. 
+- **Markdown Support** The assistant's responses (and user messages) can include Markdown formatting. The client will render Markdown into HTML (for example, **bold text**, *italics*, `code blocks`, lists, etc.). The app uses **Marked** (Markdown parser) and **DOMPurify** (to sanitize output) on the client side to render any Markdown content from the LLM.
 
 - **Lightweight and Dependency-Minimal** The entire app is relatively small in terms of code. It uses a few Python packages (Flask, NaCl for security, LangChain for llama.cpp integration) and some JS libraries (HTMX and extensions, Marked, DOMPurify), all of which are either included or installable via [uv](https://docs.astral.sh/uv/). There is no need for Node.js build steps, no bundlers, and no heavy frameworks.
 
@@ -47,8 +47,6 @@ It’s meant for educational use only.
 This project has **several limitations** by design. It's important to understand them if you plan to use or extend this code:
 
 - **Not Scalable (Single-User Queue):** The app can only comfortably handle one chat interaction at a time. The LLM processing is single-threaded and queued. If two users ask questions simultaneously, one will wait until the other's response is done. This is fine for a personal assistant or small demo, but not for a multi-user or high-traffic scenario. Scaling would require architectural changes (e.g., running the model in a separate service or adding task workers).
-
-- **Blocking Operations:** Related to the above, the server processes each message send in a blocking manner. While the response streams out, the Flask worker handling it is busy until it's done. In development mode this is okay. In production, you'd use a server that can handle concurrent connections (or an async framework). As is, long AI responses tie up the serving thread.
 
 - **Minimal Error Handling:** The application doesn't have robust error management. If something goes wrong (like the model runs out of memory, or a bug occurs), the user will either see a generic error message in the chat or possibly a 5xx error page. There's no retry logic or user-friendly error feedback beyond a basic "⚠️ Error". Logging is also minimal (mainly non-existent). For a real app, you'd want better logging and error recovery.
 
@@ -76,7 +74,7 @@ This project has **several limitations** by design. It's important to understand
 - [uv](https://docs.astral.sh/uv/)
 - a compatible GGUF LLM model (e.g. Phi-3.5)
 - a relatively fast computer (ideally with a strong GPU)
-- C/C++ Build Tools:  Needed to install `llama-cpp-python` (which compiles the llama.cpp C++ library). On Linux, ensure you have `cmake`, `g++`, etc. installed. 
+- C/C++ Build Tools:  Needed to install `llama-cpp-python` (which compiles the llama.cpp C++ library). On Linux, ensure you have `cmake`, `g++`, etc. installed.
 
 ### Run
 Download [Phi-3.5-mini-instruct-GGUF](https://huggingface.co/MaziyarPanahi/Phi-3.5-mini-instruct-GGUF) (tested with the [Q5_K_M](https://huggingface.co/MaziyarPanahi/Phi-3.5-mini-instruct-GGUF/blob/main/Phi-3.5-mini-instruct.Q5_K_M.gguf) quantization).

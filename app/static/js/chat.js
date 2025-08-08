@@ -1,6 +1,6 @@
 let currentSSEListener = null;
 
-https://stackoverflow.com/questions/5499078/fastest-method-to-escape-html-tags-as-html-entities
+// From https://stackoverflow.com/questions/5499078/fastest-method-to-escape-html-tags-as-html-entities
 var escape = document.createElement('textarea');
 function escapeHTML(html) {
     escape.textContent = html;
