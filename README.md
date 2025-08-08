@@ -3,8 +3,11 @@
 
 > ❗ **This project is a personal learning experiment. It is not production-ready. Do not deploy this without major modifications.**
 
-![screenshot](./doc/20250808_chat.png)
+### Screenshots
 
+![Chat screenshot](./doc/20250808_chat.png)
+![Login screenshot](./doc/20250808_login.png)
+![Registration screenshot](./doc/20250808_registration.png)
 ---
 
 ## About
@@ -15,6 +18,8 @@ This project was built as a **hands-on experiment** in combining:
 - ⚡ **HTMX** for seamless front-end interactivity without JavaScript frameworks
 - 🌐 **Flask** for backend routing and SSE streaming
 - 💅 A **Neumorphic UI** for minimal styling
+- 🔐 Simple **username/password auth** (Argon2 hashes + encrypted cookies)
+- ✨ Client-side **Markdown rendering**
 
 It’s a **prototype**, intended for exploring techniques like:
 
@@ -22,6 +27,8 @@ It’s a **prototype**, intended for exploring techniques like:
 - Managing chat history by session (in SQLite)
 - Coordinating LLM calls with a safe in-process queue
 - Building interactive web apps with minimal frontend JavaScript using [htmx](https://htmx.org/)
+- Simple username/password authentication with encrypted cookies
+- Chat session management (create, delete, rename)
 
 ---
 
@@ -29,7 +36,7 @@ It’s a **prototype**, intended for exploring techniques like:
 
 **This project is *not* suitable for deployment.**
 
-- ❌ No authentication or session protection
+- ⚠️ Very limited authentication/session handling (no password recovery, rate limiting, etc.)
 - ❌ Very basic error handling
 - ❌ Blocking, single-threaded queue for LLM calls
 - ❌ Input is not sanitized or restricted
