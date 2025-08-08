@@ -23,6 +23,7 @@ def register():
 
         max_user = current_app.config["MAX_USERNAME_LENGTH"]
         max_pass = current_app.config["MAX_PASSWORD_LENGTH"]
+        min_pass = current_app.config.get("MIN_PASSWORD_LENGTH")
 
         # Basic validations
         if not username or not password or not confirm:
@@ -44,6 +45,18 @@ def register():
 
         if password != confirm:
             return render_template("register.html", error="Passwords do not match")
+
+        if len(password) < min_pass:
+            return render_template(
+                "register.html",
+                error=f"Password must be at least {min_pass} characters long",
+            )
+
+        if not re.search(r"[A-Za-z]", password) or not re.search(r"\d", password):
+            return render_template(
+                "register.html",
+                error="Password must contain at least one letter and one number",
+            )
 
         if db.get_user_by_username(username):
             return render_template("register.html", error="Username already exists")

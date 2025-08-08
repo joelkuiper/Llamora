@@ -15,10 +15,22 @@
       <form method="post">
         <input type="text" name="username" placeholder="Username"
                required pattern="^[A-Za-z0-9_]+$" maxlength="{{ config.MAX_USERNAME_LENGTH }}"/>
-        <input type="password" name="password" placeholder="Password"
-               required maxlength="{{ config.MAX_PASSWORD_LENGTH }}" />
-        <input type="password" name="confirm_password" placeholder="Confirm Password"
-               required maxlength="{{ config.MAX_PASSWORD_LENGTH }}" />
+        <input type="password"
+               name="password"
+               placeholder="Password"
+               required
+               pattern="^(?=.*[A-Za-z])(?=.*\d).+$"
+               maxlength="{{ config.MAX_PASSWORD_LENGTH }}"
+               minlength="{{ config.MIN_PASSWORD_LENGTH }}"
+               />
+        <input type="password"
+               name="confirm_password"
+               placeholder="Confirm password"
+               required
+               pattern="^(?=.*[A-Za-z])(?=.*\d).+$"
+               maxlength="{{ config.MAX_PASSWORD_LENGTH }}"
+               minlength="{{ config.MIN_PASSWORD_LENGTH }}"
+               />
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit">Create account</button>
       </form>

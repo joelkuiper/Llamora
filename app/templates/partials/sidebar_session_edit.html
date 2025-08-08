@@ -1,17 +1,20 @@
-<li id="session-{{ session.id }}" class="{% if session.id == session_id %}active{% endif %}">
+<li
+  id="session-{{ session.id }}"
+  class="{% if session.id == session_id %}active{% endif %}">
   <div class="session-item">
     <form
       hx-put="/s/{{ session.id }}/rename"
       hx-target="#session-{{ session.id }}"
       hx-swap="outerHTML"
-      style="width: 100%"> <!-- keeps it full-width if flexbox -->
+    >
       <input
         type="text"
         name="name"
         value="{{ session.name or 'Untitled' }}"
         maxlength="{{ config.MAX_SESSION_NAME_LENGTH }}"
         minlength="2"
-        required
+        require
+        autofocus
         class="session-name-input"
         onfocus="this.select()"
         onkeyup="if (event.key === 'Enter') this.form.requestSubmit()"
