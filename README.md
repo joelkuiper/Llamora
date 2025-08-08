@@ -3,6 +3,13 @@
 
 > ❗ **This project is a personal learning experiment. It is not production-ready. Do not deploy this without major modifications.**
 
+- ⚠️ Very limited authentication/session handling (no password recovery, rate limiting, etc.)
+- ❌ Very basic error handling
+- ❌ Blocking, single-threaded queue for LLM calls
+
+It’s meant for educational use only.
+
+
 ### Screenshots
 
 ![Chat screenshot](./doc/20250808_chat.png)
@@ -12,36 +19,59 @@
 
 ## About
 
-This project was built as a **hands-on experiment** in combining:
+- **Local LLM Backend** -- Runs a llama.cpp model locally via [**llama-cpp-python**](https://github.com/abetlen/llama-cpp-python), using [LangChain](https://www.langchain.com/) to manage prompts. No cloud or API keys needed -- your data and queries stay on your machine. You just provide a GGUF model file, and the app will load it at startup.
 
-- 🧠 A local **LLM backend** (via [llama.cpp](https://github.com/ggml-org/llama.cpp) and [LangChain](https://www.langchain.com/))
-- ⚡ **HTMX** for seamless front-end interactivity without JavaScript frameworks
-- 🌐 **Flask** for backend routing and SSE streaming
-- 💅 A **Neumorphic UI** for minimal styling
-- 🔐 Simple **username/password auth** (Argon2 hashes + encrypted cookies)
-- ✨ Client-side **Markdown rendering**
+- **Streaming Responses** -- Utilizes **Server-Sent Events (SSE)** to stream the AI's response token by token. The user sees the answer appear as it's being generated, similar to ChatGPT's interface. This makes the UI feel responsive, especially for longer answers.
 
-It’s a **prototype**, intended for exploring techniques like:
+- **HTMX-Powered UI** -- Leverages [**HTMX**](https://htmx.org/) for dynamic content updates without writing custom JS for every interaction. For example:
 
-- Streaming LLM output over Server-Sent Events (SSE)
-- Managing chat history by session (in SQLite)
-- Chat session management (create, delete, rename)
-- Coordinating LLM calls with a safe in-process queue
-- Building interactive web apps with minimal frontend JavaScript using [htmx](https://htmx.org/)
-- Simple username/password authentication with encrypted cookies
+- Creating a new chat session, switching between sessions, and deleting sessions all happen via HTMX requests that swap in new HTML fragments.
 
----
+- Sending a message uses HTMX to POST the message and then initiates an SSE stream for the reply, all in the background.
 
-## 🚫 Not for Production
+- This approach means **no SPA framework** is needed -- the server renders HTML partials which are inserted into the page. It's simple and keeps front-end code to a minimum.
 
-**This project is *not* suitable for deployment.**
+- **Multi-Session Chat** -- Supports multiple chat sessions per user. Users can have several conversations (sessions) with the assistant and switch between them. Each session's message history is stored in a local SQLite database and retrieved when you revisit that session. You can create new sessions (they start blank with a greeting), rename sessions, or delete sessions.
 
-- ⚠️ Very limited authentication/session handling (no password recovery, rate limiting, etc.)
-- ❌ Very basic error handling
-- ❌ Blocking, single-threaded queue for LLM calls
-- ❌ Input is not sanitized or restricted
+- **User Accounts** -- Includes a basic username/password authentication system:
 
-It’s meant for educational use only.
+- Users can register and login. Passwords are stored securely (hashed with Argon2id + salt).
+
+- Logged-in users can only access their own chat sessions and data (isolated per account).
+
+- The app uses encrypted cookies to keep users logged in without server-side sessions. (Cookies are encrypted with a secret key so they can't be tampered with.)
+
+- **Neumorphic UI Design** -- The interface has a clean, modern look with soft shadows. It's mobile-responsive (the layout is simple enough to work on different screen sizes). There's virtually no JavaScript in the frontend beyond handling the streamed messages and some minor UX tweaks (like auto-scrolling the chat window).
+
+- **Markdown Support** -- The assistant's responses (and user messages) can include Markdown formatting. The client will render Markdown into HTML (for example, **bold text**, *italics*, `code blocks`, lists, etc.). The app uses **Marked** (Markdown parser) and **DOMPurify** (to sanitize output) on the client side to safely render any Markdown content from the LLM. This makes it great for answers that include code snippets or lists.
+
+- **Lightweight and Dependency-Minimal** -- The entire app is relatively small in terms of code. It uses a few Python packages (Flask, itsdangerous/NaCl for security, LangChain for llama.cpp integration) and some JS libraries (HTMX and extensions, Marked, DOMPurify), all of which are either included or installable via uv. There is no need for Node.js build steps, no bundlers, and no heavy frameworks.
+
+## Known Limitations
+
+This project has **several limitations** by design. It's important to understand them if you plan to use or extend this code:
+
+- **Not Scalable (Single-User Queue):** The app can only comfortably handle one chat interaction at a time. The LLM processing is single-threaded and queued. If two users ask questions simultaneously, one will wait until the other's response is done. This is fine for a personal assistant or small demo, but not for a multi-user or high-traffic scenario. Scaling would require architectural changes (e.g., running the model in a separate service or adding task workers).
+
+- **Blocking Operations:** Related to the above, the server processes each message send in a blocking manner. While the response streams out, the Flask worker handling it is busy until it's done. In development mode this is okay. In production, you'd use a server that can handle concurrent connections (or an async framework). As is, long AI responses tie up the serving thread.
+
+- **Minimal Error Handling:** The application doesn't have robust error management. If something goes wrong (like the model runs out of memory, or a bug occurs), the user will either see a generic error message in the chat or possibly a 5xx error page. There's no retry logic or user-friendly error feedback beyond a basic "⚠️ Error". Logging is also minimal (mainly print statements). For a real app, you'd want better logging and error recovery.
+
+- **No API or External Interface:** The app doesn't expose an API for programmatic access -- it's purely a web interface. That's fine for interactive use, but if you wanted to use this as a backend service, you'd have to add JSON endpoints or similar.
+
+- **Auth is Basic:** The authentication system is very simple:
+
+- No password reset or email verification flow.
+
+- No account deletion or profile management.
+
+- No multi-factor auth.
+
+- All users are equal (no roles or admin). It serves the purpose of protecting your chat data from others on a shared deployment, but it's not meant for a large user base without enhancements.
+
+- **Input/Output Filtering:** Aside from Markdown sanitization, there's no content filtering on user inputs or AI outputs. The model could potentially produce inappropriate content if prompted. There is also nothing preventing prompt injections (where a user could ask the assistant to ignore its system prompt). Since this is a closed environment (local model, one user), that wasn't a focus. But it's something to consider if expanded -- e.g., using moderation models or guardrails if it were public.
+
+- **Model and Performance:** The app loads the model into RAM when it starts. Large models (even quantized) can be slow or consume a lot of memory. The example model (Phi 3.5 mini) is relatively small, but anything larger might make the app sluggish or not fit in memory depending on your hardware. There's no mechanism to swap models on the fly; it's a static single model. Also, generation parameters (temperature, max tokens) are hardcoded in the LLMEngine. You'd have to modify code to adjust those.
 
 ---
 
