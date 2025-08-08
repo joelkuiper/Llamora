@@ -301,11 +301,14 @@ h1 {
   background: var(--color-bg);
 }
 
-.message > p,
-.message > pre {
+.markdown-body {
+  display: contents;
+}
+
+.markdown-body  p,
+.markdown-body  pre {
   padding: 0;
   margin: 0;
-  display: inline-block;
 }
 
 .message code {
@@ -329,10 +332,6 @@ h1 {
 .bot-stream, .bot {
   word-wrap: break-word;
   word-break: break-word;
-}
-
-.bot {
-  white-space: pre-wrap;
 }
 
 .chat-controls {

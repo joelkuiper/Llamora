@@ -1,22 +1,26 @@
 let currentSSEListener = null;
 
-// Set options
-marked.use({
-  gfm: true,
-  breaks: false
-});
-
 function renderMarkdown(text) {
-  text = text.replace(/\[newline\]/g, "\n");
-  return DOMPurify.sanitize(marked.parse(text));
+  return DOMPurify.sanitize(marked.parse(text, {"breaks": true, "gfm": true}));
 }
 
 function renderMarkdownInElement(el, text) {
   if (!el) return;
-  let src = text !== undefined ? text : el.textContent;
+  const src = text !== undefined ? text : el.textContent || "";
 
-  el.innerHTML = renderMarkdown(src);
-  el.dataset.rendered = 'true';
+  // Render Markdown to safe HTML
+  const markdownHtml = renderMarkdown(src);
+
+  // Create a wrapper with display: contents
+  const wrapper = document.createElement("div");
+  wrapper.className = "markdown-body";
+  wrapper.innerHTML = markdownHtml;
+
+  // Clear target and inject the wrapper
+  el.innerHTML = "";
+  el.appendChild(wrapper);
+
+  el.dataset.rendered = "true";
 }
 
 function renderAllMarkdown(root) {
@@ -122,41 +126,42 @@ function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrappe
     document.body.removeEventListener("htmx:sseMessage", currentSSEListener);
   }
 
-const sseRenders = new WeakMap();
+  const sseRenders = new WeakMap();
 
-function scheduleRender(container, fn) {
-  const prev = sseRenders.get(container);
-  if (prev) cancelAnimationFrame(prev);
-  const id = requestAnimationFrame(() => {
-    sseRenders.delete(container);
-   fn();
-  });
-  sseRenders.set(container, id);
-}
-
-currentSSEListener = (evt) => {
-  const { type } = evt.detail;
-  const wrap = evt.target.closest('.bot-stream');
-  if (!wrap) return;
-
-  const sink = wrap.querySelector('.raw-response');
-  const contentDiv = wrap.querySelector('.message-content');
-  if (!sink || !contentDiv) return;
-
-  const renderNow = () => {
-    contentDiv.innerHTML = renderMarkdown(sink.textContent || "");
-  };
-
-  if (type === "message") {
-    scheduleRender(wrap, () => { renderNow(); scrollToBottom(); });
-  } else if (type === "error" || type === "done") {
-    const rid = sseRenders.get(wrap);
-    if (rid) { cancelAnimationFrame(rid); sseRenders.delete(wrap); }
-    renderNow();
-    if (type === "done") setFormEnabled(true);
-    scrollToBottom();
+  function scheduleRender(container, fn) {
+    const prev = sseRenders.get(container);
+    if (prev) cancelAnimationFrame(prev);
+    const id = requestAnimationFrame(() => {
+      sseRenders.delete(container);
+      fn();
+    });
+    sseRenders.set(container, id);
   }
-};
+
+  currentSSEListener = (evt) => {
+    const { type } = evt.detail;
+    const wrap = evt.target.closest('.bot-stream');
+    if (!wrap) return;
+
+    const sink = wrap.querySelector('.raw-response');
+    const contentDiv = wrap.querySelector('.markdown-body');
+    if (!sink || !contentDiv) return;
+
+    const renderNow = () => {
+      let text = (sink.textContent || "").replace(/\[newline\]/g, "\n");
+      contentDiv.innerHTML = renderMarkdown(text);
+    };
+
+    if (type === "message") {
+      scheduleRender(wrap, () => { renderNow(); scrollToBottom(); });
+    } else if (type === "error" || type === "done") {
+      const rid = sseRenders.get(wrap);
+      if (rid) { cancelAnimationFrame(rid); sseRenders.delete(wrap); }
+      renderNow();
+      if (type === "done") setFormEnabled(true);
+      scrollToBottom();
+    }
+  };
 
   document.body.addEventListener("htmx:sseMessage", currentSSEListener);
 

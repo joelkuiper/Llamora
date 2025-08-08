@@ -249,10 +249,9 @@ def sse_reply(msg_id, session_id):
                 if first:
                     chunk = chunk.lstrip()
                     first = False
-                safe = replace_newline(escape(chunk))
 
-                full_response += safe
-                yield f"event: message\ndata: {safe}\n\n"
+                full_response += chunk
+                yield f"event: message\ndata: {replace_newline(chunk)}\n\n"
         except Exception as e:
             yield f"event: message\ndata: <span class='error'>⚠️ {str(e)}</span>\n\n"
             error_occurred = True
