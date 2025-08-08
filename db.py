@@ -30,7 +30,7 @@ class LocalDB:
                 CREATE TABLE IF NOT EXISTS sessions (
                     id TEXT PRIMARY KEY,
                     ulid TEXT UNIQUE NOT NULL,
-                    user_id INTEGER NOT NULL,
+                    user_id TEXT NOT NULL,
                     name TEXT DEFAULT 'Untitled',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -38,7 +38,7 @@ class LocalDB:
 
                 CREATE TABLE IF NOT EXISTS messages (
                     id TEXT PRIMARY KEY,
-                    session_id TEXT NOT NULL,
+                    session_id TEXT UNIQUE NOT NULL,
                     role TEXT NOT NULL,
                     content TEXT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
