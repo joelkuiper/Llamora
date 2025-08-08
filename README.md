@@ -3,7 +3,7 @@
 
 > ❗ **This project is a personal learning experiment. It is not production-ready. Do not deploy this without major modifications.**
 
-![screenshot](./doc/screenshot.png)
+![screenshot](./doc/20250808_chat.png)
 
 ---
 
