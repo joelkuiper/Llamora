@@ -11,13 +11,14 @@ from langchain_core.callbacks import CallbackManager, StreamingStdOutCallbackHan
 class LLMEngine:
     """Handles queuing, streaming, and history formatting for an LLM chat interface."""
 
-    def __init__(self, model_path: str, max_workers: int = 1):
+    def __init__(self, model_path: str, max_workers: int = 1, verbose: bool = False):
+        self.verbose = verbose
         self.model_path = model_path
         self.llm = self._load_model()
+
         self.MAX_TOKENS = self.llm.n_ctx
         self.prompt = self._build_prompt()
         self.chain = self.prompt | self.llm
-
         self._request_queue = queue.Queue()
         self._start_workers(max_workers)
 
@@ -25,8 +26,8 @@ class LLMEngine:
         return LlamaCpp(
             model_path=self.model_path,
             temperature=0.8,
+            verbose=self.verbose,
             max_tokens=MAX_RESPONSE_TOKENS,
-            verbose=True,
             n_ctx=1024 * 9,
             streaming=True,
             n_gpu_layers=-1,

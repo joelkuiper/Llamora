@@ -4,14 +4,17 @@ from html import escape
 import os
 import re
 from llm_backend import LLMEngine
-
+from util import str_to_bool
 from app import db
 from app.services.auth_helpers import login_required, get_current_user
 
 chat_bp = Blueprint("chat", __name__)
 
 
-llm = LLMEngine(model_path=os.environ["CHAT_MODEL_GGUF"])
+llm = LLMEngine(
+    model_path=os.environ["CHAT_MODEL_GGUF"],
+    verbose=str_to_bool(os.environ["FLASK_DEBUG"]),
+)
 
 
 @chat_bp.route("/")
