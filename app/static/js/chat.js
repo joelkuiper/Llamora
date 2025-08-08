@@ -1,13 +1,33 @@
 let currentSSEListener = null;
 
+https://stackoverflow.com/questions/5499078/fastest-method-to-escape-html-tags-as-html-entities
+var escape = document.createElement('textarea');
+function escapeHTML(html) {
+    escape.textContent = html;
+    return escape.innerHTML;
+}
+
+function unescapeHTML(html) {
+    escape.innerHTML = html;
+    return escape.textContent;
+}
+
 function renderMarkdown(text) {
-  return DOMPurify.sanitize(marked.parse(text, {"breaks": true, "gfm": true}));
+  const rawHtml = marked.parse(text, { gfm: true, breaks: true });
+
+  return DOMPurify.sanitize(rawHtml);
 }
 
 function renderAllMarkdown(root) {
   root.querySelectorAll('.user, .bot').forEach(el => {
     if (el.dataset.rendered !== 'true') {
-      renderMarkdownInElement(el);
+      const isUser = el.classList.contains("user");
+      let text = el.textContent;
+      if(isUser) {
+        // Escape again so Marked can’t treat raw HTML like <img> as HTML
+        text = escapeHTML(text);
+      }
+      renderMarkdownInElement(el, text);
     }
   });
 }

@@ -37,6 +37,7 @@ def session(session_id):
         return render_template("partials/error.html", message="Session not found."), 404
 
     history = db.get_history(uid, session_id)
+
     sessions = db.get_all_sessions(uid)
 
     html = render_template(
@@ -195,7 +196,7 @@ def delete_session(session_id):
 @chat_bp.route("/s/<session_id>/message", methods=["POST"])
 @login_required
 def send_message(session_id):
-    user_text = escape(request.form.get("message", "").strip())
+    user_text = request.form.get("message", "").strip()
     user = get_current_user()
     uid = user["id"]
 
