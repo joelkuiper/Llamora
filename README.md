@@ -25,10 +25,10 @@ It’s a **prototype**, intended for exploring techniques like:
 
 - Streaming LLM output over Server-Sent Events (SSE)
 - Managing chat history by session (in SQLite)
+- Chat session management (create, delete, rename)
 - Coordinating LLM calls with a safe in-process queue
 - Building interactive web apps with minimal frontend JavaScript using [htmx](https://htmx.org/)
 - Simple username/password authentication with encrypted cookies
-- Chat session management (create, delete, rename)
 
 ---
 
