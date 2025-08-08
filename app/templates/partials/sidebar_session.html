@@ -8,7 +8,7 @@
       data-session-id="{{ session.id }}"
       hx-target="#chatbox-wrapper"
       hx-swap="outerHTML">
-      {{ session.name or 'Untitled' }}
+      {{ session.name|markupsafe }}
     </a>
     <div class="session-actions">
       <button
