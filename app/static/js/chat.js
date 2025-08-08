@@ -137,25 +137,6 @@ function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrappe
     sseRenders.set(container, id);
   }
 
-  function insertTypingIndicator(container, indicator) {
-    if (!indicator) return;
-
-    let node = container;
-
-    // Traverse to the deepest lastElementChild
-    while (node.lastElementChild) {
-      node = node.lastElementChild;
-    }
-
-    // If the deepest node is text-like, insert after it
-    if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE) {
-      node.appendChild(indicator);
-    } else {
-      // fallback: just append to the container
-      container.appendChild(indicator);
-    }
-  }
-
 
   currentSSEListener = (evt) => {
     const { type } = evt.detail;
@@ -172,7 +153,16 @@ function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrappe
       const typing = wrap.querySelector("#typing-indicator");
       contentDiv.innerHTML = renderMarkdown(text);
 
-      insertTypingIndicator(contentDiv, typing);
+      if (typing) {
+        // Move it into the last paragraph/inline node if possible
+        const lastChild = contentDiv.lastElementChild;
+
+        if (lastChild && lastChild.tagName.match(/^(P|LI|SPAN|STRONG|EM|CODE)$/)) {
+          lastChild.appendChild(typing);
+        } else {
+          contentDiv.appendChild(typing); // fallback
+        }
+      }
 
     };
 
