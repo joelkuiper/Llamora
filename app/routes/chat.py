@@ -1,6 +1,6 @@
-from flask import Blueprint, render_template, redirect, request, Response, current_app
+from quart import Blueprint, render_template, redirect, request, Response, current_app
 from html import escape
-import threading
+import asyncio
 import os
 import re
 from llm_backend import LLMEngine
@@ -13,37 +13,40 @@ chat_bp = Blueprint("chat", __name__)
 
 llm = LLMEngine(
     model_path=os.environ["CHAT_MODEL_GGUF"],
-    verbose=str_to_bool(os.getenv("FLASK_DEBUG", "False")),
+    verbose=str_to_bool(os.getenv("QUART_DEBUG", "False")),
 )
 
 
 @chat_bp.route("/")
 @login_required
-def index():
-    user = get_current_user()
+async def index():
+    user = await get_current_user()
     uid = user["id"]
-    session_id = db.get_latest_session(uid) or db.create_session(uid)
+    session_id = await db.get_latest_session(uid) or await db.create_session(uid)
     return redirect(f"/s/{session_id}", code=302)
 
 
 @chat_bp.route("/s/<session_id>")
 @login_required
-def session(session_id):
-    user = get_current_user()
+async def session(session_id):
+    user = await get_current_user()
     uid = user["id"]
-    session = db.get_session(uid, session_id)
+    session = await db.get_session(uid, session_id)
 
     if not session:
-        return render_template("partials/error.html", message="Session not found."), 404
+        return (
+            await render_template("partials/error.html", message="Session not found."),
+            404,
+        )
 
-    history = db.get_history(uid, session_id)
+    history = await db.get_history(uid, session_id)
     pending_msg_id = None
     if history and history[-1]["role"] == "user":
         pending_msg_id = history[-1]["id"]
 
-    sessions = db.get_all_sessions(uid)
+    sessions = await db.get_all_sessions(uid)
 
-    html = render_template(
+    html = await render_template(
         "index.html",
         user=user,
         history=history,
@@ -55,20 +58,23 @@ def session(session_id):
     return html
 
 
-def render_chat(session_id, oob=False):
-    user = get_current_user()
+async def render_chat(session_id, oob=False):
+    user = await get_current_user()
     uid = user["id"]
-    session = db.get_session(uid, session_id)
+    session = await db.get_session(uid, session_id)
 
     if not session:
-        return render_template("partials/error.html", message="Session not found."), 404
+        return (
+            await render_template("partials/error.html", message="Session not found."),
+            404,
+        )
 
-    history = db.get_history(uid, session_id)
+    history = await db.get_history(uid, session_id)
     pending_msg_id = None
     if history and history[-1]["role"] == "user":
         pending_msg_id = history[-1]["id"]
 
-    html = render_template(
+    html = await render_template(
         "partials/chat.html",
         session=session,
         history=history,
@@ -81,26 +87,26 @@ def render_chat(session_id, oob=False):
 
 @chat_bp.route("/s/<session_id>/chat")
 @login_required
-def chat_htmx(session_id):
-    html = render_chat(session_id, False)
+async def chat_htmx(session_id):
+    html = await render_chat(session_id, False)
     return html, 200, {"HX-Push-Url": f"/s/{session_id}"}
 
 
 @chat_bp.route("/s/create", methods=["POST"])
 @login_required
-def create_session():
-    user = get_current_user()
+async def create_session():
+    user = await get_current_user()
     uid = user["id"]
-    new_session_id = db.create_session(uid)
-    new_session = db.get_session(uid, new_session_id)
+    new_session_id = await db.create_session(uid)
+    new_session = await db.get_session(uid, new_session_id)
 
-    sidebar_html = render_template(
+    sidebar_html = await render_template(
         "partials/sidebar_session.html",
         session=new_session,
         session_id=new_session_id,
     )
-    chat_html = render_chat(new_session_id, oob=True)
-
+    chat_html = await render_chat(new_session_id, oob=True)
+    print("New session")
     return (
         f"{chat_html}{sidebar_html}",
         200,
@@ -110,80 +116,90 @@ def create_session():
 
 @chat_bp.route("/s/<session_id>/rename", methods=["GET"])
 @login_required
-def edit_session_name(session_id):
-    user = get_current_user()
+async def edit_session_name(session_id):
+    user = await get_current_user()
     uid = user["id"]
-    session = db.get_session(uid, session_id)
+    session = await db.get_session(uid, session_id)
 
     if not session:
-        return render_template("partials/error.html", message="Session not found."), 404
+        return (
+            await render_template("partials/error.html", message="Session not found."),
+            404,
+        )
 
-    return render_template(
+    return await render_template(
         "partials/sidebar_session_edit.html", session=session, session_id=session_id
     )
 
 
 @chat_bp.route("/s/<session_id>/rename", methods=["PUT"])
 @login_required
-def rename_session(session_id):
-    user = get_current_user()
+async def rename_session(session_id):
+    user = await get_current_user()
     uid = user["id"]
-    new_name = request.form.get("name", "").strip()
+    form = await request.form
+    new_name = form.get("name", "").strip()
     max_len = current_app.config["MAX_SESSION_NAME_LENGTH"]
     active_session_id = request.headers.get("X-Active-Session")
 
-    if not db.get_session(uid, session_id) or not new_name or len(new_name) > max_len:
+    if (
+        not await db.get_session(uid, session_id)
+        or not new_name
+        or len(new_name) > max_len
+    ):
         return (
-            render_template(
+            await render_template(
                 "partials/error.html",
                 message="Error",
             ),
             400,
         )
 
-    db.rename_session(uid, session_id, new_name)
-    session = db.get_session(uid, session_id)
+    await db.rename_session(uid, session_id, new_name)
+    session = await db.get_session(uid, session_id)
 
-    return render_template(
+    return await render_template(
         "partials/sidebar_session.html", session=session, session_id=active_session_id
     )
 
 
 @chat_bp.route("/s/<session_id>", methods=["DELETE"])
 @login_required
-def delete_session(session_id):
-    user = get_current_user()
+async def delete_session(session_id):
+    user = await get_current_user()
     uid = user["id"]
 
-    if not db.get_session(uid, session_id):
-        return render_template("partials/error.html", message="Session not found."), 404
+    if not await db.get_session(uid, session_id):
+        return (
+            await render_template("partials/error.html", message="Session not found."),
+            404,
+        )
 
     active_session_id = request.headers.get("X-Active-Session")
     is_active = active_session_id == session_id
 
     if not is_active:
-
-        db.delete_session(uid, session_id)
+        await db.delete_session(uid, session_id)
         return ""  # Deletes it from the DOM
 
     else:
-        next_id = db.get_adjacent_session(uid, session_id, "next")
-        prev_id = db.get_adjacent_session(uid, session_id, "prev")
+        next_id = await db.get_adjacent_session(uid, session_id, "next")
+        prev_id = await db.get_adjacent_session(uid, session_id, "prev")
 
         new_session_id = next_id or prev_id
         new_session_was_created = False
 
         if not new_session_id:
-            new_session_id = db.create_session(uid)
+            new_session_id = await db.create_session(uid)
             new_session_was_created = True
 
-        db.delete_session(uid, session_id)
+        await db.delete_session(uid, session_id)
 
-        new_session = db.get_session(uid, new_session_id)
+        new_session = await db.get_session(uid, new_session_id)
 
         sidebar_html = ""
         if new_session_was_created:
-            sidebar_html = render_template(
+            sidebar_html = await render_template(
                 "partials/sidebar_session.html",
                 session=new_session,
             )
@@ -193,7 +209,7 @@ def delete_session(session_id):
           </ul>
           """
 
-        chat_html = render_chat(new_session_id, oob=True)
+        chat_html = await render_chat(new_session_id, oob=True)
 
         return (
             f"{chat_html}{sidebar_html}",
@@ -211,17 +227,14 @@ class PendingResponse:
         self.text = ""
         self.done = False
         self.error = False
-        self._cond = threading.Condition()
-        thread = threading.Thread(
-            target=self._generate, args=(uid, session_id, history), daemon=True
-        )
-        thread.start()
+        self._cond = asyncio.Condition()
+        asyncio.create_task(self._generate(uid, session_id, history))
 
-    def _generate(self, uid: str, session_id: str, history: list[dict]):
+    async def _generate(self, uid: str, session_id: str, history: list[dict]):
         full_response = ""
         first = True
         try:
-            for chunk in llm.stream_response(history):
+            async for chunk in llm.stream_response(history):
                 if isinstance(chunk, dict) and chunk.get("type") == "error":
                     full_response += f"<span class='error'>{chunk['data']}</span>"
                     self.error = True
@@ -232,7 +245,7 @@ class PendingResponse:
                     first = False
 
                 full_response += chunk
-                with self._cond:
+                async with self._cond:
                     self.text = full_response
                     self._cond.notify_all()
 
@@ -241,19 +254,19 @@ class PendingResponse:
             self.error = True
         finally:
             if not self.error and full_response.strip():
-                db.append(uid, session_id, "assistant", full_response)
-            with self._cond:
+                await db.append(uid, session_id, "assistant", full_response)
+            async with self._cond:
                 self.text = full_response
                 self.done = True
                 self._cond.notify_all()
             pending_responses.pop(self.msg_id, None)
 
-    def stream(self):
+    async def stream(self):
         sent = 0
         while True:
-            with self._cond:
+            async with self._cond:
                 while len(self.text) == sent and not self.done:
-                    self._cond.wait()
+                    await self._cond.wait()
                 chunk = self.text[sent:]
                 sent = len(self.text)
                 if chunk:
@@ -264,25 +277,30 @@ class PendingResponse:
 
 @chat_bp.route("/s/<session_id>/message", methods=["POST"])
 @login_required
-def send_message(session_id):
-    user_text = request.form.get("message", "").strip()
-    user = get_current_user()
+async def send_message(session_id):
+    form = await request.form
+    user_text = form.get("message", "").strip()
+    user = await get_current_user()
     uid = user["id"]
 
     max_len = current_app.config["MAX_MESSAGE_LENGTH"]
 
-    if not user_text or len(user_text) > max_len or not db.get_session(uid, session_id):
+    if (
+        not user_text
+        or len(user_text) > max_len
+        or not await db.get_session(uid, session_id)
+    ):
         return (
-            render_template(
+            await render_template(
                 "partials/error.html",
                 message="Message is empty, too long, or session is invalid.",
             ),
             400,
         )
 
-    msg_id = db.append(uid, session_id, "user", user_text)
+    msg_id = await db.append(uid, session_id, "user", user_text)
 
-    return render_template(
+    return await render_template(
         "partials/placeholder.html",
         user_text=user_text,
         msg_id=msg_id,
@@ -296,10 +314,10 @@ def replace_newline(s: str) -> str:
 
 @chat_bp.route("/s/<session_id>/sse-reply/<msg_id>")
 @login_required
-def sse_reply(msg_id, session_id):
-    user = get_current_user()
+async def sse_reply(msg_id, session_id):
+    user = await get_current_user()
     uid = user["id"]
-    history = db.get_history(uid, session_id)
+    history = await db.get_history(uid, session_id)
 
     if not history:
         return Response(
@@ -311,8 +329,8 @@ def sse_reply(msg_id, session_id):
         pending = PendingResponse(msg_id, uid, session_id, history)
         pending_responses[msg_id] = pending
 
-    def event_stream():
-        for chunk in pending.stream():
+    async def event_stream():
+        async for chunk in pending.stream():
             yield f"event: message\ndata: {replace_newline(escape(chunk))}\n\n"
         yield "event: done\ndata: \n\n"
         pending_responses.pop(msg_id, None)

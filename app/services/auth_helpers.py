@@ -1,6 +1,6 @@
 import os
 import base64
-from flask import request, redirect
+from quart import request, redirect
 from functools import wraps
 from nacl import secret
 from app import db
@@ -27,21 +27,21 @@ def get_secure_cookie(name):
         return None
 
 
-def get_current_user():
+async def get_current_user():
     uid = get_secure_cookie("uid")
-    return db.get_user_by_id(uid) if uid else None
+    return await db.get_user_by_id(uid) if uid else None
 
 
 def login_required(f):
     @wraps(f)
-    def wrapper(*args, **kwargs):
-        if not get_current_user():
+    async def wrapper(*args, **kwargs):
+        if not await get_current_user():
             return redirect("/login")
-        return f(*args, **kwargs)
+        return await f(*args, **kwargs)
 
     return wrapper
 
 
-def load_user():
+async def load_user():
     # Eager-load user info if needed in templates
-    request.user = get_current_user()
+    request.user = await get_current_user()

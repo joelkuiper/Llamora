@@ -1,6 +1,6 @@
-from flask import Flask
+from quart import Quart
 from dotenv import load_dotenv
-from flask_wtf import CSRFProtect
+from quart_wtf import CSRFProtect
 import os
 from db import LocalDB
 
@@ -10,7 +10,7 @@ db = LocalDB()
 
 
 def create_app():
-    app = Flask(__name__)
+    app = Quart(__name__)
     app.secret_key = os.getenv("CHAT_SECRET_KEY")
     app.config.from_object("config")
 
