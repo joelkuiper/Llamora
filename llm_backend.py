@@ -2,17 +2,22 @@ import threading
 import textwrap
 import queue
 import asyncio
+import logging
 from config import MAX_RESPONSE_TOKENS
 from langchain_community.llms import LlamaCpp
 from langchain.chains import LLMChain
 from langchain_core.prompts import PromptTemplate
-from langchain_core.callbacks import CallbackManager
 
 
 class LLMEngine:
     """Handles queuing, streaming, and history formatting for an LLM chat interface."""
 
-    def __init__(self, model_path: str, max_workers: int = 1, verbose: bool = False):
+    def __init__(
+        self,
+        model_path: str,
+        max_workers: int = 1,
+        verbose: bool = False,
+    ):
         self.verbose = verbose
         self.model_path = model_path
         self.llm = self._load_model()
@@ -47,11 +52,14 @@ class LLMEngine:
         return PromptTemplate.from_template(template)
 
     def _start_workers(self, count: int):
+        logger = logging.getLogger(__name__)
         for _ in range(count):
             t = threading.Thread(target=self._worker_loop, daemon=True)
             t.start()
+            logger.debug("Started LLM worker thread %s", t.name)
 
     def _worker_loop(self):
+        logger = logging.getLogger(__name__)
         while True:
             req = self._request_queue.get()
             if req is None:
@@ -61,10 +69,10 @@ class LLMEngine:
                 formatted = self.format_history(trimmed)
                 for token in self.chain.stream({"history": formatted}):
                     req.output_queue.put(token)
-            except Exception as e:
-                error_msg = f"⚠️ Error: {str(e)}"
+            except Exception:
+                logger.exception("LLM generation failed")
+                error_msg = "⚠️ Unable to generate response. Please try again later."
                 req.output_queue.put({"type": "error", "data": error_msg})
-
             finally:
                 req.output_queue.put(None)
                 req.done.set()
@@ -97,8 +105,10 @@ class LLMEngine:
 
     def stream_response(self, history: list[dict]):
         """Submit a request to the queue and return an async generator for its output."""
+        logger = logging.getLogger(__name__)
         req = self.Request(history)
         self._request_queue.put(req)
+        logger.debug("Queued LLM request with %d messages", len(history))
 
         async def generator():
             while True:

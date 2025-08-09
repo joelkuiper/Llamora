@@ -34,6 +34,7 @@ async def session(session_id):
     session = await db.get_session(uid, session_id)
 
     if not session:
+        current_app.logger.warning("Session not found for user")
         return (
             await render_template("partials/error.html", message="Session not found."),
             404,
@@ -65,6 +66,7 @@ async def render_chat(session_id, oob=False):
     session = await db.get_session(uid, session_id)
 
     if not session:
+        current_app.logger.warning("Session not found for user")
         return (
             await render_template("partials/error.html", message="Session not found."),
             404,
@@ -108,7 +110,6 @@ async def create_session():
         session_id=new_session_id,
     )
     chat_html = await render_chat(new_session_id, oob=True)
-    print("New session")
     return (
         f"{chat_html}{sidebar_html}",
         200,
@@ -124,6 +125,7 @@ async def edit_session_name(session_id):
     session = await db.get_session(uid, session_id)
 
     if not session:
+        current_app.logger.warning("Session not found for user")
         return (
             await render_template("partials/error.html", message="Session not found."),
             404,
@@ -149,6 +151,7 @@ async def rename_session(session_id):
         or not new_name
         or len(new_name) > max_len
     ):
+        current_app.logger.warning("Invalid rename request")
         return (
             await render_template(
                 "partials/error.html",
@@ -172,6 +175,7 @@ async def delete_session(session_id):
     uid = user["id"]
 
     if not await db.get_session(uid, session_id):
+        current_app.logger.warning("Session not found for user")
         return (
             await render_template("partials/error.html", message="Session not found."),
             404,
@@ -233,6 +237,7 @@ class PendingResponse:
         self.error = False
         self._cond = asyncio.Condition()
         self.dek = dek
+        current_app.logger.debug("Starting generation for message %s", msg_id)
         asyncio.create_task(self._generate(uid, session_id, history))
 
     async def _generate(self, uid: str, session_id: str, history: list[dict]):
@@ -254,14 +259,27 @@ class PendingResponse:
                     self.text = full_response
                     self._cond.notify_all()
 
-        except Exception as e:
-            full_response += f"<span class='error'>⚠️ {str(e)}</span>"
+        except Exception:
+            current_app.logger.exception("Error during LLM streaming")
+            full_response += (
+                "<span class='error'>⚠️ An unexpected error occurred.</span>"
+            )
             self.error = True
         finally:
             if not self.error and full_response.strip():
-                await db.append(
-                    uid, session_id, "assistant", full_response, self.dek
-                )
+                try:
+                    await db.append(
+                        uid, session_id, "assistant", full_response, self.dek
+                    )
+                    current_app.logger.debug("Saved assistant message")
+                except Exception:
+                    current_app.logger.exception(
+                        "Failed to save assistant message"
+                    )
+                    full_response += (
+                        "<span class='error'>⚠️ Failed to save response.</span>"
+                    )
+                    self.error = True
             async with self._cond:
                 self.text = full_response
                 self.done = True
@@ -306,7 +324,12 @@ async def send_message(session_id):
             400,
         )
 
-    msg_id = await db.append(uid, session_id, "user", user_text, dek)
+    try:
+        msg_id = await db.append(uid, session_id, "user", user_text, dek)
+        current_app.logger.debug("Saved user message %s", msg_id)
+    except Exception:
+        current_app.logger.exception("Failed to save user message")
+        raise
 
     return await render_template(
         "partials/placeholder.html",
@@ -329,6 +352,7 @@ async def sse_reply(msg_id, session_id):
     history = await db.get_history(uid, session_id, dek)
 
     if not history:
+        current_app.logger.warning("History not found for message %s", msg_id)
         return Response(
             "event: error\ndata: Invalid ID\n\n", mimetype="text/event-stream"
         )
