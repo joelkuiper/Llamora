@@ -321,39 +321,6 @@ wheels = [
 ]
 
 [[package]]
-name = "flask-chat"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "aiosqlite" },
-    { name = "langchain" },
-    { name = "langchain-community" },
-    { name = "langchain-core" },
-    { name = "llama-cpp-python" },
-    { name = "pynacl" },
-    { name = "python-dotenv" },
-    { name = "python-ulid" },
-    { name = "quart" },
-    { name = "quart-wtforms" },
-    { name = "requests" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiosqlite", specifier = ">=0.20.0" },
-    { name = "langchain", specifier = ">=0.3.27" },
-    { name = "langchain-community", specifier = ">=0.3.27" },
-    { name = "langchain-core", specifier = ">=0.3.72" },
-    { name = "llama-cpp-python", git = "https://github.com/inference-sh/llama-cpp-python.git?branch=main" },
-    { name = "pynacl", specifier = ">=1.5.0" },
-    { name = "python-dotenv", specifier = ">=1.1.1" },
-    { name = "python-ulid", specifier = ">=3.0.0" },
-    { name = "quart", specifier = ">=0.20.0" },
-    { name = "quart-wtforms", specifier = ">=1.0.3" },
-    { name = "requests", specifier = ">=2.32.4" },
-]
-
-[[package]]
 name = "frozenlist"
 version = "1.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -713,6 +680,39 @@ dependencies = [
     { name = "jinja2" },
     { name = "numpy" },
     { name = "typing-extensions" },
+]
+
+[[package]]
+name = "llamora"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "aiosqlite" },
+    { name = "langchain" },
+    { name = "langchain-community" },
+    { name = "langchain-core" },
+    { name = "llama-cpp-python" },
+    { name = "pynacl" },
+    { name = "python-dotenv" },
+    { name = "python-ulid" },
+    { name = "quart" },
+    { name = "quart-wtforms" },
+    { name = "requests" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiosqlite", specifier = ">=0.20.0" },
+    { name = "langchain", specifier = ">=0.3.27" },
+    { name = "langchain-community", specifier = ">=0.3.27" },
+    { name = "langchain-core", specifier = ">=0.3.72" },
+    { name = "llama-cpp-python", git = "https://github.com/inference-sh/llama-cpp-python.git?branch=main" },
+    { name = "pynacl", specifier = ">=1.5.0" },
+    { name = "python-dotenv", specifier = ">=1.1.1" },
+    { name = "python-ulid", specifier = ">=3.0.0" },
+    { name = "quart", specifier = ">=0.20.0" },
+    { name = "quart-wtforms", specifier = ">=1.0.3" },
+    { name = "requests", specifier = ">=2.32.4" },
 ]
 
 [[package]]

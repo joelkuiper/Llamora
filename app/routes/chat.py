@@ -6,7 +6,7 @@ import re
 from llm_backend import LLMEngine
 from util import str_to_bool
 from app import db
-from app.services.auth_helpers import login_required, get_current_user
+from app.services.auth_helpers import login_required, get_current_user, get_dek
 
 chat_bp = Blueprint("chat", __name__)
 
@@ -39,7 +39,8 @@ async def session(session_id):
             404,
         )
 
-    history = await db.get_history(uid, session_id)
+    dek = get_dek()
+    history = await db.get_history(uid, session_id, dek)
     pending_msg_id = None
     if history and history[-1]["role"] == "user":
         pending_msg_id = history[-1]["id"]
@@ -69,7 +70,8 @@ async def render_chat(session_id, oob=False):
             404,
         )
 
-    history = await db.get_history(uid, session_id)
+    dek = get_dek()
+    history = await db.get_history(uid, session_id, dek)
     pending_msg_id = None
     if history and history[-1]["role"] == "user":
         pending_msg_id = history[-1]["id"]
@@ -222,12 +224,15 @@ pending_responses: dict[str, "PendingResponse"] = {}
 
 
 class PendingResponse:
-    def __init__(self, msg_id: str, uid: str, session_id: str, history: list[dict]):
+    def __init__(
+        self, msg_id: str, uid: str, session_id: str, history: list[dict], dek: bytes
+    ):
         self.msg_id = msg_id
         self.text = ""
         self.done = False
         self.error = False
         self._cond = asyncio.Condition()
+        self.dek = dek
         asyncio.create_task(self._generate(uid, session_id, history))
 
     async def _generate(self, uid: str, session_id: str, history: list[dict]):
@@ -254,7 +259,9 @@ class PendingResponse:
             self.error = True
         finally:
             if not self.error and full_response.strip():
-                await db.append(uid, session_id, "assistant", full_response)
+                await db.append(
+                    uid, session_id, "assistant", full_response, self.dek
+                )
             async with self._cond:
                 self.text = full_response
                 self.done = True
@@ -282,6 +289,7 @@ async def send_message(session_id):
     user_text = form.get("message", "").strip()
     user = await get_current_user()
     uid = user["id"]
+    dek = get_dek()
 
     max_len = current_app.config["MAX_MESSAGE_LENGTH"]
 
@@ -298,7 +306,7 @@ async def send_message(session_id):
             400,
         )
 
-    msg_id = await db.append(uid, session_id, "user", user_text)
+    msg_id = await db.append(uid, session_id, "user", user_text, dek)
 
     return await render_template(
         "partials/placeholder.html",
@@ -317,7 +325,8 @@ def replace_newline(s: str) -> str:
 async def sse_reply(msg_id, session_id):
     user = await get_current_user()
     uid = user["id"]
-    history = await db.get_history(uid, session_id)
+    dek = get_dek()
+    history = await db.get_history(uid, session_id, dek)
 
     if not history:
         return Response(
@@ -326,7 +335,7 @@ async def sse_reply(msg_id, session_id):
 
     pending = pending_responses.get(msg_id)
     if not pending:
-        pending = PendingResponse(msg_id, uid, session_id, history)
+        pending = PendingResponse(msg_id, uid, session_id, history, dek)
         pending_responses[msg_id] = pending
 
     async def event_stream():
