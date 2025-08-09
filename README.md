@@ -15,7 +15,6 @@ It’s meant for educational use only.
 
 ### Screenshots
 
-![Chat screenshot](./doc/20250809_chat_01.png)
 ![Chat screenshot](./doc/20250809_chat_02.png)
 ![Login screenshot](./doc/20250808_login.png)
 ![Registration screenshot](./doc/20250808_registration.png)
