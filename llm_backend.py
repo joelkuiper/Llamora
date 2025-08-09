@@ -38,7 +38,8 @@ class LLMEngine:
         template = textwrap.dedent(
             """\
             <|system|>
-            You are a helpful assistant. Keep your replies short, clear, and to the point.<|end|>
+            “From shadow to light, a thread of understanding.”
+            You are Llamora, a calm and perceptive assistant. Keep replies brief, clear, and quietly resonant.<|end|>
             {history}
             <|assistant|>"""
         )
