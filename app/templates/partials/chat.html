@@ -37,6 +37,7 @@
       import { updateActiveSession } from "{{ url_for('static', filename='js/session.js') }}";
       initChatUI();
       updateActiveSession();
+      document.title = "{{ session.name }}";
     </script>
   </div>
 </main>
