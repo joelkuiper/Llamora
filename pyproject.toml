@@ -1,7 +1,7 @@
 [project]
-name = "flask-chat"
+name = "Llamora"
 version = "0.1.0"
-description = "Add your description here"
+description = "A chatbot webapp based on Python, HTMX, and llama-cpp-python via LangChain "
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

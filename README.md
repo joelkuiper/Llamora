@@ -1,5 +1,7 @@
-# Minimal chatbot
-**A minimal Flask + HTMX + LangChain (with llama.cpp) interface for learning purposes only**
+# Llamora
+> “The unseen current of thought.”
+
+**A minimal Quart + HTMX + LangChain (with llama.cpp) interface for learning purposes only**
 
 ❗ **This project is a personal learning experiment. It is not production-ready. Do not deploy this without major modifications.**
 
@@ -40,7 +42,7 @@ It’s meant for educational use only.
 
 - **Markdown Support** The assistant's responses (and user messages) can include Markdown formatting. The client will render Markdown into HTML (for example, **bold text**, *italics*, `code blocks`, lists, etc.). The app uses **Marked** (Markdown parser) and **DOMPurify** (to sanitize output) on the client side to render any Markdown content from the LLM.
 
-- **Lightweight and Dependency-Minimal** The entire app is relatively small in terms of code. It uses a few Python packages (Flask, NaCl for security, LangChain for llama.cpp integration) and some JS libraries (HTMX and extensions, Marked, DOMPurify), all of which are either included or installable via [uv](https://docs.astral.sh/uv/). There is no need for Node.js build steps, no bundlers, and no heavy frameworks.
+- **Lightweight and Dependency-Minimal** The entire app is relatively small in terms of code. It uses a few Python packages (Quart, NaCl for security, LangChain for llama.cpp integration) and some JS libraries (HTMX and extensions, Marked, DOMPurify), all of which are either included or installable via [uv](https://docs.astral.sh/uv/). There is no need for Node.js build steps, no bundlers, and no heavy frameworks.
 
 ## Known Limitations
 
@@ -83,10 +85,10 @@ Set the `CHAT_MODEL_GGUF` environment variable to the full path of the `.gguf` f
 Install [uv](https://docs.astral.sh/uv/#installation). Then run:
 
 ```bash
-uv run flask --app main run
+uv run quart --app main run
 ```
 
-Set `FLASK_DEBUG=1` for automatic reloading on code changes.
+Set `QUART_DEBUG=1` for automatic reloading on code changes.
 
 For CUDA support (Nvidia GPU) you must reinstall the [llama-cpp-python](https://github.com/inference-sh/llama-cpp-python) library (and have the CUDA toolkit installed):
 

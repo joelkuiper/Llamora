@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8">
-    <title>Minimal Flask chat app</title>
+    <title>{{ config.APP_NAME }}</title>
     <script src="{{url_for('static', filename='js/vendor/htmx.min.js')}}"></script>
     <script src="{{url_for('static', filename='js/vendor/htmx-ext-sse.js')}}"></script>
     <script src="{{url_for('static', filename='js/vendor/htmx-ext-response-targets.js')}}"></script>
