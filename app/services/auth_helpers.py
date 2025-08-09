@@ -5,12 +5,8 @@ from functools import wraps
 from nacl import secret
 from app import db
 
-cookie_secret = os.environ.get("COOKIE_SECRET")
-cookie_key = (
-    base64.urlsafe_b64decode(cookie_secret)
-    if cookie_secret
-    else b"0" * secret.SecretBox.KEY_SIZE
-)
+cookie_secret = os.environ.get("CHAT_COOKIE_SECRET")
+cookie_key = base64.urlsafe_b64decode(cookie_secret)
 cookie_box = secret.SecretBox(cookie_key)
 
 
