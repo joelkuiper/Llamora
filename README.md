@@ -43,7 +43,7 @@ It’s meant for educational use only.
 
 - **Neumorphic UI Design** The interface has a clean, modern look with soft shadows. There's virtually no JavaScript in the frontend beyond handling the streamed messages and some minor UX tweaks (like auto-scrolling the chat window).
 
-- **Markdown Support** The assistant's responses (and user messages) can include Markdown formatting. The client will render Markdown into HTML (for example, **bold text**, *italics*, `code blocks`, lists, etc.). The app uses **Marked** (Markdown parser) and **DOMPurify** (to sanitize output) on the client side to render any Markdown content from the LLM.
+- **Markdown Support** The assistant's responses can include Markdown formatting. The client will render Markdown into HTML (for example, **bold text**, *italics*, `code blocks`, lists, etc.). The app uses **Marked** (Markdown parser) and **DOMPurify** (to sanitize output) on the client side to render any Markdown content from the LLM.
 
 - **Lightweight and Dependency-Minimal** The entire app is relatively small in terms of code. It uses a few Python packages (Quart, NaCl for security, LangChain for llama.cpp integration) and some JS libraries (HTMX and extensions, Marked, DOMPurify), all of which are either included or installable via [uv](https://docs.astral.sh/uv/). There is no need for Node.js build steps, no bundlers, and no heavy frameworks.
 
@@ -59,7 +59,7 @@ This project has **several limitations** by design. It's important to understand
 
 - **Auth is Basic:** The authentication system is very simple:
 
-  - Password reset requires the one-time recovery code and there's no email verification.
+  - Password reset requires the recovery code and there's no email verification.
   - No account deletion or profile management.
   - No multi-factor auth.
   - No OAuth or other single-sign on method
