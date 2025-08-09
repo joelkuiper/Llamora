@@ -17,65 +17,6 @@ llm = LLMEngine(
 )
 
 
-pending_responses: dict[str, "PendingResponse"] = {}
-
-
-class PendingResponse:
-    def __init__(self, msg_id: str, uid: str, session_id: str, history: list[dict]):
-        self.msg_id = msg_id
-        self.text = ""
-        self.done = False
-        self.error = False
-        self._cond = threading.Condition()
-        thread = threading.Thread(
-            target=self._generate, args=(uid, session_id, history), daemon=True
-        )
-        thread.start()
-
-    def _generate(self, uid: str, session_id: str, history: list[dict]):
-        full_response = ""
-        first = True
-        try:
-            for chunk in llm.stream_response(history):
-                if isinstance(chunk, dict) and chunk.get("type") == "error":
-                    full_response += f"<span class='error'>{chunk['data']}</span>"
-                    self.error = True
-                    break
-
-                if first:
-                    chunk = chunk.lstrip()
-                    first = False
-
-                full_response += chunk
-                with self._cond:
-                    self.text = full_response
-                    self._cond.notify_all()
-        except Exception as e:
-            full_response += f"<span class='error'>⚠️ {str(e)}</span>"
-            self.error = True
-        finally:
-            if not self.error and full_response.strip():
-                db.append(uid, session_id, "assistant", full_response)
-            with self._cond:
-                self.text = full_response
-                self.done = True
-                self._cond.notify_all()
-            pending_responses.pop(self.msg_id, None)
-
-    def stream(self):
-        sent = 0
-        while True:
-            with self._cond:
-                while len(self.text) == sent and not self.done:
-                    self._cond.wait()
-                chunk = self.text[sent:]
-                sent = len(self.text)
-                if chunk:
-                    yield chunk
-                if self.done:
-                    break
-
-
 @chat_bp.route("/")
 @login_required
 def index():
@@ -259,6 +200,66 @@ def delete_session(session_id):
             200,
             {"HX-Push-Url": f"/s/{new_session_id}"},
         )
+
+
+pending_responses: dict[str, "PendingResponse"] = {}
+
+
+class PendingResponse:
+    def __init__(self, msg_id: str, uid: str, session_id: str, history: list[dict]):
+        self.msg_id = msg_id
+        self.text = ""
+        self.done = False
+        self.error = False
+        self._cond = threading.Condition()
+        thread = threading.Thread(
+            target=self._generate, args=(uid, session_id, history), daemon=True
+        )
+        thread.start()
+
+    def _generate(self, uid: str, session_id: str, history: list[dict]):
+        full_response = ""
+        first = True
+        try:
+            for chunk in llm.stream_response(history):
+                if isinstance(chunk, dict) and chunk.get("type") == "error":
+                    full_response += f"<span class='error'>{chunk['data']}</span>"
+                    self.error = True
+                    break
+
+                if first:
+                    chunk = chunk.lstrip()
+                    first = False
+
+                full_response += chunk
+                with self._cond:
+                    self.text = full_response
+                    self._cond.notify_all()
+
+        except Exception as e:
+            full_response += f"<span class='error'>⚠️ {str(e)}</span>"
+            self.error = True
+        finally:
+            if not self.error and full_response.strip():
+                db.append(uid, session_id, "assistant", full_response)
+            with self._cond:
+                self.text = full_response
+                self.done = True
+                self._cond.notify_all()
+            pending_responses.pop(self.msg_id, None)
+
+    def stream(self):
+        sent = 0
+        while True:
+            with self._cond:
+                while len(self.text) == sent and not self.done:
+                    self._cond.wait()
+                chunk = self.text[sent:]
+                sent = len(self.text)
+                if chunk:
+                    yield chunk
+                if self.done:
+                    break
 
 
 @chat_bp.route("/s/<session_id>/message", methods=["POST"])
