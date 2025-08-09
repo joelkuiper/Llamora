@@ -12,7 +12,7 @@ It’s meant for educational use only.
 
 ### Screenshots
 
-![Chat screenshot](./doc/20250808_chat.png)
+![Chat screenshot](./doc/20250809_chat.png)
 ![Login screenshot](./doc/20250808_login.png)
 ![Registration screenshot](./doc/20250808_registration.png)
 ---
@@ -50,7 +50,7 @@ This project has **several limitations** by design. It's important to understand
 
 - **Minimal Error Handling:** The application doesn't have robust error management. If something goes wrong (like the model runs out of memory, or a bug occurs), the user will either see a generic error message in the chat or possibly a 5xx error page. There's no retry logic or user-friendly error feedback beyond a basic "⚠️ Error". Logging is also minimal (mainly non-existent). For a real app, you'd want better logging and error recovery.
 
-- **No API or External Interface:** The app doesn't expose an API for programmatic access -- it's purely a web interface. That's fine for interactive use, but if you wanted to use this as a backend service, you'd have to add JSON endpoints or similar.
+- **No API or External Interface:** The app doesn't expose an API for programmatic access, it's purely a web interface. That's fine for interactive use, but if you wanted to use this as a backend service, you'd have to add JSON endpoints or similar.
 
 - **Auth is Basic:** The authentication system is very simple:
 
