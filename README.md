@@ -6,7 +6,7 @@
 
 **A minimal Quart + HTMX + LangChain (with llama.cpp) interface for learning purposes only**
 
-- ⚠️ Very limited authentication/session handling (no password recovery, rate limiting, etc.)
+- ⚠️ Very limited authentication/session handling
 - ❌ Very basic error handling
 - ❌ Blocking, single-threaded queue for LLM calls
 
@@ -39,6 +39,8 @@ It’s meant for educational use only.
   - Logged-in users can only access their own chat sessions and data (isolated per account).
   - The app uses encrypted cookies to keep users logged in without server-side sessions. (Cookies are encrypted with a secret key so they can't be tampered with.)
 
+- **Zero-Knowledge Message Encryption** Each user gets a random 32-byte Data Encryption Key (DEK) that is wrapped with Argon2id using both their password and the recovery code. Messages are encrypted and can only be decrypted with either secret. Resetting a password re-wraps the existing DEK without touching stored ciphertexts.
+
 - **Neumorphic UI Design** The interface has a clean, modern look with soft shadows. There's virtually no JavaScript in the frontend beyond handling the streamed messages and some minor UX tweaks (like auto-scrolling the chat window).
 
 - **Markdown Support** The assistant's responses (and user messages) can include Markdown formatting. The client will render Markdown into HTML (for example, **bold text**, *italics*, `code blocks`, lists, etc.). The app uses **Marked** (Markdown parser) and **DOMPurify** (to sanitize output) on the client side to render any Markdown content from the LLM.
@@ -57,7 +59,7 @@ This project has **several limitations** by design. It's important to understand
 
 - **Auth is Basic:** The authentication system is very simple:
 
-  - No password reset or email verification flow.
+  - Password reset requires the one-time recovery code and there's no email verification.
   - No account deletion or profile management.
   - No multi-factor auth.
   - No OAuth or other single-sign on method
