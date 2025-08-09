@@ -5,7 +5,7 @@ from config import MAX_RESPONSE_TOKENS
 from langchain_community.llms import LlamaCpp
 from langchain.chains import LLMChain
 from langchain_core.prompts import PromptTemplate
-from langchain_core.callbacks import CallbackManager, StreamingStdOutCallbackHandler
+from langchain_core.callbacks import CallbackManager
 
 
 class LLMEngine:
@@ -31,7 +31,6 @@ class LLMEngine:
             n_ctx=1024 * 9,
             streaming=True,
             n_gpu_layers=-1,
-            callback_manager=CallbackManager([StreamingStdOutCallbackHandler()]),
         )
 
     def _build_prompt(self):
