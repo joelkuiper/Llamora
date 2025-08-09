@@ -1,6 +1,7 @@
 import threading
 import textwrap
 import queue
+import asyncio
 from config import MAX_RESPONSE_TOKENS
 from langchain_community.llms import LlamaCpp
 from langchain.chains import LLMChain
@@ -94,13 +95,13 @@ class LLMEngine:
         return trimmed
 
     def stream_response(self, history: list[dict]):
-        """Submit a request to the queue and return a generator for its output."""
+        """Submit a request to the queue and return an async generator for its output."""
         req = self.Request(history)
         self._request_queue.put(req)
 
-        def generator():
+        async def generator():
             while True:
-                token = req.output_queue.get()
+                token = await asyncio.to_thread(req.output_queue.get)
                 if token is None:
                     break
                 yield token
