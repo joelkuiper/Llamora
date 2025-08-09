@@ -36,7 +36,7 @@ It’s meant for educational use only.
   - Logged-in users can only access their own chat sessions and data (isolated per account).
   - The app uses encrypted cookies to keep users logged in without server-side sessions. (Cookies are encrypted with a secret key so they can't be tampered with.)
 
-- **Neumorphic UI Design** The interface has a clean, modern look with soft shadows. It's mobile-responsive (the layout is simple enough to work on different screen sizes). There's virtually no JavaScript in the frontend beyond handling the streamed messages and some minor UX tweaks (like auto-scrolling the chat window).
+- **Neumorphic UI Design** The interface has a clean, modern look with soft shadows. There's virtually no JavaScript in the frontend beyond handling the streamed messages and some minor UX tweaks (like auto-scrolling the chat window).
 
 - **Markdown Support** The assistant's responses (and user messages) can include Markdown formatting. The client will render Markdown into HTML (for example, **bold text**, *italics*, `code blocks`, lists, etc.). The app uses **Marked** (Markdown parser) and **DOMPurify** (to sanitize output) on the client side to render any Markdown content from the LLM.
 
