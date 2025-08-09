@@ -28,7 +28,10 @@
                    -4px -4px 8px var(--shadow-light);
   --inset-shadow-disabled: inset 1px 1px 3px #bebebe,
                            inset -1px -1px 3px #ffffff;
+  --text-shadow-soft: 1px 1px 2px var(--shadow-dark),
+                      -1px -1px 2px var(--shadow-light);
 }
+
 * {
   box-sizing: border-box;
 }
@@ -63,6 +66,20 @@ body {
   box-shadow: none;
   padding-left: 1.25rem;
   transition: transform 0.3s ease, width 0.3s ease, padding-left 0.3s ease;
+}
+
+#sidebar-logo {
+  width: 5em;
+  margin: 0 auto;
+  display: flex;
+  padding: var(--spacing-sm);
+}
+
+#sidebar h1 {
+  font-weight: lighter;
+  margin: -0.35rem 0 var(--spacing-xl) 0;
+  font-size: 1em;
+  text-shadow: var(--text-shadow-soft);
 }
 
 #sidebar-toggle {
@@ -124,7 +141,6 @@ body {
 #sidebar .sidebar-header {
   border-bottom: 1px solid var(--shadow-light);
   padding-bottom: var(--spacing-sm);
-  padding-top: var(--spacing-xl);
 }
 
 #sidebar ul {
