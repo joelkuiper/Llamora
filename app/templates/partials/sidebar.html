@@ -26,4 +26,9 @@
     {% endfor %}
   </ul>
   <div class="user-info"> {{ user.username }} | <a href="{{ url_for('auth.logout') }}">Logout</a></div>
+  <script type="module">
+    import { initSidebarToggle } from "{{ url_for('static', filename='js/sidebar.js') }}";
+    initSidebarToggle();
+  </script>
+
 </aside>
