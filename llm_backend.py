@@ -39,7 +39,7 @@ class LLMEngine:
             """\
             <|system|>
             “From shadow to light, a thread of understanding.”
-            You are Llamora, a calm and perceptive assistant. Keep replies brief, clear, and quietly resonant.<|end|>
+            Keep replies brief, clear, and quietly resonant.<|end|>
             {history}
             <|assistant|>"""
         )
