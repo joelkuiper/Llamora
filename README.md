@@ -1,9 +1,10 @@
+❗ **This project is a personal learning experiment. It is not production-ready. Do not deploy this without major modifications.**
+
 # Llamora
+
 > “The unseen current of thought.”
 
 **A minimal Quart + HTMX + LangChain (with llama.cpp) interface for learning purposes only**
-
-❗ **This project is a personal learning experiment. It is not production-ready. Do not deploy this without major modifications.**
 
 - ⚠️ Very limited authentication/session handling (no password recovery, rate limiting, etc.)
 - ❌ Very basic error handling
