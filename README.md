@@ -15,7 +15,7 @@
 
 ## Features
 
-- **Local LLM Backend** Runs a llama.cpp model locally via [**llama-cpp-python**](https://github.com/abetlen/llama-cpp-python), using [LangChain](https://www.langchain.com/) to manage prompts. No cloud or API keys needed -- your data and queries stay on your machine. You just provide a GGUF model file, and the app will load it at startup.
+- **Local LLM Backend** Runs a llama.cpp model locally via [**llama-cpp-python**](https://github.com/abetlen/llama-cpp-python), using [LangChain](https://www.langchain.com/) to manage prompts. No cloud or API keys needed, your data and queries stay on your machine. You just provide a GGUF model file, and the app will load it at startup.
 
 - **Streaming Responses** Utilizes **Server-Sent Events (SSE)** to stream the AI's response token by token. The user sees the answer appear as it's being generated, similar to ChatGPT's interface.
 
