@@ -3,6 +3,7 @@ import aiosqlite
 import asyncio
 from contextlib import asynccontextmanager
 import secrets
+import logging
 from config import MAX_USERNAME_LENGTH
 from ulid import ULID
 
@@ -16,7 +17,7 @@ class LocalDB:
     async def _ensure_schema(self, is_new):
         async with self.get_conn() as conn:
             if is_new:
-                print("Creating new database...")
+                logging.getLogger(__name__).info("Creating new database at %s", self.db_path)
             await conn.executescript(
                 f"""
                 CREATE TABLE IF NOT EXISTS users (

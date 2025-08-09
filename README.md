@@ -1,16 +1,9 @@
-❗ **This project is a personal learning experiment. It is not production-ready. Do not deploy this without major modifications.**
+❗ **This project is a personal learning experiment. It is not production-ready. Do not deploy this without major modifications. It’s meant for educational use only.**
 
 # Llamora
 
 > “The unseen current of thought.”
 
-**A minimal Quart + HTMX + LangChain (with llama.cpp) interface for learning purposes only**
-
-- ⚠️ Very limited authentication/session handling
-- ❌ Very basic error handling
-- ❌ Blocking, single-threaded queue for LLM calls
-
-It’s meant for educational use only.
 
 
 ### Screenshots
@@ -53,8 +46,6 @@ It’s meant for educational use only.
 This project has **several limitations** by design. It's important to understand them if you plan to use or extend this code:
 
 - **Not Scalable (Single-User Queue):** The app can only comfortably handle one chat interaction at a time. The LLM processing is single-threaded and queued. If two users ask questions simultaneously, one will wait until the other's response is done. This is fine for a personal assistant or small demo, but not for a multi-user or high-traffic scenario. Scaling would require architectural changes (e.g., running the model in a separate service or adding task workers).
-
-- **Minimal Error Handling:** The application doesn't have robust error management. If something goes wrong (like the model runs out of memory, or a bug occurs), the user will either see a generic error message in the chat or possibly a 5xx error page. There's no retry logic or user-friendly error feedback beyond a basic "⚠️ Error". Logging is also minimal (mainly non-existent). For a real app, you'd want better logging and error recovery.
 
 - **No API or External Interface:** The app doesn't expose an API for programmatic access, it's purely a web interface. That's fine for interactive use, but if you wanted to use this as a backend service, you'd have to add JSON endpoints or similar.
 
