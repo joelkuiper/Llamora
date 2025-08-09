@@ -1,11 +1,16 @@
+{% from 'partials/bot_stream.html' import bot_stream %}
 <main
   id="chatbox-wrapper"
   {% if oob %} hx-swap-oob="true" {% endif %}>
   <div id="chat" data-session-id="{{ session.id }}">
     <div class="message bot">Hello there! Say anything you want, I'm a helpful assistant.</div>
     {% for msg in history %}
-    <div class="message {{ 'bot' if msg['role'] != 'user' else 'user'}}">{{ msg.content }}</div>
+      <div class="message {{ 'bot' if msg['role'] != 'user' else 'user'}}">{{ msg.content }}</div>
     {% endfor %}
+
+    {% if pending_msg_id %}
+      {{ bot_stream(pending_msg_id, session.id) }}
+    {% endif %}
   </div>
 
   <div class="chat-controls">

@@ -1,0 +1,15 @@
+{% macro bot_stream(msg_id, session_id) -%}
+<div id="bot-{{ msg_id }}" class="message bot-stream"
+     hx-ext="sse" sse-close="done"
+     sse-connect="/s/{{ session_id }}/sse-reply/{{ msg_id }}">
+  <span class="raw-response" sse-swap="message,done" hidden hx-swap="beforeend"></span>
+
+  <span class="markdown-body">
+    <span id="typing-indicator"
+          sse-swap="done"
+          hx-swap="outerHTML">
+      <span class="cursor">❚</span>
+    </span>
+  </span>
+</div>
+{%- endmacro %}

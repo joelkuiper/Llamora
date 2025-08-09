@@ -76,7 +76,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-bg);
+  background: #f9f9f9;
   color: var(--color-heading);
   border: none;
   box-shadow: var(--raised-shadow);

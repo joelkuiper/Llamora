@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, request, Response, current_app
-import uuid
 from html import escape
+import threading
 import os
 import re
 from llm_backend import LLMEngine
@@ -15,6 +15,65 @@ llm = LLMEngine(
     model_path=os.environ["CHAT_MODEL_GGUF"],
     verbose=str_to_bool(os.getenv("FLASK_DEBUG", "False")),
 )
+
+
+pending_responses: dict[str, "PendingResponse"] = {}
+
+
+class PendingResponse:
+    def __init__(self, msg_id: str, uid: str, session_id: str, history: list[dict]):
+        self.msg_id = msg_id
+        self.text = ""
+        self.done = False
+        self.error = False
+        self._cond = threading.Condition()
+        thread = threading.Thread(
+            target=self._generate, args=(uid, session_id, history), daemon=True
+        )
+        thread.start()
+
+    def _generate(self, uid: str, session_id: str, history: list[dict]):
+        full_response = ""
+        first = True
+        try:
+            for chunk in llm.stream_response(history):
+                if isinstance(chunk, dict) and chunk.get("type") == "error":
+                    full_response += f"<span class='error'>{chunk['data']}</span>"
+                    self.error = True
+                    break
+
+                if first:
+                    chunk = chunk.lstrip()
+                    first = False
+
+                full_response += chunk
+                with self._cond:
+                    self.text = full_response
+                    self._cond.notify_all()
+        except Exception as e:
+            full_response += f"<span class='error'>⚠️ {str(e)}</span>"
+            self.error = True
+        finally:
+            if not self.error and full_response.strip():
+                db.append(uid, session_id, "assistant", full_response)
+            with self._cond:
+                self.text = full_response
+                self.done = True
+                self._cond.notify_all()
+            pending_responses.pop(self.msg_id, None)
+
+    def stream(self):
+        sent = 0
+        while True:
+            with self._cond:
+                while len(self.text) == sent and not self.done:
+                    self._cond.wait()
+                chunk = self.text[sent:]
+                sent = len(self.text)
+                if chunk:
+                    yield chunk
+                if self.done:
+                    break
 
 
 @chat_bp.route("/")
@@ -37,6 +96,9 @@ def session(session_id):
         return render_template("partials/error.html", message="Session not found."), 404
 
     history = db.get_history(uid, session_id)
+    pending_msg_id = None
+    if history and history[-1]["role"] == "user":
+        pending_msg_id = history[-1]["id"]
 
     sessions = db.get_all_sessions(uid)
 
@@ -46,6 +108,7 @@ def session(session_id):
         history=history,
         session=session,
         sessions=sessions,
+        pending_msg_id=pending_msg_id,
     )
 
     return html
@@ -60,11 +123,16 @@ def render_chat(session_id, oob=False):
         return render_template("partials/error.html", message="Session not found."), 404
 
     history = db.get_history(uid, session_id)
+    pending_msg_id = None
+    if history and history[-1]["role"] == "user":
+        pending_msg_id = history[-1]["id"]
+
     html = render_template(
         "partials/chat.html",
         session=session,
         history=history,
         oob=oob,
+        pending_msg_id=pending_msg_id,
     )
 
     return html
@@ -211,8 +279,7 @@ def send_message(session_id):
             400,
         )
 
-    msg_id = uuid.uuid4().hex
-    db.append(uid, session_id, "user", user_text)
+    msg_id = db.append(uid, session_id, "user", user_text)
 
     return render_template(
         "partials/placeholder.html",
@@ -238,30 +305,15 @@ def sse_reply(msg_id, session_id):
             "event: error\ndata: Invalid ID\n\n", mimetype="text/event-stream"
         )
 
+    pending = pending_responses.get(msg_id)
+    if not pending:
+        pending = PendingResponse(msg_id, uid, session_id, history)
+        pending_responses[msg_id] = pending
+
     def event_stream():
-        full_response = ""
-        first = True
-        error_occurred = False
-
-        try:
-            for chunk in llm.stream_response(history):
-                if isinstance(chunk, dict) and chunk.get("type") == "error":
-                    yield f"event: message\ndata: <span class='error'>{chunk['data']}</span>\n\n"
-                    error_occurred = True
-                    break
-
-                if first:
-                    chunk = chunk.lstrip()
-                    first = False
-
-                full_response += chunk
-                yield f"event: message\ndata: {replace_newline(escape(chunk))}\n\n"
-        except Exception as e:
-            yield f"event: message\ndata: <span class='error'>⚠️ {str(e)}</span>\n\n"
-            error_occurred = True
-        finally:
-            yield "event: done\ndata: \n\n"
-            if not error_occurred and full_response.strip():
-                db.append(uid, session_id, "assistant", full_response)
+        for chunk in pending.stream():
+            yield f"event: message\ndata: {replace_newline(escape(chunk))}\n\n"
+        yield "event: done\ndata: \n\n"
+        pending_responses.pop(msg_id, None)
 
     return Response(event_stream(), mimetype="text/event-stream")

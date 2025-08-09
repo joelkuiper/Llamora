@@ -127,6 +127,8 @@ class LocalDB:
                 (ulid, session_id, role, content),
             )
 
+            return ulid
+
     def create_session(self, user_id):
         session_id = secrets.token_urlsafe(32)
         ulid = str(ULID())
@@ -153,7 +155,7 @@ class LocalDB:
                 raise ValueError("User does not own session")
 
             rows = conn.execute(
-                "SELECT role, content FROM messages WHERE session_id = ? ORDER BY id ASC",
+                "SELECT id, role, content FROM messages WHERE session_id = ? ORDER BY id ASC",
                 (session_id,),
             ).fetchall()
             return [dict(row) for row in rows]
