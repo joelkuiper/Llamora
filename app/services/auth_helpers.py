@@ -32,6 +32,16 @@ async def get_current_user():
     return await db.get_user_by_id(uid) if uid else None
 
 
+def get_dek():
+    data = get_secure_cookie("dek")
+    if not data:
+        return None
+    try:
+        return base64.b64decode(data)
+    except Exception:
+        return None
+
+
 def login_required(f):
     @wraps(f)
     async def wrapper(*args, **kwargs):

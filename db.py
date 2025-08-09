@@ -23,6 +23,12 @@ class LocalDB:
                     id TEXT PRIMARY KEY,
                     username TEXT UNIQUE NOT NULL CHECK(length(username) <= {MAX_USERNAME_LENGTH}),
                     password_hash TEXT NOT NULL,
+                    dek_pw_salt BLOB NOT NULL,
+                    dek_pw_nonce BLOB NOT NULL,
+                    dek_pw_cipher BLOB NOT NULL,
+                    dek_rc_salt BLOB NOT NULL,
+                    dek_rc_nonce BLOB NOT NULL,
+                    dek_rc_cipher BLOB NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
 
@@ -39,7 +45,9 @@ class LocalDB:
                     id TEXT PRIMARY KEY,
                     session_id TEXT NOT NULL,
                     role TEXT NOT NULL,
-                    content TEXT NOT NULL,
+                    nonce BLOB NOT NULL,
+                    ciphertext BLOB NOT NULL,
+                    alg BLOB NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
                 );
@@ -60,12 +68,38 @@ class LocalDB:
             await conn.commit()
 
     # user helpers
-    async def create_user(self, username, password_hash):
+    async def create_user(
+        self,
+        username,
+        password_hash,
+        pw_salt,
+        pw_nonce,
+        pw_cipher,
+        rc_salt,
+        rc_nonce,
+        rc_cipher,
+    ):
         async with self.get_conn() as conn:
             ulid = str(ULID())
             await conn.execute(
-                "INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)",
-                (ulid, username, password_hash),
+                """
+                INSERT INTO users (
+                    id, username, password_hash,
+                    dek_pw_salt, dek_pw_nonce, dek_pw_cipher,
+                    dek_rc_salt, dek_rc_nonce, dek_rc_cipher
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    ulid,
+                    username,
+                    password_hash,
+                    pw_salt,
+                    pw_nonce,
+                    pw_cipher,
+                    rc_salt,
+                    rc_nonce,
+                    rc_cipher,
+                ),
             )
 
     async def get_user_by_username(self, username):
@@ -113,15 +147,30 @@ class LocalDB:
             row = await cursor.fetchone()
         return row["id"] if row else None
 
-    async def append(self, user_id, session_id, role, content):
+    async def update_password_wrap(
+        self, user_id, password_hash, pw_salt, pw_nonce, pw_cipher
+    ):
+        async with self.get_conn() as conn:
+            await conn.execute(
+                "UPDATE users SET password_hash = ?, dek_pw_salt = ?, dek_pw_nonce = ?, dek_pw_cipher = ? WHERE id = ?",
+                (password_hash, pw_salt, pw_nonce, pw_cipher, user_id),
+            )
+
+    async def append(self, user_id, session_id, role, content, dek):
+        from app.services.crypto import encrypt_message
+
         async with self.get_conn() as conn:
             ulid = str(ULID())
             if not await self._owns_session(conn, user_id, session_id):
                 raise ValueError("User does not own session")
 
+            nonce, ct, alg = encrypt_message(
+                dek, user_id, session_id, ulid, content
+            )
+
             await conn.execute(
-                "INSERT INTO messages (id, session_id, role, content) VALUES (?, ?, ?, ?)",
-                (ulid, session_id, role, content),
+                "INSERT INTO messages (id, session_id, role, nonce, ciphertext, alg) VALUES (?, ?, ?, ?, ?, ?)",
+                (ulid, session_id, role, nonce, ct, alg),
             )
 
             return ulid
@@ -146,17 +195,31 @@ class LocalDB:
                 (session_id, user_id),
             )
 
-    async def get_history(self, user_id, session_id):
+    async def get_history(self, user_id, session_id, dek):
+        from app.services.crypto import decrypt_message
+
         async with self.get_conn() as conn:
             if not await self._owns_session(conn, user_id, session_id):
                 raise ValueError("User does not own session")
 
             cursor = await conn.execute(
-                "SELECT id, role, content FROM messages WHERE session_id = ? ORDER BY id ASC",
+                "SELECT id, role, nonce, ciphertext, alg FROM messages WHERE session_id = ? ORDER BY id ASC",
                 (session_id,),
             )
             rows = await cursor.fetchall()
-            return [dict(row) for row in rows]
+            history = []
+            for row in rows:
+                content = decrypt_message(
+                    dek,
+                    user_id,
+                    session_id,
+                    row["id"],
+                    row["nonce"],
+                    row["ciphertext"],
+                    row["alg"],
+                )
+                history.append({"id": row["id"], "role": row["role"], "content": content})
+            return history
 
     async def get_all_sessions(self, user_id):
         async with self.get_conn() as conn:

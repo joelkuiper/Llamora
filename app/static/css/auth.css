@@ -75,3 +75,8 @@
   color: var(--color-text);
   text-decoration: underline;
 }
+
+#recovery {
+  font-size: large;
+  text-align: center;
+}

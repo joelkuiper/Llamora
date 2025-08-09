@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>{{ config.APP_NAME }} | Recovery Code</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}" />
+    <link rel="icon" href="{{url_for('static', filename='img/favicon.ico')}}" type="image/x-icon">
+
+  </head>
+  <body>
+    <div class="login-container">
+      <h1>Recovery Code</h1>
+      <p>
+        <strong>Important:</strong> Save this recovery code in a secure place. You will need it to reset your password. Without it, if you forget your password, <strong>all your data will be permanently lost</strong> and cannot be recovered.
+      </p>
+
+      <pre class="recovery">{{ code }}</pre>
+      <p><a href="{{ url_for('auth.login') }}">Continue to login</a></p>
+    </div>
+  </body>
+</html>
