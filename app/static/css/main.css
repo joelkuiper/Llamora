@@ -68,17 +68,23 @@ body {
   transition: transform 0.3s ease, width 0.3s ease, padding-left 0.3s ease;
 }
 
+#branding {
+   display: flex;
+   align-items:center;
+   margin-left: 2.75em;
+}
+
+
 #sidebar-logo {
   width: 5em;
-  margin: 0 auto;
-  display: flex;
   padding: var(--spacing-sm);
 }
 
 #sidebar h1 {
   font-weight: lighter;
-  margin: -0.35rem 0 var(--spacing-xl) 0;
   font-size: 1em;
+  margin-top: 1.5rem;
+  margin-left: -0.5rem;
   text-shadow: var(--text-shadow-soft);
 }
 
