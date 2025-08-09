@@ -4,7 +4,7 @@
   <div id="chat" data-session-id="{{ session.id }}">
     <div class="message bot">Hello there! Say anything you want, I'm a helpful assistant.</div>
     {% for msg in history %}
-    <div class="message {{ 'bot' if msg['role'] != 'user' else 'user'}}">{{ msg.content|markupsafe}}</div>
+    <div class="message {{ 'bot' if msg['role'] != 'user' else 'user'}}">{{ msg.content }}</div>
     {% endfor %}
   </div>
 

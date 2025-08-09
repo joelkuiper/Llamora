@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.13'",
@@ -311,7 +311,6 @@ dependencies = [
     { name = "langchain-community" },
     { name = "langchain-core" },
     { name = "llama-cpp-python" },
-    { name = "markupsafe" },
     { name = "pynacl" },
     { name = "python-dotenv" },
     { name = "python-ulid" },
@@ -327,7 +326,6 @@ requires-dist = [
     { name = "langchain-community", specifier = ">=0.3.27" },
     { name = "langchain-core", specifier = ">=0.3.72" },
     { name = "llama-cpp-python", git = "https://github.com/inference-sh/llama-cpp-python.git?branch=main" },
-    { name = "markupsafe", specifier = ">=3.0.2" },
     { name = "pynacl", specifier = ">=1.5.0" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
     { name = "python-ulid", specifier = ">=3.0.0" },

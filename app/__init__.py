@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 from flask_wtf import CSRFProtect
 import os
 from db import LocalDB
-from markupsafe import escape
 
 load_dotenv()
 
@@ -23,7 +22,6 @@ def create_app():
     app.register_blueprint(auth_bp)
     app.register_blueprint(chat_bp)
 
-    app.jinja_env.filters["markupsafe"] = escape
     from .services.auth_helpers import load_user
 
     app.before_request(load_user)
