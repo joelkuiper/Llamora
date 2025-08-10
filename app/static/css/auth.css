@@ -92,16 +92,22 @@
     text-decoration: underline;
   }
 
-  &.user-profile {
-    h2 {
-      font-size: 1.2em;
-      border-bottom: 1px solid var(--shadow-dark);
-      margin: var(--spacing-xl) 0 var(--spacing-md) 0;
-    }
+  h2 {
+    font-size: 1.2em;
+    border-bottom: 1px solid var(--shadow-dark);
+    margin: var(--spacing-xl) 0 var(--spacing-md) 0;
+    padding-bottom: var(--spacing-md);
   }
 }
 
 #recovery {
   font-size: large;
   text-align: center;
+}
+
+.back {
+  text-align: center;
+  margin-top: var(--spacing-xl);
+  border-top: 1px solid var(--shadow-light);
+  padding-top: var(--spacing-lg);
 }
