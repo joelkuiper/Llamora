@@ -9,7 +9,7 @@
 ### Screenshots
 
 ![Chat screenshot](./doc/20250809_chat_02.png)
-![Login screenshot](./doc/20250808_login.png)
+![Login screenshot](./doc/20280810_login.png)
 ![Registration screenshot](./doc/20250808_registration.png)
 ---
 
@@ -51,7 +51,6 @@ This project has **several limitations** by design. It's important to understand
 - **Auth is Basic:** The authentication system is very simple:
 
   - Password reset requires the recovery code and there's no email verification.
-  - No account deletion or profile management.
   - No multi-factor auth.
   - No OAuth or other single-sign on method
   - Very weak constraints on passwords.
