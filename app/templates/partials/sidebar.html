@@ -7,7 +7,7 @@
     <div class="session-item new-session">
       <a class="session-link"
          title="New session"
-         hx-post="{{ url_for('chat.create_session') }}"
+         hx-post="{{ url_for('sessions.create_session') }}"
          hx-swap="afterbegin"
          hx-target="#sessions-list">
         <svg class="session-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"

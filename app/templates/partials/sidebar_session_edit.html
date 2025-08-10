@@ -3,7 +3,7 @@
   class="{% if session.id == session_id %}active{% endif %}">
   <div class="session-item">
     <form
-      hx-put="{{ url_for('chat.rename_session', session_id=session.id) }}"
+      hx-put="{{ url_for('sessions.rename_session', session_id=session.id) }}"
       hx-target="#session-{{ session.id }}"
       hx-swap="outerHTML"
     >
