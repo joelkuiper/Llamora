@@ -93,7 +93,7 @@
   }
 
   h2 {
-    font-size: 1.2em;
+    font-size: 1em;
     border-bottom: 1px solid var(--shadow-dark);
     margin: var(--spacing-xl) 0 var(--spacing-md) 0;
     padding-bottom: var(--spacing-md);

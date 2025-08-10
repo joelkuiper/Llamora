@@ -62,7 +62,6 @@ def _safe_return_path() -> str:
 def login_required(f):
     @wraps(f)
     async def wrapper(*args, **kwargs):
-        login_url = "/login"
         return_path = _safe_return_path()
         login_url = f"/login?return={quote(return_path, safe='') }"
 
