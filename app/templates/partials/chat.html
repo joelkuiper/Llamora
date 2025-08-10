@@ -5,39 +5,37 @@
   <div id="chat" data-session-id="{{ session.id }}">
     <div class="message bot">Hello. Speak your mind, and I will listen.</div>
     {% for msg in history %}
-      <div class="message {{ 'bot' if msg['role'] != 'user' else 'user'}}">{{ msg.content }}</div>
+    <div class="message {{ 'bot' if msg['role'] != 'user' else 'user'}}">{{ msg.content }}</div>
     {% endfor %}
 
     {% if pending_msg_id %}
-      {{ bot_stream(pending_msg_id, session.id) }}
+    {{ bot_stream(pending_msg_id, session.id) }}
     {% endif %}
   </div>
 
-  <div class="chat-controls">
-    <form id="chat-form"
-          hx-post="/s/{{ session.id }}/message"
-          hx-target="#chat"
-          hx-on::after-request="this.reset()"
-          hx-swap="beforeend">
+  <form id="chat-form"
+        hx-post="/s/{{ session.id }}/message"
+        hx-target="#chat"
+        hx-on::after-request="this.reset()"
+        hx-swap="beforeend">
 
-      <div class="input-wrapper">
-        <textarea
-          onkeydown="if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); this.form.requestSubmit(); }"
-          name="message"
-          rows="3"
-          placeholder="Type your message"
-          cols="40"
-          maxlength="{{ config.MAX_MESSAGE_LENGTH }}"
-          required></textarea>
-        <button type="submit">➤</button>
-      </div>
-    </form>
-    <script type="module">
-      import { initChatUI } from "{{ url_for('static', filename='js/chat.js') }}";
-      import { updateActiveSession } from "{{ url_for('static', filename='js/session.js') }}";
-      initChatUI();
-      updateActiveSession();
-      document.title = "{{ session.name }}";
-    </script>
-  </div>
+    <div class="input-wrapper">
+      <textarea
+        onkeydown="if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); this.form.requestSubmit(); }"
+        name="message"
+        rows="3"
+        placeholder="Type your message"
+        cols="40"
+        maxlength="{{ config.MAX_MESSAGE_LENGTH }}"
+        required></textarea>
+      <button type="submit">➤</button>
+    </div>
+  </form>
+  <script type="module">
+    import { initChatUI } from "{{ url_for('static', filename='js/chat.js') }}";
+    import { updateActiveSession } from "{{ url_for('static', filename='js/session.js') }}";
+    initChatUI();
+    updateActiveSession();
+    document.title = "{{ session.name }}";
+  </script>
 </main>
