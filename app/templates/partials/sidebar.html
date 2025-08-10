@@ -29,7 +29,7 @@
     {% include "partials/sidebar_session.html" %}
     {% endfor %}
   </ul>
-  <div class="user-info"> {{ user.username }} | <a href="{{ url_for('auth.logout') }}">Logout</a></div>
+    <div class="user-info"> <a href="{{ url_for('auth.profile') }}">{{ user.username }}</a> | <a href="{{ url_for('auth.logout') }}">Logout</a></div>
   <script type="module">
     import { initSidebarToggle } from "{{ url_for('static', filename='js/sidebar.js') }}";
     initSidebarToggle();

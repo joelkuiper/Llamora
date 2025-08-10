@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>{{ config.APP_NAME }} | Profile</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}" />
+    <link rel="icon" href="{{url_for('static', filename='img/favicon.ico')}}" type="image/x-icon">
+  </head>
+  <body>
+    <div class="login-container user-profile">
+      <h1>Profile</h1>
+      <p>Logged in as <strong>{{ user.username }}</strong></p>
+      <p><a href="{{ url_for('chat.index') }}">Back to chat</a></p>
+
+      {% if pw_error %}
+      <div class="error">{{ pw_error }}</div>
+      {% elif pw_success %}
+      <div class="success">Password updated</div>
+      {% endif %}
+      <h2>Change Password</h2>
+      <form method="post" action="{{ url_for('auth.change_password') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <input type="password" name="current_password" placeholder="Current password" required maxlength="{{ config.MAX_PASSWORD_LENGTH }}" />
+        <input type="password" name="new_password" placeholder="New password" required maxlength="{{ config.MAX_PASSWORD_LENGTH }}" />
+        <input type="password" name="confirm_password" placeholder="Confirm new password" required maxlength="{{ config.MAX_PASSWORD_LENGTH }}" />
+        <button type="submit">Update Password</button>
+      </form>
+
+      {% if rc_error %}
+      <div class="error">{{ rc_error }}</div>
+      {% endif %}
+      <h2>Recovery</h2>
+      <form method="post" action="{{ url_for('auth.regen_recovery') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <button type="submit">Generate New Recovery Code</button>
+      </form>
+
+      <h2>Danger Zone</h2>
+      <button
+        class="dangerous"
+        hx-delete="{{ url_for('auth.delete_profile') }}"
+        hx-confirm="Are you sure you want to delete your profile? This cannot be undone."
+      >Delete Profile</button>
+    </div>
+  </body>
+</html>

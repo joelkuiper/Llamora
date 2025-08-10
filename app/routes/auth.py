@@ -4,9 +4,16 @@ from quart import (
     request,
     redirect,
     current_app,
+    url_for,
+    Response,
 )
 from nacl import pwhash
-from app.services.auth_helpers import set_secure_cookie
+from app.services.auth_helpers import (
+    set_secure_cookie,
+    login_required,
+    get_current_user,
+    get_dek,
+)
 from app.services.crypto import generate_dek, wrap_key, unwrap_key
 from app import db
 import re
@@ -85,7 +92,9 @@ async def register():
             rc_cipher,
         )
 
-        return await render_template("recovery.html", code=recovery_code)
+        return await render_template(
+            "recovery.html", code=recovery_code, next_url=url_for("auth.login")
+        )
 
     return await render_template("register.html")
 
@@ -193,3 +202,92 @@ async def reset_password():
         return redirect("/login")
 
     return await render_template("reset_password.html")
+
+
+@auth_bp.route("/profile")
+@login_required
+async def profile():
+    user = await get_current_user()
+    return await render_template("profile.html", user=user)
+
+
+@auth_bp.route("/profile/password", methods=["POST"])
+@login_required
+async def change_password():
+    user = await get_current_user()
+    form = await request.form
+    current = form.get("current_password", "")
+    new = form.get("new_password", "")
+    confirm = form.get("confirm_password", "")
+
+    max_pass = current_app.config["MAX_PASSWORD_LENGTH"]
+    min_pass = current_app.config.get("MIN_PASSWORD_LENGTH")
+
+    if (
+        not current
+        or not new
+        or not confirm
+        or len(current) > max_pass
+        or len(new) > max_pass
+        or new != confirm
+        or len(new) < min_pass
+        or not re.search(r"[A-Za-z]", new)
+        or not re.search(r"\d", new)
+    ):
+        return await render_template("profile.html", user=user, pw_error="Invalid input")
+
+    try:
+        pwhash.argon2id.verify(
+            user["password_hash"].encode("utf-8"), current.encode("utf-8")
+        )
+    except Exception:
+        return await render_template(
+            "profile.html", user=user, pw_error="Invalid current password"
+        )
+
+    dek = get_dek()
+    if not dek:
+        return await render_template(
+            "profile.html", user=user, pw_error="Missing encryption key"
+        )
+
+    password_bytes = new.encode("utf-8")
+    hash_bytes = pwhash.argon2id.str(password_bytes)
+    password_hash = hash_bytes.decode("utf-8")
+    pw_salt, pw_nonce, pw_cipher = wrap_key(dek, new)
+    await db.update_password_wrap(
+        user["id"], password_hash, pw_salt, pw_nonce, pw_cipher
+    )
+
+    return await render_template("profile.html", user=user, pw_success=True)
+
+
+@auth_bp.route("/profile/recovery", methods=["POST"])
+@login_required
+async def regen_recovery():
+    user = await get_current_user()
+    dek = get_dek()
+    if not dek:
+        return await render_template(
+            "profile.html", user=user, rc_error="Missing encryption key"
+        )
+
+    recovery_code = secrets.token_hex(16)
+    rc_salt, rc_nonce, rc_cipher = wrap_key(dek, recovery_code)
+    await db.update_recovery_wrap(user["id"], rc_salt, rc_nonce, rc_cipher)
+
+    return await render_template(
+        "recovery.html", code=recovery_code, next_url=url_for("auth.profile")
+    )
+
+
+@auth_bp.route("/profile", methods=["DELETE"])
+@login_required
+async def delete_profile():
+    user = await get_current_user()
+    await db.delete_user(user["id"])
+    resp = Response(status=204)
+    resp.delete_cookie("uid")
+    resp.delete_cookie("dek")
+    resp.headers["HX-Redirect"] = "/login"
+    return resp

@@ -157,6 +157,17 @@ class LocalDB:
                 (password_hash, pw_salt, pw_nonce, pw_cipher, user_id),
             )
 
+    async def update_recovery_wrap(self, user_id, rc_salt, rc_nonce, rc_cipher):
+        async with self.get_conn() as conn:
+            await conn.execute(
+                "UPDATE users SET dek_rc_salt = ?, dek_rc_nonce = ?, dek_rc_cipher = ? WHERE id = ?",
+                (rc_salt, rc_nonce, rc_cipher, user_id),
+            )
+
+    async def delete_user(self, user_id):
+        async with self.get_conn() as conn:
+            await conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+
     async def append(self, user_id, session_id, role, content, dek):
         from app.services.crypto import encrypt_message
 

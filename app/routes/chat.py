@@ -273,9 +273,7 @@ class PendingResponse:
                     )
                     current_app.logger.debug("Saved assistant message")
                 except Exception:
-                    current_app.logger.exception(
-                        "Failed to save assistant message"
-                    )
+                    current_app.logger.exception("Failed to save assistant message")
                     full_response += (
                         "<span class='error'>⚠️ Failed to save response.</span>"
                     )
