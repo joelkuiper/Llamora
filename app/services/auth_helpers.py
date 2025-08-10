@@ -1,6 +1,7 @@
 import os
 import base64
 from quart import Response, request, redirect
+from urllib.parse import urlparse, quote
 from functools import wraps
 from nacl import secret
 from app import db
@@ -42,10 +43,29 @@ def get_dek():
         return None
 
 
+def _safe_return_path() -> str:
+    """Determine a safe path to return to after login."""
+
+    if request.headers.get("HX-Request"):
+        # HTMX sends the current URL in this header
+        current = request.headers.get("HX-Current-URL", "/")
+        parsed = urlparse(current)
+        path = parsed.path or "/"
+        if parsed.query:
+            path += f"?{parsed.query}"
+    else:
+        # full_path includes trailing '?' if there was no query string
+        path = request.full_path if request.query_string else request.path
+    return path.rstrip("?") or "/"
+
+
 def login_required(f):
     @wraps(f)
     async def wrapper(*args, **kwargs):
         login_url = "/login"
+        return_path = _safe_return_path()
+        login_url = f"/login?return={quote(return_path, safe='') }"
+
         if not await get_current_user():
             if request.headers.get("HX-Request"):
                 resp = Response(status=401)

@@ -101,16 +101,22 @@ async def register():
 
 @auth_bp.route("/login", methods=["GET", "POST"])
 async def login():
+    def _safe_return(url: str | None) -> str | None:
+        if url and url.startswith("/") and not url.startswith("//"):
+            return url
+        return None
+
     if request.method == "POST":
         form = await request.form
         username = form.get("username", "").strip()
         password = form.get("password", "")
+        return_url = _safe_return(form.get("return") or request.args.get("return"))
 
         max_user = current_app.config["MAX_USERNAME_LENGTH"]
         max_pass = current_app.config["MAX_PASSWORD_LENGTH"]
 
         if len(username) > max_user or len(password) > max_pass:
-            return await render_template("login.html", error="Invalid credentials")
+            return await render_template("login.html", error="Invalid credentials", return_url=return_url)
 
         user = await db.get_user_by_username(username)
         if user:
@@ -125,7 +131,7 @@ async def login():
                     user["dek_pw_nonce"],
                     password,
                 )
-                resp = redirect("/")
+                resp = redirect(return_url or "/")
                 set_secure_cookie(resp, "uid", str(user["id"]))
                 set_secure_cookie(
                     resp, "dek", base64.b64encode(dek).decode("utf-8")
@@ -133,8 +139,10 @@ async def login():
                 return resp
             except Exception:
                 pass
-        return await render_template("login.html", error="Invalid credentials")
-    return await render_template("login.html")
+        return await render_template("login.html", error="Invalid credentials", return_url=return_url)
+
+    return_url = _safe_return(request.args.get("return"))
+    return await render_template("login.html", return_url=return_url)
 
 
 @auth_bp.route("/logout")

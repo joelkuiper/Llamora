@@ -19,6 +19,9 @@
       {% endif %}
       <form method="post">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if return_url %}
+        <input type="hidden" name="return" value="{{ return_url }}">
+        {% endif %}
         <input type="text" name="username" placeholder="Username"
                required pattern="^\S+$" maxlength="{{ config.MAX_USERNAME_LENGTH }}" />
         <input type="password" name="password" placeholder="Password"
