@@ -8,7 +8,7 @@
     <link rel="icon" href="{{url_for('static', filename='img/favicon.ico')}}" type="image/x-icon">
   </head>
   <body>
-    <div class="login-container user-profile">
+    <div class="form-container user-profile">
       <h1>Profile</h1>
       <p>Logged in as <strong>{{ user.username }}</strong></p>
       <p><a href="{{ url_for('chat.index') }}">Back to chat</a></p>

@@ -1,5 +1,5 @@
 /* Login form styling */
-.login-container {
+.form-container {
   max-width: 400px;
   margin: 10vh auto;
   padding: var(--spacing-xl);
