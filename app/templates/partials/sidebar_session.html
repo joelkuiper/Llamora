@@ -3,8 +3,8 @@
   class="{% if session.id == session_id %}active{% endif %}">
   <div class="session-item">
     <a
-      href="/s/{{ session.id }}"
-      hx-get="/s/{{ session.id }}/chat"
+      href="{{ url_for('chat.session', session_id=session.id) }}"
+      hx-get="{{ url_for('chat.chat_htmx', session_id=session.id) }}"
       data-session-id="{{ session.id }}"
       hx-target="#chatbox-wrapper"
       title="{{session.name}}"
@@ -14,7 +14,7 @@
     <div class="session-actions">
       <button
         class="edit-btn"
-        hx-get="/s/{{ session.id }}/rename"
+        hx-get="{{ url_for('chat.edit_session_name', session_id=session.id) }}"
         hx-target="#session-{{ session.id }}"
         hx-swap="outerHTML"
         title="Edit session name"
@@ -26,7 +26,7 @@
       </button>
     <button
       class="delete-btn"
-      hx-delete="/s/{{ session.id }}"
+      hx-delete="{{ url_for('chat.delete_session', session_id=session.id) }}"
       hx-target="#session-{{ session.id }}"
       hx-confirm="Are sure you want to delete this session?"
       hx-swap="outerHTML"

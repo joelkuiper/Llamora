@@ -14,7 +14,7 @@
   </div>
 
   <form id="chat-form"
-        hx-post="/s/{{ session.id }}/message"
+        hx-post="{{ url_for('chat.send_message', session_id=session.id) }}"
         hx-target="#chat"
         hx-on::after-request="this.reset()"
         hx-swap="beforeend">
