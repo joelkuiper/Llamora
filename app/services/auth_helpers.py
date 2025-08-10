@@ -1,6 +1,6 @@
 import os
 import base64
-from quart import request, redirect
+from quart import Response, request, redirect
 from functools import wraps
 from nacl import secret
 from app import db
@@ -45,8 +45,14 @@ def get_dek():
 def login_required(f):
     @wraps(f)
     async def wrapper(*args, **kwargs):
+        login_url = "/login"
         if not await get_current_user():
-            return redirect("/login")
+            if request.headers.get("HX-Request"):
+                resp = Response(status=401)
+                resp.headers["HX-Redirect"] = login_url
+                return resp
+            return redirect(login_url)
+
         return await f(*args, **kwargs)
 
     return wrapper
