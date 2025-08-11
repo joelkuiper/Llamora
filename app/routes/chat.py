@@ -9,21 +9,16 @@ from quart import (
 )
 from html import escape
 import asyncio
-import os
 import re
 from llm.llm_backend import LLMEngine
-from util import str_to_bool
+from config import LLM_ENGINE_CONFIG
 from app import db
 from app.services.auth_helpers import login_required, get_current_user, get_dek
 
 chat_bp = Blueprint("chat", __name__)
 
 
-llm = LLMEngine(
-    model_path=os.environ["CHAT_MODEL_GGUF"],
-    verbose=str_to_bool(os.getenv("QUART_DEBUG", "False")),
-    max_workers=int(os.getenv("CHAT_LLM_WORKERS", "1")),
-)
+llm = LLMEngine(**LLM_ENGINE_CONFIG)
 
 
 async def render_chat(session_id, oob=False):

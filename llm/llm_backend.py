@@ -3,7 +3,6 @@ import textwrap
 import queue
 import asyncio
 import logging
-from config import MAX_RESPONSE_TOKENS
 from llm.prompt_template import (
     CHAT_PROMPT_TEMPLATE,
     get_prompt,
@@ -29,11 +28,15 @@ class LLMEngine:
         model_path: str,
         max_workers: int = 1,
         verbose: bool = False,
+        llama_cpp_kwargs: dict | None = None,
     ):
         self.verbose = verbose
         self.model_path = model_path
-        self.n_ctx = 1024 * 9
-        self.max_response_tokens = MAX_RESPONSE_TOKENS
+        self.llama_cpp_kwargs = llama_cpp_kwargs or {}
+
+        # Allow context length and max tokens to be overridden via configuration
+        self.n_ctx = self.llama_cpp_kwargs.get("n_ctx")
+        self.max_response_tokens = self.llama_cpp_kwargs.get("max_tokens")
 
         self.token_counter = TokenCounter(model_path)
         self.system_tokens = self.token_counter.count(
@@ -46,15 +49,11 @@ class LLMEngine:
         self._start_workers(max_workers)
 
     def _load_model(self):
-        return LlamaCpp(
-            model_path=self.model_path,
-            temperature=0.8,
-            verbose=self.verbose,
-            max_tokens=self.max_response_tokens,
-            n_ctx=self.n_ctx,
-            streaming=True,
-            n_gpu_layers=-1,
-        )
+        """Instantiate a ``LlamaCpp`` model with configured parameters."""
+
+        kwargs = {"model_path": self.model_path, **self.llama_cpp_kwargs}
+
+        return LlamaCpp(**kwargs)
 
     def _start_workers(self, count: int):
         logger = logging.getLogger(__name__)
