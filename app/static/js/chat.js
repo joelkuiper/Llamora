@@ -42,6 +42,11 @@ export function initChatUI(root = document) {
 
   if (!form || !textarea || !button || !chat) return;
 
+  const sessionId = chat.dataset.sessionId;
+  const draftKey = `chat-draft-${sessionId}`;
+
+  textarea.value = sessionStorage.getItem(draftKey) || "";
+
   const setFormEnabled = (enabled) => {
     textarea.disabled = !enabled;
     button.disabled = !enabled;
@@ -50,13 +55,20 @@ export function initChatUI(root = document) {
 
   const scrollToBottom = setupScrollHandler(setFormEnabled);
 
-  form.addEventListener("htmx:afterRequest", () => setFormEnabled(false));
+  form.addEventListener("htmx:afterRequest", () => {
+    setFormEnabled(false);
+    sessionStorage.removeItem(draftKey);
+  });
 
   form.addEventListener("htmx:configRequest", (event) => {
     if (!textarea.value.trim()) {
       event.preventDefault();
       textarea.focus();
     }
+  });
+
+  textarea.addEventListener("input", () => {
+    sessionStorage.setItem(draftKey, textarea.value);
   });
 
   errors?.addEventListener("htmx:afterSwap", () => {
