@@ -61,7 +61,7 @@ body {
   h1 {
     font-weight: lighter;
     font-size: 1em;
-    margin-top: 1.5rem;
+    margin-top: 1rem;
     margin-left: -0.5rem;
     text-shadow: var(--text-shadow-soft);
   }
@@ -100,5 +100,36 @@ body {
 
       &:hover { color: #700000; }
     }
+  }
+}
+
+/* Full-page error */
+.error-page {
+  height: 80vh;
+  max-width: 60rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+
+  h1 {
+    color: #a00000;
+    margin-bottom: var(--spacing-lg);
+  }
+
+  .home-button {
+    text-decoration: none;
+    background-color: var(--color-heading);
+    color: white;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--raised-shadow);
+  }
+
+  .home-button:hover {
+    background-color: #333;
+
   }
 }

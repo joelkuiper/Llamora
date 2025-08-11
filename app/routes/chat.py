@@ -5,6 +5,7 @@ from quart import (
     Response,
     current_app,
     make_response,
+    abort,
 )
 from html import escape
 import asyncio
@@ -32,10 +33,7 @@ async def render_chat(session_id, oob=False):
 
     if not session:
         current_app.logger.warning("Session not found for user")
-        html = await render_template(
-            "partials/error.html", message="Session not found."
-        )
-        return await make_response(html, 404)
+        abort(404, description="Session not found.")
 
     dek = get_dek()
     history = await db.get_history(uid, session_id, dek)
@@ -153,11 +151,7 @@ async def send_message(session_id):
         or len(user_text) > max_len
         or not await db.get_session(uid, session_id)
     ):
-        html = await render_template(
-            "partials/error.html",
-            message="Message is empty, too long, or session is invalid.",
-        )
-        return await make_response(html, 400)
+        abort(400, description="Message is empty, too long, or session is invalid.")
 
     try:
         msg_id = await db.append(uid, session_id, "user", user_text, dek)

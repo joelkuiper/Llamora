@@ -1,4 +1,12 @@
-from quart import Blueprint, render_template, redirect, request, current_app, make_response
+from quart import (
+    Blueprint,
+    render_template,
+    redirect,
+    request,
+    current_app,
+    make_response,
+    abort,
+)
 from app import db
 from app.services.auth_helpers import login_required, get_current_user, get_dek
 from .chat import render_chat
@@ -24,8 +32,7 @@ async def session(session_id):
 
     if not session:
         current_app.logger.warning("Session not found for user")
-        html = await render_template("partials/error.html", message="Session not found.")
-        return await make_response(html, 404)
+        abort(404, description="Session not found.")
 
     dek = get_dek()
     history = await db.get_history(uid, session_id, dek)
@@ -75,8 +82,7 @@ async def edit_session_name(session_id):
 
     if not session:
         current_app.logger.warning("Session not found for user")
-        html = await render_template("partials/error.html", message="Session not found.")
-        return await make_response(html, 404)
+        abort(404, description="Session not found.")
 
     return await render_template(
         "partials/sidebar_session_edit.html", session=session, session_id=session_id
@@ -99,11 +105,7 @@ async def rename_session(session_id):
         or len(new_name) > max_len
     ):
         current_app.logger.warning("Invalid rename request")
-        html = await render_template(
-            "partials/error.html",
-            message="Error",
-        )
-        return await make_response(html, 400)
+        abort(400, description="Session not found or name invalid.")
 
     await db.rename_session(uid, session_id, new_name)
     session = await db.get_session(uid, session_id)
@@ -121,8 +123,7 @@ async def delete_session(session_id):
 
     if not await db.get_session(uid, session_id):
         current_app.logger.warning("Session not found for user")
-        html = await render_template("partials/error.html", message="Session not found.")
-        return await make_response(html, 404)
+        abort(404, description="Session not found.")
 
     active_session_id = request.headers.get("X-Active-Session")
     is_active = active_session_id == session_id

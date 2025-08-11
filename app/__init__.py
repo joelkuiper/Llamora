@@ -1,4 +1,4 @@
-from quart import Quart, render_template, make_response
+from quart import Quart, render_template, make_response, request
 from dotenv import load_dotenv
 from quart_wtf import CSRFProtect
 import os
@@ -35,17 +35,22 @@ def create_app():
     app.before_request(load_user)
 
     @app.errorhandler(404)
-    async def not_found(_):
-        html = await render_template("partials/error.html", message="Page not found.")
+    async def not_found(e):
+        message = getattr(e, "description", "Page not found.")
+        if request.headers.get("HX-Request"):
+            html = await render_template("partials/error.html", message=message)
+            return await make_response(html, 404)
+        html = await render_template("error.html", message=message)
         return await make_response(html, 404)
 
     @app.errorhandler(Exception)
     async def handle_exception(e):
         app.logger.exception("Unhandled exception: %s", e)
-        html = await render_template(
-            "partials/error.html",
-            message="An unexpected error occurred. Please try again later.",
-        )
+        message = "An unexpected error occurred. Please try again later."
+        if request.headers.get("HX-Request"):
+            html = await render_template("partials/error.html", message=message)
+            return await make_response(html, 500)
+        html = await render_template("error.html", message=message)
         return await make_response(html, 500)
 
     app.logger.info("Application initialized")
