@@ -10,7 +10,12 @@ from langchain_core.prompts import PromptTemplate
 
 
 class LLMEngine:
-    """Handles queuing, streaming, and history formatting for an LLM chat interface."""
+    """Handles queuing, streaming, and history formatting for an LLM chat interface.
+
+    Supports basic scalability by running multiple worker threads, each with its own
+    model instance. Requests are distributed across the workers allowing concurrent
+    chats when ``max_workers`` is greater than ``1``.
+    """
 
     def __init__(
         self,
@@ -20,12 +25,10 @@ class LLMEngine:
     ):
         self.verbose = verbose
         self.model_path = model_path
-        self.llm = self._load_model()
-
-        self.MAX_TOKENS = self.llm.n_ctx
         self.prompt = self._build_prompt()
-        self.chain = self.prompt | self.llm
         self._request_queue = queue.Queue()
+        self.llm = None  # primary model for token counting
+        self.MAX_TOKENS = None
         self._start_workers(max_workers)
 
     def _load_model(self):
@@ -53,12 +56,21 @@ class LLMEngine:
 
     def _start_workers(self, count: int):
         logger = logging.getLogger(__name__)
-        for _ in range(count):
-            t = threading.Thread(target=self._worker_loop, daemon=True)
+        for i in range(count):
+            llm = self._load_model()
+            if self.llm is None:
+                self.llm = llm
+                self.MAX_TOKENS = llm.n_ctx
+            chain = self.prompt | llm
+            t = threading.Thread(
+                target=self._worker_loop,
+                args=(chain,),
+                daemon=True,
+            )
             t.start()
             logger.debug("Started LLM worker thread %s", t.name)
 
-    def _worker_loop(self):
+    def _worker_loop(self, chain: LLMChain):
         logger = logging.getLogger(__name__)
         while True:
             req = self._request_queue.get()
@@ -67,7 +79,7 @@ class LLMEngine:
             try:
                 trimmed = self._trim_history(req.history)
                 formatted = self.format_history(trimmed)
-                for token in self.chain.stream({"history": formatted}):
+                for token in chain.stream({"history": formatted}):
                     req.output_queue.put(token)
             except Exception:
                 logger.exception("LLM generation failed")

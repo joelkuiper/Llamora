@@ -44,7 +44,7 @@
 
 This project has **several limitations** by design. It's important to understand them if you plan to use or extend this code:
 
-- **Not Scalable (Single-User Queue):** The app can only comfortably handle one chat interaction at a time. The LLM processing is single-threaded and queued. If two users ask questions simultaneously, one will wait until the other's response is done. This is fine for a personal assistant or small demo, but not for a multi-user or high-traffic scenario. Scaling would require architectural changes (e.g., running the model in a separate service or adding task workers).
+- **Limited Scalability:** By default, Llamora processes requests with a single worker. Set the `CHAT_LLM_WORKERS` environment variable to spawn additional worker threads, each with its own model instance, allowing multiple chats to run in parallel. More workers require more memory, and for heavy traffic a dedicated model service is still recommended.
 
 - **No API or External Interface:** The app doesn't expose an API for programmatic access, it's purely a web interface. That's fine for interactive use, but if you wanted to use this as a backend service, you'd have to add JSON endpoints or similar.
 
@@ -82,6 +82,10 @@ uv run quart --app main run
 ```
 
 Set `QUART_DEBUG=1` for automatic reloading on code changes.
+
+To handle multiple chat requests in parallel, set `CHAT_LLM_WORKERS` to the number of
+worker threads to spawn. Each worker loads its own copy of the model, so ensure
+your system has enough memory.
 
 For CUDA support (Nvidia GPU) you must reinstall the [llama-cpp-python](https://github.com/inference-sh/llama-cpp-python) library (and have the CUDA toolkit installed):
 
