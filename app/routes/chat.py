@@ -9,16 +9,16 @@ from quart import (
 )
 from html import escape
 import asyncio
+import os
 import re
-from llm.llm_backend import LLMEngine
-from config import LLM_ENGINE_CONFIG
+from llm_engine import LLMEngine, LlamaConfig
 from app import db
 from app.services.auth_helpers import login_required, get_current_user, get_dek
 
 chat_bp = Blueprint("chat", __name__)
 
 
-llm = LLMEngine(**LLM_ENGINE_CONFIG)
+llm = LLMEngine(os.getenv("LLAMAFILE"), LlamaConfig())
 
 
 async def render_chat(session_id, oob=False):
