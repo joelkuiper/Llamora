@@ -1,4 +1,11 @@
-from quart import Blueprint, render_template, request, Response, current_app
+from quart import (
+    Blueprint,
+    render_template,
+    request,
+    Response,
+    current_app,
+    make_response,
+)
 from html import escape
 import asyncio
 import os
@@ -25,10 +32,10 @@ async def render_chat(session_id, oob=False):
 
     if not session:
         current_app.logger.warning("Session not found for user")
-        return (
-            await render_template("partials/error.html", message="Session not found."),
-            404,
+        html = await render_template(
+            "partials/error.html", message="Session not found."
         )
+        return await make_response(html, 404)
 
     dek = get_dek()
     history = await db.get_history(uid, session_id, dek)
@@ -51,7 +58,9 @@ async def render_chat(session_id, oob=False):
 @login_required
 async def chat_htmx(session_id):
     html = await render_chat(session_id, False)
-    return html, 200, {"HX-Push-Url": f"/s/{session_id}"}
+    resp = await make_response(html, 200)
+    resp.headers["HX-Push-Url"] = f"/s/{session_id}"
+    return resp
 
 
 pending_responses: dict[str, "PendingResponse"] = {}
@@ -144,13 +153,11 @@ async def send_message(session_id):
         or len(user_text) > max_len
         or not await db.get_session(uid, session_id)
     ):
-        return (
-            await render_template(
-                "partials/error.html",
-                message="Message is empty, too long, or session is invalid.",
-            ),
-            400,
+        html = await render_template(
+            "partials/error.html",
+            message="Message is empty, too long, or session is invalid.",
         )
+        return await make_response(html, 400)
 
     try:
         msg_id = await db.append(uid, session_id, "user", user_text, dek)

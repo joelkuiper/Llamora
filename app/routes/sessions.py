@@ -1,4 +1,4 @@
-from quart import Blueprint, render_template, redirect, request, current_app
+from quart import Blueprint, render_template, redirect, request, current_app, make_response
 from app import db
 from app.services.auth_helpers import login_required, get_current_user, get_dek
 from .chat import render_chat
@@ -24,10 +24,8 @@ async def session(session_id):
 
     if not session:
         current_app.logger.warning("Session not found for user")
-        return (
-            await render_template("partials/error.html", message="Session not found."),
-            404,
-        )
+        html = await render_template("partials/error.html", message="Session not found.")
+        return await make_response(html, 404)
 
     dek = get_dek()
     history = await db.get_history(uid, session_id, dek)
@@ -63,11 +61,9 @@ async def create_session():
         session_id=new_session_id,
     )
     chat_html = await render_chat(new_session_id, oob=True)
-    return (
-        f"{chat_html}{sidebar_html}",
-        200,
-        {"HX-Push-Url": f"/s/{new_session_id}"},
-    )
+    resp = await make_response(f"{chat_html}{sidebar_html}", 200)
+    resp.headers["HX-Push-Url"] = f"/s/{new_session_id}"
+    return resp
 
 
 @sessions_bp.route("/s/<session_id>/rename", methods=["GET"])
@@ -79,10 +75,8 @@ async def edit_session_name(session_id):
 
     if not session:
         current_app.logger.warning("Session not found for user")
-        return (
-            await render_template("partials/error.html", message="Session not found."),
-            404,
-        )
+        html = await render_template("partials/error.html", message="Session not found.")
+        return await make_response(html, 404)
 
     return await render_template(
         "partials/sidebar_session_edit.html", session=session, session_id=session_id
@@ -105,13 +99,11 @@ async def rename_session(session_id):
         or len(new_name) > max_len
     ):
         current_app.logger.warning("Invalid rename request")
-        return (
-            await render_template(
-                "partials/error.html",
-                message="Error",
-            ),
-            400,
+        html = await render_template(
+            "partials/error.html",
+            message="Error",
         )
+        return await make_response(html, 400)
 
     await db.rename_session(uid, session_id, new_name)
     session = await db.get_session(uid, session_id)
@@ -129,10 +121,8 @@ async def delete_session(session_id):
 
     if not await db.get_session(uid, session_id):
         current_app.logger.warning("Session not found for user")
-        return (
-            await render_template("partials/error.html", message="Session not found."),
-            404,
-        )
+        html = await render_template("partials/error.html", message="Session not found.")
+        return await make_response(html, 404)
 
     active_session_id = request.headers.get("X-Active-Session")
     is_active = active_session_id == session_id
@@ -169,9 +159,6 @@ async def delete_session(session_id):
           """
 
         chat_html = await render_chat(new_session_id, oob=True)
-
-        return (
-            f"{chat_html}{sidebar_html}",
-            200,
-            {"HX-Push-Url": f"/s/{new_session_id}"},
-        )
+        resp = await make_response(f"{chat_html}{sidebar_html}", 200)
+        resp.headers["HX-Push-Url"] = f"/s/{new_session_id}"
+        return resp

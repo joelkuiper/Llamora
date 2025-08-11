@@ -1,4 +1,4 @@
-from quart import Quart, render_template
+from quart import Quart, render_template, make_response
 from dotenv import load_dotenv
 from quart_wtf import CSRFProtect
 import os
@@ -36,21 +36,17 @@ def create_app():
 
     @app.errorhandler(404)
     async def not_found(_):
-        return (
-            await render_template("partials/error.html", message="Page not found."),
-            404,
-        )
+        html = await render_template("partials/error.html", message="Page not found.")
+        return await make_response(html, 404)
 
     @app.errorhandler(Exception)
     async def handle_exception(e):
         app.logger.exception("Unhandled exception: %s", e)
-        return (
-            await render_template(
-                "partials/error.html",
-                message="An unexpected error occurred. Please try again later.",
-            ),
-            500,
+        html = await render_template(
+            "partials/error.html",
+            message="An unexpected error occurred. Please try again later.",
         )
+        return await make_response(html, 500)
 
     app.logger.info("Application initialized")
     return app
