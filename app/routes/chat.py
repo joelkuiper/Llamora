@@ -11,7 +11,7 @@ from html import escape
 import asyncio
 import os
 import re
-from llm_backend import LLMEngine
+from llm.llm_backend import LLMEngine
 from util import str_to_bool
 from app import db
 from app.services.auth_helpers import login_required, get_current_user, get_dek

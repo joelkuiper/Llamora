@@ -4,6 +4,13 @@ import queue
 import asyncio
 import logging
 from config import MAX_RESPONSE_TOKENS
+from llm.prompt_template import (
+    CHAT_PROMPT_TEMPLATE,
+    get_prompt,
+    format_history,
+    format_message,
+)
+from llm.token_counter import TokenCounter
 from langchain_community.llms import LlamaCpp
 from langchain.chains import LLMChain
 from langchain_core.prompts import PromptTemplate
@@ -25,7 +32,14 @@ class LLMEngine:
     ):
         self.verbose = verbose
         self.model_path = model_path
-        self.prompt = self._build_prompt()
+        self.n_ctx = 1024 * 9
+        self.max_response_tokens = MAX_RESPONSE_TOKENS
+
+        self.token_counter = TokenCounter(model_path)
+        self.system_tokens = self.token_counter.count(
+            CHAT_PROMPT_TEMPLATE.format(history="")
+        )
+        self.prompt = get_prompt()
         self._request_queue = queue.Queue()
         self.llm = None  # primary model for token counting
         self.MAX_TOKENS = None
@@ -36,23 +50,11 @@ class LLMEngine:
             model_path=self.model_path,
             temperature=0.8,
             verbose=self.verbose,
-            max_tokens=MAX_RESPONSE_TOKENS,
-            n_ctx=1024 * 9,
+            max_tokens=self.max_response_tokens,
+            n_ctx=self.n_ctx,
             streaming=True,
             n_gpu_layers=-1,
         )
-
-    def _build_prompt(self):
-        template = textwrap.dedent(
-            """\
-            <|system|>
-            “From shadow to light, a thread of understanding.”
-            Keep replies brief, clear, and quietly resonant.<|end|>
-            {history}
-            <|assistant|>"""
-        )
-
-        return PromptTemplate.from_template(template)
 
     def _start_workers(self, count: int):
         logger = logging.getLogger(__name__)
@@ -78,7 +80,7 @@ class LLMEngine:
                 break
             try:
                 trimmed = self._trim_history(req.history)
-                formatted = self.format_history(trimmed)
+                formatted = format_history(trimmed)
                 for token in chain.stream({"history": formatted}):
                     req.output_queue.put(token)
             except Exception:
@@ -96,24 +98,25 @@ class LLMEngine:
             self.output_queue = queue.Queue()
             self.done = threading.Event()
 
-    def format_history(self, history: list[dict]) -> str:
-        """Convert chat history into Phi instruct-compatible prompt string."""
-        return "".join(
-            f"<|{msg['role']}|>\n{msg['content']}<|end|>\n" for msg in history
-        )
-
     def _trim_history(self, history: list[dict]) -> list[dict]:
-        """Trim oldest messages to fit within context window."""
-        trimmed = []
-        for message in reversed(history):
-            temp = [message] + trimmed
-            formatted = self.format_history(temp)
-            prompt = self.prompt.format(history=formatted)
-            token_count = self.llm.get_num_tokens(prompt)
-            if token_count + MAX_RESPONSE_TOKENS > self.MAX_TOKENS:
-                break
-            trimmed = temp
-        return trimmed
+        if not history:
+            return []
+        messages = [format_message(m) for m in history]
+        counts = [self.token_counter.count(m) for m in messages]
+        prefix = [0]
+        for c in counts:
+            prefix.append(prefix[-1] + c)
+        max_tokens = self.n_ctx - self.max_response_tokens
+        n = len(history)
+        lo, hi = 0, n
+        while lo < hi:
+            mid = (lo + hi) // 2
+            used = self.system_tokens + (prefix[n] - prefix[mid])
+            if used <= max_tokens:
+                hi = mid
+            else:
+                lo = mid + 1
+        return history[lo:]
 
     def stream_response(self, history: list[dict]):
         """Submit a request to the queue and return an async generator for its output."""
