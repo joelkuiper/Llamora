@@ -87,7 +87,12 @@ export function initChatUI(root = document) {
   renderAllMarkdown(chat);
 
   scrollToBottom();
-  textarea.focus();
+  // If a bot response is currently streaming, keep the form disabled
+  if (chat.querySelector("#typing-indicator")) {
+    setFormEnabled(false);
+  } else {
+    textarea.focus();
+  }
 }
 
 function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrapper") {
