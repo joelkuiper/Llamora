@@ -81,3 +81,5 @@ uv run quart --app main run
 ```
 
 Set `QUART_DEBUG=1` for automatic reloading on code changes.
+
+Alternatively set `LLAMORA_LLAMA_HOST` to the address of a running Llama file (e.g. http://localhost:8080), this bypasses the subprocess entirely and just talks to the API endpoint.
