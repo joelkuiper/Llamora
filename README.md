@@ -67,7 +67,7 @@ This project has **several limitations** by design. It's important to understand
 ### Requirements
 
 - [uv](https://docs.astral.sh/uv/)
-- a [llamafile](https://github.com/Mozilla-Ocho/llamafile) model (e.g., [Phi-3.5-mini-instruct](https://huggingface.co/microsoft/Phi-3.5-mini-instruct))
+- a [llamafile](https://github.com/Mozilla-Ocho/llamafile) model (e.g., [Phi-3.5-mini-instruct](https://huggingface.co/Mozilla/Phi-3-mini-4k-instruct-llamafile))
 - a relatively fast computer (ideally with a strong GPU)
 
 ### Run
