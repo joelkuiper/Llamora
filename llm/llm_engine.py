@@ -8,7 +8,6 @@ from typing import Any, AsyncGenerator
 
 import httpx
 from httpx import HTTPError
-import httpcore  # type: ignore
 
 from config import DEFAULT_LLM_REQUEST, LLM_SERVER
 from llm.prompt_template import build_prompt
