@@ -15,7 +15,7 @@
 
 ## Features
 
-- **Local LLM Backend** Runs a model locally using [**llamafile**](https://github.com/Mozilla-Ocho/llamafile). No cloud or API keys needed, your data and queries stay on your machine. You just provide a llamafile, and the app will load it at startup.
+- **Local LLM Backend** Runs a model locally using [**llamafile**](https://github.com/Mozilla-Ocho/llamafile), a single-file executable that bundles an LLM and a small server. No cloud or API keys are needed, and your data and queries stay on your machine. You just provide a llamafile, and the app will load it at startup.
 
 - **Streaming Responses** Utilizes **Server-Sent Events (SSE)** to stream the AI's response token by token. The user sees the answer appear as it's being generated, similar to ChatGPT's interface.
 
@@ -70,16 +70,18 @@ This project has **several limitations** by design. It's important to understand
 - a [llamafile](https://github.com/Mozilla-Ocho/llamafile) model (e.g., [Phi-3.5-mini-instruct](https://huggingface.co/Mozilla/Phi-3-mini-4k-instruct-llamafile))
 - a relatively fast computer (ideally with a strong GPU)
 
-### Run
-Download a [Phi-3.5-mini-instruct](https://huggingface.co/microsoft/Phi-3.5-mini-instruct) [(download Q5_K_M)](https://huggingface.co/Mozilla/Phi-3-mini-4k-instruct-llamafile/resolve/main/Phi-3-mini-4k-instruct.Q5_K_M.llamafile) llamafile.
-Set the `LLAMORA_LLAMAFILE` environment variable to the full path of the `.llamafile` file, or edit the `.env` file to include: `LLAMORA_LLAMAFILE=/path/to/your/model.llamafile`
+### Quick Start
 
-Install [uv](https://docs.astral.sh/uv/#installation). Then run:
+1. Download a [Phi-3.5-mini-instruct](https://huggingface.co/microsoft/Phi-3.5-mini-instruct) [(download Q5_K_M)](https://huggingface.co/Mozilla/Phi-3-mini-4k-instruct-llamafile/resolve/main/Phi-3-mini-4k-instruct.Q5_K_M.llamafile) llamafile.
+2. Set the `LLAMORA_LLAMAFILE` environment variable to the full path of the `.llamafile` file, or add a line like `LLAMORA_LLAMAFILE=/path/to/your/model.llamafile` to a `.env` file.
+3. Start the server:
 
-```bash
-uv run quart --app main run
-```
+   ```bash
+   uv run quart --app main run
+   ```
+
+   If the server starts correctly it will log something like `Running on http://127.0.0.1:5000`.
 
 Set `QUART_DEBUG=1` for automatic reloading on code changes.
 
-Alternatively set `LLAMORA_LLAMA_HOST` to the address of a running Llama file (e.g. http://localhost:8080), this bypasses the subprocess entirely and just talks to the API endpoint.
+Alternatively set `LLAMORA_LLAMA_HOST` to the address of a running Llama file (e.g. `http://localhost:8080`); this bypasses the subprocess entirely and just talks to the API endpoint.
