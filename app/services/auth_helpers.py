@@ -7,7 +7,19 @@ from nacl import secret
 from app import db
 
 cookie_secret = os.environ.get("LLAMORA_COOKIE_SECRET")
-cookie_key = base64.urlsafe_b64decode(cookie_secret)
+if not cookie_secret or len(cookie_secret) % 4 != 0:
+    raise RuntimeError("Set LLAMORA_COOKIE_SECRET to a 32-byte base64 string")
+
+try:
+    cookie_key = base64.b64decode(cookie_secret, altchars=b"-_", validate=True)
+except Exception as exc:
+    raise RuntimeError(
+        "Set LLAMORA_COOKIE_SECRET to a 32-byte base64 string"
+    ) from exc
+
+if len(cookie_key) != secret.SecretBox.KEY_SIZE:
+    raise RuntimeError("Set LLAMORA_COOKIE_SECRET to a 32-byte base64 string")
+
 cookie_box = secret.SecretBox(cookie_key)
 
 

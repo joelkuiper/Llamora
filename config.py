@@ -50,9 +50,15 @@ LLM_SERVER = {
     "args": _deep_merge(DEFAULT_LLAMA_ARGS, env_overrides or {}),
 }
 
+try:
+    llm_request_overrides = json.loads(os.getenv("LLAMORA_LLM_REQUEST", "{}"))
+except json.JSONDecodeError:
+    logging.warning("Invalid JSON in LLAMORA_LLM_REQUEST, ignoring.")
+    llm_request_overrides = {}
+
 DEFAULT_LLM_REQUEST = {
     "n_predict": int(os.getenv("LLAMORA_MAX_RESPONSE_TOKENS", "1024")),
     "stream": True,
     "stop": ["<|end|>", "<|assistant|>"],
-    **(json.loads(os.getenv("LLAMORA_LLM_REQUEST", "{}"))),
+    **llm_request_overrides,
 }
