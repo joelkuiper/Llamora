@@ -33,6 +33,88 @@ function renderMarkdownInElement(el, text) {
 }
 
 
+const VOID_TAGS = new Set([
+  'AREA','BASE','BR','COL','EMBED','HR','IMG','INPUT','LINK','META','PARAM','SOURCE','TRACK','WBR'
+]);
+
+function isVoid(el) {
+  return el.nodeType === Node.ELEMENT_NODE && VOID_TAGS.has(el.tagName);
+}
+
+function isInlineElement(el) {
+  if (!(el instanceof Element)) return false;
+  const disp = getComputedStyle(el).display || '';
+  return disp.startsWith('inline'); // inline, inline-block, inline-flex
+}
+
+function getLastNonWhitespaceTextNode(root) {
+  // TreeWalker over TEXT nodes to find the last non-whitespace
+  const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      return /\S/.test(node.nodeValue || '') ? NodeFilter.FILTER_ACCEPT
+        : NodeFilter.FILTER_SKIP;
+    }
+  });
+  let last = null, n;
+  while ((n = tw.nextNode())) last = n;
+  return last;
+}
+
+function getDeepestInlineElement(root) {
+  // TreeWalker over ELEMENT nodes; keep the *last* inline element seen
+  const tw = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
+  let lastInline = null, n = root;
+  do {
+    if (isInlineElement(n) && !isVoid(n)) lastInline = n;
+  } while ((n = tw.nextNode()));
+  return lastInline;
+}
+
+function insertAfterNode(node, toInsert) {
+  const range = document.createRange();
+  range.setStartAfter(node);
+  range.collapse(true);
+  if (toInsert.parentNode) toInsert.parentNode.removeChild(toInsert);
+  range.insertNode(toInsert);
+}
+
+function insertAtEnd(el, toInsert) {
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(false);
+  if (toInsert.parentNode) toInsert.parentNode.removeChild(toInsert);
+  range.insertNode(toInsert);
+}
+
+function positionTypingIndicator(root, typingEl) {
+  // 1) Try after the last text
+  const lastText = getLastNonWhitespaceTextNode(root);
+  if (lastText) {
+    insertAfterNode(lastText, typingEl);
+    return;
+  }
+
+  // 2) Try deepest inline element
+  const inlineEl = getDeepestInlineElement(root);
+  if (inlineEl) {
+    insertAtEnd(inlineEl, typingEl);
+    return;
+  }
+
+  // 3) Fallback: end of the last non-void element; add ZWSP to keep inline
+  // Find last element (any)
+  let lastEl = root;
+  const tw = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
+  let n;
+  while ((n = tw.nextNode())) lastEl = n;
+  const target = (lastEl && !isVoid(lastEl)) ? lastEl : root;
+
+  // Ensure inline context with zero-width space if target ends with a block
+  const zwsp = document.createTextNode('\u200B');
+  target.appendChild(zwsp);
+  insertAfterNode(zwsp, typingEl);
+}
+
 export function initChatUI(root = document) {
   const form = root.querySelector("#chat-form");
   const textarea = form?.querySelector("textarea");
@@ -174,14 +256,7 @@ function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrappe
       contentDiv.innerHTML = renderMarkdown(text);
 
       if (typing) {
-        // Move it into the last paragraph/inline node if possible
-        const lastChild = contentDiv.lastElementChild;
-
-        if (lastChild && lastChild.tagName.match(/^(P|LI|SPAN|STRONG|EM|CODE)$/)) {
-          lastChild.appendChild(typing);
-        } else {
-          contentDiv.appendChild(typing); // fallback
-        }
+        positionTypingIndicator(contentDiv, typing);
       }
 
     };

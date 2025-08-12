@@ -282,6 +282,8 @@
     animation: blink 1s step-start infinite;
     font-weight: bold;
     padding-left: 4px;
+    line-height: 1;
+    vertical-align: baseline;
   }
 
 }
