@@ -46,6 +46,8 @@ class LLMEngine:
         self.logger = logger
 
         self.port = _find_free_port()
+        self.restart_attempts = 0
+        self.max_restarts = 3
 
         host = LLM_SERVER.get("host")
         llamafile_path = LLM_SERVER.get("llamafile_path")
@@ -58,12 +60,13 @@ class LLMEngine:
         if host:
             self.proc = None
             self.server_url = host
+            self.cmd = None
             logger.info("Using external llama server at %s", host)
         else:
             if not llamafile_path:
                 raise ValueError("LLAMORA_LLAMAFILE environment variable not set")
 
-            cmd = [
+            self.cmd = [
                 "sh",
                 llamafile_path,
                 "--server",
@@ -73,31 +76,10 @@ class LLMEngine:
                 *_server_args_to_cli(cfg_server_args),
             ]
 
-            logger.info("Starting llamafile with:" + " ".join(cmd))
-
-            self.proc = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            if self.proc.stdout:
-                threading.Thread(
-                    target=self._log_stream,
-                    args=(self.proc.stdout, logging.INFO),
-                    daemon=True,
-                ).start()
-            if self.proc.stderr:
-                threading.Thread(
-                    target=self._log_stream,
-                    args=(self.proc.stderr, logging.INFO),
-                    daemon=True,
-                ).start()
-
             self.server_url = f"http://127.0.0.1:{self.port}"
 
+            self._launch_server()
             atexit.register(self.shutdown)
-            self._wait_until_ready()
 
     def _wait_until_ready(self) -> None:
         logger = logging.getLogger(__name__)
@@ -116,6 +98,57 @@ class LLMEngine:
         for line in iter(stream.readline, ""):
             if line:
                 self.logger.log(level, line.rstrip())
+
+    def _launch_server(self) -> None:
+        if not getattr(self, "cmd", None):
+            return
+        self.logger.info("Starting llamafile with:" + " ".join(self.cmd))
+        self.proc = subprocess.Popen(
+            self.cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if self.proc.stdout:
+            threading.Thread(
+                target=self._log_stream,
+                args=(self.proc.stdout, logging.INFO),
+                daemon=True,
+            ).start()
+        if self.proc.stderr:
+            threading.Thread(
+                target=self._log_stream,
+                args=(self.proc.stderr, logging.INFO),
+                daemon=True,
+            ).start()
+        self._wait_until_ready()
+
+    def _is_server_healthy(self) -> bool:
+        try:
+            resp = httpx.get(f"{self.server_url}/health", timeout=1.0)
+            return resp.json().get("status") == "ok"
+        except Exception:
+            return False
+
+    def _restart_server(self) -> None:
+        if not getattr(self, "cmd", None):
+            raise RuntimeError("Cannot restart external server")
+        if self.restart_attempts >= self.max_restarts:
+            raise RuntimeError("llamafile server repeatedly crashed")
+        self.restart_attempts += 1
+        self.logger.warning(
+            "Restarting llamafile server (attempt %d)", self.restart_attempts
+        )
+        self.shutdown()
+        self._launch_server()
+
+    def _ensure_server_running(self) -> None:
+        if self.proc is None:
+            if not self._is_server_healthy():
+                raise RuntimeError("llamafile server is unavailable")
+            return
+        if self.proc.poll() is not None or not self._is_server_healthy():
+            self._restart_server()
 
     def shutdown(self) -> None:
         if getattr(self, "proc", None) and self.proc.poll() is None:
@@ -148,6 +181,8 @@ class LLMEngine:
     async def stream_response(
         self, history: list[dict], params: dict | None = None
     ) -> AsyncGenerator[str, None]:
+        self._ensure_server_running()
+
         cfg = {**self.default_request, **(params or {})}
         n_predict = cfg.get("n_predict")
         max_input = self.ctx_size - n_predict
@@ -208,6 +243,7 @@ class LLMEngine:
                             pass
                     return
             except HTTPError as e:
+                self._ensure_server_running()
                 yield {"type": "error", "data": f"HTTP error: {e}"}
                 return
             except Exception as e:
