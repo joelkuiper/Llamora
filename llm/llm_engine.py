@@ -12,7 +12,7 @@ from httpx import RemoteProtocolError, HTTPError
 import httpcore  # type: ignore
 
 from config import MAX_RESPONSE_TOKENS
-from prompt_template import build_prompt
+from llm.prompt_template import build_prompt
 
 
 def _find_free_port() -> int:
@@ -276,6 +276,7 @@ class LLMEngine:
                                 continue
                             if data.get("stop"):
                                 return
+
                             content = data.get("content")
                             if content:
                                 yield content
