@@ -15,7 +15,7 @@
 
 ## Features
 
-- **Local LLM Backend** Runs a llama.cpp model locally via [**llama-cpp-python**](https://github.com/abetlen/llama-cpp-python), using [LangChain](https://www.langchain.com/) to manage prompts. No cloud or API keys needed, your data and queries stay on your machine. You just provide a GGUF model file, and the app will load it at startup.
+- **Local LLM Backend** Runs a model locally using [**llamafile**](https://github.com/Mozilla-Ocho/llamafile), a single-file executable that bundles an LLM and a small server. No cloud or API keys are needed, and your data and queries stay on your machine. You just provide a llamafile, and the app will load it at startup.
 
 - **Streaming Responses** Utilizes **Server-Sent Events (SSE)** to stream the AI's response token by token. The user sees the answer appear as it's being generated, similar to ChatGPT's interface.
 
@@ -38,13 +38,13 @@
 
 - **Markdown Support** The assistant's responses can include Markdown formatting. The client will render Markdown into HTML (for example, **bold text**, *italics*, `code blocks`, lists, etc.). The app uses **Marked** (Markdown parser) and **DOMPurify** (to sanitize output) on the client side to render any Markdown content from the LLM.
 
-- **Lightweight and Dependency-Minimal** The entire app is relatively small in terms of code. It uses a few Python packages (Quart, NaCl for security, LangChain for llama.cpp integration) and some JS libraries (HTMX and extensions, Marked, DOMPurify), all of which are either included or installable via [uv](https://docs.astral.sh/uv/). There is no need for Node.js build steps, no bundlers, and no heavy frameworks.
+- **Lightweight and Dependency-Minimal** The entire app is relatively small in terms of code. It uses a few Python packages (Quart, NaCl for security) and some JS libraries (HTMX and extensions, Marked, DOMPurify), all of which are either included or installable via [uv](https://docs.astral.sh/uv/). There is no need for Node.js build steps, no bundlers, and no heavy frameworks.
 
 ## Known Limitations
 
 This project has **several limitations** by design. It's important to understand them if you plan to use or extend this code:
 
-- **Limited Scalability:** By default, Llamora processes requests with a single worker. Set the `CHAT_LLM_WORKERS` environment variable to spawn additional worker threads, each with its own model instance, allowing multiple chats to run in parallel. More workers require more memory, and for heavy traffic a dedicated model service is still recommended.
+- **Limited Scalability:** By default, Llamora processes requests with a single worker. For heavy traffic, consider running multiple instances or a dedicated model service.
 
 - **No API or External Interface:** The app doesn't expose an API for programmatic access, it's purely a web interface. That's fine for interactive use, but if you wanted to use this as a backend service, you'd have to add JSON endpoints or similar.
 
@@ -58,7 +58,7 @@ This project has **several limitations** by design. It's important to understand
 
 - **Input/Output Filtering:** Aside from Markdown sanitization, there's no content filtering on user inputs or AI outputs. The model could potentially produce inappropriate content if prompted. There is also nothing preventing prompt injections (where a user could ask the assistant to ignore its system prompt). Since this is a closed environment (local model, one user), that wasn't a focus. But it's something to consider if expanded; e.g., using moderation models or guardrails if it were public.
 
-- **Model and Performance:** The app loads the model into RAM when it starts. Large models (even quantized) can be slow or consume a lot of memory. The example model (Phi 3.5 mini) is relatively small, but anything larger might make the app sluggish or not fit in memory depending on your hardware. There's no mechanism to swap models on the fly; it's a static single model. Generation parameters such as temperature, context window, or GPU usage can be adjusted in ``config.py`` and are passed through to the underlying ``llama_cpp`` model.
+- **Model and Performance:** The app loads the model into RAM when it starts. Large models (even quantized) can be slow or consume a lot of memory. The example model (Phi 3.5 mini) is relatively small, but anything larger might make the app sluggish or not fit in memory depending on your hardware. There's no mechanism to swap models on the fly; it's a static single model. Generation parameters such as temperature or top-k can be provided via the client or the ``LLAMORA_LLM_REQUEST`` environment variable, while server settings like context window or GPU usage are set with ``LLAMORA_LLAMA_ARGS``.
 
 ---
 
@@ -67,33 +67,21 @@ This project has **several limitations** by design. It's important to understand
 ### Requirements
 
 - [uv](https://docs.astral.sh/uv/)
-- a compatible GGUF LLM model (e.g. Phi-3.5)
+- a [llamafile](https://github.com/Mozilla-Ocho/llamafile) model (e.g., [Phi-3.5-mini-instruct](https://huggingface.co/Mozilla/Phi-3-mini-4k-instruct-llamafile))
 - a relatively fast computer (ideally with a strong GPU)
-- C/C++ Build Tools:  Needed to install `llama-cpp-python` (which compiles the llama.cpp C++ library). On Linux, ensure you have `cmake`, `g++`, etc. installed.
 
-### Run
-Download [Phi-3.5-mini-instruct-GGUF](https://huggingface.co/MaziyarPanahi/Phi-3.5-mini-instruct-GGUF) (tested with the [Q5_K_M](https://huggingface.co/MaziyarPanahi/Phi-3.5-mini-instruct-GGUF/blob/main/Phi-3.5-mini-instruct.Q5_K_M.gguf) quantization).
-Set the `CHAT_MODEL_GGUF` environment variable to the full path of the `.gguf` file. Or edit the `.env` file to include: `CHAT_MODEL_GGUF=/path/to/your/model.gguf`
+### Quick Start
 
-Install [uv](https://docs.astral.sh/uv/#installation). Then run:
+1. Download a [Phi-3.5-mini-instruct](https://huggingface.co/microsoft/Phi-3.5-mini-instruct) [(download Q5_K_M)](https://huggingface.co/Mozilla/Phi-3-mini-4k-instruct-llamafile/resolve/main/Phi-3-mini-4k-instruct.Q5_K_M.llamafile) llamafile.
+2. Set the `LLAMORA_LLAMAFILE` environment variable to the full path of the `.llamafile` file, or add a line like `LLAMORA_LLAMAFILE=/path/to/your/model.llamafile` to a `.env` file.
+3. Start the server:
 
-```bash
-uv run quart --app main run
-```
+   ```bash
+   uv run quart --app main run
+   ```
+
+   If the server starts correctly it will log something like `Running on http://127.0.0.1:5000`.
 
 Set `QUART_DEBUG=1` for automatic reloading on code changes.
 
-To handle multiple chat requests in parallel, set `CHAT_LLM_WORKERS` to the number of
-worker threads to spawn. Each worker loads its own copy of the model, so ensure
-your system has enough memory.
-
-For CUDA support (Nvidia GPU) you must reinstall the [llama-cpp-python](https://github.com/inference-sh/llama-cpp-python) library (and have the CUDA toolkit installed):
-
-``` bash
-CMAKE_ARGS="\
- -DGGML_CUDA=on \
- -DLLAMA_BUILD_TESTS=OFF \
- -DLLAMA_BUILD_EXAMPLES=OFF \
- -DLLAMA_BUILD_TOOLS=OFF \
-uv add --force-reinstall --no-cache-dir llama-cpp-python
-```
+Alternatively set `LLAMORA_LLAMA_HOST` to the address of a running Llama file (e.g. `http://localhost:8080`); this bypasses the subprocess entirely and just talks to the API endpoint.

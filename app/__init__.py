@@ -12,7 +12,7 @@ db = LocalDB()
 
 def create_app():
     app = Quart(__name__)
-    app.secret_key = os.getenv("CHAT_SECRET_KEY")
+    app.secret_key = os.getenv("LLAMORA_SECRET_KEY")
     app.config.from_object("config")
 
     logging.basicConfig(
@@ -33,6 +33,7 @@ def create_app():
     from .services.auth_helpers import load_user
 
     app.before_request(load_user)
+    app.before_serving(db.init)
 
     @app.errorhandler(404)
     async def not_found(e):

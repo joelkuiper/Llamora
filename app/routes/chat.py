@@ -9,16 +9,16 @@ from quart import (
 )
 from html import escape
 import asyncio
+import json
 import re
-from llm.llm_backend import LLMEngine
-from config import LLM_ENGINE_CONFIG
+from llm.llm_engine import LLMEngine
 from app import db
 from app.services.auth_helpers import login_required, get_current_user, get_dek
 
 chat_bp = Blueprint("chat", __name__)
 
 
-llm = LLMEngine(**LLM_ENGINE_CONFIG)
+llm = LLMEngine()
 
 
 async def render_chat(session_id, oob=False):
@@ -61,7 +61,13 @@ pending_responses: dict[str, "PendingResponse"] = {}
 
 class PendingResponse:
     def __init__(
-        self, msg_id: str, uid: str, session_id: str, history: list[dict], dek: bytes
+        self,
+        msg_id: str,
+        uid: str,
+        session_id: str,
+        history: list[dict],
+        dek: bytes,
+        params: dict | None = None,
     ):
         self.msg_id = msg_id
         self.text = ""
@@ -70,13 +76,19 @@ class PendingResponse:
         self._cond = asyncio.Condition()
         self.dek = dek
         current_app.logger.debug("Starting generation for message %s", msg_id)
-        asyncio.create_task(self._generate(uid, session_id, history))
+        asyncio.create_task(self._generate(uid, session_id, history, params))
 
-    async def _generate(self, uid: str, session_id: str, history: list[dict]):
+    async def _generate(
+        self,
+        uid: str,
+        session_id: str,
+        history: list[dict],
+        params: dict | None,
+    ):
         full_response = ""
         first = True
         try:
-            async for chunk in llm.stream_response(history):
+            async for chunk in llm.stream_response(history, params):
                 if isinstance(chunk, dict) and chunk.get("type") == "error":
                     full_response += f"<span class='error'>{chunk['data']}</span>"
                     self.error = True
@@ -181,9 +193,17 @@ async def sse_reply(msg_id, session_id):
             "event: error\ndata: Invalid ID\n\n", mimetype="text/event-stream"
         )
 
+    params = None
+    cfg = request.args.get("config")
+    if cfg:
+        try:
+            params = json.loads(cfg)
+        except Exception:
+            current_app.logger.warning("Invalid config JSON for message %s", msg_id)
+
     pending = pending_responses.get(msg_id)
     if not pending:
-        pending = PendingResponse(msg_id, uid, session_id, history, dek)
+        pending = PendingResponse(msg_id, uid, session_id, history, dek, params)
         pending_responses[msg_id] = pending
 
     async def event_stream():

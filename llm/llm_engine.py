@@ -1,0 +1,215 @@
+import atexit
+import json
+import subprocess
+import time
+import logging
+import threading
+from typing import Any, AsyncGenerator
+
+import httpx
+from httpx import HTTPError
+
+from config import DEFAULT_LLM_REQUEST, LLM_SERVER
+from llm.prompt_template import build_prompt
+import socket
+
+
+def _server_args_to_cli(args: dict[str, Any]) -> list[str]:
+    cli_args: list[str] = []
+    for k, v in args.items():
+        if v is None or v is False:
+            continue
+        flag = f"--{k.replace('_', '-')}"
+        if v is True:
+            cli_args.append(flag)
+        else:
+            cli_args.extend([flag, str(v)])
+    return cli_args
+
+
+def _find_free_port() -> int:
+    """Return an available TCP port on localhost."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+class LLMEngine:
+    """Manage a llamafile server process and stream responses."""
+
+    def __init__(
+        self,
+        server_args: dict | None = None,
+        default_request: dict | None = None,
+    ):
+        logger = logging.getLogger(__name__)
+        self.logger = logger
+
+        self.port = _find_free_port()
+
+        host = LLM_SERVER.get("host")
+        llamafile_path = LLM_SERVER.get("llamafile_path")
+        cfg_server_args = {**LLM_SERVER.get("args", {}), **(server_args or {})}
+
+        self.default_request = {**DEFAULT_LLM_REQUEST, **(default_request or {})}
+
+        self.ctx_size = cfg_server_args.get("ctx_size")
+
+        if host:
+            self.proc = None
+            self.server_url = host
+            logger.info("Using external llama server at %s", host)
+        else:
+            if not llamafile_path:
+                raise ValueError("LLAMORA_LLAMAFILE environment variable not set")
+
+            cmd = [
+                "sh",
+                llamafile_path,
+                "--server",
+                "--nobrowser",
+                "--port",
+                str(self.port),
+                *_server_args_to_cli(cfg_server_args),
+            ]
+
+            logger.info("Starting llamafile with:" + " ".join(cmd))
+
+            self.proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            if self.proc.stdout:
+                threading.Thread(
+                    target=self._log_stream,
+                    args=(self.proc.stdout, logging.INFO),
+                    daemon=True,
+                ).start()
+            if self.proc.stderr:
+                threading.Thread(
+                    target=self._log_stream,
+                    args=(self.proc.stderr, logging.INFO),
+                    daemon=True,
+                ).start()
+
+            self.server_url = f"http://127.0.0.1:{self.port}"
+
+            atexit.register(self.shutdown)
+            self._wait_until_ready()
+
+    def _wait_until_ready(self) -> None:
+        logger = logging.getLogger(__name__)
+        for _ in range(100):
+            try:
+                resp = httpx.get(f"{self.server_url}/health", timeout=1.0)
+                if resp.json().get("status") == "ok":
+                    logger.info("Llamafile server responded with ok status")
+                    return
+            except Exception:
+                pass
+            time.sleep(0.1)
+        raise RuntimeError("llamafile server failed to start")
+
+    def _log_stream(self, stream, level: int) -> None:
+        for line in iter(stream.readline, ""):
+            if line:
+                self.logger.log(level, line.rstrip())
+
+    def shutdown(self) -> None:
+        if getattr(self, "proc", None) and self.proc.poll() is None:
+            self.proc.terminate()
+            try:
+                self.proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:  # pragma: no cover - unlikely
+                self.proc.kill()
+
+    async def _count_tokens(self, client: httpx.AsyncClient, text: str) -> int:
+        resp = await client.post(f"{self.server_url}/tokenize", json={"content": text})
+        resp.raise_for_status()
+        return len(resp.json().get("tokens", []))
+
+    async def _trim_history(self, history: list[dict], max_input: int) -> list[dict]:
+        if not history:
+            return history
+        async with httpx.AsyncClient(timeout=None) as client:
+            lo, hi = 0, len(history)
+            while lo < hi:
+                mid = (lo + hi) // 2
+                prompt = build_prompt(history[mid:])
+                tokens = await self._count_tokens(client, prompt)
+                if tokens <= max_input:
+                    hi = mid
+                else:
+                    lo = mid + 1
+        return history[lo:]
+
+    async def stream_response(
+        self, history: list[dict], params: dict | None = None
+    ) -> AsyncGenerator[str, None]:
+        cfg = {**self.default_request, **(params or {})}
+        n_predict = cfg.get("n_predict")
+        max_input = self.ctx_size - n_predict
+        history = await self._trim_history(history, max_input)
+        prompt = build_prompt(history)
+        payload = {"prompt": prompt, **cfg}
+
+        transport = httpx.AsyncHTTPTransport(retries=0)
+        headers = {
+            "Accept": "text/event-stream",
+            "Connection": "keep-alive",
+            "Accept-Encoding": "identity",
+            "Cache-Control": "no-cache",
+        }
+
+        async with httpx.AsyncClient(timeout=None, transport=transport) as client:
+            try:
+                async with client.stream(
+                    "POST",
+                    f"{self.server_url}/completion",
+                    json=payload,
+                    headers=headers,
+                ) as resp:
+                    resp.raise_for_status()
+
+                    event_buf: list[str] = []
+
+                    async for line in resp.aiter_lines():
+                        if line is None:
+                            continue
+                        if line.startswith(":"):
+                            continue  # SSE comment/heartbeat
+                        if line.startswith("data:"):
+                            event_buf.append(line[5:].lstrip())
+                            continue
+                        if line == "":
+                            if not event_buf:
+                                continue
+                            data_str = "\n".join(event_buf).strip()
+                            event_buf.clear()
+                            try:
+                                data = json.loads(data_str)
+                            except Exception:
+                                continue
+                            if data.get("stop"):
+                                return
+                            content = data.get("content")
+                            if content:
+                                yield content
+
+                    if event_buf:
+                        try:
+                            data = json.loads("\n".join(event_buf).strip())
+                            content = data.get("content")
+                            if content and content.strip():
+                                yield content
+                        except Exception:
+                            pass
+                    return
+            except HTTPError as e:
+                yield {"type": "error", "data": f"HTTP error: {e}"}
+                return
+            except Exception as e:
+                yield {"type": "error", "data": f"Unexpected error: {e}"}
+                return

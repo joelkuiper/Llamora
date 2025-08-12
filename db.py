@@ -1,6 +1,5 @@
 import os
 import aiosqlite
-import asyncio
 from contextlib import asynccontextmanager
 import secrets
 import logging
@@ -10,9 +9,11 @@ from ulid import ULID
 
 class LocalDB:
     def __init__(self, db_path=None):
-        self.db_path = db_path or os.getenv("CHAT_DB_PATH", "state.sqlite3")
+        self.db_path = db_path or os.getenv("LLAMORA_DB_PATH", "state.sqlite3")
+
+    async def init(self):
         is_new = not os.path.exists(self.db_path)
-        asyncio.run(self._ensure_schema(is_new))
+        await self._ensure_schema(is_new)
 
     async def _ensure_schema(self, is_new):
         async with self.get_conn() as conn:
