@@ -33,6 +33,7 @@ def create_app():
     from .services.auth_helpers import load_user
 
     app.before_request(load_user)
+    app.before_serving(db.init)
 
     @app.errorhandler(404)
     async def not_found(e):
