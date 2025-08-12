@@ -40,6 +40,25 @@
           event.detail.headers["X-Active-Session"] = activeSessionId;
         }
       });
+
+
+      function showServerError() {
+        const errors = document.getElementById("errors");
+        if (!errors) return;
+        const box = document.createElement("div");
+        box.className = "error-box";
+        box.textContent = "⚠️ Unable to reach server.";
+        const btn = document.createElement("button");
+        btn.className = "close-error";
+        btn.setAttribute("aria-label", "Close error");
+        btn.textContent = "×";
+        btn.onclick = () => box.remove();
+        box.appendChild(btn);
+        errors.appendChild(box);
+      }
+
+      document.body.addEventListener("htmx:sendError", showServerError);
+      // document.body.addEventListener("htmx:responseError", showServerError);
     </script>
   </body>
 </html>

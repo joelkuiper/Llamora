@@ -1,5 +1,4 @@
 import threading
-import textwrap
 import queue
 import asyncio
 import logging
@@ -12,7 +11,6 @@ from llm.prompt_template import (
 from llm.token_counter import TokenCounter
 from langchain_community.llms import LlamaCpp
 from langchain.chains import LLMChain
-from langchain_core.prompts import PromptTemplate
 
 
 class LLMEngine:
