@@ -50,7 +50,8 @@ class LlamaConfig:
     n_probs: int = 0
 
     # server arguments
-    ctx_size: int = 2048
+    ctx_size: int = 2048 * 3
+    gpu: str | None = "auto"
     threads: int | None = None
     threads_batch: int | None = None
     n_gpu_layers: int | None = None
@@ -65,8 +66,6 @@ class LlamaConfig:
     lora_base: str | None = None
     timeout: int | None = None
     host: str | None = None
-    api_key: list[str] = field(default_factory=list)
-    api_key_file: str | None = None
     embedding: bool = False
     parallel: int | None = None
     cont_batching: bool = False
@@ -76,6 +75,8 @@ class LlamaConfig:
 
     def to_cli_args(self) -> list[str]:
         args: list[str] = []
+        if self.gpu is not None:
+            args += ["--gpu", str(self.gpu)]
         if self.threads is not None:
             args += ["--threads", str(self.threads)]
         if self.threads_batch is not None:
@@ -140,6 +141,7 @@ class LlamaConfig:
             "ignore_eos": self.ignore_eos,
             "logit_bias": self.logit_bias or [],
             "n_probs": self.n_probs,
+            "stop": ["<|end|>", "<|assistant|>"],
         }
 
 
@@ -208,9 +210,7 @@ class LLMEngine:
             return history
 
         max_input = self.config.ctx_size - self.config.n_predict
-        async with httpx.AsyncClient(
-            timeout=None, transport=httpx.AsyncHTTPTransport(http2=False)
-        ) as client:
+        async with httpx.AsyncClient(timeout=None) as client:
             lo, hi = 0, len(history)
             while lo < hi:
                 mid = (lo + hi) // 2
@@ -222,46 +222,16 @@ class LLMEngine:
                     lo = mid + 1
         return history[lo:]
 
-    async def _iter_sse_events(self, resp):
-        """
-        Robust SSE parser: reads raw bytes, splits on CRLF, yields 'data:' payloads.
-        Survives early connection close by yielding whatever is fully buffered.
-        """
-        buf = bytearray()
-        async for chunk in resp.aiter_raw():
-            if not chunk:
-                continue
-            buf.extend(chunk)
-            while True:
-                nl = buf.find(b"\n")
-                if nl < 0:
-                    break
-                line = bytes(buf[:nl]).rstrip(b"\r")
-                del buf[: nl + 1]
-                if not line:
-                    continue
-                if line.startswith(b"data:"):
-                    yield line[5:].strip().decode("utf-8", "replace")
-        # connection closed: flush any last complete line (no exception here)
-        if buf:
-            line = bytes(buf).rstrip(b"\r\n")
-            if line.startswith(b"data:"):
-                yield line[5:].strip().decode("utf-8", "replace")
-
-    async def stream_response(self, history: list[dict]):
+    async def stream_response(self, history):
         history = await self._trim_history(history)
         prompt = build_prompt(history)
         payload = self.config.to_payload(prompt)
 
-        saw_any = False
-
-        # Force HTTP/1.1 (chunked), but we’ll be tolerant to bad endings.
-        transport = httpx.AsyncHTTPTransport(http2=False, retries=0)
+        transport = httpx.AsyncHTTPTransport(retries=0)
         headers = {
             "Accept": "text/event-stream",
             "Connection": "keep-alive",
             "Accept-Encoding": "identity",
-            # Some servers gate SSE on this header:
             "Cache-Control": "no-cache",
         }
 
@@ -275,36 +245,44 @@ class LLMEngine:
                 ) as resp:
                     resp.raise_for_status()
 
-                    async for data_str in self._iter_sse_events(resp):
-                        if not data_str:
+                    event_buf: list[str] = []
+
+                    async for line in resp.aiter_lines():
+                        if line is None:
                             continue
-                        if data_str == "[DONE]":
-                            return
+                        if line.startswith(":"):
+                            continue  # SSE comment/heartbeat
+                        if line.startswith("data:"):
+                            # strip "data:" and one leading space if present
+                            event_buf.append(line[5:].lstrip())
+                            continue
+                        if line == "":
+                            # end of event
+                            if not event_buf:
+                                continue
+                            data_str = "\n".join(event_buf).strip()
+                            event_buf.clear()
+                            try:
+                                data = json.loads(data_str)
+                            except Exception:
+                                continue
+                            if data.get("stop"):
+                                return
+                            content = data.get("content")
+                            if content:
+                                yield content
+
+                    # flush trailing event if server closed without final blank line
+                    if event_buf:
                         try:
-                            data = json.loads(data_str)
+                            data = json.loads("\n".join(event_buf).strip())
+                            content = data.get("content")
+                            if content:
+                                if content.strip():
+                                    yield content
                         except Exception:
-                            # ignore noise / partial json lines
-                            continue
-                        if data.get("stop"):
-                            return
-                        content = data.get("content")
-                        if content:
-                            saw_any = True
-                            yield content
-                # normal exit
-                return
-
-            except (RemoteProtocolError, httpcore.RemoteProtocolError):
-                # The server closed without the final 0-chunk.
-                # If we streamed anything, treat as clean EOF; otherwise surface an error.
-                if saw_any:
+                            pass
                     return
-                yield {
-                    "type": "error",
-                    "data": "Upstream closed early (incomplete chunked read)",
-                }
-                return
-
             except HTTPError as e:
                 yield {"type": "error", "data": f"HTTP error: {e}"}
                 return

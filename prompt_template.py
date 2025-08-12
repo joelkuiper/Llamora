@@ -6,14 +6,9 @@ CHAT_PROMPT_TEMPLATE = textwrap.dedent(
     <|system|>
     “From shadow to light, a thread of understanding.”
     Keep replies brief, clear, and quietly resonant.<|end|>
-    {history}<|assistant|>
+    {history}
+    <|assistant|>
     """
-)
-
-# System prompt text reused for OpenAPI-style chat messages.
-SYSTEM_PROMPT = (
-    "“From shadow to light, a thread of understanding.” "
-    "Keep replies brief, clear, and quietly resonant."
 )
 
 
@@ -31,10 +26,3 @@ def build_prompt(history: list[dict]) -> str:
     """Return a full prompt for *history* messages."""
     rendered = format_history(history)
     return CHAT_PROMPT_TEMPLATE.format(history=rendered)
-
-
-def build_messages(history: list[dict]) -> list[dict]:
-    """Return OpenAI-style messages including the system prompt."""
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    messages.extend({"role": m["role"], "content": m["content"]} for m in history)
-    return messages
