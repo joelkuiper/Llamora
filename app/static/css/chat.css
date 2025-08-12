@@ -284,6 +284,7 @@
     padding-left: 4px;
     line-height: 1;
     vertical-align: baseline;
+    white-space: normal; /* don't inherit pre spacing */
   }
 
 }

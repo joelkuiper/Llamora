@@ -87,9 +87,27 @@ function insertAtEnd(el, toInsert) {
 }
 
 function positionTypingIndicator(root, typingEl) {
-  // 1) Try after the last text
+  // 1) Try after the last text (with special handling for preformatted trailing \n)
   const lastText = getLastNonWhitespaceTextNode(root);
   if (lastText) {
+    const parentEl = lastText.parentElement;
+    const inPre =
+      parentEl &&
+      (parentEl.closest('pre') ||
+       (getComputedStyle(parentEl).whiteSpace || '').includes('pre'));
+
+    if (inPre) {
+      const v = lastText.nodeValue || '';
+      const m = v.match(/[\r\n]+$/); // trailing CR/LF?
+      if (m) {
+        // split before the newline run so we stay on the same visual line
+        const tail = lastText.splitText(v.length - m[0].length);
+        if (typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+        tail.parentNode.insertBefore(typingEl, tail);
+        return;
+      }
+    }
+
     insertAfterNode(lastText, typingEl);
     return;
   }
@@ -102,18 +120,18 @@ function positionTypingIndicator(root, typingEl) {
   }
 
   // 3) Fallback: end of the last non-void element; add ZWSP to keep inline
-  // Find last element (any)
   let lastEl = root;
   const tw = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
   let n;
   while ((n = tw.nextNode())) lastEl = n;
   const target = (lastEl && !isVoid(lastEl)) ? lastEl : root;
 
-  // Ensure inline context with zero-width space if target ends with a block
   const zwsp = document.createTextNode('\u200B');
   target.appendChild(zwsp);
   insertAfterNode(zwsp, typingEl);
 }
+
+
 
 export function initChatUI(root = document) {
   const form = root.querySelector("#chat-form");
