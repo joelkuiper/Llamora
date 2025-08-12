@@ -3,6 +3,7 @@ import json
 import subprocess
 import time
 import logging
+import threading
 from typing import Any, AsyncGenerator
 
 import httpx
@@ -43,6 +44,7 @@ class LLMEngine:
         default_request: dict | None = None,
     ):
         logger = logging.getLogger(__name__)
+        self.logger = logger
 
         self.port = _find_free_port()
 
@@ -75,8 +77,24 @@ class LLMEngine:
             logger.info("Starting llamafile with:" + " ".join(cmd))
 
             self.proc = subprocess.Popen(
-                cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
             )
+            if self.proc.stdout:
+                threading.Thread(
+                    target=self._log_stream,
+                    args=(self.proc.stdout, logging.INFO),
+                    daemon=True,
+                ).start()
+            if self.proc.stderr:
+                threading.Thread(
+                    target=self._log_stream,
+                    args=(self.proc.stderr, logging.INFO),
+                    daemon=True,
+                ).start()
+
             self.server_url = f"http://127.0.0.1:{self.port}"
 
             atexit.register(self.shutdown)
@@ -94,6 +112,11 @@ class LLMEngine:
                 pass
             time.sleep(0.1)
         raise RuntimeError("llamafile server failed to start")
+
+    def _log_stream(self, stream, level: int) -> None:
+        for line in iter(stream.readline, ""):
+            if line:
+                self.logger.log(level, line.rstrip())
 
     def shutdown(self) -> None:
         if getattr(self, "proc", None) and self.proc.poll() is None:
