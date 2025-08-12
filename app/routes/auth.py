@@ -19,6 +19,7 @@ from app import db
 import re
 import base64
 import secrets
+import json
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -217,6 +218,41 @@ async def reset_password():
 async def profile():
     user = await get_current_user()
     return await render_template("profile.html", user=user)
+
+
+@auth_bp.route("/profile/data")
+@login_required
+async def download_user_data():
+    user = await get_current_user()
+    dek = get_dek()
+    if not dek:
+        return Response("Missing encryption key", status=400)
+
+    sessions = await db.get_all_sessions(user["id"])
+    data_sessions = []
+    for session in sessions:
+        history = await db.get_history(user["id"], session["id"], dek)
+        data_sessions.append(
+            {
+                "id": session["id"],
+                "name": session["name"],
+                "created_at": session["created_at"],
+                "messages": history,
+            }
+        )
+
+    user_data = {
+        "user": {
+            "id": user["id"],
+            "username": user["username"],
+            "created_at": user["created_at"],
+        },
+        "sessions": data_sessions,
+    }
+
+    payload = json.dumps(user_data)
+    headers = {"Content-Disposition": "attachment; filename=user_data.json"}
+    return Response(payload, headers=headers, mimetype="application/json")
 
 
 @auth_bp.route("/profile/password", methods=["POST"])

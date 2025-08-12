@@ -34,6 +34,11 @@
         <button type="submit">Generate New Recovery Code</button>
       </form>
 
+      <h2>Data</h2>
+      <form method="get" action="{{ url_for('auth.download_user_data') }}">
+        <button type="submit">Download My Data</button>
+      </form>
+
       <h2>Danger Zone</h2>
       <button
         class="dangerous"
