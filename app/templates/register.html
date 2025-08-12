@@ -31,10 +31,11 @@
                minlength="{{ config.MIN_PASSWORD_LENGTH }}"
                />
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit">Create account</button>
+        <button type="submit" data-loading="Creating account">Create account</button>
       </form>
       <br>
       <p>Already have an account? <a href="{{ url_for('auth.login') }}">Login</a></p>
     </div>
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
   </body>
 </html>

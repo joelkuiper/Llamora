@@ -60,6 +60,28 @@
       transform: translateY(-1px);
       color: #fafafa;
     }
+    /* Pressed state */
+    &:active {
+      transform: translateY(1px);
+      box-shadow: var(--inset-shadow);
+    }
+
+    /* Disabled / loading */
+    &:disabled,
+    &[aria-busy="true"],
+    &.is-disabled {
+      cursor: not-allowed;
+      opacity: 0.75;
+      color: #8a8a8a;
+      box-shadow: var(--inset-shadow-disabled);
+      transform: none;
+      pointer-events: none;
+
+      /* lock the style: no hover/active while disabled */
+      &:hover,
+      &:active { box-shadow: var(--inset-shadow-disabled); transform: none; }
+    }
+
   }
 
   .error {
