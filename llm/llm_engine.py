@@ -186,10 +186,13 @@ class LLMEngine:
         self._wait_until_ready()
 
     def _wait_until_ready(self) -> None:
+        logger = logging.getLogger(__name__)
+
         for _ in range(100):
             try:
                 resp = httpx.get(f"{self.server_url}/health", timeout=1.0)
                 if resp.json().get("status") == "ok":
+                    logger.info("Llamafile server responded with ok status")
                     return
             except Exception:
                 pass

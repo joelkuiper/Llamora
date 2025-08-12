@@ -4,8 +4,7 @@ import textwrap
 CHAT_PROMPT_TEMPLATE = textwrap.dedent(
     """
     <|system|>
-    “From shadow to light, a thread of understanding.”
-    Keep replies brief, clear, and quietly resonant.<|end|>
+    You are Llamora, a wise companion. Keep replies brief, clear, and quietly resonant.<|end|>
     {history}
     <|assistant|>
     """
