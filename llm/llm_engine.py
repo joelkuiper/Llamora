@@ -3,10 +3,13 @@ import json
 import socket
 import subprocess
 import time
-from dataclasses import dataclass
-from typing import Any
+import logging
+from dataclasses import dataclass, field
+from typing import Any, AsyncGenerator
 
 import httpx
+from httpx import RemoteProtocolError, HTTPError
+import httpcore  # type: ignore
 
 from config import MAX_RESPONSE_TOKENS
 from prompt_template import build_prompt
@@ -52,7 +55,7 @@ class LlamaConfig:
     gpu: str | None = "auto"
     threads: int | None = None
     threads_batch: int | None = None
-    n_gpu_layers: int | None = None
+    n_gpu_layers: int | None = 999
     main_gpu: int | None = None
     tensor_split: str | None = None
     batch_size: int | None = None
@@ -152,6 +155,8 @@ class LLMEngine:
         config: LlamaConfig | None = None,
         **kwargs,
     ):
+        logger = logging.getLogger(__name__)
+
         if not llamafile_path:
             raise ValueError("LLAMAFILE environment variable not set")
         if config and kwargs:
@@ -169,6 +174,8 @@ class LLMEngine:
             str(self.port),
             *self.config.to_cli_args(),
         ]
+
+        logger.info("Starting llamafile with:" + " ".join(cmd))
 
         self.proc = subprocess.Popen(
             cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
