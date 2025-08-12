@@ -9,7 +9,7 @@ import httpx
 from httpx import HTTPError
 import httpcore  # type: ignore
 
-from config import MAX_RESPONSE_TOKENS, DEFAULT_LLM_REQUEST, LLM_SERVER
+from config import DEFAULT_LLM_REQUEST, LLM_SERVER
 from llm.prompt_template import build_prompt
 import socket
 
@@ -127,7 +127,7 @@ class LLMEngine:
         self, history: list[dict], params: dict | None = None
     ) -> AsyncGenerator[str, None]:
         cfg = {**self.default_request, **(params or {})}
-        n_predict = cfg.get("n_predict", MAX_RESPONSE_TOKENS)
+        n_predict = cfg.get("n_predict")
         max_input = self.ctx_size - n_predict
         history = await self._trim_history(history, max_input)
         prompt = build_prompt(history)
