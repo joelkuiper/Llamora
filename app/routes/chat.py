@@ -11,14 +11,14 @@ from html import escape
 import asyncio
 import os
 import re
-from llm_engine import LLMEngine, LlamaConfig
+from llm_engine import LLMEngine
 from app import db
 from app.services.auth_helpers import login_required, get_current_user, get_dek
 
 chat_bp = Blueprint("chat", __name__)
 
 
-llm = LLMEngine(os.getenv("LLAMAFILE"), LlamaConfig())
+llm = LLMEngine(os.getenv("LLAMAFILE"))
 
 
 async def render_chat(session_id, oob=False):

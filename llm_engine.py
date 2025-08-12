@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from typing import Any, AsyncGenerator
 
 import httpx
+from httpx import RemoteProtocolError, HTTPError
+import httpcore  # type: ignore
 
 from config import MAX_RESPONSE_TOKENS
 from prompt_template import build_prompt
@@ -31,7 +33,6 @@ class LlamaConfig:
     n_predict: int = MAX_RESPONSE_TOKENS
     n_keep: int = 0
     stream: bool = True
-    stop: list[str] = field(default_factory=list)
     tfs_z: float = 1.0
     typical_p: float = 1.0
     repeat_penalty: float = 1.1
@@ -43,15 +44,10 @@ class LlamaConfig:
     mirostat: int = 0
     mirostat_tau: float = 5.0
     mirostat_eta: float = 0.1
-    grammar: str | None = None
     seed: int = -1
     ignore_eos: bool = False
     logit_bias: Any | None = None
     n_probs: int = 0
-    image_data: Any | None = None
-    slot_id: int = -1
-    cache_prompt: bool = False
-    system_prompt: Any | None = None
 
     # server arguments
     ctx_size: int = 2048
@@ -74,7 +70,6 @@ class LlamaConfig:
     embedding: bool = False
     parallel: int | None = None
     cont_batching: bool = False
-    system_prompt_file: str | None = None
     mmproj: str | None = None
     grp_attn_n: int | None = None
     grp_attn_w: int | None = None
@@ -109,21 +104,8 @@ class LlamaConfig:
             args += ["--lora-base", self.lora_base]
         if self.timeout is not None:
             args += ["--timeout", str(self.timeout)]
-        if self.host is not None:
-            args += ["--host", self.host]
-        if self.api_key:
-            for key in self.api_key:
-                args += ["--api-key", key]
-        if self.api_key_file is not None:
-            args += ["--api-key-file", self.api_key_file]
-        if self.embedding:
-            args.append("--embedding")
         if self.parallel is not None:
             args += ["--parallel", str(self.parallel)]
-        if self.cont_batching:
-            args.append("--cont-batching")
-        if self.system_prompt_file is not None:
-            args += ["--system-prompt-file", self.system_prompt_file]
         if self.mmproj is not None:
             args += ["--mmproj", self.mmproj]
         if self.grp_attn_n is not None:
@@ -143,7 +125,6 @@ class LlamaConfig:
             "n_predict": self.n_predict,
             "n_keep": self.n_keep,
             "stream": self.stream,
-            "stop": self.stop,
             "tfs_z": self.tfs_z,
             "typical_p": self.typical_p,
             "repeat_penalty": self.repeat_penalty,
@@ -155,30 +136,39 @@ class LlamaConfig:
             "mirostat": self.mirostat,
             "mirostat_tau": self.mirostat_tau,
             "mirostat_eta": self.mirostat_eta,
-            "grammar": self.grammar,
             "seed": self.seed,
             "ignore_eos": self.ignore_eos,
             "logit_bias": self.logit_bias or [],
             "n_probs": self.n_probs,
-            "image_data": self.image_data or [],
-            "slot_id": self.slot_id,
-            "cache_prompt": self.cache_prompt,
-            "system_prompt": self.system_prompt,
         }
 
 
 class LLMEngine:
     """Manage a llamafile server process and stream responses."""
 
-    def __init__(self, llamafile_path: str, config: LlamaConfig | None = None):
+    def __init__(
+        self,
+        llamafile_path: str,
+        config: LlamaConfig | None = None,
+        **kwargs,
+    ):
         if not llamafile_path:
             raise ValueError("LLAMAFILE environment variable not set")
+        if config and kwargs:
+            raise ValueError("Provide either a config object or keyword args, not both")
 
-        self.config = config or LlamaConfig()
-        self.port = _find_free_port()
+        self.port = 8080  # kwargs.pop("port", _find_free_port())
+        self.config = config or LlamaConfig(**kwargs)
 
-        cmd = [llamafile_path]
-        print(cmd)
+        cmd = [
+            "sh",
+            llamafile_path,
+            "--server",
+            "--nobrowser",
+            "--port",
+            str(self.port),
+            *self.config.to_cli_args(),
+        ]
 
         self.proc = subprocess.Popen(
             cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
@@ -208,6 +198,7 @@ class LLMEngine:
                 self.proc.kill()
 
     async def _count_tokens(self, client: httpx.AsyncClient, text: str) -> int:
+        print(self.server_url)
         resp = await client.post(f"{self.server_url}/tokenize", json={"content": text})
         resp.raise_for_status()
         return len(resp.json().get("tokens", []))
@@ -217,7 +208,9 @@ class LLMEngine:
             return history
 
         max_input = self.config.ctx_size - self.config.n_predict
-        async with httpx.AsyncClient(timeout=None) as client:
+        async with httpx.AsyncClient(
+            timeout=None, transport=httpx.AsyncHTTPTransport(http2=False)
+        ) as client:
             lo, hi = 0, len(history)
             while lo < hi:
                 mid = (lo + hi) // 2
@@ -229,31 +222,92 @@ class LLMEngine:
                     lo = mid + 1
         return history[lo:]
 
-    async def stream_response(self, history: list[dict]) -> AsyncGenerator[str, None]:
-        """Stream a response from the llamafile server for *history* messages."""
+    async def _iter_sse_events(self, resp):
+        """
+        Robust SSE parser: reads raw bytes, splits on CRLF, yields 'data:' payloads.
+        Survives early connection close by yielding whatever is fully buffered.
+        """
+        buf = bytearray()
+        async for chunk in resp.aiter_raw():
+            if not chunk:
+                continue
+            buf.extend(chunk)
+            while True:
+                nl = buf.find(b"\n")
+                if nl < 0:
+                    break
+                line = bytes(buf[:nl]).rstrip(b"\r")
+                del buf[: nl + 1]
+                if not line:
+                    continue
+                if line.startswith(b"data:"):
+                    yield line[5:].strip().decode("utf-8", "replace")
+        # connection closed: flush any last complete line (no exception here)
+        if buf:
+            line = bytes(buf).rstrip(b"\r\n")
+            if line.startswith(b"data:"):
+                yield line[5:].strip().decode("utf-8", "replace")
 
+    async def stream_response(self, history: list[dict]):
         history = await self._trim_history(history)
         prompt = build_prompt(history)
         payload = self.config.to_payload(prompt)
 
-        async with httpx.AsyncClient(timeout=None) as client:
-            async with client.stream(
-                "POST",
-                f"{self.server_url}/completion",
-                json=payload,
-            ) as resp:
-                async for line in resp.aiter_lines():
-                    if not line or not line.startswith("data:"):
-                        continue
-                    data_str = line[len("data:") :].strip()
-                    if not data_str:
-                        continue
-                    try:
-                        data = json.loads(data_str)
-                    except Exception:  # pragma: no cover - network noise
-                        continue
-                    if data.get("stop"):
-                        break
-                    content = data.get("content")
-                    if content:
-                        yield content
+        saw_any = False
+
+        # Force HTTP/1.1 (chunked), but we’ll be tolerant to bad endings.
+        transport = httpx.AsyncHTTPTransport(http2=False, retries=0)
+        headers = {
+            "Accept": "text/event-stream",
+            "Connection": "keep-alive",
+            "Accept-Encoding": "identity",
+            # Some servers gate SSE on this header:
+            "Cache-Control": "no-cache",
+        }
+
+        async with httpx.AsyncClient(timeout=None, transport=transport) as client:
+            try:
+                async with client.stream(
+                    "POST",
+                    f"{self.server_url}/completion",
+                    json=payload,
+                    headers=headers,
+                ) as resp:
+                    resp.raise_for_status()
+
+                    async for data_str in self._iter_sse_events(resp):
+                        if not data_str:
+                            continue
+                        if data_str == "[DONE]":
+                            return
+                        try:
+                            data = json.loads(data_str)
+                        except Exception:
+                            # ignore noise / partial json lines
+                            continue
+                        if data.get("stop"):
+                            return
+                        content = data.get("content")
+                        if content:
+                            saw_any = True
+                            yield content
+                # normal exit
+                return
+
+            except (RemoteProtocolError, httpcore.RemoteProtocolError):
+                # The server closed without the final 0-chunk.
+                # If we streamed anything, treat as clean EOF; otherwise surface an error.
+                if saw_any:
+                    return
+                yield {
+                    "type": "error",
+                    "data": "Upstream closed early (incomplete chunked read)",
+                }
+                return
+
+            except HTTPError as e:
+                yield {"type": "error", "data": f"HTTP error: {e}"}
+                return
+            except Exception as e:
+                yield {"type": "error", "data": f"Unexpected error: {e}"}
+                return
