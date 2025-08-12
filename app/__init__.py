@@ -12,7 +12,7 @@ db = LocalDB()
 
 def create_app():
     app = Quart(__name__)
-    app.secret_key = os.getenv("CHAT_SECRET_KEY")
+    app.secret_key = os.getenv("LLAMORA_SECRET_KEY")
     app.config.from_object("config")
 
     logging.basicConfig(

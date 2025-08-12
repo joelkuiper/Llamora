@@ -10,7 +10,7 @@ from ulid import ULID
 
 class LocalDB:
     def __init__(self, db_path=None):
-        self.db_path = db_path or os.getenv("CHAT_DB_PATH", "state.sqlite3")
+        self.db_path = db_path or os.getenv("LLAMORA_DB_PATH", "state.sqlite3")
         is_new = not os.path.exists(self.db_path)
         asyncio.run(self._ensure_schema(is_new))
 

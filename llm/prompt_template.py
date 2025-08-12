@@ -1,12 +1,9 @@
 import textwrap
 
-# Shared chat prompt template to avoid duplication between the web process
-# and worker processes.
 PROMPT_TEMPLATE = textwrap.dedent(
     """
     <|system|>
-    “From shadow to light, a thread of understanding.”
-    Keep replies brief, clear, and quietly resonant.<|end|>
+    Your name is Llamora. A calm, wise companion. Keep replies concise, clear, and human. Lead with the answer; add one gentle insight if it helps. If uncertain, say so and propose a next step.<|end|>
     {history}
     <|assistant|>
     """

@@ -44,7 +44,7 @@
 
 This project has **several limitations** by design. It's important to understand them if you plan to use or extend this code:
 
-- **Limited Scalability:** By default, Llamora processes requests with a single worker. Set the `CHAT_LLM_WORKERS` environment variable to spawn additional worker threads, each with its own model instance, allowing multiple chats to run in parallel. More workers require more memory, and for heavy traffic a dedicated model service is still recommended.
+- **Limited Scalability:** By default, Llamora processes requests with a single worker. Set the `LLAMORA_LLM_WORKERS` environment variable to spawn additional worker threads, each with its own model instance, allowing multiple chats to run in parallel. More workers require more memory, and for heavy traffic a dedicated model service is still recommended.
 
 - **No API or External Interface:** The app doesn't expose an API for programmatic access, it's purely a web interface. That's fine for interactive use, but if you wanted to use this as a backend service, you'd have to add JSON endpoints or similar.
 
@@ -58,7 +58,7 @@ This project has **several limitations** by design. It's important to understand
 
 - **Input/Output Filtering:** Aside from Markdown sanitization, there's no content filtering on user inputs or AI outputs. The model could potentially produce inappropriate content if prompted. There is also nothing preventing prompt injections (where a user could ask the assistant to ignore its system prompt). Since this is a closed environment (local model, one user), that wasn't a focus. But it's something to consider if expanded; e.g., using moderation models or guardrails if it were public.
 
-- **Model and Performance:** The app loads the model into RAM when it starts. Large models (even quantized) can be slow or consume a lot of memory. The example model (Phi 3.5 mini) is relatively small, but anything larger might make the app sluggish or not fit in memory depending on your hardware. There's no mechanism to swap models on the fly; it's a static single model. Generation parameters such as temperature, context window, or GPU usage can be adjusted in ``config.py`` and are passed through to the underlying ``llama_cpp`` model.
+  - **Model and Performance:** The app loads the model into RAM when it starts. Large models (even quantized) can be slow or consume a lot of memory. The example model (Phi 3.5 mini) is relatively small, but anything larger might make the app sluggish or not fit in memory depending on your hardware. There's no mechanism to swap models on the fly; it's a static single model. Generation parameters such as temperature or top-k can be provided via the client or the ``LLAMORA_LLM_REQUEST`` environment variable, while server settings like context window or GPU usage are set with ``LLAMORA_LLAMA_ARGS``.
 
 ---
 
@@ -73,7 +73,7 @@ This project has **several limitations** by design. It's important to understand
 
 ### Run
 Download [Phi-3.5-mini-instruct-GGUF](https://huggingface.co/MaziyarPanahi/Phi-3.5-mini-instruct-GGUF) (tested with the [Q5_K_M](https://huggingface.co/MaziyarPanahi/Phi-3.5-mini-instruct-GGUF/blob/main/Phi-3.5-mini-instruct.Q5_K_M.gguf) quantization).
-Set the `CHAT_MODEL_GGUF` environment variable to the full path of the `.gguf` file. Or edit the `.env` file to include: `CHAT_MODEL_GGUF=/path/to/your/model.gguf`
+Set the `LLAMORA_MODEL_GGUF` environment variable to the full path of the `.gguf` file. Or edit the `.env` file to include: `LLAMORA_MODEL_GGUF=/path/to/your/model.gguf`
 
 Install [uv](https://docs.astral.sh/uv/#installation). Then run:
 
@@ -83,7 +83,7 @@ uv run quart --app main run
 
 Set `QUART_DEBUG=1` for automatic reloading on code changes.
 
-To handle multiple chat requests in parallel, set `CHAT_LLM_WORKERS` to the number of
+To handle multiple chat requests in parallel, set `LLAMORA_LLM_WORKERS` to the number of
 worker threads to spawn. Each worker loads its own copy of the model, so ensure
 your system has enough memory.
 

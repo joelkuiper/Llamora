@@ -6,7 +6,7 @@ from functools import wraps
 from nacl import secret
 from app import db
 
-cookie_secret = os.environ.get("CHAT_COOKIE_SECRET")
+cookie_secret = os.environ.get("LLAMORA_COOKIE_SECRET")
 cookie_key = base64.urlsafe_b64decode(cookie_secret)
 cookie_box = secret.SecretBox(cookie_key)
 
