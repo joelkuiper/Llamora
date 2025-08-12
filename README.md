@@ -71,7 +71,7 @@ This project has **several limitations** by design. It's important to understand
 - a relatively fast computer (ideally with a strong GPU)
 
 ### Run
-Download the [Phi-3.5-mini-instruct](https://huggingface.co/microsoft/Phi-3.5-mini-instruct) ([download])[, [(download)](https://huggingface.co/Mozilla/Phi-3-mini-4k-instruct-llamafile/resolve/main/Phi-3-mini-4k-instruct.Q5_K_M.llamafile)] llamafile.
+Download a [Phi-3.5-mini-instruct](https://huggingface.co/microsoft/Phi-3.5-mini-instruct) [(download Q5_K_M)](https://huggingface.co/Mozilla/Phi-3-mini-4k-instruct-llamafile/resolve/main/Phi-3-mini-4k-instruct.Q5_K_M.llamafile) llamafile.
 Set the `LLAMORA_LLAMAFILE` environment variable to the full path of the `.llamafile` file, or edit the `.env` file to include: `LLAMORA_LLAMAFILE=/path/to/your/model.llamafile`
 
 Install [uv](https://docs.astral.sh/uv/#installation). Then run:
