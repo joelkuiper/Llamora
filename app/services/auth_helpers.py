@@ -1,6 +1,7 @@
 import os
 import base64
-from quart import Response, request, redirect
+import json
+from quart import Response, request, redirect, g
 from urllib.parse import urlparse, quote
 from functools import wraps
 from nacl import secret
@@ -13,31 +14,71 @@ if not cookie_secret or len(cookie_secret) % 4 != 0:
 try:
     cookie_key = base64.b64decode(cookie_secret, altchars=b"-_", validate=True)
 except Exception as exc:
-    raise RuntimeError(
-        "Set LLAMORA_COOKIE_SECRET to a 32-byte base64 string"
-    ) from exc
+    raise RuntimeError("Set LLAMORA_COOKIE_SECRET to a 32-byte base64 string") from exc
 
 if len(cookie_key) != secret.SecretBox.KEY_SIZE:
     raise RuntimeError("Set LLAMORA_COOKIE_SECRET to a 32-byte base64 string")
 
+COOKIE_NAME = os.environ.get("LLAMORA_COOKIE_NAME", "llamora")
 cookie_box = secret.SecretBox(cookie_key)
 
 
-def set_secure_cookie(response, name, value):
-    token = cookie_box.encrypt(value.encode("utf-8"))
-    b64 = base64.urlsafe_b64encode(token).decode("utf-8")
-    response.set_cookie(name, b64, httponly=True, secure=True, samesite="Lax")
+def _get_cookie_data() -> dict:
+    # If we've already got a merged state this request, return it
+    if hasattr(g, "_secure_cookie_state"):
+        return g._secure_cookie_state
 
+    raw = request.cookies.get(COOKIE_NAME)
+    if not raw:
+        return {}
 
-def get_secure_cookie(name):
-    data = request.cookies.get(name)
-    if not data:
-        return None
     try:
-        token = base64.urlsafe_b64decode(data)
-        return cookie_box.decrypt(token).decode("utf-8")
+        token = base64.urlsafe_b64decode(raw)
+        decrypted = cookie_box.decrypt(token).decode("utf-8")
+        data = json.loads(decrypted)
+        g._secure_cookie_state = data  # cache for later calls
+        return data
     except Exception:
-        return None
+        return {}
+
+
+def _cookie_state() -> dict:
+    """Per-request merged cookie state."""
+    if not hasattr(g, "_secure_cookie_state"):
+        g._secure_cookie_state = _get_cookie_data()
+    return g._secure_cookie_state
+
+
+def _set_cookie_data(response: Response, data: dict) -> None:
+    # If empty -> delete cookie to avoid storing an empty blob
+    if not data:
+        response.delete_cookie(COOKIE_NAME, path="/", samesite="Lax")
+        return
+    token = cookie_box.encrypt(json.dumps(data).encode("utf-8"))
+    b64 = base64.urlsafe_b64encode(token).decode("utf-8")
+    response.set_cookie(
+        COOKIE_NAME, b64, httponly=True, secure=True, samesite="Lax", path="/"
+    )
+
+
+def get_secure_cookie(name: str) -> str | None:
+    # Prefer in-request state if we've already touched it
+    if hasattr(g, "_secure_cookie_state"):
+        return g._secure_cookie_state.get(name)
+    return _get_cookie_data().get(name)
+
+
+def set_secure_cookie(response: Response, name: str, value: str | None) -> None:
+    state = _cookie_state()  # start from cached/merged state
+    if value is None:
+        state.pop(name, None)  # delete key
+    else:
+        state[name] = value  # merge key
+    _set_cookie_data(response, state)  # write back the full, merged dict
+
+
+def clear_secure_cookie(response: Response) -> None:
+    response.delete_cookie(COOKIE_NAME)
 
 
 async def get_current_user():
@@ -78,6 +119,7 @@ def login_required(f):
         login_url = f"/login?return={quote(return_path, safe='') }"
 
         if not await get_current_user():
+            print("No user redirecting")
             if request.headers.get("HX-Request"):
                 resp = Response(status=401)
                 resp.headers["HX-Redirect"] = login_url

@@ -13,6 +13,7 @@ from app.services.auth_helpers import (
     login_required,
     get_current_user,
     get_dek,
+    clear_secure_cookie,
 )
 from app.services.crypto import generate_dek, wrap_key, unwrap_key
 from app import db
@@ -38,10 +39,14 @@ async def register():
 
         # Basic validations
         if not username or not password or not confirm:
-            return await render_template("register.html", error="All fields are required")
+            return await render_template(
+                "register.html", error="All fields are required"
+            )
 
         if len(username) > max_user or len(password) > max_pass:
-            return await render_template("register.html", error="Input exceeds max length")
+            return await render_template(
+                "register.html", error="Input exceeds max length"
+            )
 
         if not re.fullmatch(r"\S+", username):
             return await render_template(
@@ -55,7 +60,9 @@ async def register():
             )
 
         if password != confirm:
-            return await render_template("register.html", error="Passwords do not match")
+            return await render_template(
+                "register.html", error="Passwords do not match"
+            )
 
         if len(password) < min_pass:
             return await render_template(
@@ -70,7 +77,9 @@ async def register():
             )
 
         if await db.get_user_by_username(username):
-            return await render_template("register.html", error="Username already exists")
+            return await render_template(
+                "register.html", error="Username already exists"
+            )
 
         # All good — create user
         password_bytes = password.encode("utf-8")
@@ -117,7 +126,9 @@ async def login():
         max_pass = current_app.config["MAX_PASSWORD_LENGTH"]
 
         if len(username) > max_user or len(password) > max_pass:
-            return await render_template("login.html", error="Invalid credentials", return_url=return_url)
+            return await render_template(
+                "login.html", error="Invalid credentials", return_url=return_url
+            )
 
         user = await db.get_user_by_username(username)
         if user:
@@ -132,15 +143,26 @@ async def login():
                     user["dek_pw_nonce"],
                     password,
                 )
-                resp = redirect(return_url or "/")
+                redirect_url = return_url
+                if not redirect_url:
+                    state = await db.get_state(user["id"])
+                    active_session = state.get("active_session")
+                    if active_session and await db.get_session(
+                        user["id"], active_session
+                    ):
+                        redirect_url = f"/s/{active_session}"
+                    else:
+                        redirect_url = "/"
+                resp = redirect(redirect_url)
                 set_secure_cookie(resp, "uid", str(user["id"]))
-                set_secure_cookie(
-                    resp, "dek", base64.b64encode(dek).decode("utf-8")
-                )
+                set_secure_cookie(resp, "dek", base64.b64encode(dek).decode("utf-8"))
+                print(resp)
                 return resp
             except Exception:
                 pass
-        return await render_template("login.html", error="Invalid credentials", return_url=return_url)
+        return await render_template(
+            "login.html", error="Invalid credentials", return_url=return_url
+        )
 
     return_url = _safe_return(request.args.get("return"))
     return await render_template("login.html", return_url=return_url)
@@ -149,8 +171,7 @@ async def login():
 @auth_bp.route("/logout")
 async def logout():
     resp = redirect("/login")
-    resp.delete_cookie("uid")
-    resp.delete_cookie("dek")
+    clear_secure_cookie(resp)
     return resp
 
 
@@ -179,9 +200,7 @@ async def reset_password():
             or not re.search(r"[A-Za-z]", password)
             or not re.search(r"\d", password)
         ):
-            return await render_template(
-                "reset_password.html", error="Invalid input"
-            )
+            return await render_template("reset_password.html", error="Invalid input")
 
         user = await db.get_user_by_username(username)
         if not user:
@@ -217,7 +236,13 @@ async def reset_password():
 @login_required
 async def profile():
     user = await get_current_user()
-    return await render_template("profile.html", user=user)
+    state = await db.get_state(user["id"])
+    active_session = state.get("active_session")
+    if active_session and not await db.get_session(user["id"], active_session):
+        active_session = None
+    return await render_template(
+        "profile.html", user=user, active_session=active_session
+    )
 
 
 @auth_bp.route("/profile/data")
@@ -278,7 +303,9 @@ async def change_password():
         or not re.search(r"[A-Za-z]", new)
         or not re.search(r"\d", new)
     ):
-        return await render_template("profile.html", user=user, pw_error="Invalid input")
+        return await render_template(
+            "profile.html", user=user, pw_error="Invalid input"
+        )
 
     try:
         pwhash.argon2id.verify(
@@ -331,7 +358,6 @@ async def delete_profile():
     user = await get_current_user()
     await db.delete_user(user["id"])
     resp = Response(status=204)
-    resp.delete_cookie("uid")
-    resp.delete_cookie("dek")
+    clear_secure_cookie(resp)
     resp.headers["HX-Redirect"] = "/login"
     return resp

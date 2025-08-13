@@ -37,8 +37,8 @@ DEFAULT_LLAMA_ARGS = {
     "server": True,
     "nobrowser": True,
     "threads": os.cpu_count() or 4,
-    "n_gpu_layers": 999,
-    "gpu": "auto",
+    # "n_gpu_layers": 999,
+    # "gpu": "auto",
     "ctx_size": 8192,  # n_ctx
 }
 

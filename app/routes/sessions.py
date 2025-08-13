@@ -8,7 +8,11 @@ from quart import (
     abort,
 )
 from app import db
-from app.services.auth_helpers import login_required, get_current_user, get_dek
+from app.services.auth_helpers import (
+    login_required,
+    get_current_user,
+    get_dek,
+)
 from .chat import render_chat
 
 sessions_bp = Blueprint("sessions", __name__)
@@ -19,7 +23,14 @@ sessions_bp = Blueprint("sessions", __name__)
 async def index():
     user = await get_current_user()
     uid = user["id"]
-    session_id = await db.get_latest_session(uid) or await db.create_session(uid)
+    state = await db.get_state(uid)
+    session_id = state.get("active_session")
+    if session_id:
+        if not await db.get_session(uid, session_id):
+            session_id = None
+    if not session_id:
+        session_id = await db.get_latest_session(uid) or await db.create_session(uid)
+    await db.update_state(uid, active_session=session_id)
     return redirect(f"/s/{session_id}", code=302)
 
 
@@ -50,8 +61,9 @@ async def session(session_id):
         sessions=sessions,
         pending_msg_id=pending_msg_id,
     )
-
-    return html
+    resp = await make_response(html)
+    await db.update_state(uid, active_session=session_id)
+    return resp
 
 
 @sessions_bp.route("/s/create", methods=["POST"])
@@ -70,6 +82,7 @@ async def create_session():
     chat_html = await render_chat(new_session_id, oob=True)
     resp = await make_response(f"{chat_html}{sidebar_html}", 200)
     resp.headers["HX-Push-Url"] = f"/s/{new_session_id}"
+    await db.update_state(uid, active_session=new_session_id)
     return resp
 
 
@@ -162,4 +175,5 @@ async def delete_session(session_id):
         chat_html = await render_chat(new_session_id, oob=True)
         resp = await make_response(f"{chat_html}{sidebar_html}", 200)
         resp.headers["HX-Push-Url"] = f"/s/{new_session_id}"
+        await db.update_state(uid, active_session=new_session_id)
         return resp

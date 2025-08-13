@@ -13,7 +13,11 @@ import json
 import re
 from llm.llm_engine import LLMEngine
 from app import db
-from app.services.auth_helpers import login_required, get_current_user, get_dek
+from app.services.auth_helpers import (
+    login_required,
+    get_current_user,
+    get_dek,
+)
 
 chat_bp = Blueprint("chat", __name__)
 
@@ -53,6 +57,8 @@ async def chat_htmx(session_id):
     html = await render_chat(session_id, False)
     resp = await make_response(html, 200)
     resp.headers["HX-Push-Url"] = f"/s/{session_id}"
+    user = await get_current_user()
+    await db.update_state(user["id"], active_session=session_id)
     return resp
 
 

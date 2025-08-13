@@ -3,6 +3,7 @@ import aiosqlite
 from contextlib import asynccontextmanager
 import secrets
 import logging
+import json
 from config import MAX_USERNAME_LENGTH
 from ulid import ULID
 
@@ -18,7 +19,9 @@ class LocalDB:
     async def _ensure_schema(self, is_new):
         async with self.get_conn() as conn:
             if is_new:
-                logging.getLogger(__name__).info("Creating new database at %s", self.db_path)
+                logging.getLogger(__name__).info(
+                    "Creating new database at %s", self.db_path
+                )
             await conn.executescript(
                 f"""
                 CREATE TABLE IF NOT EXISTS users (
@@ -31,6 +34,7 @@ class LocalDB:
                     dek_rc_salt BLOB NOT NULL,
                     dek_rc_nonce BLOB NOT NULL,
                     dek_rc_cipher BLOB NOT NULL,
+                    state TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
 
@@ -118,6 +122,32 @@ class LocalDB:
             row = await cursor.fetchone()
             return dict(row) if row else None
 
+    async def get_state(self, user_id):
+        async with self.get_conn() as conn:
+            cursor = await conn.execute(
+                "SELECT state FROM users WHERE id = ?", (user_id,)
+            )
+            row = await cursor.fetchone()
+            if row and row["state"]:
+                try:
+                    return json.loads(row["state"])
+                except Exception:
+                    return {}
+            return {}
+
+    async def update_state(self, user_id, **updates):
+        state = await self.get_state(user_id)
+        for key, value in updates.items():
+            if value is None:
+                state.pop(key, None)
+            else:
+                state[key] = value
+        async with self.get_conn() as conn:
+            await conn.execute(
+                "UPDATE users SET state = ? WHERE id = ?",
+                (json.dumps(state), user_id),
+            )
+
     async def _owns_session(self, conn, user_id, session_id):
         cursor = await conn.execute(
             "SELECT * FROM sessions WHERE id = ? AND user_id = ? LIMIT 1",
@@ -177,9 +207,7 @@ class LocalDB:
             if not await self._owns_session(conn, user_id, session_id):
                 raise ValueError("User does not own session")
 
-            nonce, ct, alg = encrypt_message(
-                dek, user_id, session_id, ulid, content
-            )
+            nonce, ct, alg = encrypt_message(dek, user_id, session_id, ulid, content)
 
             await conn.execute(
                 "INSERT INTO messages (id, session_id, role, nonce, ciphertext, alg) VALUES (?, ?, ?, ?, ?, ?)",
@@ -231,7 +259,9 @@ class LocalDB:
                     row["ciphertext"],
                     row["alg"],
                 )
-                history.append({"id": row["id"], "role": row["role"], "content": content})
+                history.append(
+                    {"id": row["id"], "role": row["role"], "content": content}
+                )
             return history
 
     async def get_all_sessions(self, user_id):

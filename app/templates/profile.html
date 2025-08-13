@@ -46,7 +46,13 @@
         hx-confirm="Are you sure you want to delete your profile? This cannot be undone."
       >Delete Profile</button>
 
-      <div class="back"><a href="{{ url_for('sessions.index') }}">Back to chat</a></div>
+      <div class="back">
+        {% if active_session %}
+        <a href="{{ url_for('sessions.session', session_id=active_session) }}">Back to chat</a>
+        {% else %}
+        <a href="{{ url_for('sessions.index') }}">Back to chat</a>
+        {% endif %}
+      </div>
     </div>
   </body>
 </html>
