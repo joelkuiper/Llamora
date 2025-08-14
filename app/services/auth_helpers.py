@@ -119,7 +119,6 @@ def login_required(f):
         login_url = f"/login?return={quote(return_path, safe='') }"
 
         if not await get_current_user():
-            print("No user redirecting")
             if request.headers.get("HX-Request"):
                 resp = Response(status=401)
                 resp.headers["HX-Redirect"] = login_url
