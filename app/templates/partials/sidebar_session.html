@@ -1,5 +1,5 @@
 <li
-  id="session-{{ session.id }}">
+  id="session-{{ session.id }}"{% if session.id == session_id %} class="active"{% endif %}>
   <div class="session-item">
     <a
       href="{{ url_for('sessions.session', session_id=session.id) }}"
