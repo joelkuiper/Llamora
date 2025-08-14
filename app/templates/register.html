@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <title>{{ config.APP_NAME }} | Register</title>
+    <script src="{{url_for('static', filename='js/vendor/htmx.min.js')}}"></script>
     <link rel="stylesheet" href="{{url_for('static', filename='css/main.css')}}" />
     <link rel="stylesheet" href="{{url_for('static', filename='css/auth.css')}}" />
     <link rel="icon" href="{{url_for('static', filename='img/favicon.ico')}}" type="image/x-icon">
@@ -18,17 +19,19 @@
                name="password"
                placeholder="Password"
                required
-               pattern="^(?=.*[A-Za-z])(?=.*\d).+$"
                maxlength="{{ config.MAX_PASSWORD_LENGTH }}"
-               minlength="{{ config.MIN_PASSWORD_LENGTH }}"
+               hx-post="{{ url_for('auth.password_strength_check') }}"
+               hx-trigger="input changed delay:200ms"
+               hx-target="#password-strength"
+               hx-include="[name='csrf_token']"
                />
+        <div id="password-strength">
+          <div class="strength-meter"><div class="bar"></div></div>
+        </div>
         <input type="password"
                name="confirm_password"
                placeholder="Confirm password"
                required
-               pattern="^(?=.*[A-Za-z])(?=.*\d).+$"
-               maxlength="{{ config.MAX_PASSWORD_LENGTH }}"
-               minlength="{{ config.MIN_PASSWORD_LENGTH }}"
                />
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" data-loading="Creating account">Create account</button>

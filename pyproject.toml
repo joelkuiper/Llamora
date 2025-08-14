@@ -13,4 +13,5 @@ dependencies = [
     "quart>=0.20.0",
     "quart-wtforms>=1.0.3",
     "httpx>=0.27.0",
+    "zxcvbn>=4.4.2",
 ]

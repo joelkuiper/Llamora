@@ -21,8 +21,22 @@ import re
 import base64
 import secrets
 import json
+from zxcvbn import zxcvbn
 
 auth_bp = Blueprint("auth", __name__)
+
+
+@auth_bp.route("/password_strength", methods=["POST"])
+async def password_strength_check():
+    form = await request.form
+    password = form.get("password", "")
+    strength = zxcvbn(password)
+    score = strength.get("score", 0)
+    percent = min(100, score * 25)
+    html = await render_template(
+        "partials/password_strength.html", score=score, percent=percent
+    )
+    return html
 
 
 @auth_bp.route("/register", methods=["GET", "POST"])
@@ -35,7 +49,6 @@ async def register():
 
         max_user = current_app.config["MAX_USERNAME_LENGTH"]
         max_pass = current_app.config["MAX_PASSWORD_LENGTH"]
-        min_pass = current_app.config.get("MIN_PASSWORD_LENGTH")
 
         # Basic validations
         if not username or not password or not confirm:
@@ -46,11 +59,6 @@ async def register():
         if len(username) > max_user or len(password) > max_pass:
             return await render_template(
                 "register.html", error="Input exceeds max length"
-            )
-
-        if not re.fullmatch(r"\S+", username):
-            return await render_template(
-                "register.html", error="Username may not contain spaces"
             )
 
         if not re.fullmatch(r"^[A-Za-z0-9_]+$", username):
@@ -64,24 +72,15 @@ async def register():
                 "register.html", error="Passwords do not match"
             )
 
-        if len(password) < min_pass:
-            return await render_template(
-                "register.html",
-                error=f"Password must be at least {min_pass} characters long",
-            )
-
-        if not re.search(r"[A-Za-z]", password) or not re.search(r"\d", password):
-            return await render_template(
-                "register.html",
-                error="Password must contain at least one letter and one number",
-            )
+        strength = zxcvbn(password)
+        if strength.get("score", 0) < 3:
+            return await render_template("register.html", error="Password is too weak")
 
         if await db.get_user_by_username(username):
             return await render_template(
                 "register.html", error="Username already exists"
             )
 
-        # All good — create user
         password_bytes = password.encode("utf-8")
         hash_bytes = pwhash.argon2id.str(password_bytes)
         password_hash = hash_bytes.decode("utf-8")

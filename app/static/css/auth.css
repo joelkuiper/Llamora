@@ -104,6 +104,28 @@
     margin-bottom: var(--spacing-sm);
   }
 
+  .strength-meter {
+    height: 0.5rem;
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+    box-shadow: var(--inset-shadow);
+    margin-bottom: var(--spacing-md);
+
+    .bar {
+      display: block;
+      height: 100%;
+      width: 0%;
+      border-radius: inherit;
+      transition: width 0.3s ease;
+    }
+
+    .bar.strength-0,
+    .bar.strength-1 { background: #ff6b6b; }
+    .bar.strength-2 { background: #feca57; }
+    .bar.strength-3 { background: #8bc34a; }
+    .bar.strength-4 { background: #4caf50; }
+  }
+
   p {
     text-align: center;
     margin-top: var(--spacing-sm);
