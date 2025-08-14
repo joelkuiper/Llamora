@@ -12,6 +12,7 @@ from html import escape
 import asyncio
 import json
 import re
+from weakref import WeakValueDictionary
 from llm.llm_engine import LLMEngine
 from app import db
 from app.services.auth_helpers import (
@@ -62,8 +63,22 @@ async def chat_htmx(session_id):
     await db.update_state(user["id"], active_session=session_id)
     return resp
 
+PENDING_TTL = 300  # seconds
+CLEANUP_INTERVAL = 60  # seconds
+pending_responses: WeakValueDictionary[str, "PendingResponse"] = WeakValueDictionary()
+_cleanup_task: asyncio.Task | None = None
 
-pending_responses: dict[str, "PendingResponse"] = {}
+
+async def _cleanup_expired_pending() -> None:
+    try:
+        while True:
+            await asyncio.sleep(CLEANUP_INTERVAL)
+            cutoff = asyncio.get_event_loop().time() - PENDING_TTL
+            for msg_id, pending in list(pending_responses.items()):
+                if pending.done or pending.created_at < cutoff:
+                    pending_responses.pop(msg_id, None)
+    except asyncio.CancelledError:
+        pass
 
 
 class PendingResponse:
@@ -82,6 +97,7 @@ class PendingResponse:
         self.error = False
         self._cond = asyncio.Condition()
         self.dek = dek
+        self.created_at = asyncio.get_event_loop().time()
         current_app.logger.debug("Starting generation for message %s", msg_id)
         asyncio.create_task(self._generate(uid, session_id, history, params))
 
@@ -207,16 +223,20 @@ async def sse_reply(msg_id, session_id):
             params = json.loads(cfg)
         except Exception:
             current_app.logger.warning("Invalid config JSON for message %s", msg_id)
-
     pending = pending_responses.get(msg_id)
     if not pending:
         pending = PendingResponse(msg_id, uid, session_id, history, dek, params)
         pending_responses[msg_id] = pending
 
+    global _cleanup_task
+    if _cleanup_task is None or _cleanup_task.done():
+        _cleanup_task = asyncio.create_task(_cleanup_expired_pending())
+
     async def event_stream():
         async for chunk in pending.stream():
             yield f"event: message\ndata: {replace_newline(escape(chunk))}\n\n"
-        yield "event: done\ndata: \n\n"
+        event = "error" if pending.error else "done"
+        yield f"event: {event}\ndata: \n\n"
         pending_responses.pop(msg_id, None)
 
     return Response(event_stream(), mimetype="text/event-stream")
