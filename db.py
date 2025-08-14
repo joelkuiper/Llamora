@@ -6,15 +6,28 @@ import logging
 import json
 from config import MAX_USERNAME_LENGTH
 from ulid import ULID
+from aiosqlitepool import SQLiteConnectionPool
 
 
 class LocalDB:
     def __init__(self, db_path=None):
         self.db_path = db_path or os.getenv("LLAMORA_DB_PATH", "state.sqlite3")
+        self.pool = None
 
     async def init(self):
         is_new = not os.path.exists(self.db_path)
+        self.pool = SQLiteConnectionPool(self._connection_factory)
         await self._ensure_schema(is_new)
+
+    async def close(self):
+        if self.pool is not None:
+            await self.pool.close()
+
+    async def _connection_factory(self):
+        conn = await aiosqlite.connect(self.db_path)
+        await conn.execute("PRAGMA foreign_keys = ON")
+        conn.row_factory = aiosqlite.Row
+        return conn
 
     async def _ensure_schema(self, is_new):
         async with self.get_conn() as conn:
@@ -67,11 +80,15 @@ class LocalDB:
 
     @asynccontextmanager
     async def get_conn(self):
-        async with aiosqlite.connect(self.db_path) as conn:
-            await conn.execute("PRAGMA foreign_keys = ON")
-            conn.row_factory = aiosqlite.Row
-            yield conn
-            await conn.commit()
+        if self.pool is None:
+            raise RuntimeError("Database has not been initialized")
+        async with self.pool.connection() as conn:
+            try:
+                yield conn
+                await conn.commit()
+            except Exception:
+                await conn.rollback()
+                raise
 
     # user helpers
     async def create_user(

@@ -34,6 +34,7 @@ def create_app():
 
     app.before_request(load_user)
     app.before_serving(db.init)
+    app.after_serving(db.close)
 
     @app.errorhandler(404)
     async def not_found(e):

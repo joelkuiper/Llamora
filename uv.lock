@@ -24,6 +24,15 @@ wheels = [
 ]
 
 [[package]]
+name = "aiosqlitepool"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c6/5a/f3184cdfd195a748bbb330894e34e5b274fec0e9b8dfac4c1fc71f36fc8b/aiosqlitepool-1.0.0.tar.gz", hash = "sha256:397f79993d7f34a5740939fb6e52ff29563fad5c400ef8b70990e64331957409", size = 16491, upload-time = "2025-07-11T10:15:43.029Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e0/65/4d9a7eb8a4cf6a586f14abcce9d774d5b4a986e3c3028a9c88801c9648d2/aiosqlitepool-1.0.0-py3-none-any.whl", hash = "sha256:832acb166bb9afef7f46b320d024b343083c90f4eb4bdc8c0d794a79e1fd1b4d", size = 12946, upload-time = "2025-07-11T10:15:41.953Z" },
+]
+
+[[package]]
 name = "anyio"
 version = "4.10.0"
 source = { registry = "https://pypi.org/simple" }
@@ -310,6 +319,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "aiosqlite" },
+    { name = "aiosqlitepool" },
     { name = "httpx" },
     { name = "pynacl" },
     { name = "python-dotenv" },
@@ -323,6 +333,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "aiosqlite", specifier = ">=0.20.0" },
+    { name = "aiosqlitepool", specifier = ">=1.0.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "pynacl", specifier = ">=1.5.0" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
