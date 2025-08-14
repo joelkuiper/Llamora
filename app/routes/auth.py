@@ -150,13 +150,14 @@ async def login():
                     if active_session and await db.get_session(
                         user["id"], active_session
                     ):
-                        redirect_url = url_for("sessions.session", session_id=active_session)
+                        redirect_url = url_for(
+                            "sessions.session", session_id=active_session
+                        )
                     else:
                         redirect_url = "/"
                 resp = redirect(redirect_url)
                 set_secure_cookie(resp, "uid", str(user["id"]))
                 set_secure_cookie(resp, "dek", base64.b64encode(dek).decode("utf-8"))
-                print(resp)
                 return resp
             except Exception:
                 pass
