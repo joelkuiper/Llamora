@@ -150,7 +150,7 @@ async def login():
                     if active_session and await db.get_session(
                         user["id"], active_session
                     ):
-                        redirect_url = f"/s/{active_session}"
+                        redirect_url = url_for("sessions.session", session_id=active_session)
                     else:
                         redirect_url = "/"
                 resp = redirect(redirect_url)

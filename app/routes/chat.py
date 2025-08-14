@@ -6,6 +6,7 @@ from quart import (
     current_app,
     make_response,
     abort,
+    url_for,
 )
 from html import escape
 import asyncio
@@ -56,7 +57,7 @@ async def render_chat(session_id, oob=False):
 async def chat_htmx(session_id):
     html = await render_chat(session_id, False)
     resp = await make_response(html, 200)
-    resp.headers["HX-Push-Url"] = f"/s/{session_id}"
+    resp.headers["HX-Push-Url"] = url_for("sessions.session", session_id=session_id)
     user = await get_current_user()
     await db.update_state(user["id"], active_session=session_id)
     return resp
