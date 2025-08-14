@@ -20,6 +20,7 @@
                placeholder="Password"
                required
                maxlength="{{ config.MAX_PASSWORD_LENGTH }}"
+               minlength="2"
                hx-post="{{ url_for('auth.password_strength_check') }}"
                hx-trigger="input changed delay:200ms"
                hx-target="#password-strength"
@@ -31,6 +32,7 @@
         <input type="password"
                name="confirm_password"
                placeholder="Confirm password"
+               minlength="2"
                required
                />
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

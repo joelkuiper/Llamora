@@ -29,12 +29,32 @@ auth_bp = Blueprint("auth", __name__)
 @auth_bp.route("/password_strength", methods=["POST"])
 async def password_strength_check():
     form = await request.form
-    password = form.get("password", "")
-    strength = zxcvbn(password)
-    score = strength.get("score", 0)
+    pw = form.get("password", "") or ""
+
+    # Short-circuit obviously empty input to avoid zxcvbn edge-case crashes
+    if not pw:
+        score = 0
+        percent = 0
+        html = await render_template(
+            "partials/password_strength.html", score=score, percent=percent
+        )
+        return html
+
+    try:
+        strength = zxcvbn(pw)
+        score = int(strength.get("score", 0))
+        suggestions = strength.get("feedback").get("suggestions")
+    except Exception as e:
+        # Be defensive: never 500 due to the estimator
+        current_app.logger.warning("zxcvbn failed: %r", e)
+        score = 0
+
     percent = min(100, score * 25)
     html = await render_template(
-        "partials/password_strength.html", score=score, percent=percent
+        "partials/password_strength.html",
+        score=score,
+        percent=percent,
+        suggestions=suggestions,
     )
     return html
 
