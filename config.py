@@ -37,8 +37,8 @@ DEFAULT_LLAMA_ARGS = {
     "server": True,
     "nobrowser": True,
     "threads": os.cpu_count() or 4,
-    # "n_gpu_layers": 999,
-    # "gpu": "auto",
+    "n_gpu_layers": 999,
+    "gpu": "auto",
     "ctx_size": 8192,  # n_ctx
 }
 
@@ -50,14 +50,11 @@ LLM_SERVER = {
     "args": _deep_merge(DEFAULT_LLAMA_ARGS, env_overrides or {}),
 }
 
-try:
-    llm_request_overrides = json.loads(os.getenv("LLAMORA_LLM_REQUEST", "{}"))
-except json.JSONDecodeError:
-    logging.warning("Invalid JSON in LLAMORA_LLM_REQUEST, ignoring.")
-    llm_request_overrides = {}
+llm_request_overrides = _json_env("LLAMORA_LLM_REQUEST") or {}
+
 
 DEFAULT_LLM_REQUEST = {
-    "n_predict": int(os.getenv("LLAMORA_MAX_RESPONSE_TOKENS", "1024")),
+    "n_predict": 1024,
     "stream": True,
     "stop": ["<|end|>", "<|assistant|>"],
     **llm_request_overrides,
