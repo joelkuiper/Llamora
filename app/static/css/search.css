@@ -1,0 +1,37 @@
+#search-form {
+  margin: 0.5rem 0;
+}
+
+#search-input {
+  width: 100%;
+  padding: 0.25rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+#search-ind {
+  font-size: 0.875rem;
+  color: #666;
+  display: none;
+}
+
+#search-ind.htmx-request {
+  display: inline;
+}
+
+#search-results {
+  margin-top: 0.5rem;
+}
+
+.search-result-item {
+  list-style: none;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  border-radius: 8px;
+  box-shadow: 2px 2px 5px #ccc, -2px -2px 5px #fff;
+}
+
+.search-result-meta {
+  font-size: 0.75rem;
+  color: #555;
+}

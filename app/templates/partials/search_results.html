@@ -1,0 +1,13 @@
+<section id="search-results"
+         aria-live="polite"
+         aria-busy="false"
+         hx-on::before-request="this.setAttribute('aria-busy','true')"
+         hx-on::after-request="this.setAttribute('aria-busy','false')">
+  {% if results %}
+    <ul class="search-results-list">
+      {% for item in results %}
+        {% include 'partials/search_result_item.html' %}
+      {% endfor %}
+    </ul>
+  {% endif %}
+</section>

@@ -30,10 +30,12 @@ def create_app():
     from .routes.auth import auth_bp
     from .routes.sessions import sessions_bp
     from .routes.chat import chat_bp
+    from .routes.search import search_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(sessions_bp)
     app.register_blueprint(chat_bp)
+    app.register_blueprint(search_bp)
 
     from .services.auth_helpers import load_user
 

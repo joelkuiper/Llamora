@@ -1,4 +1,5 @@
 {% from 'partials/bot_stream.html' import bot_stream %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/search.css') }}">
 <main
   id="chatbox-wrapper"
   {% if oob %} hx-swap-oob="true" {% endif %}>
@@ -12,6 +13,10 @@
     {{ bot_stream(pending_msg_id, session.id) }}
     {% endif %}
   </div>
+
+  {% include 'partials/search_form.html' %}
+  <div id="search-ind" class="htmx-indicator">Searching…</div>
+  {% include 'partials/search_results.html' %}
 
   <form id="chat-form"
         hx-post="{{ url_for('chat.send_message', session_id=session.id) }}"
