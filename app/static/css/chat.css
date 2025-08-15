@@ -1,3 +1,12 @@
+#content {
+  display: flex;
+  flex-direction: column; /* header on top, chat below */
+  flex: 1 1 auto;
+  min-width: 0;  /* prevent overflow in flex layouts */
+  min-height: 0; /* critical so the child can shrink and scroll */
+}
+
+
 .app-container {
   display: flex;
   height: 100vh; /* fill full viewport height */
@@ -357,6 +366,167 @@
 
 }
 
+/* Search */
+#search-container {
+  position: sticky;
+  top: 0;
+  z-index: 40;                 /* stays above chat */
+  background: transparent;     /* let the shell float */
+  padding: var(--spacing-md) var(--spacing-xl) var(--spacing-sm);
+
+  --glass-bg: rgba(255, 255, 255, 0.65);
+  --glass-stroke: rgba(255, 255, 255, 0.45);
+  --glass-shadow: 0 12px 28px rgba(0,0,0,0.08);
+
+  #search-form {
+    margin: 0 auto;
+    max-width: 60rem;          /* align with chat width */
+  }
+
+  .search-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    filter: none;
+  }
+
+  #search-input {
+    width: 100%;
+    height: 2.75rem;
+    padding: 0.5rem 2.25rem 0.5rem 0.85rem;
+    border: none;
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
+    box-shadow: var(--inset-shadow);
+    outline: none;
+    font-family: var(--font-base);
+    transition: box-shadow 0.2s ease, transform 0.05s ease;
+  }
+  #search-input:focus {
+    box-shadow:
+      inset 1px 1px 3px var(--shadow-dark),
+      inset -1px -1px 3px var(--shadow-light),
+      0 0 4px rgba(0,0,0,0.05);
+  }
+  #search-input:active { transform: scale(0.998); }
+
+  /* Spinner inside input, same spot */
+  #search-spinner {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1rem;
+    display: none;
+    pointer-events: none;
+  }
+  #search-spinner.htmx-request { display: block; }
+
+  /* Frosted glass dropdown */
+  .search-results-overlay {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: var(--spacing-xl);
+    z-index: 50;
+    backdrop-filter: blur(12px) saturate(160%);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    background: rgba(255,255,255,0.65);
+    border: 1px solid rgba(255,255,255,0.45);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.08);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: min(60vh, 40rem);
+  }
+
+  /* Make the overlay a flex column so the UL can scroll */
+  .search-results-overlay {
+    display: flex;
+    flex-direction: column;
+    max-height: min(60vh, 40rem);
+  }
+
+  .search-results-list {
+    flex: 1 1 auto;
+    min-height: 0;       /* critical for nested flex scrolling */
+    overflow-y: auto;
+    margin: 0;
+    padding: var(--spacing-sm);
+  }
+
+  /* Result row: meta LEFT, content RIGHT (flex, no grid/floats) */
+  .search-result-item a {
+    display: flex;
+    align-items: flex-start;      /* top align everything */
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    text-decoration: none;
+    color: inherit;
+    border: 1px solid transparent; /* for a crisp hover edge */
+    transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .search-result-meta {
+    flex: 0 0 8rem;               /* fixed meta column */
+    white-space: nowrap;
+    font-size: 0.85rem;
+    line-height: 1.2;
+    opacity: 0.75;
+  }
+
+  .search-result-main {
+    flex: 1 1 auto;               /* fills remaining row space */
+    min-width: 0;                 /* allow ellipsis/clamping */
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .search-result-title {
+    margin: 0;
+    font-weight: 600;
+  }
+
+  .search-result-content {
+    margin: 0;
+    font-size: 0.95rem;
+    opacity: 0.9;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;         /* nice 2-line clamp */
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  /* Stronger hover */
+  .search-result-item a:hover {
+    background: rgba(255,255,255,0.58);
+    border-color: rgba(0,0,0,0.12);
+    box-shadow:
+      inset 2px 2px 6px rgba(0,0,0,0.05),
+      inset -2px -2px 6px rgba(255,255,255,0.7);
+  }
+
+
+  /* Empty/hidden states */
+  #search-results[hidden] { display: none; }
+}
+
+/* Progressive enhancement fallbacks */
+@supports not (backdrop-filter: blur(1px)) {
+  #search-container .search-results-overlay {
+    background: rgba(250, 250, 250, 0.98);
+  }
+}
+
+.highlight {
+  animation: flash 2s ease-in-out;
+}
+
+
 /* Animations */
 @keyframes blink {
   0%, 100% { opacity: 0; }
@@ -378,4 +548,9 @@
 
 form textarea, form button {
   transition: opacity 0.3s ease, box-shadow 0.3s ease;
+}
+
+@keyframes flash {
+  from { background: #fff7a0; }
+  to { background: transparent; }
 }

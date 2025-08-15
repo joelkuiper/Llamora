@@ -1,6 +1,6 @@
-<section id="search-results" class="search-results-overlay"
-         aria-live="polite"
-         aria-busy="false"
+<section id="search-results"
+         class="search-results-overlay"
+         {% if results|length == 0 %}hidden{% endif %}
          hx-on::before-request="this.setAttribute('aria-busy','true')"
          hx-on::after-request="this.setAttribute('aria-busy','false')">
   {% if results %}

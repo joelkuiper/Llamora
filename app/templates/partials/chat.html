@@ -1,14 +1,7 @@
 {% from 'partials/bot_stream.html' import bot_stream %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/search.css') }}">
 <main
   id="chatbox-wrapper"
   {% if oob %} hx-swap-oob="true" {% endif %}>
-
-<div id="search-container">
-  {% include 'partials/search_form.html' %}
-  {% include 'partials/search_results.html' %}
-
-</div>
 
   <div id="chat" data-session-id="{{ session.id }}">
     <div class="message bot">Hello. Speak your mind, and I will listen.</div>
