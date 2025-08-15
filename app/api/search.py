@@ -1,3 +1,4 @@
+import logging
 import time
 from typing import List
 
@@ -17,6 +18,9 @@ from app.index.session_ann import SessionIndexRegistry
 from app.services.crypto import encrypt_vector, decrypt_message
 
 
+logger = logging.getLogger(__name__)
+
+
 class SearchAPI:
     """High level search interface operating on encrypted messages."""
 
@@ -32,6 +36,9 @@ class SearchAPI:
         k1: int = PROGRESSIVE_K1,
         k2: int = PROGRESSIVE_K2,
     ):
+        logger.debug(
+            "Search requested by user %s with k1=%d k2=%d", user_id, k1, k2
+        )
         index = await self.registry.get_or_build(user_id, dek)
         q_vec = embed_texts([query]).astype(np.float32).reshape(1, -1)
 
@@ -48,13 +55,16 @@ class SearchAPI:
         start = time.monotonic()
         ids, dists = index.search(q_vec, current_k1)
         cosines = [1 - d for d in dists]
+        logger.debug("Initial search found %d candidates", len(ids))
 
         rounds = 0
         while not quality(ids, cosines):
             elapsed_ms = (time.monotonic() - start) * 1000
             if rounds >= PROGRESSIVE_ROUNDS or elapsed_ms >= PROGRESSIVE_MAX_MS:
+                logger.debug("Stopping after %d rounds, elapsed %.1fms", rounds, elapsed_ms)
                 break
             added = await self.registry.expand_older(user_id, dek, PROGRESSIVE_BATCH)
+            logger.debug("Round %d added %d items", rounds + 1, added)
             if added <= 0:
                 break
             rounds += 1
@@ -88,11 +98,15 @@ class SearchAPI:
                     "content": content,
                 }
             )
+        logger.debug("Returning %d results for user %s", len(results), user_id)
         return results
 
     async def on_message_appended(
         self, user_id: str, session_id: str, msg_id: str, content: str, dek: bytes
     ):
+        logger.debug(
+            "Appending message %s in session %s for user %s", msg_id, session_id, user_id
+        )
         vec = embed_texts([content]).astype(np.float32).reshape(1, -1)
         nonce, ct, alg = encrypt_vector(
             dek, user_id, msg_id, vec[0].tobytes(), session_id=session_id
@@ -102,4 +116,5 @@ class SearchAPI:
         index.add_batch([msg_id], vec)
 
     async def maintenance_tick(self) -> None:
+        logger.debug("Running maintenance tick")
         self.registry.evict_idle()

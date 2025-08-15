@@ -25,7 +25,7 @@ def create_app():
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
-    csrf = CSRFProtect(app)
+    CSRFProtect(app)
 
     from .routes.auth import auth_bp
     from .routes.sessions import sessions_bp

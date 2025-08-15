@@ -4,12 +4,11 @@
       hx-swap="outerHTML"
       hx-trigger="keyup changed delay:300ms from:#search-input, submit"
       hx-indicator="#search-ind"
-      hx-include="[name='session_id']"
       hx-sync="this:replace">
   <input type="search"
          id="search-input"
          name="q"
          placeholder="Search"
          onkeydown="if(event.key==='Escape'){ this.value=''; this.form.dispatchEvent(new Event('submit', {bubbles:true})); }">
-  <input type="hidden" name="session_id" value="{{ session.id }}">
+  <!-- <input type="hidden" name="session_id" value="{{ session.id }}"> -->
 </form>
