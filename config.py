@@ -10,7 +10,7 @@ MAX_SESSION_NAME_LENGTH = 100
 APP_NAME = "Llamora"
 
 # Database pool and connection defaults
-DB_POOL_SIZE = int(os.getenv("LLAMORA_DB_POOL_SIZE", 5))
+DB_POOL_SIZE = int(os.getenv("LLAMORA_DB_POOL_SIZE", 25))
 DB_POOL_ACQUIRE_TIMEOUT = float(os.getenv("LLAMORA_DB_ACQUIRE_TIMEOUT", 10))
 DB_TIMEOUT = float(os.getenv("LLAMORA_DB_TIMEOUT", 5))
 DB_BUSY_TIMEOUT = int(os.getenv("LLAMORA_DB_BUSY_TIMEOUT", 5000))  # milliseconds

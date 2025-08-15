@@ -30,8 +30,8 @@ class LocalDB:
         is_new = not os.path.exists(self.db_path)
         self.pool = SQLiteConnectionPool(
             self._connection_factory,
-            size=DB_POOL_SIZE,
-            timeout=DB_POOL_ACQUIRE_TIMEOUT,
+            pool_size=DB_POOL_SIZE,
+            acquisition_timeout=DB_POOL_ACQUIRE_TIMEOUT,
         )
         await self._ensure_schema(is_new)
 
