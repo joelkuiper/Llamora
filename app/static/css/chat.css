@@ -439,6 +439,7 @@
     display: flex;
     flex-direction: column;
     max-height: min(60vh, 40rem);
+    border: 1px solid rgba(0,0,0,0.25);
   }
 
   /* Make the overlay a flex column so the UL can scroll */
@@ -454,9 +455,9 @@
     overflow-y: auto;
     margin: 0;
     padding: var(--spacing-sm);
+    list-style-type: none;
   }
 
-  /* Result row: meta LEFT, content RIGHT (flex, no grid/floats) */
   .search-result-item a {
     display: flex;
     align-items: flex-start;      /* top align everything */
@@ -479,7 +480,7 @@
 
   .search-result-main {
     flex: 1 1 auto;               /* fills remaining row space */
-    min-width: 0;                 /* allow ellipsis/clamping */
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
@@ -496,9 +497,10 @@
     opacity: 0.9;
     overflow: hidden;
     text-overflow: ellipsis;
-    display: -webkit-box;         /* nice 2-line clamp */
+    display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+
   }
 
   /* Stronger hover */
