@@ -1,4 +1,6 @@
 import os
+import asyncio
+import time
 import aiosqlite
 from contextlib import asynccontextmanager
 import secrets
@@ -12,11 +14,20 @@ from aiosqlitepool import SQLiteConnectionPool
 class LocalDB:
     def __init__(self, db_path=None):
         self.db_path = db_path or os.getenv("LLAMORA_DB_PATH", "state.sqlite3")
+        self.pool_size = int(os.getenv("LLAMORA_DB_POOL_SIZE", "12"))
+        self.acq_timeout = float(os.getenv("LLAMORA_DB_ACQ_TIMEOUT", "30"))
+        self.conn_timeout = float(os.getenv("LLAMORA_DB_CONN_TIMEOUT", "10"))
+        self.bg_concurrency = int(os.getenv("LLAMORA_DB_BG_CONCURRENCY", "2"))
         self.pool = None
+        self._bg_sem = asyncio.Semaphore(self.bg_concurrency)
 
     async def init(self):
         is_new = not os.path.exists(self.db_path)
-        self.pool = SQLiteConnectionPool(self._connection_factory)
+        self.pool = SQLiteConnectionPool(
+            self._connection_factory,
+            pool_size=self.pool_size,
+            acquisition_timeout=self.acq_timeout,
+        )
         await self._ensure_schema(is_new)
 
     async def close(self):
@@ -24,8 +35,10 @@ class LocalDB:
             await self.pool.close()
 
     async def _connection_factory(self):
-        conn = await aiosqlite.connect(self.db_path)
+        conn = await aiosqlite.connect(self.db_path, timeout=self.conn_timeout)
         await conn.execute("PRAGMA foreign_keys = ON")
+        await conn.execute("PRAGMA busy_timeout = 5000")
+        await conn.execute("PRAGMA mmap_size = 67108864")
         conn.row_factory = aiosqlite.Row
         return conn
 
@@ -82,7 +95,11 @@ class LocalDB:
     async def get_conn(self):
         if self.pool is None:
             raise RuntimeError("Database has not been initialized")
+        start = time.perf_counter()
         async with self.pool.connection() as conn:
+            wait = time.perf_counter() - start
+            logger = logging.getLogger(__name__)
+            logger.debug("Acquired DB connection in %.3fs", wait)
             try:
                 yield conn
                 await conn.commit()
@@ -102,8 +119,8 @@ class LocalDB:
         rc_nonce,
         rc_cipher,
     ):
+        ulid = str(ULID())
         async with self.get_conn() as conn:
-            ulid = str(ULID())
             await conn.execute(
                 """
                 INSERT INTO users (
@@ -131,13 +148,13 @@ class LocalDB:
                 "SELECT * FROM users WHERE username = ?", (username,)
             )
             row = await cursor.fetchone()
-            return dict(row) if row else None
+        return dict(row) if row else None
 
     async def get_user_by_id(self, user_id):
         async with self.get_conn() as conn:
             cursor = await conn.execute("SELECT * FROM users WHERE id = ?", (user_id,))
             row = await cursor.fetchone()
-            return dict(row) if row else None
+        return dict(row) if row else None
 
     async def get_state(self, user_id):
         async with self.get_conn() as conn:
@@ -145,12 +162,12 @@ class LocalDB:
                 "SELECT state FROM users WHERE id = ?", (user_id,)
             )
             row = await cursor.fetchone()
-            if row and row["state"]:
-                try:
-                    return json.loads(row["state"])
-                except Exception:
-                    return {}
-            return {}
+        if row and row["state"]:
+            try:
+                return json.loads(row["state"])
+            except Exception:
+                return {}
+        return {}
 
     async def update_state(self, user_id, **updates):
         state = await self.get_state(user_id)
@@ -159,10 +176,11 @@ class LocalDB:
                 state.pop(key, None)
             else:
                 state[key] = value
+        state_json = json.dumps(state)
         async with self.get_conn() as conn:
             await conn.execute(
                 "UPDATE users SET state = ? WHERE id = ?",
-                (json.dumps(state), user_id),
+                (state_json, user_id),
             )
 
     async def _owns_session(self, conn, user_id, session_id):
@@ -175,7 +193,8 @@ class LocalDB:
 
     async def get_session(self, user_id, session_id):
         async with self.get_conn() as conn:
-            return await self._owns_session(conn, user_id, session_id)
+            row = await self._owns_session(conn, user_id, session_id)
+        return row
 
     async def rename_session(self, user_id, session_id, name):
         async with self.get_conn() as conn:
@@ -218,20 +237,18 @@ class LocalDB:
 
     async def append(self, user_id, session_id, role, content, dek):
         from app.services.crypto import encrypt_message
+        ulid = str(ULID())
+        nonce, ct, alg = encrypt_message(dek, user_id, session_id, ulid, content)
+        async with self._bg_sem:
+            async with self.get_conn() as conn:
+                if not await self._owns_session(conn, user_id, session_id):
+                    raise ValueError("User does not own session")
 
-        async with self.get_conn() as conn:
-            ulid = str(ULID())
-            if not await self._owns_session(conn, user_id, session_id):
-                raise ValueError("User does not own session")
-
-            nonce, ct, alg = encrypt_message(dek, user_id, session_id, ulid, content)
-
-            await conn.execute(
-                "INSERT INTO messages (id, session_id, role, nonce, ciphertext, alg) VALUES (?, ?, ?, ?, ?, ?)",
-                (ulid, session_id, role, nonce, ct, alg),
-            )
-
-            return ulid
+                await conn.execute(
+                    "INSERT INTO messages (id, session_id, role, nonce, ciphertext, alg) VALUES (?, ?, ?, ?, ?, ?)",
+                    (ulid, session_id, role, nonce, ct, alg),
+                )
+        return ulid
 
     async def create_session(self, user_id):
         session_id = secrets.token_urlsafe(32)
@@ -255,7 +272,6 @@ class LocalDB:
 
     async def get_history(self, user_id, session_id, dek):
         from app.services.crypto import decrypt_message
-
         async with self.get_conn() as conn:
             if not await self._owns_session(conn, user_id, session_id):
                 raise ValueError("User does not own session")
@@ -265,21 +281,19 @@ class LocalDB:
                 (session_id,),
             )
             rows = await cursor.fetchall()
-            history = []
-            for row in rows:
-                content = decrypt_message(
-                    dek,
-                    user_id,
-                    session_id,
-                    row["id"],
-                    row["nonce"],
-                    row["ciphertext"],
-                    row["alg"],
-                )
-                history.append(
-                    {"id": row["id"], "role": row["role"], "content": content}
-                )
-            return history
+        history = []
+        for row in rows:
+            content = decrypt_message(
+                dek,
+                user_id,
+                session_id,
+                row["id"],
+                row["nonce"],
+                row["ciphertext"],
+                row["alg"],
+            )
+            history.append({"id": row["id"], "role": row["role"], "content": content})
+        return history
 
     async def get_all_sessions(self, user_id):
         async with self.get_conn() as conn:
@@ -293,28 +307,26 @@ class LocalDB:
     async def get_adjacent_session(self, user_id, session_id, direction="next"):
         op = ">" if direction == "next" else "<"
         order = "ASC" if direction == "next" else "DESC"
-
         async with self.get_conn() as conn:
             current_cursor = await conn.execute(
                 "SELECT ulid FROM sessions WHERE id = ? AND user_id = ?",
                 (session_id, user_id),
             )
             current = await current_cursor.fetchone()
-
-            if not current:
-                return None
-
-            ulid = current["ulid"]
-
-            cursor = await conn.execute(
-                f"""
-                SELECT id FROM sessions
-                WHERE user_id = ? AND ulid {op} ?
-                ORDER BY ulid {order}
-                LIMIT 1
-                """,
-                (user_id, ulid),
-            )
-            row = await cursor.fetchone()
-
-            return row["id"] if row else None
+            if current:
+                ulid = current["ulid"]
+                cursor = await conn.execute(
+                    f"""
+                    SELECT id FROM sessions
+                    WHERE user_id = ? AND ulid {op} ?
+                    ORDER BY ulid {order}
+                    LIMIT 1
+                    """,
+                    (user_id, ulid),
+                )
+                row = await cursor.fetchone()
+            else:
+                row = None
+        if not current:
+            return None
+        return row["id"] if row else None
