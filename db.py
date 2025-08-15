@@ -124,9 +124,9 @@ class LocalDB:
             try:
                 yield conn
                 await conn.commit()
-            except Exception:
-                await conn.rollback()
-                raise
+            finally:
+                if conn.in_transaction:
+                    await conn.rollback()
 
     # user helpers
     async def create_user(
