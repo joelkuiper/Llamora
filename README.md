@@ -82,6 +82,31 @@ See [config.py](./config.py) for more details.
 
    If the server starts correctly it will log something like `Running on http://127.0.0.1:5000`.
 
-Set `QUART_DEBUG=1` for automatic reloading on code changes.
+   Set `QUART_DEBUG=1` for automatic reloading on code changes.
 
-Alternatively set `LLAMORA_LLAMA_HOST` to the address of a running Llama file (e.g. `http://localhost:8080`); this bypasses the subprocess entirely and just talks to the API endpoint.
+   Alternatively set `LLAMORA_LLAMA_HOST` to the address of a running Llama file (e.g. `http://localhost:8080`); this bypasses the subprocess entirely and just talks to the API endpoint.
+
+### Deployment (not recommended)
+
+This project is an educational experiment and is **not** intended for production. If you still choose to deploy it, you must set several environment variables manually:
+
+1. Generate secrets for the application and cookies:
+
+   ```bash
+   python3 - <<'PY'
+   import secrets, base64
+   print('LLAMORA_SECRET_KEY=' + secrets.token_urlsafe(32))
+   print('LLAMORA_COOKIE_SECRET=' + base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())
+   PY
+   ```
+
+   Add the printed values to your environment. `LLAMORA_SECRET_KEY` is used by Quart. `LLAMORA_COOKIE_SECRET` must be a base64-encoded 32‑byte string for encrypted cookies. Without these keys the application is not secure. Keep these values somehwere safe. 
+
+2. Set the usual runtime variables such as:
+
+   - `LLAMORA_LLAMAFILE` or `LLAMORA_LLAMA_HOST`
+   - Optional overrides like `LLAMORA_LLAMA_ARGS`, `LLAMORA_LLM_REQUEST`, `LLAMORA_DB_PATH`, `LLAMORA_COOKIE_NAME`
+
+Deploying this project as-is is discouraged. Use at your own risk.
+
+
