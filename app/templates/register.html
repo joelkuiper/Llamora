@@ -24,7 +24,6 @@
                hx-post="{{ url_for('auth.password_strength_check') }}"
                hx-trigger="input changed delay:200ms"
                hx-target="#password-strength"
-               hx-include="[name='csrf_token']"
                />
         <div id="password-strength">
           <div class="strength-meter"><div class="bar"></div></div>
