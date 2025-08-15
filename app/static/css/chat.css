@@ -238,6 +238,7 @@
   overflow-y: auto;
   border-left: 1px solid rgba(0, 0, 0, 0.05);
   min-width: 0; /* <- important to prevent overflow in flex layouts */
+  border-top-left-radius: var(--radius-md);
 }
 
 #chat {
@@ -408,7 +409,6 @@
       inset -1px -1px 3px var(--shadow-light),
       0 0 4px rgba(0,0,0,0.05);
   }
-  #search-input:active { transform: scale(0.998); }
 
   /* Spinner inside input, same spot */
   #search-spinner {

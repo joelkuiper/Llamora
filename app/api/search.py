@@ -36,9 +36,7 @@ class SearchAPI:
         k1: int = PROGRESSIVE_K1,
         k2: int = PROGRESSIVE_K2,
     ):
-        logger.debug(
-            "Search requested by user %s with k1=%d k2=%d", user_id, k1, k2
-        )
+        logger.debug("Search requested by user %s with k1=%d k2=%d", user_id, k1, k2)
         index = await self.registry.get_or_build(user_id, dek)
         q_vec = embed_texts([query]).astype(np.float32).reshape(1, -1)
 
@@ -61,7 +59,9 @@ class SearchAPI:
         while not quality(ids, cosines):
             elapsed_ms = (time.monotonic() - start) * 1000
             if rounds >= PROGRESSIVE_ROUNDS or elapsed_ms >= PROGRESSIVE_MAX_MS:
-                logger.debug("Stopping after %d rounds, elapsed %.1fms", rounds, elapsed_ms)
+                logger.debug(
+                    "Stopping after %d rounds, elapsed %.1fms", rounds, elapsed_ms
+                )
                 break
             added = await self.registry.expand_older(user_id, dek, PROGRESSIVE_BATCH)
             logger.debug("Round %d added %d items", rounds + 1, added)
@@ -101,6 +101,7 @@ class SearchAPI:
                 {
                     "id": row["id"],
                     "session_id": row["session_id"],
+                    "created_at": row["created_at"],
                     "role": row["role"],
                     "content": content,
                 }
@@ -112,7 +113,10 @@ class SearchAPI:
         self, user_id: str, session_id: str, msg_id: str, content: str, dek: bytes
     ):
         logger.debug(
-            "Appending message %s in session %s for user %s", msg_id, session_id, user_id
+            "Appending message %s in session %s for user %s",
+            msg_id,
+            session_id,
+            user_id,
         )
         vec = embed_texts([content]).astype(np.float32).reshape(1, -1)
         nonce, ct, alg = encrypt_vector(

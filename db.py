@@ -380,7 +380,7 @@ class LocalDB:
         async with self.get_conn() as conn:
             cursor = await conn.execute(
                 f"""
-                SELECT m.id, m.session_id, m.role, m.nonce, m.ciphertext, m.alg
+                SELECT m.id, m.session_id, m.created_at, m.role, m.nonce, m.ciphertext, m.alg
                 FROM messages m
                 JOIN sessions s ON m.session_id = s.id
                 WHERE s.user_id = ? AND m.id IN ({placeholders})

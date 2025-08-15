@@ -1,6 +1,6 @@
 <li class="search-result-item" role="option">
   <a href="{{ url_for('sessions.session', session_id=item.session_id) }}?target=msg-{{ item.id }}#msg-{{ item.id }}">
-    <div class="search-result-meta">{{ item.role }}</div>
+    <div class="search-result-meta">{{ "you" if  item.role == "user" else config.APP_NAME }} </div>
     <div class="search-result-content">{{ item.content }}</div>
   </a>
 </li>
