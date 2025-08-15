@@ -31,6 +31,11 @@ class LocalDB:
     async def _connection_factory(self):
         conn = await aiosqlite.connect(self.db_path)
         await conn.execute("PRAGMA foreign_keys = ON")
+        # From https://github.com/slaily/aiosqlitepool
+        await conn.execute("PRAGMA journal_mode = WAL")
+        await conn.execute("PRAGMA synchronous = NORMAL")
+        await conn.execute("PRAGMA cache_size = 10000")
+        await conn.execute("PRAGMA temp_store = MEMORY")
         conn.row_factory = aiosqlite.Row
         return conn
 
