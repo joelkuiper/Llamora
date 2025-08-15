@@ -49,3 +49,38 @@ def decrypt_message(
     aad = f"{user_id}|{session_id}|{msg_id}|{alg.decode()}".encode("utf-8")
     pt = crypto_aead_xchacha20poly1305_ietf_decrypt(ct, aad, nonce, dek)
     return pt.decode("utf-8")
+
+
+def encrypt_vector(
+    dek: bytes, user_id: str, msg_id: str, vec: bytes, session_id: str | None = None
+):
+    """Encrypt a vector embedding for storage.
+
+    The vector is provided as raw bytes and is encrypted using the same AEAD
+    algorithm as messages. Associated data ties the vector to the owning user
+    and message identifier.
+    """
+
+    nonce = utils.random(24)
+    aad = (
+        f"{user_id}|{session_id or ''}|{msg_id}|vector|{ALG.decode()}".encode("utf-8")
+    )
+    ct = crypto_aead_xchacha20poly1305_ietf_encrypt(vec, aad, nonce, dek)
+    return nonce, ct, ALG
+
+
+def decrypt_vector(
+    dek: bytes,
+    user_id: str,
+    msg_id: str,
+    nonce: bytes,
+    ct: bytes,
+    alg: bytes,
+    session_id: str | None = None,
+) -> bytes:
+    """Decrypt an encrypted vector embedding."""
+
+    aad = (
+        f"{user_id}|{session_id or ''}|{msg_id}|vector|{alg.decode()}".encode("utf-8")
+    )
+    return crypto_aead_xchacha20poly1305_ietf_decrypt(ct, aad, nonce, dek)
