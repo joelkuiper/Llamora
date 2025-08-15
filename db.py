@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 import secrets
 import logging
 import json
+import asyncio
 from config import MAX_USERNAME_LENGTH
 from ulid import ULID
 from aiosqlitepool import SQLiteConnectionPool
@@ -13,6 +14,10 @@ class LocalDB:
     def __init__(self, db_path=None):
         self.db_path = db_path or os.getenv("LLAMORA_DB_PATH", "state.sqlite3")
         self.pool = None
+        self.search_api = None
+
+    def set_search_api(self, api):
+        self.search_api = api
 
     async def init(self):
         is_new = not os.path.exists(self.db_path)
@@ -71,10 +76,25 @@ class LocalDB:
                     FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
                 );
 
+                CREATE TABLE IF NOT EXISTS vectors (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    dim INTEGER NOT NULL,
+                    nonce BLOB NOT NULL,
+                    ciphertext BLOB NOT NULL,
+                    alg BLOB NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (id) REFERENCES messages(id) ON DELETE CASCADE
+                );
+
                 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
                 CREATE INDEX IF NOT EXISTS idx_sessions_user_id_id ON sessions(user_id, id);
                 CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages(session_id);
+                CREATE INDEX IF NOT EXISTS idx_messages_session_created ON messages(session_id, created_at);
                 CREATE INDEX IF NOT EXISTS idx_sessions_user_id_created ON sessions(user_id, ulid);
+                CREATE INDEX IF NOT EXISTS idx_vectors_user_id ON vectors(user_id);
+                CREATE INDEX IF NOT EXISTS idx_vectors_id ON vectors(id);
                 """
             )
 
@@ -230,8 +250,125 @@ class LocalDB:
                 "INSERT INTO messages (id, session_id, role, nonce, ciphertext, alg) VALUES (?, ?, ?, ?, ?, ?)",
                 (ulid, session_id, role, nonce, ct, alg),
             )
+            msg_id = ulid
 
-            return ulid
+        if self.search_api:
+            asyncio.create_task(
+                self.search_api.on_message_appended(
+                    user_id, session_id, msg_id, content, dek
+                )
+            )
+
+        return msg_id
+
+    async def store_vector(self, msg_id, user_id, dim, nonce, ciphertext, alg):
+        async with self.get_conn() as conn:
+            await conn.execute(
+                """
+                INSERT OR REPLACE INTO vectors (id, user_id, dim, nonce, ciphertext, alg)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (msg_id, user_id, dim, nonce, ciphertext, alg),
+            )
+
+    async def get_latest_vectors(self, user_id: str, limit: int):
+        async with self.get_conn() as conn:
+            cursor = await conn.execute(
+                """
+                SELECT v.id, v.dim, v.nonce, v.ciphertext, v.alg, m.session_id, m.created_at
+                FROM vectors v
+                JOIN messages m ON v.id = m.id
+                JOIN sessions s ON m.session_id = s.id
+                WHERE s.user_id = ?
+                ORDER BY m.id DESC
+                LIMIT ?
+                """,
+                (user_id, limit),
+            )
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    async def get_latest_messages(self, user_id: str, limit: int):
+        async with self.get_conn() as conn:
+            cursor = await conn.execute(
+                """
+                SELECT m.id, m.session_id, m.role, m.nonce, m.ciphertext, m.alg, m.created_at
+                FROM messages m
+                JOIN sessions s ON m.session_id = s.id
+                WHERE s.user_id = ?
+                ORDER BY m.id DESC
+                LIMIT ?
+                """,
+                (user_id, limit),
+            )
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    async def get_vectors_older_than(self, user_id: str, before_id: str, limit: int):
+        async with self.get_conn() as conn:
+            cursor = await conn.execute(
+                """
+                SELECT v.id, v.dim, v.nonce, v.ciphertext, v.alg, m.session_id, m.created_at
+                FROM vectors v
+                JOIN messages m ON v.id = m.id
+                JOIN sessions s ON m.session_id = s.id
+                WHERE s.user_id = ? AND m.id < ?
+                ORDER BY m.id DESC
+                LIMIT ?
+                """,
+                (user_id, before_id, limit),
+            )
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    async def get_messages_older_than(self, user_id: str, before_id: str, limit: int):
+        async with self.get_conn() as conn:
+            cursor = await conn.execute(
+                """
+                SELECT m.id, m.session_id, m.role, m.nonce, m.ciphertext, m.alg, m.created_at
+                FROM messages m
+                JOIN sessions s ON m.session_id = s.id
+                WHERE s.user_id = ? AND m.id < ?
+                ORDER BY m.id DESC
+                LIMIT ?
+                """,
+                (user_id, before_id, limit),
+            )
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    async def get_user_latest_id(self, user_id: str):
+        async with self.get_conn() as conn:
+            cursor = await conn.execute(
+                """
+                SELECT m.id
+                FROM messages m
+                JOIN sessions s ON m.session_id = s.id
+                WHERE s.user_id = ?
+                ORDER BY m.id DESC
+                LIMIT 1
+                """,
+                (user_id,),
+            )
+            row = await cursor.fetchone()
+            return row["id"] if row else None
+
+    async def get_messages_by_ids(self, user_id: str, ids: list[str]):
+        if not ids:
+            return []
+        placeholders = ",".join("?" for _ in ids)
+        async with self.get_conn() as conn:
+            cursor = await conn.execute(
+                f"""
+                SELECT m.id, m.session_id, m.role, m.nonce, m.ciphertext, m.alg
+                FROM messages m
+                JOIN sessions s ON m.session_id = s.id
+                WHERE s.user_id = ? AND m.id IN ({placeholders})
+                """,
+                (user_id, *ids),
+            )
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
 
     async def create_session(self, user_id):
         session_id = secrets.token_urlsafe(32)

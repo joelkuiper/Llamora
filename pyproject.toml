@@ -15,4 +15,7 @@ dependencies = [
     "httpx>=0.27.0",
     "zxcvbn>=4.4.2",
     "aiosqlitepool>=1.0.0",
+    "numpy>=1.26.4",
+    "sentence-transformers>=2.2.2",
+    "hnswlib>=0.8.0",
 ]

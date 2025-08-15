@@ -58,3 +58,12 @@ DEFAULT_LLM_REQUEST = {
     "stop": ["<|end|>", "<|assistant|>"],
     **llm_request_overrides,
 }
+
+# Progressive backfill search defaults
+PROGRESSIVE_K1 = int(os.getenv("LLAMORA_PROGRESSIVE_K1", 128))
+PROGRESSIVE_K2 = int(os.getenv("LLAMORA_PROGRESSIVE_K2", 10))
+PROGRESSIVE_ROUNDS = int(os.getenv("LLAMORA_PROGRESSIVE_ROUNDS", 3))
+PROGRESSIVE_BATCH = int(os.getenv("LLAMORA_PROGRESSIVE_BATCH", 1000))
+PROGRESSIVE_MAX_MS = int(os.getenv("LLAMORA_PROGRESSIVE_MAX_MS", 1500))
+POOR_MATCH_MAX_COS = float(os.getenv("LLAMORA_POOR_MATCH_MAX_COS", 0.28))
+POOR_MATCH_MIN_HITS = int(os.getenv("LLAMORA_POOR_MATCH_MIN_HITS", 3))
