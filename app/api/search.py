@@ -73,7 +73,14 @@ class SearchAPI:
             ids, dists = index.search(q_vec, current_k1)
             cosines = [1 - d for d in dists]
 
-        top_ids = ids[:k2]
+        seen = set()
+        dedup_ids: List[str] = []
+        for mid in ids:
+            if mid not in seen:
+                seen.add(mid)
+                dedup_ids.append(mid)
+
+        top_ids = dedup_ids[:k2]
         rows = await self.db.get_messages_by_ids(user_id, top_ids)
         row_map = {r["id"]: r for r in rows}
         results: List[dict] = []
@@ -113,7 +120,8 @@ class SearchAPI:
         )
         await self.db.store_vector(msg_id, user_id, vec.shape[1], nonce, ct, alg)
         index = await self.registry.get_or_build(user_id, dek)
-        index.add_batch([msg_id], vec)
+        if not index.contains(msg_id):
+            index.add_batch([msg_id], vec)
 
     async def maintenance_tick(self) -> None:
         logger.debug("Running maintenance tick")

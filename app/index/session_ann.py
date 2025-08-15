@@ -28,6 +28,10 @@ class SessionIndex:
     def touch(self) -> None:
         self.last_used = time.monotonic()
 
+    def contains(self, msg_id: str) -> bool:
+        """Return True if msg_id already indexed."""
+        return msg_id in self.id_to_idx
+
     def add_batch(self, ids: list[str], vecs: np.ndarray) -> None:
         if not ids:
             return
@@ -36,6 +40,16 @@ class SessionIndex:
             vecs = vecs.reshape(1, -1)
         if vecs.shape[0] != len(ids):
             raise ValueError("ids and vecs length mismatch")
+
+        pairs = [
+            (mid, vec) for mid, vec in zip(ids, vecs) if mid not in self.id_to_idx
+        ]
+        if not pairs:
+            return
+
+        ids, vecs = zip(*pairs)
+        vecs = np.asarray(vecs, dtype=np.float32)
+
         self.touch()
         idxs = np.arange(self.next_idx, self.next_idx + len(ids))
         logger.debug("Adding %d vectors starting at index %d", len(ids), self.next_idx)
