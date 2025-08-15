@@ -9,6 +9,13 @@ MAX_MESSAGE_LENGTH = 1000
 MAX_SESSION_NAME_LENGTH = 100
 APP_NAME = "Llamora"
 
+# Database pool and connection defaults
+DB_POOL_SIZE = int(os.getenv("LLAMORA_DB_POOL_SIZE", 5))
+DB_POOL_ACQUIRE_TIMEOUT = float(os.getenv("LLAMORA_DB_ACQUIRE_TIMEOUT", 10))
+DB_TIMEOUT = float(os.getenv("LLAMORA_DB_TIMEOUT", 5))
+DB_BUSY_TIMEOUT = int(os.getenv("LLAMORA_DB_BUSY_TIMEOUT", 5000))  # milliseconds
+DB_MMAP_SIZE = int(os.getenv("LLAMORA_DB_MMAP_SIZE", 10 * 1024 * 1024))
+
 
 def _deep_merge(base: dict, override: dict) -> dict:
     out = deepcopy(base)
