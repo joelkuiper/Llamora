@@ -3,20 +3,23 @@
 <main
   id="chatbox-wrapper"
   {% if oob %} hx-swap-oob="true" {% endif %}>
+
+<div id="search-container">
+  {% include 'partials/search_form.html' %}
+  {% include 'partials/search_results.html' %}
+
+</div>
+
   <div id="chat" data-session-id="{{ session.id }}">
     <div class="message bot">Hello. Speak your mind, and I will listen.</div>
     {% for msg in history %}
-    <div class="message {{ 'bot' if msg['role'] != 'user' else 'user'}}">{{ msg.content }}</div>
+    <div id="msg-{{ msg['id'] }}" class="message {{ 'bot' if msg['role'] != 'user' else 'user'}}">{{ msg.content }}</div>
     {% endfor %}
 
     {% if pending_msg_id %}
     {{ bot_stream(pending_msg_id, session.id) }}
     {% endif %}
   </div>
-
-  {% include 'partials/search_form.html' %}
-  <div id="search-ind" class="htmx-indicator">Searching…</div>
-  {% include 'partials/search_results.html' %}
 
   <form id="chat-form"
         hx-post="{{ url_for('chat.send_message', session_id=session.id) }}"
@@ -39,8 +42,11 @@
   <script type="module">
     import { initChatUI } from "{{ url_for('static', filename='js/chat.js') }}";
     import { updateActiveSession } from "{{ url_for('static', filename='js/session.js') }}";
+    import { initSearchUI, scrollToHighlight } from "{{ url_for('static', filename='js/ui.js') }}";
     initChatUI();
     updateActiveSession();
+    initSearchUI();
+    scrollToHighlight();
     document.title = "{{ session.name }}";
   </script>
 </main>

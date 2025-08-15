@@ -3,12 +3,15 @@
       hx-target="#search-results"
       hx-swap="outerHTML"
       hx-trigger="keyup changed delay:300ms from:#search-input, submit"
-      hx-indicator="#search-ind"
+      hx-indicator="#search-spinner"
       hx-sync="this:replace">
-  <input type="search"
-         id="search-input"
-         name="q"
-         placeholder="Search"
-         onkeydown="if(event.key==='Escape'){ this.value=''; this.form.dispatchEvent(new Event('submit', {bubbles:true})); }">
-  <!-- <input type="hidden" name="session_id" value="{{ session.id }}"> -->
+  <div class="search-input-wrap">
+    <input type="search"
+           id="search-input"
+           name="q"
+           placeholder="Search"
+           autocomplete="off"
+           onkeydown="if(event.key==='Escape'){ this.value=''; this.form.dispatchEvent(new Event('submit', {bubbles:true})); }">
+    <span id="search-spinner" class="spinner htmx-indicator" aria-hidden="true"></span>
+  </div>
 </form>

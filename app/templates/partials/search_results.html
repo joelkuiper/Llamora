@@ -1,10 +1,10 @@
-<section id="search-results"
+<section id="search-results" class="search-results-overlay"
          aria-live="polite"
          aria-busy="false"
          hx-on::before-request="this.setAttribute('aria-busy','true')"
          hx-on::after-request="this.setAttribute('aria-busy','false')">
   {% if results %}
-    <ul class="search-results-list">
+    <ul class="search-results-list" role="listbox">
       {% for item in results %}
         {% include 'partials/search_result_item.html' %}
       {% endfor %}
