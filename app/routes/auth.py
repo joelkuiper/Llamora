@@ -19,6 +19,7 @@ from app.services.crypto import generate_dek, wrap_key, unwrap_key
 from app import db
 import re
 import base64
+import config
 import secrets
 import json
 from zxcvbn import zxcvbn
@@ -29,7 +30,8 @@ auth_bp = Blueprint("auth", __name__)
 @auth_bp.route("/password_strength", methods=["POST"])
 async def password_strength_check():
     form = await request.form
-    pw = form.get("password", "") or ""
+    raw = form.get("password", "") or ""
+    pw = raw.strip()[: config.MAX_PASSWORD_LENGTH]
 
     # Short-circuit obviously empty input to avoid zxcvbn edge-case crashes
     if not pw:
