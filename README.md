@@ -38,7 +38,12 @@
 
 - **Markdown Support** The assistant's responses can include Markdown formatting. The client will render Markdown into HTML (for example, **bold text**, *italics*, `code blocks`, lists, etc.). The app uses **Marked** (Markdown parser) and **DOMPurify** (to sanitize output) on the client side to render any Markdown content from the LLM.
 
-- **Lightweight and Dependency-Minimal** The entire app is relatively small in terms of code. It uses a few Python packages (Quart, NaCl for security) and some JS libraries (HTMX and extensions, Marked, DOMPurify), all of which are either included or installable via [uv](https://docs.astral.sh/uv/). There is no need for Node.js build steps, no bundlers, and no heavy frameworks.
+- **Lightweight and Dependency-Minimal** The entire app is relatively small in terms of code. It uses a few Python packages (Quart, NaCl for security, fastembed for embeddings) and some JS libraries (HTMX and extensions, Marked, DOMPurify), all of which are either included or installable via [uv](https://docs.astral.sh/uv/). There is no need for Node.js build steps, no bundlers, and no heavy frameworks.
+
+- **Privacy first search with ANN** The app includes a privacy-first search engine that runs entirely on your machine. Each message is embedded locally (e.g., with multi-qa-MiniLM-L6-cos-v1) and encrypted at rest, and decryption happens only in memory after login. Queries are answered by an in-memory [HNSW](https://github.com/nmslib/hnswlib) index (cosine over normalized embeddings) for fast semantic K-NN, warmed with recent items and progressively backfilled so results improve in place. On top of this, we perform fast exact/phrase matching (Aho-Corasick) and rank exact hits above purely semantic neighbors.
+
+There are some natural trade-offs: since the index lives in memory, RAM usage grows with the size of the chat history; large collections can take noticeable memory. And because exact matches are only surfaced if they also appear in the nearest-neighbor candidates, there is a small risk of false negatives—an exact string may exist but not be retrieved if it falls outside the top-K semantic hits.
+
 
 ## Known Limitations
 
@@ -59,7 +64,7 @@ This project has **several limitations** by design. It's important to understand
 - **Input/Output Filtering:** Aside from Markdown sanitization, there's no content filtering on user inputs or AI outputs. The model could potentially produce inappropriate content if prompted. There is also nothing preventing prompt injections (where a user could ask the assistant to ignore its system prompt). Since this is a closed environment (local model, one user), that wasn't a focus. But it's something to consider if expanded; e.g., using moderation models or guardrails if it were public.
 
 - **Model and Performance:** The app loads the model into RAM when it starts. Large models (even quantized) can be slow or consume a lot of memory. The example model (Phi 3.5 mini) is relatively small, but anything larger might make the app sluggish or not fit in memory depending on your hardware. There's no mechanism to swap models on the fly; it's a static single model. Generation parameters such as temperature or top-k can be provided via the client or the ``LLAMORA_LLM_REQUEST`` environment variable, while server settings like context window or GPU usage are set with ``LLAMORA_LLAMA_ARGS``.
-See [config.py](./config.py) for more details. 
+See [config.py](./config.py) for more details.
 ---
 
 ## Running the App
@@ -100,7 +105,7 @@ This project is an educational experiment and is **not** intended for production
    PY
    ```
 
-   Add the printed values to your environment. `LLAMORA_SECRET_KEY` is used by Quart. `LLAMORA_COOKIE_SECRET` must be a base64-encoded 32‑byte string for encrypted cookies. Without these keys the application is not secure. Keep these values somehwere safe. 
+   Add the printed values to your environment. `LLAMORA_SECRET_KEY` is used by Quart. `LLAMORA_COOKIE_SECRET` must be a base64-encoded 32‑byte string for encrypted cookies. Without these keys the application is not secure. Keep these values somehwere safe.
 
 2. Set the usual runtime variables such as:
 
@@ -108,5 +113,3 @@ This project is an educational experiment and is **not** intended for production
    - Optional overrides like `LLAMORA_LLAMA_ARGS`, `LLAMORA_LLM_REQUEST`, `LLAMORA_DB_PATH`, `LLAMORA_COOKIE_NAME`
 
 Deploying this project as-is is discouraged. Use at your own risk.
-
-
