@@ -26,7 +26,6 @@
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f6f6f6;
   flex-shrink: 0;
   z-index: 0;
   box-shadow: none;
@@ -265,12 +264,12 @@
 }
 
 #chatbox-wrapper {
-  box-shadow: -4px 0 8px rgba(0, 0, 0, 0.05); /* subtle shadow to the left */
+  box-shadow: -4px 0 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0,0,0,0.125);
   z-index: 1;
   padding: var(--spacing-xl);
   flex: 1;
   overflow-y: auto;
-  border-left: 1px solid var(--border);
   min-width: 0; /* <- important to prevent overflow in flex layouts */
   border-top-left-radius: var(--radius-md);
 }

@@ -38,10 +38,10 @@
     &::placeholder { opacity: 0.65; }
 
     &:hover {
-      border-color: var(--accent-10);
+      border-color: var(--accent-20);
       box-shadow:
         var(--inset-shadow),
-        0 0 0 2px var(--accent-05);
+        0 0 0 2px var(--accent-30);
     }
 
     &:focus,
@@ -85,10 +85,10 @@
       background-color 0.2s ease;
 
     &:hover {
-      border-color: var(--accent-10);
+      border-color: var(--accent-20);
       box-shadow:
         var(--inset-shadow-disabled),
-        0 0 0 2px var(--accent-05);
+        0 0 0 2px var(--accent-30);
     }
 
     &:focus,
