@@ -1,12 +1,21 @@
 {% if results %}
-<section id="search-results" class="search-results-overlay">
-  <button id="search-close" class="search-close" type="button" aria-label="Close search results">×</button>
+<div class="sr-panel search-results-overlay">
+  <button id="search-close"
+          class="search-close"
+          type="button"
+          aria-label="Close search results"
+          hx-get="/search"
+          hx-target="#search-results"
+          hx-vals='{"q": ""}'
+          hx-swap="innerHTML"
+          hx-trigger="click delay:180ms"
+          hx-on:click="this.closest('#search-results')
+                       ?.querySelector('.sr-panel')
+                       ?.classList.add('sr-closing')">×</button>
   <ul class="search-results-list" role="listbox">
     {% for item in results %}
-      {% include 'partials/search_result_item.html' %}
+    {% include 'partials/search_result_item.html' %}
     {% endfor %}
   </ul>
-</section>
-{% else %}
-<section id="search-results"></section>
+</div>
 {% endif %}

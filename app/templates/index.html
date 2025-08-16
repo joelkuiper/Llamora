@@ -29,7 +29,9 @@
       <div id="content">
         <header id="search-container">
           {% include 'partials/search_form.html' %}
-          {% include 'partials/search_results.html' %}
+          <section id="search-results">
+            {% include 'partials/search_results.html' %}
+          </section>
         </header>
         {% include "partials/chat.html" %}
       </div>

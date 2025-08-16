@@ -53,126 +53,77 @@ export function stopButtonSpinner(btn) {
 }
 
 export function initSearchUI() {
-  const spinner = document.getElementById("search-spinner");
-  if (spinner) {
-    let id = null;
-    const update = () => {
-      if (spinner.classList.contains("htmx-request")) {
-        if (!id) id = spin(spinner);
-      } else if (id) {
-        clearInterval(id);
-        id = null;
-        spinner.textContent = "";
-      }
-    };
-    const observer = new MutationObserver(update);
-    observer.observe(spinner, { attributes: true, attributeFilter: ["class"] });
-  }
-
   const input = document.getElementById("search-input");
-  let results = document.getElementById("search-results");
-  let visible = false;
+  const wrap  = document.getElementById("search-results");
 
-  const getResultsEl = () => (results = document.getElementById("search-results"));
+  document.body.addEventListener("htmx:afterSwap", (evt) => {
+    if (evt.detail?.target !== wrap) return;
+    const panel = wrap.querySelector(".sr-panel");
+    if (!panel) { wrap.classList.remove("is-open"); return; }
 
-  if (input && results) {
-    const cleanupAfterClose = () => {
-      const el = getResultsEl();
-      if (!el) return;
-      el.innerHTML = "";
-      el.classList.remove("search-results-overlay", "sr-hide", "sr-pop");
-      visible = false;
-    };
+    if (wrap.classList.contains("is-open")) {
+      // Already open: show immediately, no entry animation
+      panel.classList.remove("htmx-added"); // avoid hidden state while typing
+      return;
+    }
 
-    const closeResults = (clearInput = false) => {
-      if (clearInput) input.value = "";
+    // First open: run the pop-in under a stable class
+    panel.classList.add("sr-enter");
+    panel.addEventListener("animationend", () => {
+      panel.classList.remove("sr-enter");
+      wrap.classList.add("is-open");
+    }, { once: true });
+  });
 
-      const el = getResultsEl();          // <-- rebind to the live element
-      if (!el || el.classList.contains("sr-hide")) return;
+  const closeResults = (clearInput = false) => {
+    if (clearInput && input) input.value = "";
+    const panel = wrap.querySelector(".sr-panel");
+    if (!panel) { wrap.classList.remove("is-open"); return; }
+    panel.classList.add("sr-closing");
+    panel.addEventListener("animationend", () => {
+      wrap.classList.remove("is-open");
+      wrap.innerHTML = "";
+    }, { once: true });
+  };
 
-      el.classList.add("sr-hide");
-      el.addEventListener("animationend", () => {
-        cleanupAfterClose();
-      }, { once: true });
-
-      // safety: if animation is interrupted
-      setTimeout(() => {
-        const live = getResultsEl();
-        if (live && live.classList.contains("sr-hide")) cleanupAfterClose();
-      }, 240);
-    };
-
+  // Triggers
+  if (input) {
     input.addEventListener("input", () => {
       if (!input.value.trim()) closeResults();
     });
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") closeResults(true);
-    });
-    document.addEventListener("click", (e) => {
-      const el = getResultsEl();
-      if (el.classList.contains("search-results-overlay") &&
-          !el.contains(e.target) && e.target !== input) {
-        closeResults(true);
-      }
-    });
-
-    document.addEventListener("click", (evt) => {
-      if (evt.target.closest("#search-close")) {
-        closeResults(true);
-      }
-    });
-
-    document.addEventListener("click", (evt) => {
-      const link = evt.target.closest("#search-results a[data-target]");
-      if (!link) return;
-
-      const currentId = document.getElementById("chat")?.dataset.sessionId;
-      const targetId = link.dataset.target;
-
-      if (link.dataset.sessionId === currentId) {
-        evt.preventDefault();
-        closeResults(true);
-        const el = document.getElementById(targetId);
-        if (el) {
-          history.pushState(
-            null,
-            "",
-            `${window.location.pathname}?target=${targetId}#${targetId}`
-          );
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-          flashHighlight(el);
-        }
-      } else {
-        closeResults(true);
-      }
-    });
-
-    // Rebind after every HTMX swap so `results` stays current
-    document.body.addEventListener("htmx:afterSwap", (evt) => {
-      const t = evt.detail?.target;
-      if (t && t.id === "search-results") {
-        results = t;
-        const hasItems = !!results.querySelector("li");
-        if (hasItems) {
-          results.classList.add("search-results-overlay");
-          if (!visible) {
-            results.classList.add("sr-pop");
-            results.addEventListener(
-              "animationend",
-              () => results.classList.remove("sr-pop"),
-              { once: true }
-            );
-          }
-          visible = true;
-        } else {
-          results.classList.remove("search-results-overlay");
-          visible = false;
-        }
-      }
-    });
   }
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeResults(true);
+  });
+  document.addEventListener("click", (e) => {
+    const panel = wrap.querySelector(".sr-panel");
+    if (panel && !panel.contains(e.target) && e.target !== input) {
+      closeResults(true);
+    }
+  });
+  document.addEventListener("click", (evt) => {
+    if (evt.target.closest("#search-close")) closeResults(true);
+  });
 
+  document.addEventListener("click", (evt) => {
+    const link = evt.target.closest("#search-results a[data-target]");
+    if (!link) return;
+    const currentId = document.getElementById("chat")?.dataset.sessionId;
+    const targetId  = link.dataset.target;
 
+    if (link.dataset.sessionId === currentId) {
+      evt.preventDefault();
+      closeResults(true);
+      const el = document.getElementById(targetId);
+      if (el) {
+        history.pushState(null, "", `${window.location.pathname}?target=${targetId}#${targetId}`);
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        flashHighlight(el);
+      }
+    } else {
+      closeResults(true);
+    }
+  });
 }
 
 export function scrollToHighlight() {

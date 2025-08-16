@@ -620,40 +620,46 @@
   from { opacity: 0; transform: translateY(-6px) scale(.98) rotateX(2deg); }
   to   { opacity: 1; transform: translateY(0)    scale(1)  rotateX(0); }
 }
-
 @keyframes sr-out {
   from { opacity: 1; transform: translateY(0)    scale(1)  rotateX(0); }
   to   { opacity: 0; transform: translateY(-6px) scale(.98) rotateX(2deg); }
 }
 
-#search-results.htmx-added {
+/* Wrapper: keep it simple (NO contain: paint!) */
+#search-results { position: relative; }
+
+/* Base panel: visible */
+#search-results > .sr-panel {
+  opacity: 1;
+  transform: translateY(0) scale(1) rotateX(0);
+  transform-origin: top center;
+  will-change: opacity, transform;
+  pointer-events: auto;
+}
+
+/* When NOT open, the fresh fragment should start hidden (no animation here) */
+#search-results:not(.is-open) > .sr-panel.htmx-added {
   opacity: 0;
   transform: translateY(-6px) scale(.98) rotateX(2deg);
 }
-#search-results.htmx-swapping { display: none; }
 
-#search-results:not(.search-results-overlay) { pointer-events: none; }
-
-#search-results {
-  opacity: 1;
-  transform: translateY(0)    scale(1)  rotateX(0);
-  transition: opacity 180ms cubic-bezier(.2,.7,.2,1),
-              transform 180ms cubic-bezier(.2,.7,.2,1);
-  will-change: opacity, transform;
-  transform-origin: top center;
-  contain: layout paint;
+/* First open: animate via a stable class you add, not via .htmx-added */
+#search-results > .sr-panel.sr-enter {
+  animation: sr-pop 180ms cubic-bezier(.2,.7,.2,1) both;
 }
 
-#search-results.sr-hide {
-  animation: sr-out 180ms cubic-bezier(.2,.7,.2,1) both;
-  pointer-events: none;
+/* Close animation */
+#search-results > .sr-panel.sr-closing {
+  animation: sr-out 160ms cubic-bezier(.2,.7,.2,1) both;
 }
 
-.user, .bot, .bot-stream { animation: fadeInUp 0.3s ease-out; }
 
 .no-anim {
   animation: none !important;
 }
+
+
+.user, .bot, .bot-stream { animation: fadeInUp 0.3s ease-out; }
 
 @keyframes pulse {
   0% { transform: scale(1); }
