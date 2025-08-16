@@ -48,9 +48,7 @@ async def password_strength_check():
         score = int(strength.get("score", 0))
         feedback = strength.get("feedback")
         if not isinstance(feedback, dict):
-            current_app.logger.warning(
-                "Unexpected zxcvbn response: %r", strength
-            )
+            current_app.logger.warning("Unexpected zxcvbn response: %r", strength)
         else:
             suggestions = feedback.get("suggestions") or []
             if not isinstance(suggestions, list):
@@ -211,13 +209,13 @@ async def login():
     return await render_template("login.html", return_url=return_url)
 
 
-@auth_bp.route("/logout")
+@auth_bp.route("/logout", methods=["POST"])
 async def logout():
     user = await get_current_user()
-    current_app.logger.debug(
-        "Logout for user %s", user["id"] if user else None
-    )
-    resp = redirect("/login")
+    current_app.logger.debug("Logout for user %s", user["id"] if user else None)
+    next_url = "/login"
+    resp = redirect(next_url)
+
     clear_secure_cookie(resp)
     return resp
 
