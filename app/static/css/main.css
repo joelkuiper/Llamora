@@ -2,11 +2,12 @@
   /* Base colors */
   --color-bg: #fafafa;
   --color-bg-alt: #f6f6f6;
-  --color-user-bg: #f9f9f9;
+  --color-user-bg: #f5f9ff;
   --color-text: #444;
   --color-heading: #333;
   --color-user-text: #444;
   --color-bot-text: #555;
+  --color-bot-bg: #fefefe;
 
   /* Accent palette (cyan-leaning blue) */
   --accent: #36a6f4;          /* primary accent */
