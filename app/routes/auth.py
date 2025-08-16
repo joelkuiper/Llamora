@@ -220,7 +220,7 @@ async def reset_password():
 
         max_user = current_app.config["MAX_USERNAME_LENGTH"]
         max_pass = current_app.config["MAX_PASSWORD_LENGTH"]
-        min_pass = current_app.config.get("MIN_PASSWORD_LENGTH")
+        min_pass = current_app.config["MIN_PASSWORD_LENGTH"]
 
         if (
             not username
@@ -324,7 +324,7 @@ async def change_password():
     confirm = form.get("confirm_password", "")
 
     max_pass = current_app.config["MAX_PASSWORD_LENGTH"]
-    min_pass = current_app.config.get("MIN_PASSWORD_LENGTH")
+    min_pass = current_app.config["MIN_PASSWORD_LENGTH"]
 
     if (
         not current
