@@ -66,6 +66,7 @@ body {
         0 0 0 2px var(--accent-20),
         0 10px 24px var(--accent-10);
       font-weight: 600;
+
     }
 
     &:not(.active) .session-item:hover {
@@ -452,11 +453,10 @@ body {
     gap: var(--spacing-sm);
 
     .logo {
-      width: 2rem;
+      width: 3rem;
       padding: 0;
     }
 
-    h1 { margin: 0; }
   }
 
   .header-right {
