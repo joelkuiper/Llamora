@@ -8,9 +8,9 @@
 
 ### Screenshots
 
-![Chat screenshot](./doc/20250809_chat_02.png)
-![Login screenshot](./doc/20280810_login.png)
-![Registration screenshot](./doc/20250808_registration.png)
+![Chat screenshot](./doc/screenshots/chat.png)
+![Search screenshot](./doc/screenshots/search.png)
+![Login screenshot](./doc/screenshots/login.png)
 ---
 
 ## Features
