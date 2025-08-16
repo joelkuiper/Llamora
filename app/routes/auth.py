@@ -42,14 +42,27 @@ async def password_strength_check():
         )
         return html
 
+    suggestions: list[str] = []
     try:
         strength = zxcvbn(pw)
         score = int(strength.get("score", 0))
-        suggestions = strength.get("feedback").get("suggestions")
+        feedback = strength.get("feedback")
+        if not isinstance(feedback, dict):
+            current_app.logger.warning(
+                "Unexpected zxcvbn response: %r", strength
+            )
+        else:
+            suggestions = feedback.get("suggestions") or []
+            if not isinstance(suggestions, list):
+                current_app.logger.warning(
+                    "Unexpected zxcvbn suggestions: %r", feedback
+                )
+                suggestions = []
     except Exception as e:
         # Be defensive: never 500 due to the estimator
         current_app.logger.warning("zxcvbn failed: %r", e)
         score = 0
+        suggestions = []
 
     percent = min(100, score * 25)
     html = await render_template(
