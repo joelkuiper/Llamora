@@ -581,7 +581,12 @@
 }
 
 
+
 .user, .bot, .bot-stream { animation: fadeInUp 0.3s ease-out; }
+
+.no-anim {
+  animation: none !important;
+}
 
 @keyframes pulse {
   0% { transform: scale(1); }
@@ -591,10 +596,6 @@
 
 form textarea, form button {
   transition: opacity 0.3s ease, box-shadow 0.3s ease;
-}
-
-.message.highlight {
-  animation: flash 2s ease-in-out;
 }
 
 @keyframes flash {

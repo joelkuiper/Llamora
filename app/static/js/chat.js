@@ -184,6 +184,20 @@ export function initChatUI(root = document) {
     renderAllMarkdown(chat);
   });
 
+  const observer = new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      m.addedNodes.forEach((node) => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          node.classList?.remove("no-anim");
+          node.querySelectorAll?.(".no-anim").forEach((el) =>
+            el.classList.remove("no-anim")
+          );
+        }
+      });
+    }
+  });
+  observer.observe(chat, { childList: true });
+
   renderAllMarkdown(chat);
 
   scrollToBottom();

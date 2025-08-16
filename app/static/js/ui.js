@@ -12,6 +12,22 @@ function spin(el, text = "") {
   }, SPINNER.interval);
 }
 
+function flashHighlight(el) {
+  if (!el) return;
+  el.classList.remove("no-anim");
+  el.classList.add("highlight");
+  el.style.animation = "flash 1s ease-in-out";
+  el.addEventListener(
+    "animationend",
+    () => {
+      el.classList.remove("highlight");
+      el.style.animation = "";
+      el.classList.add("no-anim");
+    },
+    { once: true }
+  );
+}
+
 export function startButtonSpinner(btn, loadingText = "Loading") {
   if (!btn || btn.dataset.spinning === "1") return;
   const originalText = btn.textContent;
@@ -124,8 +140,7 @@ export function initSearchUI() {
             `${window.location.pathname}?target=${targetId}#${targetId}`
           );
           el.scrollIntoView({ behavior: "smooth", block: "center" });
-          el.classList.add("highlight");
-          setTimeout(() => el.classList.remove("highlight"), 2000);
+          flashHighlight(el);
         }
       } else {
         closeResults(true);
@@ -170,8 +185,7 @@ export function scrollToHighlight() {
     const el = document.getElementById(target);
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
-      el.classList.add("highlight");
-      setTimeout(() => el.classList.remove("highlight"), 2000);
+      flashHighlight(el);
     }
   }
 }
