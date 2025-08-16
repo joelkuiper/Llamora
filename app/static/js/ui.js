@@ -55,53 +55,70 @@ export function initSearchUI() {
 
   const input = document.getElementById("search-input");
   let results = document.getElementById("search-results");
+
+  const getResultsEl = () => (results = document.getElementById("search-results"));
+
   if (input && results) {
-    const closeResults = () => {
-      results.hidden = true;
+    const cleanupAfterClose = () => {
+      const el = getResultsEl();
+      if (!el) return;
+      el.innerHTML = "";
+      el.classList.remove("search-results-overlay", "sr-hide");
+    };
+
+    const closeResults = (clearInput = false) => {
+      if (clearInput) input.value = "";
+
+      const el = getResultsEl();          // <-- rebind to the live element
+      if (!el || el.classList.contains("sr-hide")) return;
+
+      el.classList.add("sr-hide");
+      el.addEventListener("animationend", () => {
+        cleanupAfterClose();
+      }, { once: true });
+
+      // safety: if animation is interrupted
+      setTimeout(() => {
+        const live = getResultsEl();
+        if (live && live.classList.contains("sr-hide")) cleanupAfterClose();
+      }, 240);
     };
 
     input.addEventListener("input", () => {
-      if (!input.value.trim()) {
-        closeResults();
-      }
+      if (!input.value.trim()) closeResults();
     });
-
-    input.addEventListener("focus", () => {
-      if (input.value.trim()) {
-        input.form.dispatchEvent(new Event("submit", { bubbles: true }));
-      }
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeResults(true);
     });
-
-    document.addEventListener("keydown", (evt) => {
-      if (evt.key === "Escape") {
-        closeResults();
-      }
-    });
-
-    document.addEventListener("click", (evt) => {
-      const target = evt.target;
-      if (
-        !results.hidden &&
-        !results.contains(target) &&
-        target !== input
-      ) {
-        closeResults();
+    document.addEventListener("click", (e) => {
+      const el = getResultsEl();
+      if (el.classList.contains("search-results-overlay") &&
+          !el.contains(e.target) && e.target !== input) {
+        closeResults(true);
       }
     });
 
     document.addEventListener("click", (evt) => {
       if (evt.target.closest("#search-close")) {
-        closeResults();
+        closeResults(true);
       }
     });
 
+    // Rebind after every HTMX swap so `results` stays current
     document.body.addEventListener("htmx:afterSwap", (evt) => {
-      if (evt.target.id === "search-results") {
-        results = document.getElementById("search-results");
-        results.hidden = !results.querySelector("li");
+      const t = evt.detail?.target;
+      if (t && t.id === "search-results") {
+        results = t; // <-- keep reference fresh
+        if (results.querySelector("li")) {
+          results.classList.add("search-results-overlay");
+        } else {
+          results.classList.remove("search-results-overlay");
+        }
       }
     });
   }
+
+
 }
 
 export function scrollToHighlight() {
@@ -119,4 +136,3 @@ export function scrollToHighlight() {
     }
   }
 }
-

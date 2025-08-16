@@ -372,12 +372,13 @@
   position: sticky;
   top: 0;
   z-index: 40;                 /* stays above chat */
-  background: transparent;     /* let the shell float */
+  background: transparent;
   padding: var(--spacing-md) var(--spacing-xl) var(--spacing-sm);
 
   --glass-bg: rgba(255, 255, 255, 0.65);
   --glass-stroke: rgba(255, 255, 255, 0.45);
   --glass-shadow: 0 12px 28px rgba(0,0,0,0.08);
+  perspective: 900px; /* For the animation */
 
   #search-form {
     margin: 0 auto;
@@ -529,10 +530,6 @@
       inset 2px 2px 6px rgba(0,0,0,0.05),
       inset -2px -2px 6px rgba(255,255,255,0.7);
   }
-
-
-  /* Empty/hidden states */
-  #search-results[hidden] { display: none; }
 }
 
 /* Progressive enhancement fallbacks */
@@ -557,6 +554,31 @@
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+@keyframes sr-pop {
+  from { opacity: 0; transform: translateY(-6px) scale(.98) rotateX(2deg); }
+  to   { opacity: 1; transform: translateY(0)    scale(1)  rotateX(0); }
+}
+
+#search-results { pointer-events: none; }
+#search-results:not(:empty) {
+  pointer-events: auto;
+  animation: sr-pop 180ms cubic-bezier(.2,.7,.2,1) both;
+  will-change: opacity, transform;
+}
+
+
+@keyframes sr-out {
+  from { opacity: 1; transform: translateY(0)    scale(1)  rotateX(0); }
+  to   { opacity: 0; transform: translateY(-6px) scale(.98) rotateX(2deg); }
+}
+
+/* close class uses a DIFFERENT animation name so it always fires */
+#search-results.sr-hide {
+  animation: sr-out 180ms cubic-bezier(.2,.7,.2,1) both;
+  pointer-events: none;
+}
+
 
 .user, .bot, .bot-stream { animation: fadeInUp 0.3s ease-out; }
 

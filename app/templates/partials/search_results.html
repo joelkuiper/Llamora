@@ -1,12 +1,12 @@
-<section id="search-results"
-         class="search-results-overlay"
-         {% if results|length == 0 %}hidden{% endif %}>
+{% if results %}
+<section id="search-results" class="search-results-overlay">
   <button id="search-close" class="search-close" type="button" aria-label="Close search results">×</button>
-  {% if results %}
-    <ul class="search-results-list" role="listbox">
-      {% for item in results %}
-        {% include 'partials/search_result_item.html' %}
-      {% endfor %}
-    </ul>
-  {% endif %}
+  <ul class="search-results-list" role="listbox">
+    {% for item in results %}
+      {% include 'partials/search_result_item.html' %}
+    {% endfor %}
+  </ul>
 </section>
+{% else %}
+<section id="search-results"></section>
+{% endif %}
