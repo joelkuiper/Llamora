@@ -22,17 +22,47 @@
     hx-target-4*="#errors">
 
     <div id="errors" hx-swap="beforeend"></div>
-    <div class="app-container">
-
-      <button id="sidebar-toggle" aria-label="Toggle sidebar">&#9776;</button>
-      {% include "partials/sidebar.html" %}
-      <div id="content">
-        <header id="search-container">
+    <header id="search-container">
+      <button id="sidebar-toggle" class="icon-btn" aria-label="Toggle sidebar">
+        <svg class="icon-close" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <svg class="icon-open" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <div id="branding">
+        <img class="logo" src="{{url_for('static', filename='img/logo.svg')}}" alt="Logo">
+        <h1>{{ config.APP_NAME }}</h1>
+      </div>
+      <div class="header-right">
+        <div class="search-wrap">
           {% include 'partials/search_form.html' %}
           <section id="search-results">
             {% include 'partials/search_results.html' %}
           </section>
-        </header>
+        </div>
+        <div class="user-actions">
+          <a href="{{ url_for('auth.profile') }}" class="icon-btn" aria-label="Profile">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </a>
+          <a href="{{ url_for('auth.logout') }}" class="icon-btn" aria-label="Logout">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M16 17l5-5-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M12 19H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <div class="app-container">
+      {% include "partials/sidebar.html" %}
+      <div id="content">
         {% include "partials/chat.html" %}
       </div>
     </div>
@@ -68,6 +98,11 @@
 
       document.body.addEventListener("htmx:sendError", showServerError);
       // document.body.addEventListener("htmx:responseError", showServerError);
+    </script>
+
+    <script type="module">
+      import { initSidebarToggle } from "{{ url_for('static', filename='js/sidebar.js') }}";
+      initSidebarToggle();
     </script>
   </body>
 </html>

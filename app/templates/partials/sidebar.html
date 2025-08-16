@@ -1,9 +1,5 @@
 <aside id="sidebar">
   <div class="sidebar-header">
-    <div id="branding">
-      <img class="logo" src="{{url_for('static', filename='img/logo.svg')}}">
-      <h1>{{ config.APP_NAME }}</h1>
-    </div>
     <div class="session-item new-session">
       <a class="session-link"
          title="New session"
@@ -29,10 +25,4 @@
     {% include "partials/sidebar_session.html" %}
     {% endfor %}
   </ul>
-    <div class="user-info"> <a href="{{ url_for('auth.profile') }}">{{ user.username }}</a> | <a href="{{ url_for('auth.logout') }}">Logout</a></div>
-  <script type="module">
-    import { initSidebarToggle } from "{{ url_for('static', filename='js/sidebar.js') }}";
-    initSidebarToggle();
-  </script>
-
 </aside>
