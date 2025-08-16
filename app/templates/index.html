@@ -23,14 +23,35 @@
 
     <div id="errors" hx-swap="beforeend"></div>
     <header id="search-container">
-      <button id="sidebar-toggle" class="icon-btn" aria-label="Toggle sidebar">
-        <svg class="icon-close" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+
+      <button id="sidebar-toggle" class="icon-btn" aria-label="Toggle sidebar" aria-pressed="false">
+        <svg class="icon-closed" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <!-- outer page -->
+          <rect x="3" y="5" width="18" height="14" rx="3"
+                stroke="currentColor" stroke-width="2"/>
+          <!-- vertical divider (sidebar) -->
+          <line x1="9.75" y1="5" x2="9.75" y2="19"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <!-- triangle pointing LEFT -->
+          <polygon points="13,12 16.5,10 16.5,14"
+                   fill="currentColor" />
         </svg>
-        <svg class="icon-open" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+        <svg class="icon-open" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <!-- outer page -->
+          <rect x="3" y="5" width="18" height="14" rx="3"
+                stroke="currentColor" stroke-width="2"/>
+          <!-- thin left sliver hint -->
+          <rect x="4.5" y="6.5" width="1.6" height="11" rx="0.8"
+                fill="currentColor" opacity=".22"/>
+          <!-- triangle pointing RIGHT -->
+          <polygon points="11,12 7.5,10 7.5,14"
+                   fill="currentColor" />
         </svg>
       </button>
+
+
       <div id="branding">
         <img class="logo" src="{{url_for('static', filename='img/logo.svg')}}" alt="Logo">
         <h1>{{ config.APP_NAME }}</h1>
@@ -69,31 +90,31 @@
 
     <script>
       document.body.addEventListener('htmx:configRequest', (event) => {
-        event.detail.headers['X-CSRFToken'] = '{{ csrf_token() }}';
+          event.detail.headers['X-CSRFToken'] = '{{ csrf_token() }}';
       });
 
       document.body.addEventListener("htmx:configRequest", function (event) {
-        const chat = document.getElementById("chat");
-        const activeSessionId = chat?.dataset.sessionId;
-        if (activeSessionId) {
-          event.detail.headers["X-Active-Session"] = activeSessionId;
-        }
+          const chat = document.getElementById("chat");
+          const activeSessionId = chat?.dataset.sessionId;
+          if (activeSessionId) {
+              event.detail.headers["X-Active-Session"] = activeSessionId;
+          }
       });
 
 
       function showServerError() {
-        const errors = document.getElementById("errors");
-        if (!errors) return;
-        const box = document.createElement("div");
-        box.className = "error-box";
-        box.textContent = "⚠️ Unable to reach server.";
-        const btn = document.createElement("button");
-        btn.className = "close-error";
-        btn.setAttribute("aria-label", "Close error");
-        btn.textContent = "×";
-        btn.onclick = () => box.remove();
-        box.appendChild(btn);
-        errors.appendChild(box);
+          const errors = document.getElementById("errors");
+          if (!errors) return;
+          const box = document.createElement("div");
+          box.className = "error-box";
+          box.textContent = "⚠️ Unable to reach server.";
+          const btn = document.createElement("button");
+          btn.className = "close-error";
+          btn.setAttribute("aria-label", "Close error");
+          btn.textContent = "×";
+          btn.onclick = () => box.remove();
+          box.appendChild(btn);
+          errors.appendChild(box);
       }
 
       document.body.addEventListener("htmx:sendError", showServerError);
