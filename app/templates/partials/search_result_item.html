@@ -1,5 +1,11 @@
 <li class="{{ item.css_class }}" role="option">
-  <a href="{{ url_for('sessions.session', session_id=item.session_id) }}?target=msg-{{ item.id }}#msg-{{ item.id }}">
+  <a href="{{ url_for('sessions.session', session_id=item.session_id) }}?target=msg-{{ item.id }}#msg-{{ item.id }}"
+     hx-get="{{ url_for('chat.chat_htmx', session_id=item.session_id) }}?target=msg-{{ item.id }}"
+     hx-target="#chatbox-wrapper"
+     hx-swap="outerHTML"
+     data-session-id="{{ item.session_id }}"
+     data-target="msg-{{ item.id }}"
+     hx-trigger="click[document.getElementById('chat').dataset.sessionId !== this.dataset.sessionId]">
     <div class="search-result-meta">{{ "you" if  item.role == "user" else config.APP_NAME }} </div>
     <div class="search-result-content">
       {% if item.snippet.leading_ellipsis %}…{% endif %}

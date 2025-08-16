@@ -55,6 +55,7 @@ export function initSearchUI() {
 
   const input = document.getElementById("search-input");
   let results = document.getElementById("search-results");
+  let visible = false;
 
   const getResultsEl = () => (results = document.getElementById("search-results"));
 
@@ -63,7 +64,8 @@ export function initSearchUI() {
       const el = getResultsEl();
       if (!el) return;
       el.innerHTML = "";
-      el.classList.remove("search-results-overlay", "sr-hide");
+      el.classList.remove("search-results-overlay", "sr-hide", "sr-pop");
+      visible = false;
     };
 
     const closeResults = (clearInput = false) => {
@@ -104,15 +106,52 @@ export function initSearchUI() {
       }
     });
 
+    document.addEventListener("click", (evt) => {
+      const link = evt.target.closest("#search-results a[data-target]");
+      if (!link) return;
+
+      const currentId = document.getElementById("chat")?.dataset.sessionId;
+      const targetId = link.dataset.target;
+
+      if (link.dataset.sessionId === currentId) {
+        evt.preventDefault();
+        closeResults(true);
+        const el = document.getElementById(targetId);
+        if (el) {
+          history.pushState(
+            null,
+            "",
+            `${window.location.pathname}?target=${targetId}#${targetId}`
+          );
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.classList.add("highlight");
+          setTimeout(() => el.classList.remove("highlight"), 2000);
+        }
+      } else {
+        closeResults(true);
+      }
+    });
+
     // Rebind after every HTMX swap so `results` stays current
     document.body.addEventListener("htmx:afterSwap", (evt) => {
       const t = evt.detail?.target;
       if (t && t.id === "search-results") {
         results = t; // <-- keep reference fresh
-        if (results.querySelector("li")) {
+        const hasItems = !!results.querySelector("li");
+        if (hasItems) {
           results.classList.add("search-results-overlay");
+          if (!visible) {
+            results.classList.add("sr-pop");
+            results.addEventListener(
+              "animationend",
+              () => results.classList.remove("sr-pop"),
+              { once: true }
+            );
+          }
+          visible = true;
         } else {
           results.classList.remove("search-results-overlay");
+          visible = false;
         }
       }
     });
