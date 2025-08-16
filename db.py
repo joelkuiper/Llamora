@@ -22,6 +22,17 @@ class LocalDB:
         self.pool = None
         self.search_api = None
 
+    def __del__(self):
+        if self.pool is not None:
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(self.pool.close())
+                else:
+                    loop.run_until_complete(self.pool.close())
+            except Exception:
+                pass
+
     def set_search_api(self, api):
         self.search_api = api
 
@@ -124,7 +135,7 @@ class LocalDB:
                 CREATE INDEX IF NOT EXISTS idx_sessions_user_id_created ON sessions(user_id, ulid);
                 CREATE INDEX IF NOT EXISTS idx_vectors_user_id ON vectors(user_id);
                 CREATE INDEX IF NOT EXISTS idx_vectors_id ON vectors(id);
-                """
+                """,
             )
 
     # user helpers
