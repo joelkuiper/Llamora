@@ -40,7 +40,7 @@
 
 - **Lightweight and Dependency-Minimal** The entire app is relatively small in terms of code. It uses a few Python packages (Quart, NaCl for security, fastembed for embeddings) and some JS libraries (HTMX and extensions, Marked, DOMPurify), all of which are either included or installable via [uv](https://docs.astral.sh/uv/). There is no need for Node.js build steps, no bundlers, and no heavy frameworks.
 
-- **Privacy first search with ANN** The app includes a privacy-first search engine that runs entirely on your machine. Each message is embedded locally (e.g., with multi-qa-MiniLM-L6-cos-v1) and encrypted at rest, and decryption happens only in memory after login. Queries are answered by an in-memory [HNSW](https://github.com/nmslib/hnswlib) index (cosine over normalized embeddings) for fast semantic K-NN, warmed with recent items and progressively backfilled so results improve in place. On top of this, we perform fast exact/phrase matching (Aho-Corasick) and rank exact hits above purely semantic neighbors.
+- **Privacy first search with ANN** The app includes a privacy-first search engine that runs entirely on your machine. Each message is embedded locally (e.g., with [FlagEmbedding](https://huggingface.co/BAAI/bge-small-en-v1.5)) and encrypted at rest, and decryption happens only in memory after login. Queries are answered by an in-memory [HNSW](https://github.com/nmslib/hnswlib) index (cosine over normalized embeddings) for fast semantic K-NN, warmed with recent items and progressively backfilled so results improve in place. On top of this, we perform fast exact/phrase matching (Aho-Corasick) and rank exact hits above purely semantic neighbors.
 
 There are some natural trade-offs: since the index lives in memory, RAM usage grows with the size of the chat history; large collections can take noticeable memory. And because exact matches are only surfaced if they also appear in the nearest-neighbor candidates, there is a small risk of false negatives—an exact string may exist but not be retrieved if it falls outside the top-K semantic hits.
 
@@ -58,7 +58,6 @@ This project has **several limitations** by design. It's important to understand
   - Password reset requires the recovery code and there's no email verification.
   - No multi-factor auth.
   - No OAuth or other single-sign on method
-  - Very weak constraints on passwords.
   - All users are equal (no roles or admin). It serves the purpose of protecting your chat data from others on a shared deployment, but it's not meant for a large user base without enhancements.
 
 - **Input/Output Filtering:** Aside from Markdown sanitization, there's no content filtering on user inputs or AI outputs. The model could potentially produce inappropriate content if prompted. There is also nothing preventing prompt injections (where a user could ask the assistant to ignore its system prompt). Since this is a closed environment (local model, one user), that wasn't a focus. But it's something to consider if expanded; e.g., using moderation models or guardrails if it were public.
@@ -79,17 +78,20 @@ See [config.py](./config.py) for more details.
 
 1. Download a [Phi-3.5-mini-instruct](https://huggingface.co/microsoft/Phi-3.5-mini-instruct) [(download Q5_K_M)](https://huggingface.co/Mozilla/Phi-3-mini-4k-instruct-llamafile/resolve/main/Phi-3-mini-4k-instruct.Q5_K_M.llamafile) llamafile.
 2. Set the `LLAMORA_LLAMAFILE` environment variable to the full path of the `.llamafile` file, or add a line like `LLAMORA_LLAMAFILE=/path/to/your/model.llamafile` to a `.env` file.
+
+Alternatively set `LLAMORA_LLAMA_HOST` to the address of a running Llama file (e.g. `http://localhost:8080`); this bypasses the subprocess entirely and just talks to the API endpoint.
+
 3. Start the server:
 
    ```bash
    uv run quart --app main run
    ```
 
-   If the server starts correctly it will log something like `Running on http://127.0.0.1:5000`.
+   If the server starts correctly it will log something like `Running on http://127.0.0.1:5000`. The first time it will download an embedding model from HuggingFace, so first startup might be slow.
 
-   Set `QUART_DEBUG=1` for automatic reloading on code changes.
+   - Set `QUART_DEBUG=1` for automatic reloading on code changes.
+   - Set `LOG_LEVEL=DEBUG` for debug logging
 
-   Alternatively set `LLAMORA_LLAMA_HOST` to the address of a running Llama file (e.g. `http://localhost:8080`); this bypasses the subprocess entirely and just talks to the API endpoint.
 
 ### Deployment (not recommended)
 
@@ -105,7 +107,7 @@ This project is an educational experiment and is **not** intended for production
    PY
    ```
 
-   Add the printed values to your environment. `LLAMORA_SECRET_KEY` is used by Quart. `LLAMORA_COOKIE_SECRET` must be a base64-encoded 32‑byte string for encrypted cookies. Without these keys the application is not secure. Keep these values somehwere safe.
+   Add the printed values to your environment. `LLAMORA_SECRET_KEY` is used by Quart. `LLAMORA_COOKIE_SECRET` must be a base64-encoded 32‑byte string for encrypted cookies. Without these keys the application is not secure. Keep these values somewhere safe.
 
 2. Set the usual runtime variables such as:
 
