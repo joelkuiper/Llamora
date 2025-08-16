@@ -263,14 +263,15 @@
   }
 }
 
+/* Main chat pane — subtle separation */
 #chatbox-wrapper {
   box-shadow: -4px 0 8px rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(0,0,0,0.125);
+  border: 1px solid var(--border-strong);
   z-index: 1;
   padding: var(--spacing-xl);
   flex: 1;
   overflow-y: auto;
-  min-width: 0; /* <- important to prevent overflow in flex layouts */
+  min-width: 0; /* prevent overflow in flex layouts */
   border-top-left-radius: var(--radius-md);
 }
 
@@ -312,13 +313,39 @@
     }
   }
 
-  .markdown-body {
-    display: contents;
+  /* Markdown refinements */
+  .markdown-body { display: contents; }
 
-    p, pre {
-      padding: 0;
-      margin: 0;
-    }
+  .markdown-body p,
+  .markdown-body pre { padding: 0; margin: 0; }
+
+  .markdown-body a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    text-decoration-thickness: .08em;
+    transition: color .15s ease, text-decoration-color .15s ease, background-color .15s ease;
+  }
+  .markdown-body a:hover {
+    text-decoration-color: rgba(59,167,246,.6);
+    background-color: var(--accent-05);
+  }
+
+  .markdown-body pre,
+  .markdown-body code {
+    background: #f7fbff;                 /* light, not black */
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+  .markdown-body pre { padding: var(--spacing-md); overflow: auto; }
+  .markdown-body code { padding: 0 .25em; }
+
+  .markdown-body blockquote {
+    margin: .75rem 0;
+    padding: .5rem .75rem;
+    border-left: 3px solid var(--accent-20);
+    background: var(--accent-05);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   }
 
   #typing-indicator {
@@ -401,12 +428,8 @@
 
       &:active {
         transform: translateY(1px);
+        border-color: var(--accent-10);
         box-shadow: var(--inset-shadow-disabled);
-        border-color: var(--accent);
-        box-shadow:
-          var(--inset-shadow),
-          0 0 0 2px var(--accent-20),
-          0 8px 20px var(--accent-10);
       }
 
       &:disabled {
@@ -625,7 +648,7 @@
   to   { opacity: 0; transform: translateY(-6px) scale(.98) rotateX(2deg); }
 }
 
-/* Wrapper: keep it simple (NO contain: paint!) */
+/* Wrapper */
 #search-results { position: relative; }
 
 /* Base panel: visible */
@@ -637,13 +660,13 @@
   pointer-events: auto;
 }
 
-/* When NOT open, the fresh fragment should start hidden (no animation here) */
+/* Hidden starting state (no animation) */
 #search-results:not(.is-open) > .sr-panel.htmx-added {
   opacity: 0;
   transform: translateY(-6px) scale(.98) rotateX(2deg);
 }
 
-/* First open: animate via a stable class you add, not via .htmx-added */
+/* First open: animate via stable class */
 #search-results > .sr-panel.sr-enter {
   animation: sr-pop 180ms cubic-bezier(.2,.7,.2,1) both;
 }
@@ -653,11 +676,7 @@
   animation: sr-out 160ms cubic-bezier(.2,.7,.2,1) both;
 }
 
-
-.no-anim {
-  animation: none !important;
-}
-
+.no-anim { animation: none !important; }
 
 .user, .bot, .bot-stream { animation: fadeInUp 0.3s ease-out; }
 
