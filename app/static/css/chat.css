@@ -24,6 +24,7 @@
 #sidebar {
   width: 280px;
   height: 100vh;
+  background: var(--color-bg-alt);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -197,7 +198,6 @@
     padding: var(--spacing-xl);
     font-size: 0.85rem;
     border-top: 1px solid var(--border);
-    background: var(--color-bg);
     text-align: center;
 
     a {
@@ -333,7 +333,6 @@
 
   .markdown-body pre,
   .markdown-body code {
-    background: #f7fbff;                 /* light, not black */
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
   }
@@ -453,7 +452,7 @@
   position: sticky;
   top: 0;
   z-index: 40;
-  background: transparent;
+  background: var(--color-bg-alt);
   padding: var(--spacing-md) var(--spacing-xl) var(--spacing-sm);
   perspective: 900px;
 

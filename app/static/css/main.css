@@ -1,45 +1,53 @@
 :root {
-  --color-bg: #f5f5f5; /*  #f2f2f2; */
-  --color-text: #444;
-  --color-heading: #555;
-  --color-user-text: #555;
+  /* Base colors */
+  --color-bg: #fafafa;
+  --color-bg-alt: #f6f6f6;
   --color-user-bg: #f9f9f9;
+  --color-text: #444;
+  --color-heading: #333;
+  --color-user-text: #444;
   --color-bot-text: #555;
 
-  --radius-sm: 0.5rem;
-  --radius-md: 1rem;
-  --radius-lg: 1.2rem;
-
-  --spacing-xs: 0.5rem;
-  --spacing-sm: 0.6rem;
-  --spacing-md: 0.75rem;
-  --spacing-lg: 1.1rem;
-  --spacing-xl: 1.5rem;
-
-  --font-base: sans-serif;
-  --font-size: 1rem;
-
-  --text-shadow-soft: 1px 1px 2px var(--shadow-dark),
-                      -1px -1px 2px var(--shadow-light);
+  /* Accent palette (cyan-leaning blue) */
+  --accent: #36a6f4;          /* primary accent */
+  --accent-hover: #1f97f2;    /* hover state, deeper */
+  --accent-active: #0e85de;   /* active/focus */
+  --accent-05: rgba(54,166,244,0.05);
+  --accent-10: rgba(54,166,244,0.10);
+  --accent-20: rgba(54,166,244,0.20);
+  --accent-30: rgba(54,166,244,0.30);
 
   --highlight-color: #fff7a0;
 
-  --raised-shadow: 0 4px 12px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
-  --inset-shadow: inset 1px 1px 3px rgba(0,0,0,0.08), inset -1px -1px 3px rgba(255,255,255,0.85);
-  --inset-shadow-disabled: inset 1px 1px 2px rgba(0,0,0,0.05), inset -1px -1px 2px rgba(255,255,255,0.8);
-
-  --shadow-dark: rgba(0,0,0,0.08);
-  --shadow-light: rgba(255,255,255,0.85);
-
+  /* Shadows & borders */
+  --shadow-dark: rgba(0,0,0,0.07);
+  --shadow-light: rgba(255,255,255,0.9);
+  --raised-shadow: 0 4px 10px var(--shadow-dark), 0 1px 2px rgba(0,0,0,0.04);
+  --inset-shadow: inset 1px 1px 3px rgba(0,0,0,0.08),
+                  inset -1px -1px 3px var(--shadow-light);
+  --inset-shadow-disabled: inset 1px 1px 2px rgba(0,0,0,0.04),
+                           inset -1px -1px 2px rgba(255,255,255,0.8);
   --border: rgba(0,0,0,0.08);
-  --border-strong: rgba(0,0,0,0.16);
+  --border-strong: rgba(0,0,0,0.18);
 
-  --accent: #3ba7f6; /* lighter, more cyan primary */
-  --accent-05: rgba(59,167,246,0.05);
-  --accent-10: rgba(59,167,246,0.10);
-  --accent-20: rgba(59,167,246,0.20);
-  --accent-30: rgba(59,167,246,0.30);
+  /* Radius & spacing */
+  --radius-sm: 0.4rem;
+  --radius-md: 0.8rem;
+  --radius-lg: 1.2rem;
+
+  --spacing-xs: 0.4rem;
+  --spacing-sm: 0.6rem;
+  --spacing-md: 0.9rem;
+  --spacing-lg: 1.2rem;
+  --spacing-xl: 1.6rem;
+
+  /* Typography */
+  --font-base: system-ui, sans-serif;
+  --font-size: 1rem;
+  --text-shadow-soft: 1px 1px 2px var(--shadow-dark),
+                      -1px -1px 2px var(--shadow-light);
 }
+
 
 * { box-sizing: border-box; }
 
