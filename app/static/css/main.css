@@ -30,6 +30,7 @@
                            inset -1px -1px 3px #ffffff;
   --text-shadow-soft: 1px 1px 2px var(--shadow-dark),
                       -1px -1px 2px var(--shadow-light);
+  --highlight-color: #fff7a0;
 }
 
 * { box-sizing: border-box; }

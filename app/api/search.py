@@ -1,8 +1,10 @@
 import logging
 import time
+import re
 from typing import List
 
 import numpy as np
+import ahocorasick
 
 from config import (
     PROGRESSIVE_BATCH,
@@ -28,15 +30,18 @@ class SearchAPI:
         self.db = db
         self.registry = SessionIndexRegistry(db)
 
-    async def search(
+    async def knn_search(
         self,
         user_id: str,
         dek: bytes,
         query: str,
         k1: int = PROGRESSIVE_K1,
         k2: int = PROGRESSIVE_K2,
-    ):
-        logger.debug("Search requested by user %s with k1=%d k2=%d", user_id, k1, k2)
+    ) -> List[dict]:
+        """Return KNN results with decrypted content and cosine scores."""
+        logger.debug(
+            "KNN search requested by user %s with k1=%d k2=%d", user_id, k1, k2
+        )
         index = await self.registry.get_or_build(user_id, dek)
         q_vec = embed_texts([query]).astype(np.float32).reshape(1, -1)
 
@@ -75,16 +80,19 @@ class SearchAPI:
 
         seen = set()
         dedup_ids: List[str] = []
-        for mid in ids:
+        id_cos: dict[str, float] = {}
+        for mid, cos in zip(ids, cosines):
             if mid not in seen:
                 seen.add(mid)
                 dedup_ids.append(mid)
+            if mid not in id_cos:
+                id_cos[mid] = cos
 
-        top_ids = dedup_ids[:k2]
-        rows = await self.db.get_messages_by_ids(user_id, top_ids)
+        rows = await self.db.get_messages_by_ids(user_id, dedup_ids)
         row_map = {r["id"]: r for r in rows}
+
         results: List[dict] = []
-        for mid in top_ids:
+        for mid in dedup_ids:
             row = row_map.get(mid)
             if not row:
                 continue
@@ -104,8 +112,161 @@ class SearchAPI:
                     "created_at": row["created_at"],
                     "role": row["role"],
                     "content": content,
+                    "cosine": id_cos.get(mid, 0.0),
                 }
             )
+
+        results.sort(key=lambda r: r["cosine"], reverse=True)
+        logger.debug("KNN search returning %d candidates", len(results))
+        return results
+
+    def _lexical_rerank(
+        self, query: str, candidates: List[dict], limit: int
+    ) -> List[dict]:
+        lower_query = query.lower()
+        automaton = ahocorasick.Automaton()
+        automaton.add_word(lower_query, ("E", lower_query))
+        tokens = [
+            t for t in dict.fromkeys(re.findall(r"\w+", lower_query)) if len(t) >= 2
+        ]
+        for tok in tokens:
+            automaton.add_word(tok, ("T", tok))
+        automaton.make_automaton()
+        token_count = len(tokens)
+
+        results: List[dict] = []
+        for cand in candidates:
+            content = cand["content"]
+            text_lower = content.lower()
+            spans = []
+            matched_tokens = set()
+            exact = False
+            for end, (kind, word) in automaton.iter(text_lower):
+                start = end - len(word) + 1
+                spans.append({"start": start, "end": end + 1, "kind": kind})
+                if kind == "T":
+                    matched_tokens.add(word)
+                else:
+                    exact = True
+
+            spans.sort(key=lambda s: s["start"])
+            merged: List[dict] = []
+            for s in spans:
+                if not merged or s["start"] > merged[-1]["end"]:
+                    merged.append(s.copy())
+                else:
+                    m = merged[-1]
+                    m["end"] = max(m["end"], s["end"])
+                    if s["kind"] == "E" or m["kind"] == "E":
+                        m["kind"] = "E"
+            for m in merged:
+                if text_lower[m["start"] : m["end"]] == lower_query:
+                    m["kind"] = "E"
+
+            overlap = len(matched_tokens) / token_count if token_count else 0.0
+
+            max_len = 350
+            context = 20
+            if merged:
+                first = merged[0]
+                snippet_start = max(first["start"] - context, 0)
+            else:
+                snippet_start = 0
+            snippet_end = min(snippet_start + max_len, len(content))
+            leading_ellipsis = snippet_start > 0
+            trailing_ellipsis = snippet_end < len(content)
+
+            snippet_spans = []
+            for m in merged:
+                if m["end"] <= snippet_start or m["start"] >= snippet_end:
+                    continue
+                snippet_spans.append(
+                    {
+                        "start": max(m["start"], snippet_start) - snippet_start,
+                        "end": min(m["end"], snippet_end) - snippet_start,
+                        "kind": m["kind"],
+                    }
+                )
+            snippet_spans.sort(key=lambda s: s["start"])
+
+            segments = []
+            cursor = 0
+            for sp in snippet_spans:
+                if sp["start"] > cursor:
+                    segments.append(
+                        {
+                            "text": content[
+                                snippet_start + cursor : snippet_start + sp["start"]
+                            ],
+                            "hit": False,
+                            "kind": None,
+                        }
+                    )
+                segments.append(
+                    {
+                        "text": content[
+                            snippet_start + sp["start"] : snippet_start + sp["end"]
+                        ],
+                        "hit": True,
+                        "kind": "exact" if sp["kind"] == "E" else "token",
+                    }
+                )
+                cursor = sp["end"]
+            if cursor < snippet_end - snippet_start:
+                segments.append(
+                    {
+                        "text": content[snippet_start + cursor : snippet_end],
+                        "hit": False,
+                        "kind": None,
+                    }
+                )
+
+            snippet = {
+                "segments": segments,
+                "leading_ellipsis": leading_ellipsis,
+                "trailing_ellipsis": trailing_ellipsis,
+            }
+
+            cosine = cand["cosine"]
+            poor = cosine < POOR_MATCH_MAX_COS
+            status = "exact" if exact else ("token" if overlap > 0 else "semantic")
+            css_class = f"search-result-item status-{status}"
+            if poor:
+                css_class += " status-poor"
+            sort_key = (
+                2 if exact else (1 if overlap > 0 else 0),
+                overlap,
+                cosine,
+            )
+            results.append(
+                {
+                    "id": cand["id"],
+                    "session_id": cand["session_id"],
+                    "created_at": cand["created_at"],
+                    "role": cand["role"],
+                    "snippet": snippet,
+                    "status": status,
+                    "css_class": css_class,
+                    "_sort": sort_key,
+                }
+            )
+
+        results.sort(key=lambda r: r["_sort"], reverse=True)
+        for r in results:
+            r.pop("_sort", None)
+        return results[:limit]
+
+    async def search(
+        self,
+        user_id: str,
+        dek: bytes,
+        query: str,
+        k1: int = PROGRESSIVE_K1,
+        k2: int = PROGRESSIVE_K2,
+    ):
+        logger.debug("Search requested by user %s with k1=%d k2=%d", user_id, k1, k2)
+        candidates = await self.knn_search(user_id, dek, query, k1, k2)
+        results = self._lexical_rerank(query, candidates, k2)
         logger.debug("Returning %d results for user %s", len(results), user_id)
         return results
 

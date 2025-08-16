@@ -1,6 +1,16 @@
-<li class="search-result-item" role="option">
+<li class="{{ item.css_class }}" role="option">
   <a href="{{ url_for('sessions.session', session_id=item.session_id) }}?target=msg-{{ item.id }}#msg-{{ item.id }}">
     <div class="search-result-meta">{{ "you" if  item.role == "user" else config.APP_NAME }} </div>
-    <div class="search-result-content">{{ item.content }}</div>
+    <div class="search-result-content">
+      {% if item.snippet.leading_ellipsis %}…{% endif %}
+      {% for seg in item.snippet.segments %}
+        {% if seg.hit %}
+          <mark>{{ seg.text }}</mark>
+        {% else %}
+          {{ seg.text }}
+        {% endif %}
+      {% endfor %}
+      {% if item.snippet.trailing_ellipsis %}…{% endif %}
+    </div>
   </a>
 </li>

@@ -404,6 +404,7 @@
     font-family: var(--font-base);
     transition: box-shadow 0.2s ease, transform 0.05s ease;
   }
+
   #search-input:focus {
     box-shadow:
       inset 1px 1px 3px var(--shadow-dark),
@@ -443,13 +444,6 @@
     border: 1px solid rgba(0,0,0,0.25);
   }
 
-  /* Make the overlay a flex column so the UL can scroll */
-  .search-results-overlay {
-    display: flex;
-    flex-direction: column;
-    max-height: min(60vh, 40rem);
-  }
-
   .search-results-list {
     flex: 1 1 auto;
     min-height: 0;       /* critical for nested flex scrolling */
@@ -457,6 +451,17 @@
     margin: 0;
     padding: var(--spacing-sm);
     list-style-type: none;
+
+    mark {
+      background-color: var(--highlight-color);
+    }
+
+    .status-semantic {
+      opacity: 0.5;
+      &:hover {
+        opacity: 1;
+      }
+    }
   }
 
   .search-result-item a {
@@ -593,6 +598,6 @@ form textarea, form button {
 }
 
 @keyframes flash {
-  from { background: #fff7a0; }
+  from { background: var(--higlight-color); }
   to { background: transparent; }
 }
