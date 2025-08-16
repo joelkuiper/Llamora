@@ -151,7 +151,7 @@ export function initSearchUI() {
     document.body.addEventListener("htmx:afterSwap", (evt) => {
       const t = evt.detail?.target;
       if (t && t.id === "search-results") {
-        results = t; // <-- keep reference fresh
+        results = t;
         const hasItems = !!results.querySelector("li");
         if (hasItems) {
           results.classList.add("search-results-overlay");
