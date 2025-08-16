@@ -137,6 +137,14 @@
           0 8px 18px rgba(0,0,0,0.04);
       }
 
+      &:active {
+        border-color: var(--accent);
+        box-shadow:
+          var(--inset-shadow),
+          0 0 0 2px var(--accent-20),
+          0 8px 24px var(--accent-10);
+      }
+
       .session-link {
         display: flex;
         align-items: center;
