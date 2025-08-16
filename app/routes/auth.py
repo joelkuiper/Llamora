@@ -140,6 +140,7 @@ async def login():
         username = form.get("username", "").strip()
         password = form.get("password", "")
         return_url = _safe_return(form.get("return") or request.args.get("return"))
+        current_app.logger.debug("Login attempt for %s", username)
 
         max_user = current_app.config["MAX_USERNAME_LENGTH"]
         max_pass = current_app.config["MAX_PASSWORD_LENGTH"]
@@ -177,9 +178,16 @@ async def login():
                 resp = redirect(redirect_url)
                 set_secure_cookie(resp, "uid", str(user["id"]))
                 set_secure_cookie(resp, "dek", base64.b64encode(dek).decode("utf-8"))
+                current_app.logger.debug(
+                    "Login succeeded for %s, redirecting to %s", username, redirect_url
+                )
                 return resp
             except Exception:
+                current_app.logger.debug(
+                    "Login verification failed for %s", username, exc_info=True
+                )
                 pass
+        current_app.logger.debug("Login failed for %s", username)
         return await render_template(
             "login.html", error="Invalid credentials", return_url=return_url
         )
@@ -190,6 +198,10 @@ async def login():
 
 @auth_bp.route("/logout")
 async def logout():
+    user = await get_current_user()
+    current_app.logger.debug(
+        "Logout for user %s", user["id"] if user else None
+    )
     resp = redirect("/login")
     clear_secure_cookie(resp)
     return resp
