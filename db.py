@@ -1,6 +1,5 @@
 import os
 import aiosqlite
-from contextlib import asynccontextmanager
 import secrets
 import logging
 import json
@@ -52,13 +51,25 @@ class LocalDB:
         conn.row_factory = aiosqlite.Row
         return conn
 
+    async def with_transaction(self, conn, func, *args, **kwargs):
+        try:
+            result = await func(*args, **kwargs)
+            await conn.commit()
+            return result
+        except Exception:
+            if conn.in_transaction:
+                await conn.rollback()
+            raise
+
     async def _ensure_schema(self, is_new):
         if is_new:
             logging.getLogger(__name__).info(
                 "Creating new database at %s", self.db_path
             )
-        async with self.get_conn() as conn:
-            await conn.executescript(
+        async with self.pool.connection() as conn:
+            await self.with_transaction(
+                conn,
+                conn.executescript,
                 f"""
                 CREATE TABLE IF NOT EXISTS users (
                     id TEXT PRIMARY KEY,
@@ -116,18 +127,6 @@ class LocalDB:
                 """
             )
 
-    @asynccontextmanager
-    async def get_conn(self):
-        if self.pool is None:
-            raise RuntimeError("Database has not been initialized")
-        async with self.pool.connection() as conn:
-            try:
-                yield conn
-                await conn.commit()
-            finally:
-                if conn.in_transaction:
-                    await conn.rollback()
-
     # user helpers
     async def create_user(
         self,
@@ -141,15 +140,17 @@ class LocalDB:
         rc_cipher,
     ):
         ulid = str(ULID())
-        async with self.get_conn() as conn:
-            await conn.execute(
+        async with self.pool.connection() as conn:
+            await self.with_transaction(
+                conn,
+                conn.execute,
                 """
-                INSERT INTO users (
-                    id, username, password_hash,
-                    dek_pw_salt, dek_pw_nonce, dek_pw_cipher,
-                    dek_rc_salt, dek_rc_nonce, dek_rc_cipher
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
+                    INSERT INTO users (
+                        id, username, password_hash,
+                        dek_pw_salt, dek_pw_nonce, dek_pw_cipher,
+                        dek_rc_salt, dek_rc_nonce, dek_rc_cipher
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
                 (
                     ulid,
                     username,
@@ -164,7 +165,7 @@ class LocalDB:
             )
 
     async def get_user_by_username(self, username):
-        async with self.get_conn() as conn:
+        async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 "SELECT * FROM users WHERE username = ?", (username,)
             )
@@ -172,13 +173,13 @@ class LocalDB:
         return dict(row) if row else None
 
     async def get_user_by_id(self, user_id):
-        async with self.get_conn() as conn:
+        async with self.pool.connection() as conn:
             cursor = await conn.execute("SELECT * FROM users WHERE id = ?", (user_id,))
             row = await cursor.fetchone()
         return dict(row) if row else None
 
     async def get_state(self, user_id):
-        async with self.get_conn() as conn:
+        async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 "SELECT state FROM users WHERE id = ?", (user_id,)
             )
@@ -198,8 +199,10 @@ class LocalDB:
             else:
                 state[key] = value
         state_json = json.dumps(state)
-        async with self.get_conn() as conn:
-            await conn.execute(
+        async with self.pool.connection() as conn:
+            await self.with_transaction(
+                conn,
+                conn.execute,
                 "UPDATE users SET state = ? WHERE id = ?",
                 (state_json, user_id),
             )
@@ -213,21 +216,23 @@ class LocalDB:
         return dict(row) if row else None
 
     async def get_session(self, user_id, session_id):
-        async with self.get_conn() as conn:
+        async with self.pool.connection() as conn:
             return await self._owns_session(conn, user_id, session_id)
 
     async def rename_session(self, user_id, session_id, name):
-        async with self.get_conn() as conn:
+        async with self.pool.connection() as conn:
             if not await self._owns_session(conn, user_id, session_id):
                 raise ValueError("User does not own session")
 
-            await conn.execute(
+            await self.with_transaction(
+                conn,
+                conn.execute,
                 "UPDATE sessions SET name = ? WHERE id = ? AND user_id = ?",
                 (name, session_id, user_id),
             )
 
     async def get_latest_session(self, user_id):
-        async with self.get_conn() as conn:
+        async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 "SELECT id FROM sessions WHERE user_id = ? ORDER BY ulid DESC LIMIT 1",
                 (user_id,),
@@ -238,35 +243,46 @@ class LocalDB:
     async def update_password_wrap(
         self, user_id, password_hash, pw_salt, pw_nonce, pw_cipher
     ):
-        async with self.get_conn() as conn:
-            await conn.execute(
+        async with self.pool.connection() as conn:
+            await self.with_transaction(
+                conn,
+                conn.execute,
                 "UPDATE users SET password_hash = ?, dek_pw_salt = ?, dek_pw_nonce = ?, dek_pw_cipher = ? WHERE id = ?",
                 (password_hash, pw_salt, pw_nonce, pw_cipher, user_id),
             )
 
     async def update_recovery_wrap(self, user_id, rc_salt, rc_nonce, rc_cipher):
-        async with self.get_conn() as conn:
-            await conn.execute(
+        async with self.pool.connection() as conn:
+            await self.with_transaction(
+                conn,
+                conn.execute,
                 "UPDATE users SET dek_rc_salt = ?, dek_rc_nonce = ?, dek_rc_cipher = ? WHERE id = ?",
                 (rc_salt, rc_nonce, rc_cipher, user_id),
             )
 
     async def delete_user(self, user_id):
-        async with self.get_conn() as conn:
-            await conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        async with self.pool.connection() as conn:
+            await self.with_transaction(
+                conn,
+                conn.execute,
+                "DELETE FROM users WHERE id = ?",
+                (user_id,),
+            )
 
     async def append(self, user_id, session_id, role, content, dek):
         from app.services.crypto import encrypt_message
 
-        async with self.get_conn() as conn:
+        async with self.pool.connection() as conn:
             if not await self._owns_session(conn, user_id, session_id):
                 raise ValueError("User does not own session")
 
         ulid = str(ULID())
         nonce, ct, alg = encrypt_message(dek, user_id, session_id, ulid, content)
 
-        async with self.get_conn() as conn:
-            await conn.execute(
+        async with self.pool.connection() as conn:
+            await self.with_transaction(
+                conn,
+                conn.execute,
                 "INSERT INTO messages (id, session_id, role, nonce, ciphertext, alg) VALUES (?, ?, ?, ?, ?, ?)",
                 (ulid, session_id, role, nonce, ct, alg),
             )
@@ -282,17 +298,19 @@ class LocalDB:
         return msg_id
 
     async def store_vector(self, msg_id, user_id, dim, nonce, ciphertext, alg):
-        async with self.get_conn() as conn:
-            await conn.execute(
+        async with self.pool.connection() as conn:
+            await self.with_transaction(
+                conn,
+                conn.execute,
                 """
-                INSERT OR REPLACE INTO vectors (id, user_id, dim, nonce, ciphertext, alg)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
+                    INSERT OR REPLACE INTO vectors (id, user_id, dim, nonce, ciphertext, alg)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
                 (msg_id, user_id, dim, nonce, ciphertext, alg),
             )
 
     async def get_latest_vectors(self, user_id: str, limit: int):
-        async with self.get_conn() as conn:
+        async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
                 SELECT v.id, v.dim, v.nonce, v.ciphertext, v.alg, m.session_id, m.created_at
@@ -309,7 +327,7 @@ class LocalDB:
         return [dict(row) for row in rows]
 
     async def get_latest_messages(self, user_id: str, limit: int):
-        async with self.get_conn() as conn:
+        async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
                 SELECT m.id, m.session_id, m.role, m.nonce, m.ciphertext, m.alg, m.created_at
@@ -325,7 +343,7 @@ class LocalDB:
         return [dict(row) for row in rows]
 
     async def get_vectors_older_than(self, user_id: str, before_id: str, limit: int):
-        async with self.get_conn() as conn:
+        async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
                 SELECT v.id, v.dim, v.nonce, v.ciphertext, v.alg, m.session_id, m.created_at
@@ -342,7 +360,7 @@ class LocalDB:
         return [dict(row) for row in rows]
 
     async def get_messages_older_than(self, user_id: str, before_id: str, limit: int):
-        async with self.get_conn() as conn:
+        async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
                 SELECT m.id, m.session_id, m.role, m.nonce, m.ciphertext, m.alg, m.created_at
@@ -358,7 +376,7 @@ class LocalDB:
         return [dict(row) for row in rows]
 
     async def get_user_latest_id(self, user_id: str):
-        async with self.get_conn() as conn:
+        async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
                 SELECT m.id
@@ -377,7 +395,7 @@ class LocalDB:
         if not ids:
             return []
         placeholders = ",".join("?" for _ in ids)
-        async with self.get_conn() as conn:
+        async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 f"""
                 SELECT m.id, m.session_id, m.created_at, m.role, m.nonce, m.ciphertext, m.alg
@@ -393,19 +411,23 @@ class LocalDB:
     async def create_session(self, user_id):
         session_id = secrets.token_urlsafe(32)
         ulid = str(ULID())
-        async with self.get_conn() as conn:
-            await conn.execute(
+        async with self.pool.connection() as conn:
+            await self.with_transaction(
+                conn,
+                conn.execute,
                 "INSERT INTO sessions (id, ulid, user_id) VALUES (?, ?, ?)",
                 (session_id, ulid, user_id),
             )
         return session_id
 
     async def delete_session(self, user_id, session_id):
-        async with self.get_conn() as conn:
+        async with self.pool.connection() as conn:
             if not await self._owns_session(conn, user_id, session_id):
                 raise ValueError("User does not own session")
 
-            await conn.execute(
+            await self.with_transaction(
+                conn,
+                conn.execute,
                 "DELETE FROM sessions WHERE id = ? AND user_id = ?",
                 (session_id, user_id),
             )
@@ -413,7 +435,7 @@ class LocalDB:
     async def get_history(self, user_id, session_id, dek):
         from app.services.crypto import decrypt_message
 
-        async with self.get_conn() as conn:
+        async with self.pool.connection() as conn:
             if not await self._owns_session(conn, user_id, session_id):
                 raise ValueError("User does not own session")
 
@@ -438,7 +460,7 @@ class LocalDB:
         return history
 
     async def get_all_sessions(self, user_id):
-        async with self.get_conn() as conn:
+        async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 "SELECT id, name, created_at FROM sessions WHERE user_id = ? ORDER BY ulid DESC",
                 (user_id,),
@@ -449,7 +471,7 @@ class LocalDB:
     async def get_adjacent_session(self, user_id, session_id, direction="next"):
         op = ">" if direction == "next" else "<"
         order = "ASC" if direction == "next" else "DESC"
-        async with self.get_conn() as conn:
+        async with self.pool.connection() as conn:
             current_cursor = await conn.execute(
                 "SELECT ulid FROM sessions WHERE id = ? AND user_id = ?",
                 (session_id, user_id),
