@@ -78,7 +78,6 @@ See [config.py](./config.py) for more details.
 
 1. Download a [Phi-3.5-mini-instruct](https://huggingface.co/microsoft/Phi-3.5-mini-instruct) [(download Q5_K_M)](https://huggingface.co/Mozilla/Phi-3-mini-4k-instruct-llamafile/resolve/main/Phi-3-mini-4k-instruct.Q5_K_M.llamafile) llamafile.
 2. Set the `LLAMORA_LLAMAFILE` environment variable to the full path of the `.llamafile` file, or add a line like `LLAMORA_LLAMAFILE=/path/to/your/model.llamafile` to a `.env` file.
-
 Alternatively set `LLAMORA_LLAMA_HOST` to the address of a running Llama file (e.g. `http://localhost:8080`); this bypasses the subprocess entirely and just talks to the API endpoint.
 
 3. Start the server:
