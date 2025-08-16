@@ -165,8 +165,8 @@ class SearchAPI:
 
             overlap = len(matched_tokens) / token_count if token_count else 0.0
 
-            max_len = 350
-            context = 20
+            max_len = 500
+            context = 30
             if merged:
                 first = merged[0]
                 snippet_start = max(first["start"] - context, 0)

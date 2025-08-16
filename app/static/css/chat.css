@@ -545,10 +545,6 @@
   }
 }
 
-.highlight {
-  animation: flash 2s ease-in-out;
-}
-
 
 /* Animations */
 @keyframes blink {
@@ -595,6 +591,10 @@
 
 form textarea, form button {
   transition: opacity 0.3s ease, box-shadow 0.3s ease;
+}
+
+.message.highlight {
+  animation: flash 2s ease-in-out;
 }
 
 @keyframes flash {
