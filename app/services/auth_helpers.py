@@ -1,7 +1,7 @@
 import os
 import base64
 import json
-from quart import Response, request, redirect, g
+from quart import Response, request, redirect, g, current_app
 from urllib.parse import urlparse, quote
 from functools import wraps
 from nacl import secret
@@ -30,6 +30,7 @@ def _get_cookie_data() -> dict:
 
     raw = request.cookies.get(COOKIE_NAME)
     if not raw:
+        current_app.logger.debug("No %s cookie present", COOKIE_NAME)
         return {}
 
     try:
@@ -37,8 +38,12 @@ def _get_cookie_data() -> dict:
         decrypted = cookie_box.decrypt(token).decode("utf-8")
         data = json.loads(decrypted)
         g._secure_cookie_state = data  # cache for later calls
+        current_app.logger.debug(
+            "Loaded %s cookie with keys %s", COOKIE_NAME, list(data.keys())
+        )
         return data
     except Exception:
+        current_app.logger.debug("Failed to decode %s cookie", COOKIE_NAME, exc_info=True)
         return {}
 
 
@@ -52,12 +57,31 @@ def _cookie_state() -> dict:
 def _set_cookie_data(response: Response, data: dict) -> None:
     # If empty -> delete cookie to avoid storing an empty blob
     if not data:
+        current_app.logger.debug("Clearing %s cookie", COOKIE_NAME)
         response.delete_cookie(COOKIE_NAME, path="/", samesite="Lax")
         return
     token = cookie_box.encrypt(json.dumps(data).encode("utf-8"))
     b64 = base64.urlsafe_b64encode(token).decode("utf-8")
+    # Only mark the cookie as secure when the current request is served
+    # over HTTPS. When running the application locally without TLS the
+    # "secure" flag would prevent the browser from storing the cookie at all
+    # which leads to a successful login immediately redirecting back to the
+    # login page. Detect the scheme from the request so development setups
+    # using plain HTTP continue to function while production deployments
+    # still benefit from secure cookies.
+    current_app.logger.debug(
+        "Setting %s cookie (secure=%s) with keys %s",
+        COOKIE_NAME,
+        request.is_secure,
+        list(data.keys()),
+    )
     response.set_cookie(
-        COOKIE_NAME, b64, httponly=True, secure=True, samesite="Lax", path="/"
+        COOKIE_NAME,
+        b64,
+        httponly=True,
+        secure=request.is_secure,
+        samesite="Lax",
+        path="/",
     )
 
 
@@ -78,7 +102,9 @@ def set_secure_cookie(response: Response, name: str, value: str | None) -> None:
 
 
 def clear_secure_cookie(response: Response) -> None:
-    response.delete_cookie(COOKIE_NAME)
+    # Ensure we delete the same cookie we set by matching its attributes.
+    current_app.logger.debug("Deleting %s cookie", COOKIE_NAME)
+    response.delete_cookie(COOKIE_NAME, path="/", samesite="Lax")
 
 
 async def get_current_user():
@@ -119,6 +145,7 @@ def login_required(f):
         login_url = f"/login?return={quote(return_path, safe='') }"
 
         if not await get_current_user():
+            current_app.logger.debug("Unauthenticated access to %s", request.path)
             if request.headers.get("HX-Request"):
                 resp = Response(status=401)
                 resp.headers["HX-Redirect"] = login_url
@@ -133,3 +160,7 @@ def login_required(f):
 async def load_user():
     # Eager-load user info if needed in templates
     request.user = await get_current_user()
+    if request.user:
+        current_app.logger.debug("Loaded user %s for request", request.user["id"])
+    else:
+        current_app.logger.debug("No user loaded for request")

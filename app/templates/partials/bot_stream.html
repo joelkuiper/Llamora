@@ -1,5 +1,5 @@
 {% macro bot_stream(msg_id, session_id) -%}
-<div id="bot-{{ msg_id }}" class="message bot-stream"
+<div id="msg-{{ msg_id }}" class="message bot-stream"
      hx-ext="sse" sse-close="done"
      sse-connect="{{ url_for('chat.sse_reply', session_id=session_id, msg_id=msg_id) }}">
   <span class="raw-response" sse-swap="message,done" hidden hx-swap="beforeend"></span>

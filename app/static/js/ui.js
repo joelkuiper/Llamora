@@ -1,0 +1,142 @@
+export const SPINNER = {
+  interval: 80,
+  frames: ["⠋", "⠙", "⠚", "⠞", "⠖", "⠦", "⠴", "⠲", "⠳", "⠓"],
+};
+
+function spin(el, text = "") {
+  let i = 0;
+  el.textContent = text ? `${SPINNER.frames[i]} ${text}` : SPINNER.frames[i];
+  return setInterval(() => {
+    i = (i + 1) % SPINNER.frames.length;
+    el.textContent = text ? `${SPINNER.frames[i]} ${text}` : SPINNER.frames[i];
+  }, SPINNER.interval);
+}
+
+function flashHighlight(el) {
+  if (!el) return;
+  el.classList.remove("no-anim");
+  el.classList.add("highlight");
+  el.style.animation = "flash 1s ease-in-out";
+  el.addEventListener(
+    "animationend",
+    () => {
+      el.classList.remove("highlight");
+      el.style.animation = "";
+      el.classList.add("no-anim");
+    },
+    { once: true }
+  );
+}
+
+export function startButtonSpinner(btn, loadingText = "Loading") {
+  if (!btn || btn.dataset.spinning === "1") return;
+  const originalText = btn.textContent;
+  btn.dataset.spinning = "1";
+  btn.dataset.originalText = originalText;
+  btn.disabled = true;
+  btn.setAttribute("aria-busy", "true");
+  const id = spin(btn, loadingText);
+  btn.dataset.spinnerId = String(id);
+  return id;
+}
+
+export function stopButtonSpinner(btn) {
+  const id = btn && btn.dataset.spinnerId;
+  if (id) clearInterval(Number(id));
+  if (btn && btn.dataset.originalText) btn.textContent = btn.dataset.originalText;
+  if (btn) {
+    btn.disabled = false;
+    btn.removeAttribute("aria-busy");
+    btn.removeAttribute("data-spinner-id");
+    btn.removeAttribute("data-spinning");
+  }
+}
+
+export function initSearchUI() {
+  const input = document.getElementById("search-input");
+  const wrap  = document.getElementById("search-results");
+
+  document.body.addEventListener("htmx:afterSwap", (evt) => {
+    if (evt.detail?.target !== wrap) return;
+    const panel = wrap.querySelector(".sr-panel");
+    if (!panel) { wrap.classList.remove("is-open"); return; }
+
+    if (wrap.classList.contains("is-open")) {
+      // Already open: show immediately, no entry animation
+      panel.classList.remove("htmx-added"); // avoid hidden state while typing
+      return;
+    }
+
+    // First open: run the pop-in under a stable class
+    panel.classList.add("sr-enter");
+    panel.addEventListener("animationend", () => {
+      panel.classList.remove("sr-enter");
+      wrap.classList.add("is-open");
+    }, { once: true });
+  });
+
+  const closeResults = (clearInput = false) => {
+    if (clearInput && input) input.value = "";
+    const panel = wrap.querySelector(".sr-panel");
+    if (!panel) { wrap.classList.remove("is-open"); return; }
+    panel.classList.add("sr-closing");
+    panel.addEventListener("animationend", () => {
+      wrap.classList.remove("is-open");
+      wrap.innerHTML = "";
+    }, { once: true });
+  };
+
+  // Triggers
+  if (input) {
+    input.addEventListener("input", () => {
+      if (!input.value.trim()) closeResults();
+    });
+  }
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeResults(true);
+  });
+  document.addEventListener("click", (e) => {
+    const panel = wrap.querySelector(".sr-panel");
+    if (panel && !panel.contains(e.target) && e.target !== input) {
+      closeResults(true);
+    }
+  });
+  document.addEventListener("click", (evt) => {
+    if (evt.target.closest("#search-close")) closeResults(true);
+  });
+
+  document.addEventListener("click", (evt) => {
+    const link = evt.target.closest("#search-results a[data-target]");
+    if (!link) return;
+    const currentId = document.getElementById("chat")?.dataset.sessionId;
+    const targetId  = link.dataset.target;
+
+    if (link.dataset.sessionId === currentId) {
+      evt.preventDefault();
+      closeResults(true);
+      const el = document.getElementById(targetId);
+      if (el) {
+        history.pushState(null, "", `${window.location.pathname}?target=${targetId}#${targetId}`);
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        flashHighlight(el);
+      }
+    } else {
+      closeResults(true);
+    }
+  });
+}
+
+export function scrollToHighlight() {
+  const params = new URLSearchParams(window.location.search);
+  let target = params.get("target");
+  if (!target && window.location.hash.startsWith("#msg-")) {
+    target = window.location.hash.substring(1);
+  }
+  if (target) {
+    const el = document.getElementById(target);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      flashHighlight(el);
+    }
+  }
+}

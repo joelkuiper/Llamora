@@ -1,36 +1,53 @@
 :root {
-  --color-bg: #f5f5f5; /*  #f2f2f2; */
-  --color-text: #444;
-  --color-heading: #555;
-  --color-user-text: #555;
+  /* Base colors */
+  --color-bg: #fafafa;
+  --color-bg-alt: #f6f6f6;
   --color-user-bg: #f9f9f9;
+  --color-text: #444;
+  --color-heading: #333;
+  --color-user-text: #444;
   --color-bot-text: #555;
 
-  --shadow-light: #ffffff;
-  --shadow-dark: #d1d1d1;
+  /* Accent palette (cyan-leaning blue) */
+  --accent: #36a6f4;          /* primary accent */
+  --accent-hover: #1f97f2;    /* hover state, deeper */
+  --accent-active: #0e85de;   /* active/focus */
+  --accent-05: rgba(54,166,244,0.05);
+  --accent-10: rgba(54,166,244,0.10);
+  --accent-20: rgba(54,166,244,0.20);
+  --accent-30: rgba(54,166,244,0.30);
 
-  --radius-sm: 0.5rem;
-  --radius-md: 1rem;
+  --highlight-color: #fff7a0;
+
+  /* Shadows & borders */
+  --shadow-dark: rgba(0,0,0,0.07);
+  --shadow-light: rgba(255,255,255,0.9);
+  --raised-shadow: 0 4px 10px var(--shadow-dark), 0 1px 2px rgba(0,0,0,0.04);
+  --inset-shadow: inset 1px 1px 3px rgba(0,0,0,0.08),
+                  inset -1px -1px 3px var(--shadow-light);
+  --inset-shadow-disabled: inset 1px 1px 2px rgba(0,0,0,0.04),
+                           inset -1px -1px 2px rgba(255,255,255,0.8);
+  --border: rgba(0,0,0,0.08);
+  --border-strong: rgba(0,0,0,0.18);
+
+  /* Radius & spacing */
+  --radius-sm: 0.4rem;
+  --radius-md: 0.8rem;
   --radius-lg: 1.2rem;
 
-  --spacing-xs: 0.5rem;
+  --spacing-xs: 0.4rem;
   --spacing-sm: 0.6rem;
-  --spacing-md: 0.75rem;
-  --spacing-lg: 1.1rem;
-  --spacing-xl: 1.5rem;
+  --spacing-md: 0.9rem;
+  --spacing-lg: 1.2rem;
+  --spacing-xl: 1.6rem;
 
-  --font-base: sans-serif;
+  /* Typography */
+  --font-base: system-ui, sans-serif;
   --font-size: 1rem;
-
-  --inset-shadow: inset 2px 2px 5px var(--shadow-dark),
-                  inset -2px -2px 5px var(--shadow-light);
-  --raised-shadow: 4px 4px 8px var(--shadow-dark),
-                   -4px -4px 8px var(--shadow-light);
-  --inset-shadow-disabled: inset 1px 1px 3px #bebebe,
-                           inset -1px -1px 3px #ffffff;
   --text-shadow-soft: 1px 1px 2px var(--shadow-dark),
                       -1px -1px 2px var(--shadow-light);
 }
+
 
 * { box-sizing: border-box; }
 

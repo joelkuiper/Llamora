@@ -12,6 +12,8 @@ from httpx import HTTPError
 from config import DEFAULT_LLM_REQUEST, LLM_SERVER
 from llm.prompt_template import build_prompt
 import socket
+import os
+import signal
 
 
 def _server_args_to_cli(args: dict[str, Any]) -> list[str]:
@@ -108,6 +110,7 @@ class LLMEngine:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            start_new_session=True,
         )
         if self.proc.stdout:
             threading.Thread(
@@ -152,11 +155,13 @@ class LLMEngine:
 
     def shutdown(self) -> None:
         if getattr(self, "proc", None) and self.proc.poll() is None:
-            self.proc.terminate()
             try:
+                os.killpg(self.proc.pid, signal.SIGTERM)
                 self.proc.wait(timeout=5)
             except subprocess.TimeoutExpired:  # pragma: no cover - unlikely
-                self.proc.kill()
+                os.killpg(self.proc.pid, signal.SIGKILL)
+            except ProcessLookupError:  # process already gone
+                pass
 
     async def _count_tokens(self, client: httpx.AsyncClient, text: str) -> int:
         resp = await client.post(f"{self.server_url}/tokenize", json={"content": text})

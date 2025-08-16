@@ -23,9 +23,18 @@
 
     <div id="errors" hx-swap="beforeend"></div>
     <div class="app-container">
+
       <button id="sidebar-toggle" aria-label="Toggle sidebar">&#9776;</button>
       {% include "partials/sidebar.html" %}
-      {% include "partials/chat.html" %}
+      <div id="content">
+        <header id="search-container">
+          {% include 'partials/search_form.html' %}
+          <section id="search-results">
+            {% include 'partials/search_results.html' %}
+          </section>
+        </header>
+        {% include "partials/chat.html" %}
+      </div>
     </div>
 
     <script>

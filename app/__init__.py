@@ -3,11 +3,16 @@ from dotenv import load_dotenv
 from quart_wtf import CSRFProtect
 import os
 import logging
+import asyncio
+from contextlib import suppress
 from db import LocalDB
+from app.api.search import SearchAPI
 
 load_dotenv()
 
 db = LocalDB()
+search_api = SearchAPI(db)
+db.set_search_api(search_api)
 
 
 def create_app():
@@ -20,21 +25,45 @@ def create_app():
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
-    csrf = CSRFProtect(app)
+    CSRFProtect(app)
 
     from .routes.auth import auth_bp
     from .routes.sessions import sessions_bp
     from .routes.chat import chat_bp
+    from .routes.search import search_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(sessions_bp)
     app.register_blueprint(chat_bp)
+    app.register_blueprint(search_bp)
 
     from .services.auth_helpers import load_user
 
     app.before_request(load_user)
     app.before_serving(db.init)
     app.after_serving(db.close)
+
+    maintenance_task: asyncio.Task | None = None
+
+    async def _maintenance_loop():
+        try:
+            while True:
+                await asyncio.sleep(60)
+                await search_api.maintenance_tick()
+        except asyncio.CancelledError:
+            pass
+
+    @app.before_serving
+    async def _start_maintenance():
+        nonlocal maintenance_task
+        maintenance_task = asyncio.create_task(_maintenance_loop())
+
+    @app.after_serving
+    async def _stop_maintenance():
+        if maintenance_task:
+            maintenance_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await maintenance_task
 
     @app.errorhandler(404)
     async def not_found(e):

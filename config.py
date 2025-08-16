@@ -9,6 +9,13 @@ MAX_MESSAGE_LENGTH = 1000
 MAX_SESSION_NAME_LENGTH = 100
 APP_NAME = "Llamora"
 
+# Database pool and connection defaults
+DB_POOL_SIZE = int(os.getenv("LLAMORA_DB_POOL_SIZE", 25))
+DB_POOL_ACQUIRE_TIMEOUT = float(os.getenv("LLAMORA_DB_ACQUIRE_TIMEOUT", 10))
+DB_TIMEOUT = float(os.getenv("LLAMORA_DB_TIMEOUT", 5))
+DB_BUSY_TIMEOUT = int(os.getenv("LLAMORA_DB_BUSY_TIMEOUT", 5000))  # milliseconds
+DB_MMAP_SIZE = int(os.getenv("LLAMORA_DB_MMAP_SIZE", 10 * 1024 * 1024))
+
 
 def _deep_merge(base: dict, override: dict) -> dict:
     out = deepcopy(base)
@@ -58,3 +65,12 @@ DEFAULT_LLM_REQUEST = {
     "stop": ["<|end|>", "<|assistant|>"],
     **llm_request_overrides,
 }
+
+# Progressive backfill search defaults
+PROGRESSIVE_K1 = int(os.getenv("LLAMORA_PROGRESSIVE_K1", 128))
+PROGRESSIVE_K2 = int(os.getenv("LLAMORA_PROGRESSIVE_K2", 10))
+PROGRESSIVE_ROUNDS = int(os.getenv("LLAMORA_PROGRESSIVE_ROUNDS", 3))
+PROGRESSIVE_BATCH = int(os.getenv("LLAMORA_PROGRESSIVE_BATCH", 1000))
+PROGRESSIVE_MAX_MS = int(os.getenv("LLAMORA_PROGRESSIVE_MAX_MS", 1500))
+POOR_MATCH_MAX_COS = float(os.getenv("LLAMORA_POOR_MATCH_MAX_COS", 0.28))
+POOR_MATCH_MIN_HITS = int(os.getenv("LLAMORA_POOR_MATCH_MIN_HITS", 3))

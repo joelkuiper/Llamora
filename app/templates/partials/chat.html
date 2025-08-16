@@ -2,10 +2,11 @@
 <main
   id="chatbox-wrapper"
   {% if oob %} hx-swap-oob="true" {% endif %}>
+
   <div id="chat" data-session-id="{{ session.id }}">
     <div class="message bot">Hello. Speak your mind, and I will listen.</div>
     {% for msg in history %}
-    <div class="message {{ 'bot' if msg['role'] != 'user' else 'user'}}">{{ msg.content }}</div>
+    <div id="msg-{{ msg['id'] }}" class="message {{ 'bot' if msg['role'] != 'user' else 'user'}}">{{ msg.content }}</div>
     {% endfor %}
 
     {% if pending_msg_id %}
@@ -34,8 +35,11 @@
   <script type="module">
     import { initChatUI } from "{{ url_for('static', filename='js/chat.js') }}";
     import { updateActiveSession } from "{{ url_for('static', filename='js/session.js') }}";
+    import { initSearchUI, scrollToHighlight } from "{{ url_for('static', filename='js/ui.js') }}";
     initChatUI();
     updateActiveSession();
+    initSearchUI();
+    scrollToHighlight();
     document.title = "{{ session.name }}";
   </script>
 </main>
