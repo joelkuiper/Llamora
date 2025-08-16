@@ -54,50 +54,16 @@ export function initSearchUI() {
   }
 
   const input = document.getElementById("search-input");
-  let results = document.getElementById("search-results");
+  const results = document.getElementById("search-results");
   if (input && results) {
-    const closeResults = () => {
-      results.hidden = true;
-    };
-
     input.addEventListener("input", () => {
       if (!input.value.trim()) {
-        closeResults();
-      }
-    });
-
-    input.addEventListener("focus", () => {
-      if (input.value.trim()) {
-        input.form.dispatchEvent(new Event("submit", { bubbles: true }));
-      }
-    });
-
-    document.addEventListener("keydown", (evt) => {
-      if (evt.key === "Escape") {
-        closeResults();
-      }
-    });
-
-    document.addEventListener("click", (evt) => {
-      const target = evt.target;
-      if (
-        !results.hidden &&
-        !results.contains(target) &&
-        target !== input
-      ) {
-        closeResults();
-      }
-    });
-
-    document.addEventListener("click", (evt) => {
-      if (evt.target.closest("#search-close")) {
-        closeResults();
+        results.hidden = true;
       }
     });
 
     document.body.addEventListener("htmx:afterSwap", (evt) => {
       if (evt.target.id === "search-results") {
-        results = document.getElementById("search-results");
         results.hidden = !results.querySelector("li");
       }
     });

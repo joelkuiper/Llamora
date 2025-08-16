@@ -10,7 +10,8 @@
            id="search-input"
            name="q"
            placeholder="Search"
-           autocomplete="off">
+           autocomplete="off"
+           onkeydown="if(event.key==='Escape'){ this.value=''; this.form.dispatchEvent(new Event('submit', {bubbles:true})); }">
     <span id="search-spinner" class="spinner htmx-indicator" aria-hidden="true"></span>
   </div>
 </form>

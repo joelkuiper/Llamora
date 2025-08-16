@@ -1,7 +1,8 @@
 <section id="search-results"
          class="search-results-overlay"
-         {% if results|length == 0 %}hidden{% endif %}>
-  <button id="search-close" class="search-close" type="button" aria-label="Close search results">×</button>
+         {% if results|length == 0 %}hidden{% endif %}
+         hx-on::before-request="this.setAttribute('aria-busy','true')"
+         hx-on::after-request="this.setAttribute('aria-busy','false')">
   {% if results %}
     <ul class="search-results-list" role="listbox">
       {% for item in results %}
