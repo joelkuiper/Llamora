@@ -34,6 +34,11 @@
   --border: rgba(0,0,0,0.08);
   --border-strong: rgba(0,0,0,0.16);
 
+  --accent: #3ba7f6; /* lighter, more cyan primary */
+  --accent-05: rgba(59,167,246,0.05);
+  --accent-10: rgba(59,167,246,0.10);
+  --accent-20: rgba(59,167,246,0.20);
+  --accent-30: rgba(59,167,246,0.30);
 }
 
 * { box-sizing: border-box; }
