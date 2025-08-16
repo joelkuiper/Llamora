@@ -6,9 +6,6 @@
   --color-user-bg: #f9f9f9;
   --color-bot-text: #555;
 
-  --shadow-light: #ffffff;
-  --shadow-dark: #d1d1d1;
-
   --radius-sm: 0.5rem;
   --radius-md: 1rem;
   --radius-lg: 1.2rem;
@@ -22,15 +19,21 @@
   --font-base: sans-serif;
   --font-size: 1rem;
 
-  --inset-shadow: inset 2px 2px 5px var(--shadow-dark),
-                  inset -2px -2px 5px var(--shadow-light);
-  --raised-shadow: 4px 4px 8px var(--shadow-dark),
-                   -4px -4px 8px var(--shadow-light);
-  --inset-shadow-disabled: inset 1px 1px 3px #bebebe,
-                           inset -1px -1px 3px #ffffff;
   --text-shadow-soft: 1px 1px 2px var(--shadow-dark),
                       -1px -1px 2px var(--shadow-light);
+
   --highlight-color: #fff7a0;
+
+  --raised-shadow: 0 4px 12px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+  --inset-shadow: inset 1px 1px 3px rgba(0,0,0,0.08), inset -1px -1px 3px rgba(255,255,255,0.85);
+  --inset-shadow-disabled: inset 1px 1px 2px rgba(0,0,0,0.05), inset -1px -1px 2px rgba(255,255,255,0.8);
+
+  --shadow-dark: rgba(0,0,0,0.08);
+  --shadow-light: rgba(255,255,255,0.85);
+
+  --border: rgba(0,0,0,0.08);
+  --border-strong: rgba(0,0,0,0.16);
+
 }
 
 * { box-sizing: border-box; }

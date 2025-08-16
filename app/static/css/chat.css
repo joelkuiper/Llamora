@@ -6,7 +6,6 @@
   min-height: 0; /* critical so the child can shrink and scroll */
 }
 
-
 .app-container {
   display: flex;
   height: 100vh; /* fill full viewport height */
@@ -21,7 +20,6 @@
     }
   }
 }
-
 
 #sidebar {
   width: 280px;
@@ -78,6 +76,7 @@
     position: relative;
     padding-right: var(--spacing-md);
     cursor: pointer;
+    border: 1px solid var(--border);
 
     a {
       flex-grow: 1;
@@ -98,6 +97,7 @@
       border-radius: var(--radius-md);
       box-shadow: var(--inset-shadow);
       transition: background 0.2s ease, box-shadow 0.2s ease;
+      border: 1px solid var(--border);
 
       &:hover {
         background: #e4e4e4;
@@ -163,7 +163,7 @@
   .user-info {
     padding: var(--spacing-xl);
     font-size: 0.85rem;
-    border-top: 1px solid var(--shadow-dark);
+    border-top: 1px solid var(--border);
     background: var(--color-bg);
     text-align: center;
 
@@ -236,7 +236,7 @@
   padding: var(--spacing-xl);
   flex: 1;
   overflow-y: auto;
-  border-left: 1px solid rgba(0, 0, 0, 0.05);
+  border-left: 1px solid var(--border);
   min-width: 0; /* <- important to prevent overflow in flex layouts */
   border-top-left-radius: var(--radius-md);
 }
@@ -251,6 +251,7 @@
   .error { color: darkred; }
 
   .message {
+    border: 1px solid var(--border);
     padding: var(--spacing-lg) var(--spacing-xl);
     border-radius: var(--radius-lg);
     max-width: 90%;
@@ -322,15 +323,16 @@
       padding: var(--spacing-lg);
       font-size: var(--font-size);
       background: var(--color-bg);
-      border: none;
+      border: 1px solid var(--border);
       border-radius: var(--radius-md);
       resize: none;
       outline: none;
       box-shadow: var(--inset-shadow);
-      transition: box-shadow 0.3s ease-in-out;
+      transition: box-shadow 0.3s ease-in-out, border-color 0.2s ease-in-out;
       font-family: var(--font-base);
 
       &:focus {
+        border-color: var(--border-strong);
         box-shadow:
           inset 1px 1px 3px var(--shadow-dark),
           inset -1px -1px 3px var(--shadow-light),
@@ -342,7 +344,7 @@
       padding: var(--spacing-md) var(--spacing-lg);
       font-size: 1.2rem;
       background: var(--color-bg);
-      border: none;
+      border: 1px solid var(--border);
       border-radius: var(--radius-md);
       box-shadow: var(--inset-shadow);
       cursor: pointer;
@@ -371,78 +373,42 @@
 #search-container {
   position: sticky;
   top: 0;
-  z-index: 40;                 /* stays above chat */
+  z-index: 40;
   background: transparent;
   padding: var(--spacing-md) var(--spacing-xl) var(--spacing-sm);
-
-  --glass-bg: rgba(255, 255, 255, 0.65);
-  --glass-stroke: rgba(255, 255, 255, 0.45);
-  --glass-shadow: 0 12px 28px rgba(0,0,0,0.08);
-  perspective: 900px; /* For the animation */
+  perspective: 900px;
 
   #search-form {
     margin: 0 auto;
-    max-width: 60rem;          /* align with chat width */
+    max-width: 60rem;
+    display: flex;
+    justify-content: flex-end;
   }
 
   .search-input-wrap {
     position: relative;
     display: flex;
     align-items: center;
-    filter: none;
+    width: clamp(18rem, 32vw, 24rem);
   }
 
   #search-input {
     width: 100%;
-    height: 2.75rem;
-    padding: 0.5rem 2.25rem 0.5rem 0.85rem;
-    border: none;
-    border-radius: var(--radius-md);
+    height: 2.4rem;
+    padding: 0.5rem 2.25rem 0.5rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
     background: var(--color-bg);
-    box-shadow: var(--inset-shadow);
+    box-shadow: var(--raised-shadow);
     outline: none;
     font-family: var(--font-base);
-    transition: box-shadow 0.2s ease, transform 0.05s ease;
-  }
+    transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.05s ease;
 
-  #search-input:focus {
-    box-shadow:
-      inset 1px 1px 3px var(--shadow-dark),
-      inset -1px -1px 3px var(--shadow-light),
-      0 0 4px rgba(0,0,0,0.05);
-  }
-
-  /* Spinner inside input, same spot */
-  #search-spinner {
-    position: absolute;
-    right: 0.75rem;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 1rem;
-    display: none;
-    pointer-events: none;
-  }
-  #search-spinner.htmx-request { display: block; }
-
-  /* Frosted glass dropdown */
-  .search-results-overlay {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: var(--spacing-xl);
-    z-index: 50;
-    backdrop-filter: blur(12px) saturate(160%);
-    -webkit-backdrop-filter: blur(12px) saturate(160%);
-    background: rgba(255,255,255,0.65);
-    border: 1px solid rgba(255,255,255,0.45);
-    border-radius: var(--radius-lg);
-    box-shadow: 0 12px 28px rgba(0,0,0,0.08);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    max-height: min(60vh, 40rem);
-    border: 1px solid rgba(0,0,0,0.25);
-    pointer-events: auto;
+    &:focus {
+      transform: translateY(-1px);
+      border-color: var(--border-strong);
+      box-shadow: var(--raised-shadow);
+    }
   }
 
   .search-results-list {
@@ -463,6 +429,64 @@
         opacity: 1;
       }
     }
+  }
+
+  #search-spinner {
+    position: absolute;
+    right: 0.6rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1rem;
+    display: none;
+    pointer-events: none;
+
+    &.htmx-request { display: block; }
+  }
+
+  .search-results-overlay {
+    position: absolute;
+    top: calc(100% - 0.25rem);
+    right: var(--spacing-md);
+    left: auto;
+    width: min(48rem, 92vw);
+    z-index: 50;
+    /* Frosted glass effect */
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    background: rgba(255,255,255,0.70);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--raised-shadow);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: min(60vh, 40rem);
+    pointer-events: auto;
+
+    .search-close {
+      position: absolute;
+      top: var(--spacing-xs);
+      right: var(--spacing-xs);
+      width: 1.5rem;
+      height: 1.5rem;
+      border: none;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.10);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+
+      &:hover { background: rgba(0,0,0,0.18); }
+    }
+  }
+
+  .search-result-item a:hover {
+    background: rgba(255,255,255,0.58);
+    border-color: var(--border-strong);
+    box-shadow:
+      inset 2px 2px 6px rgba(0,0,0,0.05),
+      inset -2px -2px 6px rgba(255,255,255,0.7);
   }
 
   .search-result-item a {
@@ -507,34 +531,6 @@
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
-
-  }
-
-  .search-close {
-    position: absolute;
-    top: var(--spacing-xs);
-    right: var(--spacing-xs);
-    width: 1.5rem;
-    height: 1.5rem;
-    border: none;
-    border-radius: 50%;
-    background: rgba(0,0,0,0.1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-  }
-
-  .search-close:hover {
-    background: rgba(0,0,0,0.2);
-  }
-
-  .search-result-item a:hover {
-    background: rgba(255,255,255,0.58);
-    border-color: rgba(0,0,0,0.3);
-    box-shadow:
-      inset 2px 2px 6px rgba(0,0,0,0.05),
-      inset -2px -2px 6px rgba(255,255,255,0.7);
   }
 }
 
@@ -544,7 +540,6 @@
     background: rgba(250, 250, 250, 0.98);
   }
 }
-
 
 /* Animations */
 @keyframes blink {
