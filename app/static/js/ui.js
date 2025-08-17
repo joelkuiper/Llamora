@@ -12,22 +12,6 @@ function spin(el, text = "") {
   }, SPINNER.interval);
 }
 
-function flashHighlight(el) {
-  if (!el) return;
-  el.classList.remove("no-anim");
-  el.classList.add("highlight");
-  el.style.animation = "flash 1s ease-in-out";
-  el.addEventListener(
-    "animationend",
-    () => {
-      el.classList.remove("highlight");
-      el.style.animation = "";
-      el.classList.add("no-anim");
-    },
-    { once: true }
-  );
-}
-
 export function startButtonSpinner(btn, loadingText = "Loading") {
   if (!btn || btn.dataset.spinning === "1") return;
   const originalText = btn.textContent;
@@ -52,7 +36,40 @@ export function stopButtonSpinner(btn) {
   }
 }
 
+function flashHighlight(el) {
+  if (!el) return;
+  el.classList.remove("no-anim");
+  el.classList.add("highlight");
+  el.style.animation = "flash 1s ease-in-out";
+  el.addEventListener(
+    "animationend",
+    () => {
+      el.classList.remove("highlight");
+      el.style.animation = "";
+      el.classList.add("no-anim");
+    },
+    { once: true }
+  );
+}
+
 export function initSearchUI() {
+  const spinner = document.getElementById("search-spinner");
+  if (spinner) {
+    let id = null;
+    const update = () => {
+      if (spinner.classList.contains("htmx-request")) {
+        if (!id) id = spin(spinner);
+      } else if (id) {
+        clearInterval(id);
+        id = null;
+        spinner.textContent = "";
+      }
+    };
+    const observer = new MutationObserver(update);
+    observer.observe(spinner, { attributes: true, attributeFilter: ["class"] });
+  }
+
+
   const input = document.getElementById("search-input");
   const wrap  = document.getElementById("search-results");
 
