@@ -1,10 +1,12 @@
 import logging
 import time
 import re
+from datetime import datetime
 from typing import List
 
 import numpy as np
 import ahocorasick
+import humanize
 
 from config import (
     PROGRESSIVE_BATCH,
@@ -238,11 +240,15 @@ class SearchAPI:
                 overlap,
                 cosine,
             )
+            created_at_dt = datetime.fromisoformat(cand["created_at"])
+            created_at_human = humanize.naturaltime(created_at_dt)
+
             results.append(
                 {
                     "id": cand["id"],
                     "session_id": cand["session_id"],
                     "created_at": cand["created_at"],
+                    "created_at_human": created_at_human,
                     "role": cand["role"],
                     "snippet": snippet,
                     "status": status,

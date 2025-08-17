@@ -634,8 +634,14 @@ body {
   }
 
   .search-result-meta {
-    flex: 0 0 8rem;               /* fixed meta column */
-    white-space: nowrap;
+    flex: 0 0 4.5rem;
+    font-size: 0.85rem;
+    line-height: 1.2;
+    opacity: 0.75;
+  }
+
+  .search-result-time {
+    flex: 0 0 7rem;
     font-size: 0.85rem;
     line-height: 1.2;
     opacity: 0.75;
@@ -655,6 +661,8 @@ body {
   }
 
   .search-result-content {
+    flex: 1 1 auto;
+    min-width: 0;
     margin: 0;
     font-size: 0.95rem;
     opacity: 0.9;

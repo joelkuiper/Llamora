@@ -19,4 +19,5 @@ dependencies = [
     "hnswlib>=0.8.0",
     "pyahocorasick>=2.1.0",
     "fastembed>=0.7.1",
+    "humanize>=4.9.0",
 ]

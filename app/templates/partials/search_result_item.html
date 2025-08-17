@@ -6,7 +6,12 @@
      data-session-id="{{ item.session_id }}"
      data-target="msg-{{ item.id }}"
      hx-trigger="click[document.getElementById('chat').dataset.sessionId !== this.dataset.sessionId]">
-    <div class="search-result-meta">{{ "You" if  item.role == "user" else config.APP_NAME }} </div>
+    <div class="search-result-meta">
+      {{ "You" if  item.role == "user" else config.APP_NAME }}
+    </div>
+    <div class="search-result-time">
+      {{ item.created_at_human }}
+    </div>
     <div class="search-result-content">
       {%- if item.snippet.leading_ellipsis %}…{% endif -%}
       {%- for seg in item.snippet.segments -%}
