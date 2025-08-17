@@ -17,27 +17,27 @@
       <div class="success">Password updated</div>
       {% endif %}
       <h2>Change Password</h2>
-      <form method="post" action="{{ url_for('auth.change_password') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-        <input class="input" type="password" name="current_password" placeholder="Current password" required maxlength="{{ config.MAX_PASSWORD_LENGTH }}" />
-        <input class="input" type="password" name="new_password" placeholder="New password" required maxlength="{{ config.MAX_PASSWORD_LENGTH }}" />
-        <input class="input" type="password" name="confirm_password" placeholder="Confirm new password" required maxlength="{{ config.MAX_PASSWORD_LENGTH }}" />
-        <button class="btn" type="submit">Update Password</button>
-      </form>
+        <form method="post" action="{{ url_for('auth.change_password') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <input class="input" type="password" name="current_password" placeholder="Current password" required maxlength="{{ config.MAX_PASSWORD_LENGTH }}" />
+          <input class="input" type="password" name="new_password" placeholder="New password" required maxlength="{{ config.MAX_PASSWORD_LENGTH }}" />
+          <input class="input" type="password" name="confirm_password" placeholder="Confirm new password" required maxlength="{{ config.MAX_PASSWORD_LENGTH }}" />
+          <button class="btn" type="submit" data-loading="Updating">Update Password</button>
+        </form>
 
       {% if rc_error %}
       <div class="error">{{ rc_error }}</div>
       {% endif %}
       <h2>Recovery</h2>
-      <form method="post" action="{{ url_for('auth.regen_recovery') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-        <button class="btn" type="submit">Generate New Recovery Code</button>
-      </form>
+        <form method="post" action="{{ url_for('auth.regen_recovery') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <button class="btn" type="submit" data-loading="Generating">Generate New Recovery Code</button>
+        </form>
 
       <h2>Data</h2>
-      <form method="get" action="{{ url_for('auth.download_user_data') }}">
-        <button class="btn" type="submit">Download My Data</button>
-      </form>
+        <form method="get" action="{{ url_for('auth.download_user_data') }}">
+          <button class="btn" type="submit" data-loading="Preparing">Download My Data</button>
+        </form>
 
       <h2>Danger Zone</h2>
       <button
@@ -54,5 +54,6 @@
         {% endif %}
       </div>
     </div>
-  </body>
-</html>
+      <script type="module" src="{{ url_for('static', filename='js/forms.js') }}"></script>
+    </body>
+  </html>
