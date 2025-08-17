@@ -144,8 +144,12 @@ def login_required(f):
         return_path = _safe_return_path()
         login_url = f"/login?return={quote(return_path, safe='') }"
 
-        if not await get_current_user():
-            current_app.logger.debug("Unauthenticated access to %s", request.path)
+        user = await get_current_user()
+        dek = get_dek() if user else None
+        if not user or not dek:
+            current_app.logger.debug(
+                "Unauthenticated access or missing DEK to %s", request.path
+            )
             if request.headers.get("HX-Request"):
                 resp = Response(status=401)
                 resp.headers["HX-Redirect"] = login_url
