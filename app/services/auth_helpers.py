@@ -70,7 +70,7 @@ def _set_cookie_data(response: Response, data: dict) -> None:
         current_app.logger.debug("Clearing %s cookie", COOKIE_NAME)
         response.delete_cookie(COOKIE_NAME, path="/", samesite="Lax")
         return
-    token = cookie_box.encrypt(orjson.dumps(data).encode("utf-8"))
+    token = cookie_box.encrypt(orjson.dumps(data))
     b64 = base64.urlsafe_b64encode(token).decode("utf-8")
     # Only mark the cookie as secure when the current request is served
     # over HTTPS. When running the application locally without TLS the
