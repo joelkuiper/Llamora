@@ -33,21 +33,21 @@ body {
 }
 
 #sidebar {
-  width: 280px;
+  width: 280px; /* needed for animation */
   height: 100%;
   background: var(--color-bg-alt);
   display: flex;
   flex-direction: column;
+  padding: 0 0 0 var(--spacing-sm);
   flex-shrink: 0;
   z-index: 0;
   box-shadow: none;
-  padding-left: 1.25rem;
   padding-top: var(--spacing-lg);
   transition: transform 0.3s ease, width 0.3s ease, padding-left 0.3s ease;
 
   .sidebar-header {
     border-bottom: 1px solid var(--shadow-light);
-    padding-bottom: var(--spacing-sm);
+    padding-bottom: var(--spacing-md);
   }
 
   ul {
@@ -55,18 +55,19 @@ body {
     overflow-y: auto;
     list-style: none;
     margin: 0;
-    padding: var(--spacing-md);
+    padding: var(--spacing-xs) var(--spacing-md);
   }
 
   li {
+
     &.active .session-item {
+      background: #f8f9fb;
       border-color: var(--accent-20);
       box-shadow:
         var(--raised-shadow),
         0 0 0 2px var(--accent-20),
         0 10px 24px var(--accent-10);
       font-weight: 600;
-
     }
 
     &:not(.active) .session-item:hover {
@@ -86,16 +87,15 @@ body {
 
   /* Make sessions feel like the search pill (button-like) */
   .session-item {
+
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin: var(--spacing-sm) 0;
-    background: #f6f6f6;
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     box-shadow: var(--raised-shadow);
     position: relative;
-    padding-right: var(--spacing-md);
     cursor: pointer;
     transition:
       background 0.18s ease,
@@ -116,7 +116,6 @@ body {
       padding: var(--spacing-sm) 0 var(--spacing-sm) var(--spacing-md);
     }
 
-    /* Keyboard focus */
     &:focus-visible,
     &:focus-within {
       outline: none;
@@ -182,8 +181,8 @@ body {
     font-family: var(--font-base);
     padding: var(--spacing-sm) var(--spacing-md);
     border: none;
-    background: transparent;
-    width: 100%;
+    background: transparent,
+                width: 100%;
 
     &:focus { outline: none; }
   }
@@ -214,23 +213,6 @@ body {
       }
     }
   }
-
-  .user-info {
-    padding: var(--spacing-xl);
-    font-size: 0.85rem;
-    border-top: 1px solid var(--border);
-    text-align: center;
-
-    a {
-      color: var(--color-text);
-      text-decoration: none;
-      font-weight: bold;
-
-      &:hover { text-decoration: underline; }
-    }
-
-    &:hover { opacity: 1; }
-  }
 }
 
 @media (max-width: 768px) {
@@ -244,9 +226,11 @@ body {
   }
 }
 
-/* Main chat pane — subtle separation */
+/* Main chat panel */
 #chatbox-wrapper {
-  box-shadow: -4px 0 8px rgba(0, 0, 0, 0.05);
+  box-shadow:
+    -4px 0 8px rgba(0,0,0,0.05),
+    0 0 0 1px rgba(255,255,255,0.6) inset; /* soft inner edge */
   border: 1px solid var(--border-strong);
   z-index: 1;
   padding: var(--spacing-xl);
@@ -254,6 +238,7 @@ body {
   overflow-y: auto;
   min-width: 0; /* prevent overflow in flex layouts */
   border-top-left-radius: var(--radius-md);
+  overscroll-behavior: contain;
 }
 
 #chat {
@@ -296,37 +281,38 @@ body {
   }
 
   /* Markdown refinements */
-  .markdown-body { display: contents; }
+  .markdown-body {
+    display: contents;
+    p,
+    pre { padding: 0; margin: 0; }
 
-  .markdown-body p,
-  .markdown-body pre { padding: 0; margin: 0; }
+    a {
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      text-decoration-thickness: .08em;
+      transition: color .15s ease, text-decoration-color .15s ease, background-color .15s ease;
+    }
+    a:hover {
+      text-decoration-color: rgba(59,167,246,.6);
+      background-color: var(--accent-05);
+    }
 
-  .markdown-body a {
-    color: var(--accent);
-    text-decoration: underline;
-    text-underline-offset: 2px;
-    text-decoration-thickness: .08em;
-    transition: color .15s ease, text-decoration-color .15s ease, background-color .15s ease;
-  }
-  .markdown-body a:hover {
-    text-decoration-color: rgba(59,167,246,.6);
-    background-color: var(--accent-05);
-  }
+    pre,
+    code {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+    }
+    pre { padding: var(--spacing-md); overflow: auto; }
+    code { padding: 0 .25em; }
 
-  .markdown-body pre,
-  .markdown-body code {
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-  }
-  .markdown-body pre { padding: var(--spacing-md); overflow: auto; }
-  .markdown-body code { padding: 0 .25em; }
-
-  .markdown-body blockquote {
-    margin: .75rem 0;
-    padding: .5rem .75rem;
-    border-left: 3px solid var(--accent-20);
-    background: var(--accent-05);
-    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    blockquote {
+      margin: .75rem 0;
+      padding: .5rem .75rem;
+      border-left: 3px solid var(--accent-20);
+      background: var(--accent-05);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    }
   }
 
   #typing-indicator {
@@ -429,6 +415,28 @@ body {
 
 }
 
+#branding {
+  display: flex;
+  align-items: center;
+  width: auto;
+
+  .logo {
+    width: 3rem;
+    padding: 0;
+  }
+  h1 {
+    font-weight: lighter;
+    font-size: 1em;
+    text-shadow: var(--text-shadow-soft);
+  }
+}
+
+#sidebar-toggle {
+  margin-left: var(--spacing-md);
+  margin-top: 1px;
+}
+
+
 /* Search */
 #search-container {
   position: sticky;
@@ -440,24 +448,6 @@ body {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
-
-  #sidebar-toggle {
-    margin-right: var(--spacing-sm);
-  }
-
-  #branding {
-    margin: 0;
-    width: auto;
-    position: static;
-    left: 0;
-    gap: var(--spacing-sm);
-
-    .logo {
-      width: 3rem;
-      padding: 0;
-    }
-
-  }
 
   .header-right {
     margin-left: auto;
@@ -622,11 +612,11 @@ body {
 
   .search-result-item a:hover {
     background: rgba(255,255,255,0.58);
-        border-color: var(--accent);
-        box-shadow:
-          var(--inset-shadow),
-          0 0 0 2px var(--accent-20),
-          0 8px 24px var(--accent-10);
+    border-color: var(--accent);
+    box-shadow:
+      var(--inset-shadow),
+      0 0 0 2px var(--accent-20),
+      0 8px 24px var(--accent-10);
 
   }
 

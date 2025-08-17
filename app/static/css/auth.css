@@ -5,6 +5,28 @@ body {
   height: 100vh;
 }
 
+#branding {
+  display: flex;
+  align-items: center;
+  margin: 0 auto;
+  width: fit-content;
+  position: relative;
+  left: -10px;
+
+  .logo {
+    width: 5em;
+    padding: var(--spacing-sm);
+  }
+
+  h1 {
+    font-weight: lighter;
+    font-size: 1em;
+    margin-top: 1rem;
+    margin-left: -0.5rem;
+    text-shadow: var(--text-shadow-soft);
+  }
+}
+
 .form-container {
   max-width: 400px;
   margin: 10vh auto;

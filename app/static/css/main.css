@@ -62,27 +62,6 @@ html, body {
   height: 100%;
 }
 
-#branding {
-  display: flex;
-  align-items: center;
-  margin: 0 auto;
-  width: fit-content;
-  position: relative;
-  left: -10px;
-
-  .logo {
-    width: 5em;
-    padding: var(--spacing-sm);
-  }
-
-  h1 {
-    font-weight: lighter;
-    font-size: 1em;
-    margin-top: 1rem;
-    margin-left: -0.5rem;
-    text-shadow: var(--text-shadow-soft);
-  }
-}
 
 /* Errors */
 #errors {
@@ -149,4 +128,11 @@ html, body {
     background-color: #333;
 
   }
+}
+
+/* Reduce motion preference */
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important;
+      transition: none !important;
+    }
 }
