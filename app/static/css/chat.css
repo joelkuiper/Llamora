@@ -181,23 +181,24 @@ body {
     font-family: var(--font-base);
     padding: var(--spacing-sm) var(--spacing-md);
     border: none;
-    background: transparent,
-                width: 100%;
-
+    background: transparent;
     &:focus { outline: none; }
   }
 
   .session-actions {
     display: flex;
     align-items: center;
+    padding-right: var(--spacing-xs);
+
+    &:last-child {
+      padding-left: 0.33rem;
+    }
 
     .delete-btn,
     .edit-btn {
       background: none;
       border: none;
-      padding: 0.25rem;
       opacity: 0;
-      margin-left: 0.25rem;
       cursor: pointer;
       color: var(--color-text-muted);
       display: flex;
