@@ -29,7 +29,9 @@
           <button class="btn btn-primary" type="submit" data-loading="Logging in">Login</button>
         </form>
       <br>
+      {% if not config.DISABLE_REGISTRATION %}
       <p>Need an account? <a href="{{ url_for('auth.register') }}">Register</a></p>
+      {% endif %}
       <p><a href="{{ url_for('auth.reset_password') }}">Forgot password?</a></p>
     </div>
       <script type="module" src="{{ url_for('static', filename='js/forms.js') }}"></script>

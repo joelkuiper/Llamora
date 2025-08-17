@@ -1,9 +1,10 @@
-from quart import Quart, render_template, make_response, request
+from quart import Quart, render_template, make_response, request, url_for
 from dotenv import load_dotenv
 from quart_wtf import CSRFProtect
 import os
 import logging
 import asyncio
+import secrets
 from contextlib import suppress
 from db import LocalDB
 from app.api.search import SearchAPI
@@ -42,6 +43,20 @@ def create_app():
     app.before_request(load_user)
     app.before_serving(db.init)
     app.after_serving(db.close)
+
+    @app.before_serving
+    async def _print_registration_link():
+        if app.config.get("DISABLE_REGISTRATION"):
+            if await db.users_table_empty():
+                token = secrets.token_urlsafe(32)
+                app.config["REGISTRATION_TOKEN"] = token
+                url = url_for("auth.register", token=token, _external=True)
+                app.logger.warning(
+                    "Registration disabled but no users exist. One-time URL: %s",
+                    url,
+                )
+            else:
+                app.config["REGISTRATION_TOKEN"] = None
 
     maintenance_task: asyncio.Task | None = None
 

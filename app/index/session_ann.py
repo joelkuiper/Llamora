@@ -166,7 +166,8 @@ class SessionIndexRegistry:
                 self.cursors[user_id] = msgs[-1]["id"]
             else:
                 logger.debug("No existing data for user %s, creating empty index", user_id)
-                idx = SessionIndex(384)
+                dim = embed_texts([""]).shape[1]
+                idx = SessionIndex(dim)
                 latest = await self.db.get_user_latest_id(user_id)
                 self.cursors[user_id] = latest
 

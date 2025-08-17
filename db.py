@@ -189,6 +189,12 @@ class LocalDB:
             row = await cursor.fetchone()
         return dict(row) if row else None
 
+    async def users_table_empty(self) -> bool:
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute("SELECT 1 FROM users LIMIT 1")
+            row = await cursor.fetchone()
+        return row is None
+
     async def get_state(self, user_id):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(

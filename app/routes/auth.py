@@ -6,6 +6,7 @@ from quart import (
     current_app,
     url_for,
     Response,
+    abort,
 )
 from nacl import pwhash
 from app.services.auth_helpers import (
@@ -81,6 +82,12 @@ async def password_strength_check():
 
 @auth_bp.route("/register", methods=["GET", "POST"])
 async def register():
+    if current_app.config.get("DISABLE_REGISTRATION"):
+        token = request.args.get("token")
+        reg_token = current_app.config.get("REGISTRATION_TOKEN")
+        if not reg_token or token != reg_token:
+            abort(404)
+
     if request.method == "POST":
         form = await request.form
         username = form.get("username", "").strip()
@@ -140,6 +147,9 @@ async def register():
             rc_nonce,
             rc_cipher,
         )
+
+        if current_app.config.get("DISABLE_REGISTRATION"):
+            current_app.config["REGISTRATION_TOKEN"] = None
 
         return await render_template(
             "recovery.html",

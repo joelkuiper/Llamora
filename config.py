@@ -3,6 +3,7 @@ import os
 import logging
 from copy import deepcopy
 from datetime import timedelta
+from util import str_to_bool
 
 MAX_USERNAME_LENGTH = 30
 MAX_PASSWORD_LENGTH = 128
@@ -10,6 +11,14 @@ MIN_PASSWORD_LENGTH = 8
 MAX_MESSAGE_LENGTH = 1000
 MAX_SESSION_NAME_LENGTH = 100
 APP_NAME = "Llamora"
+
+# Feature toggles
+DISABLE_REGISTRATION = str_to_bool(
+    os.getenv("LLAMORA_DISABLE_REGISTRATION", "false")
+)
+
+# Embedding configuration
+EMBED_MODEL = os.getenv("LLAMORA_EMBED_MODEL", "BAAI/bge-small-en-v1.5")
 
 # Session and CSRF configuration
 SESSION_TTL = int(os.getenv("LLAMORA_SESSION_TTL", 7 * 24 * 60 * 60))

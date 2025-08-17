@@ -29,7 +29,7 @@
         <h1>{{ config.APP_NAME }}</h1>
       </div>
 
-      <button id="sidebar-toggle" class="icon-btn" aria-label="Toggle sidebar" aria-pressed="false">
+      <button id="sidebar-toggle" class="icon-btn" aria-label="Toggle sidebar" aria-pressed="false" data-popup-title="Toggle sidebar">
         <svg class="icon-closed" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <!-- outer page -->
           <rect x="3" y="5" width="18" height="14" rx="3"
@@ -65,7 +65,7 @@
           </section>
         </div>
         <div class="user-actions">
-          <a href="{{ url_for('auth.profile') }}" class="icon-btn" aria-label="Profile">
+          <a href="{{ url_for('auth.profile') }}" class="icon-btn" aria-label="Profile" data-popup-title="Profile">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -73,7 +73,7 @@
           </a>
           <form method="post" action="{{ url_for('auth.logout') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="icon-btn" aria-label="Logout">
+            <button type="submit" class="icon-btn" aria-label="Logout" data-popup-title="Logout">
               <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M16 17l5-5-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 <path d="M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -127,7 +127,9 @@
 
     <script type="module">
       import { initSidebarToggle } from "{{ url_for('static', filename='js/sidebar.js') }}";
+      import { initPopups } from "{{ url_for('static', filename='js/ui.js') }}";
       initSidebarToggle();
+      initPopups();
     </script>
   </body>
 </html>

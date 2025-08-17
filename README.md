@@ -116,5 +116,7 @@ This project is an educational experiment and is **not** intended for production
      - `cookie` (default) – survives server restarts but if an attacker gets both the cookie and `LLAMORA_COOKIE_SECRET` they can decrypt user data.
      - `session` – stores the key in server memory with an inactivity timeout (`LLAMORA_SESSION_TTL`), more secure but users must log in again after restarts and stale sessions are purged.
    - `LLAMORA_SESSION_TTL` to set session expiration in seconds (defaults to 604800)
+   - `LLAMORA_EMBED_MODEL` to override the default embedding model name
+   - `LLAMORA_DISABLE_REGISTRATION` set to a truthy value (e.g., `1`, `true`, `yes`) to hide registration and block `/register` (prints a one-time link if no users exist)
 
 Deploying this project as-is is discouraged. Use at your own risk.

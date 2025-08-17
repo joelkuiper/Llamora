@@ -1,16 +1,19 @@
 import numpy as np
-import os
 from functools import lru_cache
 
 from fastembed import TextEmbedding
-
-_MODEL = os.getenv("LLAMORA_EMBED_MODEL", "BAAI/bge-small-en-v1.5")  # 384-dim
+from quart import current_app
+import config
 
 
 @lru_cache(maxsize=1)
 def _get_model() -> TextEmbedding:
     # downloads once to ~/.cache; CPU-only and fast
-    return TextEmbedding(model_name=_MODEL)
+    try:
+        model_name = current_app.config.get("EMBED_MODEL", config.EMBED_MODEL)
+    except RuntimeError:
+        model_name = config.EMBED_MODEL
+    return TextEmbedding(model_name=model_name)
 
 
 def embed_texts(texts: list[str]) -> np.ndarray:
