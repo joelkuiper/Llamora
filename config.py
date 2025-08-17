@@ -10,15 +10,6 @@ MAX_MESSAGE_LENGTH = 1000
 MAX_SESSION_NAME_LENGTH = 100
 APP_NAME = "Llamora"
 
-seven_days = 60 * 60 * 24 * 7  # seconds
-
-# Session lifetime
-SESSION_TTL_SECONDS = int(os.getenv("LLAMORA_SESSION_TTL", seven_days))
-# CSRF configuration
-# Extend CSRF token lifetime to 7 days so idle sessions don't
-# immediately break once a user returns to the page.
-WTF_CSRF_TIME_LIMIT = seven_days
-
 # Database pool and connection defaults
 DB_POOL_SIZE = int(os.getenv("LLAMORA_DB_POOL_SIZE", 25))
 DB_POOL_ACQUIRE_TIMEOUT = float(os.getenv("LLAMORA_DB_ACQUIRE_TIMEOUT", 10))

@@ -1,22 +1,12 @@
-from quart import (
-    Quart,
-    render_template,
-    make_response,
-    request,
-    redirect,
-    url_for,
-    Response,
-)
+from quart import Quart, render_template, make_response, request
 from dotenv import load_dotenv
 from quart_wtf import CSRFProtect
-from quart_wtf.csrf import CSRFError
 import os
 import logging
 import asyncio
 from contextlib import suppress
 from db import LocalDB
 from app.api.search import SearchAPI
-from datetime import timedelta
 
 load_dotenv()
 
@@ -29,9 +19,6 @@ def create_app():
     app = Quart(__name__)
     app.secret_key = os.getenv("LLAMORA_SECRET_KEY")
     app.config.from_object("config")
-    app.permanent_session_lifetime = timedelta(
-        seconds=app.config["SESSION_TTL_SECONDS"]
-    )
 
     logging.basicConfig(
         level=os.getenv("LOG_LEVEL", "INFO"),
@@ -50,8 +37,7 @@ def create_app():
     app.register_blueprint(chat_bp)
     app.register_blueprint(search_bp)
 
-    from .services.auth_helpers import load_user, clear_secure_cookie
-    from .services import session_store
+    from .services.auth_helpers import load_user
 
     app.before_request(load_user)
     app.before_serving(db.init)
@@ -64,7 +50,6 @@ def create_app():
             while True:
                 await asyncio.sleep(60)
                 await search_api.maintenance_tick()
-                session_store.cleanup_expired()
         except asyncio.CancelledError:
             pass
 
@@ -79,25 +64,6 @@ def create_app():
             maintenance_task.cancel()
             with suppress(asyncio.CancelledError):
                 await maintenance_task
-
-    @app.errorhandler(CSRFError)
-    async def handle_csrf_error(e):
-        message = e.description or "CSRF token missing or invalid."
-        login_url = url_for("auth.login")
-        if "expired" in message.lower():
-            if request.headers.get("HX-Request"):
-                resp = Response(status=401)
-                resp.headers["HX-Redirect"] = login_url
-                clear_secure_cookie(resp)
-                return resp
-            resp = redirect(login_url)
-            clear_secure_cookie(resp)
-            return resp
-        if request.headers.get("HX-Request"):
-            html = await render_template("partials/error.html", message=message)
-            return await make_response(html, 400)
-        html = await render_template("error.html", message=message)
-        return await make_response(html, 400)
 
     @app.errorhandler(404)
     async def not_found(e):
