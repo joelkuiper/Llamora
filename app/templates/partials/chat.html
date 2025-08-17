@@ -21,17 +21,17 @@
         hx-swap="beforeend">
 
     <div class="input-wrapper">
-      <textarea
-        onkeydown="if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); this.form.requestSubmit(); }"
-        name="message"
-        rows="3"
-        placeholder="Type your message"
-        cols="40"
-        maxlength="{{ config.MAX_MESSAGE_LENGTH }}"
-        required></textarea>
-      <button type="submit">➤</button>
-    </div>
-  </form>
+        <textarea class="input"
+          onkeydown="if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); this.form.requestSubmit(); }"
+          name="message"
+          rows="3"
+          placeholder="Type your message"
+          cols="40"
+          maxlength="{{ config.MAX_MESSAGE_LENGTH }}"
+          required></textarea>
+        <button class="btn" type="submit">➤</button>
+      </div>
+    </form>
   <script type="module">
     import { initChatUI } from "{{ url_for('static', filename='js/chat.js') }}";
     import { updateActiveSession } from "{{ url_for('static', filename='js/session.js') }}";

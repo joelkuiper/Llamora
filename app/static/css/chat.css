@@ -185,14 +185,14 @@ body {
     &:focus { outline: none; }
   }
 
+  .session-actions button:last-child {
+    padding-left: 0.4rem;
+  }
+
   .session-actions {
     display: flex;
     align-items: center;
     padding-right: var(--spacing-xs);
-
-    &:last-child {
-      padding-left: 0.33rem;
-    }
 
     .delete-btn,
     .edit-btn {
@@ -349,71 +349,21 @@ body {
     textarea {
       flex: 1;
       padding: var(--spacing-lg);
-      font-size: var(--font-size);
-      background: var(--color-bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
       resize: none;
       outline: none;
-      box-shadow: var(--inset-shadow);
-      transition: box-shadow 0.3s ease-in-out, border-color 0.2s ease-in-out;
       font-family: var(--font-base);
-
-      &:focus {
-        border-color: var(--accent);
-        box-shadow:
-          var(--inset-shadow),
-          0 0 0 2px var(--accent-20),
-          0 8px 24px var(--accent-10);
-      }
     }
 
     button {
       padding: var(--spacing-md) var(--spacing-lg);
       font-size: 1.2rem;
-      background: var(--color-bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      box-shadow: var(--inset-shadow);
-      cursor: pointer;
-      transition: box-shadow 0.2s ease-in-out, opacity 0.2s ease, border-color 0.2s ease-in-out, transform 0.08s ease;
-
-      &:hover {
-        border-color: var(--accent-10);
-        box-shadow:
-          var(--inset-shadow-disabled),
-          0 0 0 2px var(--accent-05);
-      }
-
-      &:focus-visible {
-        outline: none;
-        border-color: var(--accent);
-        box-shadow:
-          var(--inset-shadow),
-          0 0 0 2px var(--accent-20),
-          0 8px 20px var(--accent-10);
-      }
-
-      &:active {
-        transform: translateY(1px);
-        border-color: var(--accent-10);
-        box-shadow: var(--inset-shadow-disabled);
-      }
-
-      &:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-        box-shadow: var(--inset-shadow-disabled);
-      }
     }
 
-    textarea:disabled {
+    textarea:disabled,
+    button:disabled {
       opacity: 0.5;
-      cursor: not-allowed;
-      box-shadow: var(--inset-shadow-disabled);
     }
   }
-
 }
 
 #branding {

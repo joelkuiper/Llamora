@@ -19,10 +19,10 @@
       <h2>Change Password</h2>
       <form method="post" action="{{ url_for('auth.change_password') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-        <input type="password" name="current_password" placeholder="Current password" required maxlength="{{ config.MAX_PASSWORD_LENGTH }}" />
-        <input type="password" name="new_password" placeholder="New password" required maxlength="{{ config.MAX_PASSWORD_LENGTH }}" />
-        <input type="password" name="confirm_password" placeholder="Confirm new password" required maxlength="{{ config.MAX_PASSWORD_LENGTH }}" />
-        <button type="submit">Update Password</button>
+        <input class="input" type="password" name="current_password" placeholder="Current password" required maxlength="{{ config.MAX_PASSWORD_LENGTH }}" />
+        <input class="input" type="password" name="new_password" placeholder="New password" required maxlength="{{ config.MAX_PASSWORD_LENGTH }}" />
+        <input class="input" type="password" name="confirm_password" placeholder="Confirm new password" required maxlength="{{ config.MAX_PASSWORD_LENGTH }}" />
+        <button class="btn" type="submit">Update Password</button>
       </form>
 
       {% if rc_error %}
@@ -31,17 +31,17 @@
       <h2>Recovery</h2>
       <form method="post" action="{{ url_for('auth.regen_recovery') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-        <button type="submit">Generate New Recovery Code</button>
+        <button class="btn" type="submit">Generate New Recovery Code</button>
       </form>
 
       <h2>Data</h2>
       <form method="get" action="{{ url_for('auth.download_user_data') }}">
-        <button type="submit">Download My Data</button>
+        <button class="btn" type="submit">Download My Data</button>
       </form>
 
       <h2>Danger Zone</h2>
       <button
-        class="dangerous"
+        class="btn dangerous"
         hx-delete="{{ url_for('auth.delete_profile') }}"
         hx-confirm="Are you sure you want to delete your profile? This cannot be undone."
       >Delete Profile</button>

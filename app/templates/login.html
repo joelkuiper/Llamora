@@ -18,16 +18,16 @@
       <div class="error">{{ error }}</div>
       {% endif %}
       <form method="post">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        {% if return_url %}
-        <input type="hidden" name="return" value="{{ return_url }}">
-        {% endif %}
-        <input type="text" name="username" placeholder="Username"
-               required pattern="^\S+$" maxlength="{{ config.MAX_USERNAME_LENGTH }}" />
-        <input type="password" name="password" placeholder="Password"
-               required maxlength="{{ config.MAX_PASSWORD_LENGTH }}" />
-        <button type="submit" data-loading="Logging in">Login</button>
-      </form>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% if return_url %}
+          <input type="hidden" name="return" value="{{ return_url }}">
+          {% endif %}
+          <input class="input" type="text" name="username" placeholder="Username"
+                 required pattern="^\S+$" maxlength="{{ config.MAX_USERNAME_LENGTH }}" />
+          <input class="input" type="password" name="password" placeholder="Password"
+                 required maxlength="{{ config.MAX_PASSWORD_LENGTH }}" />
+          <button class="btn btn-primary" type="submit" data-loading="Logging in">Login</button>
+        </form>
       <br>
       <p>Need an account? <a href="{{ url_for('auth.register') }}">Register</a></p>
       <p><a href="{{ url_for('auth.reset_password') }}">Forgot password?</a></p>
