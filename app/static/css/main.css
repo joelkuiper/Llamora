@@ -228,6 +228,9 @@ html, body {
 }
 
 
+.btn, .input {
+  transition: all 0.3 ease;
+}
 
 /* Errors */
 #errors {

@@ -62,7 +62,6 @@ body {
     color: #0b6a36;
   }
 
-  /* Password strength (kept but harmonized) */
   .strength-meter {
     height: 0.5rem;
     border-radius: var(--radius-sm);

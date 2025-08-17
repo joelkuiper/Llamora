@@ -231,7 +231,7 @@ body {
 #chatbox-wrapper {
   box-shadow:
     -4px 0 8px rgba(0,0,0,0.05),
-    0 0 0 1px rgba(255,255,255,0.6) inset; /* soft inner edge */
+    0 0 0 1px rgba(255,255,255,0.6) inset;
   border: 1px solid var(--border-strong);
   z-index: 1;
   padding: var(--spacing-xl);
@@ -481,7 +481,7 @@ body {
 
   .search-results-list {
     flex: 1 1 auto;
-    min-height: 0;       /* critical for nested flex scrolling */
+    min-height: 0;
     overflow-y: auto;
     margin: 0;
     padding: var(--spacing-sm);
@@ -644,10 +644,8 @@ body {
   to   { opacity: 0; transform: translateY(-6px) scale(.98) rotateX(2deg); }
 }
 
-/* Wrapper */
 #search-results { position: relative; }
 
-/* Base panel: visible */
 #search-results > .sr-panel {
   opacity: 1;
   transform: translateY(0) scale(1) rotateX(0);
@@ -656,18 +654,15 @@ body {
   pointer-events: auto;
 }
 
-/* Hidden starting state (no animation) */
 #search-results:not(.is-open) > .sr-panel.htmx-added {
   opacity: 0;
   transform: translateY(-6px) scale(.98) rotateX(2deg);
 }
 
-/* First open: animate via stable class */
 #search-results > .sr-panel.sr-enter {
   animation: sr-pop 180ms cubic-bezier(.2,.7,.2,1) both;
 }
 
-/* Close animation */
 #search-results > .sr-panel.sr-closing {
   animation: sr-out 160ms cubic-bezier(.2,.7,.2,1) both;
 }
@@ -680,10 +675,6 @@ body {
   0% { transform: scale(1); }
   50% { transform: scale(0.97); }
   100% { transform: scale(1); }
-}
-
-form textarea, form button {
-  transition: opacity 0.3s ease, box-shadow 0.3s ease;
 }
 
 @keyframes flash {
