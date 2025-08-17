@@ -15,12 +15,17 @@ from app.services.auth_helpers import (
     get_dek,
     clear_secure_cookie,
 )
-from app.services.crypto import generate_dek, wrap_key, unwrap_key
+from app.services.crypto import (
+    generate_dek,
+    wrap_key,
+    unwrap_key,
+    generate_recovery_code,
+    format_recovery_code,
+)
 from app import db
 import re
 import base64
 import config
-import secrets
 import json
 from zxcvbn import zxcvbn
 
@@ -119,7 +124,7 @@ async def register():
         password_hash = hash_bytes.decode("utf-8")
 
         dek = generate_dek()
-        recovery_code = secrets.token_hex(16)
+        recovery_code = generate_recovery_code()
         pw_salt, pw_nonce, pw_cipher = wrap_key(dek, password)
         rc_salt, rc_nonce, rc_cipher = wrap_key(dek, recovery_code)
 
@@ -135,7 +140,9 @@ async def register():
         )
 
         return await render_template(
-            "recovery.html", code=recovery_code, next_url=url_for("auth.login")
+            "recovery.html",
+            code=format_recovery_code(recovery_code),
+            next_url=url_for("auth.login"),
         )
 
     return await render_template("register.html")
@@ -225,7 +232,7 @@ async def reset_password():
     if request.method == "POST":
         form = await request.form
         username = form.get("username", "").strip()
-        recovery = form.get("recovery_code", "")
+        recovery = form.get("recovery_code", "").replace("-", "").upper()
         password = form.get("new_password", "")
         confirm = form.get("confirm_password", "")
 
@@ -388,12 +395,14 @@ async def regen_recovery():
             "profile.html", user=user, rc_error="Missing encryption key"
         )
 
-    recovery_code = secrets.token_hex(16)
+    recovery_code = generate_recovery_code()
     rc_salt, rc_nonce, rc_cipher = wrap_key(dek, recovery_code)
     await db.update_recovery_wrap(user["id"], rc_salt, rc_nonce, rc_cipher)
 
     return await render_template(
-        "recovery.html", code=recovery_code, next_url=url_for("auth.profile")
+        "recovery.html",
+        code=format_recovery_code(recovery_code),
+        next_url=url_for("auth.profile"),
     )
 
 

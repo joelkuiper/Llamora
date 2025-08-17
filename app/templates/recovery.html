@@ -5,18 +5,23 @@
     <title>{{ config.APP_NAME }} | Recovery Code</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}" />
-    <link rel="icon" href="{{url_for('static', filename='img/favicon.ico')}}" type="image/x-icon">
-
+    <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}" type="image/x-icon" />
   </head>
   <body>
     <div class="form-container">
       <h1>Recovery Code</h1>
-      <p>
-        <strong>Important:</strong> Save this recovery code in a secure place. You will need it to reset your password. Without it, if you forget your password, <strong>all your data will be permanently lost</strong> and cannot be recovered.
+      <p class="warning">
+        Without this code, if you lose your password, your account and data
+        cannot be recovered.
       </p>
 
       <pre id="recovery">{{ code }}</pre>
-      <p><a href="{{ next_url }}">Continue</a></p>
+      <div class="recovery-actions">
+        <button class="btn" id="copy">Copy</button>
+        <button class="btn" id="download">Download</button>
+      </div>
+      <p class="continue"><a href="{{ next_url }}">Continue</a></p>
     </div>
+    <script type="module" src="{{ url_for('static', filename='js/recovery.js') }}"></script>
   </body>
 </html>
