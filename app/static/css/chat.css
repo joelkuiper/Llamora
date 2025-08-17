@@ -29,6 +29,10 @@ body {
       transform: translateX(-240px);
       padding-left: 0;
     }
+
+    #chatbox-wrapper {
+      border-top-left-radius: 0;
+    }
   }
 }
 
