@@ -1,4 +1,4 @@
-from quart import Quart, render_template, make_response, request, url_for
+from quart import Quart, render_template, make_response, request
 from dotenv import load_dotenv
 from quart_wtf import CSRFProtect
 import os
@@ -50,7 +50,12 @@ def create_app():
             if await db.users_table_empty():
                 token = secrets.token_urlsafe(32)
                 app.config["REGISTRATION_TOKEN"] = token
-                url = url_for("auth.register", token=token, _external=True)
+                server = app.config.get("SERVER_NAME")
+                scheme = app.config.get("PREFERRED_URL_SCHEME", "http")
+                if server:
+                    url = f"{scheme}://{server}/register?token={token}"
+                else:
+                    url = f"/register?token={token}"
                 app.logger.warning(
                     "Registration disabled but no users exist. One-time URL: %s",
                     url,
