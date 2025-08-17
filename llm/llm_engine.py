@@ -1,5 +1,5 @@
 import atexit
-import json
+import orjson
 import subprocess
 import time
 import logging
@@ -229,7 +229,7 @@ class LLMEngine:
                             data_str = "\n".join(event_buf).strip()
                             event_buf.clear()
                             try:
-                                data = json.loads(data_str)
+                                data = orjson.loads(data_str)
                             except Exception:
                                 continue
                             if data.get("stop"):
@@ -240,7 +240,7 @@ class LLMEngine:
 
                     if event_buf:
                         try:
-                            data = json.loads("\n".join(event_buf).strip())
+                            data = orjson.loads("\n".join(event_buf).strip())
                             content = data.get("content")
                             if content and content.strip():
                                 yield content

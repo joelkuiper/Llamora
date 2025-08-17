@@ -10,7 +10,7 @@ from quart import (
 )
 from html import escape
 import asyncio
-import json
+import orjson
 import re
 from weakref import WeakValueDictionary
 from llm.llm_engine import LLMEngine
@@ -225,7 +225,7 @@ async def sse_reply(msg_id, session_id):
     cfg = request.args.get("config")
     if cfg:
         try:
-            raw = json.loads(cfg)
+            raw = orjson.loads(cfg)
             if isinstance(raw, dict):
                 allowed = current_app.config.get("ALLOWED_LLM_CONFIG_KEYS", set())
                 params = {k: raw[k] for k in raw if k in allowed}

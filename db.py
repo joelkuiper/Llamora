@@ -2,7 +2,7 @@ import os
 import aiosqlite
 import secrets
 import logging
-import json
+import orjson
 import asyncio
 from config import (
     MAX_USERNAME_LENGTH,
@@ -203,7 +203,7 @@ class LocalDB:
             row = await cursor.fetchone()
         if row and row["state"]:
             try:
-                return json.loads(row["state"])
+                return orjson.loads(row["state"])
             except Exception:
                 return {}
         return {}
@@ -215,7 +215,7 @@ class LocalDB:
                 state.pop(key, None)
             else:
                 state[key] = value
-        state_json = json.dumps(state)
+        state_json = orjson.dumps(state)
         async with self.pool.connection() as conn:
             await self.with_transaction(
                 conn,

@@ -1,6 +1,6 @@
 import os
 import base64
-import json
+import orjson
 import secrets
 from cachetools import TTLCache
 from quart import Response, request, redirect, g, current_app
@@ -44,14 +44,16 @@ def _get_cookie_data() -> dict:
     try:
         token = base64.urlsafe_b64decode(raw)
         decrypted = cookie_box.decrypt(token).decode("utf-8")
-        data = json.loads(decrypted)
+        data = orjson.loads(decrypted)
         g._secure_cookie_state = data  # cache for later calls
         current_app.logger.debug(
             "Loaded %s cookie with keys %s", COOKIE_NAME, list(data.keys())
         )
         return data
     except Exception:
-        current_app.logger.debug("Failed to decode %s cookie", COOKIE_NAME, exc_info=True)
+        current_app.logger.debug(
+            "Failed to decode %s cookie", COOKIE_NAME, exc_info=True
+        )
         return {}
 
 
@@ -68,7 +70,7 @@ def _set_cookie_data(response: Response, data: dict) -> None:
         current_app.logger.debug("Clearing %s cookie", COOKIE_NAME)
         response.delete_cookie(COOKIE_NAME, path="/", samesite="Lax")
         return
-    token = cookie_box.encrypt(json.dumps(data).encode("utf-8"))
+    token = cookie_box.encrypt(orjson.dumps(data).encode("utf-8"))
     b64 = base64.urlsafe_b64encode(token).decode("utf-8")
     # Only mark the cookie as secure when the current request is served
     # over HTTPS. When running the application locally without TLS the
@@ -122,9 +124,7 @@ def set_dek(response: Response, dek: bytes) -> None:
         set_secure_cookie(response, "sid", sid)
         set_secure_cookie(response, "dek", None)
     else:
-        set_secure_cookie(
-            response, "dek", base64.b64encode(dek).decode("utf-8")
-        )
+        set_secure_cookie(response, "dek", base64.b64encode(dek).decode("utf-8"))
 
 
 def clear_session_dek() -> None:

@@ -29,7 +29,7 @@ from app import db
 import re
 import base64
 import config
-import json
+import orjson
 from zxcvbn import zxcvbn
 
 auth_bp = Blueprint("auth", __name__)
@@ -340,7 +340,7 @@ async def download_user_data():
         "sessions": data_sessions,
     }
 
-    payload = json.dumps(user_data)
+    payload = orjson.dumps(user_data)
     headers = {"Content-Disposition": "attachment; filename=user_data.json"}
     return Response(payload, headers=headers, mimetype="application/json")
 

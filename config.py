@@ -1,4 +1,4 @@
-import json
+import orjson
 import os
 import logging
 from copy import deepcopy
@@ -50,8 +50,8 @@ def _json_env(name: str):
     if not raw:
         return None
     try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
+        return orjson.loads(raw)
+    except orjson.JSONDecodeError:
         logging.warning("Invalid JSON in %s, ignoring.", name)
         return None
 
