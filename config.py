@@ -13,9 +13,7 @@ MAX_SESSION_NAME_LENGTH = 100
 APP_NAME = "Llamora"
 
 # Feature toggles
-DISABLE_REGISTRATION = str_to_bool(
-    os.getenv("LLAMORA_DISABLE_REGISTRATION", "false")
-)
+DISABLE_REGISTRATION = str_to_bool(os.getenv("LLAMORA_DISABLE_REGISTRATION", "false"))
 
 # Embedding configuration
 EMBED_MODEL = os.getenv("LLAMORA_EMBED_MODEL", "BAAI/bge-small-en-v1.5")
@@ -31,6 +29,10 @@ DB_POOL_ACQUIRE_TIMEOUT = float(os.getenv("LLAMORA_DB_ACQUIRE_TIMEOUT", 10))
 DB_TIMEOUT = float(os.getenv("LLAMORA_DB_TIMEOUT", 5))
 DB_BUSY_TIMEOUT = int(os.getenv("LLAMORA_DB_BUSY_TIMEOUT", 5000))  # milliseconds
 DB_MMAP_SIZE = int(os.getenv("LLAMORA_DB_MMAP_SIZE", 10 * 1024 * 1024))
+
+
+# Only allow a limited subset of parameters to be forwarded to the LLM
+ALLOWED_LLM_CONFIG_KEYS = {"temperature"}
 
 
 def _deep_merge(base: dict, override: dict) -> dict:

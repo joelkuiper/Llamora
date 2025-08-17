@@ -225,9 +225,18 @@ async def sse_reply(msg_id, session_id):
     cfg = request.args.get("config")
     if cfg:
         try:
-            params = json.loads(cfg)
+            raw = json.loads(cfg)
+            if isinstance(raw, dict):
+                allowed = current_app.config.get("ALLOWED_LLM_CONFIG_KEYS", set())
+                params = {k: raw[k] for k in raw if k in allowed}
+            else:
+                current_app.logger.warning("Invalid config JSON for message %s", msg_id)
         except Exception:
             current_app.logger.warning("Invalid config JSON for message %s", msg_id)
+
+    if not params:
+        params = None
+
     pending = pending_responses.get(msg_id)
     if not pending:
         pending = PendingResponse(msg_id, uid, session_id, history, dek, params)
