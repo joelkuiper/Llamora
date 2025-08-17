@@ -14,6 +14,8 @@ from app.services.auth_helpers import (
     get_current_user,
     get_dek,
     clear_secure_cookie,
+    set_dek,
+    clear_session_dek,
 )
 from app.services.crypto import (
     generate_dek,
@@ -197,7 +199,7 @@ async def login():
                         redirect_url = "/"
                 resp = redirect(redirect_url)
                 set_secure_cookie(resp, "uid", str(user["id"]))
-                set_secure_cookie(resp, "dek", base64.b64encode(dek).decode("utf-8"))
+                set_dek(resp, dek)
                 current_app.logger.debug(
                     "Login succeeded for %s, redirecting to %s", username, redirect_url
                 )
@@ -223,6 +225,7 @@ async def logout():
     next_url = "/login"
     resp = redirect(next_url)
 
+    clear_session_dek()
     clear_secure_cookie(resp)
     return resp
 

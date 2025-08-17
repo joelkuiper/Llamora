@@ -2,6 +2,7 @@ import json
 import os
 import logging
 from copy import deepcopy
+from datetime import timedelta
 
 MAX_USERNAME_LENGTH = 30
 MAX_PASSWORD_LENGTH = 128
@@ -9,6 +10,11 @@ MIN_PASSWORD_LENGTH = 8
 MAX_MESSAGE_LENGTH = 1000
 MAX_SESSION_NAME_LENGTH = 100
 APP_NAME = "Llamora"
+
+# Session and CSRF configuration
+SESSION_TTL = int(os.getenv("LLAMORA_SESSION_TTL", 7 * 24 * 60 * 60))
+PERMANENT_SESSION_LIFETIME = timedelta(seconds=SESSION_TTL)
+WTF_CSRF_TIME_LIMIT = SESSION_TTL
 
 # Database pool and connection defaults
 DB_POOL_SIZE = int(os.getenv("LLAMORA_DB_POOL_SIZE", 25))

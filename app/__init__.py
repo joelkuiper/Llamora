@@ -37,7 +37,7 @@ def create_app():
     app.register_blueprint(chat_bp)
     app.register_blueprint(search_bp)
 
-    from .services.auth_helpers import load_user
+    from .services.auth_helpers import load_user, dek_store
 
     app.before_request(load_user)
     app.before_serving(db.init)
@@ -49,6 +49,7 @@ def create_app():
         try:
             while True:
                 await asyncio.sleep(60)
+                dek_store.expire()
                 await search_api.maintenance_tick()
         except asyncio.CancelledError:
             pass

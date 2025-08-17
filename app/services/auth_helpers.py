@@ -1,11 +1,14 @@
 import os
 import base64
 import json
+import secrets
+from cachetools import TTLCache
 from quart import Response, request, redirect, g, current_app
 from urllib.parse import urlparse, quote
 from functools import wraps
 from nacl import secret
 from app import db
+from config import SESSION_TTL
 
 cookie_secret = os.environ.get("LLAMORA_COOKIE_SECRET")
 if not cookie_secret or len(cookie_secret) % 4 != 0:
@@ -21,6 +24,11 @@ if len(cookie_key) != secret.SecretBox.KEY_SIZE:
 
 COOKIE_NAME = os.environ.get("LLAMORA_COOKIE_NAME", "llamora")
 cookie_box = secret.SecretBox(cookie_key)
+
+DEK_STORAGE = os.getenv("LLAMORA_DEK_STORAGE", "cookie").lower()
+
+# Rough upper bound on concurrent sessions; adjust as needed
+dek_store = TTLCache(maxsize=1024, ttl=SESSION_TTL)
 
 
 def _get_cookie_data() -> dict:
@@ -107,12 +115,50 @@ def clear_secure_cookie(response: Response) -> None:
     response.delete_cookie(COOKIE_NAME, path="/", samesite="Lax")
 
 
+def set_dek(response: Response, dek: bytes) -> None:
+    if DEK_STORAGE == "session":
+        sid = secrets.token_urlsafe(32)
+        dek_store[sid] = dek
+        set_secure_cookie(response, "sid", sid)
+        set_secure_cookie(response, "dek", None)
+    else:
+        set_secure_cookie(
+            response, "dek", base64.b64encode(dek).decode("utf-8")
+        )
+
+
+def clear_session_dek() -> None:
+    """Remove the DEK from the server-side store if session storage is used.
+
+    When the DEK is stored in cookies, the entire secure cookie is cleared
+    elsewhere so no extra work is needed here.
+    """
+    if DEK_STORAGE == "session":
+        sid = get_secure_cookie("sid")
+        if sid:
+            dek_store.pop(sid, None)
+
+
 async def get_current_user():
     uid = get_secure_cookie("uid")
     return await db.get_user_by_id(uid) if uid else None
 
 
 def get_dek():
+    """Retrieve the DEK from storage.
+
+    In session mode this refreshes the entry's TTL so active sessions stay
+    valid.
+    """
+    if DEK_STORAGE == "session":
+        sid = get_secure_cookie("sid")
+        if not sid:
+            return None
+        dek_store.expire()
+        dek = dek_store.get(sid)
+        if dek is not None:
+            dek_store[sid] = dek  # refresh TTL
+        return dek
     data = get_secure_cookie("dek")
     if not data:
         return None
@@ -165,6 +211,7 @@ async def load_user():
     # Eager-load user info if needed in templates
     request.user = await get_current_user()
     if request.user:
+        _ = get_dek()  # refresh session DEK TTL if present
         current_app.logger.debug("Loaded user %s for request", request.user["id"])
     else:
         current_app.logger.debug("No user loaded for request")
