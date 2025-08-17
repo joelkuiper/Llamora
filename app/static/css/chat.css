@@ -417,18 +417,11 @@ body {
 }
 
 #branding {
-  display: flex;
-  align-items: center;
   width: auto;
 
   .logo {
     width: 3rem;
     padding: 0;
-  }
-  h1 {
-    font-weight: lighter;
-    font-size: 1em;
-    text-shadow: var(--text-shadow-soft);
   }
 }
 

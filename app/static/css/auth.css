@@ -6,8 +6,6 @@ body {
 }
 
 #branding {
-  display: flex;
-  align-items: center;
   margin: 0 auto;
   width: fit-content;
   position: relative;
@@ -19,11 +17,8 @@ body {
   }
 
   h1 {
-    font-weight: lighter;
-    font-size: 1em;
     margin-top: 1rem;
     margin-left: -0.5rem;
-    text-shadow: var(--text-shadow-soft);
   }
 }
 
