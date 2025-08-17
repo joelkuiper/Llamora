@@ -6,6 +6,8 @@ from urllib.parse import urlparse, quote
 from functools import wraps
 from nacl import secret
 from app import db
+from . import session_store
+import config
 
 cookie_secret = os.environ.get("LLAMORA_COOKIE_SECRET")
 if not cookie_secret or len(cookie_secret) % 4 != 0:
@@ -82,6 +84,7 @@ def _set_cookie_data(response: Response, data: dict) -> None:
         secure=request.is_secure,
         samesite="Lax",
         path="/",
+        max_age=config.SESSION_TTL_SECONDS,
     )
 
 
@@ -113,13 +116,10 @@ async def get_current_user():
 
 
 def get_dek():
-    data = get_secure_cookie("dek")
-    if not data:
+    uid = get_secure_cookie("uid")
+    if not uid:
         return None
-    try:
-        return base64.b64decode(data)
-    except Exception:
-        return None
+    return session_store.get_dek(uid)
 
 
 def _safe_return_path() -> str:

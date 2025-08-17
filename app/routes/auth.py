@@ -6,6 +6,7 @@ from quart import (
     current_app,
     url_for,
     Response,
+    session,
 )
 from nacl import pwhash
 from app.services.auth_helpers import (
@@ -18,11 +19,11 @@ from app.services.auth_helpers import (
 from app.services.crypto import generate_dek, wrap_key, unwrap_key
 from app import db
 import re
-import base64
 import config
 import secrets
 import json
 from zxcvbn import zxcvbn
+from app.services import session_store
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -188,9 +189,13 @@ async def login():
                         )
                     else:
                         redirect_url = "/"
+
                 resp = redirect(redirect_url)
-                set_secure_cookie(resp, "uid", str(user["id"]))
-                set_secure_cookie(resp, "dek", base64.b64encode(dek).decode("utf-8"))
+                set_secure_cookie(resp, "uid", user["id"])
+                session_store.set_dek(user["id"], dek)
+
+                session.permanent = True
+
                 current_app.logger.debug(
                     "Login succeeded for %s, redirecting to %s", username, redirect_url
                 )
@@ -214,7 +219,11 @@ async def logout():
     user = await get_current_user()
     current_app.logger.debug("Logout for user %s", user["id"] if user else None)
     next_url = "/login"
+    if user:
+        session_store.clear_dek(user["id"])
+
     resp = redirect(next_url)
+    session.clear()
 
     clear_secure_cookie(resp)
     return resp
@@ -403,6 +412,8 @@ async def delete_profile():
     user = await get_current_user()
     await db.delete_user(user["id"])
     resp = Response(status=204)
+    session_store.clear_dek(user["id"])
     clear_secure_cookie(resp)
+    session.clear()
     resp.headers["HX-Redirect"] = "/login"
     return resp
