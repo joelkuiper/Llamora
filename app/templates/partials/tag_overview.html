@@ -1,0 +1,25 @@
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tags.css') }}" hx-swap-oob="true">
+<header class="tag-session-header">
+  <h1>{{ overview.tag_name }}</h1>
+</header>
+<div class="tag-container">
+  {% for sess in overview.sessions %}
+  <section class="tag-session">
+    <h2 class="tag-session-header">{{ sess.name }} — {{ sess.created_at|humanize }}</h2>
+    <ul class="tag-message-list">
+      {% for msg in sess.messages %}
+      <li>
+        <a class="tag-message-card" href="{{ url_for('sessions.session', session_id=msg.session_id) }}?target=msg-{{ msg.id }}#msg-{{ msg.id }}"
+           hx-get="{{ url_for('chat.chat_htmx', session_id=msg.session_id) }}?target=msg-{{ msg.id }}"
+           hx-target="#chatbox-wrapper" hx-swap="outerHTML"
+           data-session-id="{{ msg.session_id }}" data-target="msg-{{ msg.id }}"
+           hx-trigger="click[document.getElementById('chat').dataset.sessionId !== this.dataset.sessionId]">
+          <div class="tag-message-content">{% if msg.emoji %}<span class="tag-msg-emoji">{{ msg.emoji }}</span>{% endif %}{{ msg.content.splitlines()[0] if msg.content else '' }}</div>
+          <div class="tag-message-time">{{ msg.created_at|humanize }}</div>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endfor %}
+</div>

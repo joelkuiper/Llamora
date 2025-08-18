@@ -294,15 +294,51 @@ body {
 
   .meta-chip {
     background: var(--color-bg);
-    box-shadow: var(--raised-shadow);
+    box-shadow: var(--inset-shadow);
     border-radius: var(--radius-md);
     padding: 2px 6px;
     font-size: 0.75rem;
+    border: 1px solid var(--border);
+    text-decoration: none;
+    color: var(--color-text);
+    cursor: pointer;
+    transition:
+      box-shadow 0.2s ease,
+      border-color 0.2s ease,
+      transform 0.08s ease,
+      background-color 0.2s ease;
+  }
+
+  .meta-chip:hover {
+    border-color: var(--accent);
+    box-shadow:
+      var(--raised-shadow),
+      0 0 0 2px var(--accent-10);
+    background: linear-gradient(0deg, rgba(59,167,246,0.16), rgba(59,167,246,0.12)) var(--color-bg);
+  }
+
+  .meta-chip:focus,
+  .meta-chip:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow:
+      var(--inset-shadow),
+      0 0 0 2px var(--accent-20),
+      0 8px 20px var(--accent-10);
+  }
+
+  .meta-chip:active {
+    transform: translateY(1px);
+    box-shadow: var(--inset-shadow-disabled);
   }
 
   .meta-chip.emoji {
     font-size: 1rem;
     padding: 0;
+    border: none;
+    box-shadow: none;
+    cursor: default;
+    background: transparent;
   }
 
   /* Markdown refinements */

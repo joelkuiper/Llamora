@@ -1,12 +1,11 @@
 import logging
 import time
 import re
-from datetime import datetime
 from typing import List
+import hashlib
 
 import numpy as np
 import ahocorasick
-import humanize
 
 from config import (
     PROGRESSIVE_BATCH,
@@ -114,7 +113,11 @@ class SearchAPI:
         return results
 
     def _lexical_rerank(
-        self, query: str, candidates: List[dict], limit: int
+        self,
+        query: str,
+        candidates: List[dict],
+        limit: int,
+        tag_boosts: dict[str, float] | None = None,
     ) -> List[dict]:
         lower_query = query.lower()
         automaton = ahocorasick.Automaton()
@@ -157,6 +160,7 @@ class SearchAPI:
                     m["kind"] = "E"
 
             overlap = len(matched_tokens) / token_count if token_count else 0.0
+            boost = tag_boosts.get(cand["id"], 0.0) if tag_boosts else 0.0
 
             max_len = 500
             context = 30
@@ -228,18 +232,14 @@ class SearchAPI:
                 css_class += " status-poor"
             sort_key = (
                 2 if exact else (1 if overlap > 0 else 0),
-                overlap,
+                overlap + boost,
                 cosine,
             )
-            created_at_dt = datetime.fromisoformat(cand["created_at"])
-            created_at_human = humanize.naturaltime(created_at_dt)
-
             results.append(
                 {
                     "id": cand["id"],
                     "session_id": cand["session_id"],
                     "created_at": cand["created_at"],
-                    "created_at_human": created_at_human,
                     "role": cand["role"],
                     "snippet": snippet,
                     "status": status,
@@ -263,7 +263,19 @@ class SearchAPI:
     ):
         logger.debug("Search requested by user %s with k1=%d k2=%d", user_id, k1, k2)
         candidates = await self.knn_search(user_id, dek, query, k1, k2)
-        results = self._lexical_rerank(query, candidates, k2)
+        tokens = [t for t in dict.fromkeys(re.findall(r"\S+", query)) if t]
+        boosts: dict[str, float] = {}
+        if tokens:
+            tag_hashes = [
+                hashlib.sha256(f"{user_id}:{t}".encode("utf-8")).digest() for t in tokens
+            ]
+            message_ids = [c["id"] for c in candidates]
+            tag_map = await self.db.get_messages_with_tag_hashes(
+                user_id, tag_hashes, message_ids
+            )
+            for mid, hashes in tag_map.items():
+                boosts[mid] = 0.1 * len(hashes)
+        results = self._lexical_rerank(query, candidates, k2, boosts)
         logger.debug("Returning %d results for user %s", len(results), user_id)
         return results
 

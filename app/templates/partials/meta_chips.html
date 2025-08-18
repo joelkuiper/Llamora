@@ -1,0 +1,30 @@
+{% macro keyword_chip(keyword) -%}
+  <a class="meta-chip keyword"
+     href="{{ url_for('search.search') }}?q={{ keyword | urlencode }}"
+     hx-get="{{ url_for('search.search') }}?q={{ keyword | urlencode }}"
+     hx-target="#search-results"
+     hx-swap="innerHTML">{{ keyword }}</a>
+{%- endmacro %}
+
+{% macro emoji_chip(emoji) -%}
+  <span class="meta-chip emoji">{{ emoji }}</span>
+{%- endmacro %}
+
+{% macro render_meta_chips(meta) -%}
+  <div class="meta-chips">
+    {% if meta.emoji %}{{ emoji_chip(meta.emoji) }}{% endif %}
+    {% for kw in meta.keywords %}{{ keyword_chip(kw) }}{% endfor %}
+  </div>
+{%- endmacro %}
+
+{% macro meta_chip_templates() -%}
+  <template id="keyword-chip-template" data-url="{{ url_for('search.search') }}">
+    <a class="meta-chip keyword"
+       hx-get=""
+       hx-target="#search-results"
+       hx-swap="innerHTML"></a>
+  </template>
+  <template id="emoji-chip-template">
+    <span class="meta-chip emoji"></span>
+  </template>
+{%- endmacro %}

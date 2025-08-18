@@ -294,18 +294,22 @@ function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrappe
         let meta;
         try { meta = JSON.parse(metaEl.textContent || '{}'); } catch {}
         chips.innerHTML = '';
-        if (meta && meta.emoji) {
-          const e = document.createElement('span');
-          e.className = 'meta-chip emoji';
+        const tplEmoji = document.getElementById('emoji-chip-template');
+        const tplKeyword = document.getElementById('keyword-chip-template');
+        if (meta && meta.emoji && tplEmoji) {
+          const e = tplEmoji.content.firstElementChild.cloneNode(true);
           e.textContent = meta.emoji;
           chips.appendChild(e);
         }
-        if (meta && Array.isArray(meta.keywords)) {
+        if (meta && Array.isArray(meta.keywords) && tplKeyword) {
+          const base = tplKeyword.dataset.url || tplKeyword.content.firstElementChild.getAttribute('hx-get') || '/search';
           meta.keywords.forEach(k => {
-            const span = document.createElement('span');
-            span.className = 'meta-chip keyword';
-            span.textContent = k;
-            chips.appendChild(span);
+            const a = tplKeyword.content.firstElementChild.cloneNode(true);
+            const url = `${base}?q=${encodeURIComponent(k)}`;
+            a.textContent = k;
+            a.href = url;
+            a.setAttribute('hx-get', url);
+            chips.appendChild(a);
           });
         }
       }

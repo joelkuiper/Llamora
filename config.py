@@ -81,6 +81,7 @@ DEFAULT_LLM_REQUEST = {
     "n_predict": 1024,
     "stream": True,
     "stop": ["<|end|>", "<|assistant|>"],
+    "logit_bias": [[426, -1.0], [[500, -1.0]]],  # Reduce {, } likelihood
     **llm_request_overrides,
 }
 

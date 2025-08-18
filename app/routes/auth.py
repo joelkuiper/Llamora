@@ -27,7 +27,6 @@ from app.services.crypto import (
 )
 from app import db
 import re
-import base64
 import config
 import orjson
 from zxcvbn import zxcvbn

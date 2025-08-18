@@ -5,6 +5,7 @@ import logging
 import orjson
 import asyncio
 import numpy as np
+import hashlib
 from config import (
     MAX_USERNAME_LENGTH,
     DB_POOL_SIZE,
@@ -142,6 +143,27 @@ class LocalDB:
                 CREATE INDEX IF NOT EXISTS idx_sessions_user_id_created ON sessions(user_id, ulid);
                 CREATE INDEX IF NOT EXISTS idx_vectors_user_id ON vectors(user_id);
                 CREATE INDEX IF NOT EXISTS idx_vectors_id ON vectors(id);
+
+                CREATE TABLE IF NOT EXISTS tags (
+                    user_id TEXT NOT NULL,
+                    tag_hash BLOB(32) NOT NULL,
+                    name_ct BLOB NOT NULL,
+                    name_nonce BLOB(24) NOT NULL,
+                    alg TEXT NOT NULL,
+                    PRIMARY KEY(user_id, tag_hash)
+                );
+
+                CREATE TABLE IF NOT EXISTS tag_message_xref (
+                    user_id TEXT NOT NULL,
+                    tag_hash BLOB(32) NOT NULL,
+                    message_id TEXT NOT NULL,
+                    session_id TEXT NOT NULL,
+                    PRIMARY KEY(user_id, tag_hash, message_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_tag_message_session ON tag_message_xref(user_id, tag_hash);
+                CREATE INDEX IF NOT EXISTS idx_tag_message_message ON tag_message_xref(user_id, message_id);
+                CREATE INDEX IF NOT EXISTS idx_sessions_user_created ON sessions(user_id, created_at);
                 """,
             )
 
@@ -310,7 +332,18 @@ class LocalDB:
                 "INSERT INTO messages (id, session_id, role, nonce, ciphertext, alg) VALUES (?, ?, ?, ?, ?, ?)",
                 (ulid, session_id, role, nonce, ct, alg),
             )
+
         msg_id = ulid
+
+        if meta and isinstance(meta.get("keywords"), list):
+            for kw in meta["keywords"]:
+                if isinstance(kw, str):
+                    tag_name = kw.strip()
+                    if not tag_name:
+                        continue
+                    tag_name = tag_name[:64]
+                    tag_hash = await self.resolve_or_create_tag(user_id, tag_name, dek)
+                    await self.xref_tag_message(user_id, tag_hash, msg_id, session_id)
 
         if self.search_api:
             asyncio.create_task(
@@ -320,6 +353,129 @@ class LocalDB:
             )
 
         return msg_id
+
+    async def resolve_or_create_tag(self, user_id: str, tag_name: str, dek: bytes) -> bytes:
+        tag_name = tag_name.strip()[:64]
+        if not tag_name:
+            raise ValueError("Empty tag")
+        tag_hash = hashlib.sha256(f"{user_id}:{tag_name}".encode("utf-8")).digest()
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                "SELECT 1 FROM tags WHERE user_id = ? AND tag_hash = ?",
+                (user_id, tag_hash),
+            )
+            row = await cursor.fetchone()
+            if not row:
+                nonce, ct, alg = encrypt_message(
+                    dek, user_id, "tag", tag_hash.hex(), tag_name
+                )
+                await self.with_transaction(
+                    conn,
+                    conn.execute,
+                    "INSERT INTO tags (user_id, tag_hash, name_ct, name_nonce, alg) VALUES (?, ?, ?, ?, ?)",
+                    (user_id, tag_hash, ct, nonce, alg.decode()),
+                )
+        return tag_hash
+
+    async def xref_tag_message(
+        self, user_id: str, tag_hash: bytes, message_id: str, session_id: str
+    ) -> None:
+        async with self.pool.connection() as conn:
+            await self.with_transaction(
+                conn,
+                conn.execute,
+                "INSERT OR IGNORE INTO tag_message_xref (user_id, tag_hash, message_id, session_id) VALUES (?, ?, ?, ?)",
+                (user_id, tag_hash, message_id, session_id),
+            )
+
+    async def get_tag_overview(self, user_id: str, tag_hash: bytes, dek: bytes):
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                "SELECT name_ct, name_nonce, alg FROM tags WHERE user_id = ? AND tag_hash = ?",
+                (user_id, tag_hash),
+            )
+            tag_row = await cursor.fetchone()
+            if not tag_row:
+                raise ValueError("Tag not found")
+            tag_name = decrypt_message(
+                dek,
+                user_id,
+                "tag",
+                tag_hash.hex(),
+                tag_row["name_nonce"],
+                tag_row["name_ct"],
+                tag_row["alg"].encode() if isinstance(tag_row["alg"], str) else tag_row["alg"],
+            )
+
+            cursor = await conn.execute(
+                """
+                SELECT x.message_id, x.session_id, m.role, m.nonce, m.ciphertext, m.alg,
+                       m.created_at, s.name as session_name, s.created_at as session_created
+                FROM tag_message_xref x
+                JOIN messages m ON x.message_id = m.id
+                JOIN sessions s ON m.session_id = s.id
+                WHERE x.user_id = ? AND x.tag_hash = ?
+                ORDER BY s.created_at DESC, m.created_at DESC
+                """,
+                (user_id, tag_hash),
+            )
+            rows = await cursor.fetchall()
+
+        sessions: dict[str, dict] = {}
+        for row in rows:
+            record_json = decrypt_message(
+                dek,
+                user_id,
+                row["session_id"],
+                row["message_id"],
+                row["nonce"],
+                row["ciphertext"],
+                row["alg"],
+            )
+            rec = orjson.loads(record_json)
+            content = rec.get("message", "")
+            emoji = rec.get("meta", {}).get("emoji")
+            sess = sessions.setdefault(
+                row["session_id"],
+                {
+                    "id": row["session_id"],
+                    "name": row["session_name"],
+                    "created_at": row["session_created"],
+                    "messages": [],
+                },
+            )
+            sess["messages"].append(
+                {
+                    "id": row["message_id"],
+                    "session_id": row["session_id"],
+                    "content": content,
+                    "created_at": row["created_at"],
+                    "emoji": emoji,
+                }
+            )
+
+        return {"tag_name": tag_name, "tag_hash": tag_hash.hex(), "sessions": list(sessions.values())}
+
+    async def get_messages_with_tag_hashes(
+        self, user_id: str, tag_hashes: list[bytes], message_ids: list[str]
+    ) -> dict[str, set[bytes]]:
+        if not tag_hashes or not message_ids:
+            return {}
+        tag_placeholders = ",".join("?" * len(tag_hashes))
+        msg_placeholders = ",".join("?" * len(message_ids))
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                f"""
+                SELECT message_id, tag_hash FROM tag_message_xref
+                WHERE user_id = ? AND tag_hash IN ({tag_placeholders}) AND message_id IN ({msg_placeholders})
+                """,
+                (user_id, *tag_hashes, *message_ids),
+            )
+            rows = await cursor.fetchall()
+        mapping: dict[str, set[bytes]] = {}
+        for row in rows:
+            mapping.setdefault(row["message_id"], set()).add(row["tag_hash"])
+        return mapping
 
     async def store_vector(self, msg_id, user_id, session_id, vec, dek):
         vec_arr = np.asarray(vec, dtype=np.float32)

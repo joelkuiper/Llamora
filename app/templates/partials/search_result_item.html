@@ -10,7 +10,7 @@
       {{ "You" if  item.role == "user" else config.APP_NAME }}
     </div>
     <div class="search-result-time">
-      {{ item.created_at_human }}
+      {{ item.created_at|humanize }}
     </div>
     <div class="search-result-content">
       {%- if item.snippet.leading_ellipsis %}…{% endif -%}

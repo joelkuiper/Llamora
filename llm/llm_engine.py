@@ -220,6 +220,8 @@ class LLMEngine:
                     resp.raise_for_status()
 
                     event_buf: list[str] = []
+                    saw_stop = False
+                    saw_content = False
 
                     async for line in resp.aiter_lines():
                         if line is None:
@@ -239,19 +241,29 @@ class LLMEngine:
                             except Exception:
                                 continue
                             if data.get("stop"):
-                                return
+                                saw_stop = True
+                                break
                             content = data.get("content")
                             if content:
+                                saw_content = True
                                 yield content
 
                     if event_buf:
                         try:
                             data = orjson.loads("\n".join(event_buf).strip())
-                            content = data.get("content")
-                            if content and content.strip():
-                                yield content
+                            if data.get("stop"):
+                                saw_stop = True
+                            else:
+                                content = data.get("content")
+                                if content and content.strip():
+                                    saw_content = True
+                                    yield content
                         except Exception:
                             pass
+
+                    if not saw_stop:
+                        msg = "Stream ended unexpectedly" if saw_content else "LLM server disconnected"
+                        yield {"type": "error", "data": msg}
                     return
             except HTTPError as e:
                 self._ensure_server_running()

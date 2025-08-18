@@ -48,6 +48,7 @@ async def render_chat(session_id, oob=False):
         history=history,
         oob=oob,
         pending_msg_id=pending_msg_id,
+        user=user,
     )
 
     return html

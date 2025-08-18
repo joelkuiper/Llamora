@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>{{ overview.tag_name }} - {{ config.APP_NAME }}</title>
+    <script src="{{ url_for('static', filename='js/vendor/htmx.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/vendor/htmx-ext-sse.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/vendor/htmx-ext-response-targets.js') }}"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tags.css') }}">
+  </head>
+  <body hx-ext="response-targets">
+    {% include 'partials/tag_overview.html' %}
+  </body>
+</html>

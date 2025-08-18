@@ -1,4 +1,7 @@
 {% from 'partials/bot_stream.html' import bot_stream %}
+{% from 'partials/meta_chips.html' import render_meta_chips, meta_chip_templates %}
+{{ meta_chip_templates() }}
+
 <main
   id="chatbox-wrapper"
   {% if oob %} hx-swap-oob="true" {% endif %}>
@@ -9,10 +12,7 @@
       <div id="msg-{{ msg['id'] }}" class="message {{ 'bot' if msg['role'] != 'user' else 'user'}}">
         <div class="markdown-body">{{ msg.message }}</div>
         {% if msg.meta %}
-        <div class="meta-chips">
-          {% if msg.meta.emoji %}<span class="meta-chip emoji">{{ msg.meta.emoji }}</span>{% endif %}
-          {% for kw in msg.meta.keywords %}<span class="meta-chip keyword">{{ kw }}</span>{% endfor %}
-        </div>
+        {{ render_meta_chips(msg.meta) }}
         {% endif %}
       </div>
       {% endfor %}
@@ -51,4 +51,3 @@
     document.title = "{{ session.name }}";
   </script>
 </main>
-
