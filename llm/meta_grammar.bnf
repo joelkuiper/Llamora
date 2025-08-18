@@ -1,4 +1,4 @@
-root      ::= text "<|meta|>" obj
+root      ::= text "<|meta|>" obj "<|end|>"
 text      ::= ([^<] | "<" [^|] | "<|" [^m] | "<|m" [^e] | "<|me" [^t] | "<|met" [^a] | "<|meta" [^|] | "<|meta|" [^>])*
 quote     ::= "\""
 

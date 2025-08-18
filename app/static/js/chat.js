@@ -299,6 +299,7 @@ function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrappe
         if (meta && meta.emoji && tplEmoji) {
           const e = tplEmoji.content.firstElementChild.cloneNode(true);
           e.textContent = meta.emoji;
+          e.classList.add('chip-enter');
           chips.appendChild(e);
         }
         if (meta && Array.isArray(meta.keywords) && tplKeyword) {
@@ -309,6 +310,7 @@ function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrappe
             a.textContent = k;
             a.href = url;
             a.setAttribute('hx-get', url);
+            a.classList.add('chip-enter');
             chips.appendChild(a);
           });
         }
