@@ -8,7 +8,7 @@
 {%- endmacro %}
 
 {% macro emoji_chip(emoji) -%}
-  <span class="meta-chip emoji">{{ emoji }}</span>
+  <!--  <span class="meta-chip emoji">{{ emoji }}</span> -->
 {%- endmacro %}
 
 {% macro render_meta_chips(meta) -%}
@@ -26,7 +26,7 @@
        hx-swap="innerHTML"
        hx-on:click="var i=document.getElementById('search-input');i.value=this.textContent;i.focus()"></a>
   </template>
-  <template id="emoji-chip-template">
+  <!-- <template id="emoji-chip-template">
     <span class="meta-chip emoji"></span>
-  </template>
+  </template>-->
 {%- endmacro %}
