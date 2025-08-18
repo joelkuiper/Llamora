@@ -32,13 +32,11 @@ def create_app():
     from .routes.sessions import sessions_bp
     from .routes.chat import chat_bp
     from .routes.search import search_bp
-    from .routes.tags import tags_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(sessions_bp)
     app.register_blueprint(chat_bp)
     app.register_blueprint(search_bp)
-    app.register_blueprint(tags_bp)
 
     import humanize
     from datetime import datetime

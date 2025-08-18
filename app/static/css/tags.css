@@ -1,9 +1,0 @@
-.tag-container { padding: 1rem; }
-.tag-session { margin-bottom: 2rem; }
-.tag-session-header { position: sticky; top: 0; background: var(--bg, #f0f0f0); padding: 0.5rem 1rem; z-index: 1; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-.tag-message-list { list-style: none; padding: 0; margin: 0; }
-.tag-message-card { display: block; margin: 0.5rem 0; padding: 1rem; border-radius: 0.75rem; text-decoration: none; color: inherit; box-shadow: 3px 3px 6px #d1d9e6, -3px -3px 6px #fff; }
-.tag-message-card:hover { box-shadow: inset 3px 3px 6px #d1d9e6, inset -3px -3px 6px #fff; }
-.tag-message-content { font-weight: 500; }
-.tag-message-time { font-size: 0.8rem; color: #666; }
-.tag-msg-emoji { margin-right: 0.5rem; }

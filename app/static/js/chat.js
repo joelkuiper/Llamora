@@ -312,6 +312,9 @@ function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrappe
             chips.appendChild(a);
           });
         }
+        if (typeof htmx !== 'undefined') {
+          htmx.process(chips);
+        }
       }
     } else if (type === "error" || type === "done") {
       const rid = sseRenders.get(wrap);

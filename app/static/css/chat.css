@@ -553,6 +553,9 @@ body {
       opacity: 0.5;
       &:hover { opacity: 1; }
     }
+    .status-tag {
+      opacity: 1;
+    }
   }
 
   #search-spinner {

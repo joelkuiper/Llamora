@@ -226,7 +226,13 @@ class SearchAPI:
 
             cosine = cand["cosine"]
             poor = cosine < POOR_MATCH_MAX_COS
-            status = "exact" if exact else ("token" if overlap > 0 else "semantic")
+            status = (
+                "exact"
+                if exact
+                else (
+                    "token" if overlap > 0 else ("tag" if boost > 0 else "semantic")
+                )
+            )
             css_class = f"search-result-item status-{status}"
             if poor:
                 css_class += " status-poor"
