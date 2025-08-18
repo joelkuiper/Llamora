@@ -1,9 +1,8 @@
 {% from 'partials/bot_stream.html' import bot_stream %}
-{% from 'partials/meta_chips.html' import render_meta_chips, meta_chip_templates %}
-{{ meta_chip_templates() }}
+{% from 'partials/meta_chips.html' import render_meta_chips %}
 
 <main
-  id="chatbox-wrapper"
+  id="content-wrapper"
   {% if oob %} hx-swap-oob="true" {% endif %}>
 
     <div id="chat" data-session-id="{{ session.id }}">
@@ -22,7 +21,7 @@
       {% endif %}
     </div>
 
-  <form id="chat-form"
+  <form id="message-form"
         hx-post="{{ url_for('chat.send_message', session_id=session.id) }}"
         hx-target="#chat"
         hx-on::after-request="this.reset()"

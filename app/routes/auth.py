@@ -34,6 +34,19 @@ from zxcvbn import zxcvbn
 auth_bp = Blueprint("auth", __name__)
 
 
+async def _render_profile_page(user, **context):
+    context["user"] = user
+    if request.headers.get("HX-Request"):
+        return await render_template("partials/profile.html", **context)
+    sessions = await db.get_all_sessions(user["id"])
+    return await render_template(
+        "index.html",
+        sessions=sessions,
+        content_template="partials/profile.html",
+        **context,
+    )
+
+
 @auth_bp.route("/password_strength", methods=["POST"])
 async def password_strength_check():
     form = await request.form
@@ -300,13 +313,8 @@ async def reset_password():
 @login_required
 async def profile():
     user = await get_current_user()
-    state = await db.get_state(user["id"])
-    active_session = state.get("active_session")
-    if active_session and not await db.get_session(user["id"], active_session):
-        active_session = None
-    return await render_template(
-        "profile.html", user=user, active_session=active_session
-    )
+    await db.update_state(user["id"], active_session=None)
+    return await _render_profile_page(user)
 
 
 @auth_bp.route("/profile/data")
@@ -367,24 +375,18 @@ async def change_password():
         or not re.search(r"[A-Za-z]", new)
         or not re.search(r"\d", new)
     ):
-        return await render_template(
-            "profile.html", user=user, pw_error="Invalid input"
-        )
+        return await _render_profile_page(user, pw_error="Invalid input")
 
     try:
         pwhash.argon2id.verify(
             user["password_hash"].encode("utf-8"), current.encode("utf-8")
         )
     except Exception:
-        return await render_template(
-            "profile.html", user=user, pw_error="Invalid current password"
-        )
+        return await _render_profile_page(user, pw_error="Invalid current password")
 
     dek = get_dek()
     if not dek:
-        return await render_template(
-            "profile.html", user=user, pw_error="Missing encryption key"
-        )
+        return await _render_profile_page(user, pw_error="Missing encryption key")
 
     password_bytes = new.encode("utf-8")
     hash_bytes = pwhash.argon2id.str(password_bytes)
@@ -394,7 +396,7 @@ async def change_password():
         user["id"], password_hash, pw_salt, pw_nonce, pw_cipher
     )
 
-    return await render_template("profile.html", user=user, pw_success=True)
+    return await _render_profile_page(user, pw_success=True)
 
 
 @auth_bp.route("/profile/recovery", methods=["POST"])
@@ -403,9 +405,7 @@ async def regen_recovery():
     user = await get_current_user()
     dek = get_dek()
     if not dek:
-        return await render_template(
-            "profile.html", user=user, rc_error="Missing encryption key"
-        )
+        return await _render_profile_page(user, rc_error="Missing encryption key")
 
     recovery_code = generate_recovery_code()
     rc_salt, rc_nonce, rc_cipher = wrap_key(dek, recovery_code)

@@ -61,6 +61,7 @@ async def session(session_id):
         session=session,
         sessions=sessions,
         pending_msg_id=pending_msg_id,
+        content_template="partials/chat.html",
     )
     resp = await make_response(html)
     await db.update_state(uid, active_session=session_id)

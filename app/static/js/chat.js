@@ -124,7 +124,7 @@ function positionTypingIndicator(root, typingEl) {
 
 
 export function initChatUI(root = document) {
-  const form = root.querySelector("#chat-form");
+  const form = root.querySelector("#message-form");
   const textarea = form?.querySelector("textarea");
   const button = form?.querySelector("button");
   const chat = root.querySelector("#chat");
@@ -140,10 +140,11 @@ export function initChatUI(root = document) {
   const setFormEnabled = (enabled) => {
     textarea.disabled = !enabled;
     button.disabled = !enabled;
-    if (enabled) textarea.focus();
+    if (enabled) textarea.focus({ preventScroll: true });
   };
 
-  const scrollToBottom = setupScrollHandler(setFormEnabled);
+  const scrollToBottom = setupScrollHandler();
+  setupStreamHandler(setFormEnabled, scrollToBottom);
 
   form.addEventListener("htmx:afterRequest", () => {
     setFormEnabled(false);
@@ -153,7 +154,7 @@ export function initChatUI(root = document) {
   form.addEventListener("htmx:configRequest", (event) => {
     if (!textarea.value.trim()) {
       event.preventDefault();
-      textarea.focus();
+      textarea.focus({ preventScroll: true });
     }
   });
 
@@ -170,7 +171,6 @@ export function initChatUI(root = document) {
   });
 
   chat.addEventListener("htmx:afterSwap", () => {
-    scrollToBottom();
     renderAllMarkdown(chat);
   });
 
@@ -189,23 +189,28 @@ export function initChatUI(root = document) {
   observer.observe(chat, { childList: true });
 
   renderAllMarkdown(chat);
-
-  scrollToBottom();
   // If a bot response is currently streaming, keep the form disabled
   if (chat.querySelector("#typing-indicator")) {
     setFormEnabled(false);
   } else {
-    textarea.focus();
+    textarea.focus({ preventScroll: true });
   }
 }
 
-function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrapper") {
+function setupScrollHandler(containerSelector = "#content-wrapper") {
   const container = document.querySelector(containerSelector);
   if (!container) return () => {};
 
-  let autoScrollEnabled = true;
-  let lastScrollTop = container.scrollTop;
   const SCROLL_THRESHOLD = 10;
+
+  const isUserNearBottom = () => {
+    const distanceFromBottom =
+      container.scrollHeight - container.clientHeight - container.scrollTop;
+    return distanceFromBottom < SCROLL_THRESHOLD;
+  };
+
+  let autoScrollEnabled = isUserNearBottom();
+  let lastScrollTop = container.scrollTop;
 
   const scrollToBottom = () => {
     if (autoScrollEnabled) {
@@ -214,12 +219,6 @@ function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrappe
         behavior: "smooth",
       });
     }
-  };
-
-  const isUserNearBottom = () => {
-    const distanceFromBottom =
-          container.scrollHeight - container.clientHeight - container.scrollTop;
-    return distanceFromBottom < SCROLL_THRESHOLD;
   };
 
   const updateScrollState = (currentTop) => {
@@ -243,8 +242,10 @@ function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrappe
     if (container.scrollTop < lastScrollTop) autoScrollEnabled = false;
     lastScrollTop = container.scrollTop;
   }, { passive: true });
+  return scrollToBottom;
+}
 
-  // Remove previous SSE listener if any
+function setupStreamHandler(setFormEnabled, scrollToBottom) {
   if (currentSSEListener) {
     document.body.removeEventListener("htmx:sseMessage", currentSSEListener);
   }
@@ -260,7 +261,6 @@ function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrappe
     });
     sseRenders.set(container, id);
   }
-
 
   currentSSEListener = (evt) => {
     const { type } = evt.detail;
@@ -281,9 +281,7 @@ function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrappe
       if (typing) {
         positionTypingIndicator(contentDiv, typing);
       }
-
     };
-
 
     if (type === "message") {
       scheduleRender(wrap, () => { renderNow(); scrollToBottom(); });
@@ -330,7 +328,4 @@ function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrappe
   };
 
   document.body.addEventListener("htmx:sseMessage", currentSSEListener);
-
-  container.scrollTop = container.scrollHeight;
-  return scrollToBottom;
 }

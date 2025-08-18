@@ -1,0 +1,64 @@
+{% from 'partials/password_field.html' import password_field with context %}
+<main id="content-wrapper">
+  <section id="profile-page">
+    <header class="profile-header">
+      <button id="profile-back" class="back-btn" aria-label="Back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
+      <h1>Profile for {{ user.username }}</h1>
+    </header>
+    <section class="profile-section">
+      <h2>Change Password</h2>
+      {% if pw_error %}
+        <div class="error">{{ pw_error }}</div>
+      {% elif pw_success %}
+        <div class="success">Password updated</div>
+      {% endif %}
+      <form method="post" action="{{ url_for('auth.change_password') }}"
+            hx-post="{{ url_for('auth.change_password') }}"
+            hx-target="#content-wrapper"
+            hx-swap="outerHTML">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <input class="input" type="password" name="current_password" placeholder="Current password" required maxlength="{{ config.MAX_PASSWORD_LENGTH }}" />
+        {{ password_field('new_password', 'New password', 'new-password-strength') }}
+        <input class="input" type="password" name="confirm_password" placeholder="Confirm new password" required maxlength="{{ config.MAX_PASSWORD_LENGTH }}" />
+        <button class="btn" type="submit" data-loading="Updating">Update Password</button>
+      </form>
+    </section>
+
+    <section class="profile-section">
+      <h2>Recovery</h2>
+      {% if rc_error %}<div class="error">{{ rc_error }}</div>{% endif %}
+      <form method="post" action="{{ url_for('auth.regen_recovery') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <button class="btn" type="submit" data-loading="Generating">Generate New Recovery Code</button>
+      </form>
+    </section>
+
+    <section class="profile-section">
+      <h2>Data</h2>
+      <form method="get" action="{{ url_for('auth.download_user_data') }}" data-download>
+        <button class="btn" type="submit" data-loading="Preparing">Download My Data</button>
+      </form>
+    </section>
+
+    <section class="profile-section danger">
+      <h2>Danger Zone</h2>
+      <button
+        class="btn dangerous"
+        hx-delete="{{ url_for('auth.delete_profile') }}"
+        hx-confirm="Are you sure you want to delete your profile? This cannot be undone.">
+        Delete Profile
+      </button>
+    </section>
+  </section>
+  <script type="module">
+    import { updateActiveSession } from "{{ url_for('static', filename='js/session.js') }}";
+    updateActiveSession();
+    document.title = "Profile";
+    document.getElementById('profile-back').addEventListener('click', () => history.back());
+  </script>
+  <script type="module" src="{{ url_for('static', filename='js/forms.js') }}"></script>
+</main>

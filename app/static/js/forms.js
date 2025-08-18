@@ -1,7 +1,7 @@
 import { startButtonSpinner, stopButtonSpinner } from "./ui.js";
 
 document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll(".form-container form").forEach((form) => {
+  document.querySelectorAll(".form-container form, #profile-page form").forEach((form) => {
     form.addEventListener("submit", async (e) => {
       const btn = form.querySelector('button[type="submit"]');
       if (!btn || btn.dataset.spinning === "1") return;

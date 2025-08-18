@@ -1,9 +1,15 @@
 /* Update the active session in the sidebar */
 export function updateActiveSession() {
   const chat = document.getElementById("chat");
+  const profileBtn = document.getElementById("profile-btn");
 
-  if (!chat) return;
+  if (!chat) {
+    document.querySelectorAll("#sidebar li").forEach((li) => li.classList.remove("active"));
+    profileBtn?.classList.add("active");
+    return;
+  }
 
+  profileBtn?.classList.remove("active");
   const newSessionId = chat.dataset.sessionId;
 
   document.querySelectorAll("#sidebar li").forEach((li) => {

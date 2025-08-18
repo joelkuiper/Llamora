@@ -15,19 +15,8 @@
       <form method="post">
           <input class="input" type="text" name="username" placeholder="Username"
                  required pattern="^[A-Za-z0-9_]+$" maxlength="{{ config.MAX_USERNAME_LENGTH }}"/>
-          <input class="input" type="password"
-                 name="password"
-                 placeholder="Password"
-                 required
-                 maxlength="{{ config.MAX_PASSWORD_LENGTH }}"
-                 minlength="2"
-                 hx-post="{{ url_for('auth.password_strength_check') }}"
-                 hx-trigger="input changed delay:200ms"
-                 hx-target="#password-strength"
-                 />
-        <div id="password-strength">
-          <div class="strength-meter"><div class="bar"></div></div>
-        </div>
+          {% from 'partials/password_field.html' import password_field with context %}
+          {{ password_field('password', 'Password') }}
           <input class="input" type="password"
                  name="confirm_password"
                  placeholder="Confirm password"

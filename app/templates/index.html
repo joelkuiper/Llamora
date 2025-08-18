@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+{% from 'partials/meta_chips.html' import meta_chip_templates %}
 <html lang="en">
   <head>
     <meta charset="UTF-8">
@@ -22,6 +23,7 @@
     hx-target-4*="#errors">
 
     <div id="errors" hx-swap="beforeend"></div>
+    {{ meta_chip_templates() }}
     <header id="search-container">
 
       <div id="branding">
@@ -65,7 +67,14 @@
           </section>
         </div>
         <div class="user-actions">
-          <a href="{{ url_for('auth.profile') }}" class="icon-btn" aria-label="Profile" data-popup-title="Profile">
+          <a id="profile-btn"
+             href="{{ url_for('auth.profile') }}"
+             hx-get="{{ url_for('auth.profile') }}"
+             hx-target="#content-wrapper"
+             hx-swap="outerHTML"
+             hx-push-url="true"
+             class="icon-btn"
+             aria-label="Profile" data-popup-title="Profile">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -88,7 +97,8 @@
     <div class="app-container">
       {% include "partials/sidebar.html" %}
       <div id="content">
-        {% include "partials/chat.html" %}
+        {% set tpl = content_template if content_template is defined else 'partials/chat.html' %}
+        {% include tpl %}
       </div>
     </div>
 
