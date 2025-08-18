@@ -114,7 +114,12 @@ export function initSearchUI() {
   });
   document.addEventListener("click", (e) => {
     const panel = wrap.querySelector(".sr-panel");
-    if (panel && !panel.contains(e.target) && e.target !== input) {
+    if (
+      panel &&
+      !panel.contains(e.target) &&
+      e.target !== input &&
+      !e.target.closest(".meta-chip")
+    ) {
       closeResults(true);
     }
   });
