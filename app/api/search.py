@@ -19,7 +19,6 @@ from config import (
 )
 from app.embed.model import embed_texts
 from app.index.session_ann import SessionIndexRegistry
-from app.services.crypto import encrypt_vector, decrypt_message
 
 
 logger = logging.getLogger(__name__)
@@ -90,7 +89,7 @@ class SearchAPI:
             if mid not in id_cos:
                 id_cos[mid] = cos
 
-        rows = await self.db.get_messages_by_ids(user_id, dedup_ids)
+        rows = await self.db.get_messages_by_ids(user_id, dedup_ids, dek)
         row_map = {r["id"]: r for r in rows}
 
         results: List[dict] = []
@@ -98,15 +97,7 @@ class SearchAPI:
             row = row_map.get(mid)
             if not row:
                 continue
-            content = decrypt_message(
-                dek,
-                user_id,
-                row["session_id"],
-                row["id"],
-                row["nonce"],
-                row["ciphertext"],
-                row["alg"],
-            )
+            content = row.get("message", "")
             results.append(
                 {
                     "id": row["id"],
@@ -286,10 +277,7 @@ class SearchAPI:
             user_id,
         )
         vec = embed_texts([content]).astype(np.float32).reshape(1, -1)
-        nonce, ct, alg = encrypt_vector(
-            dek, user_id, msg_id, vec[0].tobytes(), session_id=session_id
-        )
-        await self.db.store_vector(msg_id, user_id, vec.shape[1], nonce, ct, alg)
+        await self.db.store_vector(msg_id, user_id, session_id, vec[0], dek)
         index = await self.registry.get_or_build(user_id, dek)
         if not index.contains(msg_id):
             index.add_batch([msg_id], vec)

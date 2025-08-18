@@ -7,7 +7,6 @@ import hnswlib
 import numpy as np
 
 from app.embed.model import embed_texts
-from app.services.crypto import decrypt_message, decrypt_vector, encrypt_vector
 
 
 logger = logging.getLogger(__name__)
@@ -102,37 +101,24 @@ class SessionIndexRegistry:
                 idx.touch()
                 return idx
 
-            rows = await self.db.get_latest_vectors(user_id, self.warm_limit)
+            rows = await self.db.get_latest_vectors(user_id, self.warm_limit, dek)
             if rows:
-                dim = rows[0]["dim"]
-                logger.debug("Warming index for user %s with %d vectors", user_id, len(rows))
+                logger.debug(
+                    "Warming index for user %s with %d vectors", user_id, len(rows)
+                )
+                dim = rows[0]["vec"].shape[0]
                 idx = SessionIndex(dim)
-                ids: list[str] = []
-                vecs = []
-                for row in rows:
-                    vec_bytes = decrypt_vector(
-                        dek,
-                        user_id,
-                        row["id"],
-                        row["nonce"],
-                        row["ciphertext"],
-                        row["alg"],
-                        session_id=row.get("session_id"),
-                    )
-                    vec = np.frombuffer(vec_bytes, dtype=np.float32).reshape(row["dim"])
-                    ids.append(row["id"])
-                    vecs.append(vec)
-                if vecs:
-                    vec_arr = np.array(vecs, dtype=np.float32)
-                    if vec_arr.ndim == 1:
-                        vec_arr = vec_arr.reshape(1, -1)
-                    idx.add_batch(ids, vec_arr)
-                    self.cursors[user_id] = rows[-1]["id"]
+                ids = [r["id"] for r in rows]
+                vecs = np.array([r["vec"] for r in rows], dtype=np.float32)
+                if vecs.ndim == 1:
+                    vecs = vecs.reshape(1, -1)
+                idx.add_batch(ids, vecs)
+                self.cursors[user_id] = rows[-1]["id"]
                 self.indexes[user_id] = idx
                 return idx
 
             # Fallback: no stored vectors, warm from latest messages
-            msgs = await self.db.get_latest_messages(user_id, self.warm_limit)
+            msgs = await self.db.get_latest_messages(user_id, self.warm_limit, dek)
             if msgs:
                 logger.debug(
                     "Embedding and indexing %d messages for user %s", len(msgs), user_id
@@ -141,36 +127,25 @@ class SessionIndexRegistry:
                 ids: list[str] = []
                 sess_ids: list[str] = []
                 for msg in msgs:
-                    content = decrypt_message(
-                        dek,
-                        user_id,
-                        msg["session_id"],
-                        msg["id"],
-                        msg["nonce"],
-                        msg["ciphertext"],
-                        msg["alg"],
-                    )
-                    texts.append(content)
+                    texts.append(msg["message"])
                     ids.append(msg["id"])
                     sess_ids.append(msg["session_id"])
 
                 vecs = embed_texts(texts).astype(np.float32)
                 dim = vecs.shape[1]
                 idx = SessionIndex(dim)
-                for mid, sid, vec in zip(ids, sess_ids, vecs):
-                    nonce, ct, alg = encrypt_vector(
-                        dek, user_id, mid, vec.tobytes(), session_id=sid
-                    )
-                    await self.db.store_vector(mid, user_id, vec.shape[0], nonce, ct, alg)
                 idx.add_batch(ids, vecs)
+                for mid, sid, vec in zip(ids, sess_ids, vecs):
+                    await self.db.store_vector(mid, user_id, sid, vec, dek)
                 self.cursors[user_id] = msgs[-1]["id"]
-            else:
-                logger.debug("No existing data for user %s, creating empty index", user_id)
-                dim = embed_texts([""]).shape[1]
-                idx = SessionIndex(dim)
-                latest = await self.db.get_user_latest_id(user_id)
-                self.cursors[user_id] = latest
+                self.indexes[user_id] = idx
+                return idx
 
+            logger.debug("No existing data for user %s, creating empty index", user_id)
+            dim = embed_texts([""]).shape[1]
+            idx = SessionIndex(dim)
+            latest = await self.db.get_user_latest_id(user_id)
+            self.cursors[user_id] = latest
             self.indexes[user_id] = idx
             return idx
 
@@ -188,7 +163,7 @@ class SessionIndexRegistry:
                 logger.debug("Index missing for user %s", user_id)
                 return 0
 
-            rows = await self.db.get_vectors_older_than(user_id, cursor, batch)
+            rows = await self.db.get_vectors_older_than(user_id, cursor, batch, dek)
             if rows:
                 logger.debug(
                     "Loaded %d stored vectors older than %s for user %s",
@@ -196,29 +171,15 @@ class SessionIndexRegistry:
                     cursor,
                     user_id,
                 )
-                ids: list[str] = []
-                vecs = []
-                for row in rows:
-                    vec_bytes = decrypt_vector(
-                        dek,
-                        user_id,
-                        row["id"],
-                        row["nonce"],
-                        row["ciphertext"],
-                        row["alg"],
-                        session_id=row.get("session_id"),
-                    )
-                    vec = np.frombuffer(vec_bytes, dtype=np.float32).reshape(row["dim"])
-                    ids.append(row["id"])
-                    vecs.append(vec)
-                vec_arr = np.array(vecs, dtype=np.float32)
-                if vec_arr.ndim == 1:
-                    vec_arr = vec_arr.reshape(1, -1)
-                idx.add_batch(ids, vec_arr)
+                ids = [r["id"] for r in rows]
+                vecs = np.array([r["vec"] for r in rows], dtype=np.float32)
+                if vecs.ndim == 1:
+                    vecs = vecs.reshape(1, -1)
+                idx.add_batch(ids, vecs)
                 self.cursors[user_id] = rows[-1]["id"]
                 return len(ids)
 
-            msgs = await self.db.get_messages_older_than(user_id, cursor, batch)
+            msgs = await self.db.get_messages_older_than(user_id, cursor, batch, dek)
             if msgs:
                 logger.debug(
                     "Embedding %d messages older than %s for user %s",
@@ -230,26 +191,14 @@ class SessionIndexRegistry:
                 ids: list[str] = []
                 sess_ids: list[str] = []
                 for msg in msgs:
-                    content = decrypt_message(
-                        dek,
-                        user_id,
-                        msg["session_id"],
-                        msg["id"],
-                        msg["nonce"],
-                        msg["ciphertext"],
-                        msg["alg"],
-                    )
-                    texts.append(content)
+                    texts.append(msg["message"])
                     ids.append(msg["id"])
                     sess_ids.append(msg["session_id"])
 
                 vecs = embed_texts(texts).astype(np.float32)
                 idx.add_batch(ids, vecs)
                 for mid, sid, vec in zip(ids, sess_ids, vecs):
-                    nonce, ct, alg = encrypt_vector(
-                        dek, user_id, mid, vec.tobytes(), session_id=sid
-                    )
-                    await self.db.store_vector(mid, user_id, vec.shape[0], nonce, ct, alg)
+                    await self.db.store_vector(mid, user_id, sid, vec, dek)
                 self.cursors[user_id] = msgs[-1]["id"]
                 return len(ids)
 

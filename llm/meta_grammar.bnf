@@ -1,0 +1,12 @@
+root      ::= text "<|meta|>" obj
+text      ::= ([^<] | "<" [^|] | "<|" [^m] | "<|m" [^e] | "<|me" [^t] | "<|met" [^a] | "<|meta" [^|] | "<|meta|" [^>])*
+quote     ::= "\""
+
+string ::= quote ([^"\\] | "\\" (["\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]))+ quote
+
+emoji     ::= quote ([😀-🙏] | [🚀-🛀] | [🌀-🗿]) quote
+keyword   ::= quote "#" [a-zA-Z0-9-]+ quote
+kwarray   ::= "[" (keyword ("," keyword){0,2})? "]"
+
+obj       ::= ("{" quote "emoji" quote ": " emoji ","
+                   quote "keywords" quote ": " kwarray "}")

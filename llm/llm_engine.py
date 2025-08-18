@@ -59,6 +59,12 @@ class LLMEngine:
 
         self.ctx_size = cfg_server_args.get("ctx_size")
 
+        grammar_path = os.path.join(
+            os.path.dirname(__file__), "meta_grammar.bnf"
+        )
+        with open(grammar_path, "r", encoding="utf-8") as gf:
+            self.grammar = gf.read()
+
         if host:
             self.proc = None
             self.server_url = host
@@ -193,7 +199,7 @@ class LLMEngine:
         max_input = self.ctx_size - n_predict
         history = await self._trim_history(history, max_input)
         prompt = build_prompt(history)
-        payload = {"prompt": prompt, **cfg}
+        payload = {"prompt": prompt, **cfg, "grammar": self.grammar}
 
         transport = httpx.AsyncHTTPTransport(retries=0)
         headers = {

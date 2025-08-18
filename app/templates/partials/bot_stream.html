@@ -3,6 +3,7 @@
      hx-ext="sse" sse-close="done"
      sse-connect="{{ url_for('chat.sse_reply', session_id=session_id, msg_id=msg_id) }}">
   <span class="raw-response" sse-swap="message,done" hidden hx-swap="beforeend"></span>
+  <span class="meta" sse-swap="meta" hidden></span>
 
   <span class="markdown-body">
     <span id="typing-indicator"
@@ -11,5 +12,6 @@
       <span class="cursor">❚</span>
     </span>
   </span>
+  <div class="meta-chips"></div>
 </div>
 {%- endmacro %}

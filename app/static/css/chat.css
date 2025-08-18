@@ -285,6 +285,26 @@ body {
     }
   }
 
+  .meta-chips {
+    margin-top: 0.25rem;
+    display: flex;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+  }
+
+  .meta-chip {
+    background: var(--color-bg);
+    box-shadow: var(--raised-shadow);
+    border-radius: var(--radius-md);
+    padding: 2px 6px;
+    font-size: 0.75rem;
+  }
+
+  .meta-chip.emoji {
+    font-size: 1rem;
+    padding: 0;
+  }
+
   /* Markdown refinements */
   .markdown-body {
     display: contents;

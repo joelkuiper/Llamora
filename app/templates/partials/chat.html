@@ -3,16 +3,24 @@
   id="chatbox-wrapper"
   {% if oob %} hx-swap-oob="true" {% endif %}>
 
-  <div id="chat" data-session-id="{{ session.id }}">
-    <div class="message bot">Welcome. Share what’s on your mind, and I’ll be here with you</div>
-    {% for msg in history %}
-    <div id="msg-{{ msg['id'] }}" class="message {{ 'bot' if msg['role'] != 'user' else 'user'}}">{{ msg.content }}</div>
-    {% endfor %}
+    <div id="chat" data-session-id="{{ session.id }}">
+      <div class="message bot"><div class="markdown-body">Welcome. Share what’s on your mind, and I’ll be here with you</div></div>
+      {% for msg in history %}
+      <div id="msg-{{ msg['id'] }}" class="message {{ 'bot' if msg['role'] != 'user' else 'user'}}">
+        <div class="markdown-body">{{ msg.message }}</div>
+        {% if msg.meta %}
+        <div class="meta-chips">
+          {% if msg.meta.emoji %}<span class="meta-chip emoji">{{ msg.meta.emoji }}</span>{% endif %}
+          {% for kw in msg.meta.keywords %}<span class="meta-chip keyword">{{ kw }}</span>{% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
 
-    {% if pending_msg_id %}
-    {{ bot_stream(pending_msg_id, session.id) }}
-    {% endif %}
-  </div>
+      {% if pending_msg_id %}
+      {{ bot_stream(pending_msg_id, session.id) }}
+      {% endif %}
+    </div>
 
   <form id="chat-form"
         hx-post="{{ url_for('chat.send_message', session_id=session.id) }}"
@@ -43,3 +51,4 @@
     document.title = "{{ session.name }}";
   </script>
 </main>
+

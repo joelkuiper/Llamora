@@ -102,6 +102,7 @@ class PendingResponse:
         self.error = False
         self._cond = asyncio.Condition()
         self.dek = dek
+        self.meta = None
         self.created_at = asyncio.get_event_loop().time()
         current_app.logger.debug("Starting generation for message %s", msg_id)
         asyncio.create_task(self._generate(uid, session_id, history, params))
@@ -114,6 +115,14 @@ class PendingResponse:
         params: dict | None,
     ):
         full_response = ""
+        sentinel = "<|meta|>"
+        tail = ""
+        meta_buf = ""
+        meta: dict | None = None
+        found = False
+        brace = 0
+        in_str = False
+        escape = False
         first = True
         try:
             async for chunk in llm.stream_response(history, params):
@@ -126,10 +135,56 @@ class PendingResponse:
                     chunk = chunk.lstrip()
                     first = False
 
-                full_response += chunk
-                async with self._cond:
-                    self.text = full_response
-                    self._cond.notify_all()
+                data = tail + chunk
+                tail = ""
+
+                if not found:
+                    idx = data.find(sentinel)
+                    if idx != -1:
+                        vis = data[:idx]
+                        if vis:
+                            full_response += vis
+                            async with self._cond:
+                                self.text = full_response
+                                self._cond.notify_all()
+                        data = data[idx + len(sentinel):]
+                        found = True
+                        meta_buf += data
+                    else:
+                        keep = len(data) - len(sentinel) + 1
+                        if keep > 0:
+                            vis = data[:keep]
+                            full_response += vis
+                            async with self._cond:
+                                self.text = full_response
+                                self._cond.notify_all()
+                            tail = data[keep:]
+                        else:
+                            tail = data
+                        continue
+                else:
+                    meta_buf += data
+
+                if found:
+                    for ch in data:
+                        if not in_str:
+                            if ch == "{":
+                                brace += 1
+                            elif ch == "}":
+                                brace -= 1
+                                if brace == 0:
+                                    break
+                            elif ch == '"':
+                                in_str = True
+                        else:
+                            if escape:
+                                escape = False
+                            elif ch == "\\":
+                                escape = True
+                            elif ch == '"':
+                                in_str = False
+                    if brace == 0 and meta_buf.strip():
+                        break
 
         except Exception:
             current_app.logger.exception("Error during LLM streaming")
@@ -138,10 +193,18 @@ class PendingResponse:
             )
             self.error = True
         finally:
+            if found and meta_buf.strip():
+                try:
+                    meta = orjson.loads(meta_buf)
+                except Exception:
+                    meta = {}
+            else:
+                meta = {}
+
             if not self.error and full_response.strip():
                 try:
                     await db.append(
-                        uid, session_id, "assistant", full_response, self.dek
+                        uid, session_id, "assistant", full_response, self.dek, meta
                     )
                     current_app.logger.debug("Saved assistant message")
                 except Exception:
@@ -152,6 +215,7 @@ class PendingResponse:
                     self.error = True
             async with self._cond:
                 self.text = full_response
+                self.meta = meta
                 self.done = True
                 self._cond.notify_all()
             pending_responses.pop(self.msg_id, None)
@@ -249,6 +313,9 @@ async def sse_reply(msg_id, session_id):
     async def event_stream():
         async for chunk in pending.stream():
             yield f"event: message\ndata: {replace_newline(escape(chunk))}\n\n"
+        if pending.meta is not None:
+            meta_str = orjson.dumps(pending.meta).decode()
+            yield f"event: meta\ndata: {escape(meta_str)}\n\n"
         event = "error" if pending.error else "done"
         yield f"event: {event}\ndata: \n\n"
         pending_responses.pop(msg_id, None)

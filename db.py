@@ -4,6 +4,7 @@ import secrets
 import logging
 import orjson
 import asyncio
+import numpy as np
 from config import (
     MAX_USERNAME_LENGTH,
     DB_POOL_SIZE,
@@ -14,6 +15,12 @@ from config import (
 )
 from ulid import ULID
 from aiosqlitepool import SQLiteConnectionPool
+from app.services.crypto import (
+    encrypt_message,
+    decrypt_message,
+    encrypt_vector,
+    decrypt_vector,
+)
 
 
 class LocalDB:
@@ -286,15 +293,15 @@ class LocalDB:
                 (user_id,),
             )
 
-    async def append(self, user_id, session_id, role, content, dek):
-        from app.services.crypto import encrypt_message
-
+    async def append(self, user_id, session_id, role, message, dek, meta=None):
         async with self.pool.connection() as conn:
             if not await self._owns_session(conn, user_id, session_id):
                 raise ValueError("User does not own session")
 
         ulid = str(ULID())
-        nonce, ct, alg = encrypt_message(dek, user_id, session_id, ulid, content)
+        record = {"message": message, "meta": meta or {}}
+        plaintext = orjson.dumps(record).decode()
+        nonce, ct, alg = encrypt_message(dek, user_id, session_id, ulid, plaintext)
 
         async with self.pool.connection() as conn:
             await self.with_transaction(
@@ -308,13 +315,18 @@ class LocalDB:
         if self.search_api:
             asyncio.create_task(
                 self.search_api.on_message_appended(
-                    user_id, session_id, msg_id, content, dek
+                    user_id, session_id, msg_id, message, dek
                 )
             )
 
         return msg_id
 
-    async def store_vector(self, msg_id, user_id, dim, nonce, ciphertext, alg):
+    async def store_vector(self, msg_id, user_id, session_id, vec, dek):
+        vec_arr = np.asarray(vec, dtype=np.float32)
+        dim = vec_arr.shape[0]
+        nonce, ct, alg = encrypt_vector(
+            dek, user_id, msg_id, vec_arr.tobytes(), session_id=session_id
+        )
         async with self.pool.connection() as conn:
             await self.with_transaction(
                 conn,
@@ -323,10 +335,10 @@ class LocalDB:
                     INSERT OR REPLACE INTO vectors (id, user_id, dim, nonce, ciphertext, alg)
                     VALUES (?, ?, ?, ?, ?, ?)
                     """,
-                (msg_id, user_id, dim, nonce, ciphertext, alg),
+                (msg_id, user_id, dim, nonce, ct, alg),
             )
 
-    async def get_latest_vectors(self, user_id: str, limit: int):
+    async def get_latest_vectors(self, user_id: str, limit: int, dek: bytes):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
@@ -341,9 +353,30 @@ class LocalDB:
                 (user_id, limit),
             )
             rows = await cursor.fetchall()
-        return [dict(row) for row in rows]
 
-    async def get_latest_messages(self, user_id: str, limit: int):
+        vectors = []
+        for row in rows:
+            vec_bytes = decrypt_vector(
+                dek,
+                user_id,
+                row["id"],
+                row["nonce"],
+                row["ciphertext"],
+                row["alg"],
+                session_id=row["session_id"],
+            )
+            vec = np.frombuffer(vec_bytes, dtype=np.float32).reshape(row["dim"])
+            vectors.append(
+                {
+                    "id": row["id"],
+                    "session_id": row["session_id"],
+                    "created_at": row["created_at"],
+                    "vec": vec,
+                }
+            )
+        return vectors
+
+    async def get_latest_messages(self, user_id: str, limit: int, dek: bytes):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
@@ -357,9 +390,34 @@ class LocalDB:
                 (user_id, limit),
             )
             rows = await cursor.fetchall()
-        return [dict(row) for row in rows]
 
-    async def get_vectors_older_than(self, user_id: str, before_id: str, limit: int):
+        messages = []
+        for row in rows:
+            record_json = decrypt_message(
+                dek,
+                user_id,
+                row["session_id"],
+                row["id"],
+                row["nonce"],
+                row["ciphertext"],
+                row["alg"],
+            )
+            rec = orjson.loads(record_json)
+            messages.append(
+                {
+                    "id": row["id"],
+                    "session_id": row["session_id"],
+                    "role": row["role"],
+                    "created_at": row["created_at"],
+                    "message": rec.get("message", ""),
+                    "meta": rec.get("meta", {}),
+                }
+            )
+        return messages
+
+    async def get_vectors_older_than(
+        self, user_id: str, before_id: str, limit: int, dek: bytes
+    ):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
@@ -374,9 +432,30 @@ class LocalDB:
                 (user_id, before_id, limit),
             )
             rows = await cursor.fetchall()
-        return [dict(row) for row in rows]
 
-    async def get_messages_older_than(self, user_id: str, before_id: str, limit: int):
+        vectors = []
+        for row in rows:
+            vec_bytes = decrypt_vector(
+                dek,
+                user_id,
+                row["id"],
+                row["nonce"],
+                row["ciphertext"],
+                row["alg"],
+                session_id=row["session_id"],
+            )
+            vec = np.frombuffer(vec_bytes, dtype=np.float32).reshape(row["dim"])
+            vectors.append(
+                {
+                    "id": row["id"],
+                    "session_id": row["session_id"],
+                    "created_at": row["created_at"],
+                    "vec": vec,
+                }
+            )
+        return vectors
+
+    async def get_messages_older_than(self, user_id: str, before_id: str, limit: int, dek: bytes):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
@@ -390,7 +469,30 @@ class LocalDB:
                 (user_id, before_id, limit),
             )
             rows = await cursor.fetchall()
-        return [dict(row) for row in rows]
+
+        messages = []
+        for row in rows:
+            record_json = decrypt_message(
+                dek,
+                user_id,
+                row["session_id"],
+                row["id"],
+                row["nonce"],
+                row["ciphertext"],
+                row["alg"],
+            )
+            rec = orjson.loads(record_json)
+            messages.append(
+                {
+                    "id": row["id"],
+                    "session_id": row["session_id"],
+                    "role": row["role"],
+                    "created_at": row["created_at"],
+                    "message": rec.get("message", ""),
+                    "meta": rec.get("meta", {}),
+                }
+            )
+        return messages
 
     async def get_user_latest_id(self, user_id: str):
         async with self.pool.connection() as conn:
@@ -408,7 +510,7 @@ class LocalDB:
             row = await cursor.fetchone()
         return row["id"] if row else None
 
-    async def get_messages_by_ids(self, user_id: str, ids: list[str]):
+    async def get_messages_by_ids(self, user_id: str, ids: list[str], dek: bytes):
         if not ids:
             return []
         placeholders = ",".join("?" for _ in ids)
@@ -423,7 +525,30 @@ class LocalDB:
                 (user_id, *ids),
             )
             rows = await cursor.fetchall()
-        return [dict(row) for row in rows]
+
+        messages = []
+        for row in rows:
+            record_json = decrypt_message(
+                dek,
+                user_id,
+                row["session_id"],
+                row["id"],
+                row["nonce"],
+                row["ciphertext"],
+                row["alg"],
+            )
+            rec = orjson.loads(record_json)
+            messages.append(
+                {
+                    "id": row["id"],
+                    "session_id": row["session_id"],
+                    "created_at": row["created_at"],
+                    "role": row["role"],
+                    "message": rec.get("message", ""),
+                    "meta": rec.get("meta", {}),
+                }
+            )
+        return messages
 
     async def create_session(self, user_id):
         session_id = secrets.token_urlsafe(32)
@@ -450,8 +575,6 @@ class LocalDB:
             )
 
     async def get_history(self, user_id, session_id, dek):
-        from app.services.crypto import decrypt_message
-
         async with self.pool.connection() as conn:
             if not await self._owns_session(conn, user_id, session_id):
                 raise ValueError("User does not own session")
@@ -464,7 +587,7 @@ class LocalDB:
 
         history = []
         for row in rows:
-            content = decrypt_message(
+            record_json = decrypt_message(
                 dek,
                 user_id,
                 session_id,
@@ -473,7 +596,15 @@ class LocalDB:
                 row["ciphertext"],
                 row["alg"],
             )
-            history.append({"id": row["id"], "role": row["role"], "content": content})
+            rec = orjson.loads(record_json)
+            history.append(
+                {
+                    "id": row["id"],
+                    "role": row["role"],
+                    "message": rec.get("message", ""),
+                    "meta": rec.get("meta", {}),
+                }
+            )
         return history
 
     async def get_all_sessions(self, user_id):

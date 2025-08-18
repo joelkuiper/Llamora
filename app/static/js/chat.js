@@ -7,10 +7,9 @@ function renderMarkdown(text) {
 }
 
 function renderAllMarkdown(root) {
-  root.querySelectorAll('.bot').forEach(el => {
-    if (el.dataset.rendered !== 'true') {
-      let text = el.textContent;
-      renderMarkdownInElement(el, text);
+  root.querySelectorAll('.message .markdown-body').forEach(el => {
+    if (el.dataset.rendered !== 'true' && !el.querySelector('#typing-indicator')) {
+      renderMarkdownInElement(el, el.textContent);
     }
   });
 }
@@ -18,17 +17,8 @@ function renderAllMarkdown(root) {
 function renderMarkdownInElement(el, text) {
   if (!el) return;
   const src = text !== undefined ? text : el.textContent || "";
-
-
   const markdownHtml = renderMarkdown(src);
-
-  const wrapper = document.createElement("div");
-  wrapper.className = "markdown-body";
-  wrapper.innerHTML = markdownHtml;
-
-  el.innerHTML = "";
-  el.appendChild(wrapper);
-
+  el.innerHTML = markdownHtml;
   el.dataset.rendered = "true";
 }
 
@@ -286,6 +276,7 @@ function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrappe
 
       const typing = wrap.querySelector("#typing-indicator");
       contentDiv.innerHTML = renderMarkdown(text);
+      contentDiv.dataset.rendered = "true";
 
       if (typing) {
         positionTypingIndicator(contentDiv, typing);
@@ -296,6 +287,28 @@ function setupScrollHandler(setFormEnabled, containerSelector = "#chatbox-wrappe
 
     if (type === "message") {
       scheduleRender(wrap, () => { renderNow(); scrollToBottom(); });
+    } else if (type === "meta") {
+      const metaEl = wrap.querySelector('.meta');
+      const chips = wrap.querySelector('.meta-chips');
+      if (metaEl && chips) {
+        let meta;
+        try { meta = JSON.parse(metaEl.textContent || '{}'); } catch {}
+        chips.innerHTML = '';
+        if (meta && meta.emoji) {
+          const e = document.createElement('span');
+          e.className = 'meta-chip emoji';
+          e.textContent = meta.emoji;
+          chips.appendChild(e);
+        }
+        if (meta && Array.isArray(meta.keywords)) {
+          meta.keywords.forEach(k => {
+            const span = document.createElement('span');
+            span.className = 'meta-chip keyword';
+            span.textContent = k;
+            chips.appendChild(span);
+          });
+        }
+      }
     } else if (type === "error" || type === "done") {
       const rid = sseRenders.get(wrap);
       if (rid) { cancelAnimationFrame(rid); sseRenders.delete(wrap); }
