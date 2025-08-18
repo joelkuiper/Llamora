@@ -50,7 +50,8 @@ async def _render_profile_page(user, **context):
 @auth_bp.route("/password_strength", methods=["POST"])
 async def password_strength_check():
     form = await request.form
-    raw = form.get("password", "") or ""
+    field = form.get("password_field", "password")
+    raw = form.get(field, "") or ""
     pw = raw.strip()[: config.MAX_PASSWORD_LENGTH]
 
     # Short-circuit obviously empty input to avoid zxcvbn edge-case crashes
