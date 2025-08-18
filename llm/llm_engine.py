@@ -9,7 +9,7 @@ from typing import Any, AsyncGenerator
 import httpx
 from httpx import HTTPError
 
-from config import DEFAULT_LLM_REQUEST, LLM_SERVER
+from config import DEFAULT_LLM_REQUEST, LLM_SERVER, GRAMMAR_FILE
 from llm.prompt_template import build_prompt
 import socket
 import os
@@ -59,9 +59,7 @@ class LLMEngine:
 
         self.ctx_size = cfg_server_args.get("ctx_size")
 
-        grammar_path = os.path.join(
-            os.path.dirname(__file__), "meta_grammar.bnf"
-        )
+        grammar_path = os.path.abspath(GRAMMAR_FILE)
         with open(grammar_path, "r", encoding="utf-8") as gf:
             self.grammar = gf.read()
 

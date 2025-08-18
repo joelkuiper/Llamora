@@ -85,6 +85,18 @@ DEFAULT_LLM_REQUEST = {
     **llm_request_overrides,
 }
 
+# Prompt and grammar files
+PROMPT_FILE = os.getenv(
+    "LLAMORA_PROMPT_FILE",
+    os.path.join(
+        os.path.dirname(__file__), "llm", "prompts", "llamora_phi.j2"
+    ),
+)
+GRAMMAR_FILE = os.getenv(
+    "LLAMORA_GRAMMAR_FILE",
+    os.path.join(os.path.dirname(__file__), "llm", "meta_grammar.bnf"),
+)
+
 # Progressive backfill search defaults
 PROGRESSIVE_K1 = int(os.getenv("LLAMORA_PROGRESSIVE_K1", 128))
 PROGRESSIVE_K2 = int(os.getenv("LLAMORA_PROGRESSIVE_K2", 10))
