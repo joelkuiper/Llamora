@@ -290,7 +290,13 @@ body {
     display: flex;
     gap: 0.25rem;
     flex-wrap: wrap;
+    opacity: 0.66;
+    transition: opacity 0.2s ease;
+    &:hover {
+      opacity: 1;
+    }
   }
+
 
   .meta-chip {
     background: var(--color-bg);
