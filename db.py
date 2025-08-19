@@ -117,6 +117,7 @@ class LocalDB:
                     id TEXT PRIMARY KEY,
                     session_id TEXT NOT NULL,
                     role TEXT NOT NULL,
+                    reply_to TEXT,
                     nonce BLOB NOT NULL,
                     ciphertext BLOB NOT NULL,
                     alg BLOB NOT NULL,
@@ -140,6 +141,7 @@ class LocalDB:
                 CREATE INDEX IF NOT EXISTS idx_sessions_user_id_id ON sessions(user_id, id);
                 CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages(session_id);
                 CREATE INDEX IF NOT EXISTS idx_messages_session_created ON messages(session_id, created_at);
+                CREATE INDEX IF NOT EXISTS idx_messages_reply_to ON messages(reply_to);
                 CREATE INDEX IF NOT EXISTS idx_sessions_user_id_created ON sessions(user_id, ulid);
                 CREATE INDEX IF NOT EXISTS idx_vectors_user_id ON vectors(user_id);
                 CREATE INDEX IF NOT EXISTS idx_vectors_id ON vectors(id);
@@ -315,7 +317,16 @@ class LocalDB:
                 (user_id,),
             )
 
-    async def append(self, user_id, session_id, role, message, dek, meta=None):
+    async def append(
+        self,
+        user_id,
+        session_id,
+        role,
+        message,
+        dek,
+        meta=None,
+        reply_to: str | None = None,
+    ):
         async with self.pool.connection() as conn:
             if not await self._owns_session(conn, user_id, session_id):
                 raise ValueError("User does not own session")
@@ -329,8 +340,8 @@ class LocalDB:
             await self.with_transaction(
                 conn,
                 conn.execute,
-                "INSERT INTO messages (id, session_id, role, nonce, ciphertext, alg) VALUES (?, ?, ?, ?, ?, ?)",
-                (ulid, session_id, role, nonce, ct, alg),
+                "INSERT INTO messages (id, session_id, role, reply_to, nonce, ciphertext, alg) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (ulid, session_id, role, reply_to, nonce, ct, alg),
             )
 
         msg_id = ulid
@@ -354,7 +365,9 @@ class LocalDB:
 
         return msg_id
 
-    async def resolve_or_create_tag(self, user_id: str, tag_name: str, dek: bytes) -> bytes:
+    async def resolve_or_create_tag(
+        self, user_id: str, tag_name: str, dek: bytes
+    ) -> bytes:
         tag_name = tag_name.strip()[:64]
         if not tag_name:
             raise ValueError("Empty tag")
@@ -543,7 +556,9 @@ class LocalDB:
             )
         return vectors
 
-    async def get_messages_older_than(self, user_id: str, before_id: str, limit: int, dek: bytes):
+    async def get_messages_older_than(
+        self, user_id: str, before_id: str, limit: int, dek: bytes
+    ):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
@@ -668,7 +683,7 @@ class LocalDB:
                 raise ValueError("User does not own session")
 
             cursor = await conn.execute(
-                "SELECT id, role, nonce, ciphertext, alg FROM messages WHERE session_id = ? ORDER BY id ASC",
+                "SELECT id, role, reply_to, nonce, ciphertext, alg FROM messages WHERE session_id = ? ORDER BY id ASC",
                 (session_id,),
             )
             rows = await cursor.fetchall()
@@ -689,6 +704,7 @@ class LocalDB:
                 {
                     "id": row["id"],
                     "role": row["role"],
+                    "reply_to": row["reply_to"],
                     "message": rec.get("message", ""),
                     "meta": rec.get("meta", {}),
                 }

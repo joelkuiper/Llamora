@@ -12,7 +12,6 @@ from html import escape
 import asyncio
 import orjson
 import re
-from weakref import WeakValueDictionary
 from llm.llm_engine import LLMEngine
 from app import db
 from app.services.auth_helpers import (
@@ -71,7 +70,7 @@ async def chat_htmx(session_id):
 
 PENDING_TTL = 300  # seconds
 CLEANUP_INTERVAL = 60  # seconds
-pending_responses: WeakValueDictionary[str, "PendingResponse"] = WeakValueDictionary()
+pending_responses: dict[str, "PendingResponse"] = {}
 _cleanup_task: asyncio.Task | None = None
 
 
@@ -205,7 +204,13 @@ class PendingResponse:
             if not self.error and full_response.strip():
                 try:
                     await db.append(
-                        uid, session_id, "assistant", full_response, self.dek, meta
+                        uid,
+                        session_id,
+                        "assistant",
+                        full_response,
+                        self.dek,
+                        meta,
+                        reply_to=self.msg_id,
                     )
                     current_app.logger.debug("Saved assistant message")
                 except Exception:
@@ -285,6 +290,29 @@ async def sse_reply(msg_id, session_id):
         return Response(
             "event: error\ndata: Invalid ID\n\n", mimetype="text/event-stream"
         )
+
+    existing: dict | None = None
+    for msg in history:
+        if msg.get("reply_to") == msg_id and msg["role"] == "assistant":
+            existing = msg
+            break
+    if existing is None:
+        for idx, msg in enumerate(history):
+            if msg["id"] == msg_id:
+                if idx + 1 < len(history) and history[idx + 1]["role"] == "assistant":
+                    existing = history[idx + 1]
+                break
+
+    if existing:
+        async def saved_stream():
+            yield f"event: message\ndata: {replace_newline(escape(existing['message']))}\n\n"
+            meta = existing.get("meta")
+            if meta:
+                meta_str = orjson.dumps(meta).decode()
+                yield f"event: meta\ndata: {escape(meta_str)}\n\n"
+            yield "event: done\ndata: \n\n"
+
+        return Response(saved_stream(), mimetype="text/event-stream")
 
     params = None
     cfg = request.args.get("config")

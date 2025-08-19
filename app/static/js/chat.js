@@ -322,7 +322,12 @@ function setupStreamHandler(setFormEnabled, scrollToBottom) {
       renderNow();
 
       wrap.querySelector("#typing-indicator")?.remove();
-      if (type === "done") setFormEnabled(true);
+      if (type === "done") {
+        wrap.removeAttribute("hx-ext");
+        wrap.removeAttribute("sse-connect");
+        wrap.removeAttribute("sse-close");
+        setFormEnabled(true);
+      }
       scrollToBottom();
     }
   };
