@@ -115,7 +115,7 @@ class PendingResponse:
         params: dict | None,
     ):
         full_response = ""
-        sentinel = "<|meta|>"
+        sentinel = "<~meta~>"
         tail = ""
         meta_buf = ""
         meta: dict | None = None
@@ -147,7 +147,7 @@ class PendingResponse:
                             async with self._cond:
                                 self.text = full_response
                                 self._cond.notify_all()
-                        data = data[idx + len(sentinel):]
+                        data = data[idx + len(sentinel) :]
                         found = True
                         meta_buf += data
                     else:
@@ -304,6 +304,7 @@ async def sse_reply(msg_id, session_id):
                 break
 
     if existing:
+
         async def saved_stream():
             yield f"event: message\ndata: {replace_newline(escape(existing['message']))}\n\n"
             meta = existing.get("meta")

@@ -1,5 +1,5 @@
-root      ::= text "<|meta|>" obj "<|end|>"
-text      ::= ([^<] | "<" [^|] | "<|" [^m] | "<|m" [^e] | "<|me" [^t] | "<|met" [^a] | "<|meta" [^|] | "<|meta|" [^>])*
+root      ::= text "<~meta~>" obj
+text      ::= ([^<] | "<" [^~] | "<~" [^m] | "<~m" [^e] | "<~me" [^t] | "<~met" [^a] | "<~meta" [^~] | "<~meta~" [^>])*
 quote     ::= "\""
 
 string ::= quote ([^"\\] | "\\" (["\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]))+ quote
