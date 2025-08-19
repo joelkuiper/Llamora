@@ -575,16 +575,22 @@ body {
     }
   }
 
+  /* Search spinner */
   #search-spinner {
     position: absolute;
     right: 0.6rem;
     top: 50%;
     transform: translateY(-50%);
     font-size: 1rem;
-    display: none;
     pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+    transition-delay: 0s;
 
-    &.htmx-request { display: block; }
+    &.htmx-request {
+      opacity: 1;
+      transition-delay: 0.2s;
+    }
   }
 
   .search-results-overlay {
