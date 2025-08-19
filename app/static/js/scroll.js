@@ -25,7 +25,9 @@ export function initScrollMemory(wrapperSelector = "#content-wrapper") {
     if (!hasTarget) {
       const saved = sessionStorage.getItem(key);
       if (saved !== null) {
-        container.scrollTop = parseInt(saved, 10);
+        requestAnimationFrame(() => {
+          container.scrollTop = parseInt(saved, 10);
+        });
       }
     }
     container.addEventListener("scroll", () => {
@@ -49,6 +51,6 @@ export function initScrollMemory(wrapperSelector = "#content-wrapper") {
     }
   };
 
-  document.body.addEventListener("htmx:afterSwap", handleLoad);
+  document.body.addEventListener("htmx:load", handleLoad);
   document.body.addEventListener("htmx:historyRestore", handleLoad);
 }
