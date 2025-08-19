@@ -78,19 +78,23 @@ llm_request_overrides = _json_env("LLAMORA_LLM_REQUEST") or {}
 
 
 DEFAULT_LLM_REQUEST = {
+    "temperature": 0.7,
+    "top_p": 0.8,
+    "top_k": 20,
+    "min_p": 0,
     "n_predict": 1024,
+    "stop": ["<|endoftext|>", "<|end|>"],
     "stream": True,
-    "stop": ["<|end|>", "<|assistant|>"],
-    "logit_bias": [[426, -1.0], [[500, -1.0]]],  # Reduce {, } likelihood
+    # "stop": ["<|end|>", "<|assistant|>"],
+    # Reduce {, } likelihood for Phi
+    "logit_bias": [[426, -1.0], [[500, -1.0]]],
     **llm_request_overrides,
 }
 
 # Prompt and grammar files
 PROMPT_FILE = os.getenv(
     "LLAMORA_PROMPT_FILE",
-    os.path.join(
-        os.path.dirname(__file__), "llm", "prompts", "llamora_phi.j2"
-    ),
+    os.path.join(os.path.dirname(__file__), "llm", "prompts", "llamora_phi.j2"),
 )
 GRAMMAR_FILE = os.getenv(
     "LLAMORA_GRAMMAR_FILE",
