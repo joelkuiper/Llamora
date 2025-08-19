@@ -34,9 +34,8 @@
           rows="3"
           placeholder="Write your thoughts here…"
           cols="40"
-          maxlength="{{ config.MAX_MESSAGE_LENGTH }}"
-          required></textarea>
-        <button class="btn" type="submit">➤</button>
+          maxlength="{{ config.MAX_MESSAGE_LENGTH }}"></textarea>
+        <button id="send-btn" class="btn" type="submit" aria-label="Send"></button>
       </div>
     </form>
   <script type="module">

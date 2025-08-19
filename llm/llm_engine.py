@@ -59,6 +59,8 @@ class LLMEngine:
 
         self.ctx_size = cfg_server_args.get("ctx_size")
 
+        self._active_streams: dict[str, httpx.Response] = {}
+
         grammar_path = os.path.abspath(GRAMMAR_FILE)
         with open(grammar_path, "r", encoding="utf-8") as gf:
             self.grammar = gf.read()
@@ -188,7 +190,7 @@ class LLMEngine:
         return history[lo:]
 
     async def stream_response(
-        self, history: list[dict], params: dict | None = None
+        self, msg_id: str, history: list[dict], params: dict | None = None
     ) -> AsyncGenerator[str, None]:
         self._ensure_server_running()
 
@@ -215,6 +217,7 @@ class LLMEngine:
                     json=payload,
                     headers=headers,
                 ) as resp:
+                    self._active_streams[msg_id] = resp
                     resp.raise_for_status()
 
                     event_buf: list[str] = []
@@ -270,3 +273,18 @@ class LLMEngine:
             except Exception as e:
                 yield {"type": "error", "data": f"Unexpected error: {e}"}
                 return
+            finally:
+                self._active_streams.pop(msg_id, None)
+
+    async def abort(self, msg_id: str) -> bool:
+        resp = self._active_streams.pop(msg_id, None)
+        if resp is not None:
+            self.logger.info("Aborting stream %s", msg_id)
+            try:
+                await resp.aclose()
+            except Exception:
+                self.logger.exception("Error closing stream %s", msg_id)
+            return True
+        else:
+            self.logger.debug("No active stream to abort for %s", msg_id)
+            return False

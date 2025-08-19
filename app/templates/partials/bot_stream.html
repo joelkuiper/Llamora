@@ -7,8 +7,10 @@
 
   <span class="markdown-body">
     <span id="typing-indicator"
+          data-msg-id="{{ msg_id }}"
+          data-stop-url="{{ url_for('chat.stop_generation', msg_id=msg_id) }}"
           sse-swap="done"
-          hx-swap="outerHTML">
+          hx-swap="none">
       <span class="cursor">❚</span>
     </span>
   </span>

@@ -1,0 +1,120 @@
+
+#profile-page {
+  max-width: 40rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+
+  .profile-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+  }
+
+  .profile-header h1 {
+    margin: 0;
+  }
+
+  .back-btn {
+    background: var(--color-bg);
+    border: none;
+    box-shadow: var(--raised-shadow);
+    border-radius: 50%;
+    padding: var(--spacing-sm);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.05s ease;
+
+    svg {
+      width: 1.1rem;
+      height: 1.1rem;
+    }
+
+    &:hover {
+      background: var(--accent-05);
+      box-shadow:
+        var(--raised-shadow),
+        0 0 0 2px var(--accent-05);
+    }
+
+    &:active {
+      box-shadow: var(--inset-shadow);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow:
+        var(--raised-shadow),
+        0 0 0 2px var(--accent-20),
+        0 8px 20px var(--accent-10);
+    }
+  }
+
+  .profile-section {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    background: var(--color-bg-alt);
+    box-shadow: var(--raised-shadow);
+
+    h2 {
+      margin-top: 0;
+    }
+  }
+
+  .profile-section.danger {
+    background: #fff5f5;
+  }
+
+  .error,
+  .success {
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    text-align: center;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .error {
+    background-color: #ffe5e5;
+    color: #a00000;
+  }
+
+  .success {
+    background-color: #e7fff0;
+    color: #0b6a36;
+  }
+
+  .strength-meter {
+    height: 0.5rem;
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+    border: 1px solid var(--border);
+    box-shadow: var(--inset-shadow);
+
+    .bar {
+      display: block;
+      height: 100%;
+      width: 0%;
+      border-radius: inherit;
+      transition: width 0.3s ease;
+    }
+
+    .bar.strength-0,
+    .bar.strength-1 { background: #ff6b6b; }
+    .bar.strength-2 { background: #feca57; }
+    .bar.strength-3 { background: #8bc34a; }
+    .bar.strength-4 { background: #4caf50; }
+  }
+
+}

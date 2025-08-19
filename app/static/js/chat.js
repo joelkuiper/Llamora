@@ -1,4 +1,5 @@
 let currentSSEListener = null;
+let currentStreamMsgId = null;
 
 function renderMarkdown(text) {
   const rawHtml = marked.parse(text, { gfm: true, breaks: true });
@@ -134,20 +135,58 @@ export function initChatUI(root = document) {
 
   const sessionId = chat.dataset.sessionId;
   const draftKey = `chat-draft-${sessionId}`;
-
   textarea.value = sessionStorage.getItem(draftKey) || "";
 
-  const setFormEnabled = (enabled) => {
-    textarea.disabled = !enabled;
-    button.disabled = !enabled;
-    if (enabled) textarea.focus({ preventScroll: true });
+  const handleStopClick = () => {
+    console.debug('Stop button clicked');
+    const indicator = chat.querySelector('#typing-indicator');
+    const stopEndpoint = indicator?.dataset.stopUrl;
+    const wrap = indicator?.closest('.bot-stream');
+    if (wrap) {
+      console.debug('Aborting SSE stream');
+      wrap.dispatchEvent(new Event('htmx:abort'));
+      wrap.removeAttribute('hx-ext');
+      wrap.removeAttribute('sse-connect');
+      wrap.removeAttribute('sse-close');
+      if (indicator) {
+        indicator.classList.add('stopped');
+        setTimeout(() => indicator.remove(), 1000);
+      }
+    }
+    if (stopEndpoint) {
+      console.debug('Sending stop request to', stopEndpoint);
+      htmx.ajax('POST', stopEndpoint, { swap: 'none' });
+    }
+    currentStreamMsgId = null;
+    setStreaming(false);
+  };
+
+  const setStreaming = (streaming) => {
+    textarea.disabled = streaming;
+    if (streaming) {
+      console.debug('Entering streaming state for', currentStreamMsgId);
+      button.classList.add('stopping');
+      button.type = 'button';
+      button.disabled = false;
+      button.addEventListener('click', handleStopClick, { once: true });
+      button.setAttribute('aria-label', 'Stop');
+    } else {
+      button.classList.remove('stopping');
+      button.type = 'submit';
+      textarea.disabled = false;
+      button.disabled = !textarea.value.trim();
+      textarea.focus({ preventScroll: true });
+      button.setAttribute('aria-label', 'Send');
+    }
   };
 
   const scrollToBottom = setupScrollHandler();
-  setupStreamHandler(setFormEnabled, scrollToBottom);
+  setupStreamHandler(setStreaming, scrollToBottom);
+
+  const findCurrentMsgId = () =>
+    chat.querySelector('#typing-indicator')?.dataset.msgId || null;
 
   form.addEventListener("htmx:afterRequest", () => {
-    setFormEnabled(false);
     sessionStorage.removeItem(draftKey);
   });
 
@@ -160,12 +199,15 @@ export function initChatUI(root = document) {
 
   textarea.addEventListener("input", () => {
     sessionStorage.setItem(draftKey, textarea.value);
+    if (!currentStreamMsgId) {
+      button.disabled = !textarea.value.trim();
+    }
   });
 
   errors?.addEventListener("htmx:afterSwap", () => {
     requestAnimationFrame(() => {
       if (document.querySelector("#errors .error-box")) {
-        setFormEnabled(true);
+        setStreaming(false);
       }
     });
   });
@@ -173,6 +215,8 @@ export function initChatUI(root = document) {
   chat.addEventListener("htmx:afterSwap", (event) => {
     renderAllMarkdown(chat);
     if (event.target === chat) {
+      currentStreamMsgId = findCurrentMsgId();
+      if (currentStreamMsgId) setStreaming(true);
       scrollToBottom(true);
     }
   });
@@ -192,12 +236,8 @@ export function initChatUI(root = document) {
   observer.observe(chat, { childList: true });
 
   renderAllMarkdown(chat);
-  // If a bot response is currently streaming, keep the form disabled
-  if (chat.querySelector("#typing-indicator")) {
-    setFormEnabled(false);
-  } else {
-    textarea.focus({ preventScroll: true });
-  }
+  currentStreamMsgId = findCurrentMsgId();
+  setStreaming(!!currentStreamMsgId);
 }
 
 function setupScrollHandler(containerSelector = "#content-wrapper") {
@@ -249,7 +289,7 @@ function setupScrollHandler(containerSelector = "#content-wrapper") {
   return scrollToBottom;
 }
 
-function setupStreamHandler(setFormEnabled, scrollToBottom) {
+function setupStreamHandler(setStreaming, scrollToBottom) {
   if (currentSSEListener) {
     document.body.removeEventListener("htmx:sseMessage", currentSSEListener);
   }
@@ -325,11 +365,15 @@ function setupStreamHandler(setFormEnabled, scrollToBottom) {
       if (rid) { cancelAnimationFrame(rid); sseRenders.delete(wrap); }
       renderNow();
 
-      wrap.querySelector("#typing-indicator")?.remove();
+      const indicator = wrap.querySelector("#typing-indicator");
+      if (indicator && !indicator.classList.contains('stopped')) {
+        indicator.remove();
+      }
       wrap.removeAttribute("hx-ext");
       wrap.removeAttribute("sse-connect");
       wrap.removeAttribute("sse-close");
-      setFormEnabled(true);
+      currentStreamMsgId = null;
+      setStreaming(false);
       scrollToBottom();
     }
   };

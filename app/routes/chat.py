@@ -68,6 +68,30 @@ async def chat_htmx(session_id):
     return resp
 
 
+@chat_bp.route("/c/stop/<msg_id>", methods=["POST"])
+@login_required
+async def stop_generation(msg_id: str):
+    current_app.logger.info("Stop requested for message %s", msg_id)
+    pending = pending_responses.get(msg_id)
+    handled = False
+    if pending:
+        current_app.logger.debug("Cancelling pending response %s", msg_id)
+        await pending.cancel()
+        handled = True
+    else:
+        current_app.logger.debug(
+            "No pending response for %s, aborting active stream", msg_id
+        )
+        handled = await llm.abort(msg_id)
+    if not handled:
+        current_app.logger.warning("Stop request for unknown message %s", msg_id)
+        return Response("unknown message id", status=404)
+    current_app.logger.debug(
+        "Stop request handled for %s (pending=%s)", msg_id, bool(pending)
+    )
+    return Response(status=204)
+
+
 PENDING_TTL = 300  # seconds
 CLEANUP_INTERVAL = 60  # seconds
 pending_responses: dict[str, "PendingResponse"] = {}
@@ -103,9 +127,10 @@ class PendingResponse:
         self._cond = asyncio.Condition()
         self.dek = dek
         self.meta = None
+        self.cancelled = False
         self.created_at = asyncio.get_event_loop().time()
         current_app.logger.debug("Starting generation for message %s", msg_id)
-        asyncio.create_task(self._generate(uid, session_id, history, params))
+        self._task = asyncio.create_task(self._generate(uid, session_id, history, params))
 
     async def _generate(
         self,
@@ -125,7 +150,7 @@ class PendingResponse:
         escape = False
         first = True
         try:
-            async for chunk in llm.stream_response(history, params):
+            async for chunk in llm.stream_response(self.msg_id, history, params):
                 if isinstance(chunk, dict) and chunk.get("type") == "error":
                     full_response += f"<span class='error'>{chunk['data']}</span>"
                     self.error = True
@@ -186,6 +211,9 @@ class PendingResponse:
                     if brace == 0 and meta_buf.strip():
                         break
 
+        except asyncio.CancelledError:
+            self.cancelled = True
+            return
         except Exception:
             current_app.logger.exception("Error during LLM streaming")
             full_response += (
@@ -193,6 +221,14 @@ class PendingResponse:
             )
             self.error = True
         finally:
+            if self.cancelled:
+                async with self._cond:
+                    self.text = full_response
+                    self.meta = None
+                    self.done = True
+                    self._cond.notify_all()
+                return
+
             if found and meta_buf.strip():
                 try:
                     meta = orjson.loads(meta_buf)
@@ -226,6 +262,17 @@ class PendingResponse:
                 self._cond.notify_all()
             if not self.error:
                 pending_responses.pop(self.msg_id, None)
+
+    async def cancel(self):
+        self.cancelled = True
+        await llm.abort(self.msg_id)
+        if not self._task.done():
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+        pending_responses.pop(self.msg_id, None)
 
     async def stream(self):
         sent = 0
