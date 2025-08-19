@@ -91,6 +91,17 @@ Alternatively set `LLAMORA_LLAMA_HOST` to the address of a running Llama file (e
    - Set `QUART_DEBUG=1` for automatic reloading on code changes.
    - Set `LOG_LEVEL=DEBUG` for debug logging
 
+### A note on model selection 
+While Phi 3.5 works most of the the time it is not great at instruction following and will often glitch. Personally I've had better results with [Qwen 4B-Instruct](https://huggingface.co/Qwen) but no llamafile is readily available for download. You can download a [GUFF](https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF) from HuggingFace and convert it to a llamafile (e.g. `llamafile-convert Qwen3-4B-Instruct-2507-Q5_K_M.gguf`) provide you have [llamafile tools](https://github.com/Mozilla-Ocho/llamafile?tab=readme-ov-file#source-installation) installed.
+
+Since Qwen uses a slightly different prompt format and sampling parameters you must adjust the settings. This is most easily done via the env vars. 
+
+```
+LLAMORA_LLAMAFILE=<path to model>/Qwen3-4B-Instruct-2507-Q5_K_M.llamafile \
+LLAMORA_PROMPT_FILE=llm/prompts/llamora_chatml.j2  \
+LLAMORA_LLM_REQUEST='{"temperature": 0.7, "top_p": 0.8, "top_k": 20, "min_p": 0}' \
+uv run quart --app main run
+```
 
 ### Deployment (not recommended)
 
