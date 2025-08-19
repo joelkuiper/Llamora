@@ -78,16 +78,15 @@ llm_request_overrides = _json_env("LLAMORA_LLM_REQUEST") or {}
 
 
 DEFAULT_LLM_REQUEST = {
-    "temperature": 0.7,
-    "top_p": 0.8,
-    "top_k": 20,
-    "min_p": 0,
     "n_predict": 1024,
-    "stop": ["<|endoftext|>", "<|end|>"],
     "stream": True,
+    # "temperature": 0.7,
+    # "top_p": 0.8,
+    # "top_k": 20,
+    # "stop": ["<|endoftext|>", "<|end|>"],
     # "stop": ["<|end|>", "<|assistant|>"],
-    # Reduce {, } likelihood for Phi
-    "logit_bias": [[426, -1.0], [[500, -1.0]]],
+    # Reduce {, } likelihood for Phi 3.5
+    # "logit_bias": [[426, -1.0], [[500, -1.0]]],
     **llm_request_overrides,
 }
 
