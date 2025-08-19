@@ -3,6 +3,7 @@
      href="{{ url_for('search.search') }}?q={{ keyword | urlencode }}"
      hx-get="{{ url_for('search.search') }}?q={{ keyword | urlencode }}"
      hx-target="#search-results"
+     hx-indicator="#search-spinner"
      hx-swap="innerHTML"
      hx-on:click="var i=document.getElementById('search-input');i.value=this.textContent;i.focus()">{{ keyword }}</a>
 {%- endmacro %}
@@ -23,6 +24,7 @@
     <a class="meta-chip keyword"
        hx-get=""
        hx-target="#search-results"
+       hx-indicator="#search-spinner"
        hx-swap="innerHTML"
        hx-on:click="var i=document.getElementById('search-input');i.value=this.textContent;i.focus()"></a>
   </template>
