@@ -397,7 +397,7 @@ body {
     white-space: normal; /* don't inherit pre spacing */
   }
 
-  typing-indicator.stopped {
+  #typing-indicator.stopped {
     animation: pop-fade 1.2s ease forwards;
     color: var(--color-text-muted);
   }
@@ -741,6 +741,60 @@ body {
   }
 }
 
+#scroll-bottom-container {
+  left: var(--chat-center, 50%);  /* pixel value set by JS */
+  transform: translateX(-50%);    /* center the button itself */
+  position: fixed;
+  bottom: 5rem;
+  --tx: none;
+}
+
+#scroll-bottom {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  background: rgba(255,255,255,0.70);
+  border: 1px solid var(--border);
+  box-shadow: var(--raised-shadow);
+  color: rgba(0,0,0,0.66);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.2s ease, background 0.2s ease;
+  z-index: 1000;
+  cursor: pointer;
+
+  &.visible {
+    opacity: 0.9;
+    pointer-events: auto;
+    animation: appear 180ms ease-out, breathe 6s ease-in-out 400ms infinite;
+  }
+
+  &:hover {
+    transform: scale(.96);
+    color: var(--accent-hover);
+
+    svg {
+      filter: drop-shadow(0 0 4px rgba(31,151,242,0.5));
+    }
+  }
+
+  &:active {
+    box-shadow: var(--inset-shadow);
+    transform: none scale(0.95);
+  }
+
+  &.clicked {
+    animation: tactile-pulse 280ms ease;
+  }
+
+}
+
+
 /* Animations */
 @keyframes chip-pop {
   from {
@@ -798,10 +852,14 @@ body {
 
 .user, .bot, .bot-stream { animation: fade-in-up 0.3s ease-out; }
 
-@keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(0.97); }
-  100% { transform: scale(1); }
+@keyframes appear {
+  from { transform: none scale(0.92); opacity: 0; }
+  to   { transform: none scale(1);     opacity: 0.9; }
+}
+
+@keyframes breathe {
+  0%,100% { transform: none scale(1); }
+  50%     { transform: none scale(1.015); }
 }
 
 @keyframes flash {
@@ -824,4 +882,10 @@ body {
     transform: scale(1);
     opacity: 0;
   }
+}
+
+@keyframes tactile-pulse {
+  0%   { transform: scale(1);   background: rgba(255,255,255,0.85); }
+  40%  { transform: scale(0.88); background: rgba(235,235,235,0.8); }
+  100% { transform: scale(1);   background: rgba(250,250,250,0.85); }
 }

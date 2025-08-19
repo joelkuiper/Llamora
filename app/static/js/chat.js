@@ -240,16 +240,27 @@ export function initChatUI(root = document) {
   setStreaming(!!currentStreamMsgId);
 }
 
-function setupScrollHandler(containerSelector = "#content-wrapper") {
+function setupScrollHandler(
+  containerSelector = "#content-wrapper",
+  buttonSelector = "#scroll-bottom"
+) {
   const container = document.querySelector(containerSelector);
+  const scrollBtn = document.querySelector(buttonSelector);
   if (!container) return () => {};
 
-  const SCROLL_THRESHOLD = 10;
-
-  const isUserNearBottom = () => {
+  const isUserNearBottom = (threshold) => {
     const distanceFromBottom =
       container.scrollHeight - container.clientHeight - container.scrollTop;
-    return distanceFromBottom < SCROLL_THRESHOLD;
+    return distanceFromBottom < threshold;
+  };
+
+  const toggleScrollBtn = () => {
+    if (!scrollBtn) return;
+    if (isUserNearBottom(150)) {
+      scrollBtn.classList.remove("visible");
+    } else {
+      scrollBtn.classList.add("visible");
+    }
   };
 
   let autoScrollEnabled = isUserNearBottom();
@@ -263,12 +274,13 @@ function setupScrollHandler(containerSelector = "#content-wrapper") {
         behavior: "smooth",
       });
     }
+    toggleScrollBtn();
   };
 
   const updateScrollState = (currentTop) => {
     if (currentTop < lastScrollTop - 2) {
       autoScrollEnabled = false;
-    } else if (isUserNearBottom()) {
+    } else if (isUserNearBottom(10)) {
       autoScrollEnabled = true;
     }
     lastScrollTop = currentTop;
@@ -276,16 +288,48 @@ function setupScrollHandler(containerSelector = "#content-wrapper") {
 
   container.addEventListener("scroll", () => {
     updateScrollState(container.scrollTop);
+    toggleScrollBtn();
   });
 
-  container.addEventListener("wheel", (e) => {
-    if (e.deltaY < 0) autoScrollEnabled = false;
-  }, { passive: true });
+  function alignScrollButton() {
+    const r = chat.getBoundingClientRect();
+    const centerPx = r.left + r.width / 2;
+    document.documentElement.style.setProperty('--chat-center', centerPx + 'px');
+  }
 
-  container.addEventListener("touchmove", () => {
-    if (container.scrollTop < lastScrollTop) autoScrollEnabled = false;
-    lastScrollTop = container.scrollTop;
-  }, { passive: true });
+  // Initial run + keep in sync
+  alignScrollButton();
+  window.addEventListener('resize', alignScrollButton);
+  window.addEventListener('scroll', alignScrollButton, { passive: true });
+  new ResizeObserver(alignScrollButton).observe(chat);
+
+  container.addEventListener(
+    "wheel",
+    (e) => {
+      if (e.deltaY < 0) autoScrollEnabled = false;
+    },
+    { passive: true }
+  );
+
+  container.addEventListener(
+    "touchmove",
+    () => {
+      if (container.scrollTop < lastScrollTop) autoScrollEnabled = false;
+      lastScrollTop = container.scrollTop;
+    },
+    { passive: true }
+  );
+
+  if (scrollBtn) {
+    scrollBtn.addEventListener("click", () => {
+      scrollBtn.classList.add("clicked");
+      console.log("clicked", scrollBtn);
+      scrollToBottom(true);
+      setTimeout(() => scrollBtn.classList.remove("clicked"), 300);
+    });
+  }
+
+  toggleScrollBtn();
   return scrollToBottom;
 }
 
