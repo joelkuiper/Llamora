@@ -39,13 +39,15 @@ def create_app():
     app.register_blueprint(search_bp)
 
     import humanize
-    from datetime import datetime
+    from datetime import datetime, timezone
     import hashlib
 
     @app.template_filter("humanize")
     def humanize_filter(value):
         if isinstance(value, str):
             value = datetime.fromisoformat(value)
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
         return humanize.naturaltime(value)
 
     @app.template_filter("tag_hash")
