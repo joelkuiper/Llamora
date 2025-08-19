@@ -170,8 +170,11 @@ export function initChatUI(root = document) {
     });
   });
 
-  chat.addEventListener("htmx:afterSwap", () => {
+  chat.addEventListener("htmx:afterSwap", (event) => {
     renderAllMarkdown(chat);
+    if (event.target === chat) {
+      scrollToBottom(true);
+    }
   });
 
   const observer = new MutationObserver((mutations) => {
@@ -212,8 +215,9 @@ function setupScrollHandler(containerSelector = "#content-wrapper") {
   let autoScrollEnabled = isUserNearBottom();
   let lastScrollTop = container.scrollTop;
 
-  const scrollToBottom = () => {
-    if (autoScrollEnabled) {
+  const scrollToBottom = (force = false) => {
+    if (force) autoScrollEnabled = true;
+    if (autoScrollEnabled || force) {
       container.scrollTo({
         top: container.scrollHeight,
         behavior: "smooth",
