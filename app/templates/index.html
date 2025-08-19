@@ -137,7 +137,9 @@
 
     <script type="module">
       import { initSidebarToggle } from "{{ url_for('static', filename='js/sidebar.js') }}";
+      import { initScrollMemory } from "{{ url_for('static', filename='js/scroll.js') }}";
       initSidebarToggle();
+      initScrollMemory();
     </script>
   </body>
 </html>
