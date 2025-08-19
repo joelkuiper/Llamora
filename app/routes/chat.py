@@ -224,7 +224,8 @@ class PendingResponse:
                 self.meta = meta
                 self.done = True
                 self._cond.notify_all()
-            pending_responses.pop(self.msg_id, None)
+            if not self.error:
+                pending_responses.pop(self.msg_id, None)
 
     async def stream(self):
         sent = 0
@@ -348,6 +349,7 @@ async def sse_reply(msg_id, session_id):
             yield f"event: meta\ndata: {escape(meta_str)}\n\n"
         event = "error" if pending.error else "done"
         yield f"event: {event}\ndata: \n\n"
-        pending_responses.pop(msg_id, None)
+        if not pending.error:
+            pending_responses.pop(msg_id, None)
 
     return Response(event_stream(), mimetype="text/event-stream")
