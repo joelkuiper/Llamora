@@ -441,7 +441,8 @@ body {
     button {
       padding: var(--spacing-md) var(--spacing-lg);
       font-size: 1.2rem;
-      width: 3rem;
+      width: 3.5rem;
+      height: 3.5rem;
       display: flex;
       align-items: center;
       justify-content: center;

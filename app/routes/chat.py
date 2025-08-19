@@ -222,11 +222,34 @@ class PendingResponse:
             self.error = True
         finally:
             if self.cancelled:
+                if full_response.strip():
+                    try:
+                        await db.append(
+                            uid,
+                            session_id,
+                            "assistant",
+                            full_response,
+                            self.dek,
+                            {},
+                            reply_to=self.msg_id,
+                        )
+                        current_app.logger.debug(
+                            "Saved partial assistant message"
+                        )
+                    except Exception:
+                        current_app.logger.exception(
+                            "Failed to save partial assistant message"
+                        )
+                        full_response += (
+                            "<span class='error'>⚠️ Failed to save response.</span>"
+                        )
+                        self.error = True
                 async with self._cond:
                     self.text = full_response
                     self.meta = None
                     self.done = True
                     self._cond.notify_all()
+                pending_responses.pop(self.msg_id, None)
                 return
 
             if found and meta_buf.strip():
