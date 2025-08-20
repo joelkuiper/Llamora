@@ -106,6 +106,9 @@ body {
     }
   }
 
+  .meta-chips[hidden] {
+    display: none;
+  }
 
   .meta-chip {
     background: var(--color-bg);
@@ -224,6 +227,9 @@ body {
   }
 
   .meta-chip.chip-enter {
+    animation: chip-pop 0.2s ease-out both;
+  }
+  .meta-chips.chip-enter {
     animation: chip-pop 0.2s ease-out both;
   }
 
@@ -410,6 +416,7 @@ body {
     transform: scale(1);
   }
 }
+
 @keyframes blink {
   0%, 100% { opacity: 0; }
   50% { opacity: 1; }

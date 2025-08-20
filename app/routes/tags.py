@@ -24,6 +24,8 @@ async def add_tag(msg_id: str):
     user = await get_current_user()
     form = await request.form
     tag = (form.get("tag") or "").strip()[:64]
+    if tag and not tag.startswith("#"):
+        tag = f"#{tag}"
     if not tag:
         abort(400, description="empty tag")
     dek = get_dek()

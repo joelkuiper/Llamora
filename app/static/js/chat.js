@@ -8,6 +8,13 @@ let currentStreamMsgId = null;
 
 const TYPING_INDICATOR_SELECTOR = "#typing-indicator";
 
+function revealMetaChips(container) {
+  if (!container || !container.hidden) return;
+  container.hidden = false;
+  container.classList.add('chip-enter');
+  container.addEventListener('animationend', () => container.classList.remove('chip-enter'), { once: true });
+}
+
 export function initChatUI(root = document) {
   const form = root.querySelector("#message-form");
   const textarea = form?.querySelector("textarea");
@@ -43,6 +50,7 @@ export function initChatUI(root = document) {
     }
     currentStreamMsgId = null;
     setStreaming(false);
+    revealMetaChips(wrap?.querySelector('.meta-chips'));
   };
 
   const setStreaming = (streaming) => {
@@ -277,6 +285,7 @@ function initStreamHandler(setStreaming, scrollToBottom) {
       wrap.removeAttribute("sse-close");
       currentStreamMsgId = null;
       setStreaming(false);
+      revealMetaChips(wrap.querySelector('.meta-chips'));
       scrollToBottom();
     }
   };

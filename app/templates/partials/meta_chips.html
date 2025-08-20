@@ -1,12 +1,13 @@
 {% macro keyword_chip(keyword, tag_hash, msg_id=None) -%}
+  {% set display = keyword if keyword.startswith('#') else '#' ~ keyword %}
   <span class="meta-chip keyword">
     <a class="chip-label"
-       href="{{ url_for('search.search') }}?q={{ keyword | urlencode }}"
-       hx-get="{{ url_for('search.search') }}?q={{ keyword | urlencode }}"
+       href="{{ url_for('search.search') }}?q={{ display | urlencode }}"
+       hx-get="{{ url_for('search.search') }}?q={{ display | urlencode }}"
        hx-target="#search-results"
        hx-indicator="#search-spinner"
        hx-swap="innerHTML"
-       hx-on:click="var i=document.getElementById('search-input');i.value=this.textContent;i.focus()">{{ keyword }}</a>
+       hx-on:click="var i=document.getElementById('search-input');i.value=this.textContent;i.focus()">{{ display }}</a>
     {% if msg_id %}
     <button class="chip-remove"
             hx-delete="{{ url_for('tags.remove_tag', msg_id=msg_id, tag_hash=tag_hash) }}"
@@ -20,16 +21,15 @@
   <!--  <span class="meta-chip emoji">{{ emoji }}</span> -->
 {%- endmacro %}
 
-{% macro render_meta_chips(msg_id, tags=[]) -%}
-  <div class="meta-chips" data-msg-id="{{ msg_id }}">
+{% macro render_meta_chips(msg_id, tags=[], hidden=False) -%}
+  <div class="meta-chips" data-msg-id="{{ msg_id }}" {% if hidden %}hidden{% endif %}>
     {% for tag in tags %}
       {{ keyword_chip(tag.name, tag.hash, msg_id) }}
     {% endfor %}
     <div class="tag-popover" role="tooltip" hidden>
       <form hx-post="{{ url_for('tags.add_tag', msg_id=msg_id) }}"
             hx-target="closest .tag-popover"
-            hx-swap="beforebegin"
-            hx-on::after-request="this.reset();this.closest('.tag-popover').hidden=true">
+            hx-swap="beforebegin">
         <input type="text" name="tag" maxlength="64">
         <button type="submit">Add</button>
       </form>

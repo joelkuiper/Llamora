@@ -166,6 +166,7 @@ class LocalDB:
                     tag_hash BLOB(32) NOT NULL,
                     message_id TEXT NOT NULL,
                     session_id TEXT NOT NULL,
+                    ulid TEXT NOT NULL,
                     PRIMARY KEY(user_id, tag_hash, message_id)
                 );
 
@@ -400,8 +401,8 @@ class LocalDB:
             await self.with_transaction(
                 conn,
                 conn.execute,
-                "INSERT OR IGNORE INTO tag_message_xref (user_id, tag_hash, message_id, session_id) VALUES (?, ?, ?, ?)",
-                (user_id, tag_hash, message_id, session_id),
+                "INSERT OR IGNORE INTO tag_message_xref (user_id, tag_hash, message_id, session_id, ulid) VALUES (?, ?, ?, ?, ?)",
+                (user_id, tag_hash, message_id, session_id, str(ULID())),
             )
 
     async def unlink_tag_message(
@@ -708,12 +709,13 @@ class LocalDB:
             cursor = await conn.execute(
                 """
                 SELECT m.id, m.role, m.reply_to, m.nonce, m.ciphertext, m.alg AS msg_alg,
+                       x.ulid AS tag_ulid,
                        t.tag_hash, t.name_ct, t.name_nonce, t.alg AS tag_alg
                 FROM messages m
                 LEFT JOIN tag_message_xref x ON x.message_id = m.id AND x.user_id = ?
                 LEFT JOIN tags t ON t.user_id = x.user_id AND t.tag_hash = x.tag_hash
                 WHERE m.session_id = ?
-                ORDER BY m.id ASC
+                ORDER BY m.id ASC, x.ulid ASC
                 """,
                 (user_id, session_id),
             )
