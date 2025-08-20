@@ -210,7 +210,8 @@ body {
   border-radius: 12px;
   padding: 8px 10px;
 
-  transition: opacity .25s ease, background .2s ease;
+  opacity: 0;
+  transition: opacity .2s ease, background .2s ease;
 
   /* Keep your horizontal form layout */
   form {
@@ -224,6 +225,16 @@ body {
 
   }
 }
+
+.tag-popover.tp-open { opacity: 1; }
+
+.tag-popover .tp-content {
+  transform: scale(0.95);
+  transition: transform .2s ease;
+  transform-origin: top right;
+}
+
+.tag-popover.tp-open .tp-content { transform: scale(1); }
 
 
   .meta-chip:focus,
@@ -242,8 +253,13 @@ body {
   }
 
   .meta-chip.chip-enter,
-  .meta-chips.chip-enter {
+  .meta-chips.chip-enter,
+  .meta-chip.htmx-added {
     animation: chip-pop 0.2s ease both;
+  }
+
+  .meta-chip.htmx-swapping {
+    animation: chip-pop-out 0.15s ease forwards;
   }
 
   /* Markdown refinements */
@@ -427,6 +443,17 @@ body {
   to {
     opacity: 1;
     /* transform: scale(1); */
+  }
+}
+
+@keyframes chip-pop-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.8);
   }
 }
 

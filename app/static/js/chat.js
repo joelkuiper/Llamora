@@ -10,7 +10,20 @@ const TYPING_INDICATOR_SELECTOR = "#typing-indicator";
 
 function revealMetaChips(container) {
   if (!container || !container.hidden) return;
+  const parent = container.closest('.message');
+  const start = parent?.offsetHeight;
   container.hidden = false;
+  const end = parent?.offsetHeight;
+  if (parent && start !== undefined && end !== undefined) {
+    parent.style.height = start + 'px';
+    parent.offsetHeight; // force reflow
+    parent.style.transition = 'height 0.2s ease';
+    parent.style.height = end + 'px';
+    parent.addEventListener('transitionend', () => {
+      parent.style.height = '';
+      parent.style.transition = '';
+    }, { once: true });
+  }
   container.classList.add('chip-enter');
   container.addEventListener('animationend', () => container.classList.remove('chip-enter'), { once: true });
 }

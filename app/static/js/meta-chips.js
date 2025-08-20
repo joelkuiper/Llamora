@@ -11,13 +11,13 @@ function setupAddButton(container) {
 
   const hide = () => {
     if (pop.hidden) return;
-    pop.classList.add('tp-closing');
-    const clear = () => {
+    pop.classList.remove('tp-open');
+    const clear = (e) => {
+      if (e && e.target !== pop) return;
       pop.hidden = true;
-      pop.classList.remove('tp-closing');
+      pop.removeEventListener('transitionend', clear);
     };
-    clear();
-    // pop.addEventListener('animationend', clear, { once: true });
+    pop.addEventListener('transitionend', clear);
     document.removeEventListener('click', outside, true);
     document.removeEventListener('keydown', onKey);
   };
@@ -33,8 +33,7 @@ function setupAddButton(container) {
   btn.addEventListener('click', () => {
     if (!pop.hidden) { hide(); return; }
     pop.hidden = false;
-    pop.classList.add('tp-enter');
-    pop.addEventListener('animationend', () => pop.classList.remove('tp-enter'), { once: true });
+    requestAnimationFrame(() => pop.classList.add('tp-open'));
     instance = instance || Popper.createPopper(btn, pop, { placement: 'bottom' });
     instance.update();
     pop.querySelector('input')?.focus();
@@ -56,6 +55,16 @@ function setupAddButton(container) {
   form.addEventListener('htmx:afterRequest', () => {
     form.reset();
     hide();
+  });
+
+  container.addEventListener('htmx:afterSwap', (evt) => {
+    if (evt.target === pop) {
+      const chip = pop.previousElementSibling;
+      if (chip?.classList.contains('meta-chip')) {
+        chip.classList.add('chip-enter');
+        chip.addEventListener('animationend', () => chip.classList.remove('chip-enter'), { once: true });
+      }
+    }
   });
 }
 
