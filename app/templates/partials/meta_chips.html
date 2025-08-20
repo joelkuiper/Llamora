@@ -1,34 +1,39 @@
-{% macro keyword_chip(keyword) -%}
-  <a class="meta-chip keyword"
-     href="{{ url_for('search.search') }}?q={{ keyword | urlencode }}"
-     hx-get="{{ url_for('search.search') }}?q={{ keyword | urlencode }}"
-     hx-target="#search-results"
-     hx-indicator="#search-spinner"
-     hx-swap="innerHTML"
-     hx-on:click="var i=document.getElementById('search-input');i.value=this.textContent;i.focus()">{{ keyword }}</a>
+{% macro keyword_chip(keyword, tag_hash, msg_id=None) -%}
+  <span class="meta-chip keyword">
+    <a class="chip-label"
+       href="{{ url_for('search.search') }}?q={{ keyword | urlencode }}"
+       hx-get="{{ url_for('search.search') }}?q={{ keyword | urlencode }}"
+       hx-target="#search-results"
+       hx-indicator="#search-spinner"
+       hx-swap="innerHTML"
+       hx-on:click="var i=document.getElementById('search-input');i.value=this.textContent;i.focus()">{{ keyword }}</a>
+    {% if msg_id %}
+    <button class="chip-remove"
+            hx-delete="{{ url_for('tags.remove_tag', msg_id=msg_id, tag_hash=tag_hash) }}"
+            hx-target="closest .meta-chip"
+            hx-swap="outerHTML">&times;</button>
+    {% endif %}
+  </span>
 {%- endmacro %}
 
 {% macro emoji_chip(emoji) -%}
   <!--  <span class="meta-chip emoji">{{ emoji }}</span> -->
 {%- endmacro %}
 
-{% macro render_meta_chips(meta) -%}
-  <div class="meta-chips">
-    {% if meta.emoji %}{{ emoji_chip(meta.emoji) }}{% endif %}
-    {% for kw in meta.keywords %}{{ keyword_chip(kw) }}{% endfor %}
+{% macro render_meta_chips(msg_id, tags=[]) -%}
+  <div class="meta-chips" data-msg-id="{{ msg_id }}">
+    {% for tag in tags %}
+      {{ keyword_chip(tag.name, tag.hash, msg_id) }}
+    {% endfor %}
+    <div class="tag-popover" role="tooltip" hidden>
+      <form hx-post="{{ url_for('tags.add_tag', msg_id=msg_id) }}"
+            hx-target="closest .tag-popover"
+            hx-swap="beforebegin"
+            hx-on::after-request="this.reset();this.closest('.tag-popover').hidden=true">
+        <input type="text" name="tag" maxlength="64">
+        <button type="submit">Add</button>
+      </form>
+    </div>
+    <button type="button" class="add-tag-btn">+</button>
   </div>
-{%- endmacro %}
-
-{% macro meta_chip_templates() -%}
-  <template id="keyword-chip-template" data-url="{{ url_for('search.search') }}">
-    <a class="meta-chip keyword"
-       hx-get=""
-       hx-target="#search-results"
-       hx-indicator="#search-spinner"
-       hx-swap="innerHTML"
-       hx-on:click="var i=document.getElementById('search-input');i.value=this.textContent;i.focus()"></a>
-  </template>
-  <!-- <template id="emoji-chip-template">
-    <span class="meta-chip emoji"></span>
-  </template>-->
 {%- endmacro %}

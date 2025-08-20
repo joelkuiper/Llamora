@@ -32,11 +32,13 @@ def create_app():
     from .routes.sessions import sessions_bp
     from .routes.chat import chat_bp
     from .routes.search import search_bp
+    from .routes.tags import tags_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(sessions_bp)
     app.register_blueprint(chat_bp)
     app.register_blueprint(search_bp)
+    app.register_blueprint(tags_bp)
 
     import humanize
     from datetime import datetime, timezone
@@ -51,9 +53,12 @@ def create_app():
         return humanize.naturaltime(value)
 
     @app.template_filter("tag_hash")
-    def tag_hash_filter(tag, user_id):
+    def tag_hash_filter(tag, user_id=None):
         t = tag.strip()[:64]
-        return hashlib.sha256(f"{user_id}:{t}".encode("utf-8")).hexdigest()
+        uid = user_id or (getattr(request, "user", {}) or {}).get("id")
+        if not uid:
+            return ""
+        return hashlib.sha256(f"{uid}:{t}".encode("utf-8")).hexdigest()
 
     from .services.auth_helpers import load_user, dek_store
 

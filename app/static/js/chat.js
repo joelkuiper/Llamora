@@ -1,6 +1,6 @@
 import { renderMarkdown, renderAllMarkdown } from "./markdown.js";
 import { positionTypingIndicator } from "./typing-indicator.js";
-import { renderMetaChips } from "./meta-chips.js";
+import { initTagPopovers } from "./meta-chips.js";
 
 let currentSSEListener = null;
 let currentStreamMsgId = null;
@@ -98,6 +98,7 @@ export function initChatUI(root = document) {
 
   chat.addEventListener("htmx:afterSwap", (event) => {
     renderAllMarkdown(chat);
+    initTagPopovers(chat);
     if (event.target === chat) {
       currentStreamMsgId = findCurrentMsgId();
       if (currentStreamMsgId) setStreaming(true);
@@ -120,6 +121,7 @@ export function initChatUI(root = document) {
   observer.observe(chat, { childList: true });
 
   renderAllMarkdown(chat);
+  initTagPopovers(chat);
   currentStreamMsgId = findCurrentMsgId();
   setStreaming(!!currentStreamMsgId);
 }
@@ -261,14 +263,6 @@ function initStreamHandler(setStreaming, scrollToBottom) {
 
     if (type === "message") {
       scheduleRender(wrap, () => { renderNow(); scrollToBottom(); });
-    } else if (type === "meta") {
-      const metaEl = wrap.querySelector('.meta');
-      const chips = wrap.querySelector('.meta-chips');
-      if (metaEl && chips) {
-        let meta;
-        try { meta = JSON.parse(metaEl.textContent || '{}'); } catch {}
-        renderMetaChips(meta, chips);
-      }
     } else if (type === "error" || type === "done") {
       const rid = sseRenders.get(wrap);
       if (rid) { cancelAnimationFrame(rid); sseRenders.delete(wrap); }

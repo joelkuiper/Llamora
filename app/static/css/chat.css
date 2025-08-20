@@ -122,6 +122,10 @@ body {
       border-color 0.2s ease,
       transform 0.08s ease,
       background-color 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    position: relative;
+    overflow: visible;
   }
 
   .meta-chip:hover {
@@ -130,6 +134,69 @@ body {
       var(--raised-shadow),
       0 0 0 2px var(--accent-10);
     background: linear-gradient(0deg, rgba(59,167,246,0.16), rgba(59,167,246,0.12)) var(--color-bg);
+  }
+
+  .chip-label {
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .chip-remove {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    transform: scale(0);
+    transform-origin: top right;
+    background: rgba(0, 0, 0, 0.85);
+    border: none;
+    color: #fff;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    cursor: pointer;
+    opacity: 0;
+    transition: transform 0.2s ease, opacity 0.2s ease, background-color 0.2s ease;
+  }
+
+  .chip-remove:hover {
+    background: #000;
+  }
+
+  .meta-chip:hover .chip-remove {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  .add-tag-btn {
+    background: var(--color-bg);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-md);
+    padding: 2px 6px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+  }
+
+  .add-tag-btn:hover {
+    background: var(--accent-10);
+  }
+
+  .tag-popover {
+    background-color: #333;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+    z-index: 1000;
+  }
+
+  .tag-popover form {
+    display: flex;
+    gap: 4px;
   }
 
   .meta-chip:focus,

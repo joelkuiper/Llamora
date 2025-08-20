@@ -6,6 +6,7 @@ import orjson
 import asyncio
 import numpy as np
 import hashlib
+from functools import lru_cache
 from config import (
     MAX_USERNAME_LENGTH,
     DB_POOL_SIZE,
@@ -22,6 +23,20 @@ from app.services.crypto import (
     encrypt_vector,
     decrypt_vector,
 )
+
+
+@lru_cache(maxsize=256)
+def _cached_tag_name(
+    user_id: str,
+    tag_hash: bytes,
+    name_nonce: bytes,
+    name_ct: bytes,
+    alg: bytes,
+    dek: bytes,
+) -> str:
+    return decrypt_message(
+        dek, user_id, "tag", tag_hash.hex(), name_nonce, name_ct, alg
+    )
 
 
 class LocalDB:
@@ -137,15 +152,6 @@ class LocalDB:
                     FOREIGN KEY (id) REFERENCES messages(id) ON DELETE CASCADE
                 );
 
-                CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
-                CREATE INDEX IF NOT EXISTS idx_sessions_user_id_id ON sessions(user_id, id);
-                CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages(session_id);
-                CREATE INDEX IF NOT EXISTS idx_messages_session_created ON messages(session_id, created_at);
-                CREATE INDEX IF NOT EXISTS idx_messages_reply_to ON messages(reply_to);
-                CREATE INDEX IF NOT EXISTS idx_sessions_user_id_created ON sessions(user_id, ulid);
-                CREATE INDEX IF NOT EXISTS idx_vectors_user_id ON vectors(user_id);
-                CREATE INDEX IF NOT EXISTS idx_vectors_id ON vectors(id);
-
                 CREATE TABLE IF NOT EXISTS tags (
                     user_id TEXT NOT NULL,
                     tag_hash BLOB(32) NOT NULL,
@@ -163,9 +169,16 @@ class LocalDB:
                     PRIMARY KEY(user_id, tag_hash, message_id)
                 );
 
+                CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+                CREATE INDEX IF NOT EXISTS idx_sessions_user_id_created ON sessions(user_id, ulid);
+                CREATE INDEX IF NOT EXISTS idx_sessions_user_id_id ON sessions(user_id, id);
+                CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages(session_id);
+                CREATE INDEX IF NOT EXISTS idx_messages_reply_to ON messages(reply_to);
+                CREATE INDEX IF NOT EXISTS idx_vectors_user_id ON vectors(user_id);
+                CREATE INDEX IF NOT EXISTS idx_vectors_id ON vectors(id);
+
                 CREATE INDEX IF NOT EXISTS idx_tag_message_session ON tag_message_xref(user_id, tag_hash);
                 CREATE INDEX IF NOT EXISTS idx_tag_message_message ON tag_message_xref(user_id, message_id);
-                CREATE INDEX IF NOT EXISTS idx_sessions_user_created ON sessions(user_id, created_at);
                 """,
             )
 
@@ -346,16 +359,6 @@ class LocalDB:
 
         msg_id = ulid
 
-        if meta and isinstance(meta.get("keywords"), list):
-            for kw in meta["keywords"]:
-                if isinstance(kw, str):
-                    tag_name = kw.strip()
-                    if not tag_name:
-                        continue
-                    tag_name = tag_name[:64]
-                    tag_hash = await self.resolve_or_create_tag(user_id, tag_name, dek)
-                    await self.xref_tag_message(user_id, tag_hash, msg_id, session_id)
-
         if self.search_api:
             asyncio.create_task(
                 self.search_api.on_message_appended(
@@ -400,6 +403,26 @@ class LocalDB:
                 "INSERT OR IGNORE INTO tag_message_xref (user_id, tag_hash, message_id, session_id) VALUES (?, ?, ?, ?)",
                 (user_id, tag_hash, message_id, session_id),
             )
+
+    async def unlink_tag_message(
+        self, user_id: str, tag_hash: bytes, message_id: str
+    ) -> None:
+        async with self.pool.connection() as conn:
+            await self.with_transaction(
+                conn,
+                conn.execute,
+                "DELETE FROM tag_message_xref WHERE user_id = ? AND tag_hash = ? AND message_id = ?",
+                (user_id, tag_hash, message_id),
+            )
+
+    async def get_message_session(self, user_id: str, message_id: str) -> str | None:
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                "SELECT m.session_id FROM messages m JOIN sessions s ON m.session_id = s.id WHERE m.id = ? AND s.user_id = ?",
+                (message_id, user_id),
+            )
+            row = await cursor.fetchone()
+        return row["session_id"] if row else None
 
     async def get_messages_with_tag_hashes(
         self, user_id: str, tag_hashes: list[bytes], message_ids: list[str]
@@ -683,32 +706,55 @@ class LocalDB:
                 raise ValueError("User does not own session")
 
             cursor = await conn.execute(
-                "SELECT id, role, reply_to, nonce, ciphertext, alg FROM messages WHERE session_id = ? ORDER BY id ASC",
-                (session_id,),
+                """
+                SELECT m.id, m.role, m.reply_to, m.nonce, m.ciphertext, m.alg AS msg_alg,
+                       t.tag_hash, t.name_ct, t.name_nonce, t.alg AS tag_alg
+                FROM messages m
+                LEFT JOIN tag_message_xref x ON x.message_id = m.id AND x.user_id = ?
+                LEFT JOIN tags t ON t.user_id = x.user_id AND t.tag_hash = x.tag_hash
+                WHERE m.session_id = ?
+                ORDER BY m.id ASC
+                """,
+                (user_id, session_id),
             )
             rows = await cursor.fetchall()
 
         history = []
+        current = None
         for row in rows:
-            record_json = decrypt_message(
-                dek,
-                user_id,
-                session_id,
-                row["id"],
-                row["nonce"],
-                row["ciphertext"],
-                row["alg"],
-            )
-            rec = orjson.loads(record_json)
-            history.append(
-                {
-                    "id": row["id"],
+            msg_id = row["id"]
+            if not history or history[-1]["id"] != msg_id:
+                record_json = decrypt_message(
+                    dek,
+                    user_id,
+                    session_id,
+                    msg_id,
+                    row["nonce"],
+                    row["ciphertext"],
+                    row["msg_alg"],
+                )
+                rec = orjson.loads(record_json)
+                current = {
+                    "id": msg_id,
                     "role": row["role"],
                     "reply_to": row["reply_to"],
                     "message": rec.get("message", ""),
                     "meta": rec.get("meta", {}),
+                    "tags": [],
                 }
-            )
+                history.append(current)
+            if row["tag_hash"] is not None:
+                tag_name = _cached_tag_name(
+                    user_id,
+                    row["tag_hash"],
+                    row["name_nonce"],
+                    row["name_ct"],
+                    row["tag_alg"].encode(),
+                    dek,
+                )
+                current["tags"].append(
+                    {"name": tag_name, "hash": row["tag_hash"].hex()}
+                )
         return history
 
     async def get_all_sessions(self, user_id):

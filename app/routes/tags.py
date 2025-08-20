@@ -1,0 +1,38 @@
+from quart import Blueprint, request, abort, render_template
+from app import db
+from app.services.auth_helpers import login_required, get_current_user, get_dek
+
+
+tags_bp = Blueprint("tags", __name__)
+
+
+@tags_bp.delete("/t/<msg_id>/<tag_hash>")
+@login_required
+async def remove_tag(msg_id: str, tag_hash: str):
+    user = await get_current_user()
+    try:
+        tag_hash_bytes = bytes.fromhex(tag_hash)
+    except ValueError:
+        abort(400, description="invalid tag hash")
+    await db.unlink_tag_message(user["id"], tag_hash_bytes, msg_id)
+    return ""
+
+
+@tags_bp.post("/t/<msg_id>")
+@login_required
+async def add_tag(msg_id: str):
+    user = await get_current_user()
+    form = await request.form
+    tag = (form.get("tag") or "").strip()[:64]
+    if not tag:
+        abort(400, description="empty tag")
+    dek = get_dek()
+    session_id = await db.get_message_session(user["id"], msg_id)
+    if not session_id:
+        abort(404, description="message not found")
+    tag_hash = await db.resolve_or_create_tag(user["id"], tag, dek)
+    await db.xref_tag_message(user["id"], tag_hash, msg_id, session_id)
+    html = await render_template(
+        "partials/tag_chip.html", keyword=tag, tag_hash=tag_hash.hex(), msg_id=msg_id
+    )
+    return html

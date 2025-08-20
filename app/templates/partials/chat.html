@@ -10,8 +10,8 @@
       {% for msg in history %}
       <div id="msg-{{ msg['id'] }}" class="message {{ 'bot' if msg['role'] != 'user' else 'user'}}">
         <div class="markdown-body">{{ msg.message }}</div>
-        {% if msg.meta %}
-        {{ render_meta_chips(msg.meta) }}
+        {% if msg['role'] != 'user' %}
+        {{ render_meta_chips(msg['id'], msg.get('tags', [])) }}
         {% endif %}
       </div>
       {% endfor %}
@@ -50,6 +50,7 @@
       </svg>
     </button>
   </div>
+  <script src="https://unpkg.com/@popperjs/core@2"></script>
   <script type="module">
     import { initChatUI } from "{{ url_for('static', filename='js/chat.js') }}";
     import { updateActiveSession } from "{{ url_for('static', filename='js/session.js') }}";

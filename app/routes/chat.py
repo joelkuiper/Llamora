@@ -130,7 +130,9 @@ class PendingResponse:
         self.cancelled = False
         self.created_at = asyncio.get_event_loop().time()
         current_app.logger.debug("Starting generation for message %s", msg_id)
-        self._task = asyncio.create_task(self._generate(uid, session_id, history, params))
+        self._task = asyncio.create_task(
+            self._generate(uid, session_id, history, params)
+        )
 
     async def _generate(
         self,
@@ -233,9 +235,7 @@ class PendingResponse:
                             {},
                             reply_to=self.msg_id,
                         )
-                        current_app.logger.debug(
-                            "Saved partial assistant message"
-                        )
+                        current_app.logger.debug("Saved partial assistant message")
                     except Exception:
                         current_app.logger.exception(
                             "Failed to save partial assistant message"
@@ -378,10 +378,10 @@ async def sse_reply(msg_id, session_id):
 
         async def saved_stream():
             yield f"event: message\ndata: {replace_newline(escape(existing['message']))}\n\n"
-            meta = existing.get("meta")
-            if meta:
-                meta_str = orjson.dumps(meta).decode()
-                yield f"event: meta\ndata: {escape(meta_str)}\n\n"
+            # meta = existing.get("meta")
+            # if meta:
+            #     meta_str = orjson.dumps(meta).decode()
+            #     yield f"event: meta\ndata: {escape(meta_str)}\n\n"
             yield "event: done\ndata: \n\n"
 
         return Response(saved_stream(), mimetype="text/event-stream")
@@ -415,8 +415,8 @@ async def sse_reply(msg_id, session_id):
         async for chunk in pending.stream():
             yield f"event: message\ndata: {replace_newline(escape(chunk))}\n\n"
         if pending.meta is not None:
-            meta_str = orjson.dumps(pending.meta).decode()
-            yield f"event: meta\ndata: {escape(meta_str)}\n\n"
+            # Placeholder for emitting structured metadata (e.g., tags)
+            pass
         event = "error" if pending.error else "done"
         yield f"event: {event}\ndata: \n\n"
         if not pending.error:
