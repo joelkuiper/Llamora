@@ -1,128 +1,12 @@
+import { renderMarkdown, renderAllMarkdown } from "./markdown.js";
+import { positionTypingIndicator } from "./typing-indicator.js";
+import { renderMetaChips } from "./meta-chips.js";
+
 let currentSSEListener = null;
 let currentStreamMsgId = null;
 
-function renderMarkdown(text) {
-  const rawHtml = marked.parse(text, { gfm: true, breaks: true });
 
-  return DOMPurify.sanitize(rawHtml);
-}
-
-function renderAllMarkdown(root) {
-  root.querySelectorAll('.message .markdown-body').forEach(el => {
-    if (el.dataset.rendered !== 'true' && !el.querySelector('#typing-indicator')) {
-      renderMarkdownInElement(el, el.textContent);
-    }
-  });
-}
-
-function renderMarkdownInElement(el, text) {
-  if (!el) return;
-  const src = text !== undefined ? text : el.textContent || "";
-  const markdownHtml = renderMarkdown(src);
-  el.innerHTML = markdownHtml;
-  el.dataset.rendered = "true";
-}
-
-
-const VOID_TAGS = new Set([
-  'AREA','BASE','BR','COL','EMBED','HR','IMG','INPUT','LINK','META','PARAM','SOURCE','TRACK','WBR'
-]);
-
-function isVoid(el) {
-  return el.nodeType === Node.ELEMENT_NODE && VOID_TAGS.has(el.tagName);
-}
-
-function isInlineElement(el) {
-  if (!(el instanceof Element)) return false;
-  const disp = getComputedStyle(el).display || '';
-  return disp.startsWith('inline'); // inline, inline-block, inline-flex
-}
-
-function getLastNonWhitespaceTextNode(root) {
-  // TreeWalker over TEXT nodes to find the last non-whitespace
-  const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) {
-      return /\S/.test(node.nodeValue || '') ? NodeFilter.FILTER_ACCEPT
-        : NodeFilter.FILTER_SKIP;
-    }
-  });
-  let last = null, n;
-  while ((n = tw.nextNode())) last = n;
-  return last;
-}
-
-function getDeepestInlineElement(root) {
-  // TreeWalker over ELEMENT nodes; keep the *last* inline element seen
-  const tw = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
-  let lastInline = null, n = root;
-  do {
-    if (isInlineElement(n) && !isVoid(n)) lastInline = n;
-  } while ((n = tw.nextNode()));
-  return lastInline;
-}
-
-function insertAfterNode(node, toInsert) {
-  const range = document.createRange();
-  range.setStartAfter(node);
-  range.collapse(true);
-  if (toInsert.parentNode) toInsert.parentNode.removeChild(toInsert);
-  range.insertNode(toInsert);
-}
-
-function insertAtEnd(el, toInsert) {
-  const range = document.createRange();
-  range.selectNodeContents(el);
-  range.collapse(false);
-  if (toInsert.parentNode) toInsert.parentNode.removeChild(toInsert);
-  range.insertNode(toInsert);
-}
-
-function positionTypingIndicator(root, typingEl) {
-  // 1) Try after the last text (with special handling for preformatted trailing \n)
-  const lastText = getLastNonWhitespaceTextNode(root);
-  if (lastText) {
-    const parentEl = lastText.parentElement;
-    const inPre =
-      parentEl &&
-      (parentEl.closest('pre') ||
-       (getComputedStyle(parentEl).whiteSpace || '').includes('pre'));
-
-    if (inPre) {
-      const v = lastText.nodeValue || '';
-      const m = v.match(/[\r\n]+$/); // trailing CR/LF?
-      if (m) {
-        // split before the newline run so we stay on the same visual line
-        const tail = lastText.splitText(v.length - m[0].length);
-        if (typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
-        tail.parentNode.insertBefore(typingEl, tail);
-        return;
-      }
-    }
-
-    insertAfterNode(lastText, typingEl);
-    return;
-  }
-
-  // 2) Try deepest inline element
-  const inlineEl = getDeepestInlineElement(root);
-  if (inlineEl) {
-    insertAtEnd(inlineEl, typingEl);
-    return;
-  }
-
-  // 3) Fallback: end of the last non-void element; add ZWSP to keep inline
-  let lastEl = root;
-  const tw = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
-  let n;
-  while ((n = tw.nextNode())) lastEl = n;
-  const target = (lastEl && !isVoid(lastEl)) ? lastEl : root;
-
-  const zwsp = document.createTextNode('\u200B');
-  target.appendChild(zwsp);
-  insertAfterNode(zwsp, typingEl);
-}
-
-
+const TYPING_INDICATOR_SELECTOR = "#typing-indicator";
 
 export function initChatUI(root = document) {
   const form = root.querySelector("#message-form");
@@ -139,7 +23,7 @@ export function initChatUI(root = document) {
 
   const handleStopClick = () => {
     console.debug('Stop button clicked');
-    const indicator = chat.querySelector('#typing-indicator');
+    const indicator = chat.querySelector(TYPING_INDICATOR_SELECTOR);
     const stopEndpoint = indicator?.dataset.stopUrl;
     const wrap = indicator?.closest('.bot-stream');
     if (wrap) {
@@ -180,11 +64,11 @@ export function initChatUI(root = document) {
     }
   };
 
-  const scrollToBottom = setupScrollHandler();
-  setupStreamHandler(setStreaming, scrollToBottom);
+  const scrollToBottom = initScrollHandler();
+  initStreamHandler(setStreaming, scrollToBottom);
 
   const findCurrentMsgId = () =>
-    chat.querySelector('#typing-indicator')?.dataset.msgId || null;
+    chat.querySelector(TYPING_INDICATOR_SELECTOR)?.dataset.msgId || null;
 
   form.addEventListener("htmx:afterRequest", () => {
     sessionStorage.removeItem(draftKey);
@@ -240,7 +124,7 @@ export function initChatUI(root = document) {
   setStreaming(!!currentStreamMsgId);
 }
 
-function setupScrollHandler(
+function initScrollHandler(
   containerSelector = "#content-wrapper",
   buttonSelector = "#scroll-bottom"
 ) {
@@ -323,7 +207,6 @@ function setupScrollHandler(
   if (scrollBtn) {
     scrollBtn.addEventListener("click", () => {
       scrollBtn.classList.add("clicked");
-      console.log("clicked", scrollBtn);
       scrollToBottom(true);
       setTimeout(() => scrollBtn.classList.remove("clicked"), 300);
     });
@@ -338,7 +221,7 @@ function setupScrollHandler(
   return scrollToBottom;
 }
 
-function setupStreamHandler(setStreaming, scrollToBottom) {
+function initStreamHandler(setStreaming, scrollToBottom) {
   if (currentSSEListener) {
     document.body.removeEventListener("htmx:sseMessage", currentSSEListener);
   }
@@ -367,7 +250,7 @@ function setupStreamHandler(setStreaming, scrollToBottom) {
     const renderNow = () => {
       let text = (sink.textContent || "").replace(/\[newline\]/g, "\n");
 
-      const typing = wrap.querySelector("#typing-indicator");
+      const typing = wrap.querySelector(TYPING_INDICATOR_SELECTOR);
       contentDiv.innerHTML = renderMarkdown(text);
       contentDiv.dataset.rendered = "true";
 
@@ -384,37 +267,14 @@ function setupStreamHandler(setStreaming, scrollToBottom) {
       if (metaEl && chips) {
         let meta;
         try { meta = JSON.parse(metaEl.textContent || '{}'); } catch {}
-        chips.innerHTML = '';
-        const tplEmoji = document.getElementById('emoji-chip-template');
-        const tplKeyword = document.getElementById('keyword-chip-template');
-        if (meta && meta.emoji && tplEmoji) {
-          const e = tplEmoji.content.firstElementChild.cloneNode(true);
-          e.textContent = meta.emoji;
-          e.classList.add('chip-enter');
-          chips.appendChild(e);
-        }
-        if (meta && Array.isArray(meta.keywords) && tplKeyword) {
-          const base = tplKeyword.dataset.url || tplKeyword.content.firstElementChild.getAttribute('hx-get') || '/search';
-          meta.keywords.forEach(k => {
-            const a = tplKeyword.content.firstElementChild.cloneNode(true);
-            const url = `${base}?q=${encodeURIComponent(k)}`;
-            a.textContent = k;
-            a.href = url;
-            a.setAttribute('hx-get', url);
-            a.classList.add('chip-enter');
-            chips.appendChild(a);
-          });
-        }
-        if (typeof htmx !== 'undefined') {
-          htmx.process(chips);
-        }
+        renderMetaChips(meta, chips);
       }
     } else if (type === "error" || type === "done") {
       const rid = sseRenders.get(wrap);
       if (rid) { cancelAnimationFrame(rid); sseRenders.delete(wrap); }
       renderNow();
 
-      const indicator = wrap.querySelector("#typing-indicator");
+      const indicator = wrap.querySelector(TYPING_INDICATOR_SELECTOR);
       if (indicator && !indicator.classList.contains('stopped')) {
         indicator.remove();
       }
