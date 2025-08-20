@@ -173,8 +173,21 @@
       justify-content: center;
       transition: opacity 0.2s ease, color 0.2s ease;
 
-      &.delete-btn:hover { color: #cc0000; }
-      &.edit-btn:hover   { color: var(--accent); }
+      &.delete-btn:hover {
+        color: #cc0000;
+        svg {
+          filter: drop-shadow(0 0 2px rgba(204,0,0,0.5));
+        }
+
+
+      }
+      &.edit-btn:hover   {
+        color: var(--accent);
+        svg {
+          filter: drop-shadow(0 0 2px rgba(31,151,242,0.5));
+        }
+
+      }
       &:focus-visible {
         outline: none;
         color: var(--accent);
