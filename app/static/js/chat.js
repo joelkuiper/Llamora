@@ -328,8 +328,13 @@ function setupScrollHandler(
       setTimeout(() => scrollBtn.classList.remove("clicked"), 300);
     });
   }
-
-  toggleScrollBtn();
+  // Defer initial toggle to ensure layout (and any restored scroll position)
+  // are applied before determining visibility. A double rAF gives the
+  // browser a chance to paint and then update the button state.
+  requestAnimationFrame(() => {
+    toggleScrollBtn();
+    requestAnimationFrame(toggleScrollBtn);
+  });
   return scrollToBottom;
 }
 

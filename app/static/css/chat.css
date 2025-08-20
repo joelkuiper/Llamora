@@ -776,7 +776,7 @@ body {
 
   &:hover {
     transform: scale(.96);
-    color: var(--accent-hover);
+    color: var(--accent);
 
     svg {
       filter: drop-shadow(0 0 4px rgba(31,151,242,0.5));
