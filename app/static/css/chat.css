@@ -99,6 +99,7 @@ body {
     display: flex;
     gap: 0.25rem;
     flex-wrap: wrap;
+    flex-direction: row-reverse;
     opacity: 0.66;
     transition: opacity 0.2s ease;
     &:hover {
@@ -131,7 +132,8 @@ body {
     overflow: visible;
   }
 
-  .meta-chip:hover {
+  .meta-chip:hover,
+  .add-tag-btn:hover {
     border-color: var(--accent);
     box-shadow:
       var(--raised-shadow),
@@ -149,7 +151,6 @@ body {
     top: -6px;
     right: -6px;
     transform: scale(0);
-    transform-origin: top right;
     background: rgba(0, 0, 0, 0.55);
     border: none;
     color: #fff;
@@ -176,16 +177,24 @@ body {
 
   .add-tag-btn {
     background: var(--color-bg);
-    border: 1px dashed var(--border);
+    border: 1px solid var(--border);
     border-radius: var(--radius-md);
     padding: 2px 6px;
-    font-size: 0.75rem;
     cursor: pointer;
     transition: background-color 0.2s ease;
-  }
+    width: 2em;
+    height: 2em;
+    transition:
+      box-shadow 0.2s ease,
+      border-color 0.2s ease,
+      transform 0.08s ease,
+      background-color 0.2s ease;
 
-  .add-tag-btn:hover {
-    background: var(--accent-10);
+    &:active {
+      transform: translateY(1px);
+      box-shadow: var(--inset-shadow-disabled);
+
+    }
   }
 
   .tag-popover {
@@ -217,20 +226,9 @@ body {
     box-shadow: var(--inset-shadow-disabled);
   }
 
-  .meta-chip.emoji {
-    font-size: 1rem;
-    padding: 0;
-    border: none;
-    box-shadow: none;
-    cursor: default;
-    background: transparent;
-  }
-
-  .meta-chip.chip-enter {
-    animation: chip-pop 0.2s ease-out both;
-  }
+  .meta-chip.chip-enter,
   .meta-chips.chip-enter {
-    animation: chip-pop 0.2s ease-out both;
+    animation: chip-pop 0.2s ease both;
   }
 
   /* Markdown refinements */
@@ -409,11 +407,11 @@ body {
 @keyframes chip-pop {
   from {
     opacity: 0;
-    transform: scale(0.9);
+    /* transform: scale(0.9); */
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    /* transform: scale(1); */
   }
 }
 
