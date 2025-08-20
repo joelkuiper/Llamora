@@ -1,0 +1,211 @@
+
+#sidebar {
+  width: 280px; /* needed for animation */
+  height: 100%;
+  background: var(--color-bg-alt);
+  display: flex;
+  flex-direction: column;
+  padding: 0 0 0 var(--spacing-sm);
+  flex-shrink: 0;
+  z-index: 0;
+  box-shadow: none;
+  padding-top: var(--spacing-lg);
+  transition: transform 0.3s ease, width 0.3s ease, padding-left 0.3s ease;
+
+  .sidebar-header {
+    border-bottom: 1px solid var(--shadow-light);
+    padding-bottom: var(--spacing-md);
+  }
+
+  ul {
+    flex: 1;
+    overflow-y: auto;
+    list-style: none;
+    margin: 0;
+    padding: var(--spacing-xs) var(--spacing-md);
+  }
+
+  li {
+
+    &.active .session-item {
+      background: #f8f9fb;
+      border-color: var(--accent-20);
+      box-shadow:
+        var(--raised-shadow),
+        0 0 0 2px var(--accent-20),
+        0 10px 24px var(--accent-10);
+      font-weight: 600;
+    }
+
+    &:not(.active) .session-item:hover {
+      background: #f8f9fb;
+      border-color: var(--accent-10);
+      box-shadow:
+        var(--raised-shadow),
+        0 0 0 2px var(--accent-05),
+        0 8px 18px rgba(0,0,0,0.04);
+    }
+
+    &:hover {
+      .delete-btn,
+      .edit-btn { opacity: 1; }
+    }
+  }
+
+  /* Make sessions feel like the search pill (button-like) */
+  .session-item {
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: var(--spacing-sm) 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--raised-shadow);
+    position: relative;
+    cursor: pointer;
+    transition:
+      background 0.18s ease,
+      box-shadow 0.18s ease,
+      border-color 0.18s ease,
+      transform 0.08s ease;
+
+    a {
+      flex-grow: 1;
+      text-decoration: none;
+      font-size: 0.95rem;
+      color: var(--color-text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
+      height: 100%;
+      padding: var(--spacing-sm) 0 var(--spacing-sm) var(--spacing-md);
+    }
+
+    &:focus-visible,
+    &:focus-within {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow:
+        var(--raised-shadow),
+        0 0 0 2px var(--accent-20),
+        0 10px 24px var(--accent-10);
+    }
+
+    /* Pressed feel */
+    &:active {
+      transform: translateY(1px);
+      box-shadow: var(--inset-shadow);
+    }
+
+    &.new-session {
+      margin: 0 var(--spacing-md);
+      background: #f6f6f6;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      box-shadow: var(--raised-shadow);
+      transition: background 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+
+      &:hover {
+        background: #f8f9fb;
+        border-color: var(--accent-10);
+        box-shadow:
+          var(--raised-shadow),
+          0 0 0 2px var(--accent-05),
+          0 8px 18px rgba(0,0,0,0.04);
+      }
+
+      &:active {
+        border-color: var(--accent);
+        box-shadow:
+          var(--inset-shadow),
+          0 0 0 2px var(--accent-20),
+          0 8px 24px var(--accent-10);
+      }
+
+      .session-link {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.95rem;
+        text-decoration: none;
+        color: var(--color-text);
+      }
+
+      .session-icon {
+        flex-shrink: 0;
+        width: 1rem;
+        height: 1rem;
+      }
+    }
+  }
+
+  .session-name-input {
+    flex-grow: 1;
+    font-size: 0.95rem;
+    color: var(--color-text);
+    font-family: var(--font-base);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: none;
+    background: transparent;
+    &:focus { outline: none; }
+  }
+
+  .session-actions button:last-child {
+    padding-left: 0.4rem;
+  }
+
+  .session-actions {
+    display: flex;
+    align-items: center;
+    padding-right: var(--spacing-xs);
+
+    .delete-btn,
+    .edit-btn {
+      background: none;
+      border: none;
+      opacity: 0;
+      cursor: pointer;
+      color: var(--color-text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.2s ease, color 0.2s ease;
+
+      &.delete-btn:hover { color: #cc0000; }
+      &.edit-btn:hover   { color: var(--accent); }
+      &:focus-visible {
+        outline: none;
+        color: var(--accent);
+      }
+    }
+  }
+}
+
+#sidebar-toggle {
+  margin-left: var(--spacing-md);
+  margin-top: 1px;
+}
+
+
+.app-container {
+  &.sidebar-collapsed {
+    #sidebar {
+      width: 0;
+      transform: translateX(-240px);
+      padding-left: 0;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  #sidebar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    z-index: 90;
+    box-shadow: var(--raised-shadow);
+  }
+}

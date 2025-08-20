@@ -1,0 +1,284 @@
+
+/* Search */
+#search-container {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: var(--color-bg-alt);
+  padding: var(--spacing-sm) var(--spacing-xl);
+  perspective: 900px;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+
+  .header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    position: relative;
+  }
+
+  .search-wrap { position: relative; }
+
+  #search-form {
+    margin: 0;
+    display: flex;
+  }
+
+  .search-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: clamp(18rem, 32vw, 24rem);
+  }
+
+  #search-input {
+    width: 100%;
+    height: 2.4rem;
+    padding: 0.5rem 2.25rem 0.5rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--color-bg);
+    box-shadow: var(--raised-shadow);
+    outline: none;
+    font-family: var(--font-base);
+    transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.05s ease;
+
+    &:hover {
+      border-color: var(--accent-10);
+      box-shadow:
+        var(--raised-shadow),
+        0 0 0 2px var(--accent-05);
+    }
+
+    &:focus {
+      transform: translateY(-1px);
+      border-color: var(--accent);
+      box-shadow:
+        var(--raised-shadow),
+        0 0 0 2px var(--accent-20),
+        0 10px 26px var(--accent-10);
+    }
+
+    &:focus-visible { outline: none; }
+  }
+
+  .user-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+
+  .icon-btn {
+    background: none;
+    border: none;
+    padding: var(--spacing-xs);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    color: var(--color-heading);
+    opacity: 0.33;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+
+    &:hover {
+      background: var(--accent-10);
+      color: var(--accent);
+      opacity: 1;
+      transform: scale(1.1);
+    }
+
+    svg { width: 1.25rem; height: 1.25rem; }
+  }
+
+  .icon-btn.active {
+    background: var(--accent-10);
+    color: var(--accent);
+    opacity: 1;
+  }
+
+  #sidebar-toggle .icon-open { display: none; }
+  #sidebar-toggle.is-collapsed .icon-open { display: block; }
+  #sidebar-toggle.is-collapsed .icon-closed { display: none; }
+
+  .search-results-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    margin: 0;
+    padding: var(--spacing-sm);
+    list-style-type: none;
+
+    mark { background-color: var(--highlight-color); }
+
+    .status-semantic {
+      opacity: 0.5;
+      &:hover { opacity: 1; }
+    }
+    .status-tag {
+      opacity: 1;
+    }
+  }
+
+  /* Search spinner */
+  #search-spinner {
+    position: absolute;
+    right: 0.6rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1rem;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+    transition-delay: 0s;
+
+    &.htmx-request {
+      opacity: 1;
+      transition-delay: 0.2s;
+    }
+  }
+
+  .search-results-overlay {
+    position: absolute;
+    top: calc(100% - 0.25rem);
+    right: 0;
+    left: auto;
+    z-index: 50;
+    /* Frosted glass effect */
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    background: rgba(255,255,255,0.70);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--raised-shadow);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: min(60vh, 40rem);
+    width: min(48rem, 92vw);
+    pointer-events: auto;
+
+    .search-close {
+      position: absolute;
+      top: var(--spacing-xs);
+      right: var(--spacing-xs);
+      width: 1.5rem;
+      height: 1.5rem;
+      border: none;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.10);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 1;
+
+      &:hover { background: rgba(0,0,0,0.18); }
+
+
+      &::before {
+        content: "";
+        position: absolute;
+        inset: -0.5rem;
+        border-radius: 50%;
+      }
+    }
+  }
+
+  .search-result-item a:hover {
+    background: rgba(255,255,255,0.58);
+    border-color: var(--accent);
+    box-shadow:
+      var(--inset-shadow),
+      0 0 0 2px var(--accent-20),
+      0 8px 24px var(--accent-10);
+
+  }
+
+  .search-result-item a {
+    display: flex;
+    align-items: flex-start;      /* top align everything */
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    text-decoration: none;
+    color: inherit;
+    border: 1px solid transparent; /* for a crisp hover edge */
+    transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .search-result-meta {
+    flex: 0 0 4.5rem;
+    font-size: 0.85rem;
+    line-height: 1.2;
+    opacity: 0.75;
+  }
+
+  .search-result-time {
+    flex: 0 0 7rem;
+    font-size: 0.85rem;
+    line-height: 1.2;
+    opacity: 0.75;
+  }
+
+  .search-result-main {
+    flex: 1 1 auto;               /* fills remaining row space */
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .search-result-title {
+    margin: 0;
+    font-weight: 600;
+  }
+
+  .search-result-content {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    font-size: 0.95rem;
+    opacity: 0.9;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+}
+
+
+@keyframes sr-pop {
+  from { opacity: 0; transform: translateY(-6px) scale(.98) rotateX(2deg); }
+  to   { opacity: 1; transform: translateY(0)    scale(1)  rotateX(0); }
+}
+@keyframes sr-out {
+  from { opacity: 1; transform: translateY(0)    scale(1)  rotateX(0); }
+  to   { opacity: 0; transform: translateY(-6px) scale(.98) rotateX(2deg); }
+}
+
+#search-results { position: relative; }
+
+#search-results > .sr-panel {
+  opacity: 1;
+  transform: translateY(0) scale(1) rotateX(0);
+  transform-origin: top center;
+  will-change: opacity, transform;
+  pointer-events: auto;
+}
+
+#search-results:not(.is-open) > .sr-panel.htmx-added {
+  opacity: 0;
+  transform: translateY(-6px) scale(.98) rotateX(2deg);
+}
+
+#search-results > .sr-panel.sr-enter {
+  animation: sr-pop 180ms cubic-bezier(.2,.7,.2,1) both;
+}
+
+#search-results > .sr-panel.sr-closing {
+  animation: sr-out 160ms cubic-bezier(.2,.7,.2,1) both;
+}

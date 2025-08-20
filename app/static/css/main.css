@@ -299,6 +299,12 @@ html, body {
   }
 }
 
+
+.no-anim {
+  animation: none !important;
+  transition: none !important;
+}
+
 /* Reduce motion preference */
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important;
