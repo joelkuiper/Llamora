@@ -197,19 +197,34 @@ body {
     }
   }
 
-  .tag-popover {
-    background-color: #333;
-    color: white;
-    padding: 5px 10px;
-    border-radius: 4px;
-    font-size: 13px;
-    z-index: 1000;
-  }
 
-  .tag-popover form {
+/* Frosted glass popover with working clicks */
+.tag-popover {
+  /* visual */
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  background: rgba(255,255,255,0.70);
+  border: 1px solid var(--border);
+  box-shadow: var(--raised-shadow);
+  color: rgba(0,0,0,0.66);
+  border-radius: 12px;
+  padding: 8px 10px;
+
+  transition: opacity .25s ease, background .2s ease;
+
+  /* Keep your horizontal form layout */
+  form {
     display: flex;
-    gap: 4px;
+    align-items: center;
+    gap: 6px;
+
+    button[type="submit"] {
+      font-size: small;
+    }
+
   }
+}
+
 
   .meta-chip:focus,
   .meta-chip:focus-visible {
