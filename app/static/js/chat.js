@@ -94,7 +94,7 @@ export function initChatUI(root = document) {
   initStreamHandler(setStreaming, scrollToBottom);
 
   const findCurrentMsgId = () =>
-    chat.querySelector(TYPING_INDICATOR_SELECTOR)?.dataset.msgId || null;
+    chat.querySelector(TYPING_INDICATOR_SELECTOR)?.dataset.userMsgId || null;
 
   form.addEventListener("htmx:afterRequest", () => {
     sessionStorage.removeItem(draftKey);
