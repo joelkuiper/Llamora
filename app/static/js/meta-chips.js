@@ -7,6 +7,8 @@ function setupAddButton(container) {
   const form = pop?.querySelector('form');
   const input = form?.querySelector('input[name="tag"]');
   const submit = form?.querySelector('button[type="submit"]');
+  const suggestions = pop?.querySelector('.tag-suggestions');
+  const close = pop?.querySelector('.overlay-close');
   const tagContainer = container.querySelector('.meta-tags');
   if (!btn || !pop || !form || !input || !submit || !tagContainer) return;
 
@@ -42,7 +44,7 @@ function setupAddButton(container) {
   };
 
   const outside = (e) => {
-    if (!container.contains(e.target)) hide();
+    if (!pop.contains(e.target) && e.target !== btn) hide();
   };
 
   const onKey = (e) => {
@@ -59,6 +61,22 @@ function setupAddButton(container) {
     input.focus();
     document.addEventListener('click', outside, true);
     document.addEventListener('keydown', onKey);
+    if (suggestions && !suggestions.dataset.loaded) {
+      htmx.trigger(suggestions, 'revealed');
+    }
+  });
+
+  close?.addEventListener('click', (e) => {
+    e.preventDefault();
+    hide();
+  });
+
+  suggestions?.addEventListener('htmx:afterSwap', () => {
+    if (suggestions.innerHTML.trim()) {
+      suggestions.dataset.loaded = '1';
+    } else {
+      delete suggestions.dataset.loaded;
+    }
   });
 
   form.addEventListener('htmx:configRequest', (evt) => {

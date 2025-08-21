@@ -102,7 +102,6 @@
   }
 }
 
-/* Frosted glass popover — unified look, no behavior changes */
 .tag-popover {
   --tp-glass-bg: rgba(255,255,255,0.72);
   --tp-glass-bg-hover: rgba(255,255,255,0.78);
@@ -118,19 +117,23 @@
   color: rgba(0,0,0,0.7);
   border-radius: var(--radius-sm);
   padding: 10px;
-  opacity: 0; /* your open/close logic can toggle this */
+  opacity: 0;
   transition: opacity .22s ease, background .18s ease;
 
-  /* Unified pill: input + button are fused inside the form */
+  .overlay-close {
+    top: -1.25rem;
+    right: -1.25rem;
+  }
+
   form {
     display: flex;
     align-items: stretch;
-    gap: 0;                       /* fuse */
+    gap: 0;
     height: var(--tp-h);
     border: 1px solid var(--border);
     border-radius: var(--tp-radius);
     background: rgba(255,255,255,0.9);
-    overflow: hidden;             /* clip focus ring glow */
+    overflow: hidden;
     box-shadow:
       inset 2px 2px 5px rgba(0,0,0,0.05),
       inset -2px -2px 5px rgba(255,255,255,0.7);
@@ -193,18 +196,36 @@
     }
   }
 
-  /* Suggestions/chips under the bar (inside popover) */
-  .tag-suggestions {
-    margin-top: 10px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
+    /* Suggestions/chips under the bar (inside popover) */
+    .tag-suggestions {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      position: relative;
+    }
 
-  .tag-suggestion {
-    background: var(--color-bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
+    .tag-suggestions-indicator {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0;
+    }
+
+    .tag-suggestions-indicator.htmx-request {
+      opacity: 1;
+      animation: ts-pulse 0.8s ease-in-out infinite alternate;
+      animation-delay: 0.18s;
+    }
+
+    .tag-suggestion {
+      background: var(--color-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
     padding: 2px 8px;
     font-size: 0.75rem;
     box-shadow: var(--inset-shadow);
@@ -223,11 +244,12 @@
 
 .tag-popover.tp-open { opacity: 1; }
 
-.tag-popover .tp-content {
-  transform: scale(0.95);
-  transition: transform .2s ease;
-  transform-origin: top right;
-}
+  .tag-popover .tp-content {
+    position: relative;
+    transform: scale(0.95);
+    transition: transform .2s ease;
+    transform-origin: top right;
+  }
 
 .tag-popover.tp-open .tp-content { transform: scale(1); }
 
@@ -278,4 +300,9 @@
     opacity: 0;
     transform: scale(0.8);
   }
+}
+
+@keyframes ts-pulse {
+  from { transform: scale(0.8); opacity: 0.4; }
+  to   { transform: scale(1.2); opacity: 1; }
 }

@@ -124,7 +124,7 @@ export function initSearchUI() {
     }
   });
   document.addEventListener("click", (evt) => {
-    if (evt.target.closest("#search-close")) closeResults(true);
+    if (evt.target.closest("#search-results .overlay-close")) closeResults(true);
   });
 
   document.addEventListener("click", (evt) => {
