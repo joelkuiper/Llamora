@@ -71,12 +71,12 @@ async def chat_htmx(session_id):
 @chat_bp.route("/c/stop/<user_msg_id>", methods=["POST"])
 @login_required
 async def stop_generation(user_msg_id: str):
-    current_app.logger.info("Stop requested for message %s", user_msg_id)
-    pending = pending_responses.get(user_msg_id)
+    current_app.logger.info("Stop requested for user message %s", user_msg_id)
+    pending_response = pending_responses.get(user_msg_id)
     handled = False
-    if pending:
+    if pending_response:
         current_app.logger.debug("Cancelling pending response %s", user_msg_id)
-        await pending.cancel()
+        await pending_response.cancel()
         handled = True
     else:
         current_app.logger.debug(
@@ -84,12 +84,14 @@ async def stop_generation(user_msg_id: str):
         )
         handled = await llm.abort(user_msg_id)
     if not handled:
-        current_app.logger.warning("Stop request for unknown message %s", user_msg_id)
+        current_app.logger.warning(
+            "Stop request for unknown user message %s", user_msg_id
+        )
         return Response("unknown message id", status=404)
     current_app.logger.debug(
         "Stop request handled for %s (pending=%s)",
         user_msg_id,
-        bool(pending),
+        bool(pending_response),
     )
     return Response(status=204)
 
@@ -105,14 +107,21 @@ async def _cleanup_expired_pending() -> None:
         while True:
             await asyncio.sleep(CLEANUP_INTERVAL)
             cutoff = asyncio.get_event_loop().time() - PENDING_TTL
-            for user_msg_id, pending in list(pending_responses.items()):
-                if pending.done or pending.created_at < cutoff:
+            for user_msg_id, pending_response in list(pending_responses.items()):
+                if pending_response.done or pending_response.created_at < cutoff:
                     pending_responses.pop(user_msg_id, None)
     except asyncio.CancelledError:
         pass
 
 
 class PendingResponse:
+    """Tracks an in-flight assistant reply to a user's message.
+
+    The ``user_msg_id`` identifies the original user message prompting the
+    reply. Once the assistant's response is stored in the database, the new
+    ``assistant_msg_id`` is recorded for reference.
+    """
+
     def __init__(
         self,
         user_msg_id: str,
@@ -132,7 +141,9 @@ class PendingResponse:
         self.cancelled = False
         self.created_at = asyncio.get_event_loop().time()
         self.assistant_msg_id: str | None = None
-        current_app.logger.debug("Starting generation for message %s", user_msg_id)
+        current_app.logger.debug(
+            "Starting generation for user message %s", user_msg_id
+        )
         self._task = asyncio.create_task(
             self._generate(uid, session_id, history, params)
         )
@@ -229,7 +240,7 @@ class PendingResponse:
             if self.cancelled:
                 if full_response.strip():
                     try:
-                        _msg_id = await db.append_message(
+                        assistant_msg_id = await db.append_message(
                             uid,
                             session_id,
                             "assistant",
@@ -238,9 +249,9 @@ class PendingResponse:
                             {},
                             reply_to=self.user_msg_id,
                         )
-                        self.assistant_msg_id = _msg_id
+                        self.assistant_msg_id = assistant_msg_id
                         current_app.logger.debug(
-                            "Saved partial assistant message %s", _msg_id
+                            "Saved partial assistant message %s", assistant_msg_id
                         )
                     except Exception:
                         current_app.logger.exception(
@@ -268,7 +279,7 @@ class PendingResponse:
 
             if not self.error and full_response.strip():
                 try:
-                    _msg_id = await db.append_message(
+                    assistant_msg_id = await db.append_message(
                         uid,
                         session_id,
                         "assistant",
@@ -277,8 +288,10 @@ class PendingResponse:
                         meta,
                         reply_to=self.user_msg_id,
                     )
-                    self.assistant_msg_id = _msg_id
-                    current_app.logger.debug("Saved assistant message %s", _msg_id)
+                    self.assistant_msg_id = assistant_msg_id
+                    current_app.logger.debug(
+                        "Saved assistant message %s", assistant_msg_id
+                    )
                 except Exception:
                     current_app.logger.exception("Failed to save assistant message")
                     full_response += (
@@ -357,39 +370,49 @@ def replace_newline(s: str) -> str:
 
 @chat_bp.route("/c/<session_id>/stream/<user_msg_id>")
 @login_required
-async def sse_reply(user_msg_id, session_id):
+async def sse_reply(user_msg_id: str, session_id: str):
+    """Stream the assistant's reply for a given user message.
+
+    The ``user_msg_id`` corresponds to the user's prompt message. When the
+    assistant finishes responding, the ``assistant_msg_id`` of the stored reply
+    is sent in a final ``done`` event.
+    """
+
     user = await get_current_user()
     uid = user["id"]
     dek = get_dek()
     history = await db.get_history(uid, session_id, dek)
 
     if not history:
-        current_app.logger.warning("History not found for message %s", user_msg_id)
+        current_app.logger.warning("History not found for user message %s", user_msg_id)
         return Response(
             "event: error\ndata: Invalid ID\n\n", mimetype="text/event-stream"
         )
 
-    existing: dict | None = None
+    existing_assistant_msg: dict | None = None
     for msg in history:
         if msg.get("reply_to") == user_msg_id and msg["role"] == "assistant":
-            existing = msg
+            existing_assistant_msg = msg
             break
-    if existing is None:
+    if existing_assistant_msg is None:
         for idx, msg in enumerate(history):
             if msg["id"] == user_msg_id:
                 if idx + 1 < len(history) and history[idx + 1]["role"] == "assistant":
-                    existing = history[idx + 1]
+                    existing_assistant_msg = history[idx + 1]
                 break
 
-    if existing:
+    if existing_assistant_msg:
 
         async def saved_stream():
-            yield f"event: message\ndata: {replace_newline(escape(existing['message']))}\n\n"
-            # meta = existing.get("meta")
+            yield (
+                "event: message\ndata: "
+                f"{replace_newline(escape(existing_assistant_msg['message']))}\n\n"
+            )
+            # meta = existing_assistant_msg.get("meta")
             # if meta:
             #     meta_str = orjson.dumps(meta).decode()
             #     yield f"event: meta\ndata: {escape(meta_str)}\n\n"
-            data = orjson.dumps({"assistant_msg_id": existing["id"]}).decode()
+            data = orjson.dumps({"assistant_msg_id": existing_assistant_msg["id"]}).decode()
             yield f"event: done\ndata: {escape(data)}\n\n"
 
         return Response(saved_stream(), mimetype="text/event-stream")
@@ -414,25 +437,29 @@ async def sse_reply(user_msg_id, session_id):
     if not params:
         params = None
 
-    pending = pending_responses.get(user_msg_id)
-    if not pending:
-        pending = PendingResponse(user_msg_id, uid, session_id, history, dek, params)
-        pending_responses[user_msg_id] = pending
+    pending_response = pending_responses.get(user_msg_id)
+    if not pending_response:
+        pending_response = PendingResponse(
+            user_msg_id, uid, session_id, history, dek, params
+        )
+        pending_responses[user_msg_id] = pending_response
 
     global _cleanup_task
     if _cleanup_task is None or _cleanup_task.done():
         _cleanup_task = asyncio.create_task(_cleanup_expired_pending())
 
     async def event_stream():
-        async for chunk in pending.stream():
+        async for chunk in pending_response.stream():
             yield f"event: message\ndata: {replace_newline(escape(chunk))}\n\n"
-        if pending.meta is not None:
+        if pending_response.meta is not None:
             # Placeholder for emitting structured metadata (e.g., tags)
             pass
-        if pending.error:
+        if pending_response.error:
             yield "event: error\ndata: \n\n"
         else:
-            data = orjson.dumps({"assistant_msg_id": pending.assistant_msg_id}).decode()
+            data = orjson.dumps(
+                {"assistant_msg_id": pending_response.assistant_msg_id}
+            ).decode()
             yield f"event: done\ndata: {data}\n\n"
             pending_responses.pop(user_msg_id, None)
 
