@@ -331,7 +331,7 @@ class LocalDB:
                 (user_id,),
             )
 
-    async def append(
+    async def append_message(
         self,
         user_id,
         session_id,

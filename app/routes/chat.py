@@ -226,7 +226,7 @@ class PendingResponse:
             if self.cancelled:
                 if full_response.strip():
                     try:
-                        await db.append(
+                        await db.append_message(
                             uid,
                             session_id,
                             "assistant",
@@ -262,7 +262,7 @@ class PendingResponse:
 
             if not self.error and full_response.strip():
                 try:
-                    await db.append(
+                    await db.append_message(
                         uid,
                         session_id,
                         "assistant",
@@ -330,7 +330,7 @@ async def send_message(session_id):
         abort(400, description="Message is empty, too long, or session is invalid.")
 
     try:
-        msg_id = await db.append(uid, session_id, "user", user_text, dek)
+        msg_id = await db.append_message(uid, session_id, "user", user_text, dek)
         current_app.logger.debug("Saved user message %s", msg_id)
     except Exception:
         current_app.logger.exception("Failed to save user message")
