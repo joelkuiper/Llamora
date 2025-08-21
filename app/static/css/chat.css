@@ -383,7 +383,7 @@ body {
 
 #scroll-bottom-container {
   left: var(--chat-center, 50%);  /* pixel value set by JS */
-  transform: translateX(-50%);    /* center the button itself */
+  transform: translateX(-50%);
   position: fixed;
   bottom: 5rem;
 }
@@ -425,6 +425,7 @@ body {
   &:active {
     box-shadow: var(--inset-shadow);
     transform: none scale(0.95);
+    color: var(--accent-hover);
   }
 
   &.clicked {
