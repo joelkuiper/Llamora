@@ -84,9 +84,7 @@ async def stop_generation(user_msg_id: str):
         )
         handled = await llm.abort(user_msg_id)
     if not handled:
-        current_app.logger.warning(
-            "Stop request for unknown message %s", user_msg_id
-        )
+        current_app.logger.warning("Stop request for unknown message %s", user_msg_id)
         return Response("unknown message id", status=404)
     current_app.logger.debug(
         "Stop request handled for %s (pending=%s)",
@@ -435,7 +433,7 @@ async def sse_reply(user_msg_id, session_id):
             yield "event: error\ndata: \n\n"
         else:
             data = orjson.dumps({"assistant_msg_id": pending.assistant_msg_id}).decode()
-            yield f"event: done\ndata: {escape(data)}\n\n"
+            yield f"event: done\ndata: {data}\n\n"
             pending_responses.pop(user_msg_id, None)
 
     return Response(event_stream(), mimetype="text/event-stream")
