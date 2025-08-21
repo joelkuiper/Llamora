@@ -425,6 +425,33 @@ class LocalDB:
             row = await cursor.fetchone()
         return row["session_id"] if row else None
 
+    async def get_tags_for_message(self, user_id: str, message_id: str, dek: bytes):
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                """
+                SELECT t.tag_hash, t.name_ct, t.name_nonce, t.alg AS tag_alg
+                FROM tag_message_xref x
+                JOIN tags t ON t.user_id = x.user_id AND t.tag_hash = x.tag_hash
+                WHERE x.user_id = ? AND x.message_id = ?
+                ORDER BY x.ulid ASC
+                """,
+                (user_id, message_id),
+            )
+            rows = await cursor.fetchall()
+
+        tags = []
+        for row in rows:
+            tag_name = _cached_tag_name(
+                user_id,
+                row["tag_hash"],
+                row["name_nonce"],
+                row["name_ct"],
+                row["tag_alg"].encode(),
+                dek,
+            )
+            tags.append({"name": tag_name, "hash": row["tag_hash"].hex()})
+        return tags
+
     async def get_messages_with_tag_hashes(
         self, user_id: str, tag_hashes: list[bytes], message_ids: list[str]
     ) -> dict[str, set[bytes]]:

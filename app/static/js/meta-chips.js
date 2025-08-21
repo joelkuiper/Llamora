@@ -7,10 +7,20 @@ function setupAddButton(container) {
   const form = pop?.querySelector('form');
   const input = form?.querySelector('input[name="tag"]');
   const submit = form?.querySelector('button[type="submit"]');
-  if (!btn || !pop || !form || !input || !submit) return;
+  const tagContainer = container.querySelector('.meta-tags');
+  if (!btn || !pop || !form || !input || !submit || !tagContainer) return;
+
+  const normalize = (v) => (v.startsWith('#') ? v : `#${v}`);
 
   const updateState = () => {
-    submit.disabled = !input.value.trim();
+    const raw = input.value.trim();
+    if (!raw) {
+      submit.disabled = true;
+      return;
+    }
+    const tag = normalize(raw).toLowerCase();
+    const existing = Array.from(tagContainer.querySelectorAll('.chip-label')).map((el) => el.textContent.trim().toLowerCase());
+    submit.disabled = existing.includes(tag);
   };
   input.addEventListener('input', updateState);
   updateState();
@@ -57,9 +67,12 @@ function setupAddButton(container) {
       evt.preventDefault();
       return;
     }
-    if (!value.startsWith('#')) {
-      value = `#${value}`;
-      input.value = value;
+    value = normalize(value);
+    input.value = value;
+    const existing = Array.from(tagContainer.querySelectorAll('.chip-label')).map((el) => el.textContent.trim().toLowerCase());
+    if (existing.includes(value.toLowerCase())) {
+      evt.preventDefault();
+      return;
     }
     evt.detail.parameters.tag = value;
   });
@@ -71,14 +84,24 @@ function setupAddButton(container) {
   });
 
   container.addEventListener('htmx:afterSwap', (evt) => {
-    if (evt.target === pop) {
-      const chip = pop.previousElementSibling;
+    if (evt.target === tagContainer) {
+      const chip = tagContainer.lastElementChild;
       if (chip?.classList.contains('meta-chip')) {
         chip.classList.add('chip-enter');
         chip.addEventListener('animationend', () => chip.classList.remove('chip-enter'), { once: true });
+        const label = chip.querySelector('.chip-label')?.textContent.trim().toLowerCase();
+        if (label) {
+          pop.querySelectorAll('.tag-suggestion').forEach((btn) => {
+            if (btn.textContent.trim().toLowerCase() === label) {
+              btn.remove();
+            }
+          });
+        }
       }
+      updateState();
     } else if (evt.target.classList?.contains('chip-tombstone')) {
       evt.target.remove();
+      updateState();
     }
   });
 }

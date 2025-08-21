@@ -41,3 +41,27 @@ async def add_tag(msg_id: str):
         "partials/tag_chip.html", keyword=tag, tag_hash=tag_hash.hex(), msg_id=msg_id
     )
     return html
+
+
+@tags_bp.get("/t/suggestions/<msg_id>")
+@login_required
+async def get_tag_suggestions(msg_id: str):
+    user = await get_current_user()
+    dek = get_dek()
+    messages = await db.get_messages_by_ids(user["id"], [msg_id], dek)
+    if not messages:
+        abort(404, description="message not found")
+    meta = messages[0].get("meta", {})
+    keywords = meta.get("keywords") or []
+    existing = await db.get_tags_for_message(user["id"], msg_id, dek)
+    existing_names = {t["name"] for t in existing}
+    suggestions = []
+    for kw in keywords:
+        if kw and not kw.startswith("#"):
+            kw = f"#{kw}"
+        if kw and kw not in existing_names:
+            suggestions.append(kw)
+    html = await render_template(
+        "partials/tag_suggestions.html", suggestions=suggestions, msg_id=msg_id
+    )
+    return html

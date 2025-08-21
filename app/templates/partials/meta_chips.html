@@ -39,6 +39,10 @@
           <input type="text" name="tag" maxlength="{{ config.MAX_TAG_LENGTH }}" class="input">
           <button type="submit" class="btn btn-primary" disabled>Add</button>
         </form>
+        <div class="tag-suggestions"
+             hx-get="{{ url_for('tags.get_tag_suggestions', msg_id=msg_id) }}"
+             hx-trigger="revealed"
+             hx-swap="innerHTML"></div>
       </div>
     </div>
   </div>
