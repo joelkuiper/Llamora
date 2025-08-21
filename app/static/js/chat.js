@@ -37,6 +37,11 @@ export function initChatUI(root = document) {
 
   if (!form || !textarea || !button || !chat) return;
 
+  // Ensure tag popovers are reinitialized when returning via back navigation
+  chat.querySelectorAll('.meta-chips').forEach((chips) => {
+    delete chips.dataset.popInit;
+  });
+
   const sessionId = chat.dataset.sessionId;
   const draftKey = `chat-draft-${sessionId}`;
   textarea.value = sessionStorage.getItem(draftKey) || "";
@@ -153,7 +158,8 @@ function initScrollHandler(
 ) {
   const container = document.querySelector(containerSelector);
   const scrollBtn = document.querySelector(buttonSelector);
-  if (!container) return () => {};
+  const chat = document.querySelector("#chat");
+  if (!container || !chat) return () => {};
 
   const isUserNearBottom = (threshold) => {
     const distanceFromBottom =

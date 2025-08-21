@@ -55,10 +55,18 @@
     import { initChatUI } from "{{ url_for('static', filename='js/chat.js') }}";
     import { updateActiveSession } from "{{ url_for('static', filename='js/session.js') }}";
     import { initSearchUI, scrollToHighlight } from "{{ url_for('static', filename='js/ui.js') }}";
-    initChatUI();
-    updateActiveSession();
-    initSearchUI();
-    scrollToHighlight();
-    document.title = "{{ session.name }}";
+
+    const run = () => {
+      initChatUI();
+      updateActiveSession();
+      initSearchUI();
+      scrollToHighlight();
+      document.title = "{{ session.name }}";
+    };
+
+    run();
+    window.addEventListener('pageshow', (event) => {
+      if (event.persisted) run();
+    });
   </script>
 </main>
