@@ -68,26 +68,30 @@ async def chat_htmx(session_id):
     return resp
 
 
-@chat_bp.route("/c/stop/<msg_id>", methods=["POST"])
+@chat_bp.route("/c/stop/<user_msg_id>", methods=["POST"])
 @login_required
-async def stop_generation(msg_id: str):
-    current_app.logger.info("Stop requested for message %s", msg_id)
-    pending = pending_responses.get(msg_id)
+async def stop_generation(user_msg_id: str):
+    current_app.logger.info("Stop requested for message %s", user_msg_id)
+    pending = pending_responses.get(user_msg_id)
     handled = False
     if pending:
-        current_app.logger.debug("Cancelling pending response %s", msg_id)
+        current_app.logger.debug("Cancelling pending response %s", user_msg_id)
         await pending.cancel()
         handled = True
     else:
         current_app.logger.debug(
-            "No pending response for %s, aborting active stream", msg_id
+            "No pending response for %s, aborting active stream", user_msg_id
         )
-        handled = await llm.abort(msg_id)
+        handled = await llm.abort(user_msg_id)
     if not handled:
-        current_app.logger.warning("Stop request for unknown message %s", msg_id)
+        current_app.logger.warning(
+            "Stop request for unknown message %s", user_msg_id
+        )
         return Response("unknown message id", status=404)
     current_app.logger.debug(
-        "Stop request handled for %s (pending=%s)", msg_id, bool(pending)
+        "Stop request handled for %s (pending=%s)",
+        user_msg_id,
+        bool(pending),
     )
     return Response(status=204)
 
@@ -103,9 +107,9 @@ async def _cleanup_expired_pending() -> None:
         while True:
             await asyncio.sleep(CLEANUP_INTERVAL)
             cutoff = asyncio.get_event_loop().time() - PENDING_TTL
-            for msg_id, pending in list(pending_responses.items()):
+            for user_msg_id, pending in list(pending_responses.items()):
                 if pending.done or pending.created_at < cutoff:
-                    pending_responses.pop(msg_id, None)
+                    pending_responses.pop(user_msg_id, None)
     except asyncio.CancelledError:
         pass
 
@@ -113,14 +117,14 @@ async def _cleanup_expired_pending() -> None:
 class PendingResponse:
     def __init__(
         self,
-        msg_id: str,
+        user_msg_id: str,
         uid: str,
         session_id: str,
         history: list[dict],
         dek: bytes,
         params: dict | None = None,
     ):
-        self.msg_id = msg_id
+        self.user_msg_id = user_msg_id
         self.text = ""
         self.done = False
         self.error = False
@@ -129,7 +133,8 @@ class PendingResponse:
         self.meta = None
         self.cancelled = False
         self.created_at = asyncio.get_event_loop().time()
-        current_app.logger.debug("Starting generation for message %s", msg_id)
+        self.assistant_msg_id: str | None = None
+        current_app.logger.debug("Starting generation for message %s", user_msg_id)
         self._task = asyncio.create_task(
             self._generate(uid, session_id, history, params)
         )
@@ -152,7 +157,7 @@ class PendingResponse:
         escape = False
         first = True
         try:
-            async for chunk in llm.stream_response(self.msg_id, history, params):
+            async for chunk in llm.stream_response(self.user_msg_id, history, params):
                 if isinstance(chunk, dict) and chunk.get("type") == "error":
                     full_response += f"<span class='error'>{chunk['data']}</span>"
                     self.error = True
@@ -226,16 +231,19 @@ class PendingResponse:
             if self.cancelled:
                 if full_response.strip():
                     try:
-                        await db.append_message(
+                        _msg_id = await db.append_message(
                             uid,
                             session_id,
                             "assistant",
                             full_response,
                             self.dek,
                             {},
-                            reply_to=self.msg_id,
+                            reply_to=self.user_msg_id,
                         )
-                        current_app.logger.debug("Saved partial assistant message")
+                        self.assistant_msg_id = _msg_id
+                        current_app.logger.debug(
+                            "Saved partial assistant message %s", _msg_id
+                        )
                     except Exception:
                         current_app.logger.exception(
                             "Failed to save partial assistant message"
@@ -249,7 +257,7 @@ class PendingResponse:
                     self.meta = None
                     self.done = True
                     self._cond.notify_all()
-                pending_responses.pop(self.msg_id, None)
+                pending_responses.pop(self.user_msg_id, None)
                 return
 
             if found and meta_buf.strip():
@@ -262,16 +270,17 @@ class PendingResponse:
 
             if not self.error and full_response.strip():
                 try:
-                    await db.append_message(
+                    _msg_id = await db.append_message(
                         uid,
                         session_id,
                         "assistant",
                         full_response,
                         self.dek,
                         meta,
-                        reply_to=self.msg_id,
+                        reply_to=self.user_msg_id,
                     )
-                    current_app.logger.debug("Saved assistant message")
+                    self.assistant_msg_id = _msg_id
+                    current_app.logger.debug("Saved assistant message %s", _msg_id)
                 except Exception:
                     current_app.logger.exception("Failed to save assistant message")
                     full_response += (
@@ -284,18 +293,18 @@ class PendingResponse:
                 self.done = True
                 self._cond.notify_all()
             if not self.error:
-                pending_responses.pop(self.msg_id, None)
+                pending_responses.pop(self.user_msg_id, None)
 
     async def cancel(self):
         self.cancelled = True
-        await llm.abort(self.msg_id)
+        await llm.abort(self.user_msg_id)
         if not self._task.done():
             self._task.cancel()
             try:
                 await self._task
             except asyncio.CancelledError:
                 pass
-        pending_responses.pop(self.msg_id, None)
+        pending_responses.pop(self.user_msg_id, None)
 
     async def stream(self):
         sent = 0
@@ -330,8 +339,8 @@ async def send_message(session_id):
         abort(400, description="Message is empty, too long, or session is invalid.")
 
     try:
-        msg_id = await db.append_message(uid, session_id, "user", user_text, dek)
-        current_app.logger.debug("Saved user message %s", msg_id)
+        user_msg_id = await db.append_message(uid, session_id, "user", user_text, dek)
+        current_app.logger.debug("Saved user message %s", user_msg_id)
     except Exception:
         current_app.logger.exception("Failed to save user message")
         raise
@@ -339,7 +348,7 @@ async def send_message(session_id):
     return await render_template(
         "partials/placeholder.html",
         user_text=user_text,
-        msg_id=msg_id,
+        user_msg_id=user_msg_id,
         session_id=session_id,
     )
 
@@ -348,28 +357,28 @@ def replace_newline(s: str) -> str:
     return re.sub(r"\r\n|\r|\n", "[newline]", s)
 
 
-@chat_bp.route("/c/<session_id>/stream/<msg_id>")
+@chat_bp.route("/c/<session_id>/stream/<user_msg_id>")
 @login_required
-async def sse_reply(msg_id, session_id):
+async def sse_reply(user_msg_id, session_id):
     user = await get_current_user()
     uid = user["id"]
     dek = get_dek()
     history = await db.get_history(uid, session_id, dek)
 
     if not history:
-        current_app.logger.warning("History not found for message %s", msg_id)
+        current_app.logger.warning("History not found for message %s", user_msg_id)
         return Response(
             "event: error\ndata: Invalid ID\n\n", mimetype="text/event-stream"
         )
 
     existing: dict | None = None
     for msg in history:
-        if msg.get("reply_to") == msg_id and msg["role"] == "assistant":
+        if msg.get("reply_to") == user_msg_id and msg["role"] == "assistant":
             existing = msg
             break
     if existing is None:
         for idx, msg in enumerate(history):
-            if msg["id"] == msg_id:
+            if msg["id"] == user_msg_id:
                 if idx + 1 < len(history) and history[idx + 1]["role"] == "assistant":
                     existing = history[idx + 1]
                 break
@@ -382,7 +391,8 @@ async def sse_reply(msg_id, session_id):
             # if meta:
             #     meta_str = orjson.dumps(meta).decode()
             #     yield f"event: meta\ndata: {escape(meta_str)}\n\n"
-            yield "event: done\ndata: \n\n"
+            data = orjson.dumps({"assistant_msg_id": existing["id"]}).decode()
+            yield f"event: done\ndata: {escape(data)}\n\n"
 
         return Response(saved_stream(), mimetype="text/event-stream")
 
@@ -395,17 +405,21 @@ async def sse_reply(msg_id, session_id):
                 allowed = current_app.config.get("ALLOWED_LLM_CONFIG_KEYS", set())
                 params = {k: raw[k] for k in raw if k in allowed}
             else:
-                current_app.logger.warning("Invalid config JSON for message %s", msg_id)
+                current_app.logger.warning(
+                    "Invalid config JSON for message %s", user_msg_id
+                )
         except Exception:
-            current_app.logger.warning("Invalid config JSON for message %s", msg_id)
+            current_app.logger.warning(
+                "Invalid config JSON for message %s", user_msg_id
+            )
 
     if not params:
         params = None
 
-    pending = pending_responses.get(msg_id)
+    pending = pending_responses.get(user_msg_id)
     if not pending:
-        pending = PendingResponse(msg_id, uid, session_id, history, dek, params)
-        pending_responses[msg_id] = pending
+        pending = PendingResponse(user_msg_id, uid, session_id, history, dek, params)
+        pending_responses[user_msg_id] = pending
 
     global _cleanup_task
     if _cleanup_task is None or _cleanup_task.done():
@@ -417,9 +431,11 @@ async def sse_reply(msg_id, session_id):
         if pending.meta is not None:
             # Placeholder for emitting structured metadata (e.g., tags)
             pass
-        event = "error" if pending.error else "done"
-        yield f"event: {event}\ndata: \n\n"
-        if not pending.error:
-            pending_responses.pop(msg_id, None)
+        if pending.error:
+            yield "event: error\ndata: \n\n"
+        else:
+            data = orjson.dumps({"assistant_msg_id": pending.assistant_msg_id}).decode()
+            yield f"event: done\ndata: {escape(data)}\n\n"
+            pending_responses.pop(user_msg_id, None)
 
     return Response(event_stream(), mimetype="text/event-stream")
