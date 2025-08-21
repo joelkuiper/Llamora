@@ -25,7 +25,7 @@ from app.services.crypto import (
 )
 
 
-@lru_cache(maxsize=256)
+@lru_cache(maxsize=2048)
 def _cached_tag_name(
     user_id: str,
     tag_hash: bytes,
@@ -158,6 +158,8 @@ class LocalDB:
                     name_ct BLOB NOT NULL,
                     name_nonce BLOB(24) NOT NULL,
                     alg TEXT NOT NULL,
+                    seen INTEGER DEFAULT 0,
+                    last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     PRIMARY KEY(user_id, tag_hash)
                 );
 
@@ -182,6 +184,8 @@ class LocalDB:
                 CREATE INDEX IF NOT EXISTS idx_tag_message_message ON tag_message_xref(user_id, message_id);
                 """,
             )
+
+            await conn.commit()
 
     # user helpers
     async def create_user(
@@ -398,23 +402,37 @@ class LocalDB:
         self, user_id: str, tag_hash: bytes, message_id: str, session_id: str
     ) -> None:
         async with self.pool.connection() as conn:
-            await self.with_transaction(
-                conn,
-                conn.execute,
-                "INSERT OR IGNORE INTO tag_message_xref (user_id, tag_hash, message_id, session_id, ulid) VALUES (?, ?, ?, ?, ?)",
-                (user_id, tag_hash, message_id, session_id, str(ULID())),
-            )
+
+            async def _tx():
+                cursor = await conn.execute(
+                    "INSERT OR IGNORE INTO tag_message_xref (user_id, tag_hash, message_id, session_id, ulid) VALUES (?, ?, ?, ?, ?)",
+                    (user_id, tag_hash, message_id, session_id, str(ULID())),
+                )
+                if cursor.rowcount:
+                    await conn.execute(
+                        "UPDATE tags SET seen = seen + 1, last_seen = CURRENT_TIMESTAMP WHERE user_id = ? AND tag_hash = ?",
+                        (user_id, tag_hash),
+                    )
+
+            await self.with_transaction(conn, _tx)
 
     async def unlink_tag_message(
         self, user_id: str, tag_hash: bytes, message_id: str
     ) -> None:
         async with self.pool.connection() as conn:
-            await self.with_transaction(
-                conn,
-                conn.execute,
-                "DELETE FROM tag_message_xref WHERE user_id = ? AND tag_hash = ? AND message_id = ?",
-                (user_id, tag_hash, message_id),
-            )
+
+            async def _tx():
+                cursor = await conn.execute(
+                    "DELETE FROM tag_message_xref WHERE user_id = ? AND tag_hash = ? AND message_id = ?",
+                    (user_id, tag_hash, message_id),
+                )
+                if cursor.rowcount:
+                    await conn.execute(
+                        "UPDATE tags SET seen = CASE WHEN seen > 0 THEN seen - 1 ELSE 0 END WHERE user_id = ? AND tag_hash = ?",
+                        (user_id, tag_hash),
+                    )
+
+            await self.with_transaction(conn, _tx)
 
     async def get_message_session(self, user_id: str, message_id: str) -> str | None:
         async with self.pool.connection() as conn:
@@ -450,6 +468,46 @@ class LocalDB:
                 dek,
             )
             tags.append({"name": tag_name, "hash": row["tag_hash"].hex()})
+        return tags
+
+    async def get_tag_frecency(
+        self, user_id: str, limit: int, lambda_: float, dek: bytes
+    ) -> list[dict]:
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                """
+                SELECT tag_hash, name_ct, name_nonce, alg,
+                       seen AS frequency,
+                       (julianday('now') - julianday(last_seen)) * 86400 AS recency,
+                       seen / exp(? * (julianday('now') - julianday(last_seen)) * 86400) AS frecency
+                FROM tags
+                WHERE user_id = ?
+                ORDER BY frecency DESC
+                LIMIT ?
+                """,
+                (lambda_, user_id, limit),
+            )
+            rows = await cursor.fetchall()
+
+        tags = []
+        for row in rows:
+            tag_name = _cached_tag_name(
+                user_id,
+                row["tag_hash"],
+                row["name_nonce"],
+                row["name_ct"],
+                row["alg"].encode(),
+                dek,
+            )
+            tags.append(
+                {
+                    "name": tag_name,
+                    "hash": row["tag_hash"].hex(),
+                    "frequency": row["frequency"],
+                    "recency": row["recency"],
+                    "frecency": row["frecency"],
+                }
+            )
         return tags
 
     async def get_messages_with_tag_hashes(
