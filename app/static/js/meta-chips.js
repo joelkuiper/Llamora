@@ -64,6 +64,8 @@ function setupAddButton(container) {
         chip.classList.add('chip-enter');
         chip.addEventListener('animationend', () => chip.classList.remove('chip-enter'), { once: true });
       }
+    } else if (evt.target.classList?.contains('chip-tombstone')) {
+      evt.target.remove();
     }
   });
 }

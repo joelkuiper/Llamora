@@ -12,7 +12,7 @@
     <button class="chip-remove"
             hx-delete="{{ url_for('tags.remove_tag', msg_id=msg_id, tag_hash=tag_hash) }}"
             hx-target="closest .meta-chip"
-            hx-swap="outerHTML">&times;</button>
+            hx-swap="outerHTML swap:0.15s">&times;</button>
     {% endif %}
   </span>
 {%- endmacro %}

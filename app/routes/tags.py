@@ -15,7 +15,7 @@ async def remove_tag(msg_id: str, tag_hash: str):
     except ValueError:
         abort(400, description="invalid tag hash")
     await db.unlink_tag_message(user["id"], tag_hash_bytes, msg_id)
-    return ""
+    return "<span class='chip-tombstone'></span>"
 
 
 @tags_bp.post("/t/<msg_id>")
