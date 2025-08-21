@@ -133,7 +133,8 @@ body {
   }
 
   .meta-chip:hover,
-  .add-tag-btn:hover {
+  .add-tag-btn:hover,
+  .add-tag-btn.active {
     border-color: var(--accent);
     box-shadow:
       var(--raised-shadow),

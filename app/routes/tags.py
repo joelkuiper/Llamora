@@ -1,6 +1,7 @@
 from quart import Blueprint, request, abort, render_template
 from app import db
 from app.services.auth_helpers import login_required, get_current_user, get_dek
+from config import MAX_TAG_LENGTH
 
 
 tags_bp = Blueprint("tags", __name__)
@@ -23,11 +24,13 @@ async def remove_tag(msg_id: str, tag_hash: str):
 async def add_tag(msg_id: str):
     user = await get_current_user()
     form = await request.form
-    tag = (form.get("tag") or "").strip()[:64]
+    tag = (form.get("tag") or "").strip()
     if tag and not tag.startswith("#"):
         tag = f"#{tag}"
     if not tag:
         abort(400, description="empty tag")
+    if len(tag) > MAX_TAG_LENGTH:
+        abort(400, description="tag too long")
     dek = get_dek()
     session_id = await db.get_message_session(user["id"], msg_id)
     if not session_id:

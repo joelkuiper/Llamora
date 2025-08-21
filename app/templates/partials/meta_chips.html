@@ -31,8 +31,8 @@
         <form hx-post="{{ url_for('tags.add_tag', msg_id=msg_id) }}"
               hx-target="closest .tag-popover"
               hx-swap="beforebegin">
-          <input type="text" name="tag" maxlength="64" class="input">
-          <button type="submit" class="btn btn-primary">Add</button>
+          <input type="text" name="tag" maxlength="{{ config.MAX_TAG_LENGTH }}" class="input">
+          <button type="submit" class="btn btn-primary" disabled>Add</button>
         </form>
       </div>
     </div>

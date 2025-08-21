@@ -5,6 +5,7 @@ from copy import deepcopy
 from datetime import timedelta
 from util import str_to_bool
 
+MAX_TAG_LENGTH = 64
 MAX_USERNAME_LENGTH = 30
 MAX_PASSWORD_LENGTH = 128
 MIN_PASSWORD_LENGTH = 8
@@ -31,7 +32,7 @@ DB_BUSY_TIMEOUT = int(os.getenv("LLAMORA_DB_BUSY_TIMEOUT", 5000))  # millisecond
 DB_MMAP_SIZE = int(os.getenv("LLAMORA_DB_MMAP_SIZE", 10 * 1024 * 1024))
 
 
-# Only allow a limited subset of parameters to be forwarded to the LLM
+# Only allow a limited subset of parameters to be forwarded to the LLM from the client-side
 ALLOWED_LLM_CONFIG_KEYS = {"temperature"}
 
 
