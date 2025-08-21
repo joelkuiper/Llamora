@@ -68,7 +68,6 @@ export function initChatUI(root = document) {
     }
     currentStreamMsgId = null;
     setStreaming(false);
-    revealMetaChips(wrap?.querySelector('.meta-chips'));
   };
 
   const setStreaming = (streaming) => {
@@ -304,7 +303,31 @@ function initStreamHandler(setStreaming, scrollToBottom) {
       wrap.removeAttribute("sse-close");
       currentStreamMsgId = null;
       setStreaming(false);
-      revealMetaChips(wrap.querySelector('.meta-chips'));
+      try {
+        const data = JSON.parse(evt.detail.data || '{}');
+        const assistantId = data.assistant_msg_id;
+        if (assistantId) {
+          wrap.dataset.assistantMsgId = assistantId;
+          const placeholder = wrap.querySelector('.meta-chips-placeholder');
+          if (placeholder) {
+            wrap.addEventListener(
+              'htmx:afterSwap',
+              (e) => {
+                if (e.target.classList?.contains('meta-chips')) {
+                  revealMetaChips(e.target);
+                }
+              },
+              { once: true }
+            );
+            htmx.ajax('GET', `/c/meta-chips/${assistantId}`, {
+              target: placeholder,
+              swap: 'outerHTML',
+            });
+          }
+        }
+      } catch (err) {
+        console.error('failed to load meta chips', err);
+      }
       scrollToBottom();
     }
   };

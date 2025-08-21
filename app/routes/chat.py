@@ -96,6 +96,21 @@ async def stop_generation(user_msg_id: str):
     return Response(status=204)
 
 
+@chat_bp.get("/c/meta-chips/<msg_id>")
+@login_required
+async def meta_chips(msg_id: str):
+    user = await get_current_user()
+    dek = get_dek()
+    session_id = await db.get_message_session(user["id"], msg_id)
+    if not session_id:
+        abort(404, description="message not found")
+    tags = await db.get_tags_for_message(user["id"], msg_id, dek)
+    html = await render_template(
+        "partials/meta_chips_wrapper.html", msg_id=msg_id, tags=tags, hidden=True
+    )
+    return html
+
+
 PENDING_TTL = 300  # seconds
 CLEANUP_INTERVAL = 60  # seconds
 pending_responses: dict[str, "PendingResponse"] = {}
