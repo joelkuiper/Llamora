@@ -1,19 +1,19 @@
 {% from 'partials/meta_chips.html' import render_meta_chips %}
-{% macro assistant_stream(msg_id, session_id) -%}
-<div id="msg-{{ msg_id }}" class="message assistant-stream"
+{% macro assistant_stream(user_msg_id, session_id) -%}
+<div id="msg-{{ user_msg_id }}" class="message assistant-stream"
      hx-ext="sse" sse-close="done"
-     sse-connect="{{ url_for('chat.sse_reply', session_id=session_id, msg_id=msg_id) }}">
-  <span class="raw-response" sse-swap="message,done" hidden hx-swap="beforeend"></span>
+     sse-connect="{{ url_for('chat.sse_reply', session_id=session_id, user_msg_id=user_msg_id) }}">
+  <span class="raw-response" sse-swap="message" hidden hx-swap="beforeend"></span>
 
   <span class="markdown-body">
     <span id="typing-indicator"
-          data-msg-id="{{ msg_id }}"
-          data-stop-url="{{ url_for('chat.stop_generation', msg_id=msg_id) }}"
+          data-msg-id="{{ user_msg_id }}"
+          data-stop-url="{{ url_for('chat.stop_generation', user_msg_id=user_msg_id) }}"
           sse-swap="done"
           hx-swap="none">
       <span class="cursor">❚</span>
     </span>
   </span>
-  {{ render_meta_chips(msg_id, hidden=True) }}
+  {{ render_meta_chips(user_msg_id, hidden=True) }}
 </div>
 {%- endmacro %}
