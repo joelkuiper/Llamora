@@ -99,7 +99,7 @@ body {
     display: flex;
     gap: 0.25rem;
     flex-wrap: wrap;
-    flex-direction: row-reverse;
+    /* flex-direction: row-reverse; */
     opacity: 0.66;
     transition: opacity 0.2s ease;
     &:hover {
