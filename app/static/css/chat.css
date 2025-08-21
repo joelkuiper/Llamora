@@ -83,14 +83,14 @@ body {
       box-shadow: var(--raised-shadow);
     }
 
-    &.bot,
-    &.bot-stream {
+    &.assistant,
+    &.assistant-stream {
       align-self: flex-start;
       box-shadow: var(--inset-shadow);
-      color: var(--color-bot-text);
+      color: var(--color-assistant-text);
       word-wrap: break-word;
       word-break: break-word;
-      background: var(--color-bot-bg);
+      background: var(--color-assistant-bg);
     }
   }
 
@@ -279,7 +279,7 @@ body {
 }
 
 
-.user, .bot, .bot-stream { animation: fade-in-up 0.3s ease-out; }
+.user, .assistant, .assistant-stream { animation: fade-in-up 0.3s ease-out; }
 
 @keyframes appear {
   from { transform: none scale(0.92); opacity: 0; }

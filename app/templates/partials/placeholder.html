@@ -1,3 +1,3 @@
-{% from 'partials/bot_stream.html' import bot_stream %}
+{% from 'partials/assistant_stream.html' import assistant_stream %}
 <div id="msg-{{ msg_id }}" class="message user">{{ user_text }}</div>
-{{ bot_stream(msg_id, session_id) }}
+{{ assistant_stream(msg_id, session_id) }}

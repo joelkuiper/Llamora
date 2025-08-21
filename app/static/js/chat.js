@@ -50,7 +50,7 @@ export function initChatUI(root = document) {
     console.debug('Stop button clicked');
     const indicator = chat.querySelector(TYPING_INDICATOR_SELECTOR);
     const stopEndpoint = indicator?.dataset.stopUrl;
-    const wrap = indicator?.closest('.bot-stream');
+    const wrap = indicator?.closest('.assistant-stream');
     if (wrap) {
       console.debug('Aborting SSE stream');
       wrap.dispatchEvent(new Event('htmx:abort'));
@@ -269,7 +269,7 @@ function initStreamHandler(setStreaming, scrollToBottom) {
 
   currentSSEListener = (evt) => {
     const { type } = evt.detail;
-    const wrap = evt.target.closest('.bot-stream');
+    const wrap = evt.target.closest('.assistant-stream');
     if (!wrap) return;
 
     const sink = wrap.querySelector('.raw-response');

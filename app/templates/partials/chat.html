@@ -1,4 +1,4 @@
-{% from 'partials/bot_stream.html' import bot_stream %}
+{% from 'partials/assistant_stream.html' import assistant_stream %}
 {% from 'partials/meta_chips.html' import render_meta_chips %}
 
 <main
@@ -6,9 +6,9 @@
   {% if oob %} hx-swap-oob="true" {% endif %}>
 
     <div id="chat" data-session-id="{{ session.id }}">
-      <div class="message bot"><div class="markdown-body">Welcome. Share what’s on your mind, and I’ll be here with you</div></div>
+      <div class="message assistant"><div class="markdown-body">Welcome. Share what’s on your mind, and I’ll be here with you</div></div>
       {% for msg in history %}
-      <div id="msg-{{ msg['id'] }}" class="message {{ 'bot' if msg['role'] != 'user' else 'user'}}">
+      <div id="msg-{{ msg['id'] }}" class="message {{ 'assistant' if msg['role'] != 'user' else 'user'}}">
         <div class="markdown-body">{{ msg.message }}</div>
         {% if msg['role'] != 'user' %}
         {{ render_meta_chips(msg['id'], msg.get('tags', [])) }}
@@ -17,7 +17,7 @@
       {% endfor %}
 
       {% if pending_msg_id %}
-      {{ bot_stream(pending_msg_id, session.id) }}
+      {{ assistant_stream(pending_msg_id, session.id) }}
       {% endif %}
     </div>
 

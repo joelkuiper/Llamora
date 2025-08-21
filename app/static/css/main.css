@@ -6,8 +6,8 @@
   --color-text: #444;
   --color-heading: #333;
   --color-user-text: #444;
-  --color-bot-text: #555;
-  --color-bot-bg: #fefefe;
+  --color-assistant-text: #555;
+  --color-assistant-bg: #fefefe;
 
   /* Accent palette (cyan-leaning blue) */
   --accent: #36a6f4;          /* primary accent */

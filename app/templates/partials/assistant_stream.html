@@ -1,6 +1,6 @@
 {% from 'partials/meta_chips.html' import render_meta_chips %}
-{% macro bot_stream(msg_id, session_id) -%}
-<div id="msg-{{ msg_id }}" class="message bot-stream"
+{% macro assistant_stream(msg_id, session_id) -%}
+<div id="msg-{{ msg_id }}" class="message assistant-stream"
      hx-ext="sse" sse-close="done"
      sse-connect="{{ url_for('chat.sse_reply', session_id=session_id, msg_id=msg_id) }}">
   <span class="raw-response" sse-swap="message,done" hidden hx-swap="beforeend"></span>
