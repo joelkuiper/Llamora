@@ -17,7 +17,7 @@
         hx-get="{{ url_for('sessions.edit_session_name', session_id=session.id) }}"
         hx-target="#session-{{ session.id }}"
         hx-swap="outerHTML"
-        title="Edit session name"
+        data-tooltip-title="Edit session name"
         aria-label="Edit">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M12 20h9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -30,7 +30,7 @@
         hx-target="#session-{{ session.id }}"
         hx-confirm="Are sure you want to delete this session?"
         hx-swap="outerHTML"
-        title="Delete session"
+        data-tooltip-title="Delete session"
         aria-label="Delete">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
              xmlns="http://www.w3.org/2000/svg">
