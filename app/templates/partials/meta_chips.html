@@ -48,7 +48,7 @@
         </form>
         <div class="tag-suggestions"
              hx-get="{{ url_for('tags.get_tag_suggestions', msg_id=msg_id) }}"
-             hx-trigger="revealed"
+             hx-trigger="tag-popover:show"
              hx-swap="innerHTML">
         </div>
       </div>

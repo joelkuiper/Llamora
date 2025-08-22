@@ -66,7 +66,7 @@ function setupAddButton(container) {
     document.addEventListener('click', outside, true);
     document.addEventListener('keydown', onKey);
     if (suggestions && !suggestions.dataset.loaded) {
-      htmx.trigger(suggestions, 'revealed');
+      htmx.trigger(suggestions, 'tag-popover:show');
     }
   });
 
