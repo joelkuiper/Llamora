@@ -207,6 +207,10 @@
       flex-wrap: wrap;
       gap: 6px;
       position: relative;
+
+      &:empty {
+        margin-top: 0;
+      }
     }
 
     .tag-suggestion {
