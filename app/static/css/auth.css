@@ -134,8 +134,30 @@ body {
 
   .back, .continue {
     text-align: center;
-    margin-top: var(--spacing-xl);
     border-top: 1px solid var(--shadow-light);
     padding-top: var(--spacing-lg);
   }
+
+  .back {
+    margin-top: var(--spacing-xl);
+  }
+
+  .acknowledge {
+    margin-top: var(--spacing-xl);
+  }
+
+  /* Recovery acknowledgement layout */
+  .acknowledge-label {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+  }
+
+  .acknowledge-label span {
+    line-height: 1.2;
+  }
+
+
+
 }

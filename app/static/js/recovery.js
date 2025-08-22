@@ -4,6 +4,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const downloadBtn = document.getElementById("download");
   const qrBtn = document.getElementById("qr-toggle");
   const qrCanvas = document.getElementById("qr-code");
+  const acknowledge = document.getElementById("acknowledge");
+  const continueBtn = document.getElementById("continue");
 
   const code = codeEl?.textContent.trim();
 
@@ -28,6 +30,21 @@ document.addEventListener("DOMContentLoaded", () => {
     a.download = "recovery-code.txt";
     a.click();
     URL.revokeObjectURL(url);
+  });
+
+  const updateContinueState = () => {
+    if (!continueBtn) return;
+    continueBtn.disabled = !acknowledge?.checked;
+  };
+
+  acknowledge?.addEventListener("change", updateContinueState);
+  updateContinueState();
+
+  continueBtn?.addEventListener("click", () => {
+    const next = continueBtn.dataset.next;
+    if (next) {
+      window.location.href = next;
+    }
   });
 
 });

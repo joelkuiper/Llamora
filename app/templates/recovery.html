@@ -11,8 +11,8 @@
     <div class="form-container">
       <h1>Recovery Code</h1>
       <p class="warning">
-        Without this code, if you lose your password, your account and data
-        cannot be recovered.
+        This code is the only way to get back into your account if you lose your password.
+        Keep it somewhere safe. Without it, your data cannot be recovered.
       </p>
 
       <pre id="recovery">{{ code }}</pre>
@@ -20,7 +20,26 @@
         <button class="btn" id="copy">Copy</button>
         <button class="btn" id="download">Download</button>
       </div>
-      <p class="continue"><a href="{{ next_url }}">Continue</a></p>
+      <div class="acknowledge">
+        <label class="acknowledge-label">
+          <input type="checkbox" id="acknowledge" />
+          <span>
+            I understand: anyone with this code can access my account.
+            If I lose it, I won’t be able to recover my data.
+            I will store it securely.
+          </span>
+        </label>
+      </div>
+      <p class="continue">
+        <button
+          class="btn btn-primary"
+          id="continue"
+          disabled
+          data-next="{{ next_url }}"
+        >
+          Continue
+        </button>
+      </p>
     </div>
     <script type="module" src="{{ url_for('static', filename='js/recovery.js') }}"></script>
   </body>
