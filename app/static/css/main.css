@@ -339,9 +339,9 @@ html, body {
 }
 
 /* Tooltips */
+
 .tooltip {
-  position: absolute;
-  z-index: 1000;
+  z-index: 9999;
   pointer-events: none;
   backdrop-filter: blur(10px) saturate(140%);
   -webkit-backdrop-filter: blur(10px) saturate(140%);
@@ -352,21 +352,20 @@ html, body {
   padding: var(--spacing-xs) var(--spacing-sm);
   color: var(--color-text);
   font-size: 0.85rem;
+  opacity: 0;
+  transition: opacity 0.15s ease;
 }
 
-.tooltip .tooltip-arrow,
-.tooltip .tooltip-arrow::before {
-  position: absolute;
-  width: 0.5rem;
-  height: 0.5rem;
+.tooltip.visible {
+  opacity: 1;
+  transition-delay: 0.5s;
 }
 
-.tooltip .tooltip-arrow::before {
-  content: "";
-  background: rgba(255,255,255,0.70);
-  border-left: 1px solid var(--border-strong);
-  border-top: 1px solid var(--border-strong);
-  transform: rotate(45deg);
-  box-shadow: var(--raised-shadow);
+.tooltip .tooltip-inner {
+  transform: translateY(4px);
+  transition: transform 0.1s ease;
 }
 
+.tooltip.visible .tooltip-inner {
+  transform: translateY(0);
+}

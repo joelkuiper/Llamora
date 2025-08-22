@@ -1,61 +1,102 @@
-export function initTooltips(root = document) {
-  const elements = root.querySelectorAll('[data-tooltip-title]');
-  elements.forEach((el) => {
-    if (el.dataset.tooltipInit === '1') return;
-    el.dataset.tooltipInit = '1';
+let tooltipEl;
+let innerEl;
+let popperInstance;
+let currentTarget;
+let initialized = false;
 
-    const tooltip = document.createElement('div');
-    tooltip.className = 'tooltip';
-    tooltip.setAttribute('role', 'tooltip');
-    tooltip.innerHTML = `<div class="tooltip-inner">${el.dataset.tooltipTitle}</div>`;
-    tooltip.hidden = true;
+function ensureEl() {
+  if (tooltipEl && tooltipEl.isConnected) return;
+  tooltipEl = document.createElement('div');
+  tooltipEl.className = 'tooltip';
+  tooltipEl.innerHTML = '<div class="tooltip-inner"></div>';
+  innerEl = tooltipEl.querySelector('.tooltip-inner');
+  document.body.appendChild(tooltipEl);
+}
 
-    document.body.appendChild(tooltip);
+function show(el) {
+  ensureEl();
+  hide();
+  innerEl.textContent = el.dataset.tooltipTitle || '';
+  tooltipEl.style.top = '';
+  tooltipEl.style.left = '';
+  popperInstance = Popper.createPopper(el, tooltipEl, {
+    placement: 'bottom',
+    strategy: 'fixed',
+    modifiers: [
+      { name: 'offset', options: { offset: [0, 8] } },
+    ],
+  });
+  tooltipEl.classList.add('visible');
+  currentTarget = el;
+}
 
-    const instance = Popper.createPopper(el, tooltip, {
-      placement: 'bottom',
-      modifiers: [
-        { name: 'offset', options: { offset: [0, 8] } },
-      ],
+function hide() {
+  if (!tooltipEl) return;
+  tooltipEl.classList.remove('visible');
+  if (popperInstance) {
+    const { top, left } = tooltipEl.getBoundingClientRect();
+    popperInstance.destroy();
+    popperInstance = null;
+    Object.assign(tooltipEl.style, {
+      top: `${top}px`,
+      left: `${left}px`,
+      position: 'fixed',
     });
+  }
+  currentTarget = null;
+}
 
-    const show = () => {
-      tooltip.hidden = false;
-      instance.update();
-    };
-    const hide = () => {
-      tooltip.hidden = true;
-    };
+function cleanup() {
+  hide();
+  if (tooltipEl) {
+    tooltipEl.remove();
+    tooltipEl = null;
+    innerEl = null;
+  }
+}
 
-    el.addEventListener('mouseenter', show);
-    el.addEventListener('focus', show);
-    el.addEventListener('mouseleave', hide);
-    el.addEventListener('blur', hide);
+export function initTooltips() {
+  if (initialized) return;
+  initialized = true;
 
-    // store cleanup to avoid duplicated listeners and orphaned tooltips
-    el._tooltipCleanup = () => {
-      el.removeEventListener('mouseenter', show);
-      el.removeEventListener('focus', show);
-      el.removeEventListener('mouseleave', hide);
-      el.removeEventListener('blur', hide);
-      instance.destroy();
-      tooltip.remove();
-      delete el.dataset.tooltipInit;
-      delete el._tooltipCleanup;
-    };
+  const getTrigger = (el) => {
+    const trigger = el.closest('[data-tooltip-title]');
+    return trigger && !trigger.classList.contains('active') ? trigger : null;
+  };
+
+  document.addEventListener('mouseover', (e) => {
+    const trigger = getTrigger(e.target);
+    if (!trigger || trigger === currentTarget) return;
+    show(trigger);
+  });
+
+  document.addEventListener('mouseout', (e) => {
+    if (!currentTarget) return;
+    if (e.relatedTarget && currentTarget.contains(e.relatedTarget)) return;
+    if (getTrigger(e.target) !== currentTarget) return;
+    hide();
+  });
+
+  document.addEventListener('focusin', (e) => {
+    const trigger = getTrigger(e.target);
+    if (trigger) show(trigger);
+  });
+
+  document.addEventListener('focusout', (e) => {
+    if (currentTarget && getTrigger(e.target) === currentTarget) hide();
+  });
+
+  document.addEventListener('click', hide);
+
+  if (window.htmx) {
+    document.body.addEventListener('htmx:beforeHistorySave', cleanup);
+  }
+
+  window.addEventListener('pagehide', cleanup);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) cleanup();
   });
 }
 
-// Initial run
 initTooltips();
 
-// Re-run after HTMX swaps
-if (window.htmx) {
-  document.body.addEventListener('htmx:load', (evt) => initTooltips(evt.target));
-  document.body.addEventListener('htmx:beforeCleanupElement', (evt) => {
-    const el = evt.target;
-    if (el._tooltipCleanup) {
-      el._tooltipCleanup();
-    }
-  });
-}

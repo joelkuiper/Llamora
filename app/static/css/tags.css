@@ -120,6 +120,7 @@
   opacity: 0;
   transition: opacity .22s ease, background .18s ease;
   max-width: 19rem;
+  z-index: 1100;
 
   .overlay-close {
     top: -1.25rem;
