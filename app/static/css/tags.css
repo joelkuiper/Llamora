@@ -165,6 +165,7 @@
       color: rgba(0,0,0,0.9);
       font-size: 14px;
       line-height: calc(var(--tp-h) - 2px);
+      font-family: var(--font-base);
 
       &::placeholder { opacity: .6; }
       &:focus { outline: none; }

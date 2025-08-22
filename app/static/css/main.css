@@ -337,3 +337,36 @@ html, body {
   inset: -0.5rem;
   border-radius: 50%;
 }
+
+/* Tooltips */
+.tooltip {
+  position: absolute;
+  z-index: 1000;
+  pointer-events: none;
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  background: rgba(255,255,255,0.70);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--raised-shadow);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  color: var(--color-text);
+  font-size: 0.85rem;
+}
+
+.tooltip .tooltip-arrow,
+.tooltip .tooltip-arrow::before {
+  position: absolute;
+  width: 0.5rem;
+  height: 0.5rem;
+}
+
+.tooltip .tooltip-arrow::before {
+  content: "";
+  background: rgba(255,255,255,0.70);
+  border-left: 1px solid var(--border-strong);
+  border-top: 1px solid var(--border-strong);
+  transform: rotate(45deg);
+  box-shadow: var(--raised-shadow);
+}
+
