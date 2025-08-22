@@ -8,7 +8,7 @@ let currentStreamMsgId = null;
 
 const TYPING_INDICATOR_SELECTOR = "#typing-indicator";
 
-function revealMetaChips(container) {
+function revealMetaChips(container, scrollToBottom){
   if (!container || !container.hidden) return;
   const parent = container.closest('.message');
   const start = parent?.offsetHeight;
@@ -25,7 +25,10 @@ function revealMetaChips(container) {
     }, { once: true });
   }
   container.classList.add('chip-enter');
-  container.addEventListener('animationend', () => container.classList.remove('chip-enter'), { once: true });
+  container.addEventListener('animationend', () => {
+    container.classList.remove('chip-enter');
+    scrollToBottom();
+  }, { once: true });
 }
 
 export function initChatUI(root = document) {
@@ -314,7 +317,7 @@ function initStreamHandler(setStreaming, scrollToBottom) {
               'htmx:afterSwap',
               (e) => {
                 if (e.target.classList?.contains('meta-chips')) {
-                  revealMetaChips(e.target);
+                  revealMetaChips(e.target, scrollToBottom);
                 }
               },
               { once: true }
