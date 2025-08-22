@@ -61,7 +61,7 @@ async def chat_htmx(session_id):
     resp = await make_response(html, 200)
     push_url = url_for("sessions.session", session_id=session_id)
     if target:
-        push_url = f"{push_url}?target=#{target}"
+        push_url = f"{push_url}?target={target}"
     resp.headers["HX-Push-Url"] = push_url
     user = await get_current_user()
     await db.update_state(user["id"], active_session=session_id)

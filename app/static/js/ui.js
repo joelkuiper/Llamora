@@ -138,7 +138,7 @@ export function initSearchUI() {
       closeResults(true);
       const el = document.getElementById(targetId);
       if (el) {
-        history.pushState(null, "", `${window.location.pathname}?target=${targetId}#${targetId}`);
+        history.pushState(null, "", `${window.location.pathname}?target=${targetId}`);
         el.scrollIntoView({ behavior: "smooth", block: "center" });
         flashHighlight(el);
       }
@@ -153,8 +153,12 @@ export function scrollToHighlight() {
   let target = params.get("target");
   if (!target && window.location.hash.startsWith("#msg-")) {
     target = window.location.hash.substring(1);
+    params.set("target", target);
   }
   if (target) {
+    if (window.location.hash || params.get("target") !== target) {
+      history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+    }
     const el = document.getElementById(target);
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
