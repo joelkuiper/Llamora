@@ -42,7 +42,7 @@
 
 - **Privacy first search with ANN** The app includes a privacy-first search engine that runs entirely on your machine. Each message is embedded locally (e.g., with [FlagEmbedding](https://huggingface.co/BAAI/bge-small-en-v1.5)) and encrypted at rest, and decryption happens only in memory after login. Queries are answered by an in-memory [HNSW](https://github.com/nmslib/hnswlib) index (cosine over normalized embeddings) for fast semantic K-NN, warmed with recent items and progressively backfilled so results improve in place. On top of this, we perform fast exact/phrase matching (Aho-Corasick) and rank exact hits above purely semantic neighbors. There are some natural trade-offs: since the index lives in memory, RAM usage grows with the size of the chat history; large collections can take noticeable memory. And because exact matches are only surfaced if they also appear in the nearest-neighbor candidates, there is a small risk of false negatives: an exact string may exist but not be retrieved if it falls outside the top-K semantic hits.
 
-- **Automatic tags & metadata** The system uses a hidden JSON sentinel appended to every model reply, generated under a strict grammar so it is always valid. This sentinel carries metadata such as tags, emojis, or other annotations that remain invisible to the user but can be consumed by the application. By letting the model produce structured data alongside natural text, the interface gains automatic tagging, search, and filtering without additional classifiers or brittle parsing.
+- **Automatic tags & metadata** The system uses a hidden JSON object appended to every model reply (following a sentinel token), generated under a strict grammar so it is always valid. This JSON carries metadata such as tags, emojis, or other annotations that remain invisible to the user but can be consumed by the application. By letting the model produce structured data alongside natural text, the interface could gain automatic tagging, search, and filtering.
 
 ## Known Limitations
 
@@ -74,6 +74,7 @@ See [config.py](./config.py) for more details.
 - [uv](https://docs.astral.sh/uv/)
 - a [llamafile](https://github.com/Mozilla-Ocho/llamafile) model (e.g., [Phi-3.5-mini-instruct](https://huggingface.co/Mozilla/Phi-3-mini-4k-instruct-llamafile))
 - a relatively fast computer (ideally with a strong GPU)
+- A relatively modern browser
 
 ### Quick Start
 
@@ -93,7 +94,7 @@ Alternatively set `LLAMORA_LLAMA_HOST` to the address of a running Llama file (e
    - Set `LOG_LEVEL=DEBUG` for debug logging
 
 ### A note on model selection
-While Phi 3.5 works most of the time, however it is not great at instruction following and will often glitch. Personally I've had better results with [Qwen 4B-Instruct](https://huggingface.co/Qwen) but no llamafile is readily available for download. You can download a [GUFF](https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF) from HuggingFace and convert it to a llamafile (e.g. `llamafile-convert Qwen3-4B-Instruct-2507-Q5_K_M.gguf`) provide you have [llamafile tools](https://github.com/Mozilla-Ocho/llamafile?tab=readme-ov-file#source-installation) installed.
+While Phi 3.5 works sometimes, it is not great at instruction following and will often glitch. Personally I've had much better results with [Qwen 4B-Instruct](https://huggingface.co/Qwen) but no llamafile is readily available for download. You can download a [GUFF](https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF) from HuggingFace and convert it to a llamafile (e.g. `llamafile-convert Qwen3-4B-Instruct-2507-Q5_K_M.gguf`) provide you have [llamafile tools](https://github.com/Mozilla-Ocho/llamafile?tab=readme-ov-file#source-installation) installed.
 
 Since Qwen uses a slightly different prompt format and sampling parameters you must adjust the settings. This is most easily done via the env vars.
 
