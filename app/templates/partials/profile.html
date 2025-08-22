@@ -58,7 +58,22 @@
     import { updateActiveSession } from "{{ url_for('static', filename='js/session.js') }}";
     updateActiveSession();
     document.title = "Profile";
-    document.getElementById('profile-back').addEventListener('click', () => history.back());
+    const backBtn = document.getElementById('profile-back');
+    const stored = sessionStorage.getItem('profile-return');
+    let target = stored;
+    if (!target) {
+      try {
+        const ref = new URL(document.referrer);
+        target = ref.pathname.startsWith('/profile') ? '/' : ref.pathname;
+      } catch {
+        target = '/';
+      }
+      sessionStorage.setItem('profile-return', target);
+    }
+    backBtn?.addEventListener('click', () => {
+      sessionStorage.removeItem('profile-return');
+      window.location.href = target;
+    });
   </script>
   <script type="module" src="{{ url_for('static', filename='js/forms.js') }}"></script>
 </main>
