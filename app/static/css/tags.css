@@ -205,23 +205,6 @@
       position: relative;
     }
 
-    .tag-suggestions-indicator {
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 0.5rem;
-      height: 0.5rem;
-      border-radius: 50%;
-      background: currentColor;
-      opacity: 0;
-    }
-
-    .tag-suggestions-indicator.htmx-request {
-      opacity: 1;
-      animation: ts-pulse 0.8s ease-in-out infinite alternate;
-      animation-delay: 0.18s;
-    }
-
     .tag-suggestion {
       background: var(--color-bg);
       border: 1px solid var(--border);
@@ -300,9 +283,4 @@
     opacity: 0;
     transform: scale(0.8);
   }
-}
-
-@keyframes ts-pulse {
-  from { transform: scale(0.8); opacity: 0.4; }
-  to   { transform: scale(1.2); opacity: 1; }
 }

@@ -2,7 +2,7 @@ from quart import Blueprint, request, abort, render_template
 from app import db
 from app.services.auth_helpers import login_required, get_current_user, get_dek
 from config import MAX_TAG_LENGTH
-
+import time
 
 tags_bp = Blueprint("tags", __name__)
 

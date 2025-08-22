@@ -43,9 +43,7 @@
         <div class="tag-suggestions"
              hx-get="{{ url_for('tags.get_tag_suggestions', msg_id=msg_id) }}"
              hx-trigger="revealed"
-             hx-swap="innerHTML"
-             hx-indicator="#ts-indicator-{{ msg_id }}">
-          <span id="ts-indicator-{{ msg_id }}" class="tag-suggestions-indicator"></span>
+             hx-swap="innerHTML">
         </div>
       </div>
     </div>
