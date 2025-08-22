@@ -160,6 +160,7 @@ function initScrollHandler(
 ) {
   const container = document.querySelector(containerSelector);
   const scrollBtn = document.querySelector(buttonSelector);
+  const scrollBtnContainer = scrollBtn?.parentElement;
   const chat = document.querySelector("#chat");
   if (!container || !chat) return () => {};
 
@@ -173,8 +174,10 @@ function initScrollHandler(
     if (!scrollBtn) return;
     if (isUserNearBottom(150)) {
       scrollBtn.classList.remove("visible");
+      scrollBtnContainer?.classList.remove("visible");
     } else {
       scrollBtn.classList.add("visible");
+      scrollBtnContainer?.classList.add("visible");
     }
   };
 

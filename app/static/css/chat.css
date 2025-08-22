@@ -218,6 +218,11 @@ body {
   transform: translateX(-50%);
   position: fixed;
   bottom: 5rem;
+  pointer-events: none;
+}
+
+#scroll-bottom-container.visible {
+  pointer-events: auto;
 }
 
 #scroll-bottom {
