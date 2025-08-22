@@ -106,8 +106,8 @@
   --tp-glass-bg: rgba(255,255,255,0.72);
   --tp-glass-bg-hover: rgba(255,255,255,0.78);
   --tp-ring: var(--accent-20);
-  --tp-h: 40px;
-  --tp-radius: 14px;
+  --tp-h: 2rem;
+  --tp-radius: var(--radius-md);
 
   backdrop-filter: blur(10px) saturate(140%);
   -webkit-backdrop-filter: blur(10px) saturate(140%);
@@ -119,6 +119,7 @@
   padding: 10px;
   opacity: 0;
   transition: opacity .22s ease, background .18s ease;
+  max-width: 19rem;
 
   .overlay-close {
     top: -1.25rem;

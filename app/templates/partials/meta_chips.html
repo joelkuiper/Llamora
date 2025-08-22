@@ -37,7 +37,10 @@
         <form hx-post="{{ url_for('tags.add_tag', msg_id=msg_id) }}"
               hx-target="#msg-tags-{{ msg_id }}"
               hx-swap="beforeend">
-          <input type="text" name="tag" maxlength="{{ config.MAX_TAG_LENGTH }}">
+          <input type="text"
+                 name="tag"
+                 placeholder="Add a tag"
+                 maxlength="{{ config.MAX_TAG_LENGTH }}">
           <button type="submit" disabled>Add</button>
         </form>
         <div class="tag-suggestions"

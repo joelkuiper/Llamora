@@ -2,7 +2,6 @@ from quart import Blueprint, request, abort, render_template
 from app import db
 from app.services.auth_helpers import login_required, get_current_user, get_dek
 from config import MAX_TAG_LENGTH
-import time
 
 tags_bp = Blueprint("tags", __name__)
 
@@ -55,13 +54,26 @@ async def get_tag_suggestions(msg_id: str):
     keywords = meta.get("keywords") or []
     existing = await db.get_tags_for_message(user["id"], msg_id, dek)
     existing_names = {t["name"] for t in existing}
-    suggestions = []
+
+    meta_suggestions: set[str] = set()
     for kw in keywords:
+        kw = (kw or "").strip()
         if kw and not kw.startswith("#"):
             kw = f"#{kw}"
-        if kw and kw not in existing_names:
-            suggestions.append(kw)
+        kw = kw[:MAX_TAG_LENGTH]
+        if kw:
+            meta_suggestions.add(kw)
+
+    frecent_tags = await db.get_tag_frecency(user["id"], 3, 0.0001, dek)
+    frecent_suggestions = {
+        t["name"] if t["name"].startswith("#") else f"#{t['name']}"
+        for t in frecent_tags
+    }
+
+    combined = meta_suggestions | frecent_suggestions
+    combined = [name for name in combined if name not in existing_names]
+
     html = await render_template(
-        "partials/tag_suggestions.html", suggestions=suggestions, msg_id=msg_id
+        "partials/tag_suggestions.html", suggestions=combined, msg_id=msg_id
     )
     return html
