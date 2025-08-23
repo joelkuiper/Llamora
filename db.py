@@ -6,6 +6,7 @@ import orjson
 import asyncio
 import numpy as np
 import hashlib
+import atexit
 from functools import lru_cache
 from config import (
     MAX_USERNAME_LENGTH,
@@ -44,8 +45,9 @@ class LocalDB:
         self.db_path = db_path or os.getenv("LLAMORA_DB_PATH", "state.sqlite3")
         self.pool = None
         self.search_api = None
+        atexit.register(self._atexit_close)
 
-    def __del__(self):
+    def _atexit_close(self):
         if self.pool is not None:
             try:
                 loop = asyncio.get_event_loop()
@@ -55,6 +57,9 @@ class LocalDB:
                     loop.run_until_complete(self.pool.close())
             except Exception:
                 pass
+
+    def __del__(self):
+        self._atexit_close()
 
     def set_search_api(self, api):
         self.search_api = api

@@ -30,7 +30,7 @@ def create_app():
 
     from .routes.auth import auth_bp
     from .routes.sessions import sessions_bp
-    from .routes.chat import chat_bp
+    from .routes.chat import chat_bp, llm
     from .routes.search import search_bp
     from .routes.tags import tags_bp
 
@@ -65,6 +65,10 @@ def create_app():
     app.before_request(load_user)
     app.before_serving(db.init)
     app.after_serving(db.close)
+
+    @app.after_serving
+    async def _shutdown_llm():
+        llm.shutdown()
 
     @app.before_serving
     async def _print_registration_link():

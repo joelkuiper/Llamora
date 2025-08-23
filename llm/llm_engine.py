@@ -169,6 +169,12 @@ class LLMEngine:
             except ProcessLookupError:  # process already gone
                 pass
 
+    def __del__(self):
+        try:
+            self.shutdown()
+        except Exception:
+            pass
+
     async def _count_tokens(self, client: httpx.AsyncClient, text: str) -> int:
         resp = await client.post(f"{self.server_url}/tokenize", json={"content": text})
         resp.raise_for_status()
