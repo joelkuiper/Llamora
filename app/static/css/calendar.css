@@ -134,8 +134,13 @@
     td.empty { visibility: hidden; }
 
     td a {
-      display: grid; place-items: center;
-      height: 36px; border-radius: 12px;
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+      position: relative;                 /* anchor for the dot */
+      height: 36px;
+      line-height: 36px;                  /* vertically centers the number */
+
       background: var(--color-bg);
       border: 1px solid var(--border);
       text-decoration: none; color: var(--color-text);
@@ -147,7 +152,7 @@
       border-color: var(--accent-20);
     }
 
-    .calendar-table td a:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-20); }
+    td a:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-20); }
 
     td a:active { transform: translateY(1px); }
 
@@ -165,7 +170,36 @@
     }
 
     td.has-entry a::after {
-      content: ""; width: 6px; height: 6px; margin-top: 2px; border-radius: 999px; background: var(--accent); opacity: .85;
+      content: "";
+      position: absolute;
+      top: 5px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--accent);
+      opacity: .85;
+      pointer-events: none;
+      line-height:0;
+    }
+
+    td a.inactive {
+      opacity: .5;
+      &:hover {
+        opacity: 1 !important;
+      }
+
+    }
+
+    td span.inactive {
+      display: grid; place-items: center;
+      height: 36px; border-radius: 12px;
+      background: var(--color-bg);
+      border: 1px solid var(--border);
+      color: var(--color-text);
+      opacity: .5;
+      cursor: default;
     }
   }
 }

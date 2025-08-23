@@ -46,8 +46,17 @@ export function initChatUI(root = document) {
   });
 
   const date = chat.dataset.date;
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const isToday = date === today;
   const draftKey = `chat-draft-${date}`;
   textarea.value = sessionStorage.getItem(draftKey) || "";
+  if (!isToday) {
+    textarea.disabled = true;
+    button.disabled = true;
+    textarea.placeholder = "This day has past";
+  }
 
   const handleStopClick = () => {
     console.debug('Stop button clicked');
@@ -74,6 +83,11 @@ export function initChatUI(root = document) {
   };
 
   const setStreaming = (streaming) => {
+    if (!isToday) {
+      textarea.disabled = true;
+      button.disabled = true;
+      return;
+    }
     textarea.disabled = streaming;
     if (streaming) {
       console.debug('Entering streaming state for', currentStreamMsgId);
@@ -92,8 +106,12 @@ export function initChatUI(root = document) {
     }
   };
 
-  const scrollToBottom = initScrollHandler();
-  initStreamHandler(setStreaming, scrollToBottom);
+  // Defer scroll handler setup so elements exist after day switches
+  let scrollToBottom = () => {};
+  requestAnimationFrame(() => {
+    scrollToBottom = initScrollHandler();
+    initStreamHandler(setStreaming, scrollToBottom);
+  });
 
   const findCurrentMsgId = () =>
     chat.querySelector(TYPING_INDICATOR_SELECTOR)?.dataset.userMsgId || null;

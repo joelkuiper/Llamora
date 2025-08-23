@@ -35,9 +35,7 @@ def _cached_tag_name(
     alg: bytes,
     dek: bytes,
 ) -> str:
-    return decrypt_message(
-        dek, user_id, tag_hash.hex(), name_nonce, name_ct, alg
-    )
+    return decrypt_message(dek, user_id, tag_hash.hex(), name_nonce, name_ct, alg)
 
 
 class LocalDB:
@@ -171,7 +169,6 @@ class LocalDB:
                 CREATE INDEX IF NOT EXISTS idx_messages_user_date ON messages(user_id, created_date);
                 CREATE INDEX IF NOT EXISTS idx_messages_reply_to ON messages(reply_to);
                 CREATE INDEX IF NOT EXISTS idx_vectors_user_id ON vectors(user_id);
-                CREATE INDEX IF NOT EXISTS idx_vectors_id ON vectors(id);
 
                 CREATE INDEX IF NOT EXISTS idx_tag_message_hash ON tag_message_xref(user_id, tag_hash);
                 CREATE INDEX IF NOT EXISTS idx_tag_message_message ON tag_message_xref(user_id, message_id);
@@ -330,9 +327,7 @@ class LocalDB:
 
         if self.search_api:
             asyncio.create_task(
-                self.search_api.on_message_appended(
-                    user_id, msg_id, message, dek
-                )
+                self.search_api.on_message_appended(user_id, msg_id, message, dek)
             )
 
         return msg_id
@@ -351,9 +346,7 @@ class LocalDB:
             )
             row = await cursor.fetchone()
             if not row:
-                nonce, ct, alg = encrypt_message(
-                    dek, user_id, tag_hash.hex(), tag_name
-                )
+                nonce, ct, alg = encrypt_message(dek, user_id, tag_hash.hex(), tag_name)
                 await self.with_transaction(
                     conn,
                     conn.execute,
@@ -407,9 +400,7 @@ class LocalDB:
             row = await cursor.fetchone()
         return bool(row)
 
-    async def get_message_date(
-        self, user_id: str, message_id: str
-    ) -> str | None:
+    async def get_message_date(self, user_id: str, message_id: str) -> str | None:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 "SELECT created_date FROM messages WHERE id = ? AND user_id = ?",
@@ -509,9 +500,7 @@ class LocalDB:
     async def store_vector(self, msg_id, user_id, vec, dek):
         vec_arr = np.asarray(vec, dtype=np.float32)
         dim = vec_arr.shape[0]
-        nonce, ct, alg = encrypt_vector(
-            dek, user_id, msg_id, vec_arr.tobytes()
-        )
+        nonce, ct, alg = encrypt_vector(dek, user_id, msg_id, vec_arr.tobytes())
         async with self.pool.connection() as conn:
             await self.with_transaction(
                 conn,
@@ -774,7 +763,9 @@ class LocalDB:
                 )
         return history
 
-    async def get_days_with_messages(self, user_id: str, year: int, month: int) -> list[int]:
+    async def get_days_with_messages(
+        self, user_id: str, year: int, month: int
+    ) -> list[int]:
         month_prefix = f"{year:04d}-{month:02d}"
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
