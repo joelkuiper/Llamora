@@ -11,6 +11,14 @@ from app.services.auth_helpers import (
 days_bp = Blueprint("days", __name__)
 
 
+def _nav_months(year: int, month: int) -> tuple[int, int, int, int]:
+    prev_month = month - 1 or 12
+    prev_year = year - 1 if month == 1 else year
+    next_month = month + 1 if month < 12 else 1
+    next_year = year + 1 if month == 12 else year
+    return prev_year, prev_month, next_year, next_month
+
+
 @days_bp.route("/")
 @login_required
 async def index():
@@ -52,17 +60,41 @@ async def day(date):
 async def calendar_view():
     user = await get_current_user()
     today = datetime.utcnow().date()
-    weeks = calendar.Calendar().monthdayscalendar(today.year, today.month)
     state = await db.get_state(user["id"])
-    active_day = state.get("active_date", today.isoformat())
+    weeks = calendar.Calendar().monthdayscalendar(today.year, today.month)
+    prev_year, prev_month, next_year, next_month = _nav_months(today.year, today.month)
     html = await render_template(
-        "partials/calendar.html",
+        "partials/calendar_popover.html",
         year=today.year,
         month=today.month,
         month_name=calendar.month_name[today.month],
         weeks=weeks,
-        active_day=active_day,
+        active_day=state.get("active_date", today.isoformat()),
+        prev_year=prev_year,
+        prev_month=prev_month,
+        next_year=next_year,
+        next_month=next_month,
     )
-    resp = await make_response(html)
-    resp.headers["HX-Push-Url"] = url_for("days.calendar_view")
-    return resp
+    return await make_response(html)
+
+
+@days_bp.route("/calendar/<int:year>/<int:month>")
+@login_required
+async def calendar_month(year: int, month: int):
+    user = await get_current_user()
+    state = await db.get_state(user["id"])
+    weeks = calendar.Calendar().monthdayscalendar(year, month)
+    prev_year, prev_month, next_year, next_month = _nav_months(year, month)
+    html = await render_template(
+        "partials/calendar.html",
+        year=year,
+        month=month,
+        month_name=calendar.month_name[month],
+        weeks=weeks,
+        active_day=state.get("active_date", datetime.utcnow().date().isoformat()),
+        prev_year=prev_year,
+        prev_month=prev_month,
+        next_year=next_year,
+        next_month=next_month,
+    )
+    return await make_response(html)

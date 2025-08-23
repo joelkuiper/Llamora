@@ -1,0 +1,172 @@
+/* --- Calendar control placement --- */
+#calendar-control {
+  position: fixed;
+  top: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1200;
+}
+
+/* --- Popover shell --- */
+.calendar-popover {
+  --glass: rgba(255,255,255,0.72);
+
+  background: var(--glass, var(--color-bg));
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--raised-shadow);
+  color: var(--color-text);
+  max-width: 20rem;
+  padding: 12px;
+  opacity: 0;
+  transform: translateY(-4px) scale(.98);
+  transform-origin: top center;
+  transition:
+    opacity .18s ease,
+    transform .18s ease,
+    background .18s ease;
+  z-index: 1100;
+}
+
+.calendar-popover.tp-open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* Close pill */
+.calendar-popover .overlay-close {
+  position: absolute;
+  top: -1.1rem;
+  right: -1.1rem;
+}
+
+/* --- Calendar container --- */
+#calendar {
+  text-align: center;
+}
+
+/* Top bar */
+#calendar .calendar-nav {
+  display: grid;
+  grid-template-columns: 2rem 1fr 2rem;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: .5rem;
+}
+
+#calendar .month-title {
+  margin: 0;
+  font-size: .95rem;
+  font-weight: 700;
+  letter-spacing: .2px;
+}
+
+/* Nav buttons */
+.calendar-btn {
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--color-bg);
+  box-shadow: var(--inset-shadow);
+  cursor: pointer;
+  transition:
+    box-shadow .15s ease,
+    border-color .15s ease,
+    transform .06s ease;
+}
+
+.calendar-btn:hover {
+  border-color: var(--accent);
+  box-shadow: var(--raised-shadow), 0 0 0 2px var(--accent-10);
+}
+
+.calendar-btn:active { transform: translateY(1px); }
+
+.calendar-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--raised-shadow), 0 0 0 3px var(--accent-20);
+}
+
+/* --- Grid --- */
+.calendar-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: .95rem;
+}
+
+.calendar-table th {
+  font-weight: 600;
+  padding: .25rem 0;
+  color: var(--color-bot-text);
+}
+
+.calendar-table td {
+  padding: .2rem;
+  height: 2.4rem;
+}
+
+.calendar-table td.empty { visibility: hidden; }
+
+/* Day cell as a pill */
+.calendar-day {
+  display: grid;
+  place-items: center;
+  height: 2.2rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  border: 1px solid var(--border);
+  box-shadow: var(--inset-shadow);
+  text-decoration: none;
+  color: inherit;
+  transition:
+    background .15s ease,
+    box-shadow .15s ease,
+    border-color .15s ease,
+    transform .06s ease;
+}
+
+.calendar-day:hover {
+  border-color: var(--accent);
+  box-shadow: var(--raised-shadow), 0 0 0 2px var(--accent-10);
+  background: linear-gradient(0deg, rgba(59,167,246,0.12), rgba(59,167,246,0.08)) var(--color-bg);
+}
+
+.calendar-day:active { transform: translateY(1px); }
+
+.calendar-day:focus-visible {
+  outline: none;
+  box-shadow: var(--raised-shadow), 0 0 0 3px var(--accent-20);
+}
+
+/* Selected day */
+td.active .calendar-day {
+  border-color: var(--accent);
+  box-shadow: var(--raised-shadow), 0 0 0 2px var(--accent-20);
+}
+
+/* Optional: today + has-entry states (add these classes server-side) */
+.calendar-day.is-today {
+  border-color: var(--accent-20);
+  box-shadow: var(--raised-shadow), 0 0 0 2px var(--accent-05);
+}
+
+.calendar-day.has-entry::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  opacity: .9;
+  margin-top: 2px;
+}
+
+/* Spacing tweaks for small screens */
+@media (max-width: 420px) {
+  .calendar-popover { max-width: 18rem; }
+  .calendar-table td { height: 2.1rem; padding: .15rem; }
+  .calendar-day { height: 2rem; }
+}
