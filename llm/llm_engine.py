@@ -187,7 +187,8 @@ class LLMEngine:
             lo, hi = 0, len(history)
             while lo < hi:
                 mid = (lo + hi) // 2
-                prompt = build_prompt(history[mid:])
+                slice_history = history[mid:]
+                prompt = build_prompt(slice_history)
                 tokens = await self._count_tokens(client, prompt)
                 if tokens <= max_input:
                     hi = mid
@@ -205,6 +206,7 @@ class LLMEngine:
         max_input = self.ctx_size - n_predict
         history = await self._trim_history(history, max_input)
         prompt = build_prompt(history)
+
         payload = {"prompt": prompt, **cfg, "grammar": self.grammar}
 
         transport = httpx.AsyncHTTPTransport(retries=0)
@@ -269,7 +271,11 @@ class LLMEngine:
                             pass
 
                     if not saw_stop:
-                        msg = "Stream ended unexpectedly" if saw_content else "LLM server disconnected"
+                        msg = (
+                            "Stream ended unexpectedly"
+                            if saw_content
+                            else "LLM server disconnected"
+                        )
                         yield {"type": "error", "data": msg}
                     return
             except HTTPError as e:

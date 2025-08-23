@@ -15,5 +15,4 @@ _template = env.get_template(os.path.basename(prompt_path))
 
 
 def build_prompt(history: list[dict]) -> str:
-    prompt = _template.render(history=history)
-    return prompt
+    return _template.render(history=history)
