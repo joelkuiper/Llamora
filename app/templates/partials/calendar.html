@@ -1,4 +1,4 @@
-<section id="calendar">
+<section id="calendar" data-year="{{ year }}" data-month="{{ '%02d'|format(month) }}">
   <div class="calendar-nav">
     <button class="cal-nav-btn prev"
             hx-get="{{ url_for('days.calendar_month', year=prev_year, month=prev_month) }}"
@@ -28,7 +28,11 @@
           <td class="empty"></td>
           {% else %}
           {% set date_str = "%04d-%02d-%02d"|format(year, month, day) %}
-          <td{% if date_str == active_day %} class="active"{% endif %}>
+          {% set classes = [] %}
+          {% if date_str == active_day %}{% set classes = classes + ['active'] %}{% endif %}
+          {% if date_str == today %}{% set classes = classes + ['is-today'] %}{% endif %}
+          {% if day in active_days %}{% set classes = classes + ['has-entry'] %}{% endif %}
+          <td{% if classes %} class="{{ classes|join(' ') }}"{% endif %}>
             <a href="{{ url_for('days.day', date=date_str) }}"
                hx-get="{{ url_for('chat.chat_htmx', date=date_str) }}"
                hx-target="#content-wrapper"

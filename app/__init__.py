@@ -52,6 +52,20 @@ def create_app():
             value = value.replace(tzinfo=timezone.utc)
         return humanize.naturaltime(value)
 
+    @app.template_filter("long_date")
+    def long_date_filter(value):
+        if isinstance(value, str):
+            dt = datetime.fromisoformat(value)
+        else:
+            dt = value
+        day = dt.day
+        if 10 <= day % 100 <= 20:
+            suffix = "th"
+        else:
+            suffix = {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+        month = dt.strftime("%B")
+        return f"{day}{suffix} of {month} {dt.year}"
+
     @app.template_filter("tag_hash")
     def tag_hash_filter(tag, user_id=None):
         t = tag.strip()[:64]

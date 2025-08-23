@@ -773,3 +773,17 @@ class LocalDB:
                     {"name": tag_name, "hash": row["tag_hash"].hex()}
                 )
         return history
+
+    async def get_days_with_messages(self, user_id: str, year: int, month: int) -> list[int]:
+        month_prefix = f"{year:04d}-{month:02d}"
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                """
+                SELECT DISTINCT CAST(substr(created_date, 9, 2) AS INTEGER) AS day
+                FROM messages
+                WHERE user_id = ? AND substr(created_date, 1, 7) = ?
+                """,
+                (user_id, month_prefix),
+            )
+            rows = await cursor.fetchall()
+        return [row["day"] for row in rows]

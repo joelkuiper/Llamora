@@ -30,12 +30,15 @@ import re
 import config
 import orjson
 from zxcvbn import zxcvbn
+from datetime import datetime
 
 auth_bp = Blueprint("auth", __name__)
 
 
 async def _render_profile_page(user, **context):
     context["user"] = user
+    state = await db.get_state(user["id"])
+    context["day"] = state.get("active_date", datetime.utcnow().date().isoformat())
     if request.headers.get("HX-Request"):
         return await render_template("partials/profile.html", **context)
     return await render_template(

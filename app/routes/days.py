@@ -62,6 +62,7 @@ async def calendar_view():
     today = datetime.utcnow().date()
     state = await db.get_state(user["id"])
     weeks = calendar.Calendar().monthdayscalendar(today.year, today.month)
+    active_days = await db.get_days_with_messages(user["id"], today.year, today.month)
     prev_year, prev_month, next_year, next_month = _nav_months(today.year, today.month)
     html = await render_template(
         "partials/calendar_popover.html",
@@ -70,6 +71,8 @@ async def calendar_view():
         month_name=calendar.month_name[today.month],
         weeks=weeks,
         active_day=state.get("active_date", today.isoformat()),
+        today=today.isoformat(),
+        active_days=active_days,
         prev_year=prev_year,
         prev_month=prev_month,
         next_year=next_year,
@@ -84,6 +87,7 @@ async def calendar_month(year: int, month: int):
     user = await get_current_user()
     state = await db.get_state(user["id"])
     weeks = calendar.Calendar().monthdayscalendar(year, month)
+    active_days = await db.get_days_with_messages(user["id"], year, month)
     prev_year, prev_month, next_year, next_month = _nav_months(year, month)
     html = await render_template(
         "partials/calendar.html",
@@ -92,6 +96,8 @@ async def calendar_month(year: int, month: int):
         month_name=calendar.month_name[month],
         weeks=weeks,
         active_day=state.get("active_date", datetime.utcnow().date().isoformat()),
+        today=datetime.utcnow().date().isoformat(),
+        active_days=active_days,
         prev_year=prev_year,
         prev_month=prev_month,
         next_year=next_year,
