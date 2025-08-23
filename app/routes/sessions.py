@@ -21,16 +21,16 @@ async def index():
     if not current_date:
         current_date = datetime.utcnow().date().isoformat()
     await db.update_state(uid, active_date=current_date)
-    return redirect(url_for("sessions.session", session_id=current_date), code=302)
+    return redirect(url_for("sessions.session", date=current_date), code=302)
 
 
-@sessions_bp.route("/s/<session_id>")
+@sessions_bp.route("/d/<date>")
 @login_required
-async def session(session_id):
+async def session(date):
     user = await get_current_user()
     uid = user["id"]
     dek = get_dek()
-    history = await db.get_history(uid, session_id, dek)
+    history = await db.get_history(uid, date, dek)
     pending_msg_id = None
     if history and history[-1]["role"] == "user":
         pending_msg_id = history[-1]["id"]
@@ -38,12 +38,12 @@ async def session(session_id):
         "index.html",
         user=user,
         history=history,
-        day=session_id,
+        day=date,
         pending_msg_id=pending_msg_id,
         content_template="partials/chat.html",
     )
     resp = await make_response(html)
-    await db.update_state(uid, active_date=session_id)
+    await db.update_state(uid, active_date=date)
     return resp
 
 

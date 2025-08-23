@@ -26,19 +26,19 @@ chat_bp = Blueprint("chat", __name__)
 llm = LLMEngine()
 
 
-async def render_chat(session_id, oob=False):
+async def render_chat(date, oob=False):
     user = await get_current_user()
     uid = user["id"]
 
     dek = get_dek()
-    history = await db.get_history(uid, session_id, dek)
+    history = await db.get_history(uid, date, dek)
     pending_msg_id = None
     if history and history[-1]["role"] == "user":
         pending_msg_id = history[-1]["id"]
 
     html = await render_template(
         "partials/chat.html",
-        day=session_id,
+        day=date,
         history=history,
         oob=oob,
         pending_msg_id=pending_msg_id,
@@ -48,18 +48,18 @@ async def render_chat(session_id, oob=False):
     return html
 
 
-@chat_bp.route("/c/<session_id>")
+@chat_bp.route("/c/<date>")
 @login_required
-async def chat_htmx(session_id):
+async def chat_htmx(date):
     target = request.args.get("target")
-    html = await render_chat(session_id, False)
+    html = await render_chat(date, False)
     resp = await make_response(html, 200)
-    push_url = url_for("sessions.session", session_id=session_id)
+    push_url = url_for("sessions.session", date=date)
     if target:
         push_url = f"{push_url}?target={target}"
     resp.headers["HX-Push-Url"] = push_url
     user = await get_current_user()
-    await db.update_state(user["id"], active_date=session_id)
+    await db.update_state(user["id"], active_date=date)
     return resp
 
 
@@ -100,7 +100,10 @@ async def meta_chips(msg_id: str):
         abort(404, description="message not found")
     tags = await db.get_tags_for_message(user["id"], msg_id, dek)
     html = await render_template(
-        "partials/meta_chips_wrapper.html", msg_id=msg_id, tags=tags, hidden=True
+        "partials/meta_chips_wrapper.html",
+        msg_id=msg_id,
+        tags=tags,
+        hidden=True,
     )
     return html
 
@@ -135,7 +138,7 @@ class PendingResponse:
         self,
         user_msg_id: str,
         uid: str,
-        session_id: str,
+        date: str,
         history: list[dict],
         dek: bytes,
         params: dict | None = None,
@@ -335,9 +338,9 @@ class PendingResponse:
                     break
 
 
-@chat_bp.route("/c/<session_id>/message", methods=["POST"])
+@chat_bp.route("/c/<date>/message", methods=["POST"])
 @login_required
-async def send_message(session_id):
+async def send_message(date):
     form = await request.form
     user_text = form.get("message", "").strip()
     user = await get_current_user()
@@ -360,7 +363,7 @@ async def send_message(session_id):
         "partials/placeholder.html",
         user_text=user_text,
         user_msg_id=user_msg_id,
-        day=session_id,
+        day=date,
     )
 
 
@@ -368,9 +371,9 @@ def replace_newline(s: str) -> str:
     return re.sub(r"\r\n|\r|\n", "[newline]", s)
 
 
-@chat_bp.route("/c/<session_id>/stream/<user_msg_id>")
+@chat_bp.route("/c/<date>/stream/<user_msg_id>")
 @login_required
-async def sse_reply(user_msg_id: str, session_id: str):
+async def sse_reply(user_msg_id: str, date: str):
     """Stream the assistant's reply for a given user message.
 
     The ``user_msg_id`` corresponds to the user's prompt message. When the
@@ -381,7 +384,7 @@ async def sse_reply(user_msg_id: str, session_id: str):
     user = await get_current_user()
     uid = user["id"]
     dek = get_dek()
-    history = await db.get_history(uid, session_id, dek)
+    history = await db.get_history(uid, date, dek)
 
     if not history:
         current_app.logger.warning("History not found for user message %s", user_msg_id)
@@ -442,7 +445,7 @@ async def sse_reply(user_msg_id: str, session_id: str):
     pending_response = pending_responses.get(user_msg_id)
     if not pending_response:
         pending_response = PendingResponse(
-            user_msg_id, uid, session_id, history, dek, params
+            user_msg_id, uid, date, history, dek, params
         )
         pending_responses[user_msg_id] = pending_response
 

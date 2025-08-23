@@ -1,6 +1,6 @@
 <li class="{{ item.css_class }}" role="option">
-  <a href="{{ url_for('sessions.session', session_id=item.created_at[:10]) }}?target=msg-{{ item.id }}"
-     hx-get="{{ url_for('chat.chat_htmx', session_id=item.created_at[:10]) }}?target=msg-{{ item.id }}"
+  <a href="{{ url_for('sessions.session', date=item.created_at[:10]) }}?target=msg-{{ item.id }}"
+     hx-get="{{ url_for('chat.chat_htmx', date=item.created_at[:10]) }}?target=msg-{{ item.id }}"
      hx-target="#content-wrapper"
      hx-swap="outerHTML"
      data-date="{{ item.created_at[:10] }}"

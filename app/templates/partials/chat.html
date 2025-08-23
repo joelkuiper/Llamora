@@ -11,7 +11,7 @@
       <div id="msg-{{ msg['id'] }}" class="message {{ 'assistant' if msg['role'] != 'user' else 'user'}}">
         <div class="markdown-body">{{ msg.message }}</div>
         {% if msg['role'] != 'user' %}
-        {{ render_meta_chips(msg['id'], msg.get('tags', [])) }}
+        {{ render_meta_chips(msg['id'], msg.get('tags', []), day) }}
         {% endif %}
       </div>
       {% endfor %}
@@ -22,7 +22,7 @@
     </div>
 
   <form id="message-form"
-        hx-post="{{ url_for('chat.send_message', session_id=day) }}"
+        hx-post="{{ url_for('chat.send_message', date=day) }}"
         hx-target="#chat"
         hx-on::after-request="this.reset()"
         hx-swap="beforeend">

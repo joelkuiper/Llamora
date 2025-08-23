@@ -216,7 +216,7 @@ async def login():
                     active_date = state.get("active_date")
                     if active_date:
                         redirect_url = url_for(
-                            "sessions.session", session_id=active_date
+                            "sessions.session", date=active_date
                         )
                     else:
                         redirect_url = "/"
