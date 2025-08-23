@@ -11,12 +11,6 @@
 .calendar-popover {
   --glass: rgba(255,255,255,0.72);
 
-  background: var(--glass, var(--color-bg));
-  backdrop-filter: blur(10px) saturate(140%);
-  -webkit-backdrop-filter: blur(10px) saturate(140%);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--raised-shadow);
   color: var(--color-text);
   max-width: 20rem;
   padding: 12px;
@@ -25,7 +19,6 @@
   transform-origin: top center;
   transition:
     opacity .18s ease,
-    transform .18s ease,
     background .18s ease;
   z-index: 1100;
 }
@@ -42,9 +35,17 @@
   right: -1.1rem;
 }
 
-/* --- Calendar container --- */
 #calendar {
-  text-align: center;
+  width: 20rem;                /* keeps it compact and tidy */
+  max-width: 90vw;
+  color: var(--color-text);
+  background: var(--glass, var(--color-bg));
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--raised-shadow);
+
 }
 
 /* Top bar */
@@ -56,117 +57,108 @@
   margin-bottom: .5rem;
 }
 
-#calendar .month-title {
+#calendar .calendar-nav h2 {
   margin: 0;
-  font-size: .95rem;
+  text-align: center;
   font-weight: 700;
   letter-spacing: .2px;
+  font-size: 1rem;             /* compact, readable */
 }
 
-/* Nav buttons */
-.calendar-btn {
+.cal-nav-btn {
   width: 2rem;
   height: 2rem;
-  border-radius: var(--radius-md);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md, 10px);
   border: 1px solid var(--border);
   background: var(--color-bg);
   box-shadow: var(--inset-shadow);
   cursor: pointer;
-  transition:
-    box-shadow .15s ease,
-    border-color .15s ease,
-    transform .06s ease;
+  transition: box-shadow .12s ease, border-color .12s ease, transform .06s ease;
 }
 
-.calendar-btn:hover {
+.cal-nav-btn:hover {
   border-color: var(--accent);
   box-shadow: var(--raised-shadow), 0 0 0 2px var(--accent-10);
 }
 
-.calendar-btn:active { transform: translateY(1px); }
+.cal-nav-btn:active { transform: translateY(1px); }
 
-.calendar-btn:focus-visible {
+.cal-nav-btn:focus-visible {
   outline: none;
   box-shadow: var(--raised-shadow), 0 0 0 3px var(--accent-20);
 }
 
-/* --- Grid --- */
-.calendar-table {
+/* Grid table */
+#calendar .calendar-table {
   width: 100%;
-  border-collapse: collapse;
   table-layout: fixed;
+  border-collapse: collapse;
   font-size: .95rem;
 }
 
-.calendar-table th {
+#calendar .calendar-table thead th {
   font-weight: 600;
-  padding: .25rem 0;
+  padding: .35rem 0 .25rem;
   color: var(--color-bot-text);
+  text-align: center;
 }
 
-.calendar-table td {
-  padding: .2rem;
-  height: 2.4rem;
+#calendar .calendar-table tbody td {
+  padding: 6px;
+  height: 40px;                /* stable rhythm */
+  text-align: center;
 }
 
-.calendar-table td.empty { visibility: hidden; }
+#calendar .calendar-table td.empty { visibility: hidden; }
 
-/* Day cell as a pill */
-.calendar-day {
+/* Day “pill” (the <a> inside each <td>) */
+#calendar .calendar-table td a {
   display: grid;
   place-items: center;
-  height: 2.2rem;
-  border-radius: var(--radius-sm);
+  height: 36px;
+  border-radius: 10px;
   background: var(--color-bg);
   border: 1px solid var(--border);
   box-shadow: var(--inset-shadow);
-  text-decoration: none;
-  color: inherit;
-  transition:
-    background .15s ease,
-    box-shadow .15s ease,
-    border-color .15s ease,
-    transform .06s ease;
+  text-decoration: none;       /* remove blue underline */
+  color: var(--color-text);    /* remove default link blue */
+  transition: box-shadow .12s ease, border-color .12s ease, transform .06s ease, background .12s ease;
+  user-select: none;
 }
 
-.calendar-day:hover {
+#calendar .calendar-table td a:hover {
   border-color: var(--accent);
   box-shadow: var(--raised-shadow), 0 0 0 2px var(--accent-10);
-  background: linear-gradient(0deg, rgba(59,167,246,0.12), rgba(59,167,246,0.08)) var(--color-bg);
+  background: linear-gradient(0deg, rgba(59,167,246,0.10), rgba(59,167,246,0.06)) var(--color-bg);
 }
 
-.calendar-day:active { transform: translateY(1px); }
+#calendar .calendar-table td a:active { transform: translateY(1px); }
 
-.calendar-day:focus-visible {
+#calendar .calendar-table td a:focus-visible {
   outline: none;
   box-shadow: var(--raised-shadow), 0 0 0 3px var(--accent-20);
 }
 
-/* Selected day */
-td.active .calendar-day {
+/* Selected day (your template adds .active on the <td>) */
+#calendar .calendar-table td.active a {
   border-color: var(--accent);
   box-shadow: var(--raised-shadow), 0 0 0 2px var(--accent-20);
+  font-weight: 700;
 }
 
-/* Optional: today + has-entry states (add these classes server-side) */
-.calendar-day.is-today {
+/* Optional helpers (add these classes server-side if you want) */
+#calendar .calendar-table td.is-today a {
   border-color: var(--accent-20);
   box-shadow: var(--raised-shadow), 0 0 0 2px var(--accent-05);
 }
 
-.calendar-day.has-entry::after {
+#calendar .calendar-table td.has-entry a::after {
   content: "";
-  width: 6px;
-  height: 6px;
+  width: 6px; height: 6px;
   border-radius: 999px;
   background: var(--accent);
   opacity: .9;
   margin-top: 2px;
-}
-
-/* Spacing tweaks for small screens */
-@media (max-width: 420px) {
-  .calendar-popover { max-width: 18rem; }
-  .calendar-table td { height: 2.1rem; padding: .15rem; }
-  .calendar-day { height: 2rem; }
 }

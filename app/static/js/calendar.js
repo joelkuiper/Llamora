@@ -4,6 +4,14 @@ function initCalendarPopover() {
   if (!btn || !pop) return;
   let instance;
 
+  const update = () => {
+    pop.style.transition = 'none';
+    instance.update();
+    requestAnimationFrame(() => {
+      pop.style.transition = '';
+    });
+  };
+
   const hide = () => {
     if (pop.hidden) return;
     pop.classList.remove('tp-open');
@@ -32,10 +40,10 @@ function initCalendarPopover() {
       return;
     }
     pop.hidden = false;
-    requestAnimationFrame(() => pop.classList.add('tp-open'));
     btn.classList.add('active');
     instance = instance || Popper.createPopper(btn, pop, { placement: 'bottom' });
-    instance.update();
+    update();
+    requestAnimationFrame(() => pop.classList.add('tp-open'));
     if (!pop.dataset.loaded) {
       htmx.trigger(pop, 'calendar-popover:show');
       pop.dataset.loaded = '1';
@@ -48,6 +56,12 @@ function initCalendarPopover() {
     if (e.target.closest('.overlay-close')) {
       e.preventDefault();
       hide();
+    }
+  });
+
+  pop.addEventListener('htmx:afterSwap', (e) => {
+    if (e.target === pop && instance) {
+      update();
     }
   });
 }
