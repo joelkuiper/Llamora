@@ -25,9 +25,10 @@ async def index():
     user = await get_current_user()
     uid = user["id"]
     state = await db.get_state(uid)
-    current_date = state.get("active_date")
-    if not current_date:
-        current_date = datetime.utcnow().date().isoformat()
+    today = datetime.utcnow().date().isoformat()
+    current_date = state.get("active_date", today)
+    if current_date != today:
+        current_date = today
     await db.update_state(uid, active_date=current_date)
     return redirect(url_for("days.day", date=current_date), code=302)
 

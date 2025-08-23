@@ -13,12 +13,29 @@
 #calendar-control > * { pointer-events: auto; }
 
 
-.calendar-popover { position: relative; }
+.calendar-popover {
+  position: relative;
+  opacity: 0;
+  transform: translateY(-0.25rem) scale(0.95);
+  transition: opacity .22s ease, transform .22s ease;
+}
 
-.calendar-popover.tp-open { opacity: 1; transform: translateY(0) scale(1); }
+.calendar-popover.tp-open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
 
 /* Close pill */
-.calendar-popover .overlay-close { position: absolute; top: -1.1rem; right: -1.1rem; }
+.calendar-popover .overlay-close {
+  position: absolute;
+  top: -0.1rem;
+  right: -10.3rem;
+  z-index: 9999;
+}
+
+#calendar-label {
+  margin-left: var(--spacing-sm);
+}
 
 
 .cal-nav-btn {
@@ -112,7 +129,7 @@
 
     td.is-today a {
       background: rgba(59,167,246,0.06);
-      border-color: var(--accent-20);
+      border-color: var(--accent);
       box-shadow: 0 0 0 2px var(--accent-10);
     }
 

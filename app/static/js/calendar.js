@@ -29,7 +29,7 @@ function initCalendarPopover() {
   };
 
   const outside = (e) => {
-    if (!pop.contains(e.target) && e.target !== btn) hide();
+    if (!pop.contains(e.target) && !btn.contains(e.target)) hide();
   };
 
   const onKey = (e) => {
