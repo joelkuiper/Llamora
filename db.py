@@ -124,18 +124,9 @@ class LocalDB:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
 
-                CREATE TABLE IF NOT EXISTS sessions (
-                    id TEXT PRIMARY KEY,
-                    ulid TEXT UNIQUE NOT NULL,
-                    user_id TEXT NOT NULL,
-                    name TEXT DEFAULT 'Untitled',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                );
-
                 CREATE TABLE IF NOT EXISTS messages (
                     id TEXT PRIMARY KEY,
-                    session_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
                     role TEXT NOT NULL,
                     reply_to TEXT,
                     nonce BLOB NOT NULL,
@@ -143,7 +134,7 @@ class LocalDB:
                     alg BLOB NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     created_date TEXT DEFAULT (date('now')),
-                    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 );
 
                 CREATE TABLE IF NOT EXISTS vectors (
@@ -173,15 +164,11 @@ class LocalDB:
                     user_id TEXT NOT NULL,
                     tag_hash BLOB(32) NOT NULL,
                     message_id TEXT NOT NULL,
-                    session_id TEXT NOT NULL,
                     ulid TEXT NOT NULL,
                     PRIMARY KEY(user_id, tag_hash, message_id)
                 );
 
-                CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
-                CREATE INDEX IF NOT EXISTS idx_sessions_user_id_created ON sessions(user_id, ulid);
-                CREATE INDEX IF NOT EXISTS idx_sessions_user_id_id ON sessions(user_id, id);
-                CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages(session_id);
+                CREATE INDEX IF NOT EXISTS idx_messages_user_date ON messages(user_id, created_date);
                 CREATE INDEX IF NOT EXISTS idx_messages_reply_to ON messages(reply_to);
                 CREATE INDEX IF NOT EXISTS idx_vectors_user_id ON vectors(user_id);
                 CREATE INDEX IF NOT EXISTS idx_vectors_id ON vectors(id);
@@ -279,39 +266,6 @@ class LocalDB:
                 (state_json, user_id),
             )
 
-    async def _owns_session(self, conn, user_id, session_id):
-        cursor = await conn.execute(
-            "SELECT * FROM sessions WHERE id = ? AND user_id = ? LIMIT 1",
-            (session_id, user_id),
-        )
-        row = await cursor.fetchone()
-        return dict(row) if row else None
-
-    async def get_session(self, user_id, session_id):
-        async with self.pool.connection() as conn:
-            return await self._owns_session(conn, user_id, session_id)
-
-    async def rename_session(self, user_id, session_id, name):
-        async with self.pool.connection() as conn:
-            if not await self._owns_session(conn, user_id, session_id):
-                raise ValueError("User does not own session")
-
-            await self.with_transaction(
-                conn,
-                conn.execute,
-                "UPDATE sessions SET name = ? WHERE id = ? AND user_id = ?",
-                (name, session_id, user_id),
-            )
-
-    async def get_latest_session(self, user_id):
-        async with self.pool.connection() as conn:
-            cursor = await conn.execute(
-                "SELECT id FROM sessions WHERE user_id = ? ORDER BY ulid DESC LIMIT 1",
-                (user_id,),
-            )
-            row = await cursor.fetchone()
-        return row["id"] if row else None
-
     async def update_password_wrap(
         self, user_id, password_hash, pw_salt, pw_nonce, pw_cipher
     ):
@@ -344,28 +298,23 @@ class LocalDB:
     async def append_message(
         self,
         user_id,
-        session_id,
         role,
         message,
         dek,
         meta=None,
         reply_to: str | None = None,
     ):
-        async with self.pool.connection() as conn:
-            if not await self._owns_session(conn, user_id, session_id):
-                raise ValueError("User does not own session")
-
         ulid = str(ULID())
         record = {"message": message, "meta": meta or {}}
         plaintext = orjson.dumps(record).decode()
-        nonce, ct, alg = encrypt_message(dek, user_id, session_id, ulid, plaintext)
+        nonce, ct, alg = encrypt_message(dek, user_id, ulid, plaintext)
 
         async with self.pool.connection() as conn:
             await self.with_transaction(
                 conn,
                 conn.execute,
-                "INSERT INTO messages (id, session_id, role, reply_to, nonce, ciphertext, alg) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (ulid, session_id, role, reply_to, nonce, ct, alg),
+                "INSERT INTO messages (id, user_id, role, reply_to, nonce, ciphertext, alg) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (ulid, user_id, role, reply_to, nonce, ct, alg),
             )
 
         msg_id = ulid
@@ -373,7 +322,7 @@ class LocalDB:
         if self.search_api:
             asyncio.create_task(
                 self.search_api.on_message_appended(
-                    user_id, session_id, msg_id, message, dek
+                    user_id, msg_id, message, dek
                 )
             )
 
@@ -405,14 +354,14 @@ class LocalDB:
         return tag_hash
 
     async def xref_tag_message(
-        self, user_id: str, tag_hash: bytes, message_id: str, session_id: str
+        self, user_id: str, tag_hash: bytes, message_id: str
     ) -> None:
         async with self.pool.connection() as conn:
 
             async def _tx():
                 cursor = await conn.execute(
-                    "INSERT OR IGNORE INTO tag_message_xref (user_id, tag_hash, message_id, session_id, ulid) VALUES (?, ?, ?, ?, ?)",
-                    (user_id, tag_hash, message_id, session_id, str(ULID())),
+                    "INSERT OR IGNORE INTO tag_message_xref (user_id, tag_hash, message_id, ulid) VALUES (?, ?, ?, ?)",
+                    (user_id, tag_hash, message_id, str(ULID())),
                 )
                 if cursor.rowcount:
                     await conn.execute(
@@ -440,14 +389,14 @@ class LocalDB:
 
             await self.with_transaction(conn, _tx)
 
-    async def get_message_session(self, user_id: str, message_id: str) -> str | None:
+    async def message_exists(self, user_id: str, message_id: str) -> bool:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
-                "SELECT m.session_id FROM messages m JOIN sessions s ON m.session_id = s.id WHERE m.id = ? AND s.user_id = ?",
+                "SELECT 1 FROM messages WHERE id = ? AND user_id = ?",
                 (message_id, user_id),
             )
             row = await cursor.fetchone()
-        return row["session_id"] if row else None
+        return bool(row)
 
     async def get_tags_for_message(self, user_id: str, message_id: str, dek: bytes):
         async with self.pool.connection() as conn:
@@ -537,11 +486,11 @@ class LocalDB:
             mapping.setdefault(row["message_id"], set()).add(row["tag_hash"])
         return mapping
 
-    async def store_vector(self, msg_id, user_id, session_id, vec, dek):
+    async def store_vector(self, msg_id, user_id, vec, dek):
         vec_arr = np.asarray(vec, dtype=np.float32)
         dim = vec_arr.shape[0]
         nonce, ct, alg = encrypt_vector(
-            dek, user_id, msg_id, vec_arr.tobytes(), session_id=session_id
+            dek, user_id, msg_id, vec_arr.tobytes()
         )
         async with self.pool.connection() as conn:
             await self.with_transaction(
@@ -558,11 +507,9 @@ class LocalDB:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT v.id, v.dim, v.nonce, v.ciphertext, v.alg, m.session_id, m.created_at
+                SELECT v.id, v.dim, v.nonce, v.ciphertext, v.alg, m.created_at
                 FROM vectors v
-                JOIN messages m ON v.id = m.id
-                JOIN sessions s ON m.session_id = s.id
-                WHERE s.user_id = ?
+                JOIN messages m ON v.id = m.id AND m.user_id = ?
                 ORDER BY m.id DESC
                 LIMIT ?
                 """,
@@ -579,13 +526,11 @@ class LocalDB:
                 row["nonce"],
                 row["ciphertext"],
                 row["alg"],
-                session_id=row["session_id"],
             )
             vec = np.frombuffer(vec_bytes, dtype=np.float32).reshape(row["dim"])
             vectors.append(
                 {
                     "id": row["id"],
-                    "session_id": row["session_id"],
                     "created_at": row["created_at"],
                     "vec": vec,
                 }
@@ -596,10 +541,9 @@ class LocalDB:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT m.id, m.session_id, m.role, m.nonce, m.ciphertext, m.alg, m.created_at
+                SELECT m.id, m.role, m.nonce, m.ciphertext, m.alg, m.created_at
                 FROM messages m
-                JOIN sessions s ON m.session_id = s.id
-                WHERE s.user_id = ?
+                WHERE m.user_id = ?
                 ORDER BY m.id DESC
                 LIMIT ?
                 """,
@@ -612,7 +556,6 @@ class LocalDB:
             record_json = decrypt_message(
                 dek,
                 user_id,
-                row["session_id"],
                 row["id"],
                 row["nonce"],
                 row["ciphertext"],
@@ -622,7 +565,6 @@ class LocalDB:
             messages.append(
                 {
                     "id": row["id"],
-                    "session_id": row["session_id"],
                     "role": row["role"],
                     "created_at": row["created_at"],
                     "message": rec.get("message", ""),
@@ -637,11 +579,10 @@ class LocalDB:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT v.id, v.dim, v.nonce, v.ciphertext, v.alg, m.session_id, m.created_at
+                SELECT v.id, v.dim, v.nonce, v.ciphertext, v.alg, m.created_at
                 FROM vectors v
-                JOIN messages m ON v.id = m.id
-                JOIN sessions s ON m.session_id = s.id
-                WHERE s.user_id = ? AND m.id < ?
+                JOIN messages m ON v.id = m.id AND m.user_id = ?
+                WHERE m.id < ?
                 ORDER BY m.id DESC
                 LIMIT ?
                 """,
@@ -658,13 +599,11 @@ class LocalDB:
                 row["nonce"],
                 row["ciphertext"],
                 row["alg"],
-                session_id=row["session_id"],
             )
             vec = np.frombuffer(vec_bytes, dtype=np.float32).reshape(row["dim"])
             vectors.append(
                 {
                     "id": row["id"],
-                    "session_id": row["session_id"],
                     "created_at": row["created_at"],
                     "vec": vec,
                 }
@@ -677,10 +616,9 @@ class LocalDB:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT m.id, m.session_id, m.role, m.nonce, m.ciphertext, m.alg, m.created_at
+                SELECT m.id, m.role, m.nonce, m.ciphertext, m.alg, m.created_at
                 FROM messages m
-                JOIN sessions s ON m.session_id = s.id
-                WHERE s.user_id = ? AND m.id < ?
+                WHERE m.user_id = ? AND m.id < ?
                 ORDER BY m.id DESC
                 LIMIT ?
                 """,
@@ -693,7 +631,6 @@ class LocalDB:
             record_json = decrypt_message(
                 dek,
                 user_id,
-                row["session_id"],
                 row["id"],
                 row["nonce"],
                 row["ciphertext"],
@@ -703,7 +640,6 @@ class LocalDB:
             messages.append(
                 {
                     "id": row["id"],
-                    "session_id": row["session_id"],
                     "role": row["role"],
                     "created_at": row["created_at"],
                     "message": rec.get("message", ""),
@@ -718,8 +654,7 @@ class LocalDB:
                 """
                 SELECT m.id
                 FROM messages m
-                JOIN sessions s ON m.session_id = s.id
-                WHERE s.user_id = ?
+                WHERE m.user_id = ?
                 ORDER BY m.id DESC
                 LIMIT 1
                 """,
@@ -735,10 +670,9 @@ class LocalDB:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 f"""
-                SELECT m.id, m.session_id, m.created_at, m.role, m.nonce, m.ciphertext, m.alg
+                SELECT m.id, m.created_at, m.role, m.nonce, m.ciphertext, m.alg
                 FROM messages m
-                JOIN sessions s ON m.session_id = s.id
-                WHERE s.user_id = ? AND m.id IN ({placeholders})
+                WHERE m.user_id = ? AND m.id IN ({placeholders})
                 """,
                 (user_id, *ids),
             )
@@ -749,7 +683,6 @@ class LocalDB:
             record_json = decrypt_message(
                 dek,
                 user_id,
-                row["session_id"],
                 row["id"],
                 row["nonce"],
                 row["ciphertext"],
@@ -759,7 +692,6 @@ class LocalDB:
             messages.append(
                 {
                     "id": row["id"],
-                    "session_id": row["session_id"],
                     "created_at": row["created_at"],
                     "role": row["role"],
                     "message": rec.get("message", ""),
@@ -768,35 +700,8 @@ class LocalDB:
             )
         return messages
 
-    async def create_session(self, user_id):
-        session_id = secrets.token_urlsafe(32)
-        ulid = str(ULID())
+    async def get_history(self, user_id, created_date, dek):
         async with self.pool.connection() as conn:
-            await self.with_transaction(
-                conn,
-                conn.execute,
-                "INSERT INTO sessions (id, ulid, user_id) VALUES (?, ?, ?)",
-                (session_id, ulid, user_id),
-            )
-        return session_id
-
-    async def delete_session(self, user_id, session_id):
-        async with self.pool.connection() as conn:
-            if not await self._owns_session(conn, user_id, session_id):
-                raise ValueError("User does not own session")
-
-            await self.with_transaction(
-                conn,
-                conn.execute,
-                "DELETE FROM sessions WHERE id = ? AND user_id = ?",
-                (session_id, user_id),
-            )
-
-    async def get_history(self, user_id, session_id, dek):
-        async with self.pool.connection() as conn:
-            if not await self._owns_session(conn, user_id, session_id):
-                raise ValueError("User does not own session")
-
             cursor = await conn.execute(
                 """
                 SELECT m.id, m.role, m.reply_to, m.nonce, m.ciphertext, m.alg AS msg_alg,
@@ -805,10 +710,10 @@ class LocalDB:
                 FROM messages m
                 LEFT JOIN tag_message_xref x ON x.message_id = m.id AND x.user_id = ?
                 LEFT JOIN tags t ON t.user_id = x.user_id AND t.tag_hash = x.tag_hash
-                WHERE m.session_id = ?
+                WHERE m.user_id = ? AND m.created_date = ?
                 ORDER BY m.id ASC, x.ulid ASC
                 """,
-                (user_id, session_id),
+                (user_id, user_id, created_date),
             )
             rows = await cursor.fetchall()
 
@@ -820,7 +725,6 @@ class LocalDB:
                 record_json = decrypt_message(
                     dek,
                     user_id,
-                    session_id,
                     msg_id,
                     row["nonce"],
                     row["ciphertext"],
@@ -849,40 +753,3 @@ class LocalDB:
                     {"name": tag_name, "hash": row["tag_hash"].hex()}
                 )
         return history
-
-    async def get_all_sessions(self, user_id):
-        async with self.pool.connection() as conn:
-            cursor = await conn.execute(
-                "SELECT id, name, created_at FROM sessions WHERE user_id = ? ORDER BY ulid DESC",
-                (user_id,),
-            )
-            rows = await cursor.fetchall()
-        return [dict(row) for row in rows]
-
-    async def get_adjacent_session(self, user_id, session_id, direction="next"):
-        op = ">" if direction == "next" else "<"
-        order = "ASC" if direction == "next" else "DESC"
-        async with self.pool.connection() as conn:
-            current_cursor = await conn.execute(
-                "SELECT ulid FROM sessions WHERE id = ? AND user_id = ?",
-                (session_id, user_id),
-            )
-            current = await current_cursor.fetchone()
-
-            if current:
-                ulid = current["ulid"]
-                cursor = await conn.execute(
-                    f"""
-                    SELECT id FROM sessions
-                    WHERE user_id = ? AND ulid {op} ?
-                    ORDER BY ulid {order}
-                    LIMIT 1
-                    """,
-                    (user_id, ulid),
-                )
-                row = await cursor.fetchone()
-            else:
-                row = None
-        if not current:
-            return None
-        return row["id"] if row else None

@@ -55,10 +55,10 @@ def unwrap_key(ct: bytes, salt: bytes, nonce: bytes, secret: str) -> bytes:
 
 
 def encrypt_message(
-    dek: bytes, user_id: str, session_id: str, msg_id: str, plaintext: str
+    dek: bytes, user_id: str, msg_id: str, plaintext: str
 ):
     nonce = utils.random(24)
-    aad = f"{user_id}|{session_id}|{msg_id}|{ALG.decode()}".encode("utf-8")
+    aad = f"{user_id}|{msg_id}|{ALG.decode()}".encode("utf-8")
     ct = crypto_aead_xchacha20poly1305_ietf_encrypt(
         plaintext.encode("utf-8"), aad, nonce, dek
     )
@@ -68,19 +68,18 @@ def encrypt_message(
 def decrypt_message(
     dek: bytes,
     user_id: str,
-    session_id: str,
     msg_id: str,
     nonce: bytes,
     ct: bytes,
     alg: bytes,
 ) -> str:
-    aad = f"{user_id}|{session_id}|{msg_id}|{alg.decode()}".encode("utf-8")
+    aad = f"{user_id}|{msg_id}|{alg.decode()}".encode("utf-8")
     pt = crypto_aead_xchacha20poly1305_ietf_decrypt(ct, aad, nonce, dek)
     return pt.decode("utf-8")
 
 
 def encrypt_vector(
-    dek: bytes, user_id: str, msg_id: str, vec: bytes, session_id: str | None = None
+    dek: bytes, user_id: str, msg_id: str, vec: bytes
 ):
     """Encrypt a vector embedding for storage.
 
@@ -90,7 +89,7 @@ def encrypt_vector(
     """
 
     nonce = utils.random(24)
-    aad = f"{user_id}|{session_id or ''}|{msg_id}|vector|{ALG.decode()}".encode("utf-8")
+    aad = f"{user_id}|{msg_id}|vector|{ALG.decode()}".encode("utf-8")
     ct = crypto_aead_xchacha20poly1305_ietf_encrypt(vec, aad, nonce, dek)
     return nonce, ct, ALG
 
@@ -102,9 +101,8 @@ def decrypt_vector(
     nonce: bytes,
     ct: bytes,
     alg: bytes,
-    session_id: str | None = None,
 ) -> bytes:
     """Decrypt an encrypted vector embedding."""
 
-    aad = f"{user_id}|{session_id or ''}|{msg_id}|vector|{alg.decode()}".encode("utf-8")
+    aad = f"{user_id}|{msg_id}|vector|{alg.decode()}".encode("utf-8")
     return crypto_aead_xchacha20poly1305_ietf_decrypt(ct, aad, nonce, dek)

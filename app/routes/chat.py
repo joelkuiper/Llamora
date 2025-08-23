@@ -29,11 +29,6 @@ llm = LLMEngine()
 async def render_chat(session_id, oob=False):
     user = await get_current_user()
     uid = user["id"]
-    session = await db.get_session(uid, session_id)
-
-    if not session:
-        current_app.logger.warning("Session not found for user")
-        abort(404, description="Session not found.")
 
     dek = get_dek()
     history = await db.get_history(uid, session_id, dek)
@@ -43,7 +38,7 @@ async def render_chat(session_id, oob=False):
 
     html = await render_template(
         "partials/chat.html",
-        session=session,
+        session={"id": session_id, "name": session_id},
         history=history,
         oob=oob,
         pending_msg_id=pending_msg_id,
@@ -64,7 +59,7 @@ async def chat_htmx(session_id):
         push_url = f"{push_url}?target={target}"
     resp.headers["HX-Push-Url"] = push_url
     user = await get_current_user()
-    await db.update_state(user["id"], active_session=session_id)
+    await db.update_state(user["id"], active_date=session_id)
     return resp
 
 
@@ -101,8 +96,7 @@ async def stop_generation(user_msg_id: str):
 async def meta_chips(msg_id: str):
     user = await get_current_user()
     dek = get_dek()
-    session_id = await db.get_message_session(user["id"], msg_id)
-    if not session_id:
+    if not await db.message_exists(user["id"], msg_id):
         abort(404, description="message not found")
     tags = await db.get_tags_for_message(user["id"], msg_id, dek)
     html = await render_template(
@@ -158,13 +152,12 @@ class PendingResponse:
         self.assistant_msg_id: str | None = None
         current_app.logger.debug("Starting generation for user message %s", user_msg_id)
         self._task = asyncio.create_task(
-            self._generate(uid, session_id, history, params)
+            self._generate(uid, history, params)
         )
 
     async def _generate(
         self,
         uid: str,
-        session_id: str,
         history: list[dict],
         params: dict | None,
     ):
@@ -255,7 +248,6 @@ class PendingResponse:
                     try:
                         assistant_msg_id = await db.append_message(
                             uid,
-                            session_id,
                             "assistant",
                             full_response,
                             self.dek,
@@ -294,7 +286,6 @@ class PendingResponse:
                 try:
                     assistant_msg_id = await db.append_message(
                         uid,
-                        session_id,
                         "assistant",
                         full_response,
                         self.dek,
@@ -355,15 +346,11 @@ async def send_message(session_id):
 
     max_len = current_app.config["MAX_MESSAGE_LENGTH"]
 
-    if (
-        not user_text
-        or len(user_text) > max_len
-        or not await db.get_session(uid, session_id)
-    ):
-        abort(400, description="Message is empty, too long, or session is invalid.")
+    if not user_text or len(user_text) > max_len:
+        abort(400, description="Message is empty or too long.")
 
     try:
-        user_msg_id = await db.append_message(uid, session_id, "user", user_text, dek)
+        user_msg_id = await db.append_message(uid, "user", user_text, dek)
         current_app.logger.debug("Saved user message %s", user_msg_id)
     except Exception:
         current_app.logger.exception("Failed to save user message")

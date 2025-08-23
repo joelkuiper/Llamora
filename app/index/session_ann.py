@@ -100,14 +100,13 @@ class SessionIndexRegistry:
 
         texts = [m["message"] for m in msgs]
         ids = [m["id"] for m in msgs]
-        sess_ids = [m["session_id"] for m in msgs]
         vecs = embed_texts(texts).astype(np.float32)
         if idx is None:
             dim = vecs.shape[1]
             idx = SessionIndex(dim)
         idx.add_batch(ids, vecs)
-        for mid, sid, vec in zip(ids, sess_ids, vecs):
-            await self.db.store_vector(mid, user_id, sid, vec, dek)
+        for mid, vec in zip(ids, vecs):
+            await self.db.store_vector(mid, user_id, vec, dek)
         self.cursors[user_id] = msgs[-1]["id"]
         self.indexes[user_id] = idx
         return idx

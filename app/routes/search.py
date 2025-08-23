@@ -17,14 +17,11 @@ search_bp = Blueprint("search", __name__)
 @login_required
 async def search():
     query = request.args.get("q", "").strip()
-    session_id = request.args.get("session_id", "").strip()
-    logger.debug("Route search query='%s' session_id='%s'", query, session_id)
+    logger.debug("Route search query='%s'", query)
     results = []
     if query:
         user = await get_current_user()
         dek = get_dek()
         results = await search_api.search(user["id"], dek, query)
-        if session_id:
-            results = [r for r in results if r["session_id"] == session_id]
     logger.debug("Route returning %d results", len(results))
     return await render_template("partials/search_results.html", results=results)

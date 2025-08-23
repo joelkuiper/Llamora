@@ -100,7 +100,6 @@ class SearchAPI:
             results.append(
                 {
                     "id": row["id"],
-                    "session_id": row["session_id"],
                     "created_at": row["created_at"],
                     "role": row["role"],
                     "content": content,
@@ -242,7 +241,6 @@ class SearchAPI:
             results.append(
                 {
                     "id": cand["id"],
-                    "session_id": cand["session_id"],
                     "created_at": cand["created_at"],
                     "role": cand["role"],
                     "snippet": snippet,
@@ -285,16 +283,15 @@ class SearchAPI:
         return results
 
     async def on_message_appended(
-        self, user_id: str, session_id: str, msg_id: str, content: str, dek: bytes
+        self, user_id: str, msg_id: str, content: str, dek: bytes
     ):
         logger.debug(
-            "Appending message %s in session %s for user %s",
+            "Appending message %s for user %s",
             msg_id,
-            session_id,
             user_id,
         )
         vec = embed_texts([content]).astype(np.float32).reshape(1, -1)
-        await self.db.store_vector(msg_id, user_id, session_id, vec[0], dek)
+        await self.db.store_vector(msg_id, user_id, vec[0], dek)
         index = await self.registry.get_or_build(user_id, dek)
         if not index.contains(msg_id):
             index.add_batch([msg_id], vec)

@@ -1,9 +1,9 @@
 <li class="{{ item.css_class }}" role="option">
-  <a href="{{ url_for('sessions.session', session_id=item.session_id) }}?target=msg-{{ item.id }}"
-     hx-get="{{ url_for('chat.chat_htmx', session_id=item.session_id) }}?target=msg-{{ item.id }}"
+  <a href="{{ url_for('sessions.session', session_id=item.created_at[:10]) }}?target=msg-{{ item.id }}"
+     hx-get="{{ url_for('chat.chat_htmx', session_id=item.created_at[:10]) }}?target=msg-{{ item.id }}"
      hx-target="#content-wrapper"
      hx-swap="outerHTML"
-     data-session-id="{{ item.session_id }}"
+     data-session-id="{{ item.created_at[:10] }}"
      data-target="msg-{{ item.id }}"
      hx-trigger="click[!document.getElementById('chat') || document.getElementById('chat').dataset.sessionId !== this.dataset.sessionId]">
     <div class="search-result-meta">
