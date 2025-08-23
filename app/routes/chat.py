@@ -156,9 +156,7 @@ class PendingResponse:
         self.cancelled = False
         self.created_at = asyncio.get_event_loop().time()
         self.assistant_msg_id: str | None = None
-        current_app.logger.debug(
-            "Starting generation for user message %s", user_msg_id
-        )
+        current_app.logger.debug("Starting generation for user message %s", user_msg_id)
         self._task = asyncio.create_task(
             self._generate(uid, session_id, history, params)
         )
@@ -427,7 +425,9 @@ async def sse_reply(user_msg_id: str, session_id: str):
             # if meta:
             #     meta_str = orjson.dumps(meta).decode()
             #     yield f"event: meta\ndata: {escape(meta_str)}\n\n"
-            data = orjson.dumps({"assistant_msg_id": existing_assistant_msg["id"]}).decode()
+            data = orjson.dumps(
+                {"assistant_msg_id": existing_assistant_msg["id"]}
+            ).decode()
             yield f"event: done\ndata: {escape(data)}\n\n"
 
         return Response(saved_stream(), mimetype="text/event-stream")

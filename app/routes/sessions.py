@@ -176,6 +176,8 @@ async def delete_session(session_id):
 
         chat_html = await render_chat(new_session_id, oob=True)
         resp = await make_response(f"{chat_html}{sidebar_html}", 200)
-        resp.headers["HX-Push-Url"] = url_for("sessions.session", session_id=new_session_id)
+        resp.headers["HX-Push-Url"] = url_for(
+            "sessions.session", session_id=new_session_id
+        )
         await db.update_state(uid, active_session=new_session_id)
         return resp

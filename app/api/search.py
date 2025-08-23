@@ -229,9 +229,7 @@ class SearchAPI:
             status = (
                 "exact"
                 if exact
-                else (
-                    "token" if overlap > 0 else ("tag" if boost > 0 else "semantic")
-                )
+                else ("token" if overlap > 0 else ("tag" if boost > 0 else "semantic"))
             )
             css_class = f"search-result-item status-{status}"
             if poor:
@@ -273,7 +271,8 @@ class SearchAPI:
         boosts: dict[str, float] = {}
         if tokens:
             tag_hashes = [
-                hashlib.sha256(f"{user_id}:{t}".encode("utf-8")).digest() for t in tokens
+                hashlib.sha256(f"{user_id}:{t}".encode("utf-8")).digest()
+                for t in tokens
             ]
             message_ids = [c["id"] for c in candidates]
             tag_map = await self.db.get_messages_with_tag_hashes(

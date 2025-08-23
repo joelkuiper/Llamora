@@ -38,9 +38,7 @@ def format_recovery_code(code: str, group: int = 4) -> str:
 
 
 def derive_key(secret: bytes, salt: bytes) -> bytes:
-    return pwhash.argon2id.kdf(
-        32, secret, salt, opslimit=OPSLIMIT, memlimit=MEMLIMIT
-    )
+    return pwhash.argon2id.kdf(32, secret, salt, opslimit=OPSLIMIT, memlimit=MEMLIMIT)
 
 
 def wrap_key(key: bytes, secret: str):
@@ -68,7 +66,13 @@ def encrypt_message(
 
 
 def decrypt_message(
-    dek: bytes, user_id: str, session_id: str, msg_id: str, nonce: bytes, ct: bytes, alg: bytes
+    dek: bytes,
+    user_id: str,
+    session_id: str,
+    msg_id: str,
+    nonce: bytes,
+    ct: bytes,
+    alg: bytes,
 ) -> str:
     aad = f"{user_id}|{session_id}|{msg_id}|{alg.decode()}".encode("utf-8")
     pt = crypto_aead_xchacha20poly1305_ietf_decrypt(ct, aad, nonce, dek)
@@ -86,9 +90,7 @@ def encrypt_vector(
     """
 
     nonce = utils.random(24)
-    aad = (
-        f"{user_id}|{session_id or ''}|{msg_id}|vector|{ALG.decode()}".encode("utf-8")
-    )
+    aad = f"{user_id}|{session_id or ''}|{msg_id}|vector|{ALG.decode()}".encode("utf-8")
     ct = crypto_aead_xchacha20poly1305_ietf_encrypt(vec, aad, nonce, dek)
     return nonce, ct, ALG
 
@@ -104,7 +106,5 @@ def decrypt_vector(
 ) -> bytes:
     """Decrypt an encrypted vector embedding."""
 
-    aad = (
-        f"{user_id}|{session_id or ''}|{msg_id}|vector|{alg.decode()}".encode("utf-8")
-    )
+    aad = f"{user_id}|{session_id or ''}|{msg_id}|vector|{alg.decode()}".encode("utf-8")
     return crypto_aead_xchacha20poly1305_ietf_decrypt(ct, aad, nonce, dek)

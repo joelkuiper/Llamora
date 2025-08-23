@@ -40,9 +40,7 @@ class SessionIndex:
         if vecs.shape[0] != len(ids):
             raise ValueError("ids and vecs length mismatch")
 
-        pairs = [
-            (mid, vec) for mid, vec in zip(ids, vecs) if mid not in self.id_to_idx
-        ]
+        pairs = [(mid, vec) for mid, vec in zip(ids, vecs) if mid not in self.id_to_idx]
         if not pairs:
             return
 
