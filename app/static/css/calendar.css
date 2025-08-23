@@ -106,7 +106,7 @@
       border-radius: 999px;
       border: 1px solid var(--border);
       background: var(--color-bg);
-      box-shadow: var(--raised-shadow);
+      box-shadow: var(--subtle-raised-shadow);
       transition: background .12s, border-color .12s, box-shadow .12s, transform .06s;
 
       &:hover {
@@ -151,7 +151,7 @@
       position: relative;
       height: 36px;
       line-height: 36px;
-
+      box-shadow: var(--subtle-raised-shadow);
       background: var(--color-bg);
       border: 1px solid var(--border);
       text-decoration: none;
@@ -182,10 +182,13 @@
     }
 
     td.active a {
-      background: rgba(59,167,246,0.12);
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(59,167,246,0.25);
       font-weight: 600;
+      box-shadow:
+        var(--raised-shadow),
+        0 0 0 2px var(--accent-10);
+      background: linear-gradient(0deg, rgba(59,167,246,0.16), rgba(59,167,246,0.12)) var(--color-bg);
+
     }
 
     td.is-today a {
@@ -201,6 +204,7 @@
         rgba(59,167,246,0.12);
       border-color: var(--accent);
       box-shadow: 0 0 0 3px rgba(59,167,246,0.25);
+      font-weight: 600;
     }
 
     td.has-entry a::after {
@@ -215,6 +219,10 @@
       background: var(--accent);
       opacity: .9;
       pointer-events: none;
+    }
+
+    td.active a.inactive {
+      opacity: 1;
     }
 
     td a.inactive {

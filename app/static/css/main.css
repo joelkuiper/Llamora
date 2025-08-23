@@ -25,9 +25,12 @@
 
   /* Shadows & borders */
   --shadow-dark: rgba(0,0,0,0.07);
+  --shadow-dark-02: rgba(0,0,0,0.02);
   --shadow-light: rgba(255,255,255,0.9);
   --shadow-light-60: rgba(255,255,255,0.6);
   --raised-shadow: 0 4px 10px var(--shadow-dark), 0 1px 2px rgba(0,0,0,0.04);
+  --subtle-raised-shadow: 0 2px 4px var(--shadow-dark-02), 0 1px 2px rgba(0,0,0,0.04);
+
   --inset-shadow: inset 1px 1px 3px rgba(0,0,0,0.08),
                   inset -1px -1px 3px var(--shadow-light);
   --inset-shadow-disabled: inset 1px 1px 2px rgba(0,0,0,0.04),

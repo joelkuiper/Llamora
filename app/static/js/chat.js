@@ -8,6 +8,12 @@ let currentStreamMsgId = null;
 
 const TYPING_INDICATOR_SELECTOR = "#typing-indicator";
 
+function setTimezoneCookie() {
+  const offset = new Date().getTimezoneOffset();
+  document.cookie = `tz=${offset}; path=/`;
+  return offset;
+}
+
 function revealMetaChips(container, scrollToBottom){
   if (!container || !container.hidden) return;
   const parent = container.closest('.message');
@@ -31,7 +37,20 @@ function revealMetaChips(container, scrollToBottom){
   }, { once: true });
 }
 
+// Redirect to today's chat page once the date rolls over.
+export function refreshAtMidnight() {
+  const now = new Date();
+  const nextMidnight = new Date(now);
+  nextMidnight.setHours(24, 0, 0, 0);
+  const msUntilMidnight = nextMidnight.getTime() - now.getTime();
+  setTimeout(() => {
+    const tz = setTimezoneCookie();
+    location.href = `/d/today?tz=${tz}`;
+  }, msUntilMidnight);
+}
+
 export function initChatUI(root = document) {
+  setTimezoneCookie();
   const form = root.querySelector("#message-form");
   const textarea = form?.querySelector("textarea");
   const button = form?.querySelector("button");
@@ -39,6 +58,8 @@ export function initChatUI(root = document) {
   const errors = document.getElementById("errors");
 
   if (!form || !textarea || !button || !chat) return;
+
+  refreshAtMidnight();
 
   // Ensure tag popovers are reinitialized when returning via back navigation
   chat.querySelectorAll('.meta-chips').forEach((chips) => {
