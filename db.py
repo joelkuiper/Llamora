@@ -36,7 +36,7 @@ def _cached_tag_name(
     dek: bytes,
 ) -> str:
     return decrypt_message(
-        dek, user_id, "tag", tag_hash.hex(), name_nonce, name_ct, alg
+        dek, user_id, tag_hash.hex(), name_nonce, name_ct, alg
     )
 
 
@@ -352,7 +352,7 @@ class LocalDB:
             row = await cursor.fetchone()
             if not row:
                 nonce, ct, alg = encrypt_message(
-                    dek, user_id, "tag", tag_hash.hex(), tag_name
+                    dek, user_id, tag_hash.hex(), tag_name
                 )
                 await self.with_transaction(
                     conn,

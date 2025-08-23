@@ -133,8 +133,22 @@ class MessageIndexRegistry:
                 if vecs.ndim == 1:
                     vecs = vecs.reshape(1, -1)
                 idx.add_batch(ids, vecs)
-                self.cursors[user_id] = rows[-1]["id"]
+                cursor = rows[-1]["id"]
+                self.cursors[user_id] = cursor
                 self.indexes[user_id] = idx
+
+                # Ensure messages without stored vectors are also indexed
+                msgs = await self.db.get_latest_messages(user_id, self.warm_limit, dek)
+                missing = [m for m in msgs if not idx.contains(m["id"])]
+                if missing:
+                    logger.debug(
+                        "Embedding %d messages missing vectors for user %s",
+                        len(missing),
+                        user_id,
+                    )
+                    await self._embed_and_store(user_id, missing, dek, idx)
+                    # _embed_and_store updates cursor; keep the oldest between both
+                    self.cursors[user_id] = min(cursor, self.cursors[user_id])
                 return idx
 
             # Fallback: no stored vectors, warm from latest messages
@@ -168,7 +182,9 @@ class MessageIndexRegistry:
                 logger.debug("Index missing for user %s", user_id)
                 return 0
 
+            prev_cursor = cursor
             rows = await self.db.get_vectors_older_than(user_id, cursor, batch, dek)
+            added = 0
             if rows:
                 logger.debug(
                     "Loaded %d stored vectors older than %s for user %s",
@@ -181,23 +197,28 @@ class MessageIndexRegistry:
                 if vecs.ndim == 1:
                     vecs = vecs.reshape(1, -1)
                 idx.add_batch(ids, vecs)
-                self.cursors[user_id] = rows[-1]["id"]
-                return len(ids)
+                cursor = rows[-1]["id"]
+                added += len(ids)
 
-            msgs = await self.db.get_messages_older_than(user_id, cursor, batch, dek)
-            if msgs:
+            msgs = await self.db.get_messages_older_than(user_id, prev_cursor, batch, dek)
+            missing = [m for m in msgs if not idx.contains(m["id"])]
+            if missing:
                 logger.debug(
                     "Embedding %d messages older than %s for user %s",
-                    len(msgs),
-                    cursor,
+                    len(missing),
+                    prev_cursor,
                     user_id,
                 )
-                idx = self.indexes.get(user_id)
-                await self._embed_and_store(user_id, msgs, dek, idx)
-                return len(msgs)
+                await self._embed_and_store(user_id, missing, dek, idx)
+                cursor = min(cursor, self.cursors[user_id])
+                added += len(missing)
 
-            logger.debug("No older messages for user %s", user_id)
-            return 0
+            if added == 0:
+                logger.debug("No older messages for user %s", user_id)
+                return 0
+
+            self.cursors[user_id] = cursor
+            return added
 
     def evict_idle(self) -> None:
         now = time.monotonic()
