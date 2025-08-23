@@ -30,7 +30,8 @@
     position: relative;
     display: flex;
     align-items: center;
-    width: clamp(18rem, 32vw, 24rem);
+    /* width: clamp(18rem, 32vw, 24rem); */
+    width: 18rem;
   }
 
   #search-input {
