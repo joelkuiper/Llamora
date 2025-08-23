@@ -54,12 +54,12 @@ body {
     border: 1px solid var(--border);
   }
   .error {
-    background-color: #ffe5e5;
-    color: #a00000;
+    background-color: var(--color-error-bg);
+    color: var(--color-error-text);
   }
   .success {
-    background-color: #e7fff0;
-    color: #0b6a36;
+    background-color: var(--color-success-bg);
+    color: var(--color-success-text);
   }
 
   h2 {

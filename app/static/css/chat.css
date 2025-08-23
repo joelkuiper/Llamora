@@ -42,8 +42,8 @@ body {
 /* Main chat panel */
 #content-wrapper {
   box-shadow:
-    -4px 0 8px rgba(0,0,0,0.05),
-    0 0 0 1px rgba(255,255,255,0.6) inset;
+    -4px 0 8px var(--shadow-dark),
+    0 0 0 1px var(--shadow-light-60) inset;
   border: 1px solid var(--border-strong);
   z-index: 1;
   padding: var(--spacing-xl);
@@ -61,7 +61,7 @@ body {
   flex-direction: column;
   gap: var(--spacing-lg);
 
-  .error { color: darkred; }
+  .error { color: var(--color-error-text-dark); }
 
   .message {
     border: 1px solid var(--border);
@@ -77,7 +77,7 @@ body {
     &.user {
       align-self: flex-end;
       text-align: right;
-      border: 1px solid rgba(54,166,244,0.35);  /* subtle blue border */
+      border: 1px solid var(--border-user);  /* subtle blue border */
       color: var(--color-user-text);
       background: var(--color-user-bg);
       box-shadow: var(--raised-shadow);
@@ -108,7 +108,7 @@ body {
       transition: color .15s ease, text-decoration-color .15s ease, background-color .15s ease;
     }
     a:hover {
-      text-decoration-color: rgba(59,167,246,.6);
+      text-decoration-color: var(--accent-60);
       background-color: var(--accent-05);
     }
 
@@ -210,7 +210,7 @@ body {
 /* Progressive enhancement fallbacks */
 @supports not (backdrop-filter: blur(1px)) {
   #search-container .search-results-overlay {
-    background: rgba(250, 250, 250, 0.98);
+    background: var(--glass-fallback-bg);
   }
 }
 
@@ -232,10 +232,10 @@ body {
   border-radius: 50%;
   backdrop-filter: blur(10px) saturate(140%);
   -webkit-backdrop-filter: blur(10px) saturate(140%);
-  background: rgba(255,255,255,0.70);
+  background: var(--glass-bg);
   border: 1px solid var(--border);
   box-shadow: var(--raised-shadow);
-  color: rgba(0,0,0,0.66);
+  color: var(--scroll-btn-color);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -256,7 +256,7 @@ body {
     color: var(--accent);
 
     svg {
-      filter: drop-shadow(0 0 4px rgba(31,151,242,0.5));
+      filter: drop-shadow(0 0 4px var(--accent-drop-shadow));
     }
   }
 
@@ -320,7 +320,7 @@ body {
 }
 
 @keyframes tactile-pulse {
-  0%   { transform: scale(1);   background: rgba(255,255,255,0.85); }
-  40%  { transform: scale(0.88); background: rgba(235,235,235,0.8); }
-  100% { transform: scale(1);   background: rgba(250,250,250,0.85); }
+  0%   { transform: scale(1);   background: var(--pulse-bg-start); }
+  40%  { transform: scale(0.88); background: var(--pulse-bg-mid); }
+  100% { transform: scale(1);   background: var(--pulse-bg-end); }
 }

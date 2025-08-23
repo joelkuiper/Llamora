@@ -80,14 +80,15 @@
   padding: 2px 6px;
 }
 
+
 .chip-remove {
   position: absolute;
   top: -8px;
   right: -8px;
   transform: scale(0);
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--chip-remove-bg);
   border: none;
-  color: #fff;
+  color: var(--color-white);
   width: 18px;
   height: 18px;
   border-radius: 50%;
@@ -101,7 +102,7 @@
 }
 
 .chip-remove:hover {
-  background: #000;
+  background: var(--chip-remove-bg-hover);
   font-weight: bold;
 }
 
@@ -133,8 +134,8 @@
 }
 
 .tag-popover {
-  --tp-glass-bg: rgba(255,255,255,0.72);
-  --tp-glass-bg-hover: rgba(255,255,255,0.78);
+  --tp-glass-bg: var(--glass-bg-strong);
+  --tp-glass-bg-hover: var(--glass-bg-strong-hover);
   --tp-ring: var(--accent-20);
   --tp-h: 2rem;
   --tp-radius: var(--radius-md);
@@ -144,7 +145,7 @@
   background: var(--tp-glass-bg);
   border: 1px solid var(--border);
   box-shadow: var(--raised-shadow);
-  color: rgba(0,0,0,0.7);
+  color: var(--glass-text-muted);
   border-radius: var(--radius-sm);
   padding: 10px;
   opacity: 0;
@@ -164,7 +165,7 @@
     height: var(--tp-h);
     border: 1px solid var(--border);
     border-radius: var(--tp-radius);
-    background: rgba(255,255,255,0.9);
+    background: var(--glass-bg-alt);
     overflow: hidden;
     box-shadow:
       inset 2px 2px 5px rgba(0,0,0,0.05),
@@ -172,13 +173,13 @@
     transition: border-color .18s ease, box-shadow .22s ease, background .18s ease;
 
     &:hover {
-      background: rgba(255,255,255,0.96);
+      background: var(--glass-bg-alt-hover);
       border-color: var(--accent-20);
     }
 
     &:focus-within {
       border-color: var(--accent);
-      background: #fff;
+      background: var(--color-white);
       box-shadow:
         0 0 0 2px var(--tp-ring),
         inset 2px 2px 5px rgba(0,0,0,0.05),
@@ -193,7 +194,7 @@
       border: 0;
       border-right: 1px solid var(--border);
       background: transparent;
-      color: rgba(0,0,0,0.9);
+      color: var(--glass-text-stronger);
       font-size: 14px;
       line-height: calc(var(--tp-h) - 2px);
       font-family: var(--font-base);
@@ -208,7 +209,7 @@
       padding: 0 14px;
       border: 0;
       background: linear-gradient(0deg, rgba(255,255,255,0.92), rgba(255,255,255,0.98));
-      color: rgba(0,0,0,0.75);
+      color: var(--glass-text-strong);
       font-weight: 600;
       font-size: 14px;
       cursor: pointer;
