@@ -1,4 +1,3 @@
-from datetime import datetime
 import calendar
 from quart import Blueprint, redirect, url_for, render_template, make_response
 from app import db
@@ -7,6 +6,7 @@ from app.services.auth_helpers import (
     get_current_user,
     get_dek,
 )
+from app.services.timezone import local_date
 
 days_bp = Blueprint("days", __name__)
 
@@ -25,12 +25,19 @@ async def index():
     user = await get_current_user()
     uid = user["id"]
     state = await db.get_state(uid)
-    today = datetime.utcnow().date().isoformat()
+    today = local_date().isoformat()
     current_date = state.get("active_date", today)
     if current_date != today:
         current_date = today
     await db.update_state(uid, active_date=current_date)
     return redirect(url_for("days.day", date=current_date), code=302)
+
+
+@days_bp.route("/d/today")
+@login_required
+async def day_today():
+    today = local_date().isoformat()
+    return redirect(url_for("days.day", date=today), code=302)
 
 
 @days_bp.route("/d/<date>")
@@ -60,7 +67,7 @@ async def day(date):
 @login_required
 async def calendar_view():
     user = await get_current_user()
-    today = datetime.utcnow().date()
+    today = local_date()
     state = await db.get_state(user["id"])
     weeks = calendar.Calendar().monthdayscalendar(today.year, today.month)
     active_days = await db.get_days_with_messages(user["id"], today.year, today.month)
@@ -96,8 +103,8 @@ async def calendar_month(year: int, month: int):
         month=month,
         month_name=calendar.month_name[month],
         weeks=weeks,
-        active_day=state.get("active_date", datetime.utcnow().date().isoformat()),
-        today=datetime.utcnow().date().isoformat(),
+        active_day=state.get("active_date", local_date().isoformat()),
+        today=local_date().isoformat(),
         active_days=active_days,
         prev_year=prev_year,
         prev_month=prev_month,

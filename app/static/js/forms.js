@@ -1,6 +1,12 @@
 import { startButtonSpinner, stopButtonSpinner } from "./ui.js";
 
+function setTimezoneCookie() {
+  const offset = new Date().getTimezoneOffset();
+  document.cookie = `tz=${offset}; path=/`;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+  setTimezoneCookie();
   document.querySelectorAll(".form-container form, #profile-page form").forEach((form) => {
     form.addEventListener("submit", async (e) => {
       const btn = form.querySelector('button[type="submit"]');

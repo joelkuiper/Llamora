@@ -52,12 +52,12 @@ export function updateActiveDay() {
 
 function formatLongDate(iso) {
   const [y, m, d] = iso.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  const day = dt.getUTCDate();
+  const dt = new Date(y, m - 1, d);
+  const day = dt.getDate();
   let suffix = "th";
   if (day % 100 < 11 || day % 100 > 13) {
     suffix = { 1: "st", 2: "nd", 3: "rd" }[day % 10] || "th";
   }
-  const month = dt.toLocaleString(undefined, { month: "long", timeZone: "UTC" });
-  return `${day}${suffix} of ${month} ${dt.getUTCFullYear()}`;
+  const month = dt.toLocaleString(undefined, { month: "long" });
+  return `${day}${suffix} of ${month} ${dt.getFullYear()}`;
 }

@@ -57,7 +57,6 @@
 }
 
 #calendar {
-  --glass: var(--glass-bg-strong);
   position: absolute;
   top: calc(100% + 8px);
   left: 50%;
@@ -67,7 +66,7 @@
   max-width: 90vw;
 
   color: var(--color-text);
-  background: var(--glass, var(--color-bg));
+  background: var(--glass-bg-strong, var(--color-bg));
   backdrop-filter: blur(10px) saturate(140%);
   -webkit-backdrop-filter: blur(10px) saturate(140%);
   border: 1px solid var(--border);
@@ -107,7 +106,7 @@
       border-radius: 999px;
       border: 1px solid var(--border);
       background: var(--color-bg);
-      box-shadow: var(--raised-shadow);
+      box-shadow: var(--subtle-raised-shadow);
       transition: background .12s, border-color .12s, box-shadow .12s, transform .06s;
 
       &:hover {
@@ -129,44 +128,83 @@
     table-layout: fixed;
     border-collapse: collapse;
     font-size: .95rem;
-    thead th { font-weight: 600; padding: .35rem 0 .25rem; color: var(--color-bot-text); text-align: center; }
-    tbody td { padding: 6px; height: 40px; text-align: center; }
+
+    thead th {
+      font-weight: 600;
+      padding: .35rem 0 .25rem;
+      color: var(--color-bot-text);
+      text-align: center;
+    }
+
+    tbody td {
+      padding: 6px;
+      height: 40px;
+      text-align: center;
+    }
+
     td.empty { visibility: hidden; }
 
     td a {
       display: grid;
       place-items: center;
       border-radius: 12px;
-      position: relative;                 /* anchor for the dot */
+      position: relative;
       height: 36px;
-      line-height: 36px;                  /* vertically centers the number */
-
+      line-height: 36px;
+      box-shadow: var(--subtle-raised-shadow);
       background: var(--color-bg);
       border: 1px solid var(--border);
-      text-decoration: none; color: var(--color-text);
-      transition: background .12s, border-color .12s, color .12s, transform .06s, box-shadow .12s;
+      text-decoration: none;
+      color: var(--color-text);
+      transition:
+        background .12s,
+        border-color .12s,
+        color .12s,
+        transform .06s,
+        box-shadow .12s;
+
+      &:hover {
+        background: linear-gradient(
+          0deg,
+          rgba(59,167,246,0.12),
+          rgba(59,167,246,0.07)
+        ) var(--color-bg);
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px var(--accent-10);
+      }
+
+      &:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 3px var(--accent-20);
+      }
+
+      &:active { transform: translateY(1px); }
     }
-
-    td a:hover {
-      background: linear-gradient(0deg, rgba(59,167,246,0.08), rgba(59,167,246,0.05)) var(--color-bg);
-      border-color: var(--accent-20);
-    }
-
-    td a:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-20); }
-
-    td a:active { transform: translateY(1px); }
 
     td.active a {
-      background: var(--accent-10);
       border-color: var(--accent);
-      box-shadow: 0 0 0 2px var(--accent-20);
       font-weight: 600;
+      box-shadow:
+        var(--raised-shadow),
+        0 0 0 2px var(--accent-10);
+      background: linear-gradient(0deg, rgba(59,167,246,0.16), rgba(59,167,246,0.12)) var(--color-bg);
+
     }
 
     td.is-today a {
-      background: var(--accent-05);
+      background: hsl(210 95% 90% / 0.55);
+      border-color: hsl(200 85% 45% / 0.28);
+      box-shadow: 0 0 0 3px hsl(210 85% 45% / 0.28);
+    }
+
+    /* if today is also active */
+    td.is-today.active a {
+      background:
+        linear-gradient(0deg, hsl(210 95% 90% / 0.55), hsl(210 95% 90% / 0.55)),
+        rgba(59,167,246,0.12);
       border-color: var(--accent);
-      box-shadow: 0 0 0 2px var(--accent-10);
+      box-shadow: 0 0 0 3px rgba(59,167,246,0.25);
+      font-weight: 600;
     }
 
     td.has-entry a::after {
@@ -179,22 +217,24 @@
       height: 6px;
       border-radius: 999px;
       background: var(--accent);
-      opacity: .85;
+      opacity: .9;
       pointer-events: none;
-      line-height:0;
+    }
+
+    td.active a.inactive {
+      opacity: 1;
     }
 
     td a.inactive {
       opacity: .5;
-      &:hover {
-        opacity: 1 !important;
-      }
-
+      &:hover { opacity: 1 !important; }
     }
 
     td span.inactive {
-      display: grid; place-items: center;
-      height: 36px; border-radius: 12px;
+      display: grid;
+      place-items: center;
+      height: 36px;
+      border-radius: 12px;
       background: var(--color-bg);
       border: 1px solid var(--border);
       color: var(--color-text);
