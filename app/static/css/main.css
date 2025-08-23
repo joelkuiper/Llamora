@@ -122,9 +122,11 @@ html, body {
 #branding {
   display: flex;
   align-items: center;
+  opacity: 0.8;
 
   h1 {
     font-weight: lighter;
+    user-select: none;
     font-size: 1em;
     text-shadow: var(--text-shadow-soft);
   }

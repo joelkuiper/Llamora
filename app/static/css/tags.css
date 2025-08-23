@@ -134,15 +134,11 @@
 }
 
 .tag-popover {
-  --tp-glass-bg: var(--glass-bg-strong);
-  --tp-glass-bg-hover: var(--glass-bg-strong-hover);
-  --tp-ring: var(--accent-20);
   --tp-h: 2rem;
-  --tp-radius: var(--radius-md);
 
   backdrop-filter: blur(10px) saturate(140%);
   -webkit-backdrop-filter: blur(10px) saturate(140%);
-  background: var(--tp-glass-bg);
+  background: var(--glass-bg-strong);
   border: 1px solid var(--border);
   box-shadow: var(--raised-shadow);
   color: var(--glass-text-muted);
@@ -164,7 +160,7 @@
     gap: 0;
     height: var(--tp-h);
     border: 1px solid var(--border);
-    border-radius: var(--tp-radius);
+    border-radius: var(--radius-md);
     background: var(--glass-bg-alt);
     overflow: hidden;
     box-shadow:
@@ -181,7 +177,7 @@
       border-color: var(--accent);
       background: var(--color-white);
       box-shadow:
-        0 0 0 2px var(--tp-ring),
+        0 0 0 2px var(--accent-20),
         inset 2px 2px 5px rgba(0,0,0,0.05),
         inset -2px -2px 5px rgba(255,255,255,0.75);
     }

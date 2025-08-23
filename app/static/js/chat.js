@@ -74,7 +74,7 @@ export function initChatUI(root = document) {
   if (!isToday) {
     textarea.disabled = true;
     button.disabled = true;
-    textarea.placeholder = "This day has past";
+    textarea.placeholder = "This day has past.";
   }
 
   const handleStopClick = () => {

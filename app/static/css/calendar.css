@@ -1,16 +1,12 @@
 #calendar-control {
-  position: fixed;
-  top: var(--toolbar-top, 0.95rem);
-  left: 50% ;
-  transform: translateX(-50%);
-  right: auto;
-  bottom: auto;
-  width: max-content;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
   z-index: 6000;               /* above chat */
-  pointer-events: none;        /* wrapper doesn't block clicks */
 }
-
-#calendar-control > * { pointer-events: auto; }
 
 
 .calendar-popover {
@@ -35,6 +31,10 @@
 
 #calendar-label {
   margin-left: var(--spacing-sm);
+}
+
+@media (max-width: 600px) {
+  #calendar-label { display: none; }
 }
 
 
