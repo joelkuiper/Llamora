@@ -1,9 +1,8 @@
 import orjson
 import os
 import logging
-from copy import deepcopy
 from datetime import timedelta
-from util import str_to_bool
+from util import str_to_bool, deep_merge
 
 MAX_TAG_LENGTH = 64
 MAX_USERNAME_LENGTH = 30
@@ -36,16 +35,6 @@ DB_MMAP_SIZE = int(os.getenv("LLAMORA_DB_MMAP_SIZE", 10 * 1024 * 1024))
 ALLOWED_LLM_CONFIG_KEYS = {"temperature"}
 
 
-def _deep_merge(base: dict, override: dict) -> dict:
-    out = deepcopy(base)
-    for k, v in (override or {}).items():
-        if isinstance(out.get(k), dict) and isinstance(v, dict):
-            out[k] = _deep_merge(out[k], v)
-        else:
-            out[k] = v
-    return out
-
-
 def _json_env(name: str):
     raw = os.getenv(name)
     if not raw:
@@ -72,7 +61,7 @@ env_overrides = _json_env("LLAMORA_LLAMA_ARGS")
 LLM_SERVER = {
     "llamafile_path": os.getenv("LLAMORA_LLAMAFILE", ""),
     "host": os.getenv("LLAMORA_LLAMA_HOST"),
-    "args": _deep_merge(DEFAULT_LLAMA_ARGS, env_overrides or {}),
+    "args": deep_merge(DEFAULT_LLAMA_ARGS, env_overrides or {}),
 }
 
 llm_request_overrides = _json_env("LLAMORA_LLM_REQUEST") or {}

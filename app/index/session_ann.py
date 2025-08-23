@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import time
-from typing import Dict
+from typing import Dict, Optional
 
 import hnswlib
 import numpy as np
@@ -91,6 +91,29 @@ class SessionIndexRegistry:
         self.cursors: Dict[str, str] = {}
         self.locks: Dict[str, asyncio.Lock] = {}
 
+    async def _embed_and_store(
+        self,
+        user_id: str,
+        msgs: list[dict],
+        dek: bytes,
+        idx: Optional[SessionIndex],
+    ) -> SessionIndex:
+        """Embed messages, add to index and persist vectors."""
+
+        texts = [m["message"] for m in msgs]
+        ids = [m["id"] for m in msgs]
+        sess_ids = [m["session_id"] for m in msgs]
+        vecs = embed_texts(texts).astype(np.float32)
+        if idx is None:
+            dim = vecs.shape[1]
+            idx = SessionIndex(dim)
+        idx.add_batch(ids, vecs)
+        for mid, sid, vec in zip(ids, sess_ids, vecs):
+            await self.db.store_vector(mid, user_id, sid, vec, dek)
+        self.cursors[user_id] = msgs[-1]["id"]
+        self.indexes[user_id] = idx
+        return idx
+
     async def get_or_build(self, user_id: str, dek: bytes) -> SessionIndex:
         logger.debug("Fetching index for user %s", user_id)
         lock = self.locks.setdefault(user_id, asyncio.Lock())
@@ -123,22 +146,7 @@ class SessionIndexRegistry:
                 logger.debug(
                     "Embedding and indexing %d messages for user %s", len(msgs), user_id
                 )
-                texts: list[str] = []
-                ids: list[str] = []
-                sess_ids: list[str] = []
-                for msg in msgs:
-                    texts.append(msg["message"])
-                    ids.append(msg["id"])
-                    sess_ids.append(msg["session_id"])
-
-                vecs = embed_texts(texts).astype(np.float32)
-                dim = vecs.shape[1]
-                idx = SessionIndex(dim)
-                idx.add_batch(ids, vecs)
-                for mid, sid, vec in zip(ids, sess_ids, vecs):
-                    await self.db.store_vector(mid, user_id, sid, vec, dek)
-                self.cursors[user_id] = msgs[-1]["id"]
-                self.indexes[user_id] = idx
+                idx = await self._embed_and_store(user_id, msgs, dek, None)
                 return idx
 
             logger.debug("No existing data for user %s, creating empty index", user_id)
@@ -187,20 +195,9 @@ class SessionIndexRegistry:
                     cursor,
                     user_id,
                 )
-                texts: list[str] = []
-                ids: list[str] = []
-                sess_ids: list[str] = []
-                for msg in msgs:
-                    texts.append(msg["message"])
-                    ids.append(msg["id"])
-                    sess_ids.append(msg["session_id"])
-
-                vecs = embed_texts(texts).astype(np.float32)
-                idx.add_batch(ids, vecs)
-                for mid, sid, vec in zip(ids, sess_ids, vecs):
-                    await self.db.store_vector(mid, user_id, sid, vec, dek)
-                self.cursors[user_id] = msgs[-1]["id"]
-                return len(ids)
+                idx = self.indexes.get(user_id)
+                await self._embed_and_store(user_id, msgs, dek, idx)
+                return len(msgs)
 
             logger.debug("No older messages for user %s", user_id)
             return 0
