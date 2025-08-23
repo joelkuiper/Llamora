@@ -144,6 +144,7 @@ class PendingResponse:
         params: dict | None = None,
     ):
         self.user_msg_id = user_msg_id
+        self.date = date
         self.text = ""
         self.done = False
         self.error = False
@@ -256,6 +257,7 @@ class PendingResponse:
                             self.dek,
                             {},
                             reply_to=self.user_msg_id,
+                            created_date=self.date,
                         )
                         self.assistant_msg_id = assistant_msg_id
                         current_app.logger.debug(
@@ -294,6 +296,7 @@ class PendingResponse:
                         self.dek,
                         meta,
                         reply_to=self.user_msg_id,
+                        created_date=self.date,
                     )
                     self.assistant_msg_id = assistant_msg_id
                     current_app.logger.debug(
@@ -353,7 +356,9 @@ async def send_message(date):
         abort(400, description="Message is empty or too long.")
 
     try:
-        user_msg_id = await db.append_message(uid, "user", user_text, dek)
+        user_msg_id = await db.append_message(
+            uid, "user", user_text, dek, created_date=date
+        )
         current_app.logger.debug("Saved user message %s", user_msg_id)
     except Exception:
         current_app.logger.exception("Failed to save user message")
@@ -386,7 +391,12 @@ async def sse_reply(user_msg_id: str, date: str):
     dek = get_dek()
     history = await db.get_history(uid, date, dek)
 
-    if not history:
+    if not any(msg["id"] == user_msg_id for msg in history):
+        actual_date = await db.get_message_date(uid, user_msg_id)
+        if actual_date and actual_date != date:
+            history = await db.get_history(uid, actual_date, dek)
+
+    if not any(msg["id"] == user_msg_id for msg in history):
         current_app.logger.warning("History not found for user message %s", user_msg_id)
         return Response(
             "event: error\ndata: Invalid ID\n\n", mimetype="text/event-stream"

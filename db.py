@@ -303,6 +303,7 @@ class LocalDB:
         dek,
         meta=None,
         reply_to: str | None = None,
+        created_date: str | None = None,
     ):
         ulid = str(ULID())
         record = {"message": message, "meta": meta or {}}
@@ -310,12 +311,20 @@ class LocalDB:
         nonce, ct, alg = encrypt_message(dek, user_id, ulid, plaintext)
 
         async with self.pool.connection() as conn:
-            await self.with_transaction(
-                conn,
-                conn.execute,
-                "INSERT INTO messages (id, user_id, role, reply_to, nonce, ciphertext, alg) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (ulid, user_id, role, reply_to, nonce, ct, alg),
-            )
+            if created_date:
+                await self.with_transaction(
+                    conn,
+                    conn.execute,
+                    "INSERT INTO messages (id, user_id, role, reply_to, nonce, ciphertext, alg, created_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (ulid, user_id, role, reply_to, nonce, ct, alg, created_date),
+                )
+            else:
+                await self.with_transaction(
+                    conn,
+                    conn.execute,
+                    "INSERT INTO messages (id, user_id, role, reply_to, nonce, ciphertext, alg) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (ulid, user_id, role, reply_to, nonce, ct, alg),
+                )
 
         msg_id = ulid
 
@@ -397,6 +406,17 @@ class LocalDB:
             )
             row = await cursor.fetchone()
         return bool(row)
+
+    async def get_message_date(
+        self, user_id: str, message_id: str
+    ) -> str | None:
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                "SELECT created_date FROM messages WHERE id = ? AND user_id = ?",
+                (message_id, user_id),
+            )
+            row = await cursor.fetchone()
+        return row["created_date"] if row else None
 
     async def get_tags_for_message(self, user_id: str, message_id: str, dek: bytes):
         async with self.pool.connection() as conn:
