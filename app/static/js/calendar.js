@@ -59,6 +59,9 @@ function initCalendarPopover() {
       e.preventDefault();
       hide();
     }
+    if (e.target.closest('.calendar-table a, .today-btn')) {
+      hide();
+    }
   });
 
   pop.addEventListener('htmx:afterSwap', (e) => {

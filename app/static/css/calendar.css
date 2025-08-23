@@ -93,6 +93,37 @@
     flex: 1;
   }
 
+  .calendar-today {
+    text-align: center;
+    margin-bottom: .5rem;
+
+    .today-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 .6rem;
+      height: 1.5rem;
+      font-size: .75rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--color-bg);
+      box-shadow: var(--raised-shadow);
+      transition: background .12s, border-color .12s, box-shadow .12s, transform .06s;
+
+      &:hover {
+        cursor: pointer;
+        border-color: var(--accent);
+        background: linear-gradient(0deg, rgba(59,167,246,0.16), rgba(59,167,246,0.12)) var(--color-bg);
+
+        box-shadow: var(--raised-shadow), 0 0 0 2px var(--accent-10);
+      }
+
+      &:focus-visible { outline: none; box-shadow: var(--raised-shadow), 0 0 0 3px var(--accent-20); }
+
+      &:active { transform: translateY(1px); }
+    }
+  }
+
   .calendar-table {
     width: 100%;
     table-layout: fixed;

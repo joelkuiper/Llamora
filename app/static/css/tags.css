@@ -46,6 +46,33 @@
   background: linear-gradient(0deg, rgba(59,167,246,0.16), rgba(59,167,246,0.12)) var(--color-bg);
 }
 
+.meta-chip:focus,
+.meta-chip:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow:
+    var(--inset-shadow),
+    0 0 0 2px var(--accent-20),
+    0 8px 20px var(--accent-10);
+}
+
+.meta-chip:active {
+  transform: translateY(1px);
+  box-shadow: var(--inset-shadow-disabled);
+}
+
+.meta-chip.chip-enter,
+.meta-chips.chip-enter,
+.meta-chip.htmx-added {
+  animation: chip-pop 0.2s ease both;
+}
+
+.meta-chip.htmx-swapping {
+  animation: chip-pop-out 0.15s ease forwards;
+}
+
+
+
 .chip-label {
   text-decoration: none;
   color: inherit;
@@ -245,32 +272,6 @@
   }
 
 .tag-popover.tp-open .tp-content { transform: scale(1); }
-
-
-.meta-chip:focus,
-.meta-chip:focus-visible {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow:
-    var(--inset-shadow),
-    0 0 0 2px var(--accent-20),
-    0 8px 20px var(--accent-10);
-}
-
-.meta-chip:active {
-  transform: translateY(1px);
-  box-shadow: var(--inset-shadow-disabled);
-}
-
-.meta-chip.chip-enter,
-.meta-chips.chip-enter,
-.meta-chip.htmx-added {
-  animation: chip-pop 0.2s ease both;
-}
-
-.meta-chip.htmx-swapping {
-  animation: chip-pop-out 0.15s ease forwards;
-}
 
 
 @keyframes chip-pop {
