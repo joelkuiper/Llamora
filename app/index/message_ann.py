@@ -12,7 +12,7 @@ from app.embed.model import embed_texts
 logger = logging.getLogger(__name__)
 
 
-class SessionIndex:
+class MessageIndex:
     """In-memory ANN index for a single user's messages."""
 
     def __init__(self, dim: int, max_elements: int = 100000):
@@ -78,14 +78,14 @@ class SessionIndex:
         return ids, dists[0][: len(ids)]
 
 
-class SessionIndexRegistry:
+class MessageIndexRegistry:
     """Keeps per-user ANN indexes in RAM and evicts idle ones."""
 
     def __init__(self, db, ttl: int = 600, warm_limit: int = 1000):
         self.db = db
         self.ttl = ttl
         self.warm_limit = warm_limit
-        self.indexes: Dict[str, SessionIndex] = {}
+        self.indexes: Dict[str, MessageIndex] = {}
         self.cursors: Dict[str, str] = {}
         self.locks: Dict[str, asyncio.Lock] = {}
 
@@ -94,8 +94,8 @@ class SessionIndexRegistry:
         user_id: str,
         msgs: list[dict],
         dek: bytes,
-        idx: Optional[SessionIndex],
-    ) -> SessionIndex:
+        idx: Optional[MessageIndex],
+    ) -> MessageIndex:
         """Embed messages, add to index and persist vectors."""
 
         texts = [m["message"] for m in msgs]
@@ -103,7 +103,7 @@ class SessionIndexRegistry:
         vecs = embed_texts(texts).astype(np.float32)
         if idx is None:
             dim = vecs.shape[1]
-            idx = SessionIndex(dim)
+            idx = MessageIndex(dim)
         idx.add_batch(ids, vecs)
         for mid, vec in zip(ids, vecs):
             await self.db.store_vector(mid, user_id, vec, dek)
@@ -111,7 +111,7 @@ class SessionIndexRegistry:
         self.indexes[user_id] = idx
         return idx
 
-    async def get_or_build(self, user_id: str, dek: bytes) -> SessionIndex:
+    async def get_or_build(self, user_id: str, dek: bytes) -> MessageIndex:
         logger.debug("Fetching index for user %s", user_id)
         lock = self.locks.setdefault(user_id, asyncio.Lock())
         async with lock:
@@ -127,7 +127,7 @@ class SessionIndexRegistry:
                     "Warming index for user %s with %d vectors", user_id, len(rows)
                 )
                 dim = rows[0]["vec"].shape[0]
-                idx = SessionIndex(dim)
+                idx = MessageIndex(dim)
                 ids = [r["id"] for r in rows]
                 vecs = np.array([r["vec"] for r in rows], dtype=np.float32)
                 if vecs.ndim == 1:
@@ -148,7 +148,7 @@ class SessionIndexRegistry:
 
             logger.debug("No existing data for user %s, creating empty index", user_id)
             dim = embed_texts([""]).shape[1]
-            idx = SessionIndex(dim)
+            idx = MessageIndex(dim)
             latest = await self.db.get_user_latest_id(user_id)
             self.cursors[user_id] = latest
             self.indexes[user_id] = idx

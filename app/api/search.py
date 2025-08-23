@@ -17,7 +17,7 @@ from config import (
     POOR_MATCH_MIN_HITS,
 )
 from app.embed.model import embed_texts
-from app.index.session_ann import SessionIndexRegistry
+from app.index.message_ann import MessageIndexRegistry
 
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ class SearchAPI:
 
     def __init__(self, db):
         self.db = db
-        self.registry = SessionIndexRegistry(db)
+        self.registry = MessageIndexRegistry(db)
 
     async def knn_search(
         self,
