@@ -31,8 +31,8 @@ export function updateActiveDay() {
 
   const highlight = () => {
     calendar.querySelectorAll("td.active").forEach((td) => td.classList.remove("active"));
-    const link = calendar.querySelector(`[data-date='${activeDate}']`);
-    if (link) link.parentElement.classList.add("active");
+    const link = calendar.querySelector(`.calendar-table [data-date='${activeDate}']`);
+    if (link) link.closest("td").classList.add("active");
   };
 
   if (calendar.dataset.year !== year || calendar.dataset.month !== month) {
