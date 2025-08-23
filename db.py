@@ -142,6 +142,7 @@ class LocalDB:
                     ciphertext BLOB NOT NULL,
                     alg BLOB NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_date TEXT DEFAULT (date('now')),
                     FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
                 );
 
@@ -185,7 +186,7 @@ class LocalDB:
                 CREATE INDEX IF NOT EXISTS idx_vectors_user_id ON vectors(user_id);
                 CREATE INDEX IF NOT EXISTS idx_vectors_id ON vectors(id);
 
-                CREATE INDEX IF NOT EXISTS idx_tag_message_session ON tag_message_xref(user_id, tag_hash);
+                CREATE INDEX IF NOT EXISTS idx_tag_message_hash ON tag_message_xref(user_id, tag_hash);
                 CREATE INDEX IF NOT EXISTS idx_tag_message_message ON tag_message_xref(user_id, message_id);
                 """,
             )
