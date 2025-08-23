@@ -412,3 +412,92 @@ input[type="checkbox"]:focus {
 .tooltip.visible .tooltip-inner {
   transform: translateY(0);
 }
+
+/* Password strength meter */
+.password-strength {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+
+
+  .suggestion-wrapper {
+    position: relative;
+  }
+
+  .info-icon {
+    font-size: 0.75rem;
+    font-weight: bold;
+    width: 1.2rem;
+    height: 1.2rem;
+    line-height: 1.2rem;
+    text-align: center;
+    border-radius: 50%;
+    border: 1px solid var(--accent-20);
+    color: var(--accent);
+    cursor: default;
+    display: inline-block;
+
+    &:hover {
+      border-color: var(--accent);
+      box-shadow:
+        var(--raised-shadow),
+        0 0 0 2px var(--accent-10);
+      background: linear-gradient(0deg, rgba(59,167,246,0.16), rgba(59,167,246,0.12)) var(--color-bg);
+    }
+  }
+
+  .password-suggestions {
+    display: none;
+    position: absolute;
+    top: calc(100% + var(--spacing-xs));
+    left: 0;
+    width: 16rem;
+    max-width: 80vw;
+    padding: var(--spacing-sm);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+    box-shadow: var(--raised-shadow);
+    font-size: 0.85rem;
+    z-index: 10;
+  }
+
+  .password-suggestions strong {
+    display: block;
+    margin-bottom: var(--spacing-xs);
+  }
+
+  .password-suggestions ul {
+    margin: 0;
+    padding-left: 1.2rem;
+  }
+
+  .suggestion-wrapper:hover .password-suggestions,
+  .suggestion-wrapper:focus-within .password-suggestions,
+  .password-suggestions:hover {
+    display: block;
+  }
+
+  .strength-meter {
+    flex: 1;
+    height: 0.5rem;
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+    border: 1px solid var(--border);
+    box-shadow: var(--inset-shadow);
+
+    .bar {
+      display: block;
+      height: 100%;
+      width: 0%;
+      border-radius: inherit;
+      transition: width 0.3s ease;
+    }
+
+    .bar.strength-0,
+    .bar.strength-1 { background: #ff6b6b; }
+    .bar.strength-2 { background: #feca57; }
+    .bar.strength-3 { background: #8bc34a; }
+    .bar.strength-4 { background: #4caf50; }
+  }
+}

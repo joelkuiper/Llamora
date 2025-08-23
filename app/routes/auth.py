@@ -59,7 +59,10 @@ async def password_strength_check():
         score = 0
         percent = 0
         html = await render_template(
-            "partials/password_strength.html", score=score, percent=percent
+            "partials/password_strength.html",
+            score=score,
+            percent=percent,
+            suggestions=[],
         )
         return html
 
@@ -363,20 +366,18 @@ async def change_password():
     confirm = form.get("confirm_password", "")
 
     max_pass = current_app.config["MAX_PASSWORD_LENGTH"]
-    min_pass = current_app.config["MIN_PASSWORD_LENGTH"]
+    if not current or not new or not confirm:
+        return await _render_profile_page(user, pw_error="All fields are required")
 
-    if (
-        not current
-        or not new
-        or not confirm
-        or len(current) > max_pass
-        or len(new) > max_pass
-        or new != confirm
-        or len(new) < min_pass
-        or not re.search(r"[A-Za-z]", new)
-        or not re.search(r"\d", new)
-    ):
-        return await _render_profile_page(user, pw_error="Invalid input")
+    if len(current) > max_pass or len(new) > max_pass:
+        return await _render_profile_page(user, pw_error="Input exceeds max length")
+
+    if new != confirm:
+        return await _render_profile_page(user, pw_error="Passwords do not match")
+
+    strength = zxcvbn(new)
+    if strength.get("score", 0) < 3:
+        return await _render_profile_page(user, pw_error="Password is too weak")
 
     try:
         pwhash.argon2id.verify(

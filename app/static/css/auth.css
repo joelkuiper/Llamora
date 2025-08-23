@@ -62,28 +62,6 @@ body {
     color: #0b6a36;
   }
 
-  .strength-meter {
-    height: 0.5rem;
-    border-radius: var(--radius-sm);
-    background: var(--color-bg);
-    border: 1px solid var(--border);
-    box-shadow: var(--inset-shadow);
-
-    .bar {
-      display: block;
-      height: 100%;
-      width: 0%;
-      border-radius: inherit;
-      transition: width 0.3s ease;
-    }
-
-    .bar.strength-0,
-    .bar.strength-1 { background: #ff6b6b; }
-    .bar.strength-2 { background: #feca57; }
-    .bar.strength-3 { background: #8bc34a; }
-    .bar.strength-4 { background: #4caf50; }
-  }
-
   h2 {
     font-size: 1em;
     border-bottom: 1px solid var(--border);
