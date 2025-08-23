@@ -383,33 +383,48 @@ input[type="checkbox"]:focus {
 
 /* Tooltips */
 
-.tooltip {
-  z-index: 9999;
-  pointer-events: none;
+.tooltip,
+.password-suggestions {
   backdrop-filter: blur(10px) saturate(140%);
   -webkit-backdrop-filter: blur(10px) saturate(140%);
   background: rgba(255,255,255,0.70);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   box-shadow: var(--raised-shadow);
-  padding: var(--spacing-xs) var(--spacing-sm);
   color: var(--color-text);
   font-size: 0.85rem;
   opacity: 0;
   transition: opacity 0.15s ease;
 }
 
-.tooltip.visible {
+.tooltip {
+  z-index: 9999;
+  pointer-events: none;
+  padding: var(--spacing-xs) var(--spacing-sm);
+}
+
+.tooltip.visible,
+.suggestion-wrapper:hover .password-suggestions,
+.suggestion-wrapper:focus-within .password-suggestions,
+.password-suggestions:hover {
   opacity: 1;
   transition-delay: 0.5s;
 }
 
-.tooltip .tooltip-inner {
+.tooltip .tooltip-inner,
+.password-suggestions {
   transform: translateY(4px);
+}
+
+.tooltip .tooltip-inner {
   transition: transform 0.1s ease;
 }
 
-.tooltip.visible .tooltip-inner {
+
+.tooltip.visible .tooltip-inner,
+.suggestion-wrapper:hover .password-suggestions,
+.suggestion-wrapper:focus-within .password-suggestions,
+.password-suggestions:hover {
   transform: translateY(0);
 }
 
@@ -447,22 +462,14 @@ input[type="checkbox"]:focus {
   }
 
   .password-suggestions {
-    display: none;
     position: absolute;
     left: 0;
     width: 16rem;
     max-width: 80vw;
     padding: var(--spacing-sm);
-
-    backdrop-filter: blur(10px) saturate(140%);
-    -webkit-backdrop-filter: blur(10px) saturate(140%);
-    background: rgba(255,255,255,0.70);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    box-shadow: var(--raised-shadow);
-
-    font-size: 0.85rem;
     z-index: 10;
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.1s ease;
   }
 
   .password-suggestions strong {
@@ -478,7 +485,8 @@ input[type="checkbox"]:focus {
   .suggestion-wrapper:hover .password-suggestions,
   .suggestion-wrapper:focus-within .password-suggestions,
   .password-suggestions:hover {
-    display: block;
+    pointer-events: auto;
+    transition-delay: 0.5s, 0s;
   }
 
   .strength-meter {
