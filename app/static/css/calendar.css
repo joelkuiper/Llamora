@@ -31,6 +31,7 @@
 
 #calendar-label {
   margin-left: var(--spacing-sm);
+  font-family: var(--font-base);
 }
 
 @media (max-width: 600px) {
@@ -45,6 +46,7 @@
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--color-bg);
+  cursor: pointer;
   transition: background .12s, border-color .12s, box-shadow .12s, transform .06s;
 
   &:hover {

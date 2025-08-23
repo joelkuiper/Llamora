@@ -52,7 +52,6 @@
 
   /* Typography */
   --font-base: system-ui, sans-serif;
-  --font-size: 1rem;
   --text-shadow-soft: 0 0 2px rgba(0,0,0,0.25);
   --color-text-muted: #777;
 
@@ -105,6 +104,22 @@
   /* Overlay close */
   --overlay-close-bg: rgba(0,0,0,0.10);
   --overlay-close-hover-bg: rgba(0,0,0,0.18);
+
+  --line-height: 1.6;
+  --font-size: 12pt;
+
+  --brand-text: #242323;
+  --brand-bg: #eeeeec;
+  --brand-muted: #b1b0ae;
+
+  --brand-accent: #6f6e6c;                /* neutral accent */
+  --brand-accent-08: color-mix(in srgb, var(--brand-accent), transparent 92%);
+  --brand-accent-15: color-mix(in srgb, var(--brand-accent), transparent 85%);
+  --brand-accent-25: color-mix(in srgb, var(--brand-accent), transparent 75%);
+
+  --brand-warm: #b52d10;
+  --brand-warm-08: color-mix(in srgb, var(--brand-warm), transparent 92%);
+  --brand-warm-20: color-mix(in srgb, var(--brand-warm), transparent 80%);
 }
 
 * { box-sizing: border-box; }
@@ -117,6 +132,11 @@ html, body {
   margin: 0;
   padding: 0;
   height: 100%;
+  font-family: var(--font-base);
+  line-height: var(--line-height);
+  font-size: var(--font-size);
+  color: var(--brand-text);
+  background: var(--brand-bg);
 }
 
 #branding {
