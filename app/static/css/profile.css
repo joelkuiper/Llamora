@@ -66,6 +66,8 @@
 
     h2 {
       margin: 0 0 var(--spacing-md);
+      font-size: 1.1rem;
+      color: #555;
     }
 
     /* single-action rows */
