@@ -296,7 +296,7 @@ input[type="checkbox"]:focus {
 
     .close-error {
       position: absolute;
-      top: 0.5em;
+      top: 0.8rem;
       right: 1em;
       background: none;
       border: none;
