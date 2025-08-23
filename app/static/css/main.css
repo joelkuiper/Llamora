@@ -449,27 +449,30 @@ input[type="checkbox"]:focus {
   .password-suggestions {
     display: none;
     position: absolute;
-    top: calc(100% + var(--spacing-xs));
     left: 0;
     width: 16rem;
     max-width: 80vw;
     padding: var(--spacing-sm);
-    border: 1px solid var(--border);
+
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    background: rgba(255,255,255,0.70);
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
-    background: var(--color-bg);
     box-shadow: var(--raised-shadow);
+
     font-size: 0.85rem;
     z-index: 10;
   }
 
   .password-suggestions strong {
     display: block;
-    margin-bottom: var(--spacing-xs);
   }
 
   .password-suggestions ul {
     margin: 0;
     padding-left: 1.2rem;
+    margin-top: var(--spacing-xs);
   }
 
   .suggestion-wrapper:hover .password-suggestions,
