@@ -31,14 +31,6 @@ function revealMetaChips(container, scrollToBottom){
   }, { once: true });
 }
 
-export function refreshAtMidnight() {
-  const now = new Date();
-  const nextMidnight = new Date(now);
-  nextMidnight.setHours(24, 0, 0, 0);
-  const msUntilMidnight = nextMidnight.getTime() - now.getTime();
-  setTimeout(() => location.reload(), msUntilMidnight);
-}
-
 export function initChatUI(root = document) {
   const form = root.querySelector("#message-form");
   const textarea = form?.querySelector("textarea");
@@ -47,8 +39,6 @@ export function initChatUI(root = document) {
   const errors = document.getElementById("errors");
 
   if (!form || !textarea || !button || !chat) return;
-
-  refreshAtMidnight();
 
   // Ensure tag popovers are reinitialized when returning via back navigation
   chat.querySelectorAll('.meta-chips').forEach((chips) => {
