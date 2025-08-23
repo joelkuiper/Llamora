@@ -19,7 +19,6 @@
   background: var(--color-bg);
   box-shadow: var(--inset-shadow);
   border-radius: var(--radius-md);
-  padding: 2px 6px;
   font-size: 0.75rem;
   border: 1px solid var(--border);
   text-decoration: none;
@@ -34,6 +33,7 @@
   align-items: center;
   position: relative;
   overflow: visible;
+  padding: 0;
 }
 
 .meta-chip:hover,
@@ -49,6 +49,8 @@
 .chip-label {
   text-decoration: none;
   color: inherit;
+  display: block;
+  padding: 2px 6px;
 }
 
 .chip-remove {
