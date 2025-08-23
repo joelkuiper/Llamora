@@ -19,7 +19,6 @@
     <link rel="stylesheet" href="{{url_for('static', filename='css/main.css')}}">
     <link rel="stylesheet" href="{{url_for('static', filename='css/chat.css')}}">
     <link rel="stylesheet" href="{{url_for('static', filename='css/search.css')}}">
-    <link rel="stylesheet" href="{{url_for('static', filename='css/sidebar.css')}}">
     <link rel="stylesheet" href="{{url_for('static', filename='css/profile.css')}}">
     <link rel="stylesheet" href="{{url_for('static', filename='css/tags.css')}}">
 
@@ -38,36 +37,6 @@
         <h1>{{ config.APP_NAME }}</h1>
       </div>
 
-      <button id="sidebar-toggle"
-              class="icon-btn"
-              aria-label="Toggle sidebar"
-              aria-pressed="false"
-              data-tooltip-title="Toggle sidebar">
-        <svg class="icon-closed" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <!-- outer page -->
-          <rect x="3" y="5" width="18" height="14" rx="3"
-                stroke="currentColor" stroke-width="2"/>
-          <!-- vertical divider (sidebar) -->
-          <line x1="9.75" y1="5" x2="9.75" y2="19"
-                stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <!-- triangle pointing LEFT -->
-          <polygon points="13,12 16.5,10 16.5,14"
-                   fill="currentColor" />
-        </svg>
-
-        <svg class="icon-open" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <!-- outer page -->
-          <rect x="3" y="5" width="18" height="14" rx="3"
-                stroke="currentColor" stroke-width="2"/>
-          <!-- thin left sliver hint -->
-          <rect x="4.5" y="6.5" width="1.6" height="11" rx="0.8"
-                fill="currentColor" opacity=".22"/>
-          <!-- triangle pointing RIGHT -->
-          <polygon points="11,12 7.5,10 7.5,14"
-                   fill="currentColor" />
-        </svg>
-      </button>
-
       <div class="header-right">
         <div class="search-wrap">
           {% include 'partials/search_form.html' %}
@@ -76,6 +45,21 @@
           </section>
         </div>
         <div class="user-actions">
+          <a id="calendar-btn"
+             href="{{ url_for('sessions.calendar_view') }}"
+             hx-get="{{ url_for('sessions.calendar_view') }}"
+             hx-target="#content-wrapper"
+             hx-swap="outerHTML"
+             hx-push-url="true"
+             class="icon-btn"
+             aria-label="Calendar" data-tooltip-title="Calendar">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/>
+              <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" stroke-width="2"/>
+              <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" stroke-width="2"/>
+              <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </a>
           <a id="profile-btn"
              href="{{ url_for('auth.profile') }}"
              hx-get="{{ url_for('auth.profile') }}"
@@ -104,7 +88,6 @@
     </header>
 
     <div class="app-container">
-      {% include "partials/sidebar.html" %}
       <div id="content">
         {% set tpl = content_template if content_template is defined else 'partials/chat.html' %}
         {% include tpl %}
@@ -118,9 +101,9 @@
 
       document.body.addEventListener("htmx:configRequest", function (event) {
           const chat = document.getElementById("chat");
-          const activeSessionId = chat?.dataset.sessionId;
-          if (activeSessionId) {
-              event.detail.headers["X-Active-Session"] = activeSessionId;
+          const activeDate = chat?.dataset.date;
+          if (activeDate) {
+              event.detail.headers["X-Active-Day"] = activeDate;
           }
       });
 
@@ -145,9 +128,7 @@
     </script>
 
     <script type="module">
-      import { initSidebarToggle } from "{{ url_for('static', filename='js/sidebar.js') }}";
       import { initScrollMemory } from "{{ url_for('static', filename='js/scroll.js') }}";
-      initSidebarToggle();
       initScrollMemory();
     </script>
   </body>

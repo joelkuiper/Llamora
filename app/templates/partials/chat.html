@@ -5,7 +5,7 @@
   id="content-wrapper"
   {% if oob %} hx-swap-oob="true" {% endif %}>
 
-    <div id="chat" data-session-id="{{ session.id }}">
+    <div id="chat" data-date="{{ day }}">
       <div class="message assistant"><div class="markdown-body">Welcome. Share what’s on your mind, and I’ll be here with you</div></div>
       {% for msg in history %}
       <div id="msg-{{ msg['id'] }}" class="message {{ 'assistant' if msg['role'] != 'user' else 'user'}}">
@@ -17,12 +17,12 @@
       {% endfor %}
 
       {% if pending_msg_id %}
-      {{ assistant_stream(pending_msg_id, session.id) }}
+      {{ assistant_stream(pending_msg_id, day) }}
       {% endif %}
     </div>
 
   <form id="message-form"
-        hx-post="{{ url_for('chat.send_message', session_id=session.id) }}"
+        hx-post="{{ url_for('chat.send_message', session_id=day) }}"
         hx-target="#chat"
         hx-on::after-request="this.reset()"
         hx-swap="beforeend">
@@ -52,15 +52,15 @@
   </div>
   <script type="module">
     import { initChatUI } from "{{ url_for('static', filename='js/chat.js') }}";
-    import { updateActiveSession } from "{{ url_for('static', filename='js/session.js') }}";
+    import { updateActiveDay } from "{{ url_for('static', filename='js/day.js') }}";
     import { initSearchUI, scrollToHighlight } from "{{ url_for('static', filename='js/ui.js') }}";
 
     const run = () => {
       initChatUI();
-      updateActiveSession();
+      updateActiveDay();
       initSearchUI();
       scrollToHighlight();
-      document.title = "{{ session.name }}";
+      document.title = "{{ day }}";
     };
 
     run();

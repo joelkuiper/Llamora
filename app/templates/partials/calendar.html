@@ -1,0 +1,40 @@
+<main id="content-wrapper">
+  <section id="calendar">
+    <h2>{{ month_name }} {{ year }}</h2>
+    <table class="calendar-table">
+      <thead>
+        <tr>
+          {% for d in ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"] %}
+          <th>{{ d }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for week in weeks %}
+        <tr>
+          {% for day in week %}
+            {% if day == 0 %}
+            <td class="empty"></td>
+            {% else %}
+            {% set date_str = "%04d-%02d-%02d"|format(year, month, day) %}
+            <td{% if date_str == active_day %} class="active"{% endif %}>
+              <a href="{{ url_for('sessions.session', session_id=date_str) }}"
+                 hx-get="{{ url_for('chat.chat_htmx', session_id=date_str) }}"
+                 hx-target="#content-wrapper"
+                 hx-swap="outerHTML"
+                 hx-push-url="true"
+                 data-date="{{ date_str }}">{{ day }}</a>
+            </td>
+            {% endif %}
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  <script type="module">
+    import { updateActiveDay } from "{{ url_for('static', filename='js/day.js') }}";
+    updateActiveDay();
+    document.title = "Calendar";
+  </script>
+</main>

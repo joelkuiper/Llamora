@@ -5,8 +5,8 @@ export function initScrollMemory(wrapperSelector = "#content-wrapper") {
 
   const getKey = () => {
     const chat = document.getElementById("chat");
-    if (chat && chat.dataset.sessionId) {
-      return `${storagePrefix}-session-${chat.dataset.sessionId}`;
+    if (chat && chat.dataset.date) {
+      return `${storagePrefix}-day-${chat.dataset.date}`;
     }
     return `${storagePrefix}-path-${location.pathname}`;
   };

@@ -38,7 +38,7 @@ async def render_chat(session_id, oob=False):
 
     html = await render_template(
         "partials/chat.html",
-        session={"id": session_id, "name": session_id},
+        day=session_id,
         history=history,
         oob=oob,
         pending_msg_id=pending_msg_id,
@@ -360,7 +360,7 @@ async def send_message(session_id):
         "partials/placeholder.html",
         user_text=user_text,
         user_msg_id=user_msg_id,
-        session_id=session_id,
+        day=session_id,
     )
 
 

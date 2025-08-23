@@ -130,10 +130,10 @@ export function initSearchUI() {
   document.addEventListener("click", (evt) => {
     const link = evt.target.closest("#search-results a[data-target]");
     if (!link) return;
-    const currentId = document.getElementById("chat")?.dataset.sessionId;
+    const currentId = document.getElementById("chat")?.dataset.date;
     const targetId  = link.dataset.target;
 
-    if (link.dataset.sessionId === currentId) {
+    if (link.dataset.date === currentId) {
       evt.preventDefault();
       closeResults(true);
       const el = document.getElementById(targetId);

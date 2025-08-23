@@ -3,9 +3,9 @@
      hx-get="{{ url_for('chat.chat_htmx', session_id=item.created_at[:10]) }}?target=msg-{{ item.id }}"
      hx-target="#content-wrapper"
      hx-swap="outerHTML"
-     data-session-id="{{ item.created_at[:10] }}"
+     data-date="{{ item.created_at[:10] }}"
      data-target="msg-{{ item.id }}"
-     hx-trigger="click[!document.getElementById('chat') || document.getElementById('chat').dataset.sessionId !== this.dataset.sessionId]">
+     hx-trigger="click[!document.getElementById('chat') || document.getElementById('chat').dataset.date !== this.dataset.date]">
     <div class="search-result-meta">
       {{ "You" if  item.role == "user" else config.APP_NAME }}
     </div>

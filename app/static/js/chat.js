@@ -45,8 +45,8 @@ export function initChatUI(root = document) {
     delete chips.dataset.popInit;
   });
 
-  const sessionId = chat.dataset.sessionId;
-  const draftKey = `chat-draft-${sessionId}`;
+  const date = chat.dataset.date;
+  const draftKey = `chat-draft-${date}`;
   textarea.value = sessionStorage.getItem(draftKey) || "";
 
   const handleStopClick = () => {

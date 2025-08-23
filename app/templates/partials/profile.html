@@ -55,8 +55,8 @@
     </section>
   </section>
   <script type="module">
-    import { updateActiveSession } from "{{ url_for('static', filename='js/session.js') }}";
-    updateActiveSession();
+    import { updateActiveDay } from "{{ url_for('static', filename='js/day.js') }}";
+    updateActiveDay();
     document.title = "Profile";
     const backBtn = document.getElementById('profile-back');
     const stored = sessionStorage.getItem('profile-return');
