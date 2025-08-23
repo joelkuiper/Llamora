@@ -8,10 +8,10 @@ from app.services.auth_helpers import (
     get_dek,
 )
 
-sessions_bp = Blueprint("sessions", __name__)
+days_bp = Blueprint("days", __name__)
 
 
-@sessions_bp.route("/")
+@days_bp.route("/")
 @login_required
 async def index():
     user = await get_current_user()
@@ -21,12 +21,12 @@ async def index():
     if not current_date:
         current_date = datetime.utcnow().date().isoformat()
     await db.update_state(uid, active_date=current_date)
-    return redirect(url_for("sessions.session", date=current_date), code=302)
+    return redirect(url_for("days.day", date=current_date), code=302)
 
 
-@sessions_bp.route("/d/<date>")
+@days_bp.route("/d/<date>")
 @login_required
-async def session(date):
+async def day(date):
     user = await get_current_user()
     uid = user["id"]
     dek = get_dek()
@@ -47,7 +47,7 @@ async def session(date):
     return resp
 
 
-@sessions_bp.route("/calendar")
+@days_bp.route("/calendar")
 @login_required
 async def calendar_view():
     user = await get_current_user()
@@ -64,5 +64,5 @@ async def calendar_view():
         active_day=active_day,
     )
     resp = await make_response(html)
-    resp.headers["HX-Push-Url"] = url_for("sessions.calendar_view")
+    resp.headers["HX-Push-Url"] = url_for("days.calendar_view")
     return resp

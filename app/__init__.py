@@ -29,13 +29,13 @@ def create_app():
     CSRFProtect(app)
 
     from .routes.auth import auth_bp
-    from .routes.sessions import sessions_bp
+    from .routes.days import days_bp
     from .routes.chat import chat_bp, llm
     from .routes.search import search_bp
     from .routes.tags import tags_bp
 
     app.register_blueprint(auth_bp)
-    app.register_blueprint(sessions_bp)
+    app.register_blueprint(days_bp)
     app.register_blueprint(chat_bp)
     app.register_blueprint(search_bp)
     app.register_blueprint(tags_bp)

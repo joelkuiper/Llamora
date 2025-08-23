@@ -54,7 +54,7 @@ async def chat_htmx(date):
     target = request.args.get("target")
     html = await render_chat(date, False)
     resp = await make_response(html, 200)
-    push_url = url_for("sessions.session", date=date)
+    push_url = url_for("days.day", date=date)
     if target:
         push_url = f"{push_url}?target={target}"
     resp.headers["HX-Push-Url"] = push_url

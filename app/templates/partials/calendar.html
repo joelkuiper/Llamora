@@ -18,7 +18,7 @@
             {% else %}
             {% set date_str = "%04d-%02d-%02d"|format(year, month, day) %}
             <td{% if date_str == active_day %} class="active"{% endif %}>
-              <a href="{{ url_for('sessions.session', date=date_str) }}"
+              <a href="{{ url_for('days.day', date=date_str) }}"
                  hx-get="{{ url_for('chat.chat_htmx', date=date_str) }}"
                  hx-target="#content-wrapper"
                  hx-swap="outerHTML"
