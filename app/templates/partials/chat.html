@@ -6,7 +6,11 @@
   {% if oob %} hx-swap-oob="true" {% endif %}>
 
     <div id="chat" data-date="{{ day }}">
+      {% if not history|length and not is_today %}
+      <div class="no-content">No entry was made here.</div>
+      {% else %}
       <div class="message assistant"><div class="markdown-body">Welcome. Share what’s on your mind, and I’ll be here with you</div></div>
+      {% endif %}
       {% for msg in history %}
       <div id="msg-{{ msg['id'] }}" class="message {{ 'assistant' if msg['role'] != 'user' else 'user'}}">
         <div class="markdown-body">{{ msg.message }}</div>

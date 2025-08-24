@@ -63,6 +63,15 @@ body {
 
   .error { color: var(--color-error-text-dark); }
 
+  .no-content {
+    opacity: 0.8;
+    color: var(--brand-muted);
+    padding: var(--spacing-xl);
+    text-align: center;
+    text-shadow: var(--text-shadow-soft);
+    user-select: none;
+  }
+
   .message {
     border: 1px solid var(--border);
     padding: var(--spacing-lg) var(--spacing-xl);
