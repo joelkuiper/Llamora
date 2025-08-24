@@ -171,8 +171,8 @@
         box-shadow .12s;
     }
 
-    td a:not(.inactive),
-    td span:not(.inactive) {
+    td a:not(.no-messages),
+    td span:not(.no-messages) {
       &:hover {
         background: linear-gradient(
           0deg,
@@ -234,11 +234,11 @@
       pointer-events: none;
     }
 
-    td.active .inactive {
+    td.active .no-messages {
       opacity: 1;
     }
 
-    td .inactive {
+    td .no-messages {
       opacity: .5;
       cursor: default;
       &:hover {
