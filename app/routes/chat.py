@@ -19,6 +19,7 @@ from app.services.auth_helpers import (
     get_current_user,
     get_dek,
 )
+from app.services.timezone import local_date
 
 chat_bp = Blueprint("chat", __name__)
 
@@ -36,6 +37,7 @@ async def render_chat(date, oob=False):
     if history and history[-1]["role"] == "user":
         pending_msg_id = history[-1]["id"]
 
+    today = local_date().isoformat()
     html = await render_template(
         "partials/chat.html",
         day=date,
@@ -43,6 +45,7 @@ async def render_chat(date, oob=False):
         oob=oob,
         pending_msg_id=pending_msg_id,
         user=user,
+        is_today=(date == today),
     )
 
     return html

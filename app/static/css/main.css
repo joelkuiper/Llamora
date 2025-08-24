@@ -142,7 +142,7 @@ html, body {
 #branding {
   display: flex;
   align-items: center;
-  opacity: 0.8;
+  opacity: 0.6;
 
   h1 {
     font-weight: lighter;
@@ -444,7 +444,7 @@ input[type="checkbox"]:focus {
   justify-content: center;
   border-radius: var(--radius-sm);
   color: var(--color-heading);
-  opacity: 0.33;
+  opacity: 0.45;
   transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 
   &:hover {

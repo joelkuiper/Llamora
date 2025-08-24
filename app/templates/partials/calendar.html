@@ -42,15 +42,14 @@
           {% if date_str == today %}{% set classes = classes + ['is-today'] %}{% endif %}
           {% if day in active_days %}{% set classes = classes + ['has-entry'] %}{% endif %}
           {% set is_today = (date_str == today) %}
-          <td{% if classes %} class="{{ classes|join(' ') }}"{% endif %}>
+          <td data-date="{{ date_str }}"{% if classes %} class="{{ classes|join(' ') }}"{% endif %}>
             {% if is_today or day in active_days %}
             <a{% if not is_today %} class="inactive"{% endif %}
                href="{{ url_for('days.day', date=date_str) }}"
                hx-get="{{ url_for('chat.chat_htmx', date=date_str) }}"
                hx-target="#content-wrapper"
                hx-swap="outerHTML"
-               hx-push-url="true"
-               data-date="{{ date_str }}">{{ day }}</a>
+               hx-push-url="true">{{ day }}</a>
             {% else %}
             <span class="inactive">{{ day }}</span>
             {% endif %}

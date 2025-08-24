@@ -32,10 +32,10 @@
           onkeydown="if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); this.form.requestSubmit(); }"
           name="message"
           rows="3"
-          placeholder="Write your thoughts here…"
+          placeholder="{{ 'Write your thoughts here…' if is_today else 'This day has past.' }}"
           cols="40"
-          maxlength="{{ config.MAX_MESSAGE_LENGTH }}"></textarea>
-        <button id="send-btn" class="btn" type="submit" aria-label="Send"></button>
+          maxlength="{{ config.MAX_MESSAGE_LENGTH }}"{% if not is_today %} disabled{% endif %}></textarea>
+        <button id="send-btn" class="btn" type="submit" aria-label="Send"{% if not is_today %} disabled{% endif %}></button>
       </div>
   </form>
   <div id="scroll-bottom-container">
@@ -52,12 +52,13 @@
   </div>
   <script type="module">
     import { initChatUI } from "{{ url_for('static', filename='js/chat.js') }}";
-    import { updateActiveDay } from "{{ url_for('static', filename='js/day.js') }}";
+    import { updateActiveDay, initDayNav } from "{{ url_for('static', filename='js/day.js') }}";
     import { initSearchUI, scrollToHighlight } from "{{ url_for('static', filename='js/ui.js') }}";
 
     const run = () => {
       initChatUI();
       updateActiveDay();
+      initDayNav();
       initSearchUI();
       scrollToHighlight();
       document.title = "{{ day }}";
