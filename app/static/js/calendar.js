@@ -46,10 +46,7 @@ function initCalendarPopover() {
     instance = instance || Popper.createPopper(btn, pop, { placement: 'bottom' });
     update();
     requestAnimationFrame(() => pop.classList.add('tp-open'));
-    if (!pop.dataset.loaded) {
-      htmx.trigger(pop, 'calendar-popover:show');
-      pop.dataset.loaded = '1';
-    }
+    htmx.trigger(pop, 'calendar-popover:show');
     document.addEventListener('click', outside, true);
     document.addEventListener('keydown', onKey);
   });
