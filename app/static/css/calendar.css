@@ -220,6 +220,10 @@
       font-weight: 600;
     }
 
+    td.has-entry a {
+      cursor: pointer;
+    }
+
     td.has-entry a::after {
       content: "";
       position: absolute;
