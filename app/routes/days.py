@@ -29,7 +29,7 @@ async def index():
 @login_required
 async def day_today():
     today = local_date().isoformat()
-    return redirect(url_for("days.day", date=today), code=302)
+    return await day(today)
 
 
 @days_bp.route("/d/<date>")

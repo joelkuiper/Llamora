@@ -37,38 +37,32 @@ function revealMetaChips(container, scrollToBottom){
   }, { once: true });
 }
 
-// Redirect to today's chat page once the date rolls over or the user returns
-// after being away past midnight. We check immediately, schedule the next
-// check at the upcoming midnight, and re-check whenever the document becomes
-// visible again (e.g. when the tab is focused after the laptop wakes up).
+// When viewing today's chat, reload the page after midnight or when the user
+// returns to the tab on a new day.
 export function refreshAtMidnight() {
+  const chat = document.getElementById("chat");
+  if (!chat) return;
+
+  const pad = (n) => String(n).padStart(2, "0");
+
   const check = () => {
-    const chat = document.getElementById("chat");
-    if (!chat) return;
-
-    const date = chat.dataset.date;
     const now = new Date();
-    const pad = (n) => String(n).padStart(2, "0");
     const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-    const lastDate = sessionStorage.getItem("last-date");
-
-    if (lastDate === date && date !== today) {
+    if (chat.dataset.date !== today) {
       const tz = setTimezoneCookie();
       location.href = `/d/today?tz=${tz}`;
-      return;
+    } else {
+      const nextMidnight = new Date(now);
+      nextMidnight.setHours(24, 0, 0, 0);
+      setTimeout(check, nextMidnight.getTime() - now.getTime());
     }
-
-    const nextMidnight = new Date(now);
-    nextMidnight.setHours(24, 0, 0, 0);
-    const msUntilMidnight = nextMidnight.getTime() - now.getTime();
-    setTimeout(check, msUntilMidnight);
   };
 
   if (!window.__refreshMidnightInit) {
-    window.__refreshMidnightInit = true;
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") check();
     });
+    window.__refreshMidnightInit = true;
   }
 
   check();
@@ -90,18 +84,10 @@ export function initChatUI(root = document) {
   });
 
   const date = chat.dataset.date;
-  const prevDate = sessionStorage.getItem("last-date");
-  sessionStorage.setItem("last-date", date);
   const now = new Date();
   const pad = (n) => String(n).padStart(2, "0");
   const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
   const isToday = date === today;
-
-  if (!isToday && prevDate === date) {
-    const tz = setTimezoneCookie();
-    location.href = `/d/today?tz=${tz}`;
-    return;
-  }
 
   const draftKey = `chat-draft-${date}`;
   textarea.value = sessionStorage.getItem(draftKey) || "";
