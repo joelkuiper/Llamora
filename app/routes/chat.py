@@ -180,6 +180,7 @@ class PendingResponse:
             async for chunk in llm.stream_response(self.user_msg_id, history, params):
                 if isinstance(chunk, dict) and chunk.get("type") == "error":
                     full_response += f"<span class='error'>{chunk['data']}</span>"
+                    logger.info(f"Error {chunk}")
                     self.error = True
                     break
 
@@ -462,6 +463,7 @@ async def sse_reply(user_msg_id: str, date: str):
             pass
         if pending_response.error:
             yield "event: error\ndata: \n\n"
+            logger.debug(f"Yielding error! {chunk}")
             pending_responses.pop(user_msg_id, None)
         else:
             data = orjson.dumps(

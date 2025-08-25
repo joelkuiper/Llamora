@@ -370,6 +370,7 @@ function initStreamHandler(setStreaming, scrollToBottom) {
     if (type === "message") {
       scheduleRender(wrap, () => { renderNow(); scrollToBottom(); });
     } else if (type === "error" || type === "done") {
+      console.log("Error", type);
       const rid = sseRenders.get(wrap);
       if (rid) { cancelAnimationFrame(rid); sseRenders.delete(wrap); }
       renderNow();
