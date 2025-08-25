@@ -37,16 +37,41 @@ function revealMetaChips(container, scrollToBottom){
   }, { once: true });
 }
 
-// Redirect to today's chat page once the date rolls over.
+// Redirect to today's chat page once the date rolls over or the user returns
+// after being away past midnight. We check immediately, schedule the next
+// check at the upcoming midnight, and re-check whenever the document becomes
+// visible again (e.g. when the tab is focused after the laptop wakes up).
 export function refreshAtMidnight() {
-  const now = new Date();
-  const nextMidnight = new Date(now);
-  nextMidnight.setHours(24, 0, 0, 0);
-  const msUntilMidnight = nextMidnight.getTime() - now.getTime();
-  setTimeout(() => {
-    const tz = setTimezoneCookie();
-    location.href = `/d/today?tz=${tz}`;
-  }, msUntilMidnight);
+  const check = () => {
+    const chat = document.getElementById("chat");
+    if (!chat) return;
+
+    const date = chat.dataset.date;
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const viewingToday = sessionStorage.getItem("viewing-today") === "1";
+
+    if (viewingToday && date !== today) {
+      const tz = setTimezoneCookie();
+      location.href = `/d/today?tz=${tz}`;
+      return;
+    }
+
+    const nextMidnight = new Date(now);
+    nextMidnight.setHours(24, 0, 0, 0);
+    const msUntilMidnight = nextMidnight.getTime() - now.getTime();
+    setTimeout(check, msUntilMidnight);
+  };
+
+  if (!window.__refreshMidnightInit) {
+    window.__refreshMidnightInit = true;
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") check();
+    });
+  }
+
+  check();
 }
 
 export function initChatUI(root = document) {
@@ -68,13 +93,25 @@ export function initChatUI(root = document) {
   const now = new Date();
   const pad = (n) => String(n).padStart(2, "0");
   const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const wasToday = sessionStorage.getItem("viewing-today") === "1";
   const isToday = date === today;
+
+  if (!isToday && wasToday) {
+    const tz = setTimezoneCookie();
+    location.href = `/d/today?tz=${tz}`;
+    return;
+  }
+
+  sessionStorage.setItem("viewing-today", isToday ? "1" : "0");
+
   const draftKey = `chat-draft-${date}`;
   textarea.value = sessionStorage.getItem(draftKey) || "";
   if (!isToday) {
     textarea.disabled = true;
     button.disabled = true;
     textarea.placeholder = "This day has past.";
+  } else {
+    refreshAtMidnight();
   }
 
   const handleStopClick = () => {
