@@ -50,9 +50,9 @@ export function refreshAtMidnight() {
     const now = new Date();
     const pad = (n) => String(n).padStart(2, "0");
     const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-    const viewingToday = sessionStorage.getItem("viewing-today") === "1";
+    const lastDate = sessionStorage.getItem("last-date");
 
-    if (viewingToday && date !== today) {
+    if (lastDate === date && date !== today) {
       const tz = setTimezoneCookie();
       location.href = `/d/today?tz=${tz}`;
       return;
@@ -90,19 +90,18 @@ export function initChatUI(root = document) {
   });
 
   const date = chat.dataset.date;
+  const prevDate = sessionStorage.getItem("last-date");
+  sessionStorage.setItem("last-date", date);
   const now = new Date();
   const pad = (n) => String(n).padStart(2, "0");
   const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  const wasToday = sessionStorage.getItem("viewing-today") === "1";
   const isToday = date === today;
 
-  if (!isToday && wasToday) {
+  if (!isToday && prevDate === date) {
     const tz = setTimezoneCookie();
     location.href = `/d/today?tz=${tz}`;
     return;
   }
-
-  sessionStorage.setItem("viewing-today", isToday ? "1" : "0");
 
   const draftKey = `chat-draft-${date}`;
   textarea.value = sessionStorage.getItem(draftKey) || "";

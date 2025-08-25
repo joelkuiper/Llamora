@@ -70,6 +70,22 @@ async def chat_htmx(date):
     return resp
 
 
+@chat_bp.route("/c/today")
+@login_required
+async def chat_htmx_today():
+    target = request.args.get("target")
+    date = local_date().isoformat()
+    html = await render_chat(date, False)
+    resp = await make_response(html, 200)
+    push_url = url_for("days.day_today")
+    if target:
+        push_url = f"{push_url}?target={target}"
+    resp.headers["HX-Push-Url"] = push_url
+    user = await get_current_user()
+    await db.update_state(user["id"], active_date=date)
+    return resp
+
+
 @chat_bp.route("/c/stop/<user_msg_id>", methods=["POST"])
 @login_required
 async def stop_generation(user_msg_id: str):

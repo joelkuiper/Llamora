@@ -14,8 +14,8 @@
   </div>
   <div class="calendar-today">
     <button class="today-btn"
-       href="{{ url_for('days.day', date=today) }}"
-       hx-get="{{ url_for('chat.chat_htmx', date=today) }}"
+       href="{{ url_for('days.day_today') }}"
+       hx-get="{{ url_for('chat.chat_htmx_today') }}"
        hx-target="#content-wrapper"
        hx-swap="outerHTML"
        hx-push-url="true"
