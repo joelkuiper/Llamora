@@ -124,19 +124,14 @@
 
 * { box-sizing: border-box; }
 
-body {
-  font-family: var(--font-base);
-}
-
 html, body {
+  background: var(--color-bg);
   margin: 0;
   padding: 0;
-  height: 100%;
   font-family: var(--font-base);
   line-height: var(--line-height);
   font-size: var(--font-size);
   color: var(--brand-text);
-  background: var(--brand-bg);
 }
 
 #branding {

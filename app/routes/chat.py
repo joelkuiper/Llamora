@@ -10,6 +10,7 @@ from quart import (
 )
 from html import escape
 import asyncio
+import logging
 import orjson
 import re
 from llm.llm_engine import LLMEngine
@@ -25,6 +26,9 @@ chat_bp = Blueprint("chat", __name__)
 
 
 llm = LLMEngine()
+
+
+logger = logging.getLogger(__name__)
 
 
 async def render_chat(date, oob=False):
@@ -69,24 +73,20 @@ async def chat_htmx(date):
 @chat_bp.route("/c/stop/<user_msg_id>", methods=["POST"])
 @login_required
 async def stop_generation(user_msg_id: str):
-    current_app.logger.info("Stop requested for user message %s", user_msg_id)
+    logger.info("Stop requested for user message %s", user_msg_id)
     pending_response = pending_responses.get(user_msg_id)
     handled = False
     if pending_response:
-        current_app.logger.debug("Cancelling pending response %s", user_msg_id)
+        logger.debug("Cancelling pending response %s", user_msg_id)
         await pending_response.cancel()
         handled = True
     else:
-        current_app.logger.debug(
-            "No pending response for %s, aborting active stream", user_msg_id
-        )
+        logger.debug("No pending response for %s, aborting active stream", user_msg_id)
         handled = await llm.abort(user_msg_id)
     if not handled:
-        current_app.logger.warning(
-            "Stop request for unknown user message %s", user_msg_id
-        )
+        logger.warning("Stop request for unknown user message %s", user_msg_id)
         return Response("unknown message id", status=404)
-    current_app.logger.debug(
+    logger.debug(
         "Stop request handled for %s (pending=%s)",
         user_msg_id,
         bool(pending_response),
@@ -157,10 +157,8 @@ class PendingResponse:
         self.cancelled = False
         self.created_at = asyncio.get_event_loop().time()
         self.assistant_msg_id: str | None = None
-        current_app.logger.debug("Starting generation for user message %s", user_msg_id)
-        self._task = asyncio.create_task(
-            self._generate(uid, history, params)
-        )
+        logger.debug("Starting generation for user message %s", user_msg_id)
+        self._task = asyncio.create_task(self._generate(uid, history, params))
 
     async def _generate(
         self,
@@ -244,7 +242,7 @@ class PendingResponse:
             self.cancelled = True
             return
         except Exception:
-            current_app.logger.exception("Error during LLM streaming")
+            logger.exception("Error during LLM streaming")
             full_response += (
                 "<span class='error'>⚠️ An unexpected error occurred.</span>"
             )
@@ -263,13 +261,11 @@ class PendingResponse:
                             created_date=self.date,
                         )
                         self.assistant_msg_id = assistant_msg_id
-                        current_app.logger.debug(
+                        logger.debug(
                             "Saved partial assistant message %s", assistant_msg_id
                         )
                     except Exception:
-                        current_app.logger.exception(
-                            "Failed to save partial assistant message"
-                        )
+                        logger.exception("Failed to save partial assistant message")
                         full_response += (
                             "<span class='error'>⚠️ Failed to save response.</span>"
                         )
@@ -302,11 +298,9 @@ class PendingResponse:
                         created_date=self.date,
                     )
                     self.assistant_msg_id = assistant_msg_id
-                    current_app.logger.debug(
-                        "Saved assistant message %s", assistant_msg_id
-                    )
+                    logger.debug("Saved assistant message %s", assistant_msg_id)
                 except Exception:
-                    current_app.logger.exception("Failed to save assistant message")
+                    logger.exception("Failed to save assistant message")
                     full_response += (
                         "<span class='error'>⚠️ Failed to save response.</span>"
                     )
@@ -362,9 +356,9 @@ async def send_message(date):
         user_msg_id = await db.append_message(
             uid, "user", user_text, dek, created_date=date
         )
-        current_app.logger.debug("Saved user message %s", user_msg_id)
+        logger.debug("Saved user message %s", user_msg_id)
     except Exception:
-        current_app.logger.exception("Failed to save user message")
+        logger.exception("Failed to save user message")
         raise
 
     return await render_template(
@@ -400,7 +394,7 @@ async def sse_reply(user_msg_id: str, date: str):
             history = await db.get_history(uid, actual_date, dek)
 
     if not any(msg["id"] == user_msg_id for msg in history):
-        current_app.logger.warning("History not found for user message %s", user_msg_id)
+        logger.warning("History not found for user message %s", user_msg_id)
         return Response(
             "event: error\ndata: Invalid ID\n\n", mimetype="text/event-stream"
         )
@@ -444,22 +438,16 @@ async def sse_reply(user_msg_id: str, date: str):
                 allowed = current_app.config.get("ALLOWED_LLM_CONFIG_KEYS", set())
                 params = {k: raw[k] for k in raw if k in allowed}
             else:
-                current_app.logger.warning(
-                    "Invalid config JSON for message %s", user_msg_id
-                )
+                logger.warning("Invalid config JSON for message %s", user_msg_id)
         except Exception:
-            current_app.logger.warning(
-                "Invalid config JSON for message %s", user_msg_id
-            )
+            logger.warning("Invalid config JSON for message %s", user_msg_id)
 
     if not params:
         params = None
 
     pending_response = pending_responses.get(user_msg_id)
     if not pending_response:
-        pending_response = PendingResponse(
-            user_msg_id, uid, date, history, dek, params
-        )
+        pending_response = PendingResponse(user_msg_id, uid, date, history, dek, params)
         pending_responses[user_msg_id] = pending_response
 
     global _cleanup_task
@@ -474,6 +462,7 @@ async def sse_reply(user_msg_id: str, date: str):
             pass
         if pending_response.error:
             yield "event: error\ndata: \n\n"
+            pending_responses.pop(user_msg_id, None)
         else:
             data = orjson.dumps(
                 {"assistant_msg_id": pending_response.assistant_msg_id}
