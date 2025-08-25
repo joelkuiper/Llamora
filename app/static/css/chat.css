@@ -22,12 +22,6 @@ body {
   overflow: hidden;
   position: relative;
   min-height: 0;
-
-  &.sidebar-collapsed {
-    #content-wrapper {
-      border-top-left-radius: 0;
-    }
-  }
 }
 
 #branding {
