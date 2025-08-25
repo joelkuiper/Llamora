@@ -191,7 +191,7 @@ class PendingResponse:
         found = False
         brace = 0
         in_str = False
-        escape = False
+        escaping = False
         first = True
         try:
             async for chunk in llm.stream_response(self.user_msg_id, history, params):
@@ -250,10 +250,10 @@ class PendingResponse:
                             elif ch == '"':
                                 in_str = True
                         else:
-                            if escape:
-                                escape = False
+                            if escaping:
+                                escaping = False
                             elif ch == "\\":
-                                escape = True
+                                escaping = True
                             elif ch == '"':
                                 in_str = False
                     if brace == 0 and meta_buf.strip():
@@ -262,12 +262,11 @@ class PendingResponse:
         except asyncio.CancelledError:
             self.cancelled = True
             return
-        except Exception:
+        except Exception as exc:
             logger.exception("Error during LLM streaming")
-            full_response += (
-                "<span class='error'>⚠️ An unexpected error occurred.</span>"
-            )
             self.error = True
+            self.error_message = str(exc) or "An unexpected error occurred."
+            full_response += f"<span class='error'>{escape(self.error_message)}</span>"
         finally:
             if self.cancelled:
                 if full_response.strip():
