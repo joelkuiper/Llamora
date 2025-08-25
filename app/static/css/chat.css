@@ -185,6 +185,7 @@ body {
       flex: 1;
       padding: var(--spacing-lg);
       resize: none;
+      overflow: hidden;
       outline: none;
       font-family: var(--font-base);
     }

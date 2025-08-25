@@ -75,6 +75,7 @@ export function initChatUI(root = document) {
   const button = form?.querySelector("button");
   const chat = root.querySelector("#chat");
   const errors = document.getElementById("errors");
+  const container = root.querySelector("#content-wrapper");
 
   if (!form || !textarea || !button || !chat) return;
 
@@ -91,6 +92,14 @@ export function initChatUI(root = document) {
 
   const draftKey = `chat-draft-${date}`;
   textarea.value = sessionStorage.getItem(draftKey) || "";
+  const resizeTextarea = () => {
+    textarea.style.height = "auto";
+    textarea.style.height = textarea.scrollHeight + "px";
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
+  };
+  resizeTextarea();
   if (!isToday) {
     textarea.disabled = true;
     button.disabled = true;
@@ -159,6 +168,10 @@ export function initChatUI(root = document) {
 
   form.addEventListener("htmx:afterRequest", () => {
     sessionStorage.removeItem(draftKey);
+    textarea.style.height = "auto";
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
   });
 
   form.addEventListener("htmx:configRequest", (event) => {
@@ -169,9 +182,20 @@ export function initChatUI(root = document) {
   });
 
   textarea.addEventListener("input", () => {
+    resizeTextarea();
     sessionStorage.setItem(draftKey, textarea.value);
     if (!currentStreamMsgId) {
       button.disabled = !textarea.value.trim();
+    }
+  });
+
+  textarea.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (textarea.value.trim()) {
+        form.requestSubmit();
+        textarea.style.height = "auto";
+      }
     }
   });
 

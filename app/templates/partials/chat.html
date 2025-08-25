@@ -11,7 +11,6 @@
 
     <div class="input-wrapper">
         <textarea class="input"
-          onkeydown="if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); this.form.requestSubmit(); }"
           name="message"
           rows="3"
           placeholder="{{ 'Write your thoughts here…' if is_today else 'This day has past.' }}"
