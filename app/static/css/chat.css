@@ -46,11 +46,10 @@ body {
     0 0 0 1px var(--shadow-light-60) inset;
   border: 1px solid var(--border-strong);
   z-index: 1;
-  padding: var(--spacing-xl);
+  padding: var(--spacing-xl) var(--spacing-xl) 3rem var(--spacing-xl);
   flex: 1;
   overflow-y: auto;
   min-width: 0; /* prevent overflow in flex layouts */
-  border-top-left-radius: var(--radius-md);
   overscroll-behavior: contain;
 }
 
