@@ -255,13 +255,14 @@ class PendingResponse:
         finally:
             if self.cancelled:
                 if full_response.strip():
+                    meta = {"error": True} if self.error else {}
                     try:
                         assistant_msg_id = await db.append_message(
                             uid,
                             "assistant",
                             full_response,
                             self.dek,
-                            {},
+                            meta,
                             reply_to=self.user_msg_id,
                             created_date=self.date,
                         )
@@ -290,6 +291,8 @@ class PendingResponse:
                     meta = {}
             else:
                 meta = {}
+            if self.error:
+                meta["error"] = True
             if full_response.strip():
                 try:
                     assistant_msg_id = await db.append_message(

@@ -410,6 +410,11 @@ function initStreamHandler(setStreaming, scrollToBottom) {
         } catch (err) {
           console.error('failed to load meta chips', err);
         }
+      } else {
+        const placeholder = wrap.querySelector('.meta-chips-placeholder');
+        if (placeholder) {
+          placeholder.remove();
+        }
       }
       scrollToBottom();
     }
