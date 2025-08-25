@@ -85,9 +85,9 @@ export function initSearchUI() {
     }
 
     // First open: run the pop-in under a stable class
-    panel.classList.add("sr-enter");
+    panel.classList.add("pop-enter");
     panel.addEventListener("animationend", () => {
-      panel.classList.remove("sr-enter");
+      panel.classList.remove("pop-enter");
       wrap.classList.add("is-open");
     }, { once: true });
   });
@@ -96,7 +96,7 @@ export function initSearchUI() {
     if (clearInput && input) input.value = "";
     const panel = wrap.querySelector(".sr-panel");
     if (!panel) { wrap.classList.remove("is-open"); return; }
-    panel.classList.add("sr-closing");
+    panel.classList.add("pop-exit");
     panel.addEventListener("animationend", () => {
       wrap.classList.remove("is-open");
       wrap.innerHTML = "";

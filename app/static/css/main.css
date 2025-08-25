@@ -148,6 +148,25 @@ html, body {
   }
 }
 
+/* Shared overlay animations */
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(-6px) scale(.98) rotateX(2deg); }
+  to   { opacity: 1; transform: translateY(0)    scale(1)  rotateX(0); }
+}
+
+@keyframes pop-out {
+  from { opacity: 1; transform: translateY(0)    scale(1)  rotateX(0); }
+  to   { opacity: 0; transform: translateY(-6px) scale(.98) rotateX(2deg); }
+}
+
+.pop-enter {
+  animation: pop-in 180ms cubic-bezier(.2,.7,.2,1) both;
+}
+
+.pop-exit {
+  animation: pop-out 160ms cubic-bezier(.2,.7,.2,1) both;
+}
+
 /* Utility classes */
 .btn {
   padding: var(--spacing-sm) var(--spacing-lg);

@@ -13,23 +13,20 @@
   visibility: hidden;
 }
 
-.calendar-popover {
-  position: relative;
+.calendar-popover > #calendar.htmx-added {
   opacity: 0;
-  transform: translateY(-0.25rem) scale(0.95);
-  transition: opacity .22s ease, transform .22s ease;
+  transform: translateY(-6px) scale(.98) rotateX(2deg);
 }
 
-.calendar-popover.tp-open {
-  opacity: 1;
-  transform: translateY(0) scale(1);
+.calendar-popover {
+  position: relative;
 }
 
 /* Close pill */
 .calendar-popover .overlay-close {
   position: absolute;
-  top: -0.1rem;
-  right: -10.3rem;
+  top: -0.5rem;
+  right: -0.5rem;
   z-index: 9999;
 }
 
@@ -63,10 +60,7 @@
 }
 
 #calendar {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
+  position: relative;
   z-index: 6100;
   width: 20rem;
   max-width: 90vw;
