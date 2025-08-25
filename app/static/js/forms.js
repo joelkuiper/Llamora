@@ -5,7 +5,7 @@ function setTimezoneCookie() {
   document.cookie = `tz=${tz}; path=/`;
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+function initForms() {
   setTimezoneCookie();
   document.querySelectorAll(".form-container form, #profile-page form").forEach((form) => {
     form.addEventListener("submit", async (e) => {
@@ -48,4 +48,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }, 10000);
     });
   });
-});
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initForms);
+} else {
+  initForms();
+}
