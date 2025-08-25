@@ -162,6 +162,22 @@ body {
 
 }
 
+.return-today {
+  max-width: 60rem;
+  margin: 0 auto var(--spacing-xl);
+  background: var(--color-bg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--raised-shadow);
+  padding: var(--spacing-md);
+  text-align: center;
+  a {
+    color: var(--color-text);
+    &:hover {
+      color: var(--accent);
+    }
+  }
+}
+
 #message-form {
   max-width: 60rem;
   margin: 0 auto var(--spacing-xl);

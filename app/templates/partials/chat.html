@@ -1,24 +1,34 @@
 <main
   id="content-wrapper"
   {% if oob %} hx-swap-oob="true" {% endif %}>
-    {% include 'partials/history.html' %}
-
+  {% include 'partials/history.html' %}
+  {% if is_today %}
   <form id="message-form"
         hx-post="{{ url_for('chat.send_message', date=day) }}"
         hx-target="#chat"
         hx-on::after-request="this.reset()"
         hx-swap="beforeend">
-
     <div class="input-wrapper">
         <textarea class="input"
           name="message"
           rows="3"
           placeholder="{{ 'Write your thoughts here…' if is_today else 'This day has past.' }}"
           cols="40"
-          maxlength="{{ config.MAX_MESSAGE_LENGTH }}"{% if not is_today %} disabled{% endif %}></textarea>
+          maxlength="{{ config.MAX_MESSAGE_LENGTH }}"></textarea>
         <button id="send-btn" class="btn" type="submit" aria-label="Send"{% if not is_today %} disabled{% endif %}></button>
       </div>
   </form>
+
+  {% else %}
+  <div class="return-today">This day has past.
+    <a
+    href="{{ url_for('days.day_today') }}"
+       hx-get="{{ url_for('chat.chat_htmx_today') }}"
+       hx-target="#content-wrapper"
+       hx-swap="outerHTML"
+       hx-push-url="true">
+      Return to present. </a>
+  {% endif %}
   <div id="scroll-bottom-container">
     <button id="scroll-bottom" class="scroll-btn" aria-label="Scroll to bottom">
       <svg width="100%" height="100%" viewBox="0 0 24 24"
@@ -31,6 +41,7 @@
       </svg>
     </button>
   </div>
+
   <script type="module">
     import { initChatUI } from "{{ url_for('static', filename='js/chat.js') }}";
     import { updateActiveDay, initDayNav } from "{{ url_for('static', filename='js/day.js') }}";

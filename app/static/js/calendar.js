@@ -43,7 +43,11 @@ function initCalendarPopover() {
     }
     pop.hidden = false;
     btn.classList.add('active');
-    instance = instance || Popper.createPopper(btn, pop, { placement: 'bottom' });
+    instance =
+      instance ||
+      Popper.createPopper(btn, pop, {
+        placement: 'bottom',
+      });
     update();
     requestAnimationFrame(() => pop.classList.add('tp-open'));
     htmx.trigger(pop, 'calendar-popover:show');
