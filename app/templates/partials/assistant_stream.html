@@ -4,20 +4,21 @@
      data-user-msg-id="{{ user_msg_id }}"
      data-assistant-msg-id=""
      hx-ext="sse"
-     sse-close="done, error"
+     sse-close="done"
      sse-connect="{{ url_for('chat.sse_reply', date=day, user_msg_id=user_msg_id) }}">
-  {# data-assistant-msg-id will be set by client JS once streaming completes #}
-  <span class="raw-response" sse-swap="message" hidden hx-swap="beforeend"></span>
+  <span sse-close="error">
+    {# data-assistant-msg-id will be set by client JS once streaming completes #}
+    <span class="raw-response" sse-swap="message" hidden hx-swap="beforeend"></span>
 
-  <span class="markdown-body">
-    <span id="typing-indicator"
-          data-user-msg-id="{{ user_msg_id }}"
-          data-stop-url="{{ url_for('chat.stop_generation', user_msg_id=user_msg_id) }}"
-          sse-swap="done, error"
-          hx-swap="none">
-      <span class="cursor">❚</span>
+    <span class="markdown-body">
+      <span id="typing-indicator"
+            data-user-msg-id="{{ user_msg_id }}"
+            data-stop-url="{{ url_for('chat.stop_generation', user_msg_id=user_msg_id) }}"
+            sse-swap="done"
+            hx-swap="none">
+        <span class="cursor">❚</span>
+      </span>
     </span>
-  </span>
-  <div class="meta-chips-placeholder"></div>
+    <div class="meta-chips-placeholder"></div>
 </div>
 {%- endmacro %}

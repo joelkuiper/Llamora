@@ -151,6 +151,7 @@ class PendingResponse:
         self.text = ""
         self.done = False
         self.error = False
+        self.error_message = ""
         self._cond = asyncio.Condition()
         self.dek = dek
         self.meta = None
@@ -179,9 +180,12 @@ class PendingResponse:
         try:
             async for chunk in llm.stream_response(self.user_msg_id, history, params):
                 if isinstance(chunk, dict) and chunk.get("type") == "error":
-                    full_response += f"<span class='error'>{chunk['data']}</span>"
-                    logger.info(f"Error {chunk}")
                     self.error = True
+                    self.error_message = chunk.get("data", "Unknown error")
+                    full_response = (
+                        f"<span class='error'>{escape(self.error_message)}</span>"
+                    )
+                    logger.info("Error %s", chunk)
                     break
 
                 if first:
@@ -286,8 +290,7 @@ class PendingResponse:
                     meta = {}
             else:
                 meta = {}
-
-            if not self.error and full_response.strip():
+            if full_response.strip():
                 try:
                     assistant_msg_id = await db.append_message(
                         uid,
@@ -311,8 +314,7 @@ class PendingResponse:
                 self.meta = meta
                 self.done = True
                 self._cond.notify_all()
-            if not self.error:
-                pending_responses.pop(self.user_msg_id, None)
+            pending_responses.pop(self.user_msg_id, None)
 
     async def cancel(self):
         self.cancelled = True
@@ -457,19 +459,25 @@ async def sse_reply(user_msg_id: str, date: str):
 
     async def event_stream():
         async for chunk in pending_response.stream():
-            yield f"event: message\ndata: {replace_newline(escape(chunk))}\n\n"
+            if pending_response.error:
+                yield (
+                    "event: error\ndata: "
+                    f"{replace_newline(escape(chunk))}\n\n"
+                )
+                pending_responses.pop(user_msg_id, None)
+                return
+            else:
+                yield (
+                    "event: message\ndata: "
+                    f"{replace_newline(escape(chunk))}\n\n"
+                )
         if pending_response.meta is not None:
             # Placeholder for emitting structured metadata (e.g., tags)
             pass
-        if pending_response.error:
-            yield "event: error\ndata: \n\n"
-            logger.debug(f"Yielding error! {chunk}")
-            pending_responses.pop(user_msg_id, None)
-        else:
-            data = orjson.dumps(
-                {"assistant_msg_id": pending_response.assistant_msg_id}
-            ).decode()
-            yield f"event: done\ndata: {data}\n\n"
-            pending_responses.pop(user_msg_id, None)
+        data = orjson.dumps(
+            {"assistant_msg_id": pending_response.assistant_msg_id}
+        ).decode()
+        yield f"event: done\ndata: {data}\n\n"
+        pending_responses.pop(user_msg_id, None)
 
     return Response(event_stream(), mimetype="text/event-stream")

@@ -370,7 +370,7 @@ function initStreamHandler(setStreaming, scrollToBottom) {
     if (type === "message") {
       scheduleRender(wrap, () => { renderNow(); scrollToBottom(); });
     } else if (type === "error" || type === "done") {
-      console.log("Error", type);
+      console.log("SSE done or error?", type);
       const rid = sseRenders.get(wrap);
       if (rid) { cancelAnimationFrame(rid); sseRenders.delete(wrap); }
       renderNow();
@@ -384,30 +384,32 @@ function initStreamHandler(setStreaming, scrollToBottom) {
       wrap.removeAttribute("sse-close");
       currentStreamMsgId = null;
       setStreaming(false);
-      try {
-        const data = JSON.parse(evt.detail.data || '{}');
-        const assistantId = data.assistant_msg_id;
-        if (assistantId) {
-          wrap.dataset.assistantMsgId = assistantId;
-          const placeholder = wrap.querySelector('.meta-chips-placeholder');
-          if (placeholder) {
-            wrap.addEventListener(
-              'htmx:afterSwap',
-              (e) => {
-                if (e.target.classList?.contains('meta-chips')) {
-                  revealMetaChips(e.target, scrollToBottom);
-                }
-              },
-              { once: true }
-            );
-            htmx.ajax('GET', `/c/meta-chips/${assistantId}`, {
-              target: placeholder,
-              swap: 'outerHTML',
-            });
+      if(type !== 'error') {
+        try {
+          const data = JSON.parse(evt.detail.data || '{}');
+          const assistantId = data.assistant_msg_id;
+          if (assistantId) {
+            wrap.dataset.assistantMsgId = assistantId;
+            const placeholder = wrap.querySelector('.meta-chips-placeholder');
+            if (placeholder) {
+              wrap.addEventListener(
+                'htmx:afterSwap',
+                (e) => {
+                  if (e.target.classList?.contains('meta-chips')) {
+                    revealMetaChips(e.target, scrollToBottom);
+                  }
+                },
+                { once: true }
+              );
+              htmx.ajax('GET', `/c/meta-chips/${assistantId}`, {
+                target: placeholder,
+                swap: 'outerHTML',
+              });
+            }
           }
+        } catch (err) {
+          console.error('failed to load meta chips', err);
         }
-      } catch (err) {
-        console.error('failed to load meta chips', err);
       }
       scrollToBottom();
     }
