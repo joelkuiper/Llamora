@@ -13,6 +13,7 @@ import asyncio
 import logging
 import orjson
 import re
+from datetime import datetime
 from llm.llm_engine import LLMEngine
 from app import db
 from app.services.auth_helpers import (
@@ -20,7 +21,7 @@ from app.services.auth_helpers import (
     get_current_user,
     get_dek,
 )
-from app.services.timezone import local_date
+from app.services.time import local_date, date_and_part
 
 chat_bp = Blueprint("chat", __name__)
 
@@ -161,6 +162,7 @@ class PendingResponse:
         history: list[dict],
         dek: bytes,
         params: dict | None = None,
+        context: dict | None = None,
     ):
         self.user_msg_id = user_msg_id
         self.date = date
@@ -171,6 +173,7 @@ class PendingResponse:
         self._cond = asyncio.Condition()
         self.dek = dek
         self.meta = None
+        self.context = context or {}
         self.cancelled = False
         self.created_at = asyncio.get_event_loop().time()
         self.assistant_msg_id: str | None = None
@@ -194,7 +197,9 @@ class PendingResponse:
         escaping = False
         first = True
         try:
-            async for chunk in llm.stream_response(self.user_msg_id, history, params):
+            async for chunk in llm.stream_response(
+                self.user_msg_id, history, params, self.context
+            ):
                 if isinstance(chunk, dict) and chunk.get("type") == "error":
                     self.error = True
                     self.error_message = chunk.get("data", "Unknown error")
@@ -364,6 +369,7 @@ class PendingResponse:
 async def send_message(date):
     form = await request.form
     user_text = form.get("message", "").strip()
+    user_time = form.get("user_time")
     user = await get_current_user()
     uid = user["id"]
     dek = get_dek()
@@ -387,6 +393,7 @@ async def send_message(date):
         user_text=user_text,
         user_msg_id=user_msg_id,
         day=date,
+        user_time=user_time,
     )
 
 
@@ -466,9 +473,18 @@ async def sse_reply(user_msg_id: str, date: str):
     if not params:
         params = None
 
+    user_time_str = request.args.get("user_time")
+    if not user_time_str:
+        user_time_str = datetime.utcnow().isoformat() + "Z"
+    tz = request.cookies.get("tz") or "UTC"
+    date_str, time_of_day = date_and_part(user_time_str, tz)
+    ctx = {"date": date_str, "time_of_day": time_of_day}
+
     pending_response = pending_responses.get(user_msg_id)
     if not pending_response:
-        pending_response = PendingResponse(user_msg_id, uid, date, history, dek, params)
+        pending_response = PendingResponse(
+            user_msg_id, uid, date, history, dek, params, ctx
+        )
         pending_responses[user_msg_id] = pending_response
 
     global _cleanup_task

@@ -1,8 +1,8 @@
 import { startButtonSpinner, stopButtonSpinner } from "./ui.js";
 
 function setTimezoneCookie() {
-  const offset = new Date().getTimezoneOffset();
-  document.cookie = `tz=${offset}; path=/`;
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  document.cookie = `tz=${tz}; path=/`;
 }
 
 document.addEventListener("DOMContentLoaded", () => {

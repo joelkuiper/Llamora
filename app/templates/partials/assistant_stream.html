@@ -1,11 +1,13 @@
-{% macro assistant_stream(user_msg_id, day) -%}
+{% macro assistant_stream(user_msg_id, day, user_time=None) -%}
+{# Quart's url_for drops params set to None, so we can always include user_time #}
+{%- set sse_url = url_for('chat.sse_reply', date=day, user_msg_id=user_msg_id, user_time=user_time) -%}
 <div id="msg-{{ user_msg_id }}"
      class="message assistant-stream"
      data-user-msg-id="{{ user_msg_id }}"
      data-assistant-msg-id=""
      hx-ext="sse"
      sse-close="done"
-     sse-connect="{{ url_for('chat.sse_reply', date=day, user_msg_id=user_msg_id) }}">
+     sse-connect="{{ sse_url }}">
   <span sse-close="error">
     {# data-assistant-msg-id will be set by client JS once streaming completes #}
     <span class="raw-response" sse-swap="message" hidden hx-swap="beforeend"></span>

@@ -14,5 +14,5 @@ env = Environment(
 _template = env.get_template(os.path.basename(prompt_path))
 
 
-def build_prompt(history: list[dict]) -> str:
-    return _template.render(history=history)
+def build_prompt(history: list[dict], **context) -> str:
+    return _template.render(history=history, **context)
