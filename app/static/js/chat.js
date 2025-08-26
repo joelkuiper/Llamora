@@ -76,8 +76,7 @@ export function initChatUI(root = document) {
   const chat = root.querySelector("#chat");
   const errors = document.getElementById("errors");
   const container = root.querySelector("#content-wrapper");
-
-  if (!form || !textarea || !button || !chat) return;
+  if (!chat) return;
 
   // Ensure tag popovers are reinitialized when returning via back navigation
   chat.querySelectorAll('.meta-chips').forEach((chips) => {
@@ -91,116 +90,120 @@ export function initChatUI(root = document) {
   const isToday = date === today;
 
   const draftKey = `chat-draft-${date}`;
-  textarea.value = sessionStorage.getItem(draftKey) || "";
-  const resizeTextarea = () => {
-    textarea.style.height = "auto";
-    textarea.style.height = textarea.scrollHeight + "px";
-    if (container) {
-      container.scrollTop = container.scrollHeight;
-    }
-  };
-  resizeTextarea();
-  if (!isToday) {
-    textarea.disabled = true;
-    button.disabled = true;
-    textarea.placeholder = "This day has past.";
-  } else {
-    refreshAtMidnight();
-  }
 
-  const handleStopClick = () => {
-    console.debug('Stop button clicked');
-    const indicator = chat.querySelector(TYPING_INDICATOR_SELECTOR);
-    const stopEndpoint = indicator?.dataset.stopUrl;
-    const wrap = indicator?.closest('.assistant-stream');
-    if (wrap) {
-      console.debug('Aborting SSE stream');
-      wrap.dispatchEvent(new Event('htmx:abort'));
-      wrap.removeAttribute('hx-ext');
-      wrap.removeAttribute('sse-connect');
-      wrap.removeAttribute('sse-close');
-      if (indicator) {
-        indicator.classList.add('stopped');
-        setTimeout(() => indicator.remove(), 1000);
+  let setStreaming = () => {};
+  const findCurrentMsgId = () =>
+    chat.querySelector(TYPING_INDICATOR_SELECTOR)?.dataset.userMsgId || null;
+
+  if (form && textarea && button) {
+    textarea.value = sessionStorage.getItem(draftKey) || "";
+    const resizeTextarea = () => {
+      textarea.style.height = "auto";
+      textarea.style.height = textarea.scrollHeight + "px";
+      if (container) {
+        container.scrollTop = container.scrollHeight;
       }
-    }
-    if (stopEndpoint) {
-      console.debug('Sending stop request to', stopEndpoint);
-      htmx.ajax('POST', stopEndpoint, { swap: 'none' });
-    }
-    currentStreamMsgId = null;
-    setStreaming(false);
-  };
-
-  const setStreaming = (streaming) => {
+    };
+    resizeTextarea();
     if (!isToday) {
       textarea.disabled = true;
       button.disabled = true;
-      return;
-    }
-    textarea.disabled = streaming;
-    if (streaming) {
-      console.debug('Entering streaming state for', currentStreamMsgId);
-      button.classList.add('stopping');
-      button.type = 'button';
-      button.disabled = false;
-      button.addEventListener('click', handleStopClick, { once: true });
-      button.setAttribute('aria-label', 'Stop');
+      textarea.placeholder = "This day has past.";
     } else {
-      button.classList.remove('stopping');
-      button.type = 'submit';
-      textarea.disabled = false;
-      button.disabled = !textarea.value.trim();
-      textarea.focus({ preventScroll: true });
-      button.setAttribute('aria-label', 'Send');
+      refreshAtMidnight();
     }
-  };
+
+    const handleStopClick = () => {
+      console.debug('Stop button clicked');
+      const indicator = chat.querySelector(TYPING_INDICATOR_SELECTOR);
+      const stopEndpoint = indicator?.dataset.stopUrl;
+      const wrap = indicator?.closest('.assistant-stream');
+      if (wrap) {
+        console.debug('Aborting SSE stream');
+        wrap.dispatchEvent(new Event('htmx:abort'));
+        wrap.removeAttribute('hx-ext');
+        wrap.removeAttribute('sse-connect');
+        wrap.removeAttribute('sse-close');
+        if (indicator) {
+          indicator.classList.add('stopped');
+          setTimeout(() => indicator.remove(), 1000);
+        }
+      }
+      if (stopEndpoint) {
+        console.debug('Sending stop request to', stopEndpoint);
+        htmx.ajax('POST', stopEndpoint, { swap: 'none' });
+      }
+      currentStreamMsgId = null;
+      setStreaming(false);
+    };
+
+    setStreaming = (streaming) => {
+      if (!isToday) {
+        textarea.disabled = true;
+        button.disabled = true;
+        return;
+      }
+      textarea.disabled = streaming;
+      if (streaming) {
+        console.debug('Entering streaming state for', currentStreamMsgId);
+        button.classList.add('stopping');
+        button.type = 'button';
+        button.disabled = false;
+        button.addEventListener('click', handleStopClick, { once: true });
+        button.setAttribute('aria-label', 'Stop');
+      } else {
+        button.classList.remove('stopping');
+        button.type = 'submit';
+        textarea.disabled = false;
+        button.disabled = !textarea.value.trim();
+        textarea.focus({ preventScroll: true });
+        button.setAttribute('aria-label', 'Send');
+      }
+    };
+
+    form.addEventListener("htmx:afterRequest", () => {
+      sessionStorage.removeItem(draftKey);
+      textarea.style.height = "auto";
+      if (container) {
+        container.scrollTop = container.scrollHeight;
+      }
+    });
+
+    const userTimeInput = form.querySelector("#user-time");
+    form.addEventListener("htmx:configRequest", (event) => {
+      if (userTimeInput) {
+        userTimeInput.value = new Date().toISOString();
+      }
+      if (!textarea.value.trim()) {
+        event.preventDefault();
+        textarea.focus({ preventScroll: true });
+      }
+    });
+
+    textarea.addEventListener("input", () => {
+      resizeTextarea();
+      sessionStorage.setItem(draftKey, textarea.value);
+      if (!currentStreamMsgId) {
+        button.disabled = !textarea.value.trim();
+      }
+    });
+
+    textarea.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        if (textarea.value.trim()) {
+          form.requestSubmit();
+          textarea.style.height = "auto";
+        }
+      }
+    });
+  }
 
   // Defer scroll handler setup so elements exist after day switches
   let scrollToBottom = () => {};
   requestAnimationFrame(() => {
     scrollToBottom = initScrollHandler();
     initStreamHandler(setStreaming, scrollToBottom);
-  });
-
-  const findCurrentMsgId = () =>
-    chat.querySelector(TYPING_INDICATOR_SELECTOR)?.dataset.userMsgId || null;
-
-  form.addEventListener("htmx:afterRequest", () => {
-    sessionStorage.removeItem(draftKey);
-    textarea.style.height = "auto";
-    if (container) {
-      container.scrollTop = container.scrollHeight;
-    }
-  });
-
-  const userTimeInput = form.querySelector("#user-time");
-  form.addEventListener("htmx:configRequest", (event) => {
-    if (userTimeInput) {
-      userTimeInput.value = new Date().toISOString();
-    }
-    if (!textarea.value.trim()) {
-      event.preventDefault();
-      textarea.focus({ preventScroll: true });
-    }
-  });
-
-  textarea.addEventListener("input", () => {
-    resizeTextarea();
-    sessionStorage.setItem(draftKey, textarea.value);
-    if (!currentStreamMsgId) {
-      button.disabled = !textarea.value.trim();
-    }
-  });
-
-  textarea.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      if (textarea.value.trim()) {
-        form.requestSubmit();
-        textarea.style.height = "auto";
-      }
-    }
   });
 
   errors?.addEventListener("htmx:afterSwap", () => {
