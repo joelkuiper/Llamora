@@ -31,16 +31,16 @@ function setupAddButton(container) {
 
   const hide = () => {
     if (pop.hidden) return;
-    if (suggestions) {
-      suggestions.innerHTML = "";
-      delete suggestions.dataset.loaded;
-    }
     pop.classList.remove('tp-open');
     btn.classList.remove('active');
     const clear = (e) => {
       if (e && e.target !== pop) return;
       pop.hidden = true;
       pop.removeEventListener('transitionend', clear);
+      if (suggestions) {
+        suggestions.innerHTML = "";
+        delete suggestions.dataset.loaded;
+      }
     };
     pop.addEventListener('transitionend', clear);
     document.removeEventListener('click', outside, true);
