@@ -135,6 +135,10 @@ html, body {
   color: var(--brand-text);
 }
 
+.spinner {
+  font-weight: normal;
+}
+
 #branding {
   display: flex;
   align-items: center;

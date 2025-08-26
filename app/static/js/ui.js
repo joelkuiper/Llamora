@@ -5,10 +5,14 @@ export const SPINNER = {
 
 function spin(el, text = "") {
   let i = 0;
-  el.textContent = text ? `${SPINNER.frames[i]} ${text}` : SPINNER.frames[i];
+  el.textContent = text
+    ? `${SPINNER.frames[i]} ${text}`
+    : SPINNER.frames[i];
   return setInterval(() => {
     i = (i + 1) % SPINNER.frames.length;
-    el.textContent = text ? `${SPINNER.frames[i]} ${text}` : SPINNER.frames[i];
+    el.textContent = text
+      ? `${SPINNER.frames[i]} ${text}`
+      : SPINNER.frames[i];
   }, SPINNER.interval);
 }
 
@@ -19,7 +23,13 @@ export function startButtonSpinner(btn, loadingText = "Loading") {
   btn.dataset.originalText = originalText;
   btn.disabled = true;
   btn.setAttribute("aria-busy", "true");
-  const id = spin(btn, loadingText);
+  btn.textContent = "";
+  const spinnerEl = document.createElement("span");
+  spinnerEl.className = "spinner";
+  spinnerEl.setAttribute("aria-hidden", "true");
+  btn.appendChild(spinnerEl);
+  btn.append(" ", loadingText);
+  const id = spin(spinnerEl);
   btn.dataset.spinnerId = String(id);
   return id;
 }
@@ -27,7 +37,8 @@ export function startButtonSpinner(btn, loadingText = "Loading") {
 export function stopButtonSpinner(btn) {
   const id = btn && btn.dataset.spinnerId;
   if (id) clearInterval(Number(id));
-  if (btn && btn.dataset.originalText) btn.textContent = btn.dataset.originalText;
+  if (btn && btn.dataset.originalText)
+    btn.textContent = btn.dataset.originalText;
   if (btn) {
     btn.disabled = false;
     btn.removeAttribute("aria-busy");
