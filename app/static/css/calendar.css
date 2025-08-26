@@ -13,13 +13,12 @@
   visibility: hidden;
 }
 
-.calendar-popover > #calendar.htmx-added {
-  opacity: 0;
-  transform: translateY(-6px) scale(.98) rotateX(2deg);
-}
+/* .calendar-popover > #calendar.htmx-added { */
+/*   opacity: 0; */
+/* } */
 
 .calendar-popover {
-  position: relative;
+  will-change: transform, opacity, filter;
 }
 
 /* Close pill */
