@@ -31,7 +31,7 @@ import config
 import orjson
 from zxcvbn import zxcvbn
 from datetime import datetime
-from app.services.timezone import local_date
+from app.services.time import local_date
 
 auth_bp = Blueprint("auth", __name__)
 

@@ -7,23 +7,31 @@ function initCalendarPopover() {
   let instance;
 
   const update = () => {
-    pop.style.transition = 'none';
     instance.update();
-    requestAnimationFrame(() => {
-      pop.style.transition = '';
-    });
+  };
+
+  const animateOpen = () => {
+    const panel = pop.querySelector('#calendar');
+    if (!panel) return;
+    panel.classList.add('pop-enter');
+    panel.addEventListener('animationend', () => {
+      panel.classList.remove('pop-enter');
+    }, { once: true });
   };
 
   const hide = () => {
     if (pop.hidden) return;
-    pop.classList.remove('tp-open');
     btn.classList.remove('active');
-    const clear = (e) => {
-      if (e && e.target !== pop) return;
+    const panel = pop.querySelector('#calendar');
+    if (panel) {
+      panel.classList.add('pop-exit');
+      panel.addEventListener('animationend', () => {
+        panel.classList.remove('pop-exit');
+        pop.hidden = true;
+      }, { once: true });
+    } else {
       pop.hidden = true;
-      pop.removeEventListener('transitionend', clear);
-    };
-    pop.addEventListener('transitionend', clear);
+    }
     document.removeEventListener('click', outside, true);
     document.removeEventListener('keydown', onKey);
   };
@@ -49,7 +57,7 @@ function initCalendarPopover() {
         placement: 'bottom',
       });
     update();
-    requestAnimationFrame(() => pop.classList.add('tp-open'));
+    animateOpen();
     htmx.trigger(pop, 'calendar-popover:show');
     document.addEventListener('click', outside, true);
     document.addEventListener('keydown', onKey);
@@ -69,6 +77,7 @@ function initCalendarPopover() {
     if (e.target === pop && instance) {
       update();
       updateActiveDay();
+      animateOpen();
     }
   });
 }

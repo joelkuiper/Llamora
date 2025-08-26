@@ -9,9 +9,9 @@ let currentStreamMsgId = null;
 const TYPING_INDICATOR_SELECTOR = "#typing-indicator";
 
 function setTimezoneCookie() {
-  const offset = new Date().getTimezoneOffset();
-  document.cookie = `tz=${offset}; path=/`;
-  return offset;
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  document.cookie = `tz=${tz}; path=/`;
+  return tz;
 }
 
 function revealMetaChips(container, scrollToBottom){
@@ -50,7 +50,7 @@ export function refreshAtMidnight() {
     const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
     if (chat.dataset.date !== today) {
       const tz = setTimezoneCookie();
-      location.href = `/d/today?tz=${tz}`;
+      location.href = `/d/today?tz=${encodeURIComponent(tz)}`;
     } else {
       const nextMidnight = new Date(now);
       nextMidnight.setHours(24, 0, 0, 0);
@@ -174,7 +174,11 @@ export function initChatUI(root = document) {
     }
   });
 
+  const userTimeInput = form.querySelector("#user-time");
   form.addEventListener("htmx:configRequest", (event) => {
+    if (userTimeInput) {
+      userTimeInput.value = new Date().toISOString();
+    }
     if (!textarea.value.trim()) {
       event.preventDefault();
       textarea.focus({ preventScroll: true });

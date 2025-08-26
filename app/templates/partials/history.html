@@ -2,7 +2,7 @@
 {% from 'partials/meta_chips.html' import render_meta_chips %}
 <div id="chat" data-date="{{ day }}">
   {% if not history|length and not is_today %}
-  <div class="no-content">No entry was made here.</div>
+  <div class="no-content">Nothing was written this day.</div>
   {% else %}
   <div class="message assistant"><div class="markdown-body">Welcome. Share what’s on your mind, and I’ll be here with you</div></div>
   {% endif %}

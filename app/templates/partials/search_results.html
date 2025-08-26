@@ -11,7 +11,7 @@
           hx-trigger="click delay:180ms"
           hx-on:click="this.closest('#search-results')
                        ?.querySelector('.sr-panel')
-                       ?.classList.add('sr-closing')">×</button>
+                       ?.classList.add('pop-exit')">×</button>
   <ul class="search-results-list" role="listbox">
     {% for item in results %}
     {% include 'partials/search_result_item.html' %}

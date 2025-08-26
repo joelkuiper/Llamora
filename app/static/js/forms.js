@@ -1,11 +1,11 @@
 import { startButtonSpinner, stopButtonSpinner } from "./ui.js";
 
 function setTimezoneCookie() {
-  const offset = new Date().getTimezoneOffset();
-  document.cookie = `tz=${offset}; path=/`;
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  document.cookie = `tz=${tz}; path=/`;
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+function initForms() {
   setTimezoneCookie();
   document.querySelectorAll(".form-container form, #profile-page form").forEach((form) => {
     form.addEventListener("submit", async (e) => {
@@ -48,4 +48,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }, 10000);
     });
   });
-});
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initForms);
+} else {
+  initForms();
+}

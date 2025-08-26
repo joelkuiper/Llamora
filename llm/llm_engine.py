@@ -180,7 +180,9 @@ class LLMEngine:
         resp.raise_for_status()
         return len(resp.json().get("tokens", []))
 
-    async def _trim_history(self, history: list[dict], max_input: int) -> list[dict]:
+    async def _trim_history(
+        self, history: list[dict], max_input: int, context: dict
+    ) -> list[dict]:
         if not history:
             return history
         async with httpx.AsyncClient(timeout=None) as client:
@@ -188,7 +190,7 @@ class LLMEngine:
             while lo < hi:
                 mid = (lo + hi) // 2
                 slice_history = history[mid:]
-                prompt = build_prompt(slice_history)
+                prompt = build_prompt(slice_history, **context)
                 tokens = await self._count_tokens(client, prompt)
                 if tokens <= max_input:
                     hi = mid
@@ -197,15 +199,20 @@ class LLMEngine:
         return history[lo:]
 
     async def stream_response(
-        self, msg_id: str, history: list[dict], params: dict | None = None
+        self,
+        msg_id: str,
+        history: list[dict],
+        params: dict | None = None,
+        context: dict | None = None,
     ) -> AsyncGenerator[str, None]:
         self._ensure_server_running()
 
         cfg = {**self.default_request, **(params or {})}
         n_predict = cfg.get("n_predict")
         max_input = self.ctx_size - n_predict
-        history = await self._trim_history(history, max_input)
-        prompt = build_prompt(history)
+        ctx = context or {}
+        history = await self._trim_history(history, max_input, ctx)
+        prompt = build_prompt(history, **ctx)
 
         payload = {"prompt": prompt, **cfg, "grammar": self.grammar}
 

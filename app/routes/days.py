@@ -6,7 +6,7 @@ from app.services.auth_helpers import (
     get_current_user,
     get_dek,
 )
-from app.services.timezone import local_date
+from app.services.time import local_date
 
 days_bp = Blueprint("days", __name__)
 

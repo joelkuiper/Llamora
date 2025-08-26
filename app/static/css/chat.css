@@ -22,12 +22,6 @@ body {
   overflow: hidden;
   position: relative;
   min-height: 0;
-
-  &.sidebar-collapsed {
-    #content-wrapper {
-      border-top-left-radius: 0;
-    }
-  }
 }
 
 #branding {
@@ -163,7 +157,8 @@ body {
 }
 
 .return-today {
-  max-width: 60rem;
+  max-width: 26rem;
+  color: var(--color-text-muted);
   margin: 0 auto var(--spacing-xl);
   background: var(--color-bg);
   border-radius: var(--radius-lg);
@@ -171,7 +166,7 @@ body {
   padding: var(--spacing-md);
   text-align: center;
   a {
-    color: var(--color-text);
+    color: var(--color-text-muted);
     &:hover {
       color: var(--accent);
     }
