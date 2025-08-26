@@ -15,13 +15,25 @@ import orjson
 import re
 from datetime import datetime
 from llm.llm_engine import LLMEngine
+from llm.prompt_template import build_opening_prompt
 from app import db
 from app.services.auth_helpers import (
     login_required,
     get_current_user,
     get_dek,
 )
-from app.services.time import local_date, date_and_part
+from app.services.time import (
+    local_date,
+    date_and_part,
+    get_timezone,
+    format_date,
+    part_of_day,
+)
+
+from datetime import timedelta
+from zoneinfo import ZoneInfo
+from ulid import ULID
+
 
 chat_bp = Blueprint("chat", __name__)
 
@@ -38,11 +50,13 @@ async def render_chat(date, oob=False):
 
     dek = get_dek()
     history = await db.get_history(uid, date, dek)
+    today = local_date().isoformat()
+    opening_stream = False
+    if not history and date == today:
+        opening_stream = True
     pending_msg_id = None
     if history and history[-1]["role"] == "user":
         pending_msg_id = history[-1]["id"]
-
-    today = local_date().isoformat()
     html = await render_template(
         "partials/chat.html",
         day=date,
@@ -51,6 +65,7 @@ async def render_chat(date, oob=False):
         pending_msg_id=pending_msg_id,
         user=user,
         is_today=(date == today),
+        opening_stream=opening_stream,
     )
 
     return html
@@ -128,6 +143,50 @@ async def meta_chips(msg_id: str):
     return html
 
 
+@chat_bp.get("/c/opening/<date>")
+@login_required
+async def sse_opening(date: str):
+    user = await get_current_user()
+    uid = user["id"]
+    dek = get_dek()
+    tz = get_timezone()
+    now = datetime.now(ZoneInfo(tz))
+    today_iso = now.date().isoformat()
+    date_str = format_date(now)
+    pod = part_of_day(now)
+    yesterday_iso = (now - timedelta(days=1)).date().isoformat()
+    yesterday_msgs = await db.get_history(uid, yesterday_iso, dek)
+    prompt = build_opening_prompt(
+        yesterday_messages=yesterday_msgs[-20:],
+        date=date_str,
+        part_of_day=pod,
+    )
+    stream_id = str(ULID())
+    pending = PendingResponse(
+        stream_id,
+        uid,
+        today_iso,
+        [],
+        dek,
+        context=None,
+        prompt=prompt,
+        reply_to=None,
+        meta_extra={"auto_opening": True},
+    )
+
+    async def event_stream():
+        async for chunk in pending.stream():
+            if pending.error:
+                yield ("event: error\ndata: " f"{replace_newline(escape(chunk))}\n\n")
+                return
+            else:
+                yield ("event: message\ndata: " f"{replace_newline(escape(chunk))}\n\n")
+        data = orjson.dumps({"assistant_msg_id": pending.assistant_msg_id}).decode()
+        yield f"event: done\ndata: {data}\n\n"
+
+    return Response(event_stream(), mimetype="text/event-stream")
+
+
 PENDING_TTL = 300  # seconds
 CLEANUP_INTERVAL = 60  # seconds
 pending_responses: dict[str, "PendingResponse"] = {}
@@ -163,6 +222,9 @@ class PendingResponse:
         dek: bytes,
         params: dict | None = None,
         context: dict | None = None,
+        prompt: str | None = None,
+        reply_to: str | None = None,
+        meta_extra: dict | None = None,
     ):
         self.user_msg_id = user_msg_id
         self.date = date
@@ -174,6 +236,9 @@ class PendingResponse:
         self.dek = dek
         self.meta = None
         self.context = context or {}
+        self.prompt = prompt
+        self.reply_to = reply_to if reply_to is not None else user_msg_id
+        self.meta_extra = meta_extra or {}
         self.cancelled = False
         self.created_at = asyncio.get_event_loop().time()
         self.assistant_msg_id: str | None = None
@@ -198,7 +263,11 @@ class PendingResponse:
         first = True
         try:
             async for chunk in llm.stream_response(
-                self.user_msg_id, history, params, self.context
+                self.user_msg_id,
+                history,
+                params,
+                self.context,
+                prompt=self.prompt,
             ):
                 if isinstance(chunk, dict) and chunk.get("type") == "error":
                     self.error = True
@@ -276,6 +345,7 @@ class PendingResponse:
             if self.cancelled:
                 if full_response.strip():
                     meta = {"error": True} if self.error else {}
+                    meta.update(self.meta_extra)
                     try:
                         assistant_msg_id = await db.append_message(
                             uid,
@@ -283,7 +353,7 @@ class PendingResponse:
                             full_response,
                             self.dek,
                             meta,
-                            reply_to=self.user_msg_id,
+                            reply_to=self.reply_to,
                             created_date=self.date,
                         )
                         self.assistant_msg_id = assistant_msg_id
@@ -313,6 +383,8 @@ class PendingResponse:
                 meta = {}
             if self.error:
                 meta["error"] = True
+            if self.meta_extra:
+                meta.update(self.meta_extra)
             if full_response.strip():
                 try:
                     assistant_msg_id = await db.append_message(
@@ -321,7 +393,7 @@ class PendingResponse:
                         full_response,
                         self.dek,
                         meta,
-                        reply_to=self.user_msg_id,
+                        reply_to=self.reply_to,
                         created_date=self.date,
                     )
                     self.assistant_msg_id = assistant_msg_id
@@ -494,17 +566,11 @@ async def sse_reply(user_msg_id: str, date: str):
     async def event_stream():
         async for chunk in pending_response.stream():
             if pending_response.error:
-                yield (
-                    "event: error\ndata: "
-                    f"{replace_newline(escape(chunk))}\n\n"
-                )
+                yield ("event: error\ndata: " f"{replace_newline(escape(chunk))}\n\n")
                 pending_responses.pop(user_msg_id, None)
                 return
             else:
-                yield (
-                    "event: message\ndata: "
-                    f"{replace_newline(escape(chunk))}\n\n"
-                )
+                yield ("event: message\ndata: " f"{replace_newline(escape(chunk))}\n\n")
         if pending_response.meta is not None:
             # Placeholder for emitting structured metadata (e.g., tags)
             pass

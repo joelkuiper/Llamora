@@ -3,8 +3,6 @@
 <div id="chat" data-date="{{ day }}">
   {% if not history|length and not is_today %}
   <div class="no-content">Nothing was written this day.</div>
-  {% else %}
-  <div class="message assistant"><div class="markdown-body">Welcome. Share what’s on your mind, and I’ll be here with you</div></div>
   {% endif %}
   {% for msg in history %}
   <div id="msg-{{ msg['id'] }}" class="message {{ 'assistant' if msg['role'] != 'user' else 'user'}}">
@@ -14,7 +12,10 @@
     {% endif %}
   </div>
   {% endfor %}
+  {% if opening_stream %}
+  {{ assistant_stream('opening', day, sse_url=url_for('chat.sse_opening', date=day)) }}
+  {% endif %}
   {% if pending_msg_id %}
-  {{ assistant_stream(pending_msg_id, day) }}
+  {{ assistant_stream(pending_msg_id, day, stop_url=url_for('chat.stop_generation', user_msg_id=pending_msg_id)) }}
   {% endif %}
 </div>

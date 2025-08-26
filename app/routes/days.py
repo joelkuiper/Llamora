@@ -43,6 +43,7 @@ async def day(date):
     if history and history[-1]["role"] == "user":
         pending_msg_id = history[-1]["id"]
     today = local_date().isoformat()
+    opening_stream = not history and date == today
     html = await render_template(
         "index.html",
         user=user,
@@ -51,6 +52,7 @@ async def day(date):
         pending_msg_id=pending_msg_id,
         content_template="partials/chat.html",
         is_today=(date == today),
+        opening_stream=opening_stream,
     )
     resp = await make_response(html)
     await db.update_state(uid, active_date=date)
