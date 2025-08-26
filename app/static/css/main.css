@@ -156,13 +156,13 @@ html, body {
 @keyframes lull-in {
   from {
     opacity: 0;
-    transform: translate3d(0,-4px,0) scale(.985);
-    filter: saturate(.98);
+    transform: translate3d(0, -6px, 0) scale(0.985);
+    filter: blur(1px) saturate(0.96);
   }
-  to  {
+  to {
     opacity: 1;
     transform: translate3d(0, 0, 0) scale(1);
-    filter: saturate(1);
+    filter: blur(0) saturate(1);
   }
 }
 
@@ -170,12 +170,12 @@ html, body {
   from {
     opacity: 1;
     transform: translate3d(0, 0, 0) scale(1);
-    filter: saturate(1);
+    filter: blur(0) saturate(1);
   }
-  to  {
+  to {
     opacity: 0;
-    transform: translate3d(0,-4px,0) scale(.985);
-    filter: saturate(.98);
+    transform: translate3d(0, -6px, 0) scale(0.985);
+    filter: blur(1px) saturate(0.96);
   }
 }
 
