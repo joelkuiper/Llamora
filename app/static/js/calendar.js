@@ -1,5 +1,3 @@
-import { updateActiveDay } from "./day.js";
-
 function initCalendarPopover() {
   const btn = document.getElementById('calendar-btn');
   const pop = document.getElementById('calendar-popover');
@@ -84,7 +82,6 @@ function initCalendarPopover() {
   pop.addEventListener('htmx:afterSwap', (e) => {
     if (e.target === pop && instance) {
       update();
-      updateActiveDay();
       animateOpen();
     }
   });
