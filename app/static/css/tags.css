@@ -144,8 +144,7 @@
   color: var(--glass-text-muted);
   border-radius: var(--radius-sm);
   padding: 10px;
-  opacity: 0;
-  transition: opacity .22s ease, background .18s ease;
+  transition: background .18s ease;
   max-width: 19rem;
   z-index: 1100;
 
@@ -243,11 +242,11 @@
       background: var(--color-bg);
       border: 1px solid var(--border);
       border-radius: var(--radius-md);
-    padding: 2px 8px;
-    font-size: 0.75rem;
-    box-shadow: var(--inset-shadow);
-    cursor: pointer;
-    transition: box-shadow .2s ease, border-color .18s ease, background-color .18s ease, transform .08s ease;
+      padding: 2px 8px;
+      font-size: 0.75rem;
+      box-shadow: var(--inset-shadow);
+      cursor: pointer;
+      transition: box-shadow .2s ease, border-color .18s ease, background-color .18s ease, transform .08s ease;
 
     &:hover {
       border-color: var(--accent);
@@ -259,16 +258,11 @@
 }
 
 
-.tag-popover.tp-open { opacity: 1; }
 
   .tag-popover .tp-content {
     position: relative;
-    transform: scale(0.95);
-    transition: transform .2s ease;
     transform-origin: top right;
   }
-
-.tag-popover.tp-open .tp-content { transform: scale(1); }
 
 
 @keyframes chip-pop {

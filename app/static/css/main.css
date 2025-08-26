@@ -188,6 +188,24 @@ html, body {
   animation: lull-out 160ms ease both;
 }
 
+.fade-enter {
+  animation: fade-in 160ms ease both;
+}
+
+.fade-exit {
+  animation: fade-out 160ms ease both;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
 /* Utility classes */
 .btn {
   padding: var(--spacing-sm) var(--spacing-lg);
