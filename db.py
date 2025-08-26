@@ -776,5 +776,14 @@ class LocalDB:
                 """,
                 (user_id, month_prefix),
             )
-            rows = await cursor.fetchall()
+        rows = await cursor.fetchall()
         return [row["day"] for row in rows]
+
+    async def user_has_messages(self, user_id: str) -> bool:
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                "SELECT 1 FROM messages WHERE user_id = ? LIMIT 1",
+                (user_id,),
+            )
+            row = await cursor.fetchone()
+        return bool(row)

@@ -155,11 +155,15 @@ async def sse_opening(date: str):
     date_str = format_date(now)
     pod = part_of_day(now)
     yesterday_iso = (now - timedelta(days=1)).date().isoformat()
+    is_new = not await db.user_has_messages(uid)
     yesterday_msgs = await db.get_history(uid, yesterday_iso, dek)
+    has_no_activity = not is_new and not yesterday_msgs
     prompt = build_opening_prompt(
         yesterday_messages=yesterday_msgs[-20:],
         date=date_str,
         part_of_day=pod,
+        is_new=is_new,
+        has_no_activity=has_no_activity,
     )
     stream_id = str(ULID())
     pending = PendingResponse(
