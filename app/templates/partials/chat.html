@@ -48,6 +48,7 @@
   <script type="module">
     import { initChatUI } from "{{ url_for('static', filename='js/chat.js') }}";
     import { initSearchUI, scrollToHighlight } from "{{ url_for('static', filename='js/ui.js') }}";
+    import { initDayNav } from "{{ url_for('static', filename='js/day.js') }}";
 
     const run = () => {
       initChatUI();

@@ -1,7 +1,10 @@
+let initialized = false;
+
 function initCalendarPopover() {
   const btn = document.getElementById('calendar-btn');
   const pop = document.getElementById('calendar-popover');
-  if (!btn || !pop) return;
+  if (!btn || !pop || btn.dataset.popoverInit) return;
+  btn.dataset.popoverInit = "true";
   let instance;
 
   const update = () => {
@@ -88,3 +91,7 @@ function initCalendarPopover() {
 }
 
 initCalendarPopover();
+if (!initialized) {
+  document.body.addEventListener('htmx:afterSwap', initCalendarPopover);
+  initialized = true;
+}
