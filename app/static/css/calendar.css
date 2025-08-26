@@ -14,15 +14,12 @@
 }
 
 .calendar-popover {
-  will-change: transform, opacity, filter;
-}
-
-/* Close pill */
-.calendar-popover .overlay-close {
-  position: absolute;
-  top: -0.5rem;
-  right: -0.5rem;
-  z-index: 9999;
+  .overlay-close {
+    position: absolute;
+    top: -0.5rem;
+    right: -0.5rem;
+    z-index: 9999;
+  }
 }
 
 #calendar-label {
