@@ -6,6 +6,8 @@ import logging
 import threading
 from typing import Any, AsyncGenerator
 
+import sys
+
 import httpx
 from httpx import HTTPError
 
@@ -88,6 +90,10 @@ class LLMEngine:
 
             self._launch_server()
             atexit.register(self.shutdown)
+            self._orig_signals: dict[int, signal.Handlers] = {}
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                self._orig_signals[sig] = signal.getsignal(sig)
+                signal.signal(sig, self._handle_exit)
 
     def _wait_until_ready(self) -> None:
         logger = logging.getLogger(__name__)
@@ -169,6 +175,19 @@ class LLMEngine:
             except ProcessLookupError:  # process already gone
                 pass
 
+    def _handle_exit(self, signum, frame) -> None:  # pragma: no cover - signal handler
+        try:
+            self.shutdown()
+        finally:
+            handler = self._orig_signals.get(signum, signal.SIG_DFL)
+            if handler in (signal.SIG_IGN, None):
+                return
+            if handler is signal.SIG_DFL:
+                signal.signal(signum, signal.SIG_DFL)
+                os.kill(os.getpid(), signum)
+            else:
+                handler(signum, frame)
+
     def __del__(self):
         try:
             self.shutdown()
@@ -201,18 +220,22 @@ class LLMEngine:
     async def stream_response(
         self,
         msg_id: str,
-        history: list[dict],
+        history: list[dict] | None = None,
         params: dict | None = None,
         context: dict | None = None,
+        prompt: str | None = None,
     ) -> AsyncGenerator[str, None]:
         self._ensure_server_running()
 
         cfg = {**self.default_request, **(params or {})}
-        n_predict = cfg.get("n_predict")
-        max_input = self.ctx_size - n_predict
-        ctx = context or {}
-        history = await self._trim_history(history, max_input, ctx)
-        prompt = build_prompt(history, **ctx)
+
+        if prompt is None:
+            history = history or []
+            n_predict = cfg.get("n_predict")
+            max_input = self.ctx_size - n_predict
+            ctx = context or {}
+            history = await self._trim_history(history, max_input, ctx)
+            prompt = build_prompt(history, **ctx)
 
         payload = {"prompt": prompt, **cfg, "grammar": self.grammar}
 
@@ -294,6 +317,7 @@ class LLMEngine:
                 return
             finally:
                 self._active_streams.pop(msg_id, None)
+
 
     async def abort(self, msg_id: str) -> bool:
         resp = self._active_streams.pop(msg_id, None)
