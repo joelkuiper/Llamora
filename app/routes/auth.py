@@ -6,6 +6,7 @@ from quart import (
     current_app,
     url_for,
     Response,
+    make_response,
     abort,
 )
 from nacl import pwhash
@@ -167,14 +168,21 @@ async def register():
             rc_cipher,
         )
 
+        # Fetch the newly created user so we can establish a session
+        user = await db.get_user_by_username(username)
+
         if current_app.config.get("DISABLE_REGISTRATION"):
             current_app.config["REGISTRATION_TOKEN"] = None
 
-        return await render_template(
+        html = await render_template(
             "recovery.html",
             code=format_recovery_code(recovery_code),
-            next_url=url_for("auth.login"),
+            next_url=url_for("days.index"),
         )
+        resp = await make_response(html)
+        set_secure_cookie(resp, "uid", str(user["id"]))
+        set_dek(resp, dek)
+        return resp
 
     return await render_template("register.html")
 
