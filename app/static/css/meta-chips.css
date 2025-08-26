@@ -225,28 +225,28 @@
     }
   }
 
-    /* Suggestions/chips under the bar (inside popover) */
-    .tag-suggestions {
-      margin-top: 10px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      position: relative;
+  /* Suggestions/chips under the bar (inside popover) */
+  .tag-suggestions {
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    position: relative;
 
-      &:empty {
-        margin-top: 0;
-      }
+    &:empty {
+      margin-top: 0;
     }
+  }
 
-    .tag-suggestion {
-      background: var(--color-bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      padding: 2px 8px;
-      font-size: 0.75rem;
-      box-shadow: var(--inset-shadow);
-      cursor: pointer;
-      transition: box-shadow .2s ease, border-color .18s ease, background-color .18s ease, transform .08s ease;
+  .tag-suggestion {
+    background: var(--color-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    box-shadow: var(--inset-shadow);
+    cursor: pointer;
+    transition: box-shadow .2s ease, border-color .18s ease, background-color .18s ease, transform .08s ease;
 
     &:hover {
       border-color: var(--accent);
@@ -259,10 +259,10 @@
 
 
 
-  .tag-popover .tp-content {
-    position: relative;
-    transform-origin: top right;
-  }
+.tag-popover .tp-content {
+  position: relative;
+  transform-origin: top right;
+}
 
 
 @keyframes chip-pop {

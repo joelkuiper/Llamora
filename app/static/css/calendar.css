@@ -61,9 +61,11 @@
   max-width: 90vw;
 
   color: var(--color-text);
-  background: var(--glass-bg-strong, var(--color-bg));
   backdrop-filter: blur(10px) saturate(140%);
   -webkit-backdrop-filter: blur(10px) saturate(140%);
+  background: var(--glass-bg-strong);
+
+
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   box-shadow: var(--raised-shadow);
