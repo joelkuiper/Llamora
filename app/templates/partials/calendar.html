@@ -44,7 +44,7 @@
           {% set is_today = (date_str == today) %}
           <td data-date="{{ date_str }}"{% if classes %} class="{{ classes|join(' ') }}"{% endif %}>
             {% if is_today or day in active_days %}
-            <a{% if not is_today %} class="no-messages"{% endif %}
+            <a{% if not is_today %} class="not-today"{% endif %}
                href="{{ url_for('days.day', date=date_str) }}"
                hx-get="{{ url_for('chat.chat_htmx', date=date_str) }}"
                hx-target="#content-wrapper"
