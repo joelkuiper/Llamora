@@ -14,9 +14,13 @@ function initCalendarPopover() {
     const panel = pop.querySelector('#calendar');
     if (!panel) return;
     panel.classList.add('pop-enter');
-    panel.addEventListener('animationend', () => {
-      panel.classList.remove('pop-enter');
-    }, { once: true });
+    panel.addEventListener(
+      'animationend',
+      () => {
+        panel.classList.remove('pop-enter');
+      },
+      { once: true },
+    );
   };
 
   const hide = () => {
@@ -25,10 +29,15 @@ function initCalendarPopover() {
     const panel = pop.querySelector('#calendar');
     if (panel) {
       panel.classList.add('pop-exit');
-      panel.addEventListener('animationend', () => {
-        panel.classList.remove('pop-exit');
-        pop.hidden = true;
-      }, { once: true });
+      panel.addEventListener(
+        'animationend',
+        () => {
+          panel.classList.remove('pop-exit');
+          pop.hidden = true;
+          pop.innerHTML = '';
+        },
+        { once: true },
+      );
     } else {
       pop.hidden = true;
     }
@@ -57,7 +66,6 @@ function initCalendarPopover() {
         placement: 'bottom',
       });
     update();
-    animateOpen();
     htmx.trigger(pop, 'calendar-popover:show');
     document.addEventListener('click', outside, true);
     document.addEventListener('keydown', onKey);

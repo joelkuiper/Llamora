@@ -13,10 +13,6 @@
   visibility: hidden;
 }
 
-/* .calendar-popover > #calendar.htmx-added { */
-/*   opacity: 0; */
-/* } */
-
 .calendar-popover {
   will-change: transform, opacity, filter;
 }
