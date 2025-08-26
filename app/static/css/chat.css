@@ -109,6 +109,7 @@ body {
       text-decoration-thickness: .08em;
       transition: color .15s ease, text-decoration-color .15s ease, background-color .15s ease;
     }
+
     a:hover {
       text-decoration-color: var(--accent-60);
       background-color: var(--accent-05);
@@ -166,9 +167,14 @@ body {
   padding: var(--spacing-md);
   text-align: center;
   a {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: .06em;
     color: var(--color-text-muted);
+
     &:hover {
       color: var(--accent);
+      text-decoration-color: var(--accent-60);
     }
   }
 }
