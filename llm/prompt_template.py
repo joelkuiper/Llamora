@@ -33,4 +33,6 @@ _opening_template = _open_env.get_template(os.path.basename(opening_prompt_path)
 
 
 def build_opening_prompt(yesterday_messages: list[dict], **context) -> str:
-    return _opening_template.render(yesterday_messages=yesterday_messages, **context)
+    prompt = _opening_template.render(yesterday_messages=yesterday_messages, **context)
+    print(prompt)
+    return prompt

@@ -77,6 +77,7 @@ DEFAULT_LLM_REQUEST = {
     # "stop": ["<|end|>", "<|assistant|>"],
     # Reduce {, } likelihood for Phi 3.5
     # "logit_bias": [[426, -1.0], [[500, -1.0]]],
+    "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>", "<|end|>"],
     **llm_request_overrides,
 }
 
