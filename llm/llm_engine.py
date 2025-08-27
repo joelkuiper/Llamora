@@ -122,7 +122,6 @@ class LLMEngine:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            start_new_session=True,
         )
         if self.proc.stdout:
             threading.Thread(
@@ -166,14 +165,21 @@ class LLMEngine:
             self._restart_server()
 
     def shutdown(self) -> None:
-        if getattr(self, "proc", None) and self.proc.poll() is None:
+        proc = getattr(self, "proc", None)
+        if proc and proc.poll() is None:
+            self.logger.info("Stopping llamafile server")
+            proc.terminate()
             try:
-                os.killpg(self.proc.pid, signal.SIGTERM)
-                self.proc.wait(timeout=5)
+                proc.wait(timeout=10)
             except subprocess.TimeoutExpired:  # pragma: no cover - unlikely
-                os.killpg(self.proc.pid, signal.SIGKILL)
-            except ProcessLookupError:  # process already gone
-                pass
+                self.logger.warning("Forcing llamafile server kill")
+                proc.kill()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    pass
+            self.logger.info("Llamafile server stopped")
+        self.proc = None
 
     def _handle_exit(self, signum, frame) -> None:  # pragma: no cover - signal handler
         try:

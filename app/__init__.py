@@ -76,7 +76,7 @@ def create_app():
 
     @app.after_serving
     async def _shutdown_llm():
-        llm.shutdown()
+        await asyncio.to_thread(llm.shutdown)
 
     @app.before_serving
     async def _print_registration_link():
