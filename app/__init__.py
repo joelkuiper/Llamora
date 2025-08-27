@@ -40,17 +40,11 @@ def create_app():
     app.register_blueprint(search_bp)
     app.register_blueprint(tags_bp)
 
-    import humanize
-    from datetime import datetime, timezone
+    from datetime import datetime
     import hashlib
+    from .services.time import humanize as humanize_filter
 
-    @app.template_filter("humanize")
-    def humanize_filter(value):
-        if isinstance(value, str):
-            value = datetime.fromisoformat(value)
-        if value.tzinfo is None:
-            value = value.replace(tzinfo=timezone.utc)
-        return humanize.naturaltime(value)
+    app.template_filter("humanize")(humanize_filter)
 
     @app.template_filter("long_date")
     def long_date_filter(value):

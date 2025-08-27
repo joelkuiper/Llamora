@@ -713,7 +713,8 @@ class LocalDB:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT m.id, m.role, m.reply_to, m.nonce, m.ciphertext, m.alg AS msg_alg,
+                SELECT m.id, m.created_at, m.role, m.reply_to, m.nonce,
+                       m.ciphertext, m.alg AS msg_alg,
                        x.ulid AS tag_ulid,
                        t.tag_hash, t.name_ct, t.name_nonce, t.alg AS tag_alg
                 FROM messages m
@@ -742,6 +743,7 @@ class LocalDB:
                 rec = orjson.loads(record_json)
                 current = {
                     "id": msg_id,
+                    "created_at": row["created_at"],
                     "role": row["role"],
                     "reply_to": row["reply_to"],
                     "message": rec.get("message", ""),

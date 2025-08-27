@@ -10,6 +10,13 @@ The user had no activity yesterday. Greet them softly and invite them to begin t
 Compose a single calm greeting that summarizes yesterday for the user in a few sentences.
 
 The conversation below is from yesterday. If themes appear in the conversation below, gently acknowledge them without quoting or listing. Close with a soft invitation to begin.
+
+{% for m in yesterday_messages -%}
+{{ m['created_at'] | humanize }}
+{{ "You" if m['role'] == "assistant" else "user" }}: {{ m['message']|trim }}
+
+{% endfor %}
+
 {% endif %}
 
 Every answer must always have exactly two parts, in this order:
@@ -18,8 +25,4 @@ Every answer must always have exactly two parts, in this order:
   - Immediately after, output the token `<~meta~>` followed by a single valid JSON object with the following shape: {"emoji":"…","keywords":["#tag",…]}
 
 Do not include the natural language reply inside the JSON. End your response after the JSON. Do not include the JSON before the `<~meta~>` token.<|im_end|>
-{% for m in yesterday_messages -%}
-<|im_start|>{{ m['role'] }}<|im_sep|>
-{{ m['message']|trim }}<|im_end|>
-{% endfor %}
 <|im_start|>assistant<|im_sep|>

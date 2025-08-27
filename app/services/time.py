@@ -1,6 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from quart import request
+import humanize as _humanize
 
 
 def get_timezone() -> str:
@@ -52,6 +53,14 @@ def ordinal(n: int) -> str:
 
 def format_date(dt: datetime) -> str:
     return f"{ordinal(dt.day)} of {dt.strftime('%B %Y')}"
+
+
+def humanize(value: datetime | str) -> str:
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value)
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return _humanize.naturaltime(value)
 
 
 def date_and_part(user_time: str, tz: str) -> tuple[str, str]:
