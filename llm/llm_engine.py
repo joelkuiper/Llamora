@@ -234,8 +234,13 @@ class LLMEngine:
             n_predict = cfg.get("n_predict")
             max_input = self.ctx_size - n_predict
             ctx = context or {}
-            history = await self._trim_history(history, max_input, ctx)
-            prompt = build_prompt(history, **ctx)
+            try:
+                history = await self._trim_history(history, max_input, ctx)
+                prompt = build_prompt(history, **ctx)
+            except Exception as e:
+                self.logger.exception("Failed to build prompt")
+                yield {"type": "error", "data": f"Prompt error: {e}"}
+                return
 
         payload = {"prompt": prompt, **cfg, "grammar": self.grammar}
 
