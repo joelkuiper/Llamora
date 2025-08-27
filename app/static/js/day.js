@@ -11,6 +11,24 @@ export function initDayNav() {
   const [y, m, d] = activeDate.split("-").map(Number);
   const current = new Date(y, m - 1, d);
 
+  const label = document.getElementById("calendar-label");
+  if (label) {
+    const day = current.getDate();
+    const suffix =
+      day % 10 === 1 && day % 100 !== 11
+        ? "st"
+        : day % 10 === 2 && day % 100 !== 12
+        ? "nd"
+        : day % 10 === 3 && day % 100 !== 13
+        ? "rd"
+        : "th";
+    const month = current.toLocaleDateString(undefined, {
+      month: "long",
+    });
+    const year = current.getFullYear();
+    label.textContent = `${day}${suffix} of ${month} ${year}`;
+  }
+
   const format = (dt) =>
     `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
 
