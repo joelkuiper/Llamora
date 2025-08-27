@@ -158,13 +158,21 @@ async def sse_opening(date: str):
     is_new = not await db.user_has_messages(uid)
     yesterday_msgs = await db.get_history(uid, yesterday_iso, dek)
     has_no_activity = not is_new and not yesterday_msgs
-    prompt = build_opening_prompt(
-        yesterday_messages=yesterday_msgs[-20:],
-        date=date_str,
-        part_of_day=pod,
-        is_new=is_new,
-        has_no_activity=has_no_activity,
-    )
+    try:
+        prompt = build_opening_prompt(
+            yesterday_messages=yesterday_msgs[-20:],
+            date=date_str,
+            part_of_day=pod,
+            is_new=is_new,
+            has_no_activity=has_no_activity,
+        )
+    except Exception as e:
+        logger.exception("Failed to build opening prompt")
+        async def error_stream():
+            msg = f"⚠️ {e}"
+            yield f"event: error\\ndata: {replace_newline(escape(msg))}\\n\\n"
+            yield "event: done\\ndata: {}\\n\\n"
+        return Response(error_stream(), mimetype="text/event-stream")
     stream_id = str(ULID())
     pending = PendingResponse(
         stream_id,
@@ -181,10 +189,11 @@ async def sse_opening(date: str):
     async def event_stream():
         async for chunk in pending.stream():
             if pending.error:
-                yield ("event: error\ndata: " f"{replace_newline(escape(chunk))}\n\n")
+                yield f"event: error\ndata: {replace_newline(chunk)}\n\n"
+                yield "event: done\ndata: {}\n\n"
                 return
             else:
-                yield ("event: message\ndata: " f"{replace_newline(escape(chunk))}\n\n")
+                yield f"event: message\ndata: {replace_newline(escape(chunk))}\n\n"
         data = orjson.dumps({"assistant_msg_id": pending.assistant_msg_id}).decode()
         yield f"event: done\ndata: {data}\n\n"
 
@@ -570,11 +579,12 @@ async def sse_reply(user_msg_id: str, date: str):
     async def event_stream():
         async for chunk in pending_response.stream():
             if pending_response.error:
-                yield ("event: error\ndata: " f"{replace_newline(escape(chunk))}\n\n")
+                yield f"event: error\\ndata: {replace_newline(chunk)}\\n\\n"
+                yield "event: done\\ndata: {}\\n\\n"
                 pending_responses.pop(user_msg_id, None)
                 return
             else:
-                yield ("event: message\ndata: " f"{replace_newline(escape(chunk))}\n\n")
+                yield f"event: message\\ndata: {replace_newline(escape(chunk))}\\n\\n"
         if pending_response.meta is not None:
             # Placeholder for emitting structured metadata (e.g., tags)
             pass
