@@ -49,8 +49,8 @@ export function refreshAtMidnight() {
     const now = new Date();
     const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
     if (chat.dataset.date !== today) {
-      const tz = setTimezoneCookie();
-      location.href = `/d/today?tz=${encodeURIComponent(tz)}`;
+      setTimezoneCookie();
+      location.href = "/d/today";
     } else {
       const nextMidnight = new Date(now);
       nextMidnight.setHours(24, 0, 0, 0);
@@ -92,8 +92,11 @@ export function initChatUI(root = document) {
   const draftKey = `chat-draft-${date}`;
 
   let setStreaming = () => {};
-  const findCurrentMsgId = () =>
-    chat.querySelector(TYPING_INDICATOR_SELECTOR)?.dataset.userMsgId || null;
+  const findCurrentMsgId = () => {
+    const indicator = chat.querySelector(TYPING_INDICATOR_SELECTOR);
+    if (!indicator) return null;
+    return indicator.dataset.userMsgId || "opening";
+  };
 
   if (form && textarea && button) {
     textarea.value = sessionStorage.getItem(draftKey) || "";
