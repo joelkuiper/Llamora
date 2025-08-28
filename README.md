@@ -1,9 +1,7 @@
 # Llamora
 
-> “The unseen current of thought.”
-
-Llamora is an **experimental, local-first diary app**.
-It runs entirely offline.  Bo internet access, no API keys, no cloud, just your words on your own machine. Each day begins fresh at midnight, when the app gently opens a new page and offers a reflection on the day before.
+Llamora is an **experimental, local-first diary companion**.
+It runs entirely offline.  No internet access, no API keys, no cloud, just your words on your own machine. Each day begins fresh at midnight, when the app gently opens a new page and offers a reflection on the day before.
 
 It’s both a technical playground and a design experiment: a lightweight journaling companion powered by local LLMs, encryption, and a calm interface.
 
@@ -27,8 +25,7 @@ It’s both a technical playground and a design experiment: a lightweight journa
 - **User Accounts**  Includes a basic username/password authentication system:
 
   - Users can register and login. Passwords are stored securely (hashed with Argon2id + salt).
-  - Logged-in users can only access their own chat sessions and data (isolated per account).
-  - The app uses encrypted cookies to keep users logged in without server-side sessions. (Cookies are encrypted with a secret key so they can't be tampered with.)
+  - Logged-in users can only access their own chat data (isolated per account).
 
 - **Zero-Knowledge Message Encryption** Each user gets a random 32-byte Data Encryption Key (DEK) that is encrypted using both their password and the recovery code. Messages are encrypted and can only be decrypted with either secret. Resetting a password re-wraps the existing DEK without touching stored ciphertexts.
 
@@ -133,4 +130,5 @@ This project is an educational experiment and is **not** intended for production
    - `LLAMORA_PROMPT_FILE` to point to a Jinja2 prompt template (defaults to `llm/prompts/llamora_phi.j2`)
    - `LLAMORA_GRAMMAR_FILE` to specify a grammar file (defaults to `llm/meta_grammar.bnf`)
 
-Deploying this project as-is is discouraged. Use at your own risk.
+
+❗ **This project is a personal learning experiment. It is not production-ready. Deploying this project as-is is discouraged. Use at your own risk.**
