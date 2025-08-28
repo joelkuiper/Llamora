@@ -67,7 +67,7 @@
     h2 {
       margin: 0 0 var(--spacing-md);
       font-size: 1.1rem;
-      color: #555;
+      color: var(--color-assistant-text);
     }
 
     /* single-action rows */
@@ -84,8 +84,8 @@
   }
 
   .profile-section.danger {
-    background: #fff7f7;
-    border-color: color-mix(in srgb, #ff4d4f 20%, var(--border));
+    background: var(--color-danger-bg);
+    border-color: color-mix(in srgb, var(--color-danger-mix) 20%, var(--border));
   }
 
   /* ------- Forms ------- */
@@ -100,7 +100,7 @@
       padding: 0 var(--spacing-md);
       border: 1px solid var(--border);
       border-radius: var(--radius-md);
-      background: #fff;
+      background: var(--color-white);
       color: var(--color-text);
       box-shadow: var(--inset-shadow);
       transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
@@ -111,7 +111,7 @@
         outline: none;
         border-color: var(--accent-20);
         box-shadow: var(--raised-shadow), 0 0 0 2px var(--accent-10);
-        background: #fff;
+        background: var(--color-white);
       }
     }
 
@@ -122,7 +122,7 @@
 
     /* danger button palette inside danger section */
     .btn.dangerous {
-      border-color: rgba(208,0,48,.25);
+      border-color: var(--danger-25);
       box-shadow: var(--raised-shadow);
     }
   }
@@ -139,12 +139,12 @@
   }
 
   .error {
-    background-color: #ffecec;
-    color: #9b001a;
+    background-color: var(--color-error-bg-alt);
+    color: var(--color-error-text-dark);
   }
 
   .success {
-    background-color: #eafff2;
-    color: #0b6a36;
+    background-color: var(--color-success-bg-alt);
+    color: var(--color-success-text);
   }
 }

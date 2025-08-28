@@ -8,6 +8,12 @@ let currentStreamMsgId = null;
 
 const TYPING_INDICATOR_SELECTOR = "#typing-indicator";
 
+function setTimezoneCookie() {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  document.cookie = `tz=${tz}; path=/`;
+  return tz;
+}
+
 function revealMetaChips(container, scrollToBottom){
   if (!container || !container.hidden) return;
   const parent = container.closest('.message');
@@ -31,89 +37,176 @@ function revealMetaChips(container, scrollToBottom){
   }, { once: true });
 }
 
+// When viewing today's chat, reload the page after midnight or when the user
+// returns to the tab on a new day.
+export function refreshAtMidnight() {
+  const chat = document.getElementById("chat");
+  if (!chat) return;
+
+  const pad = (n) => String(n).padStart(2, "0");
+
+  const check = () => {
+    const now = new Date();
+    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    if (chat.dataset.date !== today) {
+      setTimezoneCookie();
+      location.href = "/d/today";
+    } else {
+      const nextMidnight = new Date(now);
+      nextMidnight.setHours(24, 0, 0, 0);
+      setTimeout(check, nextMidnight.getTime() - now.getTime());
+    }
+  };
+
+  if (!window.__refreshMidnightInit) {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") check();
+    });
+    window.__refreshMidnightInit = true;
+  }
+
+  check();
+}
+
 export function initChatUI(root = document) {
+  setTimezoneCookie();
   const form = root.querySelector("#message-form");
   const textarea = form?.querySelector("textarea");
   const button = form?.querySelector("button");
   const chat = root.querySelector("#chat");
   const errors = document.getElementById("errors");
-
-  if (!form || !textarea || !button || !chat) return;
+  const container = root.querySelector("#content-wrapper");
+  if (!chat) return;
 
   // Ensure tag popovers are reinitialized when returning via back navigation
   chat.querySelectorAll('.meta-chips').forEach((chips) => {
     delete chips.dataset.popInit;
   });
 
-  const sessionId = chat.dataset.sessionId;
-  const draftKey = `chat-draft-${sessionId}`;
-  textarea.value = sessionStorage.getItem(draftKey) || "";
+  const date = chat.dataset.date;
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const isToday = date === today;
 
-  const handleStopClick = () => {
-    console.debug('Stop button clicked');
+  const draftKey = `chat-draft-${date}`;
+
+  let setStreaming = () => {};
+  const findCurrentMsgId = () => {
     const indicator = chat.querySelector(TYPING_INDICATOR_SELECTOR);
-    const stopEndpoint = indicator?.dataset.stopUrl;
-    const wrap = indicator?.closest('.assistant-stream');
-    if (wrap) {
-      console.debug('Aborting SSE stream');
-      wrap.dispatchEvent(new Event('htmx:abort'));
-      wrap.removeAttribute('hx-ext');
-      wrap.removeAttribute('sse-connect');
-      wrap.removeAttribute('sse-close');
-      if (indicator) {
-        indicator.classList.add('stopped');
-        setTimeout(() => indicator.remove(), 1000);
+    if (!indicator) return null;
+    return indicator.dataset.userMsgId || "opening";
+  };
+
+  if (form && textarea && button) {
+    textarea.value = sessionStorage.getItem(draftKey) || "";
+    const resizeTextarea = () => {
+      textarea.style.height = "auto";
+      textarea.style.height = textarea.scrollHeight + "px";
+      if (container) {
+        container.scrollTop = container.scrollHeight;
       }
-    }
-    if (stopEndpoint) {
-      console.debug('Sending stop request to', stopEndpoint);
-      htmx.ajax('POST', stopEndpoint, { swap: 'none' });
-    }
-    currentStreamMsgId = null;
-    setStreaming(false);
-  };
-
-  const setStreaming = (streaming) => {
-    textarea.disabled = streaming;
-    if (streaming) {
-      console.debug('Entering streaming state for', currentStreamMsgId);
-      button.classList.add('stopping');
-      button.type = 'button';
-      button.disabled = false;
-      button.addEventListener('click', handleStopClick, { once: true });
-      button.setAttribute('aria-label', 'Stop');
+    };
+    resizeTextarea();
+    if (!isToday) {
+      textarea.disabled = true;
+      button.disabled = true;
+      textarea.placeholder = "This day has past.";
     } else {
-      button.classList.remove('stopping');
-      button.type = 'submit';
-      textarea.disabled = false;
-      button.disabled = !textarea.value.trim();
-      textarea.focus({ preventScroll: true });
-      button.setAttribute('aria-label', 'Send');
+      refreshAtMidnight();
     }
-  };
 
-  const scrollToBottom = initScrollHandler();
-  initStreamHandler(setStreaming, scrollToBottom);
+    const handleStopClick = () => {
+      console.debug('Stop button clicked');
+      const indicator = chat.querySelector(TYPING_INDICATOR_SELECTOR);
+      const stopEndpoint = indicator?.dataset.stopUrl;
+      const wrap = indicator?.closest('.assistant-stream');
+      if (wrap) {
+        console.debug('Aborting SSE stream');
+        wrap.dispatchEvent(new Event('htmx:abort'));
+        wrap.removeAttribute('hx-ext');
+        wrap.removeAttribute('sse-connect');
+        wrap.removeAttribute('sse-close');
+        if (indicator) {
+          indicator.classList.add('stopped');
+          setTimeout(() => indicator.remove(), 1000);
+        }
+      }
+      if (stopEndpoint) {
+        console.debug('Sending stop request to', stopEndpoint);
+        htmx.ajax('POST', stopEndpoint, { swap: 'none' });
+      }
+      currentStreamMsgId = null;
+      setStreaming(false);
+    };
 
-  const findCurrentMsgId = () =>
-    chat.querySelector(TYPING_INDICATOR_SELECTOR)?.dataset.userMsgId || null;
+    setStreaming = (streaming) => {
+      if (!isToday) {
+        textarea.disabled = true;
+        button.disabled = true;
+        return;
+      }
+      textarea.disabled = streaming;
+      if (streaming) {
+        console.debug('Entering streaming state for', currentStreamMsgId);
+        button.classList.add('stopping');
+        button.type = 'button';
+        button.disabled = false;
+        button.addEventListener('click', handleStopClick, { once: true });
+        button.setAttribute('aria-label', 'Stop');
+      } else {
+        button.classList.remove('stopping');
+        button.type = 'submit';
+        textarea.disabled = false;
+        button.disabled = !textarea.value.trim();
+        textarea.focus({ preventScroll: true });
+        button.setAttribute('aria-label', 'Send');
+      }
+    };
 
-  form.addEventListener("htmx:afterRequest", () => {
-    sessionStorage.removeItem(draftKey);
-  });
+    form.addEventListener("htmx:afterRequest", () => {
+      sessionStorage.removeItem(draftKey);
+      textarea.style.height = "auto";
+      if (container) {
+        container.scrollTop = container.scrollHeight;
+      }
+    });
 
-  form.addEventListener("htmx:configRequest", (event) => {
-    if (!textarea.value.trim()) {
-      event.preventDefault();
-      textarea.focus({ preventScroll: true });
-    }
-  });
+    const userTimeInput = form.querySelector("#user-time");
+    form.addEventListener("htmx:configRequest", (event) => {
+      if (userTimeInput) {
+        userTimeInput.value = new Date().toISOString();
+      }
+      if (!textarea.value.trim()) {
+        event.preventDefault();
+        textarea.focus({ preventScroll: true });
+      }
+    });
 
-  textarea.addEventListener("input", () => {
-    sessionStorage.setItem(draftKey, textarea.value);
-    if (!currentStreamMsgId) {
-      button.disabled = !textarea.value.trim();
-    }
+    textarea.addEventListener("input", () => {
+      resizeTextarea();
+      sessionStorage.setItem(draftKey, textarea.value);
+      if (!currentStreamMsgId) {
+        button.disabled = !textarea.value.trim();
+      }
+    });
+
+    textarea.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        if (textarea.value.trim()) {
+          form.requestSubmit();
+          textarea.style.height = "auto";
+        }
+      }
+    });
+  }
+
+  // Defer scroll handler setup so elements exist after day switches
+  let scrollToBottom = () => {};
+  requestAnimationFrame(() => {
+    scrollToBottom = initScrollHandler();
+    initStreamHandler(setStreaming, scrollToBottom);
   });
 
   errors?.addEventListener("htmx:afterSwap", () => {
@@ -296,6 +389,7 @@ function initStreamHandler(setStreaming, scrollToBottom) {
     if (type === "message") {
       scheduleRender(wrap, () => { renderNow(); scrollToBottom(); });
     } else if (type === "error" || type === "done") {
+      console.log("SSE done or error?", type);
       const rid = sseRenders.get(wrap);
       if (rid) { cancelAnimationFrame(rid); sseRenders.delete(wrap); }
       renderNow();
@@ -309,30 +403,37 @@ function initStreamHandler(setStreaming, scrollToBottom) {
       wrap.removeAttribute("sse-close");
       currentStreamMsgId = null;
       setStreaming(false);
-      try {
-        const data = JSON.parse(evt.detail.data || '{}');
-        const assistantId = data.assistant_msg_id;
-        if (assistantId) {
-          wrap.dataset.assistantMsgId = assistantId;
-          const placeholder = wrap.querySelector('.meta-chips-placeholder');
-          if (placeholder) {
-            wrap.addEventListener(
-              'htmx:afterSwap',
-              (e) => {
-                if (e.target.classList?.contains('meta-chips')) {
-                  revealMetaChips(e.target, scrollToBottom);
-                }
-              },
-              { once: true }
-            );
-            htmx.ajax('GET', `/c/meta-chips/${assistantId}`, {
-              target: placeholder,
-              swap: 'outerHTML',
-            });
+      if(type !== 'error') {
+        try {
+          const data = JSON.parse(evt.detail.data || '{}');
+          const assistantId = data.assistant_msg_id;
+          if (assistantId) {
+            wrap.dataset.assistantMsgId = assistantId;
+            const placeholder = wrap.querySelector('.meta-chips-placeholder');
+            if (placeholder) {
+              wrap.addEventListener(
+                'htmx:afterSwap',
+                (e) => {
+                  if (e.target.classList?.contains('meta-chips')) {
+                    revealMetaChips(e.target, scrollToBottom);
+                  }
+                },
+                { once: true }
+              );
+              htmx.ajax('GET', `/c/meta-chips/${assistantId}`, {
+                target: placeholder,
+                swap: 'outerHTML',
+              });
+            }
           }
+        } catch (err) {
+          console.error('failed to load meta chips', err);
         }
-      } catch (err) {
-        console.error('failed to load meta chips', err);
+      } else {
+        const placeholder = wrap.querySelector('.meta-chips-placeholder');
+        if (placeholder) {
+          placeholder.remove();
+        }
       }
       scrollToBottom();
     }

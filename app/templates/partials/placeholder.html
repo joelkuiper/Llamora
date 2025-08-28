@@ -1,3 +1,5 @@
 {% from 'partials/assistant_stream.html' import assistant_stream %}
-<div id="msg-{{ user_msg_id }}" class="message user">{{ user_text }}</div>
-{{ assistant_stream(user_msg_id, session_id) }}
+<div id="msg-{{ user_msg_id }}" class="message user">
+  <div class="markdown-body">{{ user_text }}</div>
+</div>
+{{ assistant_stream(user_msg_id, day, user_time, stop_url=url_for('chat.stop_generation', user_msg_id=user_msg_id)) }}

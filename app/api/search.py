@@ -17,7 +17,7 @@ from config import (
     POOR_MATCH_MIN_HITS,
 )
 from app.embed.model import embed_texts
-from app.index.session_ann import SessionIndexRegistry
+from app.index.message_ann import MessageIndexRegistry
 
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ class SearchAPI:
 
     def __init__(self, db):
         self.db = db
-        self.registry = SessionIndexRegistry(db)
+        self.registry = MessageIndexRegistry(db)
 
     async def knn_search(
         self,
@@ -100,7 +100,6 @@ class SearchAPI:
             results.append(
                 {
                     "id": row["id"],
-                    "session_id": row["session_id"],
                     "created_at": row["created_at"],
                     "role": row["role"],
                     "content": content,
@@ -229,9 +228,7 @@ class SearchAPI:
             status = (
                 "exact"
                 if exact
-                else (
-                    "token" if overlap > 0 else ("tag" if boost > 0 else "semantic")
-                )
+                else ("token" if overlap > 0 else ("tag" if boost > 0 else "semantic"))
             )
             css_class = f"search-result-item status-{status}"
             if poor:
@@ -244,7 +241,6 @@ class SearchAPI:
             results.append(
                 {
                     "id": cand["id"],
-                    "session_id": cand["session_id"],
                     "created_at": cand["created_at"],
                     "role": cand["role"],
                     "snippet": snippet,
@@ -273,7 +269,8 @@ class SearchAPI:
         boosts: dict[str, float] = {}
         if tokens:
             tag_hashes = [
-                hashlib.sha256(f"{user_id}:{t}".encode("utf-8")).digest() for t in tokens
+                hashlib.sha256(f"{user_id}:{t}".encode("utf-8")).digest()
+                for t in tokens
             ]
             message_ids = [c["id"] for c in candidates]
             tag_map = await self.db.get_messages_with_tag_hashes(
@@ -286,16 +283,15 @@ class SearchAPI:
         return results
 
     async def on_message_appended(
-        self, user_id: str, session_id: str, msg_id: str, content: str, dek: bytes
+        self, user_id: str, msg_id: str, content: str, dek: bytes
     ):
         logger.debug(
-            "Appending message %s in session %s for user %s",
+            "Appending message %s for user %s",
             msg_id,
-            session_id,
             user_id,
         )
         vec = embed_texts([content]).astype(np.float32).reshape(1, -1)
-        await self.db.store_vector(msg_id, user_id, session_id, vec[0], dek)
+        await self.db.store_vector(msg_id, user_id, vec[0], dek)
         index = await self.registry.get_or_build(user_id, dek)
         if not index.contains(msg_id):
             index.add_batch([msg_id], vec)

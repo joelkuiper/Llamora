@@ -6,6 +6,7 @@ from quart import (
     current_app,
     url_for,
     Response,
+    make_response,
     abort,
 )
 from nacl import pwhash
@@ -30,18 +31,20 @@ import re
 import config
 import orjson
 from zxcvbn import zxcvbn
+from datetime import datetime
+from app.services.time import local_date
 
 auth_bp = Blueprint("auth", __name__)
 
 
 async def _render_profile_page(user, **context):
     context["user"] = user
+    state = await db.get_state(user["id"])
+    context["day"] = state.get("active_date", local_date().isoformat())
     if request.headers.get("HX-Request"):
         return await render_template("partials/profile.html", **context)
-    sessions = await db.get_all_sessions(user["id"])
     return await render_template(
         "index.html",
-        sessions=sessions,
         content_template="partials/profile.html",
         **context,
     )
@@ -164,14 +167,21 @@ async def register():
             rc_cipher,
         )
 
+        # Fetch the newly created user so we can establish a session
+        user = await db.get_user_by_username(username)
+
         if current_app.config.get("DISABLE_REGISTRATION"):
             current_app.config["REGISTRATION_TOKEN"] = None
 
-        return await render_template(
+        html = await render_template(
             "recovery.html",
             code=format_recovery_code(recovery_code),
-            next_url=url_for("auth.login"),
+            next_url=url_for("days.index"),
         )
+        resp = await make_response(html)
+        set_secure_cookie(resp, "uid", str(user["id"]))
+        set_dek(resp, dek)
+        return resp
 
     return await render_template("register.html")
 
@@ -214,12 +224,10 @@ async def login():
                 redirect_url = return_url
                 if not redirect_url:
                     state = await db.get_state(user["id"])
-                    active_session = state.get("active_session")
-                    if active_session and await db.get_session(
-                        user["id"], active_session
-                    ):
+                    active_date = state.get("active_date")
+                    if active_date:
                         redirect_url = url_for(
-                            "sessions.session", session_id=active_session
+                            "days.day", date=active_date
                         )
                     else:
                         redirect_url = "/"
@@ -317,7 +325,7 @@ async def reset_password():
 @login_required
 async def profile():
     user = await get_current_user()
-    await db.update_state(user["id"], active_session=None)
+    await db.update_state(user["id"], active_date=None)
     return await _render_profile_page(user)
 
 
@@ -329,26 +337,14 @@ async def download_user_data():
     if not dek:
         return Response("Missing encryption key", status=400)
 
-    sessions = await db.get_all_sessions(user["id"])
-    data_sessions = []
-    for session in sessions:
-        history = await db.get_history(user["id"], session["id"], dek)
-        data_sessions.append(
-            {
-                "id": session["id"],
-                "name": session["name"],
-                "created_at": session["created_at"],
-                "messages": history,
-            }
-        )
-
+    messages = await db.get_latest_messages(user["id"], 1000000, dek)
     user_data = {
         "user": {
             "id": user["id"],
             "username": user["username"],
             "created_at": user["created_at"],
         },
-        "sessions": data_sessions,
+        "messages": messages,
     }
 
     payload = orjson.dumps(user_data)

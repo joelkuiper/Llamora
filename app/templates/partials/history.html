@@ -1,0 +1,21 @@
+{% from 'partials/assistant_stream.html' import assistant_stream %}
+{% from 'partials/meta_chips.html' import render_meta_chips %}
+<div id="chat" data-date="{{ day }}">
+  {% if not history|length and not is_today %}
+  <div class="no-content">Nothing was written this day.</div>
+  {% endif %}
+  {% for msg in history %}
+  <div id="msg-{{ msg['id'] }}" class="message {{ 'assistant' if msg['role'] != 'user' else 'user'}}">
+    <div class="markdown-body">{{ msg.message }}</div>
+    {% if msg['role'] != 'user' and not msg.get('meta', {}).get('error') %}
+    {{ render_meta_chips(msg['id'], msg.get('tags', [])) }}
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% if opening_stream %}
+  {{ assistant_stream('opening', day, sse_url=url_for('chat.sse_opening', date=day)) }}
+  {% endif %}
+  {% if pending_msg_id %}
+  {{ assistant_stream(pending_msg_id, day, stop_url=url_for('chat.stop_generation', user_msg_id=pending_msg_id)) }}
+  {% endif %}
+</div>

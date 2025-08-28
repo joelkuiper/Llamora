@@ -1,13 +1,16 @@
-❗ **This project is a personal learning experiment. It is not production-ready. Do not deploy this without major modifications. It’s meant for educational use only.**
-
 # Llamora
 
-> “The unseen current of thought.”
+Llamora is an **experimental, local-first diary companion**.
+It runs entirely offline.  No internet access, no API keys, no cloud, just your words on your own machine. Each day begins fresh at midnight, when the app gently opens a new page and offers a reflection on the day before.
 
+It’s both a technical playground and a design experiment: a lightweight journaling companion powered by local LLMs, encryption, and a calm interface.
 
+---
 
 ### Screenshots
 
+![Chat screenshot](./doc/screenshots/calendar.png)
+![Tags screenshot](./doc/screenshots/tags.png)
 ![Chat screenshot](./doc/screenshots/chat.png)
 ![Search screenshot](./doc/screenshots/search.png)
 ![Login screenshot](./doc/screenshots/login.png)
@@ -19,20 +22,14 @@
 
 - **Streaming Responses** Utilizes **Server-Sent Events (SSE)** to stream the AI's response token by token. The user sees the answer appear as it's being generated, similar to ChatGPT's interface.
 
-- **HTMX-Powered UI** Leverages [**HTMX**](https://htmx.org/) for dynamic content updates without writing custom JS for every interaction. For example:
-
-  - Creating a new chat session, switching between sessions, and deleting sessions all happen via HTMX requests that swap in new HTML fragments.
-  - This approach means **no SPA framework** is needed, the server renders HTML partials which are inserted into the page. It's simple and keeps front-end code to a minimum.
-
-- **Multi-Session Chat** Supports multiple chat sessions per user. Users can have several conversations (sessions) with the assistant and switch between them. Each session's message history is stored in a local SQLite database and retrieved when you revisit that session. You can create new sessions (they start blank with a greeting), rename sessions, or delete sessions.
+- **HTMX-Powered UI** Leverages [**HTMX**](https://htmx.org/) for dynamic content updates without writing custom JS for every interaction. This approach means **no SPA framework** is needed, the server renders HTML partials which are inserted into the page. It's simple and keeps front-end code to a minimum.
 
 - **User Accounts**  Includes a basic username/password authentication system:
 
   - Users can register and login. Passwords are stored securely (hashed with Argon2id + salt).
-  - Logged-in users can only access their own chat sessions and data (isolated per account).
-  - The app uses encrypted cookies to keep users logged in without server-side sessions. (Cookies are encrypted with a secret key so they can't be tampered with.)
+  - Logged-in users can only access their own chat data (isolated per account).
 
-- **Zero-Knowledge Message Encryption** Each user gets a random 32-byte Data Encryption Key (DEK) that is wrapped with Argon2id using both their password and the recovery code. Messages are encrypted and can only be decrypted with either secret. Resetting a password re-wraps the existing DEK without touching stored ciphertexts.
+- **Zero-Knowledge Message Encryption** Each user gets a random 32-byte Data Encryption Key (DEK) that is encrypted using both their password and the recovery code. Messages are encrypted and can only be decrypted with either secret. Resetting a password re-wraps the existing DEK without touching stored ciphertexts.
 
 - **Neumorphic UI Design** The interface has a clean, modern look with soft shadows. There's virtually no JavaScript in the frontend beyond handling the streamed messages and some minor UX tweaks (like auto-scrolling the chat window).
 
@@ -48,7 +45,7 @@
 
 This project has **several limitations** by design. It's important to understand them if you plan to use or extend this code:
 
-- **Limited Scalability:** By default, Llamora processes requests with a single worker. For heavy traffic, consider running multiple instances or a dedicated model service.
+- **Limited Scalability:** By default, Llamora processes requests with a single worker (the llamafile). For heavy traffic, consider running multiple instances or a dedicated model service.
 
 - **No API or External Interface:** The app doesn't expose an API for programmatic access, it's purely a web interface. That's fine for interactive use, but if you wanted to use this as a backend service, you'd have to add JSON endpoints or similar.
 
@@ -56,7 +53,8 @@ This project has **several limitations** by design. It's important to understand
 
   - Password reset requires the recovery code and there's no email verification.
   - No multi-factor auth.
-  - No OAuth or other single-sign on method
+  - No captcha for registration or login.
+  - No OAuth or other single-sign on method.
   - All users are equal (no roles or admin). It serves the purpose of protecting your chat data from others on a shared deployment, but it's not meant for a large user base without enhancements.
 
 - **Input/Output Filtering:** Aside from Markdown sanitization, there's no content filtering on user inputs or AI outputs. The model could potentially produce inappropriate content if prompted. There is also nothing preventing prompt injections (where a user could ask the assistant to ignore its system prompt). Since this is a closed environment (local model, one user), that wasn't a focus. But it's something to consider if expanded; e.g., using moderation models or guardrails if it were public.
@@ -134,4 +132,5 @@ This project is an educational experiment and is **not** intended for production
    - `LLAMORA_PROMPT_FILE` to point to a Jinja2 prompt template (defaults to `llm/prompts/llamora_phi.j2`)
    - `LLAMORA_GRAMMAR_FILE` to specify a grammar file (defaults to `llm/meta_grammar.bnf`)
 
-Deploying this project as-is is discouraged. Use at your own risk.
+
+❗ **This project is a personal learning experiment. It is not production-ready. Deploying this project as-is is discouraged. Use at your own risk.**

@@ -1,3 +1,4 @@
+
 :root {
   /* Base colors */
   --color-bg: #fafafa;
@@ -8,28 +9,36 @@
   --color-user-text: #444;
   --color-assistant-text: #555;
   --color-assistant-bg: #fefefe;
+  --color-text-muted: #cacaca;
 
-  /* Accent palette (cyan-leaning blue) */
-  --accent: #36a6f4;          /* primary accent */
-  --accent-hover: #1f97f2;    /* hover state, deeper */
-  --accent-active: #0e85de;   /* active/focus */
+  /* Accent palette */
+  --accent: #36a6f4;
+  --accent-hover: #1f97f2;
+  --accent-active: #0e85de;
   --accent-05: rgba(54,166,244,0.05);
   --accent-10: rgba(54,166,244,0.10);
   --accent-20: rgba(54,166,244,0.20);
   --accent-30: rgba(54,166,244,0.30);
+  --accent-60: rgba(59,167,246,0.60);
+  --accent-drop-shadow: rgba(31,151,242,0.5);
 
   --highlight-color: #fff7a0;
 
   /* Shadows & borders */
   --shadow-dark: rgba(0,0,0,0.07);
+  --shadow-dark-02: rgba(0,0,0,0.02);
   --shadow-light: rgba(255,255,255,0.9);
+  --shadow-light-60: rgba(255,255,255,0.6);
   --raised-shadow: 0 4px 10px var(--shadow-dark), 0 1px 2px rgba(0,0,0,0.04);
+  --subtle-raised-shadow: 0 2px 4px var(--shadow-dark-02), 0 1px 2px rgba(0,0,0,0.04);
+
   --inset-shadow: inset 1px 1px 3px rgba(0,0,0,0.08),
                   inset -1px -1px 3px var(--shadow-light);
   --inset-shadow-disabled: inset 1px 1px 2px rgba(0,0,0,0.04),
                            inset -1px -1px 2px rgba(255,255,255,0.8);
   --border: rgba(0,0,0,0.08);
   --border-strong: rgba(0,0,0,0.18);
+  --border-user: rgba(54,166,244,0.35);
 
   /* Radius & spacing */
   --radius-sm: 0.4rem;
@@ -44,33 +53,157 @@
 
   /* Typography */
   --font-base: system-ui, sans-serif;
-  --font-size: 1rem;
-  --text-shadow-soft: 1px 1px 2px var(--shadow-dark),
-                      -1px -1px 2px var(--shadow-light);
-}
+  --text-shadow-soft: 0 0 2px rgba(0,0,0,0.25);
+  --color-text-muted: #777;
 
+  /* Status colors */
+  --color-error-bg: #ffe5e5;
+  --color-error-bg-alt: #ffecec;
+  --color-error-text: #a00000;
+  --color-error-text-dark: #9b001a;
+  --color-error-hover: #700000;
+  --color-success-bg: #e7fff0;
+  --color-success-bg-alt: #eafff2;
+  --color-success-text: #0b6a36;
+  --color-danger: #d00030;
+  --color-danger-bg: #fff7f7;
+  --color-danger-mix: #ff4d4f;
+  --danger-15: rgba(208,0,48,0.15);
+  --danger-20: rgba(208,0,48,0.20);
+  --danger-25: rgba(208,0,48,0.25);
+
+  /* Misc colors */
+  --color-white: #fff;
+  --color-black: #000;
+  --scroll-btn-color: rgba(0,0,0,0.66);
+
+  /* Glass backgrounds */
+  --glass-bg: rgba(255,255,255,0.70);
+  --glass-bg-hover: rgba(255,255,255,0.58);
+  --glass-bg-strong: rgba(255,255,255,0.72);
+  --glass-bg-strong-hover: rgba(255,255,255,0.78);
+  --glass-bg-alt: rgba(255,255,255,0.90);
+  --glass-bg-alt-hover: rgba(255,255,255,0.96);
+  --glass-fallback-bg: rgba(250,250,250,0.98);
+  --glass-text-muted: rgba(0,0,0,0.7);
+  --glass-text-strong: rgba(0,0,0,0.75);
+  --glass-text-stronger: rgba(0,0,0,0.9);
+  --chip-remove-bg: rgba(0,0,0,0.5);
+  --chip-remove-bg-hover: #000;
+
+  /* Password strength meter */
+  --password-strength-1: #ff6b6b;
+  --password-strength-2: #feca57;
+  --password-strength-3: #8bc34a;
+  --password-strength-4: #4caf50;
+
+  /* Animations */
+  --pulse-bg-start: rgba(255,255,255,0.85);
+  --pulse-bg-mid: rgba(235,235,235,0.8);
+  --pulse-bg-end: rgba(250,250,250,0.85);
+
+  /* Overlay close */
+  --overlay-close-bg: rgba(0,0,0,0.10);
+  --overlay-close-hover-bg: rgba(0,0,0,0.18);
+
+  --line-height: 1.6;
+  --font-size: 12pt;
+
+  --brand-text: #242323;
+  --brand-bg: #eeeeec;
+  --brand-muted: #b1b0ae;
+
+  --brand-accent: #6f6e6c;                /* neutral accent */
+  --brand-accent-08: color-mix(in srgb, var(--brand-accent), transparent 92%);
+  --brand-accent-15: color-mix(in srgb, var(--brand-accent), transparent 85%);
+  --brand-accent-25: color-mix(in srgb, var(--brand-accent), transparent 75%);
+
+  --brand-warm: #b52d10;
+  --brand-warm-08: color-mix(in srgb, var(--brand-warm), transparent 92%);
+  --brand-warm-20: color-mix(in srgb, var(--brand-warm), transparent 80%);
+}
 
 * { box-sizing: border-box; }
 
-body {
-  font-family: var(--font-base);
-}
-
 html, body {
+  background: var(--color-bg);
   margin: 0;
   padding: 0;
-  height: 100%;
+  font-family: var(--font-base);
+  line-height: var(--line-height);
+  font-size: var(--font-size);
+  color: var(--brand-text);
+}
+
+.spinner {
+  font-weight: normal;
 }
 
 #branding {
   display: flex;
   align-items: center;
+  opacity: 0.6;
 
   h1 {
     font-weight: lighter;
+    user-select: none;
     font-size: 1em;
     text-shadow: var(--text-shadow-soft);
   }
+}
+
+/* Shared overlay animations */
+@keyframes lull-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -6px, 0) scale(0.985);
+    filter: blur(1px) saturate(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0) saturate(1);
+  }
+}
+
+@keyframes lull-out {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0) saturate(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(0, -6px, 0) scale(0.985);
+    filter: blur(1px) saturate(0.96);
+  }
+}
+
+
+.pop-enter {
+  animation: lull-in 160ms ease both;
+}
+
+.pop-exit {
+  animation: lull-out 160ms ease both;
+}
+
+.fade-enter {
+  animation: fade-in 160ms ease both;
+}
+
+.fade-exit {
+  animation: fade-out 160ms ease both;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
 }
 
 /* Utility classes */
@@ -153,10 +286,10 @@ html, body {
 }
 
 .btn.dangerous {
-  border-color: rgba(208,0,48,0.25);
+  border-color: var(--danger-25);
   box-shadow:
     var(--raised-shadow),
-    0 0 0 2px rgba(208,0,48,0.15);
+    0 0 0 2px var(--danger-15);
 
   &:active {
     transform: translateY(1px);
@@ -164,22 +297,22 @@ html, body {
   }
 
   &:hover {
-    border-color: #d00030;
+    border-color: var(--color-danger);
     box-shadow:
       var(--raised-shadow),
-      0 0 0 3px rgba(208,0,48,0.25),
-      0 12px 28px rgba(208,0,48,0.2);
-    background: linear-gradient(0deg, rgba(208,0,48,0.16), rgba(208,0,48,0.12)) #d00030;
-    color: #fafafa;
+      0 0 0 3px var(--danger-25),
+      0 12px 28px var(--danger-20);
+    background: linear-gradient(0deg, rgba(208,0,48,0.16), rgba(208,0,48,0.12)) var(--color-danger);
+    color: var(--color-bg);
   }
 
   &:focus-visible {
     outline: none;
-    border-color: #d00030;
+    border-color: var(--color-danger);
     box-shadow:
       var(--raised-shadow),
-      0 0 0 3px rgba(208,0,48,0.25),
-      0 12px 28px rgba(208,0,48,0.2);
+      0 0 0 3px var(--danger-25),
+      0 12px 28px var(--danger-20);
   }
 }
 
@@ -283,12 +416,12 @@ input[type="checkbox"]:focus {
 
   .error-box {
     position: relative;
-    background-color: #ffe5e5;
-    color: #a00000;
+    background-color: var(--color-error-bg);
+    color: var(--color-error-text);
     padding: var(--spacing-sm) var(--spacing-md);
     text-align: center;
     font-weight: bold;
-    border-bottom: 2px solid #a00000;
+    border-bottom: 2px solid var(--color-error-text);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
     z-index: 1000;
     font-family: var(--font-base);
@@ -296,17 +429,17 @@ input[type="checkbox"]:focus {
 
     .close-error {
       position: absolute;
-      top: 0.5em;
+      top: 0.8rem;
       right: 1em;
       background: none;
       border: none;
       font-size: 1.2rem;
-      color: #a00000;
+      color: var(--color-error-text);
       cursor: pointer;
       padding: 0;
       line-height: 1;
 
-      &:hover { color: #700000; }
+      &:hover { color: var(--color-error-hover); }
     }
   }
 }
@@ -323,21 +456,21 @@ input[type="checkbox"]:focus {
   text-align: center;
 
   h1 {
-    color: #a00000;
+    color: var(--color-error-text);
     margin-bottom: var(--spacing-lg);
   }
 
   .home-button {
     text-decoration: none;
     background-color: var(--color-heading);
-    color: white;
+    color: var(--color-white);
     padding: var(--spacing-sm) var(--spacing-md);
     border-radius: var(--radius-sm);
     box-shadow: var(--raised-shadow);
   }
 
   .home-button:hover {
-    background-color: #333;
+    background-color: var(--color-heading);
 
   }
 }
@@ -355,6 +488,35 @@ input[type="checkbox"]:focus {
     }
 }
 
+.icon-btn {
+  background: none;
+  border: none;
+  padding: var(--spacing-xs);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--color-heading);
+  opacity: 0.45;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+
+  &:hover {
+    background: var(--accent-10);
+    color: var(--accent);
+    opacity: 1;
+    transform: scale(1.1);
+  }
+
+  svg { width: 1.25rem; height: 1.25rem; }
+}
+
+.icon-btn.active {
+  background: var(--accent-10);
+  color: var(--accent);
+  opacity: 1;
+}
+
 /* Generic overlay close button */
 .overlay-close {
   position: absolute;
@@ -364,7 +526,7 @@ input[type="checkbox"]:focus {
   height: 1.5rem;
   border: none;
   border-radius: 50%;
-  background: rgba(0,0,0,0.10);
+  background: var(--overlay-close-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -372,7 +534,7 @@ input[type="checkbox"]:focus {
   z-index: 1;
 }
 
-.overlay-close:hover { background: rgba(0,0,0,0.18); }
+.overlay-close:hover { background: var(--overlay-close-hover-bg); }
 
 .overlay-close::before {
   content: "";
@@ -387,7 +549,7 @@ input[type="checkbox"]:focus {
 .password-suggestions {
   backdrop-filter: blur(10px) saturate(140%);
   -webkit-backdrop-filter: blur(10px) saturate(140%);
-  background: rgba(255,255,255,0.70);
+  background: var(--glass-bg);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   box-shadow: var(--raised-shadow);
@@ -506,9 +668,9 @@ input[type="checkbox"]:focus {
     }
 
     .bar.strength-0,
-    .bar.strength-1 { background: #ff6b6b; }
-    .bar.strength-2 { background: #feca57; }
-    .bar.strength-3 { background: #8bc34a; }
-    .bar.strength-4 { background: #4caf50; }
+    .bar.strength-1 { background: var(--password-strength-1); }
+    .bar.strength-2 { background: var(--password-strength-2); }
+    .bar.strength-3 { background: var(--password-strength-3); }
+    .bar.strength-4 { background: var(--password-strength-4); }
   }
 }

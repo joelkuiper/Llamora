@@ -31,11 +31,10 @@ async def add_tag(msg_id: str):
     if len(tag) > MAX_TAG_LENGTH:
         abort(400, description="tag too long")
     dek = get_dek()
-    session_id = await db.get_message_session(user["id"], msg_id)
-    if not session_id:
+    if not await db.message_exists(user["id"], msg_id):
         abort(404, description="message not found")
     tag_hash = await db.resolve_or_create_tag(user["id"], tag, dek)
-    await db.xref_tag_message(user["id"], tag_hash, msg_id, session_id)
+    await db.xref_tag_message(user["id"], tag_hash, msg_id)
     html = await render_template(
         "partials/tag_chip.html", keyword=tag, tag_hash=tag_hash.hex(), msg_id=msg_id
     )

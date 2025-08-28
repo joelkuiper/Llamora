@@ -7,6 +7,7 @@ function setupAddButton(container) {
   const form = pop?.querySelector('form');
   const input = form?.querySelector('input[name="tag"]');
   const submit = form?.querySelector('button[type="submit"]');
+  const panel = pop?.querySelector('.tp-content');
   const suggestions = pop?.querySelector('.tag-suggestions');
   const close = pop?.querySelector('.overlay-close');
   const tagContainer = container.querySelector('.meta-tags');
@@ -31,18 +32,29 @@ function setupAddButton(container) {
 
   const hide = () => {
     if (pop.hidden) return;
-    if (suggestions) {
-      suggestions.innerHTML = "";
-      delete suggestions.dataset.loaded;
-    }
-    pop.classList.remove('tp-open');
     btn.classList.remove('active');
-    const clear = (e) => {
-      if (e && e.target !== pop) return;
+    const finish = () => {
       pop.hidden = true;
-      pop.removeEventListener('transitionend', clear);
+      if (suggestions) {
+        suggestions.innerHTML = "";
+        delete suggestions.dataset.loaded;
+      }
     };
-    pop.addEventListener('transitionend', clear);
+    if (panel) {
+      pop.classList.add('fade-exit');
+      panel.classList.add('pop-exit');
+      pop.addEventListener(
+        'animationend',
+        () => {
+          pop.classList.remove('fade-exit');
+          finish();
+        },
+        { once: true },
+      );
+      panel.addEventListener('animationend', () => panel.classList.remove('pop-exit'), { once: true });
+    } else {
+      finish();
+    }
     document.removeEventListener('click', outside, true);
     document.removeEventListener('keydown', onKey);
   };
@@ -55,13 +67,24 @@ function setupAddButton(container) {
     if (e.key === 'Escape') hide();
   };
 
+  const animateOpen = () => {
+    if (!panel) return;
+    panel.classList.add('pop-enter');
+    pop.classList.add('fade-enter');
+    panel.addEventListener('animationend', () => panel.classList.remove('pop-enter'), { once: true });
+    pop.addEventListener('animationend', () => pop.classList.remove('fade-enter'), { once: true });
+  };
+
   btn.addEventListener('click', () => {
-    if (!pop.hidden) { hide(); return; }
+    if (!pop.hidden) {
+      hide();
+      return;
+    }
     pop.hidden = false;
-    requestAnimationFrame(() => pop.classList.add('tp-open'));
     btn.classList.add('active');
     instance = instance || Popper.createPopper(btn, pop, { placement: 'bottom' });
     instance.update();
+    animateOpen();
     input.focus();
     document.addEventListener('click', outside, true);
     document.addEventListener('keydown', onKey);

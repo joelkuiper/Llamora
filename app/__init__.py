@@ -29,28 +29,36 @@ def create_app():
     CSRFProtect(app)
 
     from .routes.auth import auth_bp
-    from .routes.sessions import sessions_bp
+    from .routes.days import days_bp
     from .routes.chat import chat_bp, llm
     from .routes.search import search_bp
     from .routes.tags import tags_bp
 
     app.register_blueprint(auth_bp)
-    app.register_blueprint(sessions_bp)
+    app.register_blueprint(days_bp)
     app.register_blueprint(chat_bp)
     app.register_blueprint(search_bp)
     app.register_blueprint(tags_bp)
 
-    import humanize
-    from datetime import datetime, timezone
+    from datetime import datetime
     import hashlib
+    from .services.time import humanize as humanize_filter
 
-    @app.template_filter("humanize")
-    def humanize_filter(value):
+    app.template_filter("humanize")(humanize_filter)
+
+    @app.template_filter("long_date")
+    def long_date_filter(value):
         if isinstance(value, str):
-            value = datetime.fromisoformat(value)
-        if value.tzinfo is None:
-            value = value.replace(tzinfo=timezone.utc)
-        return humanize.naturaltime(value)
+            dt = datetime.fromisoformat(value)
+        else:
+            dt = value
+        day = dt.day
+        if 10 <= day % 100 <= 20:
+            suffix = "th"
+        else:
+            suffix = {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+        month = dt.strftime("%B")
+        return f"{day}{suffix} of {month} {dt.year}"
 
     @app.template_filter("tag_hash")
     def tag_hash_filter(tag, user_id=None):
@@ -68,7 +76,7 @@ def create_app():
 
     @app.after_serving
     async def _shutdown_llm():
-        llm.shutdown()
+        await asyncio.to_thread(llm.shutdown)
 
     @app.before_serving
     async def _print_registration_link():

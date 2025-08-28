@@ -1,0 +1,63 @@
+<section id="calendar" data-year="{{ year }}" data-month="{{ '%02d'|format(month) }}">
+  <div class="calendar-nav">
+    <button class="cal-nav-btn prev"
+            hx-get="{{ url_for('days.calendar_month', year=prev_year, month=prev_month) }}"
+            hx-target="#calendar"
+            hx-swap="outerHTML"
+            aria-label="Previous month">&#9664;</button>
+    <h2>{{ month_name }} {{ year }}</h2>
+    <button class="cal-nav-btn next"
+            hx-get="{{ url_for('days.calendar_month', year=next_year, month=next_month) }}"
+            hx-target="#calendar"
+            hx-swap="outerHTML"
+            aria-label="Next month">&#9654;</button>
+  </div>
+  <div class="calendar-today">
+    <button class="today-btn"
+       href="{{ url_for('days.day_today') }}"
+       hx-get="{{ url_for('chat.chat_htmx_today') }}"
+       hx-target="#content-wrapper"
+       hx-swap="outerHTML"
+       hx-push-url="true"
+       data-date="{{ today }}">Today</button>
+  </div>
+  <table class="calendar-table">
+    <thead>
+      <tr>
+        {% for d in ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"] %}
+        <th>{{ d }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for week in weeks %}
+      <tr>
+        {% for day in week %}
+          {% if day == 0 %}
+          <td class="empty"></td>
+          {% else %}
+          {% set date_str = "%04d-%02d-%02d"|format(year, month, day) %}
+          {% set classes = [] %}
+          {% if date_str == active_day %}{% set classes = classes + ['active'] %}{% endif %}
+          {% if date_str == today %}{% set classes = classes + ['is-today'] %}{% endif %}
+          {% if day in active_days %}{% set classes = classes + ['has-entry'] %}{% endif %}
+          {% set is_today = (date_str == today) %}
+          <td data-date="{{ date_str }}"{% if classes %} class="{{ classes|join(' ') }}"{% endif %}>
+            {% if is_today or day in active_days %}
+            <a{% if not is_today %} class="not-today"{% endif %}
+               href="{{ url_for('days.day', date=date_str) }}"
+               hx-get="{{ url_for('chat.chat_htmx', date=date_str) }}"
+               hx-target="#content-wrapper"
+               hx-swap="outerHTML"
+               hx-push-url="true">{{ day }}</a>
+            {% else %}
+            <span class="no-messages">{{ day }}</span>
+            {% endif %}
+          </td>
+          {% endif %}
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </div>
+</section>

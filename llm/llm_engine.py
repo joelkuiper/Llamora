@@ -6,6 +6,8 @@ import logging
 import threading
 from typing import Any, AsyncGenerator
 
+import sys
+
 import httpx
 from httpx import HTTPError
 
@@ -88,6 +90,10 @@ class LLMEngine:
 
             self._launch_server()
             atexit.register(self.shutdown)
+            self._orig_signals: dict[int, signal.Handlers] = {}
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                self._orig_signals[sig] = signal.getsignal(sig)
+                signal.signal(sig, self._handle_exit)
 
     def _wait_until_ready(self) -> None:
         logger = logging.getLogger(__name__)
@@ -116,7 +122,6 @@ class LLMEngine:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            start_new_session=True,
         )
         if self.proc.stdout:
             threading.Thread(
@@ -160,14 +165,34 @@ class LLMEngine:
             self._restart_server()
 
     def shutdown(self) -> None:
-        if getattr(self, "proc", None) and self.proc.poll() is None:
+        proc = getattr(self, "proc", None)
+        if proc and proc.poll() is None:
+            self.logger.info("Stopping llamafile server")
+            proc.terminate()
             try:
-                os.killpg(self.proc.pid, signal.SIGTERM)
-                self.proc.wait(timeout=5)
+                proc.wait(timeout=10)
             except subprocess.TimeoutExpired:  # pragma: no cover - unlikely
-                os.killpg(self.proc.pid, signal.SIGKILL)
-            except ProcessLookupError:  # process already gone
-                pass
+                self.logger.warning("Forcing llamafile server kill")
+                proc.kill()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    pass
+            self.logger.info("Llamafile server stopped")
+        self.proc = None
+
+    def _handle_exit(self, signum, frame) -> None:  # pragma: no cover - signal handler
+        try:
+            self.shutdown()
+        finally:
+            handler = self._orig_signals.get(signum, signal.SIG_DFL)
+            if handler in (signal.SIG_IGN, None):
+                return
+            if handler is signal.SIG_DFL:
+                signal.signal(signum, signal.SIG_DFL)
+                os.kill(os.getpid(), signum)
+            else:
+                handler(signum, frame)
 
     def __del__(self):
         try:
@@ -180,7 +205,9 @@ class LLMEngine:
         resp.raise_for_status()
         return len(resp.json().get("tokens", []))
 
-    async def _trim_history(self, history: list[dict], max_input: int) -> list[dict]:
+    async def _trim_history(
+        self, history: list[dict], max_input: int, context: dict
+    ) -> list[dict]:
         if not history:
             return history
         async with httpx.AsyncClient(timeout=None) as client:
@@ -188,7 +215,7 @@ class LLMEngine:
             while lo < hi:
                 mid = (lo + hi) // 2
                 slice_history = history[mid:]
-                prompt = build_prompt(slice_history)
+                prompt = build_prompt(slice_history, **context)
                 tokens = await self._count_tokens(client, prompt)
                 if tokens <= max_input:
                     hi = mid
@@ -197,15 +224,29 @@ class LLMEngine:
         return history[lo:]
 
     async def stream_response(
-        self, msg_id: str, history: list[dict], params: dict | None = None
+        self,
+        msg_id: str,
+        history: list[dict] | None = None,
+        params: dict | None = None,
+        context: dict | None = None,
+        prompt: str | None = None,
     ) -> AsyncGenerator[str, None]:
         self._ensure_server_running()
 
         cfg = {**self.default_request, **(params or {})}
-        n_predict = cfg.get("n_predict")
-        max_input = self.ctx_size - n_predict
-        history = await self._trim_history(history, max_input)
-        prompt = build_prompt(history)
+
+        if prompt is None:
+            history = history or []
+            n_predict = cfg.get("n_predict")
+            max_input = self.ctx_size - n_predict
+            ctx = context or {}
+            try:
+                history = await self._trim_history(history, max_input, ctx)
+                prompt = build_prompt(history, **ctx)
+            except Exception as e:
+                self.logger.exception("Failed to build prompt")
+                yield {"type": "error", "data": f"Prompt error: {e}"}
+                return
 
         payload = {"prompt": prompt, **cfg, "grammar": self.grammar}
 
@@ -287,6 +328,7 @@ class LLMEngine:
                 return
             finally:
                 self._active_streams.pop(msg_id, None)
+
 
     async def abort(self, msg_id: str) -> bool:
         resp = self._active_streams.pop(msg_id, None)

@@ -1,21 +1,31 @@
-{% macro assistant_stream(user_msg_id, session_id) -%}
-<div id="msg-{{ user_msg_id }}" class="message assistant-stream"
+{% macro assistant_stream(user_msg_id, day, user_time=None, sse_url=None, stop_url=None) -%}
+{# Quart's url_for drops params set to None, so we can always include user_time #}
+{%- if sse_url is none -%}
+{%- set sse_url = url_for('chat.sse_reply', date=day, user_msg_id=user_msg_id, user_time=user_time) -%}
+{%- endif -%}
+<div id="msg-{{ user_msg_id }}"
+     class="message assistant-stream"
      data-user-msg-id="{{ user_msg_id }}"
      data-assistant-msg-id=""
-     hx-ext="sse" sse-close="done"
-     sse-connect="{{ url_for('chat.sse_reply', session_id=session_id, user_msg_id=user_msg_id) }}">
-  {# data-assistant-msg-id will be set by client JS once streaming completes #}
-  <span class="raw-response" sse-swap="message" hidden hx-swap="beforeend"></span>
+     hx-ext="sse"
+     sse-close="done"
+     sse-connect="{{ sse_url }}">
+  <span sse-close="error">
+    {# data-assistant-msg-id will be set by client JS once streaming completes #}
+    <span class="raw-response" sse-swap="message" hidden hx-swap="beforeend"></span>
 
-  <span class="markdown-body">
-    <span id="typing-indicator"
-          data-user-msg-id="{{ user_msg_id }}"
-          data-stop-url="{{ url_for('chat.stop_generation', user_msg_id=user_msg_id) }}"
-          sse-swap="done"
-          hx-swap="none">
-      <span class="cursor">❚</span>
+    <span class="markdown-body">
+      <span id="typing-indicator"
+            {%- if stop_url %}
+            data-user-msg-id="{{ user_msg_id }}"
+            data-stop-url="{{ stop_url }}"
+            {%- endif %}
+            sse-swap="done"
+            hx-swap="none">
+        <span class="cursor">❚</span>
+      </span>
     </span>
+    <div class="meta-chips-placeholder"></div>
   </span>
-  <div class="meta-chips-placeholder"></div>
 </div>
 {%- endmacro %}

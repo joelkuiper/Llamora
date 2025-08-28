@@ -1,6 +1,12 @@
 import { startButtonSpinner, stopButtonSpinner } from "./ui.js";
 
-document.addEventListener("DOMContentLoaded", () => {
+function setTimezoneCookie() {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  document.cookie = `tz=${tz}; path=/`;
+}
+
+function initForms() {
+  setTimezoneCookie();
   document.querySelectorAll(".form-container form, #profile-page form").forEach((form) => {
     form.addEventListener("submit", async (e) => {
       const btn = form.querySelector('button[type="submit"]');
@@ -42,4 +48,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }, 10000);
     });
   });
-});
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initForms);
+} else {
+  initForms();
+}

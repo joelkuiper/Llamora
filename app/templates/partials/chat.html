@@ -1,43 +1,37 @@
-{% from 'partials/assistant_stream.html' import assistant_stream %}
-{% from 'partials/meta_chips.html' import render_meta_chips %}
-
 <main
   id="content-wrapper"
   {% if oob %} hx-swap-oob="true" {% endif %}>
-
-    <div id="chat" data-session-id="{{ session.id }}">
-      <div class="message assistant"><div class="markdown-body">Welcome. Share what’s on your mind, and I’ll be here with you</div></div>
-      {% for msg in history %}
-      <div id="msg-{{ msg['id'] }}" class="message {{ 'assistant' if msg['role'] != 'user' else 'user'}}">
-        <div class="markdown-body">{{ msg.message }}</div>
-        {% if msg['role'] != 'user' %}
-        {{ render_meta_chips(msg['id'], msg.get('tags', [])) }}
-        {% endif %}
-      </div>
-      {% endfor %}
-
-      {% if pending_msg_id %}
-      {{ assistant_stream(pending_msg_id, session.id) }}
-      {% endif %}
-    </div>
-
+  {% include 'partials/history.html' %}
+  {% if is_today %}
   <form id="message-form"
-        hx-post="{{ url_for('chat.send_message', session_id=session.id) }}"
+        hx-post="{{ url_for('chat.send_message', date=day) }}"
         hx-target="#chat"
         hx-on::after-request="this.reset()"
         hx-swap="beforeend">
-
     <div class="input-wrapper">
-        <textarea class="input"
-          onkeydown="if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); this.form.requestSubmit(); }"
-          name="message"
-          rows="3"
-          placeholder="Write your thoughts here…"
-          cols="40"
-          maxlength="{{ config.MAX_MESSAGE_LENGTH }}"></textarea>
-        <button id="send-btn" class="btn" type="submit" aria-label="Send"></button>
-      </div>
+      <textarea class="input"
+                name="message"
+                rows="3"
+                placeholder="{{ 'Write your thoughts here…' if is_today else 'This day has past.' }}"
+                cols="40"
+                maxlength="{{ config.MAX_MESSAGE_LENGTH }}"></textarea>
+      <input type="hidden" name="user_time" id="user-time" />
+      <button id="send-btn" class="btn" type="submit" aria-label="Send"{% if not is_today %} disabled{% endif %}></input>
+    </div>
   </form>
+
+  {% else %}
+  <div class="return-today">This day has past.
+    <a
+      href="{{ url_for('days.day_today') }}"
+      hx-get="{{ url_for('chat.chat_htmx_today') }}"
+      hx-target="#content-wrapper"
+      hx-swap="outerHTML"
+      hx-push-url="true">
+      Return to present. </a>
+  </div>
+  {% endif %}
+
   <div id="scroll-bottom-container">
     <button id="scroll-bottom" class="scroll-btn" aria-label="Scroll to bottom">
       <svg width="100%" height="100%" viewBox="0 0 24 24"
@@ -50,17 +44,18 @@
       </svg>
     </button>
   </div>
+
   <script type="module">
     import { initChatUI } from "{{ url_for('static', filename='js/chat.js') }}";
-    import { updateActiveSession } from "{{ url_for('static', filename='js/session.js') }}";
     import { initSearchUI, scrollToHighlight } from "{{ url_for('static', filename='js/ui.js') }}";
+    import { initDayNav } from "{{ url_for('static', filename='js/day.js') }}";
 
     const run = () => {
       initChatUI();
-      updateActiveSession();
+      initDayNav();
       initSearchUI();
       scrollToHighlight();
-      document.title = "{{ session.name }}";
+      document.title = "{{ day }}";
     };
 
     run();

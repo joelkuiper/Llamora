@@ -5,10 +5,14 @@ export const SPINNER = {
 
 function spin(el, text = "") {
   let i = 0;
-  el.textContent = text ? `${SPINNER.frames[i]} ${text}` : SPINNER.frames[i];
+  el.textContent = text
+    ? `${SPINNER.frames[i]} ${text}`
+    : SPINNER.frames[i];
   return setInterval(() => {
     i = (i + 1) % SPINNER.frames.length;
-    el.textContent = text ? `${SPINNER.frames[i]} ${text}` : SPINNER.frames[i];
+    el.textContent = text
+      ? `${SPINNER.frames[i]} ${text}`
+      : SPINNER.frames[i];
   }, SPINNER.interval);
 }
 
@@ -19,7 +23,13 @@ export function startButtonSpinner(btn, loadingText = "Loading") {
   btn.dataset.originalText = originalText;
   btn.disabled = true;
   btn.setAttribute("aria-busy", "true");
-  const id = spin(btn, loadingText);
+  btn.textContent = "";
+  const spinnerEl = document.createElement("span");
+  spinnerEl.className = "spinner";
+  spinnerEl.setAttribute("aria-hidden", "true");
+  btn.appendChild(spinnerEl);
+  btn.append(" ", loadingText);
+  const id = spin(spinnerEl);
   btn.dataset.spinnerId = String(id);
   return id;
 }
@@ -27,7 +37,8 @@ export function startButtonSpinner(btn, loadingText = "Loading") {
 export function stopButtonSpinner(btn) {
   const id = btn && btn.dataset.spinnerId;
   if (id) clearInterval(Number(id));
-  if (btn && btn.dataset.originalText) btn.textContent = btn.dataset.originalText;
+  if (btn && btn.dataset.originalText)
+    btn.textContent = btn.dataset.originalText;
   if (btn) {
     btn.disabled = false;
     btn.removeAttribute("aria-busy");
@@ -85,9 +96,9 @@ export function initSearchUI() {
     }
 
     // First open: run the pop-in under a stable class
-    panel.classList.add("sr-enter");
+    panel.classList.add("pop-enter");
     panel.addEventListener("animationend", () => {
-      panel.classList.remove("sr-enter");
+      panel.classList.remove("pop-enter");
       wrap.classList.add("is-open");
     }, { once: true });
   });
@@ -96,7 +107,7 @@ export function initSearchUI() {
     if (clearInput && input) input.value = "";
     const panel = wrap.querySelector(".sr-panel");
     if (!panel) { wrap.classList.remove("is-open"); return; }
-    panel.classList.add("sr-closing");
+    panel.classList.add("pop-exit");
     panel.addEventListener("animationend", () => {
       wrap.classList.remove("is-open");
       wrap.innerHTML = "";
@@ -130,10 +141,10 @@ export function initSearchUI() {
   document.addEventListener("click", (evt) => {
     const link = evt.target.closest("#search-results a[data-target]");
     if (!link) return;
-    const currentId = document.getElementById("chat")?.dataset.sessionId;
+    const currentId = document.getElementById("chat")?.dataset.date;
     const targetId  = link.dataset.target;
 
-    if (link.dataset.sessionId === currentId) {
+    if (link.dataset.date === currentId) {
       evt.preventDefault();
       closeResults(true);
       const el = document.getElementById(targetId);

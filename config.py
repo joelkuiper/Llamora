@@ -1,16 +1,14 @@
 import orjson
 import os
 import logging
-from copy import deepcopy
 from datetime import timedelta
-from util import str_to_bool
+from util import str_to_bool, deep_merge
 
 MAX_TAG_LENGTH = 64
 MAX_USERNAME_LENGTH = 30
 MAX_PASSWORD_LENGTH = 128
 MIN_PASSWORD_LENGTH = 8
 MAX_MESSAGE_LENGTH = 1000
-MAX_SESSION_NAME_LENGTH = 100
 APP_NAME = "Llamora"
 
 # Feature toggles
@@ -34,16 +32,6 @@ DB_MMAP_SIZE = int(os.getenv("LLAMORA_DB_MMAP_SIZE", 10 * 1024 * 1024))
 
 # Only allow a limited subset of parameters to be forwarded to the LLM from the client-side
 ALLOWED_LLM_CONFIG_KEYS = {"temperature"}
-
-
-def _deep_merge(base: dict, override: dict) -> dict:
-    out = deepcopy(base)
-    for k, v in (override or {}).items():
-        if isinstance(out.get(k), dict) and isinstance(v, dict):
-            out[k] = _deep_merge(out[k], v)
-        else:
-            out[k] = v
-    return out
 
 
 def _json_env(name: str):
@@ -72,7 +60,7 @@ env_overrides = _json_env("LLAMORA_LLAMA_ARGS")
 LLM_SERVER = {
     "llamafile_path": os.getenv("LLAMORA_LLAMAFILE", ""),
     "host": os.getenv("LLAMORA_LLAMA_HOST"),
-    "args": _deep_merge(DEFAULT_LLAMA_ARGS, env_overrides or {}),
+    "args": deep_merge(DEFAULT_LLAMA_ARGS, env_overrides or {}),
 }
 
 llm_request_overrides = _json_env("LLAMORA_LLM_REQUEST") or {}
@@ -88,6 +76,7 @@ DEFAULT_LLM_REQUEST = {
     # "stop": ["<|end|>", "<|assistant|>"],
     # Reduce {, } likelihood for Phi 3.5
     # "logit_bias": [[426, -1.0], [[500, -1.0]]],
+    "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>", "<|end|>"],
     **llm_request_overrides,
 }
 
