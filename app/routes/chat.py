@@ -564,8 +564,8 @@ async def sse_reply(user_msg_id: str, date: str):
     if not user_time_str:
         user_time_str = datetime.utcnow().isoformat() + "Z"
     tz = request.cookies.get("tz") or "UTC"
-    date_str, time_of_day = date_and_part(user_time_str, tz)
-    ctx = {"date": date_str, "time_of_day": time_of_day}
+    date_str, pod = date_and_part(user_time_str, tz)
+    ctx = {"date": date_str, "part_of_day": pod}
 
     pending_response = pending_responses.get(user_msg_id)
     if not pending_response:
