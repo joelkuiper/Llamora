@@ -9,6 +9,8 @@ It’s both a technical playground and a design experiment: a lightweight journa
 
 ### Screenshots
 
+![Chat screenshot](./doc/screenshots/calendar.png)
+![Tags screenshot](./doc/screenshots/tags.png)
 ![Chat screenshot](./doc/screenshots/chat.png)
 ![Search screenshot](./doc/screenshots/search.png)
 ![Login screenshot](./doc/screenshots/login.png)
