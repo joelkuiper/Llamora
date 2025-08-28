@@ -45,7 +45,6 @@ async def _render_profile_page(user, **context):
         return await render_template("partials/profile.html", **context)
     return await render_template(
         "index.html",
-        sessions=[],
         content_template="partials/profile.html",
         **context,
     )
