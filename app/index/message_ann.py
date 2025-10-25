@@ -105,8 +105,11 @@ class MessageIndexRegistry:
             dim = vecs.shape[1]
             idx = MessageIndex(dim)
         idx.add_batch(ids, vecs)
-        for mid, vec in zip(ids, vecs):
-            await self.db.store_vector(mid, user_id, vec, dek)
+        await self.db.store_vectors_batch(
+            user_id,
+            [(mid, vec) for mid, vec in zip(ids, vecs)],
+            dek,
+        )
         self.cursors[user_id] = msgs[-1]["id"]
         self.indexes[user_id] = idx
         return idx

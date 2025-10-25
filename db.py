@@ -512,6 +512,38 @@ class LocalDB:
                 (msg_id, user_id, dim, nonce, ct, alg),
             )
 
+    async def store_vectors_batch(
+        self,
+        user_id: str,
+        vectors: list[tuple[str, np.ndarray]],
+        dek: bytes,
+    ) -> None:
+        if not vectors:
+            return
+
+        records: list[tuple[str, str, int, bytes, bytes, bytes]] = []
+        for msg_id, vec in vectors:
+            vec_arr = np.asarray(vec, dtype=np.float32).ravel()
+            dim = int(vec_arr.shape[0])
+            nonce, ct, alg = encrypt_vector(
+                dek,
+                user_id,
+                msg_id,
+                vec_arr.tobytes(),
+            )
+            records.append((msg_id, user_id, dim, nonce, ct, alg))
+
+        async with self.pool.connection() as conn:
+            await self.with_transaction(
+                conn,
+                conn.executemany,
+                """
+                    INSERT OR REPLACE INTO vectors (id, user_id, dim, nonce, ciphertext, alg)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                records,
+            )
+
     async def get_latest_vectors(self, user_id: str, limit: int, dek: bytes):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
