@@ -1,15 +1,68 @@
 import logging
 import os
-from typing import Any, AsyncGenerator
+from typing import Any, AsyncGenerator, NamedTuple, TYPE_CHECKING
 
 import httpx
 import orjson
 from httpx import HTTPError
 
 from config import DEFAULT_LLM_REQUEST, GRAMMAR_FILE
-from llm.prompt_template import build_prompt
-
 from .process_manager import LlamafileProcessManager
+
+
+class SSEEvent(NamedTuple):
+    """Represents a parsed server-sent event from the LLM stream."""
+
+    type: str
+    data: str | None = None
+
+
+class SSEStreamParser:
+    """Parse Server-Sent Events emitted by the LLM completion endpoint."""
+
+    def __init__(self) -> None:
+        self._event_buf: list[str] = []
+        self.saw_stop = False
+        self.saw_content = False
+
+    def feed_line(self, line: str | None) -> list[SSEEvent]:
+        """Consume a single line from the SSE stream and emit parsed events."""
+
+        if line is None or line.startswith(":"):
+            return []
+        if line.startswith("data:"):
+            self._event_buf.append(line[5:].lstrip())
+            return []
+        if line == "":
+            event = self._flush_event()
+            return [event] if event else []
+        return []
+
+    def finalize(self) -> list[SSEEvent]:
+        """Flush any buffered event when the HTTP stream closes."""
+
+        event = self._flush_event()
+        return [event] if event else []
+
+    def _flush_event(self) -> SSEEvent | None:
+        if not self._event_buf:
+            return None
+        data_str = "\n".join(self._event_buf).strip()
+        self._event_buf.clear()
+        if not data_str:
+            return None
+        try:
+            payload = orjson.loads(data_str)
+        except Exception:
+            return None
+        if payload.get("stop"):
+            self.saw_stop = True
+            return SSEEvent("stop")
+        content = payload.get("content")
+        if content:
+            self.saw_content = True
+            return SSEEvent("content", content)
+        return None
 
 
 class LLMClient:
@@ -17,7 +70,7 @@ class LLMClient:
 
     def __init__(
         self,
-        process_manager: LlamafileProcessManager,
+        process_manager: "LlamafileProcessManager",
         default_request: dict | None = None,
     ) -> None:
         self.logger = logging.getLogger(__name__)
@@ -47,6 +100,8 @@ class LLMClient:
     ) -> list[dict[str, Any]]:
         if not history:
             return history
+        from llm.prompt_template import build_prompt
+
         async with httpx.AsyncClient(timeout=None) as client:
             lo, hi = 0, len(history)
             while lo < hi:
@@ -85,6 +140,8 @@ class LLMClient:
                     yield {"type": "error", "data": f"Prompt error: {e}"}
                     return
             try:
+                from llm.prompt_template import build_prompt
+
                 prompt = build_prompt(history, **ctx)
             except Exception as e:
                 self.logger.exception("Failed to build prompt")
@@ -112,52 +169,31 @@ class LLMClient:
                     self._active_streams[msg_id] = resp
                     resp.raise_for_status()
 
-                    event_buf: list[str] = []
-                    saw_stop = False
-                    saw_content = False
+                    parser = SSEStreamParser()
+                    stopped = False
 
                     async for line in resp.aiter_lines():
-                        if line is None:
-                            continue
-                        if line.startswith(":"):
-                            continue  # SSE comment/heartbeat
-                        if line.startswith("data:"):
-                            event_buf.append(line[5:].lstrip())
-                            continue
-                        if line == "":
-                            if not event_buf:
-                                continue
-                            data_str = "\n".join(event_buf).strip()
-                            event_buf.clear()
-                            try:
-                                data = orjson.loads(data_str)
-                            except Exception:
-                                continue
-                            if data.get("stop"):
-                                saw_stop = True
+                        events = parser.feed_line(line)
+                        for event in events:
+                            if event.type == "content" and event.data is not None:
+                                yield event.data
+                            elif event.type == "stop":
+                                stopped = True
                                 break
-                            content = data.get("content")
-                            if content:
-                                saw_content = True
-                                yield content
+                        if stopped:
+                            break
 
-                    if event_buf:
-                        try:
-                            data = orjson.loads("\n".join(event_buf).strip())
-                            if data.get("stop"):
-                                saw_stop = True
-                            else:
-                                content = data.get("content")
-                                if content and content.strip():
-                                    saw_content = True
-                                    yield content
-                        except Exception:
-                            pass
+                    if not stopped:
+                        for event in parser.finalize():
+                            if event.type == "content" and event.data is not None:
+                                yield event.data
+                            elif event.type == "stop":
+                                stopped = True
 
-                    if not saw_stop:
+                    if not parser.saw_stop:
                         msg = (
                             "Stream ended unexpectedly"
-                            if saw_content
+                            if parser.saw_content
                             else "LLM server disconnected"
                         )
                         yield {"type": "error", "data": msg}
