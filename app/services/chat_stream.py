@@ -5,7 +5,7 @@ from html import escape
 
 import orjson
 
-from llm.llm_engine import LLMEngine
+from llm.client import LLMClient
 
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ class PendingResponse:
         date: str,
         history: list[dict],
         dek: bytes,
-        llm: LLMEngine,
+        llm: LLMClient,
         db,
         on_cleanup: Callable[[str], None],
         params: dict | None = None,
@@ -258,7 +258,7 @@ class PendingResponse:
 class ChatStreamManager:
     def __init__(
         self,
-        llm: LLMEngine,
+        llm: LLMClient,
         db,
         pending_ttl: int = 300,
         cleanup_interval: int = 60,

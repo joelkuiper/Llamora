@@ -16,7 +16,8 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from ulid import ULID
 
-from llm.llm_engine import LLMEngine
+from llm.client import LLMClient
+from llm.process_manager import LlamafileProcessManager
 from llm.prompt_template import build_opening_prompt
 
 from app import db
@@ -38,7 +39,9 @@ from app.services.time import (
 chat_bp = Blueprint("chat", __name__)
 
 
-llm = LLMEngine()
+process_manager = LlamafileProcessManager()
+llm = LLMClient(process_manager)
+
 chat_stream_manager = ChatStreamManager(llm, db)
 
 
