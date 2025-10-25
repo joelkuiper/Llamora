@@ -6,7 +6,7 @@ from typing import Dict, Optional
 import hnswlib
 import numpy as np
 
-from app.embed.model import embed_texts
+from app.embed.model import async_embed_texts
 
 
 logger = logging.getLogger(__name__)
@@ -100,7 +100,7 @@ class MessageIndexRegistry:
 
         texts = [m["message"] for m in msgs]
         ids = [m["id"] for m in msgs]
-        vecs = embed_texts(texts).astype(np.float32)
+        vecs = (await async_embed_texts(texts)).astype(np.float32)
         if idx is None:
             dim = vecs.shape[1]
             idx = MessageIndex(dim)
@@ -161,7 +161,7 @@ class MessageIndexRegistry:
                 return idx
 
             logger.debug("No existing data for user %s, creating empty index", user_id)
-            dim = embed_texts([""]).shape[1]
+            dim = (await async_embed_texts([""])).shape[1]
             idx = MessageIndex(dim)
             latest = await self.db.get_user_latest_id(user_id)
             self.cursors[user_id] = latest
@@ -229,3 +229,7 @@ class MessageIndexRegistry:
             logger.debug("Evicting %d idle indexes", len(to_remove))
         for uid in to_remove:
             self.indexes.pop(uid, None)
+            self.cursors.pop(uid, None)
+            lock = self.locks.pop(uid, None)
+            if lock and lock.locked():
+                logger.debug("Lock for user %s remained locked during eviction", uid)
