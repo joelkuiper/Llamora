@@ -14,6 +14,11 @@ APP_NAME = "Llamora"
 # Feature toggles
 DISABLE_REGISTRATION = str_to_bool(os.getenv("LLAMORA_DISABLE_REGISTRATION", "false"))
 
+# Authentication and rate limiting
+MAX_LOGIN_ATTEMPTS = int(os.getenv("LLAMORA_MAX_LOGIN_ATTEMPTS", 5))
+LOGIN_LOCKOUT_TTL = int(os.getenv("LLAMORA_LOGIN_LOCKOUT_TTL", 15 * 60))
+LOGIN_FAILURE_CACHE_SIZE = int(os.getenv("LLAMORA_LOGIN_FAILURE_CACHE_SIZE", 2048))
+
 # Embedding configuration
 EMBED_MODEL = os.getenv("LLAMORA_EMBED_MODEL", "BAAI/bge-small-en-v1.5")
 

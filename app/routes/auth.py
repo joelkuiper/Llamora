@@ -10,6 +10,7 @@ from quart import (
     abort,
 )
 from nacl import pwhash
+from cachetools import TTLCache
 from app.services.auth_helpers import (
     set_secure_cookie,
     login_required,
@@ -35,6 +36,18 @@ from datetime import datetime
 from app.services.time import local_date
 
 auth_bp = Blueprint("auth", __name__)
+
+_login_failures: TTLCache = TTLCache(
+    maxsize=config.LOGIN_FAILURE_CACHE_SIZE,
+    ttl=config.LOGIN_LOCKOUT_TTL,
+)
+
+
+def _get_client_ip() -> str:
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",", 1)[0].strip()
+    return request.remote_addr or "unknown"
 
 
 async def _render_profile_page(user, **context):
@@ -200,10 +213,23 @@ async def login():
         return_url = _safe_return(form.get("return") or request.args.get("return"))
         current_app.logger.debug("Login attempt for %s", username)
 
+        client_ip = _get_client_ip()
+        cache_key = (username or "", client_ip)
+        attempts = _login_failures.get(cache_key, 0)
+        if attempts >= current_app.config["MAX_LOGIN_ATTEMPTS"]:
+            current_app.logger.warning(
+                "Login locked for %s from %s after %s attempts",
+                username,
+                client_ip,
+                attempts,
+            )
+            return Response("Too many login attempts. Try again later.", status=429)
+
         max_user = current_app.config["MAX_USERNAME_LENGTH"]
         max_pass = current_app.config["MAX_PASSWORD_LENGTH"]
 
         if len(username) > max_user or len(password) > max_pass:
+            _login_failures[cache_key] = attempts + 1
             return await render_template(
                 "login.html", error="Invalid credentials", return_url=return_url
             )
@@ -234,6 +260,8 @@ async def login():
                 resp = redirect(redirect_url)
                 set_secure_cookie(resp, "uid", str(user["id"]))
                 set_dek(resp, dek)
+                if cache_key in _login_failures:
+                    del _login_failures[cache_key]
                 current_app.logger.debug(
                     "Login succeeded for %s, redirecting to %s", username, redirect_url
                 )
@@ -244,6 +272,7 @@ async def login():
                 )
                 pass
         current_app.logger.debug("Login failed for %s", username)
+        _login_failures[cache_key] = attempts + 1
         return await render_template(
             "login.html", error="Invalid credentials", return_url=return_url
         )

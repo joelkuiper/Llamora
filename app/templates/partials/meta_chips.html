@@ -28,7 +28,7 @@
       </svg>
     </button>
 
-    <div class="meta-tags", id="msg-tags-{{ msg_id }}">
+    <div class="meta-tags" id="msg-tags-{{ msg_id }}">
       {% for tag in tags %}
       {{ keyword_chip(tag.name, tag.hash, msg_id) }}
       {% endfor %}
