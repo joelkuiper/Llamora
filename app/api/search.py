@@ -17,7 +17,7 @@ from config import (
     POOR_MATCH_MAX_COS,
     POOR_MATCH_MIN_HITS,
 )
-from app.embed.model import embed_texts
+from app.embed.model import async_embed_texts
 from app.index.message_ann import MessageIndexRegistry
 
 
@@ -44,7 +44,7 @@ class SearchAPI:
             "KNN search requested by user %s with k1=%d k2=%d", user_id, k1, k2
         )
         index = await self.registry.get_or_build(user_id, dek)
-        q_vec = embed_texts([query]).astype(np.float32).reshape(1, -1)
+        q_vec = (await async_embed_texts([query])).astype(np.float32).reshape(1, -1)
 
         def quality(ids: List[str], cosines: List[float]) -> bool:
             if len(ids) < k2:
@@ -305,7 +305,7 @@ class SearchAPI:
             msg_id,
             user_id,
         )
-        vec = embed_texts([content]).astype(np.float32).reshape(1, -1)
+        vec = (await async_embed_texts([content])).astype(np.float32).reshape(1, -1)
         await self.db.store_vector(msg_id, user_id, vec[0], dek)
         index = await self.registry.get_or_build(user_id, dek)
         if not index.contains(msg_id):

@@ -1,8 +1,10 @@
-import numpy as np
+import asyncio
 from functools import lru_cache
 
+import numpy as np
 from fastembed import TextEmbedding
 from quart import current_app
+
 import config
 
 
@@ -19,3 +21,9 @@ def embed_texts(texts: list[str]) -> np.ndarray:
     # normalize=True returns L2-normalized vectors (safe for cosine/HNSW)
     vecs = list(_get_model().embed(texts, normalize=True))
     return np.asarray(vecs, dtype=np.float32)
+
+
+async def async_embed_texts(texts: list[str]) -> np.ndarray:
+    """Run :func:`embed_texts` without blocking the event loop."""
+
+    return await asyncio.to_thread(embed_texts, texts)
