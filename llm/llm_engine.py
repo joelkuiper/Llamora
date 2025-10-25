@@ -16,6 +16,8 @@ from llm.prompt_template import build_prompt
 import socket
 import os
 import signal
+import tempfile
+from pathlib import Path
 
 
 def _server_args_to_cli(args: dict[str, Any]) -> list[str]:
@@ -76,6 +78,9 @@ class LLMEngine:
             if not llamafile_path:
                 raise ValueError("LLAMORA_LLAMAFILE environment variable not set")
 
+            self._state_file = Path(tempfile.gettempdir()) / "llamora_llm_state.json"
+            self._cleanup_stale_process()
+
             self.cmd = [
                 "sh",
                 llamafile_path,
@@ -94,6 +99,95 @@ class LLMEngine:
             for sig in (signal.SIGINT, signal.SIGTERM):
                 self._orig_signals[sig] = signal.getsignal(sig)
                 signal.signal(sig, self._handle_exit)
+
+    def _state_path(self) -> Path:
+        if hasattr(self, "_state_file"):
+            return self._state_file
+        return Path(tempfile.gettempdir()) / "llamora_llm_state.json"
+
+    def _read_state(self) -> dict[str, Any] | None:
+        state_path = self._state_path()
+        if not state_path.exists():
+            return None
+        try:
+            data = orjson.loads(state_path.read_bytes())
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+        try:
+            state_path.unlink()
+        except FileNotFoundError:
+            pass
+        return None
+
+    def _write_state(self) -> None:
+        proc = getattr(self, "proc", None)
+        if not proc or proc.poll() is not None:
+            return
+        state = {
+            "pid": proc.pid,
+            "pgid": os.getpgid(proc.pid) if hasattr(os, "getpgid") else None,
+            "port": self.port,
+        }
+        state_path = self._state_path()
+        try:
+            state_path.write_bytes(orjson.dumps(state))
+        except Exception:
+            self.logger.debug("Failed to persist llamafile state", exc_info=True)
+
+    def _clear_state(self) -> None:
+        state_path = self._state_path()
+        try:
+            state_path.unlink()
+        except FileNotFoundError:
+            pass
+
+    def _process_alive(self, pid: int) -> bool:
+        try:
+            os.kill(pid, 0)
+            return True
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+
+    def _terminate_process(self, pid: int, pgid: int | None, *, force: bool = False) -> None:
+        sig = signal.SIGKILL if force else signal.SIGTERM
+        try:
+            if pgid is not None and hasattr(os, "killpg"):
+                os.killpg(pgid, sig)
+            else:
+                os.kill(pid, sig)
+        except ProcessLookupError:
+            pass
+
+    def _cleanup_stale_process(self) -> None:
+        state = self._read_state()
+        if not state:
+            return
+        pid = state.get("pid")
+        pgid = state.get("pgid") or pid
+        if not isinstance(pid, int):
+            self._clear_state()
+            return
+        if self._process_alive(pid):
+            self.logger.info(
+                "Found existing llamafile process (pid %s), terminating before restart",
+                pid,
+            )
+            self._terminate_process(pid, pgid, force=False)
+            for _ in range(50):
+                if not self._process_alive(pid):
+                    break
+                time.sleep(0.1)
+            if self._process_alive(pid):
+                self.logger.warning(
+                    "Existing llamafile process %s did not exit, forcing kill",
+                    pid,
+                )
+                self._terminate_process(pid, pgid, force=True)
+        self._clear_state()
 
     def _wait_until_ready(self) -> None:
         logger = logging.getLogger(__name__)
@@ -122,6 +216,7 @@ class LLMEngine:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            start_new_session=True,
         )
         if self.proc.stdout:
             threading.Thread(
@@ -136,6 +231,7 @@ class LLMEngine:
                 daemon=True,
             ).start()
         self._wait_until_ready()
+        self._write_state()
 
     def _is_server_healthy(self) -> bool:
         try:
@@ -165,20 +261,38 @@ class LLMEngine:
             self._restart_server()
 
     def shutdown(self) -> None:
+        self.logger.info("Shutting called")
         proc = getattr(self, "proc", None)
         if proc and proc.poll() is None:
             self.logger.info("Stopping llamafile server")
-            proc.terminate()
+            terminated = False
+            if hasattr(os, "killpg"):
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                    terminated = True
+                except ProcessLookupError:
+                    pass
+            if not terminated:
+                proc.terminate()
             try:
                 proc.wait(timeout=10)
             except subprocess.TimeoutExpired:  # pragma: no cover - unlikely
                 self.logger.warning("Forcing llamafile server kill")
-                proc.kill()
+                if hasattr(os, "killpg"):
+                    try:
+                        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass
                 try:
                     proc.wait(timeout=5)
                 except subprocess.TimeoutExpired:
                     pass
             self.logger.info("Llamafile server stopped")
+        self._clear_state()
         self.proc = None
 
     def _handle_exit(self, signum, frame) -> None:  # pragma: no cover - signal handler
