@@ -25,6 +25,7 @@ from app.services.auth_helpers import (
     get_current_user,
     get_dek,
 )
+from app.services.chat_context import get_chat_context
 from app.services.chat_stream import ChatStreamManager
 from app.services.chat_helpers import (
     build_conversation_context,
@@ -55,26 +56,13 @@ logger = logging.getLogger(__name__)
 
 async def render_chat(date, oob=False):
     user = await get_current_user()
-    uid = user["id"]
-
-    dek = get_dek()
-    history = await db.messages.get_history(uid, date, dek)
-    today = local_date().isoformat()
-    opening_stream = False
-    if not history and date == today:
-        opening_stream = True
-    pending_msg_id = None
-    if history and history[-1]["role"] == "user":
-        pending_msg_id = history[-1]["id"]
+    context = await get_chat_context(user, date)
     html = await render_template(
         "partials/chat.html",
         day=date,
-        history=history,
         oob=oob,
-        pending_msg_id=pending_msg_id,
         user=user,
-        is_today=(date == today),
-        opening_stream=opening_stream,
+        **context,
     )
 
     return html

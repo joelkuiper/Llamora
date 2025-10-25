@@ -4,8 +4,8 @@ from app import db
 from app.services.auth_helpers import (
     login_required,
     get_current_user,
-    get_dek,
 )
+from app.services.chat_context import get_chat_context
 from app.services.time import local_date
 
 days_bp = Blueprint("days", __name__)
@@ -37,22 +37,13 @@ async def day_today():
 async def day(date):
     user = await get_current_user()
     uid = user["id"]
-    dek = get_dek()
-    history = await db.messages.get_history(uid, date, dek)
-    pending_msg_id = None
-    if history and history[-1]["role"] == "user":
-        pending_msg_id = history[-1]["id"]
-    today = local_date().isoformat()
-    opening_stream = not history and date == today
+    context = await get_chat_context(user, date)
     html = await render_template(
         "index.html",
         user=user,
-        history=history,
         day=date,
-        pending_msg_id=pending_msg_id,
         content_template="partials/chat.html",
-        is_today=(date == today),
-        opening_stream=opening_stream,
+        **context,
     )
     resp = await make_response(html)
     await db.users.update_state(uid, active_date=date)
