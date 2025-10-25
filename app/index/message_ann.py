@@ -229,3 +229,7 @@ class MessageIndexRegistry:
             logger.debug("Evicting %d idle indexes", len(to_remove))
         for uid in to_remove:
             self.indexes.pop(uid, None)
+            self.cursors.pop(uid, None)
+            lock = self.locks.pop(uid, None)
+            if lock and lock.locked():
+                logger.debug("Lock for user %s remained locked during eviction", uid)
