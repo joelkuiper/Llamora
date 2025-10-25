@@ -68,19 +68,23 @@ async def render_chat(date, oob=False):
     return html
 
 
-@chat_bp.route("/c/<date>")
-@login_required
-async def chat_htmx(date):
-    target = request.args.get("target")
+async def _render_chat_htmx(target: str | None, date: str, push_url: str):
     html = await render_chat(date, False)
     resp = await make_response(html, 200)
-    push_url = url_for("days.day", date=date)
     if target:
         push_url = f"{push_url}?target={target}"
     resp.headers["HX-Push-Url"] = push_url
     user = await get_current_user()
     await db.users.update_state(user["id"], active_date=date)
     return resp
+
+
+@chat_bp.route("/c/<date>")
+@login_required
+async def chat_htmx(date):
+    target = request.args.get("target")
+    push_url = url_for("days.day", date=date)
+    return await _render_chat_htmx(target, date, push_url)
 
 
 @chat_bp.route("/c/today")
@@ -88,15 +92,8 @@ async def chat_htmx(date):
 async def chat_htmx_today():
     target = request.args.get("target")
     date = local_date().isoformat()
-    html = await render_chat(date, False)
-    resp = await make_response(html, 200)
     push_url = url_for("days.day_today")
-    if target:
-        push_url = f"{push_url}?target={target}"
-    resp.headers["HX-Push-Url"] = push_url
-    user = await get_current_user()
-    await db.users.update_state(user["id"], active_date=date)
-    return resp
+    return await _render_chat_htmx(target, date, push_url)
 
 
 @chat_bp.route("/c/stop/<user_msg_id>", methods=["POST"])
