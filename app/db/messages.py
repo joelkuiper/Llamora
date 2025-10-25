@@ -30,6 +30,31 @@ class MessagesRepository(BaseRepository):
     def set_on_message_appended(self, callback: MessageAppendedCallback | None) -> None:
         self._on_message_appended = callback
 
+    def _rows_to_messages(
+        self, rows, user_id: str, dek: bytes
+    ) -> list[dict]:  # pragma: no cover - trivial helper
+        messages: list[dict] = []
+        for row in rows:
+            record_json = self._decrypt_message(
+                dek,
+                user_id,
+                row["id"],
+                row["nonce"],
+                row["ciphertext"],
+                row["alg"],
+            )
+            rec = orjson.loads(record_json)
+            messages.append(
+                {
+                    "id": row["id"],
+                    "created_at": row["created_at"],
+                    "role": row["role"],
+                    "message": rec.get("message", ""),
+                    "meta": rec.get("meta", {}),
+                }
+            )
+        return messages
+
     async def append_message(
         self,
         user_id: str,
@@ -98,27 +123,7 @@ class MessagesRepository(BaseRepository):
             )
             rows = await cursor.fetchall()
 
-        messages: list[dict] = []
-        for row in rows:
-            record_json = self._decrypt_message(
-                dek,
-                user_id,
-                row["id"],
-                row["nonce"],
-                row["ciphertext"],
-                row["alg"],
-            )
-            rec = orjson.loads(record_json)
-            messages.append(
-                {
-                    "id": row["id"],
-                    "role": row["role"],
-                    "created_at": row["created_at"],
-                    "message": rec.get("message", ""),
-                    "meta": rec.get("meta", {}),
-                }
-            )
-        return messages
+        return self._rows_to_messages(rows, user_id, dek)
 
     async def get_messages_older_than(
         self, user_id: str, before_id: str, limit: int, dek: bytes
@@ -136,27 +141,7 @@ class MessagesRepository(BaseRepository):
             )
             rows = await cursor.fetchall()
 
-        messages: list[dict] = []
-        for row in rows:
-            record_json = self._decrypt_message(
-                dek,
-                user_id,
-                row["id"],
-                row["nonce"],
-                row["ciphertext"],
-                row["alg"],
-            )
-            rec = orjson.loads(record_json)
-            messages.append(
-                {
-                    "id": row["id"],
-                    "role": row["role"],
-                    "created_at": row["created_at"],
-                    "message": rec.get("message", ""),
-                    "meta": rec.get("meta", {}),
-                }
-            )
-        return messages
+        return self._rows_to_messages(rows, user_id, dek)
 
     async def get_user_latest_id(self, user_id: str) -> str | None:
         async with self.pool.connection() as conn:
@@ -188,27 +173,7 @@ class MessagesRepository(BaseRepository):
             )
             rows = await cursor.fetchall()
 
-        messages: list[dict] = []
-        for row in rows:
-            record_json = self._decrypt_message(
-                dek,
-                user_id,
-                row["id"],
-                row["nonce"],
-                row["ciphertext"],
-                row["alg"],
-            )
-            rec = orjson.loads(record_json)
-            messages.append(
-                {
-                    "id": row["id"],
-                    "created_at": row["created_at"],
-                    "role": row["role"],
-                    "message": rec.get("message", ""),
-                    "meta": rec.get("meta", {}),
-                }
-            )
-        return messages
+        return self._rows_to_messages(rows, user_id, dek)
 
     async def get_history(self, user_id: str, created_date: str, dek: bytes) -> list[dict]:
         async with self.pool.connection() as conn:
