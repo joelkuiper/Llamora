@@ -387,8 +387,6 @@ class PendingResponse:
                     meta = orjson.loads(meta_str)
                 except Exception:
                     meta = {}
-                finally:
-                    logger.debug(meta)
             else:
                 meta = {}
             if self.error:
