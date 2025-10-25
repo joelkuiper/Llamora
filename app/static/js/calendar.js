@@ -1,14 +1,13 @@
 let initialized = false;
+let state;
 
-function initCalendarPopover() {
-  const btn = document.getElementById('calendar-btn');
-  const pop = document.getElementById('calendar-popover');
-  if (!btn || !pop || btn.dataset.popoverInit) return;
-  btn.dataset.popoverInit = "true";
+function setupCalendar(btn, pop) {
+  const controller = new AbortController();
+  const { signal } = controller;
   let instance;
 
   const update = () => {
-    instance.update();
+    if (instance) instance.update();
   };
 
   const animateOpen = () => {
@@ -54,44 +53,99 @@ function initCalendarPopover() {
     if (e.key === 'Escape') hide();
   };
 
-  btn.addEventListener('click', () => {
-    if (!pop.hidden) {
-      hide();
-      return;
-    }
-    pop.hidden = false;
-    btn.classList.add('active');
-    instance =
-      instance ||
-      Popper.createPopper(btn, pop, {
-        placement: 'bottom',
-      });
-    update();
-    htmx.trigger(pop, 'calendar-popover:show');
-    document.addEventListener('click', outside, true);
-    document.addEventListener('keydown', onKey);
-  });
-
-  pop.addEventListener('click', (e) => {
-    if (e.target.closest('.overlay-close')) {
-      e.preventDefault();
-      hide();
-    }
-    if (e.target.closest('.calendar-table a, .today-btn')) {
-      hide();
-    }
-  });
-
-  pop.addEventListener('htmx:afterSwap', (e) => {
-    if (e.target === pop && instance) {
+  btn.addEventListener(
+    'click',
+    () => {
+      if (!pop.hidden) {
+        hide();
+        return;
+      }
+      pop.hidden = false;
+      btn.classList.add('active');
+      instance =
+        instance ||
+        Popper.createPopper(btn, pop, {
+          placement: 'bottom',
+        });
       update();
-      animateOpen();
+      htmx.trigger(pop, 'calendar-popover:show');
+      document.addEventListener('click', outside, true);
+      document.addEventListener('keydown', onKey);
+    },
+    { signal },
+  );
+
+  pop.addEventListener(
+    'click',
+    (e) => {
+      if (e.target.closest('.overlay-close')) {
+        e.preventDefault();
+        hide();
+      }
+      if (e.target.closest('.calendar-table a, .today-btn')) {
+        hide();
+      }
+    },
+    { signal },
+  );
+
+  pop.addEventListener(
+    'htmx:afterSwap',
+    (e) => {
+      if (e.target === pop && instance) {
+        update();
+        animateOpen();
+      }
+    },
+    { signal },
+  );
+
+  const dispose = () => {
+    hide();
+    controller.abort();
+    if (instance) {
+      instance.destroy();
+      instance = null;
     }
-  });
+  };
+
+  return {
+    btn,
+    pop,
+    dispose,
+    signal,
+  };
+}
+
+function initCalendarPopover() {
+  const btn = document.getElementById('calendar-btn');
+  const pop = document.getElementById('calendar-popover');
+  if (!btn || !pop) return;
+
+  if (state && state.btn === btn && state.pop === pop && !state.signal.aborted) {
+    // HTMX history restores fire htmx:afterSwap even when the calendar nodes
+    // persist, so we keep the existing bindings instead of tearing them down.
+    return;
+  }
+
+  if (state) {
+    state.dispose();
+    state = null;
+  }
+
+  state = setupCalendar(btn, pop);
 }
 
 initCalendarPopover();
 if (!initialized) {
   document.body.addEventListener('htmx:afterSwap', initCalendarPopover);
+  document.body.addEventListener('htmx:historyRestore', initCalendarPopover);
+  window.addEventListener('pageshow', (evt) => {
+    // BFCache restores (e.g. browser back) reuse the old DOM without rerunning
+    // this module, so we re-bind handlers whenever the cached page resurfaces.
+    if (evt.persisted) {
+      initCalendarPopover();
+    }
+  });
   initialized = true;
 }
