@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import time
-from typing import Dict, Optional
+from typing import Dict, Iterable, Optional
 
 import hnswlib
 import numpy as np
@@ -78,28 +78,48 @@ class MessageIndex:
         return ids, dists[0][: len(ids)]
 
 
-class MessageIndexRegistry:
-    """Keeps per-user ANN indexes in RAM and evicts idle ones."""
+class MessageIndexStore:
+    """Manages per-user ANN indexes, persistence and maintenance."""
 
-    def __init__(self, db, ttl: int = 600, warm_limit: int = 1000):
+    def __init__(
+        self,
+        db,
+        ttl: int = 600,
+        warm_limit: int = 1000,
+        maintenance_interval: float = 60.0,
+    ):
         self.db = db
         self.ttl = ttl
         self.warm_limit = warm_limit
+        self.maintenance_interval = maintenance_interval
         self.indexes: Dict[str, MessageIndex] = {}
-        self.cursors: Dict[str, str] = {}
+        self.cursors: Dict[str, Optional[str]] = {}
         self.locks: Dict[str, asyncio.Lock] = {}
+        self._next_maintenance = time.monotonic() + maintenance_interval
+
+    def _get_lock(self, user_id: str) -> asyncio.Lock:
+        return self.locks.setdefault(user_id, asyncio.Lock())
 
     async def _embed_and_store(
         self,
         user_id: str,
-        msgs: list[dict],
+        msgs: Iterable[dict],
         dek: bytes,
         idx: Optional[MessageIndex],
     ) -> MessageIndex:
         """Embed messages, add to index and persist vectors."""
 
-        texts = [m["message"] for m in msgs]
-        ids = [m["id"] for m in msgs]
+        msg_list = list(msgs)
+        if not msg_list:
+            if idx is not None:
+                return idx
+            dim = (await async_embed_texts([""])).shape[1]
+            fresh = MessageIndex(dim)
+            self.indexes[user_id] = fresh
+            return fresh
+
+        texts = [m["message"] for m in msg_list]
+        ids = [m["id"] for m in msg_list]
         vecs = (await async_embed_texts(texts)).astype(np.float32)
         if idx is None:
             dim = vecs.shape[1]
@@ -110,13 +130,17 @@ class MessageIndexRegistry:
             [(mid, vec) for mid, vec in zip(ids, vecs)],
             dek,
         )
-        self.cursors[user_id] = msgs[-1]["id"]
+        if msg_list:
+            cursor = msg_list[-1]["id"]
+            existing = self.cursors.get(user_id)
+            if existing is None or cursor < existing:
+                self.cursors[user_id] = cursor
         self.indexes[user_id] = idx
         return idx
 
-    async def get_or_build(self, user_id: str, dek: bytes) -> MessageIndex:
-        logger.debug("Fetching index for user %s", user_id)
-        lock = self.locks.setdefault(user_id, asyncio.Lock())
+    async def ensure_index(self, user_id: str, dek: bytes) -> MessageIndex:
+        logger.debug("Ensuring index for user %s", user_id)
+        lock = self._get_lock(user_id)
         async with lock:
             idx = self.indexes.get(user_id)
             if idx:
@@ -140,7 +164,6 @@ class MessageIndexRegistry:
                 self.cursors[user_id] = cursor
                 self.indexes[user_id] = idx
 
-                # Ensure messages without stored vectors are also indexed
                 msgs = await self.db.messages.get_latest_messages(
                     user_id, self.warm_limit, dek
                 )
@@ -152,11 +175,8 @@ class MessageIndexRegistry:
                         user_id,
                     )
                     await self._embed_and_store(user_id, missing, dek, idx)
-                    # _embed_and_store updates cursor; keep the oldest between both
-                    self.cursors[user_id] = min(cursor, self.cursors[user_id])
                 return idx
 
-            # Fallback: no stored vectors, warm from latest messages
             msgs = await self.db.messages.get_latest_messages(user_id, self.warm_limit, dek)
             if msgs:
                 logger.debug(
@@ -174,8 +194,8 @@ class MessageIndexRegistry:
             return idx
 
     async def expand_older(self, user_id: str, dek: bytes, batch: int) -> int:
-        await self.get_or_build(user_id, dek)
-        lock = self.locks.setdefault(user_id, asyncio.Lock())
+        await self.ensure_index(user_id, dek)
+        lock = self._get_lock(user_id)
         async with lock:
             cursor = self.cursors.get(user_id)
             if not cursor:
@@ -187,9 +207,10 @@ class MessageIndexRegistry:
                 logger.debug("Index missing for user %s", user_id)
                 return 0
 
-            prev_cursor = cursor
-            rows = await self.db.vectors.get_vectors_older_than(user_id, cursor, batch, dek)
             added = 0
+            new_cursor = cursor
+
+            rows = await self.db.vectors.get_vectors_older_than(user_id, cursor, batch, dek)
             if rows:
                 logger.debug(
                     "Loaded %d stored vectors older than %s for user %s",
@@ -202,32 +223,55 @@ class MessageIndexRegistry:
                 if vecs.ndim == 1:
                     vecs = vecs.reshape(1, -1)
                 idx.add_batch(ids, vecs)
-                cursor = rows[-1]["id"]
                 added += len(ids)
+                new_cursor = rows[-1]["id"]
 
-            msgs = await self.db.messages.get_messages_older_than(
-                user_id, prev_cursor, batch, dek
-            )
+            msgs = await self.db.messages.get_messages_older_than(user_id, cursor, batch, dek)
             missing = [m for m in msgs if not idx.contains(m["id"])]
             if missing:
                 logger.debug(
                     "Embedding %d messages older than %s for user %s",
                     len(missing),
-                    prev_cursor,
+                    cursor,
                     user_id,
                 )
                 await self._embed_and_store(user_id, missing, dek, idx)
-                cursor = min(cursor, self.cursors[user_id])
                 added += len(missing)
+                new_cursor = missing[-1]["id"]
 
             if added == 0:
                 logger.debug("No older messages for user %s", user_id)
                 return 0
 
-            self.cursors[user_id] = cursor
+            existing = self.cursors.get(user_id)
+            if existing is None or new_cursor < existing:
+                self.cursors[user_id] = new_cursor
             return added
 
-    def evict_idle(self) -> None:
+    async def hydrate_messages(
+        self, user_id: str, message_ids: list[str], dek: bytes
+    ) -> list[dict]:
+        if not message_ids:
+            return []
+        rows = await self.db.messages.get_messages_by_ids(user_id, message_ids, dek)
+        return rows
+
+    async def index_message(
+        self, user_id: str, message_id: str, content: str, dek: bytes
+    ) -> None:
+        idx = await self.ensure_index(user_id, dek)
+        vec = (await async_embed_texts([content])).astype(np.float32)
+        lock = self._get_lock(user_id)
+        async with lock:
+            await self.db.vectors.store_vector(message_id, user_id, vec[0], dek)
+            if not idx.contains(message_id):
+                idx.add_batch([message_id], vec)
+                current = self.cursors.get(user_id)
+                if current is None or message_id < current:
+                    self.cursors[user_id] = message_id
+            self.indexes[user_id] = idx
+
+    def _evict_idle(self) -> None:
         now = time.monotonic()
         to_remove = [
             uid for uid, idx in self.indexes.items() if now - idx.last_used > self.ttl
@@ -240,3 +284,10 @@ class MessageIndexRegistry:
             lock = self.locks.pop(uid, None)
             if lock and lock.locked():
                 logger.debug("Lock for user %s remained locked during eviction", uid)
+
+    async def maintenance(self) -> None:
+        now = time.monotonic()
+        if now < self._next_maintenance:
+            return
+        self._next_maintenance = now + self.maintenance_interval
+        self._evict_idle()

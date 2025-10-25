@@ -14,7 +14,7 @@ from config import (
     POOR_MATCH_MIN_HITS,
 )
 from app.embed.model import async_embed_texts
-from app.index.message_ann import MessageIndexRegistry
+from app.index.message_ann import MessageIndexStore
 
 
 logger = logging.getLogger(__name__)
@@ -24,8 +24,38 @@ class VectorSearchService:
     """Handles ANN index access and progressive warm-up for message search."""
 
     def __init__(self, db):
-        self.db = db
-        self.registry = MessageIndexRegistry(db)
+        self.index_store = MessageIndexStore(db)
+
+    def _quality_satisfied(self, ids: List[str], cosines: List[float], k2: int) -> bool:
+        if len(ids) < k2:
+            return False
+        if not cosines:
+            return False
+        max_cos = max(cosines)
+        hits = sum(c >= POOR_MATCH_MAX_COS for c in cosines)
+        return max_cos >= POOR_MATCH_MAX_COS and hits >= POOR_MATCH_MIN_HITS
+
+    def _should_continue(
+        self,
+        start: float,
+        rounds: int,
+        ids: List[str],
+        cosines: List[float],
+        k2: int,
+    ) -> bool:
+        if self._quality_satisfied(ids, cosines, k2):
+            return False
+        if rounds >= PROGRESSIVE_ROUNDS:
+            return False
+        elapsed_ms = (time.monotonic() - start) * 1000
+        if elapsed_ms >= PROGRESSIVE_MAX_MS:
+            logger.debug(
+                "Stopping vector backfill after %d rounds due to time budget (%.1fms)",
+                rounds,
+                elapsed_ms,
+            )
+            return False
+        return True
 
     async def search_candidates(
         self,
@@ -38,17 +68,8 @@ class VectorSearchService:
         logger.debug(
             "Vector search requested by user %s with k1=%d k2=%d", user_id, k1, k2
         )
-        index = await self.registry.get_or_build(user_id, dek)
+        index = await self.index_store.ensure_index(user_id, dek)
         q_vec = (await async_embed_texts([query])).astype(np.float32).reshape(1, -1)
-
-        def quality(ids: List[str], cosines: List[float]) -> bool:
-            if len(ids) < k2:
-                return False
-            max_cos = max(cosines) if cosines else 0.0
-            hits = sum(c >= POOR_MATCH_MAX_COS for c in cosines)
-            if max_cos < POOR_MATCH_MAX_COS or hits < POOR_MATCH_MIN_HITS:
-                return False
-            return True
 
         current_k1 = k1
         start = time.monotonic()
@@ -57,16 +78,8 @@ class VectorSearchService:
         logger.debug("Initial vector search returned %d candidates", len(ids))
 
         rounds = 0
-        while not quality(ids, cosines):
-            elapsed_ms = (time.monotonic() - start) * 1000
-            if rounds >= PROGRESSIVE_ROUNDS or elapsed_ms >= PROGRESSIVE_MAX_MS:
-                logger.debug(
-                    "Stopping vector backfill after %d rounds (%.1fms)",
-                    rounds,
-                    elapsed_ms,
-                )
-                break
-            added = await self.registry.expand_older(user_id, dek, PROGRESSIVE_BATCH)
+        while self._should_continue(start, rounds, ids, cosines, k2):
+            added = await self.index_store.expand_older(user_id, dek, PROGRESSIVE_BATCH)
             logger.debug("Backfill round %d added %d vectors", rounds + 1, added)
             if added <= 0:
                 break
@@ -86,7 +99,7 @@ class VectorSearchService:
             if mid not in id_cos:
                 id_cos[mid] = cos
 
-        rows = await self.db.messages.get_messages_by_ids(user_id, dedup_ids, dek)
+        rows = await self.index_store.hydrate_messages(user_id, dedup_ids, dek)
         row_map = {r["id"]: r for r in rows}
 
         results: List[dict] = []
@@ -115,12 +128,8 @@ class VectorSearchService:
         logger.debug(
             "Adding message %s to vector index for user %s", message_id, user_id
         )
-        vec = (await async_embed_texts([content])).astype(np.float32).reshape(1, -1)
-        await self.db.vectors.store_vector(message_id, user_id, vec[0], dek)
-        index = await self.registry.get_or_build(user_id, dek)
-        if not index.contains(message_id):
-            index.add_batch([message_id], vec)
+        await self.index_store.index_message(user_id, message_id, content, dek)
 
     async def maintenance_tick(self) -> None:
         logger.debug("Running vector search maintenance")
-        self.registry.evict_idle()
+        await self.index_store.maintenance()
