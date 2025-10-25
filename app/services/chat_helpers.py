@@ -60,18 +60,23 @@ async def locate_message_and_reply(
     ``date`` when the message resides on another day.
     """
 
-    history = await db.messages.get_history(user_id, date, dek)
-    actual_date = date
+    message_info = await db.messages.get_message_with_reply(user_id, user_msg_id)
+    actual_date = (message_info or {}).get("created_date") or date
 
-    if not any(message.get("id") == user_msg_id for message in history):
-        actual_date = await db.messages.get_message_date(user_id, user_msg_id) or date
-        if actual_date != date:
-            history = await db.messages.get_history(user_id, actual_date, dek)
+    history = await db.messages.get_history(user_id, actual_date, dek)
 
-    if not any(message.get("id") == user_msg_id for message in history):
+    messages_by_id = {message.get("id"): message for message in history}
+    user_message = messages_by_id.get(user_msg_id)
+    if not user_message:
         return [], None, actual_date
 
-    assistant_message = find_existing_assistant_reply(history, user_msg_id)
+    assistant_message = None
+    if message_info and message_info.get("reply_id"):
+        assistant_message = messages_by_id.get(message_info["reply_id"])
+
+    if assistant_message is None:
+        assistant_message = find_existing_assistant_reply(history, user_msg_id)
+
     return history, assistant_message, actual_date
 
 
