@@ -8,6 +8,7 @@ import numpy as np
 import ahocorasick
 
 from config import (
+    MAX_SEARCH_QUERY_LENGTH,
     PROGRESSIVE_BATCH,
     PROGRESSIVE_K1,
     PROGRESSIVE_K2,
@@ -263,7 +264,21 @@ class SearchAPI:
         k1: int = PROGRESSIVE_K1,
         k2: int = PROGRESSIVE_K2,
     ):
+        normalized = (query or "").strip()
+        if not normalized:
+            logger.info("Rejecting empty search query for user %s", user_id)
+            return []
+        if len(normalized) > MAX_SEARCH_QUERY_LENGTH:
+            logger.info(
+                "Rejecting overlong search query (len=%d, limit=%d) for user %s",
+                len(normalized),
+                MAX_SEARCH_QUERY_LENGTH,
+                user_id,
+            )
+            return []
+
         logger.debug("Search requested by user %s with k1=%d k2=%d", user_id, k1, k2)
+        query = normalized
         candidates = await self.knn_search(user_id, dek, query, k1, k2)
         tokens = [t for t in dict.fromkeys(re.findall(r"\S+", query)) if t]
         boosts: dict[str, float] = {}

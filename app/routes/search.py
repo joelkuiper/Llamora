@@ -6,6 +6,7 @@ from app.services.auth_helpers import (
     get_current_user,
     get_dek,
 )
+from config import MAX_SEARCH_QUERY_LENGTH
 
 
 logger = logging.getLogger(__name__)
@@ -16,10 +17,18 @@ search_bp = Blueprint("search", __name__)
 @search_bp.get("/search")
 @login_required
 async def search():
-    query = request.args.get("q", "").strip()
-    logger.debug("Route search query='%s'", query)
+    raw_query = request.args.get("q", "")
+    query = raw_query.strip()
+    logger.debug("Route search raw query='%s'", raw_query)
     results = []
-    if query:
+    if len(query) > MAX_SEARCH_QUERY_LENGTH:
+        logger.info(
+            "Search query length %d exceeds limit of %d; returning no results",
+            len(query),
+            MAX_SEARCH_QUERY_LENGTH,
+        )
+        query = query[:MAX_SEARCH_QUERY_LENGTH]
+    elif query:
         user = await get_current_user()
         dek = get_dek()
         results = await search_api.search(user["id"], dek, query)
