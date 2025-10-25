@@ -6,7 +6,6 @@
   z-index: 40;
   background: var(--color-bg-alt);
   padding: var(--spacing-sm) var(--spacing-xl);
-  perspective: 900px;
   display: flex;
   align-items: center;
   gap: var(--spacing-md);

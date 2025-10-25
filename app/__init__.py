@@ -8,11 +8,15 @@ import secrets
 from contextlib import suppress
 from db import LocalDB
 from app.api.search import SearchAPI
+from app.services.lexical_reranker import LexicalReranker
+from app.services.vector_search import VectorSearchService
 
 load_dotenv()
 
 db = LocalDB()
-search_api = SearchAPI(db)
+vector_search_service = VectorSearchService(db)
+lexical_reranker = LexicalReranker()
+search_api = SearchAPI(db, vector_search_service, lexical_reranker)
 db.set_search_api(search_api)
 
 
@@ -81,7 +85,7 @@ def create_app():
     @app.before_serving
     async def _print_registration_link():
         if app.config.get("DISABLE_REGISTRATION"):
-            if await db.users_table_empty():
+            if await db.users.users_table_empty():
                 token = secrets.token_urlsafe(32)
                 app.config["REGISTRATION_TOKEN"] = token
                 server = app.config.get("SERVER_NAME")

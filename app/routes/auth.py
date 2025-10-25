@@ -20,6 +20,7 @@ from app.services.auth_helpers import (
     set_dek,
     clear_session_dek,
 )
+from app.services.validators import validate_password, PasswordValidationError
 from app.services.crypto import (
     generate_dek,
     wrap_key,
@@ -52,7 +53,7 @@ def _get_client_ip() -> str:
 
 async def _render_profile_page(user, **context):
     context["user"] = user
-    state = await db.get_state(user["id"])
+    state = await db.users.get_state(user["id"])
     context["day"] = state.get("active_date", local_date().isoformat())
     if request.headers.get("HX-Request"):
         return await render_template("partials/profile.html", **context)
@@ -130,12 +131,29 @@ async def register():
         max_pass = current_app.config["MAX_PASSWORD_LENGTH"]
 
         # Basic validations
-        if not username or not password or not confirm:
+        if not username:
             return await render_template(
                 "register.html", error="All fields are required"
             )
 
-        if len(username) > max_user or len(password) > max_pass:
+        password_error = validate_password(
+            password,
+            confirm=confirm,
+            require_confirm=True,
+            max_length=max_pass,
+            min_strength=3,
+        )
+        if password_error:
+            message_map = {
+                PasswordValidationError.MISSING: "All fields are required",
+                PasswordValidationError.MAX_LENGTH: "Input exceeds max length",
+                PasswordValidationError.MISMATCH: "Passwords do not match",
+                PasswordValidationError.WEAK: "Password is too weak",
+            }
+            message = message_map.get(password_error, "Invalid input")
+            return await render_template("register.html", error=message)
+
+        if len(username) > max_user:
             return await render_template(
                 "register.html", error="Input exceeds max length"
             )
@@ -146,16 +164,7 @@ async def register():
                 error="Username may only contain letters, digits, and underscores",
             )
 
-        if password != confirm:
-            return await render_template(
-                "register.html", error="Passwords do not match"
-            )
-
-        strength = zxcvbn(password)
-        if strength.get("score", 0) < 3:
-            return await render_template("register.html", error="Password is too weak")
-
-        if await db.get_user_by_username(username):
+        if await db.users.get_user_by_username(username):
             return await render_template(
                 "register.html", error="Username already exists"
             )
@@ -169,7 +178,7 @@ async def register():
         pw_salt, pw_nonce, pw_cipher = wrap_key(dek, password)
         rc_salt, rc_nonce, rc_cipher = wrap_key(dek, recovery_code)
 
-        await db.create_user(
+        await db.users.create_user(
             username,
             password_hash,
             pw_salt,
@@ -181,7 +190,7 @@ async def register():
         )
 
         # Fetch the newly created user so we can establish a session
-        user = await db.get_user_by_username(username)
+        user = await db.users.get_user_by_username(username)
 
         if current_app.config.get("DISABLE_REGISTRATION"):
             current_app.config["REGISTRATION_TOKEN"] = None
@@ -234,7 +243,7 @@ async def login():
                 "login.html", error="Invalid credentials", return_url=return_url
             )
 
-        user = await db.get_user_by_username(username)
+        user = await db.users.get_user_by_username(username)
         if user:
             try:
                 pwhash.argon2id.verify(
@@ -249,7 +258,7 @@ async def login():
                 )
                 redirect_url = return_url
                 if not redirect_url:
-                    state = await db.get_state(user["id"])
+                    state = await db.users.get_state(user["id"])
                     active_date = state.get("active_date")
                     if active_date:
                         redirect_url = url_for(
@@ -306,21 +315,25 @@ async def reset_password():
         max_pass = current_app.config["MAX_PASSWORD_LENGTH"]
         min_pass = current_app.config["MIN_PASSWORD_LENGTH"]
 
-        if (
-            not username
-            or not recovery
-            or not password
-            or not confirm
-            or len(username) > max_user
-            or len(password) > max_pass
-            or len(password) < min_pass
-            or password != confirm
-            or not re.search(r"[A-Za-z]", password)
-            or not re.search(r"\d", password)
-        ):
+        if not username or not recovery:
             return await render_template("reset_password.html", error="Invalid input")
 
-        user = await db.get_user_by_username(username)
+        if len(username) > max_user:
+            return await render_template("reset_password.html", error="Invalid input")
+
+        password_error = validate_password(
+            password,
+            confirm=confirm,
+            require_confirm=True,
+            min_length=min_pass,
+            max_length=max_pass,
+            require_letter=True,
+            require_digit=True,
+        )
+        if password_error:
+            return await render_template("reset_password.html", error="Invalid input")
+
+        user = await db.users.get_user_by_username(username)
         if not user:
             return await render_template(
                 "reset_password.html", error="Invalid credentials"
@@ -342,7 +355,7 @@ async def reset_password():
         hash_bytes = pwhash.argon2id.str(password_bytes)
         password_hash = hash_bytes.decode("utf-8")
         pw_salt, pw_nonce, pw_cipher = wrap_key(dek, password)
-        await db.update_password_wrap(
+        await db.users.update_password_wrap(
             user["id"], password_hash, pw_salt, pw_nonce, pw_cipher
         )
         return redirect("/login")
@@ -354,7 +367,7 @@ async def reset_password():
 @login_required
 async def profile():
     user = await get_current_user()
-    await db.update_state(user["id"], active_date=None)
+    await db.users.update_state(user["id"], active_date=None)
     return await _render_profile_page(user)
 
 
@@ -366,7 +379,7 @@ async def download_user_data():
     if not dek:
         return Response("Missing encryption key", status=400)
 
-    messages = await db.get_latest_messages(user["id"], 1000000, dek)
+    messages = await db.messages.get_latest_messages(user["id"], 1000000, dek)
     user_data = {
         "user": {
             "id": user["id"],
@@ -391,18 +404,28 @@ async def change_password():
     confirm = form.get("confirm_password", "")
 
     max_pass = current_app.config["MAX_PASSWORD_LENGTH"]
-    if not current or not new or not confirm:
+    if not current:
         return await _render_profile_page(user, pw_error="All fields are required")
 
-    if len(current) > max_pass or len(new) > max_pass:
+    if len(current) > max_pass:
         return await _render_profile_page(user, pw_error="Input exceeds max length")
 
-    if new != confirm:
-        return await _render_profile_page(user, pw_error="Passwords do not match")
-
-    strength = zxcvbn(new)
-    if strength.get("score", 0) < 3:
-        return await _render_profile_page(user, pw_error="Password is too weak")
+    password_error = validate_password(
+        new,
+        confirm=confirm,
+        require_confirm=True,
+        max_length=max_pass,
+        min_strength=3,
+    )
+    if password_error:
+        message_map = {
+            PasswordValidationError.MISSING: "All fields are required",
+            PasswordValidationError.MAX_LENGTH: "Input exceeds max length",
+            PasswordValidationError.MISMATCH: "Passwords do not match",
+            PasswordValidationError.WEAK: "Password is too weak",
+        }
+        message = message_map.get(password_error, "Invalid input")
+        return await _render_profile_page(user, pw_error=message)
 
     try:
         pwhash.argon2id.verify(
@@ -419,7 +442,7 @@ async def change_password():
     hash_bytes = pwhash.argon2id.str(password_bytes)
     password_hash = hash_bytes.decode("utf-8")
     pw_salt, pw_nonce, pw_cipher = wrap_key(dek, new)
-    await db.update_password_wrap(
+    await db.users.update_password_wrap(
         user["id"], password_hash, pw_salt, pw_nonce, pw_cipher
     )
 
@@ -436,7 +459,7 @@ async def regen_recovery():
 
     recovery_code = generate_recovery_code()
     rc_salt, rc_nonce, rc_cipher = wrap_key(dek, recovery_code)
-    await db.update_recovery_wrap(user["id"], rc_salt, rc_nonce, rc_cipher)
+    await db.users.update_recovery_wrap(user["id"], rc_salt, rc_nonce, rc_cipher)
 
     return await render_template(
         "recovery.html",
@@ -449,7 +472,7 @@ async def regen_recovery():
 @login_required
 async def delete_profile():
     user = await get_current_user()
-    await db.delete_user(user["id"])
+    await db.users.delete_user(user["id"])
     resp = Response(status=204)
     clear_secure_cookie(resp)
     resp.headers["HX-Redirect"] = "/login"

@@ -14,7 +14,7 @@ async def remove_tag(msg_id: str, tag_hash: str):
         tag_hash_bytes = bytes.fromhex(tag_hash)
     except ValueError:
         abort(400, description="invalid tag hash")
-    await db.unlink_tag_message(user["id"], tag_hash_bytes, msg_id)
+    await db.tags.unlink_tag_message(user["id"], tag_hash_bytes, msg_id)
     return "<span class='chip-tombstone'></span>"
 
 
@@ -31,10 +31,10 @@ async def add_tag(msg_id: str):
     if len(tag) > MAX_TAG_LENGTH:
         abort(400, description="tag too long")
     dek = get_dek()
-    if not await db.message_exists(user["id"], msg_id):
+    if not await db.messages.message_exists(user["id"], msg_id):
         abort(404, description="message not found")
-    tag_hash = await db.resolve_or_create_tag(user["id"], tag, dek)
-    await db.xref_tag_message(user["id"], tag_hash, msg_id)
+    tag_hash = await db.tags.resolve_or_create_tag(user["id"], tag, dek)
+    await db.tags.xref_tag_message(user["id"], tag_hash, msg_id)
     html = await render_template(
         "partials/tag_chip.html", keyword=tag, tag_hash=tag_hash.hex(), msg_id=msg_id
     )
@@ -46,12 +46,12 @@ async def add_tag(msg_id: str):
 async def get_tag_suggestions(msg_id: str):
     user = await get_current_user()
     dek = get_dek()
-    messages = await db.get_messages_by_ids(user["id"], [msg_id], dek)
+    messages = await db.messages.get_messages_by_ids(user["id"], [msg_id], dek)
     if not messages:
         abort(404, description="message not found")
     meta = messages[0].get("meta", {})
     keywords = meta.get("keywords") or []
-    existing = await db.get_tags_for_message(user["id"], msg_id, dek)
+    existing = await db.tags.get_tags_for_message(user["id"], msg_id, dek)
     existing_names = {t["name"] for t in existing}
 
     meta_suggestions: set[str] = set()
@@ -63,7 +63,7 @@ async def get_tag_suggestions(msg_id: str):
         if kw:
             meta_suggestions.add(kw)
 
-    frecent_tags = await db.get_tag_frecency(user["id"], 3, 0.0001, dek)
+    frecent_tags = await db.tags.get_tag_frecency(user["id"], 3, 0.0001, dek)
     frecent_suggestions = {
         t["name"] if t["name"].startswith("#") else f"#{t['name']}"
         for t in frecent_tags
