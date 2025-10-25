@@ -1,7 +1,9 @@
 import asyncio
+import json
 import logging
 from collections.abc import AsyncIterator, Callable
 from html import escape
+from typing import Any
 
 import orjson
 
@@ -72,10 +74,12 @@ class MetaExtractor:
         self._meta_complete = False
         self._meta_buffer = ""
         self._tail = ""
+        self._raw_buffer = ""
 
     def process(self, chunk: str) -> str:
         """Process a chunk and return the visible text portion."""
 
+        self._raw_buffer += chunk
         data = self._tail + chunk
         self._tail = ""
         visible = ""
@@ -120,6 +124,18 @@ class MetaExtractor:
     @property
     def meta_payload(self) -> str:
         return self._meta_buffer.strip()
+
+    @property
+    def raw_buffer(self) -> str:
+        return self._raw_buffer
+
+    @property
+    def sentinel_start(self) -> str:
+        return self._start
+
+    @property
+    def sentinel_end(self) -> str:
+        return self._end
 
     def flush_visible_tail(self) -> str:
         if self._found_start:
@@ -298,18 +314,99 @@ class PendingResponse:
         self._invoke_cleanup()
 
     def _build_meta(self, extractor: MetaExtractor) -> dict:
-        if extractor.found_start and extractor.meta_payload:
-            try:
-                meta = orjson.loads(extractor.meta_payload)
-            except Exception:
-                meta = {}
-        else:
+        candidate = extractor.meta_payload
+        if not candidate:
+            candidate = self._recover_meta_payload(extractor)
+        meta = self._parse_meta_json(candidate)
+        if meta is None:
             meta = {}
         if self.error:
             meta["error"] = True
         if self.meta_extra:
             meta.update(self.meta_extra)
         return meta
+
+    def _recover_meta_payload(self, extractor: MetaExtractor) -> str | None:
+        raw = extractor.raw_buffer
+        if not raw:
+            return None
+        start_idx = raw.rfind(extractor.sentinel_start)
+        if start_idx != -1:
+            raw_segment = raw[start_idx + len(extractor.sentinel_start) :]
+        else:
+            raw_segment = raw
+        end_idx = raw_segment.rfind(extractor.sentinel_end)
+        if end_idx != -1:
+            raw_segment = raw_segment[:end_idx]
+        raw_segment = raw_segment.strip()
+        if not raw_segment:
+            return None
+        candidate = self._find_last_json_object(raw_segment)
+        if candidate:
+            return candidate.strip()
+        first_brace = raw_segment.find("{")
+        if first_brace == -1:
+            return None
+        trailing = raw_segment[first_brace:]
+        candidate = self._find_last_json_object(trailing)
+        if candidate:
+            return candidate.strip()
+        return trailing.strip() or None
+
+    @staticmethod
+    def _parse_meta_json(payload: str | None) -> dict[str, Any] | None:
+        if not payload:
+            return None
+        trimmed = payload.strip()
+        if not trimmed:
+            return None
+        first_brace = trimmed.find("{")
+        if first_brace > 0:
+            trimmed = trimmed[first_brace:]
+        decoder = json.JSONDecoder()
+        try:
+            obj, _ = decoder.raw_decode(trimmed)
+        except json.JSONDecodeError:
+            try:
+                obj = orjson.loads(trimmed)
+            except Exception:
+                return None
+        if isinstance(obj, dict):
+            return obj
+        return None
+
+    @staticmethod
+    def _find_last_json_object(text: str) -> str | None:
+        in_string = False
+        escape_next = False
+        depth = 0
+        end = None
+        for idx in range(len(text) - 1, -1, -1):
+            ch = text[idx]
+            if in_string:
+                if escape_next:
+                    escape_next = False
+                    continue
+                if ch == "\\":
+                    escape_next = True
+                    continue
+                if ch == '"':
+                    in_string = False
+                continue
+            if ch == '"':
+                in_string = True
+                continue
+            if ch == '}':
+                if depth == 0:
+                    end = idx + 1
+                depth += 1
+            elif ch == '{':
+                if depth == 0:
+                    continue
+                depth -= 1
+                if depth == 0 and end is not None:
+                    return text[idx:end]
+        return None
 
     def _invoke_cleanup(self) -> None:
         if not self._cleanup_called:
