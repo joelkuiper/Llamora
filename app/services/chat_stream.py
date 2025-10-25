@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from html import escape
 
 import orjson
@@ -9,6 +9,158 @@ from llm.client import LLMClient
 
 
 logger = logging.getLogger(__name__)
+
+
+class LLMStreamError(Exception):
+    """Raised when the LLM reports an error while streaming."""
+
+
+class AssistantMessagePersistenceError(Exception):
+    """Raised when the assistant response cannot be persisted."""
+
+
+class LLMStreamSession:
+    """Encapsulates an LLM streaming session for a single response."""
+
+    def __init__(
+        self,
+        llm: LLMClient,
+        user_msg_id: str,
+        history: list[dict],
+        params: dict | None,
+        context: dict | None,
+        prompt: str | None,
+    ) -> None:
+        self._llm = llm
+        self.user_msg_id = user_msg_id
+        self._history = history
+        self._params = params
+        self._context = context or {}
+        self._prompt = prompt
+        self._first_chunk = True
+
+    async def __aiter__(self) -> AsyncIterator[str]:
+        async for chunk in self._llm.stream_response(
+            self.user_msg_id,
+            self._history,
+            self._params,
+            self._context,
+            prompt=self._prompt,
+        ):
+            if isinstance(chunk, dict) and chunk.get("type") == "error":
+                logger.info("Error chunk received for %s: %s", self.user_msg_id, chunk)
+                raise LLMStreamError(chunk.get("data", "Unknown error"))
+            text = chunk
+            if not isinstance(text, str):
+                text = str(text)
+            if self._first_chunk:
+                text = text.lstrip()
+                self._first_chunk = False
+            yield text
+
+    async def abort(self) -> None:
+        await self._llm.abort(self.user_msg_id)
+
+
+class MetaExtractor:
+    """Extracts assistant-visible text and metadata from streamed chunks."""
+
+    def __init__(self, sentinel_start: str = "<meta>", sentinel_end: str = "</meta>") -> None:
+        self._start = sentinel_start
+        self._end = sentinel_end
+        self._found_start = False
+        self._meta_complete = False
+        self._meta_buffer = ""
+        self._tail = ""
+
+    def process(self, chunk: str) -> str:
+        """Process a chunk and return the visible text portion."""
+
+        data = self._tail + chunk
+        self._tail = ""
+        visible = ""
+
+        if not self._found_start:
+            idx = data.find(self._start)
+            if idx != -1:
+                visible = data[:idx]
+                data = data[idx + len(self._start) :]
+                self._found_start = True
+                self._meta_buffer += data
+            else:
+                keep = len(data) - len(self._start) + 1
+                if keep > 0:
+                    visible = data[:keep]
+                    self._tail = data[keep:]
+                    return visible
+                self._tail = data
+                return ""
+        else:
+            self._meta_buffer += data
+        if not self._meta_complete:
+            end_idx = self._meta_buffer.find(self._end)
+            if end_idx != -1:
+                trailing = self._meta_buffer[end_idx + len(self._end) :]
+                if trailing.strip():
+                    logger.debug(
+                        "Unexpected trailing content after </meta>: %r", trailing
+                    )
+                self._meta_buffer = self._meta_buffer[:end_idx]
+                self._meta_complete = True
+        return visible
+
+    @property
+    def found_start(self) -> bool:
+        return self._found_start
+
+    @property
+    def meta_complete(self) -> bool:
+        return self._meta_complete
+
+    @property
+    def meta_payload(self) -> str:
+        return self._meta_buffer.strip()
+
+    def flush_visible_tail(self) -> str:
+        if self._found_start:
+            return ""
+        remainder = self._tail
+        self._tail = ""
+        return remainder
+
+
+class AssistantMessageWriter:
+    """Handles persistence of assistant responses."""
+
+    def __init__(self, db) -> None:
+        self._db = db
+
+    async def save(
+        self,
+        uid: str,
+        content: str,
+        dek: bytes,
+        meta: dict,
+        reply_to: str,
+        date: str,
+    ) -> str:
+        append = getattr(self._db, "append_message", None)
+        if append is None and hasattr(self._db, "messages"):
+            append = getattr(self._db.messages, "append_message", None)
+        if append is None:
+            raise AssistantMessagePersistenceError("Database does not support append_message")
+        try:
+            return await append(
+                uid,
+                "assistant",
+                content,
+                dek,
+                meta,
+                reply_to=reply_to,
+                created_date=date,
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            raise AssistantMessagePersistenceError(str(exc) or "Failed to save response") from exc
 
 
 class PendingResponse:
@@ -48,172 +200,68 @@ class PendingResponse:
         self.assistant_msg_id: str | None = None
         self._cleanup = on_cleanup
         self._cleanup_called = False
-        self._llm = llm
-        self._db = db
+        self._session = LLMStreamSession(llm, user_msg_id, history, params, context, prompt)
+        self._writer = AssistantMessageWriter(db)
         logger.debug("Starting generation for user message %s", user_msg_id)
         self._task = asyncio.create_task(
-            self._generate(uid, history, params), name=f"pending:{user_msg_id}"
+            self._generate(uid), name=f"pending:{user_msg_id}"
         )
 
-    async def _generate(
-        self,
-        uid: str,
-        history: list[dict],
-        params: dict | None,
-    ) -> None:
+    async def _generate(self, uid: str) -> None:
         full_response = ""
-        sentinel_start = "<meta>"
-        sentinel_end = "</meta>"
-        tail = ""
-        meta_buf = ""
-        meta: dict | None = None
-        found_start = False
-        meta_complete = False
-        first = True
+        extractor = MetaExtractor()
         try:
-            async for chunk in self._llm.stream_response(
-                self.user_msg_id,
-                history,
-                params,
-                self.context,
-                prompt=self.prompt,
-            ):
-                if isinstance(chunk, dict) and chunk.get("type") == "error":
-                    self.error = True
-                    self.error_message = chunk.get("data", "Unknown error")
-                    full_response = (
-                        f"<span class='error'>{escape(self.error_message)}</span>"
-                    )
-                    logger.info("Error %s", chunk)
+            async for chunk in self._session:
+                visible = extractor.process(chunk)
+                if visible:
+                    full_response += visible
+                    async with self._cond:
+                        self.text = full_response
+                        self._cond.notify_all()
+                if extractor.meta_complete:
                     break
-
-                if first:
-                    chunk = chunk.lstrip()
-                    first = False
-
-                data = tail + chunk
-                tail = ""
-
-                if not found_start:
-                    idx = data.find(sentinel_start)
-                    if idx != -1:
-                        vis = data[:idx]
-                        if vis:
-                            full_response += vis
-                            async with self._cond:
-                                self.text = full_response
-                                self._cond.notify_all()
-                        data = data[idx + len(sentinel_start) :]
-                        found_start = True
-                        meta_buf += data
-                    else:
-                        keep = len(data) - len(sentinel_start) + 1
-                        if keep > 0:
-                            vis = data[:keep]
-                            full_response += vis
-                            async with self._cond:
-                                self.text = full_response
-                                self._cond.notify_all()
-                            tail = data[keep:]
-                        else:
-                            tail = data
-                        continue
-                else:
-                    meta_buf += data
-
-                if found_start and not meta_complete:
-                    end_idx = meta_buf.find(sentinel_end)
-                    if end_idx != -1:
-                        trailing = meta_buf[end_idx + len(sentinel_end) :]
-                        if trailing.strip():
-                            logger.debug(
-                                "Unexpected trailing content after </meta>: %r",
-                                trailing,
-                            )
-                        meta_buf = meta_buf[:end_idx]
-                        meta_complete = True
-                        break
-
         except asyncio.CancelledError:
             self.cancelled = True
             return
-        except Exception as exc:
+        except LLMStreamError as exc:
+            self.error = True
+            self.error_message = str(exc) or "Unknown error"
+            full_response = f"<span class='error'>{escape(self.error_message)}</span>"
+        except Exception as exc:  # pragma: no cover - defensive
             logger.exception("Error during LLM streaming")
             self.error = True
             self.error_message = str(exc) or "An unexpected error occurred."
             full_response += f"<span class='error'>{escape(self.error_message)}</span>"
         finally:
-            await self._finalize(uid, full_response, meta_buf, found_start)
+            await self._finalize(uid, full_response, extractor)
 
     async def _finalize(
         self,
         uid: str,
         full_response: str,
-        meta_buf: str,
-        found_start: bool,
+        extractor: MetaExtractor,
     ) -> None:
+        full_response = full_response + extractor.flush_visible_tail()
         if self.cancelled:
-            if full_response.strip():
-                meta = {"error": True} if self.error else {}
-                meta.update(self.meta_extra)
-                try:
-                    assistant_msg_id = await self._db.messages.append_message(
-                        uid,
-                        "assistant",
-                        full_response,
-                        self.dek,
-                        meta,
-                        reply_to=self.reply_to,
-                        created_date=self.date,
-                    )
-                    self.assistant_msg_id = assistant_msg_id
-                    logger.debug(
-                        "Saved partial assistant message %s", assistant_msg_id
-                    )
-                except Exception:
-                    logger.exception("Failed to save partial assistant message")
-                    full_response += (
-                        "<span class='error'>⚠️ Failed to save response.</span>"
-                    )
-                    self.error = True
-            async with self._cond:
-                self.text = full_response
-                self.meta = None
-                self.done = True
-                self._cond.notify_all()
-            self._invoke_cleanup()
+            await self._handle_cancellation(uid, full_response)
             return
 
-        meta_str = meta_buf.strip()
-        if found_start and meta_str:
-            try:
-                meta = orjson.loads(meta_str)
-            except Exception:
-                meta = {}
-        else:
-            meta = {}
-        if self.error:
-            meta["error"] = True
-        if self.meta_extra:
-            meta.update(self.meta_extra)
+        meta = self._build_meta(extractor)
         if full_response.strip():
             try:
-                assistant_msg_id = await self._db.append_message(
+                assistant_msg_id = await self._writer.save(
                     uid,
-                    "assistant",
                     full_response,
                     self.dek,
                     meta,
-                    reply_to=self.reply_to,
-                    created_date=self.date,
+                    self.reply_to,
+                    self.date,
                 )
                 self.assistant_msg_id = assistant_msg_id
                 logger.debug("Saved assistant message %s", assistant_msg_id)
-            except Exception:
+            except AssistantMessagePersistenceError:
                 logger.exception("Failed to save assistant message")
-                full_response += (
-                    "<span class='error'>⚠️ Failed to save response.</span>"
-                )
+                full_response += "<span class='error'>⚠️ Failed to save response.</span>"
                 self.error = True
         async with self._cond:
             self.text = full_response
@@ -222,17 +270,58 @@ class PendingResponse:
             self._cond.notify_all()
         self._invoke_cleanup()
 
+    async def _handle_cancellation(self, uid: str, full_response: str) -> None:
+        if full_response.strip():
+            meta: dict = {"error": True} if self.error else {}
+            if self.meta_extra:
+                meta.update(self.meta_extra)
+            try:
+                assistant_msg_id = await self._writer.save(
+                    uid,
+                    full_response,
+                    self.dek,
+                    meta,
+                    self.reply_to,
+                    self.date,
+                )
+                self.assistant_msg_id = assistant_msg_id
+                logger.debug("Saved partial assistant message %s", assistant_msg_id)
+            except AssistantMessagePersistenceError:
+                logger.exception("Failed to save partial assistant message")
+                full_response += "<span class='error'>⚠️ Failed to save response.</span>"
+                self.error = True
+        async with self._cond:
+            self.text = full_response
+            self.meta = None
+            self.done = True
+            self._cond.notify_all()
+        self._invoke_cleanup()
+
+    def _build_meta(self, extractor: MetaExtractor) -> dict:
+        if extractor.found_start and extractor.meta_payload:
+            try:
+                meta = orjson.loads(extractor.meta_payload)
+            except Exception:
+                meta = {}
+        else:
+            meta = {}
+        if self.error:
+            meta["error"] = True
+        if self.meta_extra:
+            meta.update(self.meta_extra)
+        return meta
+
     def _invoke_cleanup(self) -> None:
         if not self._cleanup_called:
             self._cleanup_called = True
             try:
                 self._cleanup(self.user_msg_id)
-            except Exception:
+            except Exception:  # pragma: no cover - defensive
                 logger.exception("Cleanup callback failed for %s", self.user_msg_id)
 
     async def cancel(self) -> None:
         self.cancelled = True
-        await self._llm.abort(self.user_msg_id)
+        await self._session.abort()
         if not self._task.done():
             self._task.cancel()
             try:
@@ -338,4 +427,12 @@ class ChatStreamManager:
         self._pending.pop(user_msg_id, None)
 
 
-__all__ = ["PendingResponse", "ChatStreamManager"]
+__all__ = [
+    "LLMStreamError",
+    "AssistantMessagePersistenceError",
+    "LLMStreamSession",
+    "MetaExtractor",
+    "AssistantMessageWriter",
+    "PendingResponse",
+    "ChatStreamManager",
+]
