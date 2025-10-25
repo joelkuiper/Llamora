@@ -11,7 +11,6 @@ from quart import (
 from html import escape
 import logging
 import orjson
-import re
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from ulid import ULID
@@ -27,9 +26,15 @@ from app.services.auth_helpers import (
     get_dek,
 )
 from app.services.chat_stream import ChatStreamManager
+from app.services.chat_helpers import (
+    build_conversation_context,
+    locate_message_and_reply,
+    normalize_llm_config,
+    stream_pending_reply,
+    stream_saved_reply,
+)
 from app.services.time import (
     local_date,
-    date_and_part,
     get_timezone,
     format_date,
     part_of_day,
@@ -231,10 +236,6 @@ async def send_message(date):
     )
 
 
-def replace_newline(s: str) -> str:
-    return re.sub(r"\r\n|\r|\n", "[newline]", s)
-
-
 @chat_bp.route("/c/<date>/stream/<user_msg_id>")
 @login_required
 async def sse_reply(user_msg_id: str, date: str):
@@ -248,98 +249,39 @@ async def sse_reply(user_msg_id: str, date: str):
     user = await get_current_user()
     uid = user["id"]
     dek = get_dek()
-    history = await db.messages.get_history(uid, date, dek)
+    history, existing_assistant_msg, actual_date = await locate_message_and_reply(
+        db, uid, dek, date, user_msg_id
+    )
 
-    if not any(msg["id"] == user_msg_id for msg in history):
-        actual_date = await db.messages.get_message_date(uid, user_msg_id)
-        if actual_date and actual_date != date:
-            history = await db.messages.get_history(uid, actual_date, dek)
-
-    if not any(msg["id"] == user_msg_id for msg in history):
+    if not history:
         logger.warning("History not found for user message %s", user_msg_id)
         return Response(
             "event: error\ndata: Invalid ID\n\n", mimetype="text/event-stream"
         )
 
-    existing_assistant_msg: dict | None = None
-    for msg in history:
-        if msg.get("reply_to") == user_msg_id and msg["role"] == "assistant":
-            existing_assistant_msg = msg
-            break
-    if existing_assistant_msg is None:
-        for idx, msg in enumerate(history):
-            if msg["id"] == user_msg_id:
-                if idx + 1 < len(history) and history[idx + 1]["role"] == "assistant":
-                    existing_assistant_msg = history[idx + 1]
-                break
-
     if existing_assistant_msg:
+        return Response(
+            stream_saved_reply(existing_assistant_msg),
+            mimetype="text/event-stream",
+        )
 
-        async def saved_stream():
-            yield (
-                "event: message\ndata: "
-                f"{replace_newline(escape(existing_assistant_msg['message']))}\n\n"
-            )
-            # meta = existing_assistant_msg.get("meta")
-            # if meta:
-            #     meta_str = orjson.dumps(meta).decode()
-            #     yield f"event: meta\ndata: {escape(meta_str)}\n\n"
-            data = orjson.dumps(
-                {"assistant_msg_id": existing_assistant_msg["id"]}
-            ).decode()
-            yield f"event: done\ndata: {escape(data)}\n\n"
+    params = normalize_llm_config(
+        request.args.get("config"),
+        current_app.config.get("ALLOWED_LLM_CONFIG_KEYS", set()),
+    )
 
-        return Response(saved_stream(), mimetype="text/event-stream")
-
-    params = None
-    cfg = request.args.get("config")
-    if cfg:
-        try:
-            raw = orjson.loads(cfg)
-            if isinstance(raw, dict):
-                allowed = current_app.config.get("ALLOWED_LLM_CONFIG_KEYS", set())
-                params = {k: raw[k] for k in raw if k in allowed}
-            else:
-                logger.warning("Invalid config JSON for message %s", user_msg_id)
-        except Exception:
-            logger.warning("Invalid config JSON for message %s", user_msg_id)
-
-    if not params:
-        params = None
-
-    user_time_str = request.args.get("user_time")
-    if not user_time_str:
-        user_time_str = datetime.utcnow().isoformat() + "Z"
-    tz = request.cookies.get("tz") or "UTC"
-    date_str, pod = date_and_part(user_time_str, tz)
-    ctx = {"date": date_str, "part_of_day": pod}
+    ctx = build_conversation_context(request.args.get("user_time"), request.cookies.get("tz"))
 
     pending_response = chat_stream_manager.get(user_msg_id)
     if not pending_response:
         pending_response = chat_stream_manager.start_stream(
             user_msg_id,
             uid,
-            date,
+            actual_date or date,
             history,
             dek,
             params,
             ctx,
         )
 
-    async def event_stream():
-        async for chunk in pending_response.stream():
-            if pending_response.error:
-                yield f"event: error\ndata: {replace_newline(escape(chunk))}\n\n"
-                yield "event: done\ndata: {}\n\n"
-                return
-            else:
-                yield f"event: message\ndata: {replace_newline(escape(chunk))}\n\n"
-        if pending_response.meta is not None:
-            # Placeholder for emitting structured metadata (e.g., tags)
-            pass
-        data = orjson.dumps(
-            {"assistant_msg_id": pending_response.assistant_msg_id}
-        ).decode()
-        yield f"event: done\ndata: {data}\n\n"
-
-    return Response(event_stream(), mimetype="text/event-stream")
+    return Response(stream_pending_reply(pending_response), mimetype="text/event-stream")
