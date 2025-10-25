@@ -50,7 +50,7 @@ async def render_chat(date, oob=False):
     uid = user["id"]
 
     dek = get_dek()
-    history = await db.get_history(uid, date, dek)
+    history = await db.messages.get_history(uid, date, dek)
     today = local_date().isoformat()
     opening_stream = False
     if not history and date == today:
@@ -83,7 +83,7 @@ async def chat_htmx(date):
         push_url = f"{push_url}?target={target}"
     resp.headers["HX-Push-Url"] = push_url
     user = await get_current_user()
-    await db.update_state(user["id"], active_date=date)
+    await db.users.update_state(user["id"], active_date=date)
     return resp
 
 
@@ -99,7 +99,7 @@ async def chat_htmx_today():
         push_url = f"{push_url}?target={target}"
     resp.headers["HX-Push-Url"] = push_url
     user = await get_current_user()
-    await db.update_state(user["id"], active_date=date)
+    await db.users.update_state(user["id"], active_date=date)
     return resp
 
 
@@ -126,9 +126,9 @@ async def stop_generation(user_msg_id: str):
 async def meta_chips(msg_id: str):
     user = await get_current_user()
     dek = get_dek()
-    if not await db.message_exists(user["id"], msg_id):
+    if not await db.messages.message_exists(user["id"], msg_id):
         abort(404, description="message not found")
-    tags = await db.get_tags_for_message(user["id"], msg_id, dek)
+    tags = await db.tags.get_tags_for_message(user["id"], msg_id, dek)
     html = await render_template(
         "partials/meta_chips_wrapper.html",
         msg_id=msg_id,
@@ -150,8 +150,8 @@ async def sse_opening(date: str):
     date_str = format_date(now)
     pod = part_of_day(now)
     yesterday_iso = (now - timedelta(days=1)).date().isoformat()
-    is_new = not await db.user_has_messages(uid)
-    yesterday_msgs = await db.get_history(uid, yesterday_iso, dek)
+    is_new = not await db.messages.user_has_messages(uid)
+    yesterday_msgs = await db.messages.get_history(uid, yesterday_iso, dek)
     has_no_activity = not is_new and not yesterday_msgs
     try:
         prompt = build_opening_prompt(
@@ -211,7 +211,7 @@ async def send_message(date):
         abort(400, description="Message is empty or too long.")
 
     try:
-        user_msg_id = await db.append_message(
+        user_msg_id = await db.messages.append_message(
             uid, "user", user_text, dek, created_date=date
         )
         logger.debug("Saved user message %s", user_msg_id)
@@ -245,12 +245,12 @@ async def sse_reply(user_msg_id: str, date: str):
     user = await get_current_user()
     uid = user["id"]
     dek = get_dek()
-    history = await db.get_history(uid, date, dek)
+    history = await db.messages.get_history(uid, date, dek)
 
     if not any(msg["id"] == user_msg_id for msg in history):
-        actual_date = await db.get_message_date(uid, user_msg_id)
+        actual_date = await db.messages.get_message_date(uid, user_msg_id)
         if actual_date and actual_date != date:
-            history = await db.get_history(uid, actual_date, dek)
+            history = await db.messages.get_history(uid, actual_date, dek)
 
     if not any(msg["id"] == user_msg_id for msg in history):
         logger.warning("History not found for user message %s", user_msg_id)

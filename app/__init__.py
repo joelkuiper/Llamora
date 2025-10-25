@@ -81,7 +81,7 @@ def create_app():
     @app.before_serving
     async def _print_registration_link():
         if app.config.get("DISABLE_REGISTRATION"):
-            if await db.users_table_empty():
+            if await db.users.users_table_empty():
                 token = secrets.token_urlsafe(32)
                 app.config["REGISTRATION_TOKEN"] = token
                 server = app.config.get("SERVER_NAME")

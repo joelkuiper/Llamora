@@ -141,7 +141,7 @@ def clear_session_dek() -> None:
 
 async def get_current_user():
     uid = get_secure_cookie("uid")
-    return await db.get_user_by_id(uid) if uid else None
+    return await db.users.get_user_by_id(uid) if uid else None
 
 
 def get_dek():

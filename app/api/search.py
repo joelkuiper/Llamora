@@ -89,7 +89,7 @@ class SearchAPI:
             if mid not in id_cos:
                 id_cos[mid] = cos
 
-        rows = await self.db.get_messages_by_ids(user_id, dedup_ids, dek)
+        rows = await self.db.messages.get_messages_by_ids(user_id, dedup_ids, dek)
         row_map = {r["id"]: r for r in rows}
 
         results: List[dict] = []
@@ -288,7 +288,7 @@ class SearchAPI:
                 for t in tokens
             ]
             message_ids = [c["id"] for c in candidates]
-            tag_map = await self.db.get_messages_with_tag_hashes(
+            tag_map = await self.db.tags.get_messages_with_tag_hashes(
                 user_id, tag_hashes, message_ids
             )
             for mid, hashes in tag_map.items():
@@ -306,7 +306,7 @@ class SearchAPI:
             user_id,
         )
         vec = (await async_embed_texts([content])).astype(np.float32).reshape(1, -1)
-        await self.db.store_vector(msg_id, user_id, vec[0], dek)
+        await self.db.vectors.store_vector(msg_id, user_id, vec[0], dek)
         index = await self.registry.get_or_build(user_id, dek)
         if not index.contains(msg_id):
             index.add_batch([msg_id], vec)

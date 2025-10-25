@@ -105,7 +105,7 @@ class MessageIndexRegistry:
             dim = vecs.shape[1]
             idx = MessageIndex(dim)
         idx.add_batch(ids, vecs)
-        await self.db.store_vectors_batch(
+        await self.db.vectors.store_vectors_batch(
             user_id,
             [(mid, vec) for mid, vec in zip(ids, vecs)],
             dek,
@@ -124,7 +124,7 @@ class MessageIndexRegistry:
                 idx.touch()
                 return idx
 
-            rows = await self.db.get_latest_vectors(user_id, self.warm_limit, dek)
+            rows = await self.db.vectors.get_latest_vectors(user_id, self.warm_limit, dek)
             if rows:
                 logger.debug(
                     "Warming index for user %s with %d vectors", user_id, len(rows)
@@ -141,7 +141,9 @@ class MessageIndexRegistry:
                 self.indexes[user_id] = idx
 
                 # Ensure messages without stored vectors are also indexed
-                msgs = await self.db.get_latest_messages(user_id, self.warm_limit, dek)
+                msgs = await self.db.messages.get_latest_messages(
+                    user_id, self.warm_limit, dek
+                )
                 missing = [m for m in msgs if not idx.contains(m["id"])]
                 if missing:
                     logger.debug(
@@ -155,7 +157,7 @@ class MessageIndexRegistry:
                 return idx
 
             # Fallback: no stored vectors, warm from latest messages
-            msgs = await self.db.get_latest_messages(user_id, self.warm_limit, dek)
+            msgs = await self.db.messages.get_latest_messages(user_id, self.warm_limit, dek)
             if msgs:
                 logger.debug(
                     "Embedding and indexing %d messages for user %s", len(msgs), user_id
@@ -166,7 +168,7 @@ class MessageIndexRegistry:
             logger.debug("No existing data for user %s, creating empty index", user_id)
             dim = (await async_embed_texts([""])).shape[1]
             idx = MessageIndex(dim)
-            latest = await self.db.get_user_latest_id(user_id)
+            latest = await self.db.messages.get_user_latest_id(user_id)
             self.cursors[user_id] = latest
             self.indexes[user_id] = idx
             return idx
@@ -186,7 +188,7 @@ class MessageIndexRegistry:
                 return 0
 
             prev_cursor = cursor
-            rows = await self.db.get_vectors_older_than(user_id, cursor, batch, dek)
+            rows = await self.db.vectors.get_vectors_older_than(user_id, cursor, batch, dek)
             added = 0
             if rows:
                 logger.debug(
@@ -203,7 +205,9 @@ class MessageIndexRegistry:
                 cursor = rows[-1]["id"]
                 added += len(ids)
 
-            msgs = await self.db.get_messages_older_than(user_id, prev_cursor, batch, dek)
+            msgs = await self.db.messages.get_messages_older_than(
+                user_id, prev_cursor, batch, dek
+            )
             missing = [m for m in msgs if not idx.contains(m["id"])]
             if missing:
                 logger.debug(

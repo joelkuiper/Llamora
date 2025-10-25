@@ -157,7 +157,7 @@ class PendingResponse:
                 meta = {"error": True} if self.error else {}
                 meta.update(self.meta_extra)
                 try:
-                    assistant_msg_id = await self._db.append_message(
+                    assistant_msg_id = await self._db.messages.append_message(
                         uid,
                         "assistant",
                         full_response,
