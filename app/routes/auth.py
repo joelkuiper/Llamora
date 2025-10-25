@@ -20,6 +20,7 @@ from app.services.auth_helpers import (
     set_dek,
     clear_session_dek,
 )
+from app.services.validators import validate_password, PasswordValidationError
 from app.services.crypto import (
     generate_dek,
     wrap_key,
@@ -130,12 +131,29 @@ async def register():
         max_pass = current_app.config["MAX_PASSWORD_LENGTH"]
 
         # Basic validations
-        if not username or not password or not confirm:
+        if not username:
             return await render_template(
                 "register.html", error="All fields are required"
             )
 
-        if len(username) > max_user or len(password) > max_pass:
+        password_error = validate_password(
+            password,
+            confirm=confirm,
+            require_confirm=True,
+            max_length=max_pass,
+            min_strength=3,
+        )
+        if password_error:
+            message_map = {
+                PasswordValidationError.MISSING: "All fields are required",
+                PasswordValidationError.MAX_LENGTH: "Input exceeds max length",
+                PasswordValidationError.MISMATCH: "Passwords do not match",
+                PasswordValidationError.WEAK: "Password is too weak",
+            }
+            message = message_map.get(password_error, "Invalid input")
+            return await render_template("register.html", error=message)
+
+        if len(username) > max_user:
             return await render_template(
                 "register.html", error="Input exceeds max length"
             )
@@ -145,15 +163,6 @@ async def register():
                 "register.html",
                 error="Username may only contain letters, digits, and underscores",
             )
-
-        if password != confirm:
-            return await render_template(
-                "register.html", error="Passwords do not match"
-            )
-
-        strength = zxcvbn(password)
-        if strength.get("score", 0) < 3:
-            return await render_template("register.html", error="Password is too weak")
 
         if await db.users.get_user_by_username(username):
             return await render_template(
@@ -306,18 +315,22 @@ async def reset_password():
         max_pass = current_app.config["MAX_PASSWORD_LENGTH"]
         min_pass = current_app.config["MIN_PASSWORD_LENGTH"]
 
-        if (
-            not username
-            or not recovery
-            or not password
-            or not confirm
-            or len(username) > max_user
-            or len(password) > max_pass
-            or len(password) < min_pass
-            or password != confirm
-            or not re.search(r"[A-Za-z]", password)
-            or not re.search(r"\d", password)
-        ):
+        if not username or not recovery:
+            return await render_template("reset_password.html", error="Invalid input")
+
+        if len(username) > max_user:
+            return await render_template("reset_password.html", error="Invalid input")
+
+        password_error = validate_password(
+            password,
+            confirm=confirm,
+            require_confirm=True,
+            min_length=min_pass,
+            max_length=max_pass,
+            require_letter=True,
+            require_digit=True,
+        )
+        if password_error:
             return await render_template("reset_password.html", error="Invalid input")
 
         user = await db.users.get_user_by_username(username)
@@ -391,18 +404,28 @@ async def change_password():
     confirm = form.get("confirm_password", "")
 
     max_pass = current_app.config["MAX_PASSWORD_LENGTH"]
-    if not current or not new or not confirm:
+    if not current:
         return await _render_profile_page(user, pw_error="All fields are required")
 
-    if len(current) > max_pass or len(new) > max_pass:
+    if len(current) > max_pass:
         return await _render_profile_page(user, pw_error="Input exceeds max length")
 
-    if new != confirm:
-        return await _render_profile_page(user, pw_error="Passwords do not match")
-
-    strength = zxcvbn(new)
-    if strength.get("score", 0) < 3:
-        return await _render_profile_page(user, pw_error="Password is too weak")
+    password_error = validate_password(
+        new,
+        confirm=confirm,
+        require_confirm=True,
+        max_length=max_pass,
+        min_strength=3,
+    )
+    if password_error:
+        message_map = {
+            PasswordValidationError.MISSING: "All fields are required",
+            PasswordValidationError.MAX_LENGTH: "Input exceeds max length",
+            PasswordValidationError.MISMATCH: "Passwords do not match",
+            PasswordValidationError.WEAK: "Password is too weak",
+        }
+        message = message_map.get(password_error, "Invalid input")
+        return await _render_profile_page(user, pw_error=message)
 
     try:
         pwhash.argon2id.verify(
