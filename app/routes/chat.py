@@ -267,14 +267,13 @@ class PendingResponse:
         params: dict | None,
     ):
         full_response = ""
-        sentinel = "<~meta~>"
+        sentinel_start = "<meta>"
+        sentinel_end = "</meta>"
         tail = ""
         meta_buf = ""
         meta: dict | None = None
-        found = False
-        brace = 0
-        in_str = False
-        escaping = False
+        found_start = False
+        meta_complete = False
         first = True
         try:
             async for chunk in llm.stream_response(
@@ -300,8 +299,8 @@ class PendingResponse:
                 data = tail + chunk
                 tail = ""
 
-                if not found:
-                    idx = data.find(sentinel)
+                if not found_start:
+                    idx = data.find(sentinel_start)
                     if idx != -1:
                         vis = data[:idx]
                         if vis:
@@ -309,11 +308,11 @@ class PendingResponse:
                             async with self._cond:
                                 self.text = full_response
                                 self._cond.notify_all()
-                        data = data[idx + len(sentinel) :]
-                        found = True
+                        data = data[idx + len(sentinel_start) :]
+                        found_start = True
                         meta_buf += data
                     else:
-                        keep = len(data) - len(sentinel) + 1
+                        keep = len(data) - len(sentinel_start) + 1
                         if keep > 0:
                             vis = data[:keep]
                             full_response += vis
@@ -327,26 +326,19 @@ class PendingResponse:
                 else:
                     meta_buf += data
 
-                if found:
-                    for ch in data:
-                        if not in_str:
-                            if ch == "{":
-                                brace += 1
-                            elif ch == "}":
-                                brace -= 1
-                                if brace == 0:
-                                    break
-                            elif ch == '"':
-                                in_str = True
-                        else:
-                            if escaping:
-                                escaping = False
-                            elif ch == "\\":
-                                escaping = True
-                            elif ch == '"':
-                                in_str = False
-                    if brace == 0 and meta_buf.strip():
+                if found_start and not meta_complete:
+                    end_idx = meta_buf.find(sentinel_end)
+                    if end_idx != -1:
+                        trailing = meta_buf[end_idx + len(sentinel_end) :]
+                        if trailing.strip():
+                            logger.debug(
+                                "Unexpected trailing content after </meta>: %r",
+                                trailing,
+                            )
+                        meta_buf = meta_buf[:end_idx]
+                        meta_complete = True
                         break
+
 
         except asyncio.CancelledError:
             self.cancelled = True
@@ -389,11 +381,14 @@ class PendingResponse:
                 pending_responses.pop(self.user_msg_id, None)
                 return
 
-            if found and meta_buf.strip():
+            meta_str = meta_buf.strip()
+            if found_start and meta_str:
                 try:
-                    meta = orjson.loads(meta_buf)
+                    meta = orjson.loads(meta_str)
                 except Exception:
                     meta = {}
+                finally:
+                    logger.debug(meta)
             else:
                 meta = {}
             if self.error:

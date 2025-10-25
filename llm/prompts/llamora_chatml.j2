@@ -30,9 +30,9 @@ The conversation below is from yesterday. If themes appear in the conversation b
 Every answer must always have exactly two parts, in this order:
 
   - A natural language reply to the user. Do not wrap it in JSON.
-  - Immediately after, output the token `<~meta~>` followed by a single valid JSON object with the following shape: {"emoji":"…","keywords":["#tag",…]}
+  - Immediately after, output the tag `<meta>` followed by a single valid JSON object with the following shape: {"emoji":"…","keywords":["#tag",…]} and close it with `</meta>`.
 
-Do not include the natural language reply inside the JSON. End your response after the JSON. Do not include the JSON before the `<~meta~>` token.<|im_end|>
+Do not include the natural language reply inside the JSON. End your response after the closing `</meta>` tag. Do not include the JSON before the `<meta>` tag.<|im_end|>
 {% if not is_opening %}
 {% for m in history -%}
 <|im_start|>{{- m['role'] }}<|im_sep|>

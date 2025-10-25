@@ -1,6 +1,6 @@
-root      ::= text "<~meta~>" obj
+root      ::= text "<meta>" obj "</meta>"
 text      ::= (anychar)*
-anychar  ::= [^<] | "<" [^~]
+anychar  ::= [^<] | "<" [^m] | "<m" [^e] | "<me" [^t] | "<met" [^a] | "<meta" [^>]
 quote     ::= "\""
 
 string    ::= quote (char)* quote
