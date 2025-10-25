@@ -103,15 +103,30 @@ export function initSearchUI() {
     }, { once: true });
   });
 
-  const closeResults = (clearInput = false) => {
+  const closeResults = (clearInput = false, options = {}) => {
+    const { immediate = false } = options;
     if (clearInput && input) input.value = "";
     const panel = wrap.querySelector(".sr-panel");
-    if (!panel) { wrap.classList.remove("is-open"); return; }
-    panel.classList.add("pop-exit");
-    panel.addEventListener("animationend", () => {
+    const finish = () => {
       wrap.classList.remove("is-open");
       wrap.innerHTML = "";
-    }, { once: true });
+    };
+
+    if (!panel) {
+      finish();
+      return;
+    }
+
+    panel.classList.remove("pop-enter");
+
+    if (immediate) {
+      panel.classList.remove("pop-exit");
+      finish();
+      return;
+    }
+
+    panel.classList.add("pop-exit");
+    panel.addEventListener("animationend", finish, { once: true });
   };
 
   // Triggers
@@ -154,7 +169,7 @@ export function initSearchUI() {
         flashHighlight(el);
       }
     } else {
-      closeResults(true);
+      closeResults(true, { immediate: true });
     }
   });
 }
