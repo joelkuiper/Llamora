@@ -1,3 +1,5 @@
+import { createPopover } from "./popover.js";
+
 let initialized = false;
 let state;
 
@@ -56,96 +58,31 @@ const clearStoredCalendar = () => {
 function setupCalendar(btn, pop) {
   const controller = new AbortController();
   const { signal } = controller;
-  let instance;
   const defaultUrl = pop.getAttribute('hx-get');
 
-  const update = () => {
-    if (instance) instance.update();
-  };
-
-  const getPanel = () => pop.querySelector('#calendar');
-
-  const playAnimation = (el, cls, remove = []) => {
-    if (!el) return;
-    remove.forEach((name) => el.classList.remove(name));
-    // Force a reflow so re-adding the class retriggers the animation.
-    void el.getBoundingClientRect();
-    el.classList.add(cls);
-    let done = false;
-    const cleanup = () => {
-      if (done) return;
-      done = true;
-      el.classList.remove(cls);
-    };
-    el.addEventListener('animationend', cleanup, { once: true });
-    setTimeout(cleanup, 220);
-  };
-
-  const animateOpen = () => {
-    const panel = getPanel();
-    if (!panel) return;
-    playAnimation(pop, 'fade-enter', ['fade-enter', 'fade-exit']);
-    playAnimation(panel, 'pop-enter', ['pop-enter', 'pop-exit']);
-  };
-
-  const hide = () => {
-    if (pop.hidden) return;
-    btn.classList.remove('active');
-    const panel = getPanel();
-    const finish = () => {
-      if (panel) {
-        panel.classList.remove('pop-enter', 'pop-exit');
-      }
-      pop.classList.remove('fade-enter', 'fade-exit');
-      pop.hidden = true;
+  const popover = createPopover(btn, pop, {
+    getPanel: () => pop.querySelector('#calendar'),
+    onShow: () => {
+      btn.classList.add('active');
+      htmx.trigger(pop, 'calendar-popover:show');
+    },
+    onHide: () => {
+      btn.classList.remove('active');
+    },
+    onHidden: () => {
       pop.innerHTML = '';
-    };
-    let pending = 0;
-    const awaitAnimation = (el, className, removeClasses = []) => {
-      if (!el) return;
-      pending += 1;
-      removeClasses.forEach((cls) => el.classList.remove(cls));
-      void el.getBoundingClientRect();
-      el.classList.add(className);
+    },
+  });
 
-      let done = false;
-      const complete = () => {
-        if (done) return;
-        done = true;
-        el.classList.remove(className);
-        pending -= 1;
-        if (pending === 0) {
-          finish();
-        }
-      };
-
-      el.addEventListener('animationend', complete, { once: true });
-      setTimeout(complete, 220);
-    };
-
-    awaitAnimation(pop, 'fade-exit', ['fade-enter', 'fade-exit']);
-    awaitAnimation(panel, 'pop-exit', ['pop-enter', 'pop-exit']);
-
-    if (pending === 0) {
-      finish();
-    }
-    document.removeEventListener('click', outside, true);
-    document.removeEventListener('keydown', onKey);
-  };
-
-  const outside = (e) => {
-    if (!pop.contains(e.target) && !btn.contains(e.target)) hide();
-  };
-
-  const onKey = (e) => {
-    if (e.key === 'Escape') hide();
+  const update = () => {
+    popover.update();
   };
 
   btn.addEventListener(
     'click',
     () => {
-      if (!pop.hidden) {
-        hide();
+      if (popover.isOpen) {
+        popover.hide();
         return;
       }
       const stored = readStoredCalendar();
@@ -157,20 +94,7 @@ function setupCalendar(btn, pop) {
       if (defaultUrl) {
         pop.setAttribute('hx-get', defaultUrl);
       }
-      pop.hidden = false;
-      btn.classList.add('active');
-      instance =
-        instance ||
-        Popper.createPopper(btn, pop, {
-          placement: 'bottom',
-        });
-      update();
-      if (getPanel()) {
-        animateOpen();
-      }
-      htmx.trigger(pop, 'calendar-popover:show');
-      document.addEventListener('click', outside, true);
-      document.addEventListener('keydown', onKey);
+      popover.show();
     },
     { signal },
   );
@@ -180,7 +104,7 @@ function setupCalendar(btn, pop) {
     (e) => {
       if (e.target.closest('.overlay-close')) {
         e.preventDefault();
-        hide();
+        popover.hide();
         return;
       }
 
@@ -211,7 +135,7 @@ function setupCalendar(btn, pop) {
       }
 
       if (e.target.closest('.calendar-table a, .today-btn')) {
-        hide();
+        popover.hide();
       }
     },
     { signal },
@@ -220,10 +144,10 @@ function setupCalendar(btn, pop) {
   pop.addEventListener(
     'htmx:afterSwap',
     (e) => {
-      if (!instance || !pop.contains(e.target)) return;
+      if (!pop.contains(e.target)) return;
       update();
       if (e.target === pop) {
-        animateOpen();
+        popover.animateOpen();
       }
       const calendar = pop.querySelector('#calendar');
       if (!calendar) return;
@@ -245,12 +169,10 @@ function setupCalendar(btn, pop) {
   );
 
   const dispose = () => {
-    hide();
     controller.abort();
-    if (instance) {
-      instance.destroy();
-      instance = null;
-    }
+    popover.hide().finally(() => {
+      popover.destroy();
+    });
   };
 
   return {

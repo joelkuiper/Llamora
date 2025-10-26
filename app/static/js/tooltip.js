@@ -1,7 +1,10 @@
+import { createPopover } from "./popover.js";
+
 let tooltipEl;
 let innerEl;
-let popperInstance;
+let popoverController;
 let currentTarget;
+let lastRect;
 let initialized = false;
 
 function ensureEl() {
@@ -11,47 +14,83 @@ function ensureEl() {
   tooltipEl.innerHTML = '<div class="tooltip-inner"></div>';
   innerEl = tooltipEl.querySelector('.tooltip-inner');
   document.body.appendChild(tooltipEl);
+  tooltipEl.hidden = true;
 }
 
 function show(el) {
   ensureEl();
   hide();
   innerEl.textContent = el.dataset.tooltipTitle || '';
-  tooltipEl.style.top = '';
-  tooltipEl.style.left = '';
-  popperInstance = Popper.createPopper(el, tooltipEl, {
-    placement: 'bottom',
-    strategy: 'fixed',
-    modifiers: [
-      { name: 'offset', options: { offset: [0, 8] } },
-    ],
+  Object.assign(tooltipEl.style, {
+    top: '',
+    left: '',
+    position: '',
   });
-  tooltipEl.classList.add('visible');
+  popoverController = createPopover(el, tooltipEl, {
+    animation: null,
+    closeOnOutside: false,
+    closeOnEscape: false,
+    popperOptions: {
+      placement: 'bottom',
+      strategy: 'fixed',
+      modifiers: [{ name: 'offset', options: { offset: [0, 8] } }],
+    },
+    onShow: () => {
+      tooltipEl.classList.add('visible');
+    },
+    onHide: () => {
+      tooltipEl.classList.remove('visible');
+      const rect = tooltipEl.getBoundingClientRect();
+      lastRect = { top: rect.top, left: rect.left };
+    },
+    onHidden: () => {
+      tooltipEl.hidden = true;
+      if (lastRect) {
+        Object.assign(tooltipEl.style, {
+          top: `${lastRect.top}px`,
+          left: `${lastRect.left}px`,
+          position: 'fixed',
+        });
+        lastRect = null;
+      }
+    },
+  });
+  popoverController.show();
   currentTarget = el;
 }
 
 function hide() {
-  if (!tooltipEl) return;
-  tooltipEl.classList.remove('visible');
-  if (popperInstance) {
-    const { top, left } = tooltipEl.getBoundingClientRect();
-    popperInstance.destroy();
-    popperInstance = null;
-    Object.assign(tooltipEl.style, {
-      top: `${top}px`,
-      left: `${left}px`,
-      position: 'fixed',
-    });
+  if (!popoverController) {
+    if (tooltipEl) {
+      tooltipEl.classList.remove('visible');
+      tooltipEl.hidden = true;
+    }
+    currentTarget = null;
+    lastRect = null;
+    return Promise.resolve();
   }
+  const controller = popoverController;
+  popoverController = null;
   currentTarget = null;
+  return controller.hide().finally(() => {
+    controller.destroy();
+  });
 }
 
 function cleanup() {
-  hide();
-  if (tooltipEl) {
-    tooltipEl.remove();
-    tooltipEl = null;
-    innerEl = null;
+  const pending = hide();
+  const removeEl = () => {
+    if (tooltipEl) {
+      tooltipEl.remove();
+      tooltipEl = null;
+      innerEl = null;
+      lastRect = null;
+    }
+  };
+  if (pending && typeof pending.then === 'function') {
+    pending.finally(removeEl);
+  } else {
+    removeEl();
   }
 }
 

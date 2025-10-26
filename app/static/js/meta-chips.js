@@ -1,3 +1,5 @@
+import { createPopover } from "./popover.js";
+
 function setupAddButton(container) {
   if (container.dataset.popInit === "1") return;
   container.dataset.popInit = "1";
@@ -28,74 +30,37 @@ function setupAddButton(container) {
   input.addEventListener('input', updateState);
   updateState();
 
-  let instance;
-
-  const hide = () => {
-    if (pop.hidden) return;
-    btn.classList.remove('active');
-    const finish = () => {
-      pop.hidden = true;
+  const popover = createPopover(btn, pop, {
+    getPanel: () => panel,
+    onShow: () => {
+      btn.classList.add('active');
+      if (suggestions && !suggestions.dataset.loaded) {
+        htmx.trigger(suggestions, 'tag-popover:show');
+      }
+      input.focus();
+    },
+    onHide: () => {
+      btn.classList.remove('active');
+    },
+    onHidden: () => {
       if (suggestions) {
         suggestions.innerHTML = "";
         delete suggestions.dataset.loaded;
       }
-    };
-    if (panel) {
-      pop.classList.add('fade-exit');
-      panel.classList.add('pop-exit');
-      pop.addEventListener(
-        'animationend',
-        () => {
-          pop.classList.remove('fade-exit');
-          finish();
-        },
-        { once: true },
-      );
-      panel.addEventListener('animationend', () => panel.classList.remove('pop-exit'), { once: true });
-    } else {
-      finish();
-    }
-    document.removeEventListener('click', outside, true);
-    document.removeEventListener('keydown', onKey);
-  };
-
-  const outside = (e) => {
-    if (!pop.contains(e.target) && e.target !== btn) hide();
-  };
-
-  const onKey = (e) => {
-    if (e.key === 'Escape') hide();
-  };
-
-  const animateOpen = () => {
-    if (!panel) return;
-    panel.classList.add('pop-enter');
-    pop.classList.add('fade-enter');
-    panel.addEventListener('animationend', () => panel.classList.remove('pop-enter'), { once: true });
-    pop.addEventListener('animationend', () => pop.classList.remove('fade-enter'), { once: true });
-  };
+    },
+  });
 
   btn.addEventListener('click', () => {
-    if (!pop.hidden) {
-      hide();
+    if (popover.isOpen) {
+      popover.hide();
       return;
     }
-    pop.hidden = false;
-    btn.classList.add('active');
-    instance = instance || Popper.createPopper(btn, pop, { placement: 'bottom' });
-    instance.update();
-    animateOpen();
-    input.focus();
-    document.addEventListener('click', outside, true);
-    document.addEventListener('keydown', onKey);
-    if (suggestions && !suggestions.dataset.loaded) {
-      htmx.trigger(suggestions, 'tag-popover:show');
-    }
+    popover.show();
   });
 
   close?.addEventListener('click', (e) => {
     e.preventDefault();
-    hide();
+    popover.hide();
   });
 
   suggestions?.addEventListener('htmx:afterSwap', () => {
@@ -104,6 +69,7 @@ function setupAddButton(container) {
     } else {
       delete suggestions.dataset.loaded;
     }
+    popover.update();
   });
 
   form.addEventListener('htmx:configRequest', (evt) => {
@@ -125,7 +91,7 @@ function setupAddButton(container) {
   form.addEventListener('htmx:afterRequest', () => {
     form.reset();
     updateState();
-    hide();
+    popover.hide();
   });
 
   container.addEventListener('htmx:afterSwap', (evt) => {
