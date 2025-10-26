@@ -6,16 +6,16 @@
     <title>{{ config.APP_NAME }}</title>
     <link rel="icon" href="{{url_for('static', filename='img/favicon.ico')}}" type="image/x-icon">
 
-    <script src="{{url_for('static', filename='js/vendor/htmx.min.js')}}"></script>
-    <script src="{{url_for('static', filename='js/vendor/htmx-ext-sse.js')}}"></script>
-    <script src="{{url_for('static', filename='js/vendor/htmx-ext-response-targets.js')}}"></script>
+    <script defer src="{{url_for('static', filename='js/vendor/htmx.min.js')}}"></script>
+    <script defer src="{{url_for('static', filename='js/vendor/htmx-ext-sse.js')}}"></script>
+    <script defer src="{{url_for('static', filename='js/vendor/htmx-ext-response-targets.js')}}"></script>
 
-    <script src="{{url_for('static', filename='js/vendor/marked.umd.js')}}"></script>
-    <script src="{{url_for('static', filename='js/vendor/purify.min.js')}}"></script>
-    <script src="{{url_for('static', filename='js/vendor/popper.min.jsm.js')}}"></script>
+    <script defer src="{{url_for('static', filename='js/vendor/marked.umd.js')}}"></script>
+    <script defer src="{{url_for('static', filename='js/vendor/purify.min.js')}}"></script>
+    <script defer src="{{url_for('static', filename='js/vendor/popper.min.jsm.js')}}"></script>
 
-    <script type="module" src="{{url_for('static', filename='js/tooltip.js')}}"></script>
-    <script type="module" src="{{url_for('static', filename='js/calendar.js')}}"></script>
+    <script defer type="module" src="{{url_for('static', filename='js/tooltip.js')}}"></script>
+    <script defer type="module" src="{{url_for('static', filename='js/calendar.js')}}"></script>
 
 
     <link rel="stylesheet" href="{{url_for('static', filename='css/main.css')}}">
@@ -106,46 +106,50 @@
     </div>
 
     <script>
-      document.body.addEventListener('htmx:configRequest', (event) => {
-          event.detail.headers['X-CSRFToken'] = '{{ csrf_token() }}';
+      document.addEventListener('DOMContentLoaded', () => {
+        document.body.addEventListener('htmx:configRequest', (event) => {
+            event.detail.headers['X-CSRFToken'] = '{{ csrf_token() }}';
+        });
+
+        document.body.addEventListener('htmx:configRequest', (event) => {
+            const chat = document.getElementById('chat');
+            const activeDate = chat?.dataset.date;
+            if (activeDate) {
+                event.detail.headers['X-Active-Day'] = activeDate;
+            }
+        });
+
+        function showServerError() {
+            const errors = document.getElementById('errors');
+            if (!errors) return;
+            const box = document.createElement('div');
+            box.className = 'error-box';
+            box.textContent = '⚠️ Unable to reach server.';
+            const btn = document.createElement('button');
+            btn.className = 'close-error';
+            btn.setAttribute('aria-label', 'Close error');
+            btn.textContent = '×';
+            btn.onclick = () => box.remove();
+            box.appendChild(btn);
+            errors.appendChild(box);
+        }
+
+        document.body.addEventListener('htmx:sendError', showServerError);
+        // document.body.addEventListener('htmx:responseError', showServerError);
       });
-
-      document.body.addEventListener("htmx:configRequest", function (event) {
-          const chat = document.getElementById("chat");
-          const activeDate = chat?.dataset.date;
-          if (activeDate) {
-              event.detail.headers["X-Active-Day"] = activeDate;
-          }
-      });
-
-
-      function showServerError() {
-          const errors = document.getElementById("errors");
-          if (!errors) return;
-          const box = document.createElement("div");
-          box.className = "error-box";
-          box.textContent = "⚠️ Unable to reach server.";
-          const btn = document.createElement("button");
-          btn.className = "close-error";
-          btn.setAttribute("aria-label", "Close error");
-          btn.textContent = "×";
-          btn.onclick = () => box.remove();
-          box.appendChild(btn);
-          errors.appendChild(box);
-      }
-
-      document.body.addEventListener("htmx:sendError", showServerError);
-      // document.body.addEventListener("htmx:responseError", showServerError);
     </script>
 
-    <script type="module">
-      import { initScrollMemory } from "{{ url_for('static', filename='js/scroll.js') }}";
-      initScrollMemory();
+    <script defer type="module">
+      document.addEventListener('DOMContentLoaded', () => {
+        import("{{ url_for('static', filename='js/scroll.js') }}").then(({ initScrollMemory }) => {
+          initScrollMemory();
+        });
 
-      const profileBtn = document.getElementById('profile-btn');
-      profileBtn?.addEventListener('click', () => {
-        const { pathname, search, hash } = window.location;
-        sessionStorage.setItem('profile-return', `${pathname}${search}${hash}`);
+        const profileBtn = document.getElementById('profile-btn');
+        profileBtn?.addEventListener('click', () => {
+          const { pathname, search, hash } = window.location;
+          sessionStorage.setItem('profile-return', `${pathname}${search}${hash}`);
+        });
       });
     </script>
   </body>
