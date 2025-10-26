@@ -29,6 +29,7 @@ from app.services.chat_helpers import (
     build_conversation_context,
     locate_message_and_reply,
     normalize_llm_config,
+    replace_newline,
     stream_pending_reply,
     stream_saved_reply,
 )
@@ -152,11 +153,11 @@ async def sse_opening(date: str):
             is_new=is_new,
             has_no_activity=has_no_activity,
         )
-    except Exception:
+    except Exception as exc:
         logger.exception("Failed to build opening prompt")
 
         async def error_stream():
-            msg = f"⚠️ {e}"
+            msg = f"⚠️ {exc}"
             yield f"event: error\ndata: {replace_newline(escape(msg))}\n\n"
             yield "event: done\ndata: {}\n\n"
 
