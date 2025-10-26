@@ -1,39 +1,18 @@
-import { renderMarkdown, renderAllMarkdown } from "./markdown.js";
-import { positionTypingIndicator } from "./typing-indicator.js";
+import { renderAllMarkdown } from "./markdown.js";
 import { initTagPopovers } from "./meta-chips.js";
 import { setTimezoneCookie } from "./timezone.js";
-
-let currentSSEListener = null;
-let currentStreamMsgId = null;
-
+import { ChatFormController } from "./chat/form-controller.js";
+import { ScrollController } from "./chat/scroll-controller.js";
+import { StreamController } from "./chat/stream-controller.js";
 
 const TYPING_INDICATOR_SELECTOR = "#typing-indicator";
 
-function revealMetaChips(container, scrollToBottom){
-  if (!container || !container.hidden) return;
-  const parent = container.closest('.message');
-  const start = parent?.offsetHeight;
-  container.hidden = false;
-  const end = parent?.offsetHeight;
-  if (parent && start !== undefined && end !== undefined) {
-    parent.style.height = start + 'px';
-    parent.offsetHeight; // force reflow
-    parent.style.transition = 'height 0.2s ease';
-    parent.style.height = end + 'px';
-    parent.addEventListener('transitionend', () => {
-      parent.style.height = '';
-      parent.style.transition = '';
-    }, { once: true });
-  }
-  container.classList.add('chip-enter');
-  container.addEventListener('animationend', () => {
-    container.classList.remove('chip-enter');
-    scrollToBottom();
-  }, { once: true });
+function findCurrentMsgId(chat) {
+  const indicator = chat.querySelector(TYPING_INDICATOR_SELECTOR);
+  if (!indicator) return null;
+  return indicator.dataset.userMsgId || "opening";
 }
 
-// When viewing today's chat, reload the page after midnight or when the user
-// returns to the tab on a new day.
 export function refreshAtMidnight() {
   const chat = document.getElementById("chat");
   if (!chat) return;
@@ -65,164 +44,88 @@ export function refreshAtMidnight() {
 
 export function initChatUI(root = document) {
   setTimezoneCookie();
-  const form = root.querySelector("#message-form");
-  const textarea = form?.querySelector("textarea");
-  const button = form?.querySelector("button");
   const chat = root.querySelector("#chat");
-  const errors = document.getElementById("errors");
   const container = root.querySelector("#content-wrapper");
-  if (!chat) return;
+  if (!chat) return null;
 
-  // Ensure tag popovers are reinitialized when returning via back navigation
-  chat.querySelectorAll('.meta-chips').forEach((chips) => {
+  const previous = document.body.__chatUIInstance;
+  previous?.destroy?.();
+
+  chat.querySelectorAll(".meta-chips").forEach((chips) => {
     delete chips.dataset.popInit;
   });
 
-  const date = chat.dataset.date;
-  const now = new Date();
-  const pad = (n) => String(n).padStart(2, "0");
-  const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  const isToday = date === today;
-
-  const draftKey = `chat-draft-${date}`;
-
-  let setStreaming = () => {};
-  const findCurrentMsgId = () => {
-    const indicator = chat.querySelector(TYPING_INDICATOR_SELECTOR);
-    if (!indicator) return null;
-    return indicator.dataset.userMsgId || "opening";
+  const state = {
+    currentStreamMsgId: null,
   };
 
-  if (form && textarea && button) {
-    textarea.value = sessionStorage.getItem(draftKey) || "";
-    const resizeTextarea = () => {
-      textarea.style.height = "auto";
-      textarea.style.height = textarea.scrollHeight + "px";
-      if (container) {
-        container.scrollTop = container.scrollHeight;
-      }
-    };
-    resizeTextarea();
-    if (!isToday) {
-      textarea.disabled = true;
-      button.disabled = true;
-      textarea.placeholder = "This day has past.";
-    } else {
-      refreshAtMidnight();
-    }
+  const formController = new ChatFormController({
+    root,
+    chat,
+    container,
+    date: chat.dataset.date,
+    state,
+  });
+  formController.init();
 
-    const handleStopClick = () => {
-      console.debug('Stop button clicked');
-      const indicator = chat.querySelector(TYPING_INDICATOR_SELECTOR);
-      const stopEndpoint = indicator?.dataset.stopUrl;
-      const wrap = indicator?.closest('.assistant-stream');
-      if (wrap) {
-        console.debug('Aborting SSE stream');
-        wrap.dispatchEvent(new Event('htmx:abort'));
-        wrap.removeAttribute('hx-ext');
-        wrap.removeAttribute('sse-connect');
-        wrap.removeAttribute('sse-close');
-        if (indicator) {
-          indicator.classList.add('stopped');
-          setTimeout(() => indicator.remove(), 1000);
-        }
-      }
-      if (stopEndpoint) {
-        console.debug('Sending stop request to', stopEndpoint);
-        htmx.ajax('POST', stopEndpoint, { swap: 'none' });
-      }
-      currentStreamMsgId = null;
-      setStreaming(false);
-    };
-
-    setStreaming = (streaming) => {
-      if (!isToday) {
-        textarea.disabled = true;
-        button.disabled = true;
-        return;
-      }
-      textarea.disabled = streaming;
-      if (streaming) {
-        console.debug('Entering streaming state for', currentStreamMsgId);
-        button.classList.add('stopping');
-        button.type = 'button';
-        button.disabled = false;
-        button.addEventListener('click', handleStopClick, { once: true });
-        button.setAttribute('aria-label', 'Stop');
-      } else {
-        button.classList.remove('stopping');
-        button.type = 'submit';
-        textarea.disabled = false;
-        button.disabled = !textarea.value.trim();
-        textarea.focus({ preventScroll: true });
-        button.setAttribute('aria-label', 'Send');
-      }
-    };
-
-    form.addEventListener("htmx:afterRequest", () => {
-      sessionStorage.removeItem(draftKey);
-      textarea.style.height = "auto";
-      if (container) {
-        container.scrollTop = container.scrollHeight;
-      }
-    });
-
-    const userTimeInput = form.querySelector("#user-time");
-    form.addEventListener("htmx:configRequest", (event) => {
-      if (userTimeInput) {
-        userTimeInput.value = new Date().toISOString();
-      }
-      if (!textarea.value.trim()) {
-        event.preventDefault();
-        textarea.focus({ preventScroll: true });
-      }
-    });
-
-    textarea.addEventListener("input", () => {
-      resizeTextarea();
-      sessionStorage.setItem(draftKey, textarea.value);
-      if (!currentStreamMsgId) {
-        button.disabled = !textarea.value.trim();
-      }
-    });
-
-    textarea.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        if (textarea.value.trim()) {
-          form.requestSubmit();
-          textarea.style.height = "auto";
-        }
-      }
-    });
+  if (formController.isToday) {
+    refreshAtMidnight();
   }
 
-  // Defer scroll handler setup so elements exist after day switches
-  let scrollToBottom = () => {};
-  requestAnimationFrame(() => {
-    scrollToBottom = initScrollHandler();
-    initStreamHandler(setStreaming, scrollToBottom);
-  });
+  const scrollController = new ScrollController({ root, chat });
+  const scrollToBottom = scrollController.init() || (() => {});
 
-  errors?.addEventListener("htmx:afterSwap", () => {
-    requestAnimationFrame(() => {
-      if (document.querySelector("#errors .error-box")) {
-        setStreaming(false);
+  const streamController = new StreamController({
+    chat,
+    state,
+    setStreaming: (streaming) => formController.setStreaming(streaming),
+    scrollToBottom,
+  });
+  streamController.init();
+
+  let observer;
+
+  const instance = {
+    destroy() {
+      streamController.destroy();
+      scrollController.destroy();
+      formController.destroy();
+      observer?.disconnect();
+      observer = null;
+      chat.removeEventListener("htmx:afterSwap", onAfterSwap);
+      if (document.body.__chatUIInstance === instance) {
+        document.body.__chatUIInstance = null;
       }
-    });
-  });
+    },
+    state,
+    formController,
+    scrollToBottom,
+  };
 
-  chat.addEventListener("htmx:afterSwap", (event) => {
+  document.body.__chatUIInstance = instance;
+
+  const updateStreamingState = (forceScroll = false) => {
+    state.currentStreamMsgId = findCurrentMsgId(chat);
+    if (state.currentStreamMsgId) {
+      formController.setStreaming(true);
+    } else {
+      formController.setStreaming(false);
+    }
+    if (forceScroll) {
+      scrollToBottom(true);
+    }
+  };
+
+  const onAfterSwap = (event) => {
     renderAllMarkdown(chat);
     initTagPopovers(chat);
     if (event.target === chat) {
-      currentStreamMsgId = findCurrentMsgId();
-      if (currentStreamMsgId) setStreaming(true);
-      scrollToBottom(true);
+      updateStreamingState(true);
     }
-  });
+  };
+  chat.addEventListener("htmx:afterSwap", onAfterSwap);
 
-  const observer = new MutationObserver((mutations) => {
+  observer = new MutationObserver((mutations) => {
     for (const m of mutations) {
       m.addedNodes.forEach((node) => {
         if (node.nodeType === Node.ELEMENT_NODE) {
@@ -238,201 +141,7 @@ export function initChatUI(root = document) {
 
   renderAllMarkdown(chat);
   initTagPopovers(chat);
-  currentStreamMsgId = findCurrentMsgId();
-  setStreaming(!!currentStreamMsgId);
-}
+  updateStreamingState();
 
-function initScrollHandler(
-  containerSelector = "#content-wrapper",
-  buttonSelector = "#scroll-bottom"
-) {
-  const container = document.querySelector(containerSelector);
-  const scrollBtn = document.querySelector(buttonSelector);
-  const scrollBtnContainer = scrollBtn?.parentElement;
-  const chat = document.querySelector("#chat");
-  if (!container || !chat) return () => {};
-
-  const isUserNearBottom = (threshold) => {
-    const distanceFromBottom =
-      container.scrollHeight - container.clientHeight - container.scrollTop;
-    return distanceFromBottom < threshold;
-  };
-
-  const toggleScrollBtn = () => {
-    if (!scrollBtn) return;
-    if (isUserNearBottom(150)) {
-      scrollBtn.classList.remove("visible");
-      scrollBtnContainer?.classList.remove("visible");
-    } else {
-      scrollBtn.classList.add("visible");
-      scrollBtnContainer?.classList.add("visible");
-    }
-  };
-
-  let autoScrollEnabled = isUserNearBottom();
-  let lastScrollTop = container.scrollTop;
-
-  const scrollToBottom = (force = false) => {
-    if (force) autoScrollEnabled = true;
-    if (autoScrollEnabled || force) {
-      container.scrollTo({
-        top: container.scrollHeight,
-        behavior: "smooth",
-      });
-    }
-    toggleScrollBtn();
-  };
-
-  const updateScrollState = (currentTop) => {
-    if (currentTop < lastScrollTop - 2) {
-      autoScrollEnabled = false;
-    } else if (isUserNearBottom(10)) {
-      autoScrollEnabled = true;
-    }
-    lastScrollTop = currentTop;
-  };
-
-  container.addEventListener("scroll", () => {
-    updateScrollState(container.scrollTop);
-    toggleScrollBtn();
-  });
-
-  function alignScrollButton() {
-    const r = chat.getBoundingClientRect();
-    const centerPx = r.left + r.width / 2;
-    document.documentElement.style.setProperty('--chat-center', centerPx + 'px');
-  }
-
-  // Initial run + keep in sync
-  alignScrollButton();
-  window.addEventListener('resize', alignScrollButton);
-  window.addEventListener('scroll', alignScrollButton, { passive: true });
-  new ResizeObserver(alignScrollButton).observe(chat);
-
-  container.addEventListener(
-    "wheel",
-    (e) => {
-      if (e.deltaY < 0) autoScrollEnabled = false;
-    },
-    { passive: true }
-  );
-
-  container.addEventListener(
-    "touchmove",
-    () => {
-      if (container.scrollTop < lastScrollTop) autoScrollEnabled = false;
-      lastScrollTop = container.scrollTop;
-    },
-    { passive: true }
-  );
-
-  if (scrollBtn) {
-    scrollBtn.addEventListener("click", () => {
-      scrollBtn.classList.add("clicked");
-      scrollToBottom(true);
-      setTimeout(() => scrollBtn.classList.remove("clicked"), 300);
-    });
-  }
-  // Defer initial toggle to ensure layout (and any restored scroll position)
-  // are applied before determining visibility. A double rAF gives the
-  // browser a chance to paint and then update the button state.
-  requestAnimationFrame(() => {
-    toggleScrollBtn();
-    requestAnimationFrame(toggleScrollBtn);
-  });
-  return scrollToBottom;
-}
-
-function initStreamHandler(setStreaming, scrollToBottom) {
-  if (currentSSEListener) {
-    document.body.removeEventListener("htmx:sseMessage", currentSSEListener);
-  }
-
-  const sseRenders = new WeakMap();
-
-  function scheduleRender(container, fn) {
-    const prev = sseRenders.get(container);
-    if (prev) cancelAnimationFrame(prev);
-    const id = requestAnimationFrame(() => {
-      sseRenders.delete(container);
-      fn();
-    });
-    sseRenders.set(container, id);
-  }
-
-  currentSSEListener = (evt) => {
-    const { type } = evt.detail;
-    const wrap = evt.target.closest('.assistant-stream');
-    if (!wrap) return;
-
-    const sink = wrap.querySelector('.raw-response');
-    const contentDiv = wrap.querySelector('.markdown-body');
-    if (!sink || !contentDiv) return;
-
-    const renderNow = () => {
-      let text = (sink.textContent || "").replace(/\[newline\]/g, "\n");
-
-      const typing = wrap.querySelector(TYPING_INDICATOR_SELECTOR);
-      contentDiv.innerHTML = renderMarkdown(text);
-      contentDiv.dataset.rendered = "true";
-
-      if (typing) {
-        positionTypingIndicator(contentDiv, typing);
-      }
-    };
-
-    if (type === "message") {
-      scheduleRender(wrap, () => { renderNow(); scrollToBottom(); });
-    } else if (type === "error" || type === "done") {
-      console.log("SSE done or error?", type);
-      const rid = sseRenders.get(wrap);
-      if (rid) { cancelAnimationFrame(rid); sseRenders.delete(wrap); }
-      renderNow();
-
-      const indicator = wrap.querySelector(TYPING_INDICATOR_SELECTOR);
-      if (indicator && !indicator.classList.contains('stopped')) {
-        indicator.remove();
-      }
-      wrap.removeAttribute("hx-ext");
-      wrap.removeAttribute("sse-connect");
-      wrap.removeAttribute("sse-close");
-      currentStreamMsgId = null;
-      setStreaming(false);
-      if(type !== 'error') {
-        try {
-          const data = JSON.parse(evt.detail.data || '{}');
-          const assistantId = data.assistant_msg_id;
-          if (assistantId) {
-            wrap.dataset.assistantMsgId = assistantId;
-            const placeholder = wrap.querySelector('.meta-chips-placeholder');
-            if (placeholder) {
-              wrap.addEventListener(
-                'htmx:afterSwap',
-                (e) => {
-                  if (e.target.classList?.contains('meta-chips')) {
-                    revealMetaChips(e.target, scrollToBottom);
-                  }
-                },
-                { once: true }
-              );
-              htmx.ajax('GET', `/c/meta-chips/${assistantId}`, {
-                target: placeholder,
-                swap: 'outerHTML',
-              });
-            }
-          }
-        } catch (err) {
-          console.error('failed to load meta chips', err);
-        }
-      } else {
-        const placeholder = wrap.querySelector('.meta-chips-placeholder');
-        if (placeholder) {
-          placeholder.remove();
-        }
-      }
-      scrollToBottom();
-    }
-  };
-
-  document.body.addEventListener("htmx:sseMessage", currentSSEListener);
+  return instance;
 }

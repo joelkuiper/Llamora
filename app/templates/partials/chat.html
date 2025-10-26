@@ -50,8 +50,11 @@
     import { initSearchUI, scrollToHighlight } from "{{ url_for('static', filename='js/ui.js') }}";
     import { initDayNav } from "{{ url_for('static', filename='js/day.js') }}";
 
+    let chatInstance;
+
     const run = () => {
-      initChatUI();
+      chatInstance?.destroy?.();
+      chatInstance = initChatUI();
       initDayNav();
       initSearchUI();
       scrollToHighlight();
