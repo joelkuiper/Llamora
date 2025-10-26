@@ -127,13 +127,24 @@ async def stream_pending_reply(pending_response):
     """Stream chunks for an active LLM response using the SSE contract."""
 
     async for chunk in pending_response.stream():
-        formatted_chunk = replace_newline(escape(chunk))
+        formatted_chunk = replace_newline(escape(chunk)) if chunk else ""
         if pending_response.error:
+            if not formatted_chunk:
+                message = pending_response.text or pending_response.error_message or ""
+                formatted_chunk = replace_newline(escape(message))
             yield f"event: error\ndata: {formatted_chunk}\n\n"
             yield "event: done\ndata: {}\n\n"
             return
 
-        yield f"event: message\ndata: {formatted_chunk}\n\n"
+        if chunk:
+            yield f"event: message\ndata: {formatted_chunk}\n\n"
+
+    if pending_response.error:
+        message = pending_response.text or pending_response.error_message or ""
+        formatted = replace_newline(escape(message))
+        yield f"event: error\ndata: {formatted}\n\n"
+        yield "event: done\ndata: {}\n\n"
+        return
 
     if pending_response.meta is not None:
         # Placeholder for emitting structured metadata (e.g., tags)

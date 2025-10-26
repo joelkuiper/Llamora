@@ -315,9 +315,16 @@ class PendingResponse:
 
     def _build_meta(self, extractor: MetaExtractor) -> dict:
         candidate = extractor.meta_payload
-        if not candidate:
-            candidate = self._recover_meta_payload(extractor)
-        meta = self._parse_meta_json(candidate)
+        candidates: list[str | None] = [candidate]
+        recovered = self._recover_meta_payload(extractor)
+        if recovered and recovered not in candidates:
+            candidates.append(recovered)
+
+        meta: dict[str, Any] | None = None
+        for attempt in candidates:
+            meta = self._parse_meta_json(attempt)
+            if meta is not None:
+                break
         if meta is None:
             meta = {}
         if self.error:
@@ -355,25 +362,48 @@ class PendingResponse:
 
     @staticmethod
     def _parse_meta_json(payload: str | None) -> dict[str, Any] | None:
-        if not payload:
+        candidate = PendingResponse._extract_json_candidate(payload)
+        if not candidate:
             return None
-        trimmed = payload.strip()
-        if not trimmed:
-            return None
-        first_brace = trimmed.find("{")
-        if first_brace > 0:
-            trimmed = trimmed[first_brace:]
-        decoder = json.JSONDecoder()
         try:
-            obj, _ = decoder.raw_decode(trimmed)
+            obj = json.loads(candidate)
         except json.JSONDecodeError:
             try:
-                obj = orjson.loads(trimmed)
+                obj = orjson.loads(candidate)
             except Exception:
                 return None
         if isinstance(obj, dict):
             return obj
         return None
+
+    @staticmethod
+    def _extract_json_candidate(payload: str | None) -> str | None:
+        if not payload:
+            return None
+        text = payload.strip()
+        if not text:
+            return None
+        first_brace = text.find("{")
+        if first_brace == -1:
+            return None
+        snippet = text[first_brace:]
+        candidate = PendingResponse._find_last_json_object(snippet)
+        if candidate:
+            return candidate.strip()
+        decoder = json.JSONDecoder()
+        try:
+            _, end = decoder.raw_decode(snippet)
+        except json.JSONDecodeError:
+            last_brace = snippet.rfind("}")
+            if last_brace == -1:
+                return None
+            narrowed = snippet[: last_brace + 1]
+            candidate = PendingResponse._find_last_json_object(narrowed)
+            if candidate:
+                return candidate.strip()
+            return None
+        else:
+            return snippet[:end].strip()
 
     @staticmethod
     def _find_last_json_object(text: str) -> str | None:
