@@ -1,21 +1,44 @@
-{% if results %}
-<div class="sr-panel search-results-overlay">
-  <button class="overlay-close"
-          type="button"
-          aria-label="Close search results"
-          hx-get="/search"
-          hx-target="#search-results"
-          hx-indicator="#search-spinner"
-          hx-vals='{"q": ""}'
-          hx-swap="innerHTML"
-          hx-trigger="click delay:180ms"
-          hx-on:click="this.closest('#search-results')
-                       ?.querySelector('.sr-panel')
-                       ?.classList.add('pop-exit')">×</button>
-  <ul class="search-results-list" role="listbox">
-    {% for item in results %}
-    {% include 'partials/search_result_item.html' %}
-    {% endfor %}
-  </ul>
+{% set items = results|default([]) %}
+{% set query_present = has_query|default(false) %}
+<div class="search-results-status" aria-live="polite" role="status" aria-atomic="true">
+  {% if items %}
+  <div class="sr-panel search-results-overlay">
+    <button class="overlay-close"
+            type="button"
+            aria-label="Close search results"
+            hx-get="/search"
+            hx-target="#search-results"
+            hx-indicator="#search-spinner"
+            hx-vals='{"q": ""}'
+            hx-swap="innerHTML"
+            hx-trigger="click delay:180ms"
+            hx-on:click="this.closest('#search-results')
+                         ?.querySelector('.sr-panel')
+                         ?.classList.add('pop-exit')">×</button>
+    <ul class="search-results-list" role="listbox">
+      {% for item in items %}
+      {% include 'partials/search_result_item.html' %}
+      {% endfor %}
+    </ul>
+  </div>
+  {% elif query_present %}
+  <div class="sr-panel search-results-overlay is-empty">
+    <button class="overlay-close"
+            type="button"
+            aria-label="Close search results"
+            hx-get="/search"
+            hx-target="#search-results"
+            hx-indicator="#search-spinner"
+            hx-vals='{"q": ""}'
+            hx-swap="innerHTML"
+            hx-trigger="click delay:180ms"
+            hx-on:click="this.closest('#search-results')
+                         ?.querySelector('.sr-panel')
+                         ?.classList.add('pop-exit')">×</button>
+    <div class="search-results-empty" role="group">
+      <p class="search-results-empty-title">No matches found</p>
+      <p class="search-results-empty-description">Try a different search or adjust your filters.</p>
+    </div>
+  </div>
+  {% endif %}
 </div>
-{% endif %}

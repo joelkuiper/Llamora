@@ -33,4 +33,8 @@ async def search():
         dek = get_dek()
         results = await search_api.search(user["id"], dek, query)
     logger.debug("Route returning %d results", len(results))
-    return await render_template("partials/search_results.html", results=results)
+    return await render_template(
+        "partials/search_results.html",
+        results=results,
+        has_query=bool(query),
+    )

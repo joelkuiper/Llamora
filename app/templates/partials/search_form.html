@@ -4,7 +4,11 @@
       hx-swap="innerHTML"
       hx-trigger="keyup changed delay:300ms from:#search-input, submit"
       hx-indicator="#search-spinner"
-      hx-sync="this:replace">
+      hx-sync="this:replace"
+      hx-on:htmx:beforeRequest="document.getElementById('search-results')?.setAttribute('aria-busy', 'true')"
+      hx-on:htmx:afterRequest="document.getElementById('search-results')?.removeAttribute('aria-busy')"
+      hx-on:htmx:sendError="document.getElementById('search-results')?.removeAttribute('aria-busy')"
+      hx-on:htmx:responseError="document.getElementById('search-results')?.removeAttribute('aria-busy')">
   <div class="search-input-wrap">
     <input type="search" id="search-input" name="q" placeholder="Search" autocomplete="off">
     <span id="search-spinner" class="spinner htmx-indicator" aria-hidden="true"></span>
