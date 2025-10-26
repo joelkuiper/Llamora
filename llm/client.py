@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any, AsyncGenerator, NamedTuple, TYPE_CHECKING
+from typing import Any, AsyncGenerator, NamedTuple
 
 import httpx
 import orjson

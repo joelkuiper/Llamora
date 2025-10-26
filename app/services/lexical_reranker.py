@@ -129,14 +129,18 @@ class LexicalReranker:
             if sp["start"] > cursor:
                 segments.append(
                     {
-                        "text": content[snippet_start + cursor : snippet_start + sp["start"]],
+                        "text": content[
+                            snippet_start + cursor : snippet_start + sp["start"]
+                        ],
                         "hit": False,
                         "kind": None,
                     }
                 )
             segments.append(
                 {
-                    "text": content[snippet_start + sp["start"] : snippet_start + sp["end"]],
+                    "text": content[
+                        snippet_start + sp["start"] : snippet_start + sp["end"]
+                    ],
                     "hit": True,
                     "kind": "exact" if sp["kind"] == "E" else "token",
                 }

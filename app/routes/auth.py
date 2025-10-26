@@ -33,7 +33,6 @@ import re
 import config
 import orjson
 from zxcvbn import zxcvbn
-from datetime import datetime
 from app.services.time import local_date
 
 auth_bp = Blueprint("auth", __name__)
@@ -261,9 +260,7 @@ async def login():
                     state = await db.users.get_state(user["id"])
                     active_date = state.get("active_date")
                     if active_date:
-                        redirect_url = url_for(
-                            "days.day", date=active_date
-                        )
+                        redirect_url = url_for("days.day", date=active_date)
                     else:
                         redirect_url = "/"
                 resp = redirect(redirect_url)

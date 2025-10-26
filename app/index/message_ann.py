@@ -148,7 +148,9 @@ class MessageIndexStore:
                 idx.touch()
                 return idx
 
-            rows = await self.db.vectors.get_latest_vectors(user_id, self.warm_limit, dek)
+            rows = await self.db.vectors.get_latest_vectors(
+                user_id, self.warm_limit, dek
+            )
             if rows:
                 logger.debug(
                     "Warming index for user %s with %d vectors", user_id, len(rows)
@@ -177,7 +179,9 @@ class MessageIndexStore:
                     await self._embed_and_store(user_id, missing, dek, idx)
                 return idx
 
-            msgs = await self.db.messages.get_latest_messages(user_id, self.warm_limit, dek)
+            msgs = await self.db.messages.get_latest_messages(
+                user_id, self.warm_limit, dek
+            )
             if msgs:
                 logger.debug(
                     "Embedding and indexing %d messages for user %s", len(msgs), user_id
@@ -210,7 +214,9 @@ class MessageIndexStore:
             added = 0
             new_cursor = cursor
 
-            rows = await self.db.vectors.get_vectors_older_than(user_id, cursor, batch, dek)
+            rows = await self.db.vectors.get_vectors_older_than(
+                user_id, cursor, batch, dek
+            )
             if rows:
                 logger.debug(
                     "Loaded %d stored vectors older than %s for user %s",
@@ -226,7 +232,9 @@ class MessageIndexStore:
                 added += len(ids)
                 new_cursor = rows[-1]["id"]
 
-            msgs = await self.db.messages.get_messages_older_than(user_id, cursor, batch, dek)
+            msgs = await self.db.messages.get_messages_older_than(
+                user_id, cursor, batch, dek
+            )
             missing = [m for m in msgs if not idx.contains(m["id"])]
             if missing:
                 logger.debug(

@@ -14,8 +14,10 @@ from app.services.time import date_and_part
 def replace_newline(value: str) -> str:
     """Normalize newline characters for SSE payloads."""
 
-    return value.replace("\r\n", "[newline]").replace("\r", "[newline]").replace(
-        "\n", "[newline]"
+    return (
+        value.replace("\r\n", "[newline]")
+        .replace("\r", "[newline]")
+        .replace("\n", "[newline]")
     )
 
 

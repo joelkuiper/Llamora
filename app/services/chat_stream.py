@@ -67,7 +67,9 @@ class LLMStreamSession:
 class MetaExtractor:
     """Extracts assistant-visible text and metadata from streamed chunks."""
 
-    def __init__(self, sentinel_start: str = "<meta>", sentinel_end: str = "</meta>") -> None:
+    def __init__(
+        self, sentinel_start: str = "<meta>", sentinel_end: str = "</meta>"
+    ) -> None:
         self._start = sentinel_start
         self._end = sentinel_end
         self._found_start = False
@@ -164,7 +166,9 @@ class AssistantMessageWriter:
         if append is None and hasattr(self._db, "messages"):
             append = getattr(self._db.messages, "append_message", None)
         if append is None:
-            raise AssistantMessagePersistenceError("Database does not support append_message")
+            raise AssistantMessagePersistenceError(
+                "Database does not support append_message"
+            )
         try:
             return await append(
                 uid,
@@ -176,7 +180,9 @@ class AssistantMessageWriter:
                 created_date=date,
             )
         except Exception as exc:  # pragma: no cover - defensive
-            raise AssistantMessagePersistenceError(str(exc) or "Failed to save response") from exc
+            raise AssistantMessagePersistenceError(
+                str(exc) or "Failed to save response"
+            ) from exc
 
 
 class PendingResponse:
@@ -216,7 +222,9 @@ class PendingResponse:
         self.assistant_msg_id: str | None = None
         self._cleanup = on_cleanup
         self._cleanup_called = False
-        self._session = LLMStreamSession(llm, user_msg_id, history, params, context, prompt)
+        self._session = LLMStreamSession(
+            llm, user_msg_id, history, params, context, prompt
+        )
         self._writer = AssistantMessageWriter(db)
         logger.debug("Starting generation for user message %s", user_msg_id)
         self._task = asyncio.create_task(
@@ -426,11 +434,11 @@ class PendingResponse:
             if ch == '"':
                 in_string = True
                 continue
-            if ch == '}':
+            if ch == "}":
                 if depth == 0:
                     end = idx + 1
                 depth += 1
-            elif ch == '{':
+            elif ch == "{":
                 if depth == 0:
                     continue
                 depth -= 1
