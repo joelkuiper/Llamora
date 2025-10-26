@@ -63,36 +63,71 @@ function setupCalendar(btn, pop) {
     if (instance) instance.update();
   };
 
+  const getPanel = () => pop.querySelector('#calendar');
+
+  const playAnimation = (el, cls, remove = []) => {
+    if (!el) return;
+    remove.forEach((name) => el.classList.remove(name));
+    // Force a reflow so re-adding the class retriggers the animation.
+    void el.getBoundingClientRect();
+    el.classList.add(cls);
+    let done = false;
+    const cleanup = () => {
+      if (done) return;
+      done = true;
+      el.classList.remove(cls);
+    };
+    el.addEventListener('animationend', cleanup, { once: true });
+    setTimeout(cleanup, 220);
+  };
+
   const animateOpen = () => {
-    const panel = pop.querySelector('#calendar');
+    const panel = getPanel();
     if (!panel) return;
-    panel.classList.add('pop-enter');
-    panel.addEventListener(
-      'animationend',
-      () => {
-        panel.classList.remove('pop-enter');
-      },
-      { once: true },
-    );
+    playAnimation(pop, 'fade-enter', ['fade-enter', 'fade-exit']);
+    playAnimation(panel, 'pop-enter', ['pop-enter', 'pop-exit']);
   };
 
   const hide = () => {
     if (pop.hidden) return;
     btn.classList.remove('active');
-    const panel = pop.querySelector('#calendar');
-    if (panel) {
-      panel.classList.add('pop-exit');
-      panel.addEventListener(
-        'animationend',
-        () => {
-          panel.classList.remove('pop-exit');
-          pop.hidden = true;
-          pop.innerHTML = '';
-        },
-        { once: true },
-      );
-    } else {
+    const panel = getPanel();
+    const finish = () => {
+      if (panel) {
+        panel.classList.remove('pop-enter', 'pop-exit');
+      }
+      pop.classList.remove('fade-enter', 'fade-exit');
       pop.hidden = true;
+      pop.innerHTML = '';
+    };
+    let pending = 0;
+    const awaitAnimation = (el, className, removeClasses = []) => {
+      if (!el) return;
+      pending += 1;
+      removeClasses.forEach((cls) => el.classList.remove(cls));
+      void el.getBoundingClientRect();
+      el.classList.add(className);
+
+      let done = false;
+      const complete = () => {
+        if (done) return;
+        done = true;
+        el.classList.remove(className);
+        pending -= 1;
+        if (pending === 0) {
+          finish();
+        }
+      };
+
+      el.addEventListener('animationend', complete, { once: true });
+      setTimeout(complete, 220);
+    };
+
+    awaitAnimation(pop, 'fade-exit', ['fade-enter', 'fade-exit']);
+    awaitAnimation(panel, 'pop-exit', ['pop-enter', 'pop-exit']);
+
+    if (pending === 0) {
+      finish();
     }
     document.removeEventListener('click', outside, true);
     document.removeEventListener('keydown', onKey);
@@ -130,6 +165,9 @@ function setupCalendar(btn, pop) {
           placement: 'bottom',
         });
       update();
+      if (getPanel()) {
+        animateOpen();
+      }
       htmx.trigger(pop, 'calendar-popover:show');
       document.addEventListener('click', outside, true);
       document.addEventListener('keydown', onKey);
