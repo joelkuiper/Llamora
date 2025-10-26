@@ -1,5 +1,5 @@
 import calendar
-from quart import Blueprint, redirect, request, url_for, render_template, make_response
+from quart import Blueprint, redirect, url_for, render_template, make_response
 from app import db
 from app.services.auth_helpers import (
     login_required,
@@ -55,30 +55,17 @@ async def day(date):
 async def calendar_view():
     user = await get_current_user()
     today = local_date()
-    requested_year = request.args.get("year", type=int)
-    requested_month = request.args.get("month", type=int)
-    if (
-        requested_year is not None
-        and requested_month is not None
-        and requested_year >= 1
-        and 1 <= requested_month <= 12
-    ):
-        target_year = requested_year
-        target_month = requested_month
-    else:
-        target_year = today.year
-        target_month = today.month
     state = await db.users.get_state(user["id"])
-    weeks = calendar.Calendar().monthdayscalendar(target_year, target_month)
+    weeks = calendar.Calendar().monthdayscalendar(today.year, today.month)
     active_days = await db.messages.get_days_with_messages(
-        user["id"], target_year, target_month
+        user["id"], today.year, today.month
     )
-    prev_year, prev_month, next_year, next_month = _nav_months(target_year, target_month)
+    prev_year, prev_month, next_year, next_month = _nav_months(today.year, today.month)
     html = await render_template(
         "partials/calendar_popover.html",
-        year=target_year,
-        month=target_month,
-        month_name=calendar.month_name[target_month],
+        year=today.year,
+        month=today.month,
+        month_name=calendar.month_name[today.month],
         weeks=weeks,
         active_day=state.get("active_date", today.isoformat()),
         today=today.isoformat(),
