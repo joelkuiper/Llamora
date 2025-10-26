@@ -44,6 +44,15 @@ const writeStoredCalendar = (value) => {
   }
 };
 
+const clearStoredCalendar = () => {
+  if (!calendarStorage) return;
+  try {
+    calendarStorage.removeItem(calendarStorageKey);
+  } catch (err) {
+    /* no-op */
+  }
+};
+
 function setupCalendar(btn, pop) {
   const controller = new AbortController();
   const { signal } = controller;
@@ -134,7 +143,35 @@ function setupCalendar(btn, pop) {
       if (e.target.closest('.overlay-close')) {
         e.preventDefault();
         hide();
+        return;
       }
+
+      const todayBtn = e.target.closest('.today-btn');
+      if (todayBtn) {
+        const dateValue = todayBtn.getAttribute('data-date');
+        if (typeof dateValue === 'string') {
+          const [yearStr, monthStr] = dateValue.split('-');
+          const yearNum = Number(yearStr);
+          const monthNum = Number(monthStr);
+          if (
+            Number.isInteger(yearNum) &&
+            Number.isInteger(monthNum) &&
+            monthNum >= 1 &&
+            monthNum <= 12
+          ) {
+            const payload = { year: yearNum, month: monthNum };
+            writeStoredCalendar(payload);
+            pop.setAttribute('hx-vals', JSON.stringify(payload));
+          } else {
+            clearStoredCalendar();
+            pop.removeAttribute('hx-vals');
+          }
+        } else {
+          clearStoredCalendar();
+          pop.removeAttribute('hx-vals');
+        }
+      }
+
       if (e.target.closest('.calendar-table a, .today-btn')) {
         hide();
       }
