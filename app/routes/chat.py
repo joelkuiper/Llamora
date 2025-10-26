@@ -152,7 +152,7 @@ async def sse_opening(date: str):
             is_new=is_new,
             has_no_activity=has_no_activity,
         )
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to build opening prompt")
 
         async def error_stream():
@@ -174,9 +174,7 @@ async def sse_opening(date: str):
         meta_extra={"auto_opening": True},
     )
 
-    return Response(
-        stream_pending_reply(pending), mimetype="text/event-stream"
-    )
+    return Response(stream_pending_reply(pending), mimetype="text/event-stream")
 
 
 @chat_bp.route("/c/<date>/message", methods=["POST"])
@@ -246,7 +244,9 @@ async def sse_reply(user_msg_id: str, date: str):
         current_app.config.get("ALLOWED_LLM_CONFIG_KEYS", set()),
     )
 
-    ctx = build_conversation_context(request.args.get("user_time"), request.cookies.get("tz"))
+    ctx = build_conversation_context(
+        request.args.get("user_time"), request.cookies.get("tz")
+    )
 
     pending_response = chat_stream_manager.get(user_msg_id)
     if not pending_response:
@@ -260,4 +260,6 @@ async def sse_reply(user_msg_id: str, date: str):
             ctx,
         )
 
-    return Response(stream_pending_reply(pending_response), mimetype="text/event-stream")
+    return Response(
+        stream_pending_reply(pending_response), mimetype="text/event-stream"
+    )

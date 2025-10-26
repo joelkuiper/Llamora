@@ -52,7 +52,9 @@ class UsersRepository(BaseRepository):
 
     async def get_user_by_username(self, username: str) -> dict | None:
         async with self.pool.connection() as conn:
-            cursor = await conn.execute("SELECT * FROM users WHERE username = ?", (username,))
+            cursor = await conn.execute(
+                "SELECT * FROM users WHERE username = ?", (username,)
+            )
             row = await cursor.fetchone()
         return dict(row) if row else None
 
@@ -70,7 +72,9 @@ class UsersRepository(BaseRepository):
 
     async def get_state(self, user_id: str) -> dict:
         async with self.pool.connection() as conn:
-            cursor = await conn.execute("SELECT state FROM users WHERE id = ?", (user_id,))
+            cursor = await conn.execute(
+                "SELECT state FROM users WHERE id = ?", (user_id,)
+            )
             row = await cursor.fetchone()
         if row and row["state"]:
             try:
@@ -96,7 +100,12 @@ class UsersRepository(BaseRepository):
             )
 
     async def update_password_wrap(
-        self, user_id: str, password_hash: str, pw_salt: bytes, pw_nonce: bytes, pw_cipher: bytes
+        self,
+        user_id: str,
+        password_hash: str,
+        pw_salt: bytes,
+        pw_nonce: bytes,
+        pw_cipher: bytes,
     ) -> None:
         async with self.pool.connection() as conn:
             await self._run_in_transaction(

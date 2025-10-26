@@ -87,7 +87,9 @@ class MessagesRepository(BaseRepository):
                 )
 
         if self._on_message_appended:
-            asyncio.create_task(self._on_message_appended(user_id, msg_id, message, dek))
+            asyncio.create_task(
+                self._on_message_appended(user_id, msg_id, message, dek)
+            )
 
         return msg_id
 
@@ -108,7 +110,6 @@ class MessagesRepository(BaseRepository):
             )
             row = await cursor.fetchone()
         return row["created_date"] if row else None
-
 
     async def get_message_with_reply(
         self, user_id: str, message_id: str
@@ -139,7 +140,9 @@ class MessagesRepository(BaseRepository):
             "reply_id": row["reply_id"],
         }
 
-    async def get_latest_messages(self, user_id: str, limit: int, dek: bytes) -> list[dict]:
+    async def get_latest_messages(
+        self, user_id: str, limit: int, dek: bytes
+    ) -> list[dict]:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
@@ -188,7 +191,9 @@ class MessagesRepository(BaseRepository):
             row = await cursor.fetchone()
         return row["id"] if row else None
 
-    async def get_messages_by_ids(self, user_id: str, ids: list[str], dek: bytes) -> list[dict]:
+    async def get_messages_by_ids(
+        self, user_id: str, ids: list[str], dek: bytes
+    ) -> list[dict]:
         if not ids:
             return []
         placeholders = ",".join("?" for _ in ids)
@@ -205,7 +210,9 @@ class MessagesRepository(BaseRepository):
 
         return self._rows_to_messages(rows, user_id, dek)
 
-    async def get_history(self, user_id: str, created_date: str, dek: bytes) -> list[dict]:
+    async def get_history(
+        self, user_id: str, created_date: str, dek: bytes
+    ) -> list[dict]:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
@@ -257,7 +264,9 @@ class MessagesRepository(BaseRepository):
                     dek,
                     self._decrypt_message,
                 )
-                current["tags"].append({"name": tag_name, "hash": row["tag_hash"].hex()})
+                current["tags"].append(
+                    {"name": tag_name, "hash": row["tag_hash"].hex()}
+                )
         return history
 
     async def get_days_with_messages(

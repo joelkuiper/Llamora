@@ -9,12 +9,16 @@ from .base import BaseRepository
 class VectorsRepository(BaseRepository):
     """Persistence helpers for encrypted vector embeddings."""
 
-    def __init__(self, pool: SQLiteConnectionPool, encrypt_vector, decrypt_vector) -> None:
+    def __init__(
+        self, pool: SQLiteConnectionPool, encrypt_vector, decrypt_vector
+    ) -> None:
         super().__init__(pool)
         self._encrypt_vector = encrypt_vector
         self._decrypt_vector = decrypt_vector
 
-    async def store_vector(self, msg_id: str, user_id: str, vec: np.ndarray, dek: bytes) -> None:
+    async def store_vector(
+        self, msg_id: str, user_id: str, vec: np.ndarray, dek: bytes
+    ) -> None:
         vec_arr = np.asarray(vec, dtype=np.float32)
         dim = vec_arr.shape[0]
         nonce, ct, alg = self._encrypt_vector(dek, user_id, msg_id, vec_arr.tobytes())
@@ -61,7 +65,9 @@ class VectorsRepository(BaseRepository):
                 records,
             )
 
-    async def get_latest_vectors(self, user_id: str, limit: int, dek: bytes) -> list[dict]:
+    async def get_latest_vectors(
+        self, user_id: str, limit: int, dek: bytes
+    ) -> list[dict]:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """

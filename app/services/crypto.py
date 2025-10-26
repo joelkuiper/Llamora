@@ -54,9 +54,7 @@ def unwrap_key(ct: bytes, salt: bytes, nonce: bytes, secret: str) -> bytes:
     return crypto_aead_xchacha20poly1305_ietf_decrypt(ct, None, nonce, k)
 
 
-def encrypt_message(
-    dek: bytes, user_id: str, msg_id: str, plaintext: str
-):
+def encrypt_message(dek: bytes, user_id: str, msg_id: str, plaintext: str):
     nonce = utils.random(24)
     aad = f"{user_id}|{msg_id}|{ALG.decode()}".encode("utf-8")
     ct = crypto_aead_xchacha20poly1305_ietf_encrypt(
@@ -78,9 +76,7 @@ def decrypt_message(
     return pt.decode("utf-8")
 
 
-def encrypt_vector(
-    dek: bytes, user_id: str, msg_id: str, vec: bytes
-):
+def encrypt_vector(dek: bytes, user_id: str, msg_id: str, vec: bytes):
     """Encrypt a vector embedding for storage.
 
     The vector is provided as raw bytes and is encrypted using the same AEAD

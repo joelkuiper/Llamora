@@ -22,7 +22,9 @@ class TagsRepository(BaseRepository):
         self._encrypt_message = encrypt_message
         self._decrypt_message = decrypt_message
 
-    async def resolve_or_create_tag(self, user_id: str, tag_name: str, dek: bytes) -> bytes:
+    async def resolve_or_create_tag(
+        self, user_id: str, tag_name: str, dek: bytes
+    ) -> bytes:
         tag_name = tag_name.strip()[:64]
         if not tag_name:
             raise ValueError("Empty tag")
@@ -45,7 +47,9 @@ class TagsRepository(BaseRepository):
                 )
         return tag_hash
 
-    async def xref_tag_message(self, user_id: str, tag_hash: bytes, message_id: str) -> None:
+    async def xref_tag_message(
+        self, user_id: str, tag_hash: bytes, message_id: str
+    ) -> None:
         async with self.pool.connection() as conn:
 
             async def _tx():
@@ -61,7 +65,9 @@ class TagsRepository(BaseRepository):
 
             await self._run_in_transaction(conn, _tx)
 
-    async def unlink_tag_message(self, user_id: str, tag_hash: bytes, message_id: str) -> None:
+    async def unlink_tag_message(
+        self, user_id: str, tag_hash: bytes, message_id: str
+    ) -> None:
         async with self.pool.connection() as conn:
 
             async def _tx():
