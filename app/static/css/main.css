@@ -508,6 +508,14 @@ input[type="checkbox"]:focus {
     transform: scale(1.1);
   }
 
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    background: var(--accent-20);
+    color: var(--accent-active);
+    opacity: 1;
+  }
+
   svg { width: 1.25rem; height: 1.25rem; }
 }
 
@@ -535,6 +543,13 @@ input[type="checkbox"]:focus {
 }
 
 .overlay-close:hover { background: var(--overlay-close-hover-bg); }
+
+.overlay-close:focus-visible {
+  outline: 2px solid var(--accent-active);
+  outline-offset: 2px;
+  background: var(--accent-25);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-active), transparent 70%);
+}
 
 .overlay-close::before {
   content: "";

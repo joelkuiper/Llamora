@@ -286,6 +286,14 @@ body {
     }
   }
 
+  &:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
+    background: var(--accent-20);
+    color: var(--accent-active);
+    opacity: 1;
+  }
+
   &:active {
     box-shadow: var(--inset-shadow);
     transform: none scale(0.95);
