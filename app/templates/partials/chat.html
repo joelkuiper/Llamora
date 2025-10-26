@@ -51,12 +51,14 @@
     import { initDayNav } from "{{ url_for('static', filename='js/day.js') }}";
 
     let chatInstance;
+    let searchController;
 
     const run = () => {
       chatInstance?.destroy?.();
+      searchController?.destroy?.();
       chatInstance = initChatUI();
       initDayNav();
-      initSearchUI();
+      searchController = initSearchUI();
       scrollToHighlight();
       document.title = "{{ day }}";
     };

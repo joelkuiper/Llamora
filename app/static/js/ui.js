@@ -63,49 +63,189 @@ function flashHighlight(el) {
   );
 }
 
-export function initSearchUI() {
-  const spinner = document.getElementById("search-spinner");
-  if (spinner) {
-    let id = null;
+class SearchUIController {
+  constructor() {
+    this.abortController = null;
+    this.observer = null;
+    this.spinnerIntervalId = null;
+    this.wrap = null;
+    this.input = null;
+
+    this.handleAfterSwap = this.handleAfterSwap.bind(this);
+    this.handleInput = this.handleInput.bind(this);
+    this.handleKeydown = this.handleKeydown.bind(this);
+    this.handleDocumentClick = this.handleDocumentClick.bind(this);
+  }
+
+  init() {
+    this.wrap = document.getElementById("search-results");
+    this.input = document.getElementById("search-input");
+    this.setupSpinnerObserver();
+
+    if (this.abortController) {
+      return this;
+    }
+
+    this.abortController = new AbortController();
+    const { signal } = this.abortController;
+
+    if (this.input) {
+      this.input.addEventListener("input", this.handleInput, { signal });
+    }
+
+    document.body.addEventListener("htmx:afterSwap", this.handleAfterSwap, {
+      signal,
+    });
+    document.addEventListener("keydown", this.handleKeydown, { signal });
+    document.addEventListener("click", this.handleDocumentClick, { signal });
+
+    return this;
+  }
+
+  destroy() {
+    this.closeResults(false, { immediate: true });
+
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
+    if (this.observer) {
+      this.observer.disconnect();
+      this.observer = null;
+    }
+    if (this.spinnerIntervalId) {
+      clearInterval(this.spinnerIntervalId);
+      this.spinnerIntervalId = null;
+    }
+
+    this.wrap = null;
+    this.input = null;
+  }
+
+  setupSpinnerObserver() {
+    if (this.observer) {
+      this.observer.disconnect();
+      this.observer = null;
+    }
+    if (this.spinnerIntervalId) {
+      clearInterval(this.spinnerIntervalId);
+      this.spinnerIntervalId = null;
+    }
+
+    const spinner = document.getElementById("search-spinner");
+    if (!spinner) return;
+
     const update = () => {
       if (spinner.classList.contains("htmx-request")) {
-        if (!id) id = spin(spinner);
-      } else if (id) {
-        clearInterval(id);
-        id = null;
+        if (!this.spinnerIntervalId) {
+          this.spinnerIntervalId = spin(spinner);
+        }
+      } else if (this.spinnerIntervalId) {
+        clearInterval(this.spinnerIntervalId);
+        this.spinnerIntervalId = null;
         spinner.textContent = "";
       }
     };
-    const observer = new MutationObserver(update);
-    observer.observe(spinner, { attributes: true, attributeFilter: ["class"] });
+
+    update();
+    this.observer = new MutationObserver(update);
+    this.observer.observe(spinner, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
   }
 
+  handleAfterSwap(evt) {
+    const wrap = this.wrap;
+    if (!wrap || evt.detail?.target !== wrap) return;
 
-  const input = document.getElementById("search-input");
-  const wrap  = document.getElementById("search-results");
-
-  document.body.addEventListener("htmx:afterSwap", (evt) => {
-    if (evt.detail?.target !== wrap) return;
     const panel = wrap.querySelector(".sr-panel");
-    if (!panel) { wrap.classList.remove("is-open"); return; }
-
-    if (wrap.classList.contains("is-open")) {
-      // Already open: show immediately, no entry animation
-      panel.classList.remove("htmx-added"); // avoid hidden state while typing
+    if (!panel) {
+      wrap.classList.remove("is-open");
       return;
     }
 
-    // First open: run the pop-in under a stable class
-    panel.classList.add("pop-enter");
-    panel.addEventListener("animationend", () => {
-      panel.classList.remove("pop-enter");
-      wrap.classList.add("is-open");
-    }, { once: true });
-  });
+    if (wrap.classList.contains("is-open")) {
+      panel.classList.remove("htmx-added");
+      return;
+    }
 
-  const closeResults = (clearInput = false, options = {}) => {
+    panel.classList.add("pop-enter");
+    panel.addEventListener(
+      "animationend",
+      () => {
+        panel.classList.remove("pop-enter");
+        wrap.classList.add("is-open");
+      },
+      { once: true }
+    );
+  }
+
+  handleInput() {
+    if (!this.input || this.input.value.trim()) return;
+    this.closeResults();
+  }
+
+  handleKeydown(evt) {
+    if (evt.key === "Escape") {
+      this.closeResults(true);
+    }
+  }
+
+  handleDocumentClick(evt) {
+    const wrap = this.wrap;
+    if (!wrap) return;
+
+    const target = evt.target instanceof Element ? evt.target : evt.target?.parentElement;
+    if (!target) return;
+
+    if (target.closest("#search-results .overlay-close")) {
+      this.closeResults(true);
+      return;
+    }
+
+    const link = target.closest("#search-results a[data-target]");
+    if (link) {
+      this.navigateToResult(link, evt);
+      return;
+    }
+
+    const panel = wrap.querySelector(".sr-panel");
+    if (
+      panel &&
+      !panel.contains(target) &&
+      target !== this.input &&
+      !target.closest(".meta-chip")
+    ) {
+      this.closeResults(true);
+    }
+  }
+
+  navigateToResult(link, evt) {
+    const currentId = document.getElementById("chat")?.dataset.date;
+    const targetId = link.dataset.target;
+
+    if (link.dataset.date === currentId) {
+      evt.preventDefault();
+      this.closeResults(true);
+      const el = document.getElementById(targetId);
+      if (el) {
+        history.pushState(null, "", `${window.location.pathname}?target=${targetId}`);
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        flashHighlight(el);
+      }
+    } else {
+      this.closeResults(true, { immediate: true });
+    }
+  }
+
+  closeResults(clearInput = false, options = {}) {
+    const wrap = this.wrap;
+    if (!wrap) return;
+
     const { immediate = false } = options;
-    if (clearInput && input) input.value = "";
+    if (clearInput && this.input) this.input.value = "";
+
     const panel = wrap.querySelector(".sr-panel");
     const finish = () => {
       wrap.classList.remove("is-open");
@@ -127,51 +267,17 @@ export function initSearchUI() {
 
     panel.classList.add("pop-exit");
     panel.addEventListener("animationend", finish, { once: true });
-  };
-
-  // Triggers
-  if (input) {
-    input.addEventListener("input", () => {
-      if (!input.value.trim()) closeResults();
-    });
   }
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeResults(true);
-  });
-  document.addEventListener("click", (e) => {
-    const panel = wrap.querySelector(".sr-panel");
-    if (
-      panel &&
-      !panel.contains(e.target) &&
-      e.target !== input &&
-      !e.target.closest(".meta-chip")
-    ) {
-      closeResults(true);
-    }
-  });
-  document.addEventListener("click", (evt) => {
-    if (evt.target.closest("#search-results .overlay-close")) closeResults(true);
-  });
+}
 
-  document.addEventListener("click", (evt) => {
-    const link = evt.target.closest("#search-results a[data-target]");
-    if (!link) return;
-    const currentId = document.getElementById("chat")?.dataset.date;
-    const targetId  = link.dataset.target;
+let searchControllerInstance = null;
 
-    if (link.dataset.date === currentId) {
-      evt.preventDefault();
-      closeResults(true);
-      const el = document.getElementById(targetId);
-      if (el) {
-        history.pushState(null, "", `${window.location.pathname}?target=${targetId}`);
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        flashHighlight(el);
-      }
-    } else {
-      closeResults(true, { immediate: true });
-    }
-  });
+export function initSearchUI() {
+  if (!searchControllerInstance) {
+    searchControllerInstance = new SearchUIController();
+  }
+
+  return searchControllerInstance.init();
 }
 
 export function scrollToHighlight() {
