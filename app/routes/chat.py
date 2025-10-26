@@ -10,10 +10,8 @@ from quart import (
 )
 from html import escape
 import logging
-import orjson
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-from ulid import ULID
 
 from llm.client import LLMClient
 from llm.process_manager import LlamafileProcessManager
@@ -163,7 +161,7 @@ async def sse_opening(date: str):
             yield "event: done\ndata: {}\n\n"
 
         return Response(error_stream(), mimetype="text/event-stream")
-    stream_id = str(ULID())
+    stream_id = f"opening:{uid}:{today_iso}"
     pending = chat_stream_manager.start_stream(
         stream_id,
         uid,
@@ -176,16 +174,9 @@ async def sse_opening(date: str):
         meta_extra={"auto_opening": True},
     )
 
-    async def event_stream():
-        async for chunk in pending.stream():
-            if pending.error:
-                yield f"event: error\ndata: {replace_newline(escape(chunk))}\n\n"
-                yield "event: done\ndata: {}\n\n"
-                return
-            else:
-                yield f"event: message\ndata: {replace_newline(escape(chunk))}\n\n"
-        data = orjson.dumps({"assistant_msg_id": pending.assistant_msg_id}).decode()
-        yield f"event: done\ndata: {data}\n\n"
+    return Response(
+        stream_pending_reply(pending), mimetype="text/event-stream"
+    )
 
 
 @chat_bp.route("/c/<date>/message", methods=["POST"])
