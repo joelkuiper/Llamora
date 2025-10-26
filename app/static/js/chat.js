@@ -1,18 +1,13 @@
 import { renderMarkdown, renderAllMarkdown } from "./markdown.js";
 import { positionTypingIndicator } from "./typing-indicator.js";
 import { initTagPopovers } from "./meta-chips.js";
+import { setTimezoneCookie } from "./timezone.js";
 
 let currentSSEListener = null;
 let currentStreamMsgId = null;
 
 
 const TYPING_INDICATOR_SELECTOR = "#typing-indicator";
-
-function setTimezoneCookie() {
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  document.cookie = `tz=${tz}; path=/`;
-  return tz;
-}
 
 function revealMetaChips(container, scrollToBottom){
   if (!container || !container.hidden) return;
