@@ -1,4 +1,3 @@
-import calendar
 from quart import Blueprint, redirect, request, url_for, render_template, make_response
 from app.services.container import get_services
 from app.services.auth_helpers import (
@@ -7,20 +6,13 @@ from app.services.auth_helpers import (
 )
 from app.services.chat_context import get_chat_context
 from app.services.time import local_date
+from app.services.calendar import get_month_context
 
 days_bp = Blueprint("days", __name__)
 
 
 def _db():
     return get_services().db
-
-
-def _nav_months(year: int, month: int) -> tuple[int, int, int, int]:
-    prev_month = month - 1 or 12
-    prev_year = year - 1 if month == 1 else year
-    next_month = month + 1 if month < 12 else 1
-    next_year = year + 1 if month == 12 else year
-    return prev_year, prev_month, next_year, next_month
 
 
 @days_bp.route("/")
@@ -74,25 +66,12 @@ async def calendar_view():
     else:
         target_year = today.year
         target_month = today.month
-    state = await _db().users.get_state(user["id"])
-    weeks = calendar.Calendar().monthdayscalendar(target_year, target_month)
-    active_days = await _db().messages.get_days_with_messages(
-        user["id"], target_year, target_month
+    context = await get_month_context(
+        user["id"], target_year, target_month, today=today
     )
-    prev_year, prev_month, next_year, next_month = _nav_months(target_year, target_month)
     html = await render_template(
         "partials/calendar_popover.html",
-        year=target_year,
-        month=target_month,
-        month_name=calendar.month_name[target_month],
-        weeks=weeks,
-        active_day=state.get("active_date", today.isoformat()),
-        today=today.isoformat(),
-        active_days=active_days,
-        prev_year=prev_year,
-        prev_month=prev_month,
-        next_year=next_year,
-        next_month=next_month,
+        **context,
     )
     return await make_response(html)
 
@@ -101,22 +80,9 @@ async def calendar_view():
 @login_required
 async def calendar_month(year: int, month: int):
     user = await get_current_user()
-    state = await _db().users.get_state(user["id"])
-    weeks = calendar.Calendar().monthdayscalendar(year, month)
-    active_days = await _db().messages.get_days_with_messages(user["id"], year, month)
-    prev_year, prev_month, next_year, next_month = _nav_months(year, month)
+    context = await get_month_context(user["id"], year, month)
     html = await render_template(
         "partials/calendar.html",
-        year=year,
-        month=month,
-        month_name=calendar.month_name[month],
-        weeks=weeks,
-        active_day=state.get("active_date", local_date().isoformat()),
-        today=local_date().isoformat(),
-        active_days=active_days,
-        prev_year=prev_year,
-        prev_month=prev_month,
-        next_year=next_year,
-        next_month=next_month,
+        **context,
     )
     return await make_response(html)
