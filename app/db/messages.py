@@ -70,20 +70,33 @@ class MessagesRepository(BaseRepository):
         nonce, ct, alg = self._encrypt_message(dek, user_id, msg_id, plaintext)
 
         async with self.pool.connection() as conn:
+            columns = [
+                "id",
+                "user_id",
+                "role",
+                "reply_to",
+                "nonce",
+                "ciphertext",
+                "alg",
+            ]
+            params: list = [msg_id, user_id, role, reply_to, nonce, ct, alg]
+
             if created_date:
-                await self._run_in_transaction(
-                    conn,
-                    conn.execute,
-                    "INSERT INTO messages (id, user_id, role, reply_to, nonce, ciphertext, alg, created_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    (msg_id, user_id, role, reply_to, nonce, ct, alg, created_date),
-                )
-            else:
-                await self._run_in_transaction(
-                    conn,
-                    conn.execute,
-                    "INSERT INTO messages (id, user_id, role, reply_to, nonce, ciphertext, alg) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (msg_id, user_id, role, reply_to, nonce, ct, alg),
-                )
+                columns.append("created_date")
+                params.append(created_date)
+
+            placeholders = ", ".join(["?"] * len(columns))
+            sql = (
+                f"INSERT INTO messages ({', '.join(columns)}) "
+                f"VALUES ({placeholders})"
+            )
+
+            await self._run_in_transaction(
+                conn,
+                conn.execute,
+                sql,
+                tuple(params),
+            )
 
         if self._on_message_appended:
             await self._on_message_appended(user_id, msg_id, plaintext, dek)
