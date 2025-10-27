@@ -2,7 +2,6 @@ import { ChatFormController } from "../chat/form-controller.js";
 import { ScrollController } from "../chat/scroll-controller.js";
 import { StreamController } from "../chat/stream-controller.js";
 import { renderAllMarkdown } from "../markdown.js";
-import { initTagPopovers } from "../meta-chips.js";
 import { initDayNav } from "../day.js";
 import { scrollToHighlight } from "../ui.js";
 import { setTimezoneCookie } from "../timezone.js";
@@ -127,10 +126,6 @@ export class ChatView extends HTMLElement {
 
     const container = document.getElementById("content-wrapper");
 
-    chat.querySelectorAll(".meta-chips").forEach((chips) => {
-      delete chips.dataset.popInit;
-    });
-
     this.#state = { currentStreamMsgId: null };
     this.#chat = chat;
 
@@ -165,7 +160,6 @@ export class ChatView extends HTMLElement {
     activateAnimations(chat);
 
     renderAllMarkdown(chat);
-    initTagPopovers(chat);
     this.#updateStreamingState();
 
     initDayNav();
@@ -211,7 +205,6 @@ export class ChatView extends HTMLElement {
     }
 
     renderAllMarkdown(this.#chat);
-    initTagPopovers(this.#chat);
 
     if (event.target === this.#chat) {
       this.#updateStreamingState(true);

@@ -18,7 +18,7 @@
 {%- endmacro %}
 
 {% macro render_meta_chips(msg_id, tags=[], hidden=False) -%}
-  <div class="meta-chips" data-msg-id="{{ msg_id }}" {% if hidden %}hidden{% endif %}>
+  <meta-chips class="meta-chips" data-msg-id="{{ msg_id }}" {% if hidden %}hidden{% endif %}>
     <button
       data-tooltip-title="Add tags"
       type="button"
@@ -53,5 +53,5 @@
         </div>
       </div>
     </div>
-  </div>
+  </meta-chips>
 {%- endmacro %}
