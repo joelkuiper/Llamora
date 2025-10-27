@@ -1,18 +1,14 @@
 import asyncio
 import logging
-import sys
 from collections.abc import AsyncIterator
 from contextlib import suppress
-from pathlib import Path
 from typing import Callable
 
 from llm.client import LLMClient
 
 from app.services.chat_meta import ChatMetaParser
 
-sys.modules[__name__].__path__ = [str(Path(__file__).with_name("chat_stream"))]
-
-from app.services.chat_stream.pipeline import (
+from .pipeline import (
     AssistantMessageWriter,
     LLMStreamError,
     PipelineResult,
@@ -289,12 +285,4 @@ class ChatStreamManager:
         self._pending.clear()
 
 
-__all__ = [
-    "LLMStreamSession",
-    "PendingResponse",
-    "ChatStreamManager",
-    "ResponsePipeline",
-    "PipelineResult",
-    "AssistantMessageWriter",
-    "LLMStreamError",
-]
+__all__ = ["ChatStreamManager", "LLMStreamSession", "PendingResponse"]
