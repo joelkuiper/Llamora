@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator, Callable
+from contextlib import suppress
 from html import escape
 from typing import Any
 
@@ -566,6 +567,21 @@ class ChatStreamManager:
 
     def _remove_pending(self, user_msg_id: str) -> None:
         self._pending.pop(user_msg_id, None)
+
+    async def shutdown(self) -> None:
+        """Cancel all in-flight responses and stop background cleanup."""
+
+        for pending in list(self._pending.values()):
+            with suppress(Exception):
+                await pending.cancel()
+        self._pending.clear()
+
+        task = self._cleanup_task
+        self._cleanup_task = None
+        if task is not None:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
 
 
 __all__ = [

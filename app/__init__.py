@@ -27,7 +27,7 @@ def create_app():
 
     from .routes.auth import auth_bp
     from .routes.days import days_bp
-    from .routes.chat import chat_bp, llm, chat_stream_manager
+    from .routes.chat import chat_bp
     from .routes.search import search_bp
     from .routes.tags import tags_bp
 
@@ -36,8 +36,6 @@ def create_app():
     app.register_blueprint(chat_bp)
     app.register_blueprint(search_bp)
     app.register_blueprint(tags_bp)
-
-    chat_stream_manager.set_db(services.db)
 
     from datetime import datetime
     import hashlib
@@ -73,9 +71,15 @@ def create_app():
     app.before_serving(services.db.init)
     app.after_serving(services.db.close)
 
+    llm_service = services.llm_service
+
+    @app.before_serving
+    async def _start_llm_service() -> None:
+        await llm_service.start()
+
     @app.after_serving
-    async def _shutdown_llm():
-        await asyncio.to_thread(llm.shutdown)
+    async def _stop_llm_service() -> None:
+        await llm_service.stop()
 
     @app.before_serving
     async def _print_registration_link():

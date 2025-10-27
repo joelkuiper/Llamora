@@ -13,8 +13,6 @@ import logging
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from llm.client import LLMClient
-from llm.process_manager import LlamafileProcessManager
 from llm.prompt_template import build_opening_prompt
 
 from app.services.container import get_services
@@ -24,7 +22,6 @@ from app.services.auth_helpers import (
     get_dek,
 )
 from app.services.chat_context import get_chat_context
-from app.services.chat_stream import ChatStreamManager
 from app.services.chat_helpers import (
     build_conversation_context,
     locate_message_and_reply,
@@ -48,10 +45,8 @@ def _db():
     return get_services().db
 
 
-process_manager = LlamafileProcessManager()
-llm = LLMClient(process_manager)
-
-chat_stream_manager = ChatStreamManager(llm)
+def _chat_stream_manager():
+    return get_services().llm_service.chat_stream_manager
 
 
 logger = logging.getLogger(__name__)
@@ -103,7 +98,8 @@ async def chat_htmx_today():
 @login_required
 async def stop_generation(user_msg_id: str):
     logger.info("Stop requested for user message %s", user_msg_id)
-    handled, was_pending = await chat_stream_manager.stop(user_msg_id)
+    manager = _chat_stream_manager()
+    handled, was_pending = await manager.stop(user_msg_id)
     if not was_pending:
         logger.debug("No pending response for %s, aborting active stream", user_msg_id)
     if not handled:
@@ -167,7 +163,8 @@ async def sse_opening(date: str):
 
         return Response(error_stream(), mimetype="text/event-stream")
     stream_id = f"opening:{uid}:{today_iso}"
-    pending = chat_stream_manager.start_stream(
+    manager = _chat_stream_manager()
+    pending = manager.start_stream(
         stream_id,
         uid,
         today_iso,
@@ -253,9 +250,10 @@ async def sse_reply(user_msg_id: str, date: str):
         request.args.get("user_time"), request.cookies.get("tz")
     )
 
-    pending_response = chat_stream_manager.get(user_msg_id)
+    manager = _chat_stream_manager()
+    pending_response = manager.get(user_msg_id)
     if not pending_response:
-        pending_response = chat_stream_manager.start_stream(
+        pending_response = manager.start_stream(
             user_msg_id,
             uid,
             actual_date or date,
