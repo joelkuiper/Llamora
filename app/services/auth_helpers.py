@@ -140,11 +140,26 @@ def clear_session_dek() -> None:
 
 
 async def get_current_user():
+    """Return the current user for the request, caching the lookup."""
+
+    if hasattr(g, "_current_user"):
+        return g._current_user
+
+    if hasattr(request, "user") and request.user is not None:
+        g._current_user = request.user
+        return g._current_user
+
     uid = get_secure_cookie("uid")
     if not uid:
-        return None
-    services = get_services()
-    return await services.db.users.get_user_by_id(uid)
+        user = None
+    else:
+        services = get_services()
+        user = await services.db.users.get_user_by_id(uid)
+
+    request.user = user
+
+    g._current_user = request.user
+    return g._current_user
 
 
 def get_dek():
@@ -212,9 +227,10 @@ def login_required(f):
 
 async def load_user():
     # Eager-load user info if needed in templates
-    request.user = await get_current_user()
-    if request.user:
+    user = await get_current_user()
+    request.user = user
+    if user:
         _ = get_dek()  # refresh session DEK TTL if present
-        current_app.logger.debug("Loaded user %s for request", request.user["id"])
+        current_app.logger.debug("Loaded user %s for request", user["id"])
     else:
         current_app.logger.debug("No user loaded for request")
