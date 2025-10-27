@@ -84,7 +84,6 @@ export class ChatView extends ReactiveElement {
   #afterSwapHandler;
   #beforeSwapHandler;
   #pageShowHandler;
-  #historyRestoreHandler;
   #connectionListeners = null;
   #chatListeners = null;
   #markdownObserver = null;
@@ -95,7 +94,6 @@ export class ChatView extends ReactiveElement {
     this.#afterSwapHandler = (event) => this.#handleChatAfterSwap(event);
     this.#beforeSwapHandler = (event) => this.#handleChatBeforeSwap(event);
     this.#pageShowHandler = (event) => this.#handlePageShow(event);
-    this.#historyRestoreHandler = (event) => this.#handleHistoryRestore(event);
   }
 
   connectedCallback() {
@@ -106,11 +104,6 @@ export class ChatView extends ReactiveElement {
 
     this.#connectionListeners = this.resetListenerBag(this.#connectionListeners);
     this.#connectionListeners.add(window, "pageshow", this.#pageShowHandler);
-    this.#connectionListeners.add(
-      document.body,
-      "htmx:historyRestore",
-      this.#historyRestoreHandler
-    );
 
     if (!this.#initialized) {
       this.#initialize();
@@ -287,11 +280,6 @@ export class ChatView extends ReactiveElement {
     if (event.persisted) {
       this.#initialize();
     }
-  }
-
-  #handleHistoryRestore() {
-    this.#initialized = false;
-    this.#initialize();
   }
 
   #updateStreamingState(forceScroll = false) {
