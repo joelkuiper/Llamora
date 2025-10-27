@@ -22,14 +22,18 @@ async def search():
     query = raw_query.strip()
     logger.debug("Route search raw query='%s'", raw_query)
     results = []
-    if len(query) > MAX_SEARCH_QUERY_LENGTH:
+    truncation_notice: str | None = None
+    if query and len(query) > MAX_SEARCH_QUERY_LENGTH:
         logger.info(
-            "Search query length %d exceeds limit of %d; returning no results",
+            "Search query length %d exceeds limit of %d; truncating",
             len(query),
             MAX_SEARCH_QUERY_LENGTH,
         )
         query = query[:MAX_SEARCH_QUERY_LENGTH]
-    elif query:
+        truncation_notice = (
+            f"Your search was truncated to the first {MAX_SEARCH_QUERY_LENGTH} characters."
+        )
+    if query:
         user = await get_current_user()
         dek = get_dek()
         results = await get_search_api().search(user["id"], dek, query)
@@ -38,4 +42,5 @@ async def search():
         "partials/search_results.html",
         results=results,
         has_query=bool(query),
+        truncation_notice=truncation_notice,
     )

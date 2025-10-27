@@ -1,6 +1,7 @@
 {% set items = results|default([]) %}
 {% set query_present = has_query|default(false) %}
 {% set result_count = items|length %}
+{% set truncation_notice = truncation_notice|default('') %}
 <div class="search-results-status">
   {% if query_present %}
   <p class="visually-hidden" aria-live="polite" role="status" aria-atomic="true">
@@ -10,6 +11,9 @@
     No matches found.
     {%- endif -%}
   </p>
+  {% endif %}
+  {% if truncation_notice %}
+  <p class="search-results-notice" role="status" aria-live="polite">{{ truncation_notice }}</p>
   {% endif %}
   {% if items %}
   <div class="sr-panel search-results-overlay">
