@@ -7,7 +7,7 @@ from quart import Response, request, redirect, g, current_app
 from urllib.parse import urlparse, quote
 from functools import wraps
 from nacl import secret
-from app import db
+from app.services.container import get_services
 from config import SESSION_TTL
 
 cookie_secret = os.environ.get("LLAMORA_COOKIE_SECRET")
@@ -141,7 +141,10 @@ def clear_session_dek() -> None:
 
 async def get_current_user():
     uid = get_secure_cookie("uid")
-    return await db.users.get_user_by_id(uid) if uid else None
+    if not uid:
+        return None
+    services = get_services()
+    return await services.db.users.get_user_by_id(uid)
 
 
 def get_dek():

@@ -17,7 +17,7 @@ from llm.client import LLMClient
 from llm.process_manager import LlamafileProcessManager
 from llm.prompt_template import build_opening_prompt
 
-from app import db
+from app.services.container import get_services
 from app.services.auth_helpers import (
     login_required,
     get_current_user,
@@ -44,10 +44,14 @@ from app.services.time import (
 chat_bp = Blueprint("chat", __name__)
 
 
+def _db():
+    return get_services().db
+
+
 process_manager = LlamafileProcessManager()
 llm = LLMClient(process_manager)
 
-chat_stream_manager = ChatStreamManager(llm, db)
+chat_stream_manager = ChatStreamManager(llm)
 
 
 logger = logging.getLogger(__name__)
@@ -74,7 +78,7 @@ async def _render_chat_htmx(target: str | None, date: str, push_url: str):
         push_url = f"{push_url}?target={target}"
     resp.headers["HX-Push-Url"] = push_url
     user = await get_current_user()
-    await db.users.update_state(user["id"], active_date=date)
+    await _db().users.update_state(user["id"], active_date=date)
     return resp
 
 
@@ -118,9 +122,9 @@ async def stop_generation(user_msg_id: str):
 async def meta_chips(msg_id: str):
     user = await get_current_user()
     dek = get_dek()
-    if not await db.messages.message_exists(user["id"], msg_id):
+    if not await _db().messages.message_exists(user["id"], msg_id):
         abort(404, description="message not found")
-    tags = await db.tags.get_tags_for_message(user["id"], msg_id, dek)
+    tags = await _db().tags.get_tags_for_message(user["id"], msg_id, dek)
     html = await render_template(
         "partials/meta_chips_wrapper.html",
         msg_id=msg_id,
@@ -142,8 +146,8 @@ async def sse_opening(date: str):
     date_str = format_date(now)
     pod = part_of_day(now)
     yesterday_iso = (now - timedelta(days=1)).date().isoformat()
-    is_new = not await db.messages.user_has_messages(uid)
-    yesterday_msgs = await db.messages.get_history(uid, yesterday_iso, dek)
+    is_new = not await _db().messages.user_has_messages(uid)
+    yesterday_msgs = await _db().messages.get_history(uid, yesterday_iso, dek)
     has_no_activity = not is_new and not yesterday_msgs
     try:
         prompt = build_opening_prompt(
@@ -194,7 +198,7 @@ async def send_message(date):
         abort(400, description="Message is empty or too long.")
 
     try:
-        user_msg_id = await db.messages.append_message(
+        user_msg_id = await _db().messages.append_message(
             uid, "user", user_text, dek, created_date=date
         )
         logger.debug("Saved user message %s", user_msg_id)
@@ -225,7 +229,7 @@ async def sse_reply(user_msg_id: str, date: str):
     uid = user["id"]
     dek = get_dek()
     history, existing_assistant_msg, actual_date = await locate_message_and_reply(
-        db, uid, dek, date, user_msg_id
+        _db(), uid, dek, date, user_msg_id
     )
 
     if not history:

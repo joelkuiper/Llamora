@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from app import db
+from app.services.container import get_services
 from app.services.auth_helpers import get_dek
 from app.services.time import local_date
 
@@ -22,8 +22,9 @@ async def get_chat_context(
     - ``opening_stream``: whether the chat should initiate the opening message stream
     """
 
+    services = get_services()
     dek = get_dek()
-    history = await db.messages.get_history(user["id"], date, dek)
+    history = await services.db.messages.get_history(user["id"], date, dek)
 
     today = local_date().isoformat()
     is_today = date == today

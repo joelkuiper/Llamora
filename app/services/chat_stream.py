@@ -483,7 +483,7 @@ class ChatStreamManager:
     def __init__(
         self,
         llm: LLMClient,
-        db,
+        db=None,
         pending_ttl: int = 300,
         cleanup_interval: int = 60,
     ) -> None:
@@ -493,6 +493,9 @@ class ChatStreamManager:
         self._cleanup_interval = cleanup_interval
         self._pending: dict[str, PendingResponse] = {}
         self._cleanup_task: asyncio.Task | None = None
+
+    def set_db(self, db) -> None:
+        self._db = db
 
     def get(self, user_msg_id: str) -> PendingResponse | None:
         return self._pending.get(user_msg_id)
@@ -514,6 +517,9 @@ class ChatStreamManager:
         pending = self._pending.get(user_msg_id)
         if pending:
             return pending
+
+        if self._db is None:
+            raise RuntimeError("ChatStreamManager database is not configured")
 
         pending = PendingResponse(
             user_msg_id,

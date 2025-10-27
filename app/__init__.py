@@ -6,24 +6,17 @@ import logging
 import asyncio
 import secrets
 from contextlib import suppress
-from db import LocalDB
-from app.api.search import SearchAPI
-from app.services.lexical_reranker import LexicalReranker
-from app.services.vector_search import VectorSearchService
+from app.services.container import AppServices
 
 load_dotenv()
-
-db = LocalDB()
-vector_search_service = VectorSearchService(db)
-lexical_reranker = LexicalReranker()
-search_api = SearchAPI(db, vector_search_service, lexical_reranker)
-db.set_search_api(search_api)
-
 
 def create_app():
     app = Quart(__name__)
     app.secret_key = os.getenv("LLAMORA_SECRET_KEY")
     app.config.from_object("config")
+
+    services = AppServices.create()
+    app.extensions["llamora"] = services
 
     logging.basicConfig(
         level=os.getenv("LOG_LEVEL", "INFO"),
@@ -34,7 +27,7 @@ def create_app():
 
     from .routes.auth import auth_bp
     from .routes.days import days_bp
-    from .routes.chat import chat_bp, llm
+    from .routes.chat import chat_bp, llm, chat_stream_manager
     from .routes.search import search_bp
     from .routes.tags import tags_bp
 
@@ -43,6 +36,8 @@ def create_app():
     app.register_blueprint(chat_bp)
     app.register_blueprint(search_bp)
     app.register_blueprint(tags_bp)
+
+    chat_stream_manager.set_db(services.db)
 
     from datetime import datetime
     import hashlib
@@ -75,8 +70,8 @@ def create_app():
     from .services.auth_helpers import load_user, dek_store
 
     app.before_request(load_user)
-    app.before_serving(db.init)
-    app.after_serving(db.close)
+    app.before_serving(services.db.init)
+    app.after_serving(services.db.close)
 
     @app.after_serving
     async def _shutdown_llm():
@@ -85,7 +80,7 @@ def create_app():
     @app.before_serving
     async def _print_registration_link():
         if app.config.get("DISABLE_REGISTRATION"):
-            if await db.users.users_table_empty():
+            if await services.db.users.users_table_empty():
                 token = secrets.token_urlsafe(32)
                 app.config["REGISTRATION_TOKEN"] = token
                 server = app.config.get("SERVER_NAME")
@@ -108,7 +103,7 @@ def create_app():
             while True:
                 await asyncio.sleep(60)
                 dek_store.expire()
-                await search_api.maintenance_tick()
+                await services.search_api.maintenance_tick()
         except asyncio.CancelledError:
             pass
 

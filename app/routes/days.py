@@ -1,6 +1,6 @@
 import calendar
 from quart import Blueprint, redirect, request, url_for, render_template, make_response
-from app import db
+from app.services.container import get_services
 from app.services.auth_helpers import (
     login_required,
     get_current_user,
@@ -9,6 +9,10 @@ from app.services.chat_context import get_chat_context
 from app.services.time import local_date
 
 days_bp = Blueprint("days", __name__)
+
+
+def _db():
+    return get_services().db
 
 
 def _nav_months(year: int, month: int) -> tuple[int, int, int, int]:
@@ -46,7 +50,7 @@ async def day(date):
         **context,
     )
     resp = await make_response(html)
-    await db.users.update_state(uid, active_date=date)
+    await _db().users.update_state(uid, active_date=date)
     return resp
 
 
@@ -68,9 +72,9 @@ async def calendar_view():
     else:
         target_year = today.year
         target_month = today.month
-    state = await db.users.get_state(user["id"])
+    state = await _db().users.get_state(user["id"])
     weeks = calendar.Calendar().monthdayscalendar(target_year, target_month)
-    active_days = await db.messages.get_days_with_messages(
+    active_days = await _db().messages.get_days_with_messages(
         user["id"], target_year, target_month
     )
     prev_year, prev_month, next_year, next_month = _nav_months(target_year, target_month)
@@ -95,9 +99,9 @@ async def calendar_view():
 @login_required
 async def calendar_month(year: int, month: int):
     user = await get_current_user()
-    state = await db.users.get_state(user["id"])
+    state = await _db().users.get_state(user["id"])
     weeks = calendar.Calendar().monthdayscalendar(year, month)
-    active_days = await db.messages.get_days_with_messages(user["id"], year, month)
+    active_days = await _db().messages.get_days_with_messages(user["id"], year, month)
     prev_year, prev_month, next_year, next_month = _nav_months(year, month)
     html = await render_template(
         "partials/calendar.html",
