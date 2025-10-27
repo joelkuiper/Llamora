@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import os
-from contextlib import suppress
+from contextlib import asynccontextmanager, suppress
 from typing import Any, AsyncGenerator, NamedTuple
 
 import httpx
@@ -65,6 +65,88 @@ class SSEStreamParser:
             self.saw_content = True
             return SSEEvent("content", content)
         return None
+
+
+class _CompletionStream:
+    """Manage the background SSE completion stream and expose an iterator."""
+
+    def __init__(self, client: "LLMClient", payload: dict[str, Any]) -> None:
+        self._client = client
+        self._payload = payload
+        self._queue: asyncio.Queue[Any] = asyncio.Queue()
+        self._sentinel = object()
+        self.task: asyncio.Task[None] = asyncio.create_task(self._run())
+
+    async def _emit(self, item: Any) -> None:
+        await self._queue.put(item)
+
+    def _emit_nowait(self, item: Any) -> None:
+        try:
+            self._queue.put_nowait(item)
+        except asyncio.QueueFull:
+            pass
+
+    async def _run(self) -> None:
+        parser = SSEStreamParser()
+        stopped = False
+        try:
+            async with self._client._client.stream(
+                "POST",
+                f"{self._client.server_url}/completion",
+                json=self._payload,
+                headers=self._client._sse_headers,
+            ) as resp:
+                resp.raise_for_status()
+
+                async for line in resp.aiter_lines():
+                    events = parser.feed_line(line)
+                    for event in events:
+                        if event.type == "content" and event.data is not None:
+                            await self._emit(event.data)
+                        elif event.type == "stop":
+                            stopped = True
+                            break
+                    if stopped:
+                        break
+
+                if not stopped:
+                    for event in parser.finalize():
+                        if event.type == "content" and event.data is not None:
+                            await self._emit(event.data)
+                        elif event.type == "stop":
+                            stopped = True
+
+                if not parser.saw_stop:
+                    msg = (
+                        "Stream ended unexpectedly"
+                        if parser.saw_content
+                        else "LLM server disconnected"
+                    )
+                    await self._emit({"type": "error", "data": msg})
+        except HTTPError as e:
+            self._client.process_manager.ensure_server_running()
+            await self._emit({"type": "error", "data": f"HTTP error: {e}"})
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            await self._emit({"type": "error", "data": f"Unexpected error: {e}"})
+        finally:
+            self._emit_nowait(self._sentinel)
+
+    def __aiter__(self) -> "_CompletionStream":
+        return self
+
+    async def __anext__(self) -> Any:
+        item = await self._queue.get()
+        if item is self._sentinel:
+            raise StopAsyncIteration
+        return item
+
+    async def aclose(self) -> None:
+        if not self.task.done():
+            self.task.cancel()
+            with suppress(asyncio.CancelledError):
+                await self.task
 
 
 class LLMClient:
@@ -146,7 +228,7 @@ class LLMClient:
         params: dict[str, Any] | None = None,
         context: dict[str, Any] | None = None,
         prompt: str | None = None,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[Any, None]:
         self.process_manager.ensure_server_running()
 
         cfg = {**self.default_request, **(params or {})}
@@ -174,86 +256,14 @@ class LLMClient:
 
         payload = {"prompt": prompt, **cfg, "grammar": self.grammar}
 
-        queue: asyncio.Queue[Any] = asyncio.Queue()
-        sentinel = object()
-
-        async def _emit(item: Any) -> None:
-            await queue.put(item)
-
-        def _emit_nowait(item: Any) -> None:
-            try:
-                queue.put_nowait(item)
-            except asyncio.QueueFull:
-                pass
-
-        parser = SSEStreamParser()
-        stopped = False
-
-        async def _run_completion() -> None:
-            nonlocal stopped
-            try:
-                async with self._client.stream(
-                    "POST",
-                    f"{self.server_url}/completion",
-                    json=payload,
-                    headers=self._sse_headers,
-                ) as resp:
-                    resp.raise_for_status()
-
-                    async for line in resp.aiter_lines():
-                        events = parser.feed_line(line)
-                        for event in events:
-                            if event.type == "content" and event.data is not None:
-                                await _emit(event.data)
-                            elif event.type == "stop":
-                                stopped = True
-                                break
-                        if stopped:
-                            break
-
-                    if not stopped:
-                        for event in parser.finalize():
-                            if event.type == "content" and event.data is not None:
-                                await _emit(event.data)
-                            elif event.type == "stop":
-                                stopped = True
-
-                    if not parser.saw_stop:
-                        msg = (
-                            "Stream ended unexpectedly"
-                            if parser.saw_content
-                            else "LLM server disconnected"
-                        )
-                        await _emit({"type": "error", "data": msg})
-            except HTTPError as e:
-                self.process_manager.ensure_server_running()
-                await _emit({"type": "error", "data": f"HTTP error: {e}"})
-            except asyncio.CancelledError:
-                raise
-            except Exception as e:
-                await _emit({"type": "error", "data": f"Unexpected error: {e}"})
-            finally:
-                _emit_nowait(sentinel)
-
-        runner_task = asyncio.create_task(_run_completion())
-        async with self._streams_lock:
-            self._active_streams[msg_id] = runner_task
+        stream = _CompletionStream(self, payload)
 
         try:
-            while True:
-                item = await queue.get()
-                if item is sentinel:
-                    break
-                yield item
+            async with self._track_stream(msg_id, stream.task):
+                async for item in stream:
+                    yield item
         finally:
-            if not runner_task.done():
-                runner_task.cancel()
-                with suppress(asyncio.CancelledError):
-                    await runner_task
-            async with self._streams_lock:
-                current = self._active_streams.get(msg_id)
-                if current is runner_task:
-                    self._active_streams.pop(msg_id, None)
+            await stream.aclose()
 
     async def abort(self, msg_id: str) -> bool:
         async with self._streams_lock:
@@ -270,3 +280,17 @@ class LLMClient:
         else:
             self.logger.debug("No active stream to abort for %s", msg_id)
             return False
+
+    @asynccontextmanager
+    async def _track_stream(
+        self, msg_id: str, task: asyncio.Task[None]
+    ) -> AsyncGenerator[None, None]:
+        async with self._streams_lock:
+            self._active_streams[msg_id] = task
+        try:
+            yield
+        finally:
+            async with self._streams_lock:
+                current = self._active_streams.get(msg_id)
+                if current is task:
+                    self._active_streams.pop(msg_id, None)
