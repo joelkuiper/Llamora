@@ -96,9 +96,20 @@ class MessageIndexStore:
         self.cursors: Dict[str, Optional[str]] = {}
         self.locks: Dict[str, asyncio.Lock] = {}
         self._next_maintenance = time.monotonic() + maintenance_interval
+        self._default_dim: Optional[int] = None
+        self._default_dim_lock = asyncio.Lock()
 
     def _get_lock(self, user_id: str) -> asyncio.Lock:
         return self.locks.setdefault(user_id, asyncio.Lock())
+
+    async def _get_default_dim(self) -> int:
+        if self._default_dim is not None:
+            return self._default_dim
+
+        async with self._default_dim_lock:
+            if self._default_dim is None:
+                self._default_dim = (await async_embed_texts([""])).shape[1]
+        return self._default_dim
 
     async def _embed_and_store(
         self,
@@ -113,7 +124,7 @@ class MessageIndexStore:
         if not msg_list:
             if idx is not None:
                 return idx
-            dim = (await async_embed_texts([""])).shape[1]
+            dim = await self._get_default_dim()
             fresh = MessageIndex(dim)
             self.indexes[user_id] = fresh
             return fresh
@@ -190,7 +201,7 @@ class MessageIndexStore:
                 return idx
 
             logger.debug("No existing data for user %s, creating empty index", user_id)
-            dim = (await async_embed_texts([""])).shape[1]
+            dim = await self._get_default_dim()
             idx = MessageIndex(dim)
             latest = await self.db.messages.get_user_latest_id(user_id)
             self.cursors[user_id] = latest
