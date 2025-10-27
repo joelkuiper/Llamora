@@ -1,5 +1,6 @@
 import { ScrollController } from "../chat/scroll-controller.js";
 import { MarkdownObserver } from "../chat/markdown-observer.js";
+import { renderMarkdownInElement } from "../markdown.js";
 import { initDayNav } from "../day.js";
 import { scrollToHighlight } from "../ui.js";
 import { setTimezoneCookie } from "../timezone.js";
@@ -131,6 +132,16 @@ export class ChatView extends HTMLElement {
 
     this.#state = { currentStreamMsgId: null };
     this.#chat = chat;
+
+    chat.querySelectorAll?.(".markdown-body").forEach((el) => {
+      if (el?.dataset?.rendered) {
+        delete el.dataset.rendered;
+      }
+
+      if (!el?.querySelector?.("#typing-indicator")) {
+        renderMarkdownInElement(el);
+      }
+    });
 
     this.#chatForm = this.querySelector("chat-form");
     if (this.#chatForm) {

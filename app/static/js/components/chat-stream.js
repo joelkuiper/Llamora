@@ -108,6 +108,7 @@ class ChatStreamElement extends HTMLElement {
 
       const renderer = this.#getRenderer(contentDiv);
       const html = renderMarkdown(text);
+      contentDiv.dataset.markdownSource = text;
       const changed = renderer.update(html);
       contentDiv.dataset.rendered = "true";
 

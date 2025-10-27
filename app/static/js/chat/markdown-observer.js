@@ -103,7 +103,7 @@ export class MarkdownObserver {
 
     targets.forEach((el) => {
       if (!shouldRender(el)) return;
-      renderMarkdownInElement(el, el.textContent);
+      renderMarkdownInElement(el);
       if (this.onRender) {
         this.onRender(el);
       }

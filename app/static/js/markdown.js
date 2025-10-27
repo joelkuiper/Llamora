@@ -5,7 +5,20 @@ export function renderMarkdown(text) {
 
 export function renderMarkdownInElement(el, text) {
   if (!el) return;
-  const src = text !== undefined ? text : el.textContent || "";
+
+  let src = text;
+  if (src === undefined || src === null) {
+    if (el.dataset.markdownSource !== undefined) {
+      src = el.dataset.markdownSource;
+    } else {
+      src = el.textContent || "";
+    }
+  }
+
+  if (el.dataset.markdownSource !== src) {
+    el.dataset.markdownSource = src;
+  }
+
   const markdownHtml = renderMarkdown(src);
   el.innerHTML = markdownHtml;
   el.dataset.rendered = "true";
@@ -70,7 +83,7 @@ export function renderAllMarkdown(root, nodes = null) {
 
   targets.forEach((el) => {
     if (el.dataset.rendered !== "true" && !el.querySelector("#typing-indicator")) {
-      renderMarkdownInElement(el, el.textContent);
+      renderMarkdownInElement(el);
     }
   });
 }
