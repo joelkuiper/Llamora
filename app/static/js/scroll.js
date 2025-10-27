@@ -135,6 +135,8 @@ export function initScrollMemory(wrapperSelector = "#content-wrapper") {
     }
   };
 
+  window.addEventListener("app:scroll-target-consumed", restore);
+
   restore();
 
   document.body.addEventListener("htmx:beforeSwap", (evt) => {

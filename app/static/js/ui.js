@@ -98,6 +98,38 @@ export function flashHighlight(el) {
   );
 }
 
+export function clearScrollTarget(target, options = {}) {
+  const { emitEvent = true } = options;
+  const params = new URLSearchParams(window.location.search);
+  const hadTargetParam = params.has("target");
+  if (hadTargetParam) {
+    params.delete("target");
+  }
+
+  const highlightHash = target ? `#${target}` : "";
+  const shouldClearHash =
+    Boolean(highlightHash) && window.location.hash === highlightHash;
+
+  if (hadTargetParam || shouldClearHash) {
+    const query = params.toString();
+    const baseUrl = query
+      ? `${window.location.pathname}?${query}`
+      : window.location.pathname;
+    const finalUrl = shouldClearHash ? baseUrl : `${baseUrl}${window.location.hash}`;
+    history.replaceState(null, "", finalUrl);
+  }
+
+  if (emitEvent) {
+    const detail = { target: target ?? null };
+    window.__appScrollTargetConsumed = detail;
+    window.dispatchEvent(
+      new CustomEvent("app:scroll-target-consumed", {
+        detail,
+      })
+    );
+  }
+}
+
 export function scrollToHighlight(fallbackTarget) {
   const params = new URLSearchParams(window.location.search);
   let target = params.get("target");
@@ -120,13 +152,16 @@ export function scrollToHighlight(fallbackTarget) {
   if (target) {
     if (shouldUpdateHistory || window.location.hash) {
       const query = params.toString();
-      const newUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
+      const newUrl = query
+        ? `${window.location.pathname}?${query}`
+        : window.location.pathname;
       history.replaceState(null, "", newUrl);
     }
     const el = document.getElementById(target);
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
       flashHighlight(el);
+      clearScrollTarget(target);
     }
   }
 

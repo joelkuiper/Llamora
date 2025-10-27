@@ -1,4 +1,4 @@
-import { flashHighlight, createInlineSpinner } from "../ui.js";
+import { flashHighlight, createInlineSpinner, clearScrollTarget } from "../ui.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 
 const getEventTarget = (evt) => {
@@ -202,6 +202,7 @@ export class SearchOverlay extends ReactiveElement {
         history.pushState(null, "", `${window.location.pathname}?target=${targetId}`);
         el.scrollIntoView({ behavior: "smooth", block: "center" });
         flashHighlight(el);
+        clearScrollTarget(targetId, { emitEvent: false });
       }
     } else {
       this.#closeResults(true, { immediate: true });
