@@ -1,5 +1,7 @@
+import { renderMarkdown } from "../markdown.js";
 import { positionTypingIndicator } from "../typing-indicator.js";
 import { createListenerBag } from "../utils/events.js";
+import { IncrementalMarkdownRenderer } from "./incremental-markdown-renderer.js";
 
 const TYPING_INDICATOR_SELECTOR = "#typing-indicator";
 
@@ -43,6 +45,7 @@ export class StreamController {
 
     this.sseRenders = new WeakMap();
     this.pendingTyping = new WeakMap();
+    this.renderers = new WeakMap();
     this.listeners = null;
   }
 
@@ -59,6 +62,7 @@ export class StreamController {
     this.listeners = null;
     this.sseRenders = new WeakMap();
     this.pendingTyping = new WeakMap();
+    this.renderers = new WeakMap();
   }
 
   handleMessage(evt) {
@@ -78,8 +82,10 @@ export class StreamController {
         typing.parentNode.removeChild(typing);
       }
 
-      delete contentDiv.dataset.rendered;
-      contentDiv.textContent = text;
+      const renderer = this.#getRenderer(contentDiv);
+      const html = renderMarkdown(text);
+      const changed = renderer.update(html);
+      contentDiv.dataset.rendered = "true";
 
       this.pendingTyping.delete(contentDiv);
 
@@ -88,9 +94,10 @@ export class StreamController {
           typing,
           shouldScroll: true,
         });
-        return true;
+        this.handleMarkdownRendered(contentDiv);
+        return { hadTyping: true, changed };
       }
-      return false;
+      return { hadTyping: false, changed };
     };
 
     const scheduleRender = (fn) => {
@@ -105,8 +112,8 @@ export class StreamController {
 
     if (type === "message") {
       scheduleRender(() => {
-        const hadTyping = renderNow(true);
-        if (!hadTyping) {
+        const { hadTyping, changed } = renderNow(true);
+        if (changed && !hadTyping) {
           this.scrollToBottom();
         }
       });
@@ -119,7 +126,7 @@ export class StreamController {
         cancelAnimationFrame(rid);
         this.sseRenders.delete(wrap);
       }
-      const hadTyping = renderNow(false);
+      const { hadTyping, changed } = renderNow(false);
 
       const indicator = wrap.querySelector(TYPING_INDICATOR_SELECTOR);
       if (indicator && !indicator.classList.contains("stopped")) {
@@ -139,7 +146,7 @@ export class StreamController {
           placeholder.remove();
         }
       }
-      if (!hadTyping) {
+      if (changed && !hadTyping) {
         this.scrollToBottom();
       }
     }
@@ -189,5 +196,20 @@ export class StreamController {
     } catch (err) {
       console.error("failed to load meta chips", err);
     }
+  }
+
+  #getRenderer(target) {
+    if (!target) {
+      return {
+        update: () => false,
+        reset: () => {},
+      };
+    }
+    let renderer = this.renderers.get(target);
+    if (!renderer) {
+      renderer = new IncrementalMarkdownRenderer(target);
+      this.renderers.set(target, renderer);
+    }
+    return renderer;
   }
 }
