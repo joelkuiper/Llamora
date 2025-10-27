@@ -1,6 +1,16 @@
 {% set items = results|default([]) %}
 {% set query_present = has_query|default(false) %}
-<div class="search-results-status" aria-live="polite" role="status" aria-atomic="true">
+{% set result_count = items|length %}
+<div class="search-results-status">
+  {% if query_present %}
+  <p class="visually-hidden" aria-live="polite" role="status" aria-atomic="true">
+    {%- if items -%}
+    {{ result_count }} search result{%- if result_count != 1 %}s{% endif %} available.
+    {%- else -%}
+    No matches found.
+    {%- endif -%}
+  </p>
+  {% endif %}
   {% if items %}
   <div class="sr-panel search-results-overlay">
     <button class="overlay-close"
