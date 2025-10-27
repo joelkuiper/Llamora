@@ -1,145 +1,63 @@
-const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
-
-function parseIsoDate(value) {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const [datePart] = trimmed.split(/[T\s]/, 1);
-  const match = ISO_DATE_RE.exec(datePart);
-  if (!match) return null;
-
-  const year = Number.parseInt(match[1], 10);
-  const month = Number.parseInt(match[2], 10);
-  const day = Number.parseInt(match[3], 10);
-  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
-    return null;
-  }
-
-  const date = new Date(year, month - 1, day);
-  if (
-    Number.isNaN(date.getTime()) ||
-    date.getFullYear() !== year ||
-    date.getMonth() !== month - 1 ||
-    date.getDate() !== day
-  ) {
-    return null;
-  }
-
-  date.setHours(0, 0, 0, 0);
-  return { date, year, month, day };
-}
-
-function formatIsoDate(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function ordinalSuffix(day) {
-  if (!Number.isFinite(day)) return "";
-  const mod100 = day % 100;
-  if (mod100 >= 11 && mod100 <= 13) {
-    return "th";
-  }
-  switch (day % 10) {
-    case 1:
-      return "st";
-    case 2:
-      return "nd";
-    case 3:
-      return "rd";
-    default:
-      return "th";
-  }
-}
-
-function formatLongDate(date) {
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
-    return "";
-  }
-  const day = date.getDate();
-  const month = date.toLocaleDateString(undefined, { month: "long" });
-  const year = date.getFullYear();
-  return `${day}${ordinalSuffix(day)} of ${month} ${year}`;
-}
-
-function updateNavButton(button, { disabled, tooltip, onClick }) {
-  if (!button) return;
-  button.disabled = Boolean(disabled);
-  if (button.disabled) {
-    button.removeAttribute("data-tooltip-title");
-    button.onclick = null;
-    return;
-  }
-
-  if (tooltip) {
-    button.dataset.tooltipTitle = tooltip;
-  } else {
-    button.removeAttribute("data-tooltip-title");
-  }
-
-  button.onclick = typeof onClick === "function" ? onClick : null;
-}
-
 /* Initialize previous/next day navigation buttons */
-export function initDayNav(chat, options = {}) {
+export function initDayNav() {
+  const chat = document.getElementById("chat");
   const prevBtn = document.getElementById("prev-day");
   const nextBtn = document.getElementById("next-day");
-  if (!prevBtn || !nextBtn) return;
+  if (!chat || !prevBtn || !nextBtn) return;
 
-  const activeDaySource =
-    options.activeDay ||
-    chat?.dataset?.date ||
-    document.body?.dataset?.activeDay ||
-    "";
+  const activeDate = chat.dataset.date;
+  if (!activeDate) return;
 
-  const parsed = parseIsoDate(activeDaySource);
-  const currentDate = parsed?.date ?? null;
+  const [y, m, d] = activeDate.split("-").map(Number);
+  const current = new Date(y, m - 1, d);
 
-  const labelNode = document.getElementById("calendar-label");
-  if (labelNode) {
-    const labelText =
-      options.label ||
-      chat?.dataset?.longDate ||
-      document.body?.dataset?.activeDayLabel ||
-      (currentDate ? formatLongDate(currentDate) : activeDaySource);
-    if (typeof labelText === "string") {
-      labelNode.textContent = labelText;
-    }
+  const label = document.getElementById("calendar-label");
+  if (label) {
+    const day = current.getDate();
+    const suffix =
+      day % 10 === 1 && day % 100 !== 11
+        ? "st"
+        : day % 10 === 2 && day % 100 !== 12
+        ? "nd"
+        : day % 10 === 3 && day % 100 !== 13
+        ? "rd"
+        : "th";
+    const month = current.toLocaleDateString(undefined, {
+      month: "long",
+    });
+    const year = current.getFullYear();
+    label.textContent = `${day}${suffix} of ${month} ${year}`;
   }
 
-  if (!currentDate) {
-    updateNavButton(prevBtn, { disabled: true });
-    updateNavButton(nextBtn, { disabled: true });
-    return;
-  }
+  const format = (dt) =>
+    `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
 
-  const prevDate = new Date(currentDate);
-  prevDate.setDate(currentDate.getDate() - 1);
-  const nextDate = new Date(currentDate);
-  nextDate.setDate(currentDate.getDate() + 1);
+  const prev = new Date(current);
+  prev.setDate(current.getDate() - 1);
+  const next = new Date(current);
+  next.setDate(current.getDate() + 1);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
 
-  const prevIso = formatIsoDate(prevDate);
-  const nextIso = formatIsoDate(nextDate);
-  const yesterdayIso = formatIsoDate(yesterday);
+  const prevStr = format(prev);
+  const nextStr = format(next);
 
-  updateNavButton(prevBtn, {
-    disabled: false,
-    tooltip: prevIso === yesterdayIso ? "Yesterday" : "Previous day",
-    onClick: () => navigate(prevIso),
-  });
+  prevBtn.disabled = false;
+  prevBtn.dataset.tooltipTitle = prevStr === format(yesterday) ? "Yesterday" : "Previous day";
+  prevBtn.onclick = () => navigate(prevStr);
 
-  updateNavButton(nextBtn, {
-    disabled: nextDate > today,
-    tooltip: nextDate > today ? null : "Next day",
-    onClick: nextDate > today ? null : () => navigate(nextIso),
-  });
+  if (next > today) {
+    nextBtn.disabled = true;
+    nextBtn.removeAttribute("data-tooltip-title");
+    nextBtn.onclick = null;
+  } else {
+    nextBtn.disabled = false;
+    nextBtn.dataset.tooltipTitle = "Next day";
+    nextBtn.onclick = () => navigate(nextStr);
+  }
 
   function navigate(dateStr) {
     htmx.ajax("GET", `/c/${dateStr}`, {

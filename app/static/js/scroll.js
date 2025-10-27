@@ -9,9 +9,9 @@ export function initScrollMemory(wrapperSelector = "#content-wrapper") {
   let markdownListener = null;
 
   const getKey = () => {
-    const activeDay = document.body?.dataset?.activeDay;
-    if (activeDay) {
-      return `${storagePrefix}-day-${activeDay}`;
+    const chat = document.getElementById("chat");
+    if (chat && chat.dataset.date) {
+      return `${storagePrefix}-day-${chat.dataset.date}`;
     }
     return `${storagePrefix}-path-${location.pathname}`;
   };
