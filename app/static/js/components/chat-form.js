@@ -125,10 +125,7 @@ class ChatFormElement extends HTMLElement {
     const onAfterRequest = () => {
       if (!this.#draftKey) return;
       sessionStorage.removeItem(this.#draftKey);
-      this.#textarea.style.height = "auto";
-      if (this.#container) {
-        this.#container.scrollTop = this.#container.scrollHeight;
-      }
+      this.#resizeTextarea({ forceScroll: true });
     };
     bag.add(this.#form, "htmx:afterRequest", onAfterRequest);
 
@@ -145,7 +142,10 @@ class ChatFormElement extends HTMLElement {
     bag.add(this.#form, "htmx:configRequest", onConfigRequest);
 
     const onInput = () => {
-      this.#resizeTextarea();
+      const shouldForceScroll = this.#container
+        ? this.#isNearBottom(this.#container)
+        : false;
+      this.#resizeTextarea({ forceScroll: shouldForceScroll });
       if (this.#draftKey) {
         sessionStorage.setItem(this.#draftKey, this.#textarea.value);
       }
@@ -178,13 +178,23 @@ class ChatFormElement extends HTMLElement {
     }
   }
 
-  #resizeTextarea() {
+  #resizeTextarea({ forceScroll = false } = {}) {
     if (!this.#textarea) return;
+    const wasNearBottom = this.#container
+      ? this.#isNearBottom(this.#container)
+      : false;
     this.#textarea.style.height = "auto";
     this.#textarea.style.height = this.#textarea.scrollHeight + "px";
-    if (this.#container) {
+    if (this.#container && (forceScroll || wasNearBottom)) {
       this.#container.scrollTop = this.#container.scrollHeight;
     }
+  }
+
+  #isNearBottom(element) {
+    const threshold = 16;
+    const distance =
+      element.scrollHeight - (element.scrollTop + element.clientHeight);
+    return distance <= threshold;
   }
 
   setStreaming(streaming) {
