@@ -13,8 +13,10 @@ class ChatFormElement extends HTMLElement {
   #draftKey = null;
   #listeners = null;
   #stopListeners = null;
+  #streamFocusListeners = null;
   #connected = false;
   #initialized = false;
+  #shouldRestoreFocus = false;
 
   connectedCallback() {
     this.#connected = true;
@@ -96,6 +98,9 @@ class ChatFormElement extends HTMLElement {
     this.#listeners = null;
     this.#stopListeners?.abort();
     this.#stopListeners = null;
+    this.#streamFocusListeners?.abort();
+    this.#streamFocusListeners = null;
+    this.#shouldRestoreFocus = false;
     this.#initialized = false;
   }
 
@@ -207,6 +212,34 @@ class ChatFormElement extends HTMLElement {
     }
 
     if (streaming) {
+      this.#streamFocusListeners?.abort();
+      this.#streamFocusListeners = null;
+      this.#shouldRestoreFocus = !!(
+        this.#form && this.#form.contains(document.activeElement)
+      );
+      if (this.#shouldRestoreFocus) {
+        const bag = createListenerBag();
+        this.#streamFocusListeners = bag;
+        const cancelRestore = () => {
+          this.#shouldRestoreFocus = false;
+          this.#streamFocusListeners?.abort();
+          this.#streamFocusListeners = null;
+        };
+        bag.add(document, "pointerdown", (event) => {
+          if (!this.#form?.contains(event.target)) {
+            cancelRestore();
+          }
+        });
+        bag.add(document, "focusin", (event) => {
+          if (
+            event.target &&
+            event.target !== document.body &&
+            !this.#form?.contains(event.target)
+          ) {
+            cancelRestore();
+          }
+        });
+      }
       this.#button.classList.add("stopping");
       this.#button.type = "button";
       this.#button.disabled = false;
@@ -216,11 +249,22 @@ class ChatFormElement extends HTMLElement {
     } else {
       this.#stopListeners?.abort();
       this.#stopListeners = null;
+      this.#streamFocusListeners?.abort();
+      this.#streamFocusListeners = null;
       this.#button.classList.remove("stopping");
       this.#button.type = "submit";
       this.#textarea.disabled = false;
       this.#button.disabled = !this.#textarea.value.trim();
-      this.#textarea.focus({ preventScroll: true });
+      const active = document.activeElement;
+      if (
+        this.#shouldRestoreFocus &&
+        (!active ||
+          active === document.body ||
+          this.#form?.contains(active))
+      ) {
+        this.#textarea.focus({ preventScroll: true });
+      }
+      this.#shouldRestoreFocus = false;
       this.#button.setAttribute("aria-label", "Send");
     }
   }
