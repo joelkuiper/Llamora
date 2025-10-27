@@ -1,7 +1,7 @@
 import { renderMarkdown } from "../markdown.js";
 import { positionTypingIndicator } from "../typing-indicator.js";
 import { createListenerBag } from "../utils/events.js";
-import { IncrementalMarkdownRenderer } from "./incremental-markdown-renderer.js";
+import { IncrementalMarkdownRenderer } from "../chat/incremental-markdown-renderer.js";
 
 const TYPING_INDICATOR_SELECTOR = "#typing-indicator";
 
@@ -36,37 +36,61 @@ function revealMetaChips(container, scrollToBottom) {
   );
 }
 
-export class StreamController {
-  constructor({ chat, state, setStreaming, scrollToBottom }) {
-    this.chat = chat;
-    this.state = state;
-    this.setStreaming = setStreaming || (() => {});
-    this.scrollToBottom = scrollToBottom || (() => {});
+class ChatStreamElement extends HTMLElement {
+  #state = null;
+  #setStreaming = () => {};
+  #scrollToBottom = () => {};
+  #sseRenders = new WeakMap();
+  #pendingTyping = new WeakMap();
+  #renderers = new WeakMap();
+  #listeners = null;
+  #connected = false;
+  #boundHandleMessage;
 
-    this.sseRenders = new WeakMap();
-    this.pendingTyping = new WeakMap();
-    this.renderers = new WeakMap();
-    this.listeners = null;
+  constructor() {
+    super();
+    this.#boundHandleMessage = (event) => this.#handleMessage(event);
   }
 
-  init() {
-    this.destroy();
-    this.listeners = createListenerBag();
-    this.listeners.add(document.body, "htmx:sseMessage", (evt) =>
-      this.handleMessage(evt)
-    );
+  connectedCallback() {
+    this.#connected = true;
+    this.#init();
   }
 
-  destroy() {
-    this.listeners?.abort();
-    this.listeners = null;
-    this.sseRenders = new WeakMap();
-    this.pendingTyping = new WeakMap();
-    this.renderers = new WeakMap();
+  disconnectedCallback() {
+    this.#connected = false;
+    this.#destroy();
   }
 
-  handleMessage(evt) {
-    const { type } = evt.detail;
+  set state(value) {
+    this.#state = value || null;
+  }
+
+  set setStreaming(value) {
+    this.#setStreaming = typeof value === "function" ? value : () => {};
+  }
+
+  set scrollToBottom(value) {
+    this.#scrollToBottom = typeof value === "function" ? value : () => {};
+  }
+
+  #init() {
+    if (!this.#connected) return;
+    this.#destroy();
+    this.#listeners = createListenerBag();
+    this.#listeners.add(this, "htmx:sseMessage", this.#boundHandleMessage);
+  }
+
+  #destroy() {
+    this.#listeners?.abort();
+    this.#listeners = null;
+    this.#sseRenders = new WeakMap();
+    this.#pendingTyping = new WeakMap();
+    this.#renderers = new WeakMap();
+  }
+
+  #handleMessage(evt) {
+    const { type } = evt.detail || {};
     const wrap = evt.target.closest(".assistant-stream");
     if (!wrap) return;
 
@@ -87,10 +111,10 @@ export class StreamController {
       const changed = renderer.update(html);
       contentDiv.dataset.rendered = "true";
 
-      this.pendingTyping.delete(contentDiv);
+      this.#pendingTyping.delete(contentDiv);
 
       if (typing && shouldReposition) {
-        this.pendingTyping.set(contentDiv, {
+        this.#pendingTyping.set(contentDiv, {
           typing,
           shouldScroll: true,
         });
@@ -101,30 +125,30 @@ export class StreamController {
     };
 
     const scheduleRender = (fn) => {
-      const prev = this.sseRenders.get(wrap);
+      const prev = this.#sseRenders.get(wrap);
       if (prev) cancelAnimationFrame(prev);
       const id = requestAnimationFrame(() => {
-        this.sseRenders.delete(wrap);
+        this.#sseRenders.delete(wrap);
         fn();
       });
-      this.sseRenders.set(wrap, id);
+      this.#sseRenders.set(wrap, id);
     };
 
     if (type === "message") {
       scheduleRender(() => {
         const { hadTyping, changed } = renderNow(true);
         if (changed && !hadTyping) {
-          this.scrollToBottom();
+          this.#scrollToBottom();
         }
       });
       return;
     }
 
     if (type === "error" || type === "done") {
-      const rid = this.sseRenders.get(wrap);
+      const rid = this.#sseRenders.get(wrap);
       if (rid) {
         cancelAnimationFrame(rid);
-        this.sseRenders.delete(wrap);
+        this.#sseRenders.delete(wrap);
       }
       const { hadTyping, changed } = renderNow(false);
 
@@ -135,11 +159,13 @@ export class StreamController {
       wrap.removeAttribute("hx-ext");
       wrap.removeAttribute("sse-connect");
       wrap.removeAttribute("sse-close");
-      this.state.currentStreamMsgId = null;
-      this.setStreaming(false);
+      if (this.#state) {
+        this.#state.currentStreamMsgId = null;
+      }
+      this.#setStreaming(false);
 
       if (type !== "error") {
-        this.loadMetaChips(evt, wrap);
+        this.#loadMetaChips(evt, wrap);
       } else {
         const placeholder = wrap.querySelector(".meta-chips-placeholder");
         if (placeholder) {
@@ -147,7 +173,7 @@ export class StreamController {
         }
       }
       if (changed && !hadTyping) {
-        this.scrollToBottom();
+        this.#scrollToBottom();
       }
     }
   }
@@ -155,10 +181,10 @@ export class StreamController {
   handleMarkdownRendered(el) {
     if (!el) return;
 
-    const pending = this.pendingTyping.get(el);
+    const pending = this.#pendingTyping.get(el);
     if (!pending) return;
 
-    this.pendingTyping.delete(el);
+    this.#pendingTyping.delete(el);
 
     const { typing, shouldScroll } = pending;
     if (typing) {
@@ -166,13 +192,13 @@ export class StreamController {
     }
 
     if (shouldScroll) {
-      this.scrollToBottom();
+      this.#scrollToBottom();
     }
   }
 
-  loadMetaChips(evt, wrap) {
+  #loadMetaChips(evt, wrap) {
     try {
-      const data = JSON.parse(evt.detail.data || "{}");
+      const data = JSON.parse(evt.detail?.data || "{}");
       const assistantId = data.assistant_msg_id;
       if (assistantId) {
         wrap.dataset.assistantMsgId = assistantId;
@@ -182,7 +208,7 @@ export class StreamController {
             "htmx:afterSwap",
             (e) => {
               if (e.target.classList?.contains("meta-chips")) {
-                revealMetaChips(e.target, this.scrollToBottom);
+                revealMetaChips(e.target, this.#scrollToBottom);
               }
             },
             { once: true }
@@ -205,11 +231,15 @@ export class StreamController {
         reset: () => {},
       };
     }
-    let renderer = this.renderers.get(target);
+    let renderer = this.#renderers.get(target);
     if (!renderer) {
       renderer = new IncrementalMarkdownRenderer(target);
-      this.renderers.set(target, renderer);
+      this.#renderers.set(target, renderer);
     }
     return renderer;
   }
+}
+
+if (!customElements.get("chat-stream")) {
+  customElements.define("chat-stream", ChatStreamElement);
 }

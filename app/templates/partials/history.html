@@ -1,6 +1,6 @@
 {% from 'partials/assistant_stream.html' import assistant_stream %}
 {% from 'partials/meta_chips.html' import render_meta_chips %}
-<div id="chat" data-date="{{ day }}">
+<chat-stream id="chat" data-date="{{ day }}">
   {% if not history|length and not is_today %}
   <div class="no-content">Nothing was written this day.</div>
   {% endif %}
@@ -18,4 +18,4 @@
   {% if pending_msg_id %}
   {{ assistant_stream(pending_msg_id, day, stop_url=url_for('chat.stop_generation', user_msg_id=pending_msg_id)) }}
   {% endif %}
-</div>
+</chat-stream>

@@ -1,11 +1,11 @@
-import { ChatFormController } from "../chat/form-controller.js";
 import { ScrollController } from "../chat/scroll-controller.js";
-import { StreamController } from "../chat/stream-controller.js";
 import { MarkdownObserver } from "../chat/markdown-observer.js";
 import { initDayNav } from "../day.js";
 import { scrollToHighlight } from "../ui.js";
 import { setTimezoneCookie } from "../timezone.js";
 import { createListenerBag } from "../utils/events.js";
+import "./chat-form.js";
+import "./chat-stream.js";
 
 const TYPING_INDICATOR_SELECTOR = "#typing-indicator";
 
@@ -73,9 +73,9 @@ function scheduleMidnightRefresh(chat) {
 }
 
 export class ChatView extends HTMLElement {
-  #formController = null;
+  #chatForm = null;
   #scrollController = null;
-  #streamController = null;
+  #chatStream = null;
   #state = null;
   #chat = null;
   #scrollToBottom = null;
@@ -132,29 +132,29 @@ export class ChatView extends HTMLElement {
     this.#state = { currentStreamMsgId: null };
     this.#chat = chat;
 
-    this.#formController = new ChatFormController({
-      root: document,
-      chat,
-      container,
-      date: chat.dataset.date,
-      state: this.#state,
-    });
-    this.#formController.init();
+    this.#chatForm = this.querySelector("chat-form");
+    if (this.#chatForm) {
+      this.#chatForm.chat = chat;
+      this.#chatForm.container = container;
+      this.#chatForm.state = this.#state;
+      this.#chatForm.date = chat.dataset.date;
+    }
 
-    if (this.#formController.isToday) {
+    if (this.#chatForm?.isToday) {
       this.#midnightCleanup = scheduleMidnightRefresh(chat);
     }
 
     this.#scrollController = new ScrollController({ root: document, chat });
     this.#scrollToBottom = this.#scrollController.init() || (() => {});
 
-    this.#streamController = new StreamController({
-      chat,
-      state: this.#state,
-      setStreaming: (streaming) => this.#formController?.setStreaming(streaming),
-      scrollToBottom: (...args) => this.#scrollToBottom?.(...args),
-    });
-    this.#streamController.init();
+    this.#chatStream = chat;
+    if (this.#chatStream) {
+      this.#chatStream.state = this.#state;
+      this.#chatStream.setStreaming = (streaming) =>
+        this.#chatForm?.setStreaming(streaming);
+      this.#chatStream.scrollToBottom = (...args) =>
+        this.#scrollToBottom?.(...args);
+    }
 
     this.#chatListeners?.abort();
     this.#chatListeners = createListenerBag();
@@ -186,14 +186,8 @@ export class ChatView extends HTMLElement {
       this.#midnightCleanup = null;
     }
 
-    this.#streamController?.destroy();
-    this.#streamController = null;
-
     this.#scrollController?.destroy();
     this.#scrollController = null;
-
-    this.#formController?.destroy();
-    this.#formController = null;
 
     this.#markdownObserver?.stop();
     this.#markdownObserver = null;
@@ -202,7 +196,9 @@ export class ChatView extends HTMLElement {
     this.#chatListeners = null;
 
     this.#chat = null;
+    this.#chatStream = null;
     this.#scrollToBottom = null;
+    this.#chatForm = null;
     this.#state = null;
   }
 
@@ -276,11 +272,11 @@ export class ChatView extends HTMLElement {
   }
 
   #updateStreamingState(forceScroll = false) {
-    if (!this.#chat || !this.#formController) return;
+    if (!this.#chat || !this.#chatForm) return;
 
     const msgId = findCurrentMsgId(this.#chat);
     this.#state.currentStreamMsgId = msgId;
-    this.#formController.setStreaming(Boolean(msgId));
+    this.#chatForm.setStreaming(Boolean(msgId));
 
     if (forceScroll) {
       this.#scrollToBottom?.(true);
@@ -288,6 +284,6 @@ export class ChatView extends HTMLElement {
   }
 
   #handleMarkdownRendered(el) {
-    this.#streamController?.handleMarkdownRendered(el);
+    this.#chatStream?.handleMarkdownRendered(el);
   }
 }

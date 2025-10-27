@@ -4,22 +4,24 @@
   <chat-view{% if scroll_target %} data-scroll-target="{{ scroll_target }}"{% endif %}>
     {% include 'partials/history.html' %}
     {% if is_today %}
-    <form id="message-form"
-          hx-post="{{ url_for('chat.send_message', date=day) }}"
-          hx-target="#chat"
-          hx-on::after-request="this.reset()"
-          hx-swap="beforeend">
-      <div class="input-wrapper">
-        <textarea class="input"
-                  name="message"
-                  rows="3"
-                  placeholder="{{ 'Write your thoughts here…' if is_today else 'This day has past.' }}"
-                  cols="40"
-                  maxlength="{{ config.MAX_MESSAGE_LENGTH }}"></textarea>
-        <input type="hidden" name="user_time" id="user-time" />
-        <button id="send-btn" class="btn" type="submit" aria-label="Send"{% if not is_today %} disabled{% endif %}></button>
-      </div>
-    </form>
+    <chat-form data-date="{{ day }}">
+      <form id="message-form"
+            hx-post="{{ url_for('chat.send_message', date=day) }}"
+            hx-target="#chat"
+            hx-on::after-request="this.reset()"
+            hx-swap="beforeend">
+        <div class="input-wrapper">
+          <textarea class="input"
+                    name="message"
+                    rows="3"
+                    placeholder="{{ 'Write your thoughts here…' if is_today else 'This day has past.' }}"
+                    cols="40"
+                    maxlength="{{ config.MAX_MESSAGE_LENGTH }}"></textarea>
+          <input type="hidden" name="user_time" id="user-time" />
+          <button id="send-btn" class="btn" type="submit" aria-label="Send"{% if not is_today %} disabled{% endif %}></button>
+        </div>
+      </form>
+    </chat-form>
 
     {% else %}
     <div class="return-today">This day has past.
