@@ -84,6 +84,8 @@ export class ChatView extends ReactiveElement {
   #afterSwapHandler;
   #beforeSwapHandler;
   #pageShowHandler;
+  #historyRestoreHandler;
+  #historyRestoreFrame = null;
   #connectionListeners = null;
   #chatListeners = null;
   #markdownObserver = null;
@@ -94,6 +96,7 @@ export class ChatView extends ReactiveElement {
     this.#afterSwapHandler = (event) => this.#handleChatAfterSwap(event);
     this.#beforeSwapHandler = (event) => this.#handleChatBeforeSwap(event);
     this.#pageShowHandler = (event) => this.#handlePageShow(event);
+    this.#historyRestoreHandler = (event) => this.#handleHistoryRestore(event);
   }
 
   connectedCallback() {
@@ -104,6 +107,11 @@ export class ChatView extends ReactiveElement {
 
     this.#connectionListeners = this.resetListenerBag(this.#connectionListeners);
     this.#connectionListeners.add(window, "pageshow", this.#pageShowHandler);
+    this.#connectionListeners.add(
+      document.body,
+      "htmx:historyRestore",
+      this.#historyRestoreHandler
+    );
 
     if (!this.#initialized) {
       this.#initialize();
@@ -111,6 +119,7 @@ export class ChatView extends ReactiveElement {
   }
 
   disconnectedCallback() {
+    this.#cancelHistoryRestoreFrame();
     this.#teardown();
     this.#connectionListeners = this.disposeListenerBag(this.#connectionListeners);
     this.#initialized = false;
@@ -279,6 +288,22 @@ export class ChatView extends ReactiveElement {
   #handlePageShow(event) {
     if (event.persisted) {
       this.#initialize();
+    }
+  }
+
+  #handleHistoryRestore() {
+    this.#initialized = false;
+    this.#cancelHistoryRestoreFrame();
+    this.#historyRestoreFrame = window.requestAnimationFrame(() => {
+      this.#historyRestoreFrame = null;
+      this.#initialize();
+    });
+  }
+
+  #cancelHistoryRestoreFrame() {
+    if (this.#historyRestoreFrame != null) {
+      window.cancelAnimationFrame(this.#historyRestoreFrame);
+      this.#historyRestoreFrame = null;
     }
   }
 

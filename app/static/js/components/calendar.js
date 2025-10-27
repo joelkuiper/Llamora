@@ -74,6 +74,19 @@ export class CalendarControl extends HTMLElement {
     const handleSwap = () => this.#initCalendarPopover();
     document.body.addEventListener("htmx:afterSwap", handleSwap, { signal });
     document.body.addEventListener("htmx:historyRestore", handleSwap, { signal });
+    const handleBeforeCache = () => {
+      this.#teardownState();
+      this.#btn?.classList.remove("active");
+      if (this.#pop) {
+        this.#pop.hidden = true;
+        this.#pop.innerHTML = "";
+      }
+    };
+    document.body.addEventListener(
+      "htmx:beforeHistorySave",
+      handleBeforeCache,
+      { signal }
+    );
     window.addEventListener(
       "pageshow",
       (event) => {
@@ -83,6 +96,7 @@ export class CalendarControl extends HTMLElement {
       },
       { signal }
     );
+    window.addEventListener("pagehide", handleBeforeCache, { signal });
   }
 
   disconnectedCallback() {
