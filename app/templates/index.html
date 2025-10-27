@@ -16,6 +16,7 @@
 
     <script defer type="module" src="{{url_for('static', filename='js/tooltip.js')}}"></script>
     <script defer type="module" src="{{url_for('static', filename='js/components/calendar.js')}}"></script>
+    <script defer type="module" src="{{url_for('static', filename='js/app-init.js')}}"></script>
 
 
     <link rel="stylesheet" href="{{url_for('static', filename='css/main.css')}}">
@@ -30,7 +31,9 @@
   <body
     hx-ext="response-targets"
     hx-target-5*="#errors"
-    hx-target-4*="#errors">
+    hx-target-4*="#errors"
+    hx-on::after-settle="window.appInit?.initGlobalShell()"
+    data-csrf-token="{{ csrf_token() }}">
 
     <div id="errors" hx-swap="beforeend"></div>
     <header id="search-container">
@@ -107,52 +110,5 @@
       </div>
     </div>
 
-    <script>
-      document.addEventListener('DOMContentLoaded', () => {
-        document.body.addEventListener('htmx:configRequest', (event) => {
-            event.detail.headers['X-CSRFToken'] = '{{ csrf_token() }}';
-        });
-
-        document.body.addEventListener('htmx:configRequest', (event) => {
-            const chat = document.getElementById('chat');
-            const activeDate = chat?.dataset.date;
-            if (activeDate) {
-                event.detail.headers['X-Active-Day'] = activeDate;
-            }
-        });
-
-        function showServerError() {
-            const errors = document.getElementById('errors');
-            if (!errors) return;
-            const box = document.createElement('div');
-            box.className = 'error-box';
-            box.textContent = '⚠️ Unable to reach server.';
-            const btn = document.createElement('button');
-            btn.className = 'close-error';
-            btn.setAttribute('aria-label', 'Close error');
-            btn.textContent = '×';
-            btn.onclick = () => box.remove();
-            box.appendChild(btn);
-            errors.appendChild(box);
-        }
-
-        document.body.addEventListener('htmx:sendError', showServerError);
-        // document.body.addEventListener('htmx:responseError', showServerError);
-      });
-    </script>
-
-    <script defer type="module">
-      document.addEventListener('DOMContentLoaded', () => {
-        import("{{ url_for('static', filename='js/scroll.js') }}").then(({ initScrollMemory }) => {
-          initScrollMemory();
-        });
-
-        const profileBtn = document.getElementById('profile-btn');
-        profileBtn?.addEventListener('click', () => {
-          const { pathname, search, hash } = window.location;
-          sessionStorage.setItem('profile-return', `${pathname}${search}${hash}`);
-        });
-      });
-    </script>
   </body>
 </html>
