@@ -107,6 +107,11 @@ export class MarkdownObserver {
       if (this.onRender) {
         this.onRender(el);
       }
+      if (typeof document !== "undefined") {
+        document.dispatchEvent(
+          new CustomEvent("markdown:rendered", { detail: { element: el } })
+        );
+      }
     });
   }
 
