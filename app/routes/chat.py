@@ -52,7 +52,7 @@ def _chat_stream_manager():
 logger = logging.getLogger(__name__)
 
 
-async def render_chat(date, oob=False):
+async def render_chat(date, oob=False, scroll_target: str | None = None):
     user = await get_current_user()
     context = await get_chat_context(user, date)
     html = await render_template(
@@ -60,6 +60,7 @@ async def render_chat(date, oob=False):
         day=date,
         oob=oob,
         user=user,
+        scroll_target=scroll_target,
         **context,
     )
 
@@ -67,7 +68,7 @@ async def render_chat(date, oob=False):
 
 
 async def _render_chat_htmx(target: str | None, date: str, push_url: str):
-    html = await render_chat(date, False)
+    html = await render_chat(date, False, scroll_target=target)
     resp = await make_response(html, 200)
     if target:
         push_url = f"{push_url}?target={target}"

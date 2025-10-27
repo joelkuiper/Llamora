@@ -42,11 +42,13 @@ async def day(date):
     user = await get_current_user()
     uid = user["id"]
     context = await get_chat_context(user, date)
+    target = request.args.get("target")
     html = await render_template(
         "index.html",
         user=user,
         day=date,
         content_template="partials/chat.html",
+        scroll_target=target,
         **context,
     )
     resp = await make_response(html)

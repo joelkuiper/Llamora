@@ -163,7 +163,7 @@ export class ChatView extends HTMLElement {
     this.#updateStreamingState();
 
     initDayNav();
-    scrollToHighlight();
+    scrollToHighlight(this.dataset.scrollTarget);
 
     if (chat.dataset.date) {
       document.title = chat.dataset.date;

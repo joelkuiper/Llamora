@@ -63,21 +63,42 @@ export function flashHighlight(el) {
   );
 }
 
-export function scrollToHighlight() {
+export function scrollToHighlight(fallbackTarget) {
   const params = new URLSearchParams(window.location.search);
   let target = params.get("target");
+  let consumedFallback = false;
+  let shouldUpdateHistory = false;
+
   if (!target && window.location.hash.startsWith("#msg-")) {
     target = window.location.hash.substring(1);
     params.set("target", target);
+    shouldUpdateHistory = true;
   }
+
+  if (!target && fallbackTarget) {
+    target = fallbackTarget;
+    params.set("target", target);
+    shouldUpdateHistory = true;
+    consumedFallback = true;
+  }
+
   if (target) {
-    if (window.location.hash || params.get("target") !== target) {
-      history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+    if (shouldUpdateHistory || window.location.hash) {
+      const query = params.toString();
+      const newUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
+      history.replaceState(null, "", newUrl);
     }
     const el = document.getElementById(target);
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
       flashHighlight(el);
+    }
+  }
+
+  if (consumedFallback) {
+    const chatView = document.querySelector("chat-view");
+    if (chatView?.dataset.scrollTarget === fallbackTarget) {
+      delete chatView.dataset.scrollTarget;
     }
   }
 }

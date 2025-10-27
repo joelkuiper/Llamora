@@ -1,7 +1,7 @@
 <main
   id="content-wrapper"
   {% if oob %} hx-swap-oob="true" {% endif %}>
-  <chat-view>
+  <chat-view{% if scroll_target %} data-scroll-target="{{ scroll_target }}"{% endif %}>
     {% include 'partials/history.html' %}
     {% if is_today %}
     <form id="message-form"
