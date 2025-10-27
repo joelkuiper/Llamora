@@ -2,11 +2,14 @@ import hashlib
 import logging
 import re
 
+import orjson
+
 from config import (
     MAX_SEARCH_QUERY_LENGTH,
     PROGRESSIVE_K1,
     PROGRESSIVE_K2,
 )
+from app.services.index_worker import IndexWorker
 from app.services.lexical_reranker import LexicalReranker
 from app.services.vector_search import VectorSearchService
 
@@ -26,6 +29,20 @@ class SearchAPI:
         self.db = db
         self.vector_search = vector_search or VectorSearchService(db)
         self.lexical_reranker = lexical_reranker or LexicalReranker()
+        self._index_worker = IndexWorker(self)
+
+    async def start(self) -> None:
+        """Start background services for the search API."""
+        await self._index_worker.start()
+
+    async def stop(self) -> None:
+        """Stop background services for the search API."""
+        await self._index_worker.stop()
+
+    async def enqueue_index_job(
+        self, user_id: str, message_id: str, plaintext: str, dek: bytes
+    ) -> None:
+        await self._index_worker.enqueue(user_id, message_id, plaintext, dek)
 
     async def search(
         self,
@@ -73,8 +90,16 @@ class SearchAPI:
         return results
 
     async def on_message_appended(
-        self, user_id: str, msg_id: str, content: str, dek: bytes
-    ):
+        self, user_id: str, msg_id: str, plaintext: str, dek: bytes
+    ) -> None:
+        try:
+            record = orjson.loads(plaintext)
+            content = record.get("message", "")
+        except orjson.JSONDecodeError:
+            logger.debug(
+                "Failed to decode plaintext for message %s (user %s)", msg_id, user_id
+            )
+            content = plaintext
         await self.vector_search.append_message(user_id, msg_id, content, dek)
 
     async def maintenance_tick(self) -> None:

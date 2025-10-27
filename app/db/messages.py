@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from typing import Callable, Awaitable
 
 import orjson
@@ -87,9 +86,7 @@ class MessagesRepository(BaseRepository):
                 )
 
         if self._on_message_appended:
-            asyncio.create_task(
-                self._on_message_appended(user_id, msg_id, message, dek)
-            )
+            await self._on_message_appended(user_id, msg_id, plaintext, dek)
 
         return msg_id
 

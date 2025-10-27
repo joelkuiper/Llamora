@@ -71,7 +71,16 @@ def create_app():
     app.before_serving(services.db.init)
     app.after_serving(services.db.close)
 
+    search_api = services.search_api
     llm_service = services.llm_service
+
+    @app.before_serving
+    async def _start_search_api() -> None:
+        await search_api.start()
+
+    @app.after_serving
+    async def _stop_search_api() -> None:
+        await search_api.stop()
 
     @app.before_serving
     async def _start_llm_service() -> None:

@@ -184,10 +184,12 @@ class LocalDB:
         self.messages.set_on_message_appended(self._on_message_appended)
 
     async def _on_message_appended(
-        self, user_id: str, message_id: str, message: str, dek: bytes
+        self, user_id: str, message_id: str, plaintext: str, dek: bytes
     ) -> None:
         if self.search_api:
-            await self.search_api.on_message_appended(user_id, message_id, message, dek)
+            await self.search_api.enqueue_index_job(
+                user_id, message_id, plaintext, dek
+            )
 
     def __getattr__(self, name: str):
         for repo_name in ("users", "messages", "tags", "vectors"):
