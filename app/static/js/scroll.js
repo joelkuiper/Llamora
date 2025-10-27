@@ -144,10 +144,36 @@ export function initScrollMemory(wrapperSelector = "#content-wrapper") {
     }
   });
 
+  const resolveWrapperFromNode = (node) => {
+    if (!node) return null;
+
+    if (
+      typeof DocumentFragment !== "undefined" &&
+      node instanceof DocumentFragment
+    ) {
+      return node.querySelector?.(`#${wrapperId}`) ?? null;
+    }
+
+    if (typeof Element !== "undefined" && node instanceof Element) {
+      if (node.id === wrapperId) {
+        return node;
+      }
+      return node.querySelector?.(`#${wrapperId}`) ?? null;
+    }
+
+    return null;
+  };
+
   const handleLoad = (evt) => {
-    const target = evt.detail?.target || evt.target;
-    if (target && target.id === wrapperId) {
-      restore();
+    const detail = evt.detail ?? {};
+    const possibleSources = [detail.item, detail.target, evt.target];
+
+    for (const source of possibleSources) {
+      const wrapper = resolveWrapperFromNode(source);
+      if (wrapper) {
+        restore();
+        return;
+      }
     }
   };
 
