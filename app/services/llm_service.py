@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import suppress
 from typing import Any
 
 from llm.client import LLMClient
@@ -67,9 +66,7 @@ class LLMService:
             await chat_stream_manager.shutdown()
 
         if llm_client is not None:
-            for msg_id in list(getattr(llm_client, "_active_streams", {}).keys()):
-                with suppress(Exception):
-                    await llm_client.abort(msg_id)
+            await llm_client.aclose()
 
         if process_manager is not None:
             await asyncio.to_thread(process_manager.shutdown)

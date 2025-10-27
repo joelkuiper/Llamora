@@ -1,5 +1,7 @@
+import asyncio
 import logging
 import os
+from contextlib import suppress
 from typing import Any, AsyncGenerator, NamedTuple
 
 import httpx
@@ -77,7 +79,17 @@ class LLMClient:
         self.process_manager = process_manager
         self.default_request = {**DEFAULT_LLM_REQUEST, **(default_request or {})}
         self.ctx_size = process_manager.ctx_size
-        self._active_streams: dict[str, httpx.Response] = {}
+        self._client = httpx.AsyncClient(
+            timeout=None, transport=httpx.AsyncHTTPTransport(retries=0)
+        )
+        self._active_streams: dict[str, asyncio.Task[None]] = {}
+        self._streams_lock = asyncio.Lock()
+        self._sse_headers = {
+            "Accept": "text/event-stream",
+            "Connection": "keep-alive",
+            "Accept-Encoding": "identity",
+            "Cache-Control": "no-cache",
+        }
 
         grammar_path = os.path.abspath(GRAMMAR_FILE)
         with open(grammar_path, "r", encoding="utf-8") as gf:
@@ -90,8 +102,21 @@ class LLMClient:
     def shutdown(self) -> None:
         self.process_manager.shutdown()
 
-    async def _count_tokens(self, client: httpx.AsyncClient, text: str) -> int:
-        resp = await client.post(f"{self.server_url}/tokenize", json={"content": text})
+    async def aclose(self) -> None:
+        async with self._streams_lock:
+            tasks = list(self._active_streams.values())
+            self._active_streams.clear()
+        for task in tasks:
+            task.cancel()
+        for task in tasks:
+            with suppress(asyncio.CancelledError):
+                await task
+        await self._client.aclose()
+
+    async def _count_tokens(self, text: str) -> int:
+        resp = await self._client.post(
+            f"{self.server_url}/tokenize", json={"content": text}
+        )
         resp.raise_for_status()
         return len(resp.json().get("tokens", []))
 
@@ -102,17 +127,16 @@ class LLMClient:
             return history
         from llm.prompt_template import build_prompt
 
-        async with httpx.AsyncClient(timeout=None) as client:
-            lo, hi = 0, len(history)
-            while lo < hi:
-                mid = (lo + hi) // 2
-                slice_history = history[mid:]
-                prompt = build_prompt(slice_history, **context)
-                tokens = await self._count_tokens(client, prompt)
-                if tokens <= max_input:
-                    hi = mid
-                else:
-                    lo = mid + 1
+        lo, hi = 0, len(history)
+        while lo < hi:
+            mid = (lo + hi) // 2
+            slice_history = history[mid:]
+            prompt = build_prompt(slice_history, **context)
+            tokens = await self._count_tokens(prompt)
+            if tokens <= max_input:
+                hi = mid
+            else:
+                lo = mid + 1
         return history[lo:]
 
     async def stream_response(
@@ -150,33 +174,37 @@ class LLMClient:
 
         payload = {"prompt": prompt, **cfg, "grammar": self.grammar}
 
-        transport = httpx.AsyncHTTPTransport(retries=0)
-        headers = {
-            "Accept": "text/event-stream",
-            "Connection": "keep-alive",
-            "Accept-Encoding": "identity",
-            "Cache-Control": "no-cache",
-        }
+        queue: asyncio.Queue[Any] = asyncio.Queue()
+        sentinel = object()
 
-        async with httpx.AsyncClient(timeout=None, transport=transport) as client:
+        async def _emit(item: Any) -> None:
+            await queue.put(item)
+
+        def _emit_nowait(item: Any) -> None:
             try:
-                async with client.stream(
+                queue.put_nowait(item)
+            except asyncio.QueueFull:
+                pass
+
+        parser = SSEStreamParser()
+        stopped = False
+
+        async def _run_completion() -> None:
+            nonlocal stopped
+            try:
+                async with self._client.stream(
                     "POST",
                     f"{self.server_url}/completion",
                     json=payload,
-                    headers=headers,
+                    headers=self._sse_headers,
                 ) as resp:
-                    self._active_streams[msg_id] = resp
                     resp.raise_for_status()
-
-                    parser = SSEStreamParser()
-                    stopped = False
 
                     async for line in resp.aiter_lines():
                         events = parser.feed_line(line)
                         for event in events:
                             if event.type == "content" and event.data is not None:
-                                yield event.data
+                                await _emit(event.data)
                             elif event.type == "stop":
                                 stopped = True
                                 break
@@ -186,7 +214,7 @@ class LLMClient:
                     if not stopped:
                         for event in parser.finalize():
                             if event.type == "content" and event.data is not None:
-                                yield event.data
+                                await _emit(event.data)
                             elif event.type == "stop":
                                 stopped = True
 
@@ -196,24 +224,46 @@ class LLMClient:
                             if parser.saw_content
                             else "LLM server disconnected"
                         )
-                        yield {"type": "error", "data": msg}
-                    return
+                        await _emit({"type": "error", "data": msg})
             except HTTPError as e:
                 self.process_manager.ensure_server_running()
-                yield {"type": "error", "data": f"HTTP error: {e}"}
-                return
+                await _emit({"type": "error", "data": f"HTTP error: {e}"})
+            except asyncio.CancelledError:
+                raise
             except Exception as e:
-                yield {"type": "error", "data": f"Unexpected error: {e}"}
-                return
+                await _emit({"type": "error", "data": f"Unexpected error: {e}"})
             finally:
-                self._active_streams.pop(msg_id, None)
+                _emit_nowait(sentinel)
+
+        runner_task = asyncio.create_task(_run_completion())
+        async with self._streams_lock:
+            self._active_streams[msg_id] = runner_task
+
+        try:
+            while True:
+                item = await queue.get()
+                if item is sentinel:
+                    break
+                yield item
+        finally:
+            if not runner_task.done():
+                runner_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await runner_task
+            async with self._streams_lock:
+                current = self._active_streams.get(msg_id)
+                if current is runner_task:
+                    self._active_streams.pop(msg_id, None)
 
     async def abort(self, msg_id: str) -> bool:
-        resp = self._active_streams.pop(msg_id, None)
-        if resp is not None:
+        async with self._streams_lock:
+            task = self._active_streams.pop(msg_id, None)
+        if task is not None:
             self.logger.info("Aborting stream %s", msg_id)
             try:
-                await resp.aclose()
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
             except Exception:
                 self.logger.exception("Error closing stream %s", msg_id)
             return True
