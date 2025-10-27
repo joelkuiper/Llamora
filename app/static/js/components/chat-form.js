@@ -1,6 +1,6 @@
-import { createListenerBag } from "../utils/events.js";
+import { ReactiveElement } from "../utils/reactive-element.js";
 
-class ChatFormElement extends HTMLElement {
+class ChatFormElement extends ReactiveElement {
   #chat = null;
   #container = null;
   #state = null;
@@ -19,6 +19,7 @@ class ChatFormElement extends HTMLElement {
   #shouldRestoreFocus = false;
 
   connectedCallback() {
+    super.connectedCallback();
     this.#connected = true;
     this.#form = this.querySelector("form");
     this.#textarea = this.#form?.querySelector("textarea");
@@ -42,6 +43,7 @@ class ChatFormElement extends HTMLElement {
     this.#form = null;
     this.#textarea = null;
     this.#button = null;
+    super.disconnectedCallback();
   }
 
   set chat(value) {
@@ -94,12 +96,11 @@ class ChatFormElement extends HTMLElement {
   }
 
   #teardown() {
-    this.#listeners?.abort();
-    this.#listeners = null;
-    this.#stopListeners?.abort();
-    this.#stopListeners = null;
-    this.#streamFocusListeners?.abort();
-    this.#streamFocusListeners = null;
+    this.#listeners = this.disposeListenerBag(this.#listeners);
+    this.#stopListeners = this.disposeListenerBag(this.#stopListeners);
+    this.#streamFocusListeners = this.disposeListenerBag(
+      this.#streamFocusListeners
+    );
     this.#shouldRestoreFocus = false;
     this.#initialized = false;
   }
@@ -123,9 +124,8 @@ class ChatFormElement extends HTMLElement {
   #bindEvents() {
     if (!this.#form || !this.#textarea || !this.#button) return;
 
-    this.#listeners?.abort();
-    const bag = createListenerBag();
-    this.#listeners = bag;
+    this.#listeners = this.resetListenerBag(this.#listeners);
+    const bag = this.#listeners;
 
     const onAfterRequest = () => {
       if (!this.#draftKey) return;
@@ -212,18 +212,20 @@ class ChatFormElement extends HTMLElement {
     }
 
     if (streaming) {
-      this.#streamFocusListeners?.abort();
-      this.#streamFocusListeners = null;
+      this.#streamFocusListeners = this.disposeListenerBag(
+        this.#streamFocusListeners
+      );
       this.#shouldRestoreFocus = !!(
         this.#form && this.#form.contains(document.activeElement)
       );
       if (this.#shouldRestoreFocus) {
-        const bag = createListenerBag();
+        const bag = this.resetListenerBag(this.#streamFocusListeners);
         this.#streamFocusListeners = bag;
         const cancelRestore = () => {
           this.#shouldRestoreFocus = false;
-          this.#streamFocusListeners?.abort();
-          this.#streamFocusListeners = null;
+          this.#streamFocusListeners = this.disposeListenerBag(
+            this.#streamFocusListeners
+          );
         };
         bag.add(document, "pointerdown", (event) => {
           if (!this.#form?.contains(event.target)) {
@@ -247,10 +249,10 @@ class ChatFormElement extends HTMLElement {
       this.#textarea.disabled = true;
       this.#attachStopHandler();
     } else {
-      this.#stopListeners?.abort();
-      this.#stopListeners = null;
-      this.#streamFocusListeners?.abort();
-      this.#streamFocusListeners = null;
+      this.#stopListeners = this.disposeListenerBag(this.#stopListeners);
+      this.#streamFocusListeners = this.disposeListenerBag(
+        this.#streamFocusListeners
+      );
       this.#button.classList.remove("stopping");
       this.#button.type = "submit";
       this.#textarea.disabled = false;
@@ -271,8 +273,7 @@ class ChatFormElement extends HTMLElement {
 
   #attachStopHandler() {
     if (!this.#button) return;
-    this.#stopListeners?.abort();
-    this.#stopListeners = createListenerBag();
+    this.#stopListeners = this.resetListenerBag(this.#stopListeners);
     this.#stopListeners.add(this.#button, "click", () => this.#handleStopClick(), {
       once: true,
     });

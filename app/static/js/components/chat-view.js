@@ -5,6 +5,7 @@ import { initDayNav } from "../day.js";
 import { scrollToHighlight } from "../ui.js";
 import { setTimezoneCookie } from "../timezone.js";
 import { createListenerBag } from "../utils/events.js";
+import { ReactiveElement } from "../utils/reactive-element.js";
 import "./chat-form.js";
 import "./llm-stream.js";
 
@@ -73,7 +74,7 @@ function scheduleMidnightRefresh(chat) {
   };
 }
 
-export class ChatView extends HTMLElement {
+export class ChatView extends ReactiveElement {
   #chatForm = null;
   #scrollController = null;
   #state = null;
@@ -96,12 +97,12 @@ export class ChatView extends HTMLElement {
   }
 
   connectedCallback() {
+    super.connectedCallback();
     if (!this.style.display) {
       this.style.display = "block";
     }
 
-    this.#connectionListeners?.abort();
-    this.#connectionListeners = createListenerBag();
+    this.#connectionListeners = this.resetListenerBag(this.#connectionListeners);
     this.#connectionListeners.add(window, "pageshow", this.#pageShowHandler);
 
     if (!this.#initialized) {
@@ -111,9 +112,9 @@ export class ChatView extends HTMLElement {
 
   disconnectedCallback() {
     this.#teardown();
-    this.#connectionListeners?.abort();
-    this.#connectionListeners = null;
+    this.#connectionListeners = this.disposeListenerBag(this.#connectionListeners);
     this.#initialized = false;
+    super.disconnectedCallback();
   }
 
   #initialize() {
@@ -159,8 +160,7 @@ export class ChatView extends HTMLElement {
 
     this.#configureStreams(chat);
 
-    this.#chatListeners?.abort();
-    this.#chatListeners = createListenerBag();
+    this.#chatListeners = this.resetListenerBag(this.#chatListeners);
     this.#chatListeners.add(chat, "htmx:afterSwap", this.#afterSwapHandler);
     this.#chatListeners.add(chat, "htmx:beforeSwap", this.#beforeSwapHandler);
     this.#chatListeners.add(chat, "llm-stream:start", (event) =>
@@ -201,8 +201,7 @@ export class ChatView extends HTMLElement {
     this.#markdownObserver?.stop();
     this.#markdownObserver = null;
 
-    this.#chatListeners?.abort();
-    this.#chatListeners = null;
+    this.#chatListeners = this.disposeListenerBag(this.#chatListeners);
 
     this.#chat = null;
     this.#scrollToBottom = null;

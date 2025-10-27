@@ -1,8 +1,5 @@
-import { flashHighlight, SPINNER } from "../ui.js";
-import { createListenerBag } from "../utils/events.js";
-
-const SPINNER_FRAMES = SPINNER.frames;
-const SPINNER_INTERVAL = SPINNER.interval;
+import { flashHighlight, createInlineSpinner } from "../ui.js";
+import { ReactiveElement } from "../utils/reactive-element.js";
 
 const getEventTarget = (evt) => {
   const target = evt.target;
@@ -12,11 +9,10 @@ const getEventTarget = (evt) => {
   return target?.parentElement ?? null;
 };
 
-export class SearchOverlay extends HTMLElement {
+export class SearchOverlay extends ReactiveElement {
   #listeners = null;
   #overlayListeners = null;
-  #spinnerIntervalId = null;
-  #spinnerFrame = 0;
+  #spinnerController = null;
   #resultsEl = null;
   #inputEl = null;
   #spinnerEl = null;
@@ -38,28 +34,33 @@ export class SearchOverlay extends HTMLElement {
   }
 
   connectedCallback() {
+    super.connectedCallback();
     this.#resultsEl = this.querySelector("#search-results");
     this.#inputEl = this.querySelector("#search-input");
     this.#spinnerEl = this.querySelector("#search-spinner");
 
+    if (!this.#spinnerController) {
+      this.#spinnerController = createInlineSpinner(this.#spinnerEl);
+    } else {
+      this.#spinnerController.setElement(this.#spinnerEl);
+    }
+
     this.#stopSpinner();
     this.#deactivateOverlayListeners();
 
-    if (this.#listeners) {
-      this.#listeners.abort();
-    }
-
-    this.#listeners = createListenerBag();
+    this.#listeners = this.resetListenerBag(this.#listeners);
     const listeners = this.#listeners;
 
     if (this.#inputEl) {
       listeners.add(this.#inputEl, "input", this.#inputHandler);
     }
 
-    listeners.add(this, "htmx:beforeRequest", this.#beforeRequestHandler);
-    listeners.add(this, "htmx:afterRequest", this.#afterRequestHandler);
-    listeners.add(this, "htmx:sendError", this.#afterRequestHandler);
-    listeners.add(this, "htmx:responseError", this.#afterRequestHandler);
+    this.watchHtmxRequests(this, {
+      within: this,
+      bag: listeners,
+      onStart: this.#beforeRequestHandler,
+      onEnd: this.#afterRequestHandler,
+    });
     listeners.add(this, "htmx:afterSwap", this.#afterSwapHandler);
   }
 
@@ -67,50 +68,28 @@ export class SearchOverlay extends HTMLElement {
     this.#closeResults(false, { immediate: true });
 
     this.#deactivateOverlayListeners();
-    if (this.#listeners) {
-      this.#listeners.abort();
-      this.#listeners = null;
-    }
+    this.#listeners = this.disposeListenerBag(this.#listeners);
 
     this.#stopSpinner();
-
-    this.#spinnerFrame = 0;
-    if (this.#spinnerEl) {
-      this.#spinnerEl.textContent = "";
-    }
+    this.#spinnerController?.setElement(null);
     this.#resultsEl = null;
     this.#inputEl = null;
     this.#spinnerEl = null;
+    super.disconnectedCallback();
   }
 
   #startSpinner() {
-    const spinner = this.#spinnerEl;
-    if (!spinner || this.#spinnerIntervalId !== null) return;
-
-    this.#spinnerFrame = 0;
-    spinner.textContent = SPINNER_FRAMES[this.#spinnerFrame];
-    this.#spinnerIntervalId = window.setInterval(() => {
-      this.#spinnerFrame = (this.#spinnerFrame + 1) % SPINNER_FRAMES.length;
-      spinner.textContent = SPINNER_FRAMES[this.#spinnerFrame];
-    }, SPINNER_INTERVAL);
+    this.#spinnerController?.start();
   }
 
   #stopSpinner() {
-    if (this.#spinnerIntervalId !== null) {
-      clearInterval(this.#spinnerIntervalId);
-      this.#spinnerIntervalId = null;
-    }
-
-    if (this.#spinnerEl) {
-      this.#spinnerFrame = 0;
-      this.#spinnerEl.textContent = "";
-    }
+    this.#spinnerController?.stop();
   }
 
   #activateOverlayListeners() {
     if (this.#overlayListeners || !this.isConnected) return;
 
-    const bag = createListenerBag();
+    const bag = this.resetListenerBag(this.#overlayListeners);
     const doc = this.ownerDocument ?? document;
     bag.add(doc, "keydown", this.#keydownHandler);
     bag.add(doc, "click", this.#documentClickHandler);
@@ -118,10 +97,7 @@ export class SearchOverlay extends HTMLElement {
   }
 
   #deactivateOverlayListeners() {
-    if (this.#overlayListeners) {
-      this.#overlayListeners.abort();
-      this.#overlayListeners = null;
-    }
+    this.#overlayListeners = this.disposeListenerBag(this.#overlayListeners);
   }
 
   #handleBeforeRequest(event) {

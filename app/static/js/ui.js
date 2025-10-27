@@ -16,6 +16,41 @@ function spin(el, text = "") {
   }, SPINNER.interval);
 }
 
+export function createInlineSpinner(
+  element,
+  { text = "" } = {}
+) {
+  let spinnerEl = element || null;
+  let intervalId = null;
+
+  const start = () => {
+    if (!spinnerEl || intervalId !== null) return;
+    intervalId = spin(spinnerEl, text);
+  };
+
+  const stop = () => {
+    if (intervalId !== null) {
+      clearInterval(intervalId);
+      intervalId = null;
+    }
+    if (spinnerEl) {
+      spinnerEl.textContent = "";
+    }
+  };
+
+  const setElement = (nextEl) => {
+    if (nextEl === spinnerEl) return;
+    stop();
+    spinnerEl = nextEl || null;
+  };
+
+  return {
+    start,
+    stop,
+    setElement,
+  };
+}
+
 export function startButtonSpinner(btn, loadingText = "Loading") {
   if (!btn || btn.dataset.spinning === "1") return;
   const originalText = btn.textContent;
