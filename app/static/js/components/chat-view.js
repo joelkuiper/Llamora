@@ -4,7 +4,7 @@ import { StreamController } from "../chat/stream-controller.js";
 import { renderAllMarkdown } from "../markdown.js";
 import { initTagPopovers } from "../meta-chips.js";
 import { initDayNav } from "../day.js";
-import { initSearchUI, scrollToHighlight } from "../ui.js";
+import { scrollToHighlight } from "../ui.js";
 import { setTimezoneCookie } from "../timezone.js";
 import { createListenerBag } from "../utils/events.js";
 
@@ -169,7 +169,6 @@ export class ChatView extends HTMLElement {
     this.#updateStreamingState();
 
     initDayNav();
-    initSearchUI();
     scrollToHighlight();
 
     if (chat.dataset.date) {

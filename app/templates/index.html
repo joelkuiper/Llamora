@@ -65,10 +65,12 @@
 
       <div class="header-right">
         <div class="search-wrap">
-          {% include 'partials/search_form.html' %}
-          <section id="search-results">
-            {% include 'partials/search_results.html' %}
-          </section>
+          <search-overlay>
+            {% include 'partials/search_form.html' %}
+            <section id="search-results">
+              {% include 'partials/search_results.html' %}
+            </section>
+          </search-overlay>
         </div>
         <div class="user-actions">
           <a id="profile-btn"
