@@ -1,3 +1,5 @@
+import { createListenerBag } from "./utils/events.js";
+
 const DEFAULT_TIMEOUT = 250;
 
 const defaultAnimation = {
@@ -72,6 +74,7 @@ export function createPopover(trigger, popover, options = {}) {
 
   let popperInstance = null;
   let open = false;
+  let globalListeners = null;
 
   const ensurePopper = () => {
     if (!popperInstance) {
@@ -96,21 +99,19 @@ export function createPopover(trigger, popover, options = {}) {
   };
 
   const addGlobalListeners = () => {
+    globalListeners?.abort();
+    globalListeners = createListenerBag();
     if (closeOnOutside) {
-      document.addEventListener("click", outsideHandler, true);
+      globalListeners.add(document, "click", outsideHandler, true);
     }
     if (closeOnEscape) {
-      document.addEventListener("keydown", keyHandler);
+      globalListeners.add(document, "keydown", keyHandler);
     }
   };
 
   const removeGlobalListeners = () => {
-    if (closeOnOutside) {
-      document.removeEventListener("click", outsideHandler, true);
-    }
-    if (closeOnEscape) {
-      document.removeEventListener("keydown", keyHandler);
-    }
+    globalListeners?.abort();
+    globalListeners = null;
   };
 
   const animateOpen = () => {

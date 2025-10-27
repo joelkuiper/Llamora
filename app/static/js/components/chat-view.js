@@ -6,6 +6,7 @@ import { initTagPopovers } from "../meta-chips.js";
 import { initDayNav } from "../day.js";
 import { initSearchUI, scrollToHighlight } from "../ui.js";
 import { setTimezoneCookie } from "../timezone.js";
+import { createListenerBag } from "../utils/events.js";
 
 const TYPING_INDICATOR_SELECTOR = "#typing-indicator";
 
@@ -20,6 +21,7 @@ function scheduleMidnightRefresh(chat) {
   if (!chat) return () => {};
 
   let timeoutId = null;
+  const listeners = createListenerBag();
 
   const pad = (value) => String(value).padStart(2, "0");
 
@@ -51,11 +53,11 @@ function scheduleMidnightRefresh(chat) {
     }
   };
 
-  document.addEventListener("visibilitychange", handleVisibility);
+  listeners.add(document, "visibilitychange", handleVisibility);
   runCheck();
 
   return () => {
-    document.removeEventListener("visibilitychange", handleVisibility);
+    listeners.abort();
     if (timeoutId) {
       clearTimeout(timeoutId);
     }
@@ -73,6 +75,8 @@ export class ChatView extends HTMLElement {
   #midnightCleanup = null;
   #afterSwapHandler;
   #pageShowHandler;
+  #connectionListeners = null;
+  #chatListeners = null;
   #initialized = false;
 
   constructor() {
@@ -86,16 +90,19 @@ export class ChatView extends HTMLElement {
       this.style.display = "block";
     }
 
+    this.#connectionListeners?.abort();
+    this.#connectionListeners = createListenerBag();
+    this.#connectionListeners.add(window, "pageshow", this.#pageShowHandler);
+
     if (!this.#initialized) {
       this.#initialize();
     }
-
-    window.addEventListener("pageshow", this.#pageShowHandler);
   }
 
   disconnectedCallback() {
-    window.removeEventListener("pageshow", this.#pageShowHandler);
     this.#teardown();
+    this.#connectionListeners?.abort();
+    this.#connectionListeners = null;
     this.#initialized = false;
   }
 
@@ -143,6 +150,10 @@ export class ChatView extends HTMLElement {
     });
     this.#streamController.init();
 
+    this.#chatListeners?.abort();
+    this.#chatListeners = createListenerBag();
+    this.#chatListeners.add(chat, "htmx:afterSwap", this.#afterSwapHandler);
+
     this.#observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         mutation.addedNodes.forEach((node) => {
@@ -156,8 +167,6 @@ export class ChatView extends HTMLElement {
       }
     });
     this.#observer.observe(chat, { childList: true });
-
-    chat.addEventListener("htmx:afterSwap", this.#afterSwapHandler);
 
     renderAllMarkdown(chat);
     initTagPopovers(chat);
@@ -193,9 +202,8 @@ export class ChatView extends HTMLElement {
     this.#observer?.disconnect();
     this.#observer = null;
 
-    if (this.#chat) {
-      this.#chat.removeEventListener("htmx:afterSwap", this.#afterSwapHandler);
-    }
+    this.#chatListeners?.abort();
+    this.#chatListeners = null;
 
     this.#chat = null;
     this.#scrollToBottom = null;

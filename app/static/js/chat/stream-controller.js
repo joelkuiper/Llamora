@@ -1,5 +1,6 @@
 import { renderMarkdown } from "../markdown.js";
 import { positionTypingIndicator } from "../typing-indicator.js";
+import { createListenerBag } from "../utils/events.js";
 
 const TYPING_INDICATOR_SELECTOR = "#typing-indicator";
 
@@ -42,20 +43,20 @@ export class StreamController {
     this.scrollToBottom = scrollToBottom || (() => {});
 
     this.sseRenders = new WeakMap();
-    this.listener = null;
+    this.listeners = null;
   }
 
   init() {
     this.destroy();
-    this.listener = (evt) => this.handleMessage(evt);
-    document.body.addEventListener("htmx:sseMessage", this.listener);
+    this.listeners = createListenerBag();
+    this.listeners.add(document.body, "htmx:sseMessage", (evt) =>
+      this.handleMessage(evt)
+    );
   }
 
   destroy() {
-    if (this.listener) {
-      document.body.removeEventListener("htmx:sseMessage", this.listener);
-      this.listener = null;
-    }
+    this.listeners?.abort();
+    this.listeners = null;
     this.sseRenders = new WeakMap();
   }
 

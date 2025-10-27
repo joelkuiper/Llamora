@@ -1,3 +1,5 @@
+import { createListenerBag } from "../utils/events.js";
+
 export class ChatFormController {
   constructor({
     root = document,
@@ -19,12 +21,8 @@ export class ChatFormController {
 
     this.isToday = false;
     this.draftKey = null;
-    this.stopHandler = null;
-    this.onAfterRequest = null;
-    this.onConfigRequest = null;
-    this.onInput = null;
-    this.onKeydown = null;
-    this.onErrorsAfterSwap = null;
+    this.listeners = null;
+    this.stopListeners = null;
   }
 
   init() {
@@ -63,18 +61,21 @@ export class ChatFormController {
     if (!this.form || !this.textarea || !this.button) return;
 
     const container = this.container;
+    this.listeners?.abort();
+    const bag = createListenerBag();
+    this.listeners = bag;
 
-    this.onAfterRequest = () => {
+    const onAfterRequest = () => {
       sessionStorage.removeItem(this.draftKey);
       this.textarea.style.height = "auto";
       if (container) {
         container.scrollTop = container.scrollHeight;
       }
     };
-    this.form.addEventListener("htmx:afterRequest", this.onAfterRequest);
+    bag.add(this.form, "htmx:afterRequest", onAfterRequest);
 
     const userTimeInput = this.form.querySelector("#user-time");
-    this.onConfigRequest = (event) => {
+    const onConfigRequest = (event) => {
       if (userTimeInput) {
         userTimeInput.value = new Date().toISOString();
       }
@@ -83,18 +84,18 @@ export class ChatFormController {
         this.textarea.focus({ preventScroll: true });
       }
     };
-    this.form.addEventListener("htmx:configRequest", this.onConfigRequest);
+    bag.add(this.form, "htmx:configRequest", onConfigRequest);
 
-    this.onInput = () => {
+    const onInput = () => {
       this.resizeTextarea();
       sessionStorage.setItem(this.draftKey, this.textarea.value);
       if (!this.state.currentStreamMsgId) {
         this.button.disabled = !this.textarea.value.trim();
       }
     };
-    this.textarea.addEventListener("input", this.onInput);
+    bag.add(this.textarea, "input", onInput);
 
-    this.onKeydown = (e) => {
+    const onKeydown = (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         if (this.textarea.value.trim()) {
@@ -103,17 +104,17 @@ export class ChatFormController {
         }
       }
     };
-    this.textarea.addEventListener("keydown", this.onKeydown);
+    bag.add(this.textarea, "keydown", onKeydown);
 
     if (this.errors) {
-      this.onErrorsAfterSwap = () => {
+      const onErrorsAfterSwap = () => {
         requestAnimationFrame(() => {
           if (document.querySelector("#errors .error-box")) {
             this.setStreaming(false);
           }
         });
       };
-      this.errors.addEventListener("htmx:afterSwap", this.onErrorsAfterSwap);
+      bag.add(this.errors, "htmx:afterSwap", onErrorsAfterSwap);
     }
   }
 
@@ -143,10 +144,8 @@ export class ChatFormController {
       this.textarea.disabled = true;
       this.attachStopHandler();
     } else {
-      if (this.stopHandler) {
-        this.button.removeEventListener("click", this.stopHandler);
-        this.stopHandler = null;
-      }
+      this.stopListeners?.abort();
+      this.stopListeners = null;
       this.button.classList.remove("stopping");
       this.button.type = "submit";
       this.textarea.disabled = false;
@@ -158,11 +157,11 @@ export class ChatFormController {
 
   attachStopHandler() {
     if (!this.button) return;
-    if (this.stopHandler) {
-      this.button.removeEventListener("click", this.stopHandler);
-    }
-    this.stopHandler = () => this.handleStopClick();
-    this.button.addEventListener("click", this.stopHandler, { once: true });
+    this.stopListeners?.abort();
+    this.stopListeners = createListenerBag();
+    this.stopListeners.add(this.button, "click", () => this.handleStopClick(), {
+      once: true,
+    });
   }
 
   handleStopClick() {
@@ -188,24 +187,9 @@ export class ChatFormController {
   }
 
   destroy() {
-    if (this.form && this.onAfterRequest) {
-      this.form.removeEventListener("htmx:afterRequest", this.onAfterRequest);
-    }
-    if (this.form && this.onConfigRequest) {
-      this.form.removeEventListener("htmx:configRequest", this.onConfigRequest);
-    }
-    if (this.textarea && this.onInput) {
-      this.textarea.removeEventListener("input", this.onInput);
-    }
-    if (this.textarea && this.onKeydown) {
-      this.textarea.removeEventListener("keydown", this.onKeydown);
-    }
-    if (this.errors && this.onErrorsAfterSwap) {
-      this.errors.removeEventListener("htmx:afterSwap", this.onErrorsAfterSwap);
-    }
-    if (this.button && this.stopHandler) {
-      this.button.removeEventListener("click", this.stopHandler);
-    }
-    this.stopHandler = null;
+    this.listeners?.abort();
+    this.listeners = null;
+    this.stopListeners?.abort();
+    this.stopListeners = null;
   }
 }

@@ -1,3 +1,5 @@
+import { createListenerBag } from "../utils/events.js";
+
 export class ScrollController {
   constructor({
     root = document,
@@ -12,6 +14,7 @@ export class ScrollController {
     this.scrollBtnContainer = this.scrollBtn?.parentElement || null;
     this.autoScrollEnabled = true;
     this.lastScrollTop = 0;
+    this.listeners = null;
 
     this.alignScrollButton = this.alignScrollButton.bind(this);
     this.onScroll = this.onScroll.bind(this);
@@ -28,19 +31,21 @@ export class ScrollController {
     this.autoScrollEnabled = this.isUserNearBottom();
     this.lastScrollTop = this.container.scrollTop;
 
-    this.container.addEventListener("scroll", this.onScroll);
-    this.container.addEventListener("wheel", this.onWheel, { passive: true });
-    this.container.addEventListener("touchmove", this.onTouchMove, {
-      passive: true,
-    });
+    this.listeners?.abort();
+    this.listeners = createListenerBag();
+    const bag = this.listeners;
 
-    window.addEventListener("resize", this.alignScrollButton);
-    window.addEventListener("scroll", this.alignScrollButton, { passive: true });
+    bag.add(this.container, "scroll", this.onScroll);
+    bag.add(this.container, "wheel", this.onWheel, { passive: true });
+    bag.add(this.container, "touchmove", this.onTouchMove, { passive: true });
+
+    bag.add(window, "resize", this.alignScrollButton);
+    bag.add(window, "scroll", this.alignScrollButton, { passive: true });
     this.resizeObserver = new ResizeObserver(this.alignScrollButton);
     this.resizeObserver.observe(this.chat);
 
     if (this.scrollBtn) {
-      this.scrollBtn.addEventListener("click", this.onScrollBtnClick);
+      bag.add(this.scrollBtn, "click", this.onScrollBtnClick);
     }
 
     requestAnimationFrame(() => {
@@ -56,15 +61,10 @@ export class ScrollController {
   destroy() {
     if (!this.container || !this.chat) return;
 
-    this.container.removeEventListener("scroll", this.onScroll);
-    this.container.removeEventListener("wheel", this.onWheel);
-    this.container.removeEventListener("touchmove", this.onTouchMove);
-    window.removeEventListener("resize", this.alignScrollButton);
-    window.removeEventListener("scroll", this.alignScrollButton);
-    if (this.scrollBtn) {
-      this.scrollBtn.removeEventListener("click", this.onScrollBtnClick);
-    }
+    this.listeners?.abort();
+    this.listeners = null;
     this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
   }
 
   isUserNearBottom(threshold = 0) {
