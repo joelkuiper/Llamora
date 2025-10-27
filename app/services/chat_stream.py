@@ -185,6 +185,7 @@ class PendingResponse:
         llm: LLMClient,
         db,
         on_cleanup: Callable[[str], None],
+        pending_ttl: int,
         params: dict | None = None,
         context: dict | None = None,
         prompt: str | None = None,
@@ -215,10 +216,12 @@ class PendingResponse:
         self._writer = AssistantMessageWriter(db)
         self._parser = ChatMetaParser()
         self._visible_total = ""
+        self._pending_ttl = pending_ttl
         logger.debug("Starting generation for user message %s", user_msg_id)
         self._task = asyncio.create_task(
             self._generate(uid), name=f"pending:{user_msg_id}"
         )
+        self._task.add_done_callback(lambda _: self._invoke_cleanup())
 
     async def _generate(self, uid: str) -> None:
         worker = ResponseStreamWorker(
@@ -229,12 +232,21 @@ class PendingResponse:
         )
         async with asyncio.TaskGroup() as tg:
             stream_task = tg.create_task(
-                worker.run(), name=f"stream:{self.user_msg_id}"
+                self._run_stream(worker), name=f"stream:{self.user_msg_id}"
             )
             tg.create_task(
                 self._finalize_from_stream(persister, stream_task),
                 name=f"finalize:{self.user_msg_id}",
             )
+
+    async def _run_stream(self, worker: ResponseStreamWorker) -> str:
+        if self._pending_ttl and self._pending_ttl > 0:
+            timeout_ctx = getattr(asyncio, "timeout", None)
+            if timeout_ctx is not None:
+                async with timeout_ctx(self._pending_ttl):
+                    return await worker.run()
+            return await asyncio.wait_for(worker.run(), self._pending_ttl)
+        return await worker.run()
 
     async def _on_visible_chunk(self, chunk: str, total: str) -> None:
         self._visible_total = total
@@ -251,6 +263,15 @@ class PendingResponse:
             full_response = await stream_task
         except asyncio.CancelledError:
             self.cancelled = True
+            await self._finalize_cancelled(persister)
+            return
+        except asyncio.TimeoutError:
+            logger.warning("Streaming timed out for %s", self.user_msg_id)
+            self.cancelled = True
+            self.error = True
+            self.error_message = "The response took too long and was cancelled."
+            with suppress(Exception):
+                await self._session.abort()
             await self._finalize_cancelled(persister)
             return
         except LLMStreamError as exc:
@@ -302,6 +323,8 @@ class PendingResponse:
         self, persister: AssistantResponsePersister
     ) -> None:
         final_text = self._visible_total + self._parser.flush_visible_tail()
+        if self.error_message:
+            final_text += f"<span class='error'>{escape(self.error_message)}</span>"
         meta: dict = {"error": True} if self.error else {}
         if self.meta_extra:
             meta.update(self.meta_extra)
@@ -389,14 +412,11 @@ class ChatStreamManager:
         llm: LLMClient,
         db=None,
         pending_ttl: int = 300,
-        cleanup_interval: int = 60,
     ) -> None:
         self._llm = llm
         self._db = db
         self._pending_ttl = pending_ttl
-        self._cleanup_interval = cleanup_interval
         self._pending: dict[str, PendingResponse] = {}
-        self._cleanup_task: asyncio.Task | None = None
 
     def set_db(self, db) -> None:
         self._db = db
@@ -434,6 +454,7 @@ class ChatStreamManager:
             self._llm,
             self._db,
             self._remove_pending,
+            self._pending_ttl,
             params,
             context,
             prompt,
@@ -441,7 +462,6 @@ class ChatStreamManager:
             meta_extra,
         )
         self._pending[user_msg_id] = pending
-        self._ensure_cleanup_task()
         return pending
 
     async def stop(self, user_msg_id: str) -> tuple[bool, bool]:
@@ -453,38 +473,16 @@ class ChatStreamManager:
         handled = await self._llm.abort(user_msg_id)
         return handled, False
 
-    def _ensure_cleanup_task(self) -> None:
-        if self._cleanup_task is None or self._cleanup_task.done():
-            self._cleanup_task = asyncio.create_task(self._cleanup_expired())
-
-    async def _cleanup_expired(self) -> None:
-        try:
-            while True:
-                await asyncio.sleep(self._cleanup_interval)
-                cutoff = asyncio.get_event_loop().time() - self._pending_ttl
-                for user_msg_id, pending in list(self._pending.items()):
-                    if pending.done or pending.created_at < cutoff:
-                        self._remove_pending(user_msg_id)
-        except asyncio.CancelledError:
-            pass
-
     def _remove_pending(self, user_msg_id: str) -> None:
         self._pending.pop(user_msg_id, None)
 
     async def shutdown(self) -> None:
-        """Cancel all in-flight responses and stop background cleanup."""
+        """Cancel all in-flight responses and await their completion."""
 
         for pending in list(self._pending.values()):
             with suppress(Exception):
                 await pending.cancel()
         self._pending.clear()
-
-        task = self._cleanup_task
-        self._cleanup_task = None
-        if task is not None:
-            task.cancel()
-            with suppress(asyncio.CancelledError):
-                await task
 
 
 __all__ = [
