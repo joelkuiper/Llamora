@@ -15,7 +15,7 @@
     <script defer src="{{url_for('static', filename='js/vendor/popper.min.jsm.js')}}"></script>
 
     <script defer type="module" src="{{url_for('static', filename='js/tooltip.js')}}"></script>
-    <script defer type="module" src="{{url_for('static', filename='js/calendar.js')}}"></script>
+    <script defer type="module" src="{{url_for('static', filename='js/components/calendar.js')}}"></script>
 
 
     <link rel="stylesheet" href="{{url_for('static', filename='css/main.css')}}">
@@ -40,7 +40,7 @@
         <h1>{{ config.APP_NAME }}</h1>
       </div>
 
-      <div id="calendar-control">
+      <calendar-control id="calendar-control">
         <button id="prev-day" type="button" class="icon-btn" aria-label="Previous day" data-tooltip-title="Previous day">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="15 18 9 12 15 6"></polyline>
@@ -61,7 +61,7 @@
              hx-get="{{ url_for('days.calendar_view') }}"
              hx-trigger="calendar-popover:show"
              hx-swap="innerHTML"></div>
-      </div>
+      </calendar-control>
 
       <div class="header-right">
         <div class="search-wrap">
