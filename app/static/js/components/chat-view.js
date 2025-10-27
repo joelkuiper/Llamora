@@ -86,10 +86,12 @@ export class ChatView extends ReactiveElement {
   #pageShowHandler;
   #historyRestoreHandler;
   #historyRestoreFrame = null;
+  #pendingSyncFrame = null;
   #connectionListeners = null;
   #chatListeners = null;
   #markdownObserver = null;
   #initialized = false;
+  #lastRenderedDay = null;
 
   constructor() {
     super();
@@ -113,27 +115,37 @@ export class ChatView extends ReactiveElement {
       this.#historyRestoreHandler
     );
 
-    if (!this.#initialized) {
-      this.#initialize();
-    }
+    this.#syncToChatDate();
+    this.#scheduleSync();
   }
 
   disconnectedCallback() {
     this.#cancelHistoryRestoreFrame();
+    this.#cancelSyncFrame();
     this.#teardown();
     this.#connectionListeners = this.disposeListenerBag(this.#connectionListeners);
     this.#initialized = false;
     super.disconnectedCallback();
   }
 
-  #initialize() {
+  #initialize(
+    chat = this.querySelector("#chat"),
+    chatDate = chat?.dataset?.date ?? null
+  ) {
+    this.#cancelSyncFrame();
+    this.#initialized = false;
     this.#teardown();
 
     setTimezoneCookie();
 
-    const chat = this.querySelector("#chat");
     if (!chat) {
       this.#chat = null;
+      this.#lastRenderedDay = null;
+      if (document?.body?.dataset) {
+        delete document.body.dataset.activeDay;
+        delete document.body.dataset.activeDayLabel;
+      }
+      this.#scheduleSync();
       return;
     }
 
@@ -141,6 +153,23 @@ export class ChatView extends ReactiveElement {
 
     this.#state = { currentStreamMsgId: null };
     this.#chat = chat;
+
+    const activeDay = chatDate || null;
+    const activeDayLabel = chat?.dataset?.longDate ?? null;
+    this.#lastRenderedDay = activeDay;
+
+    if (document?.body?.dataset) {
+      if (activeDay) {
+        document.body.dataset.activeDay = activeDay;
+      } else {
+        delete document.body.dataset.activeDay;
+      }
+      if (activeDayLabel) {
+        document.body.dataset.activeDayLabel = activeDayLabel;
+      } else {
+        delete document.body.dataset.activeDayLabel;
+      }
+    }
 
     chat.querySelectorAll?.(".markdown-body").forEach((el) => {
       if (el?.dataset?.rendered) {
@@ -154,10 +183,18 @@ export class ChatView extends ReactiveElement {
 
     this.#chatForm = this.querySelector("chat-form");
     if (this.#chatForm) {
+      if (window?.customElements?.upgrade) {
+        try {
+          window.customElements.upgrade(this.#chatForm);
+        } catch (err) {
+          console.error("Failed to upgrade chat-form element", err);
+        }
+      }
+
       this.#chatForm.chat = chat;
       this.#chatForm.container = container;
       this.#chatForm.state = this.#state;
-      this.#chatForm.date = chat.dataset.date;
+      this.#chatForm.date = activeDay;
     }
 
     if (this.#chatForm?.isToday) {
@@ -188,14 +225,34 @@ export class ChatView extends ReactiveElement {
     this.#markdownObserver.start();
     this.#updateStreamingState();
 
-    initDayNav();
+    initDayNav(chat, { activeDay, label: activeDayLabel });
     scrollToHighlight(this.dataset.scrollTarget);
 
-    if (chat.dataset.date) {
-      document.title = chat.dataset.date;
+    if (activeDayLabel) {
+      document.title = activeDayLabel;
+    } else if (activeDay) {
+      document.title = activeDay;
     }
 
     this.#initialized = true;
+  }
+
+  #syncToChatDate() {
+    const chat = this.querySelector("#chat");
+    const chatDate = chat?.dataset?.date ?? null;
+    const chatChanged = chat !== this.#chat;
+    const dateChanged = chatDate !== this.#lastRenderedDay;
+
+    if (!chat) {
+      if (!this.#initialized) {
+        this.#scheduleSync();
+      }
+      return;
+    }
+
+    if (!this.#initialized || chatChanged || dateChanged) {
+      this.#initialize(chat, chatDate);
+    }
   }
 
   #teardown() {
@@ -259,6 +316,8 @@ export class ChatView extends ReactiveElement {
     if (swapTargets.includes(this.#chat)) {
       this.#updateStreamingState(true);
     }
+
+    this.#syncToChatDate();
   }
 
   #collectSwapTargets(event) {
@@ -287,7 +346,8 @@ export class ChatView extends ReactiveElement {
 
   #handlePageShow(event) {
     if (event.persisted) {
-      this.#initialize();
+      this.#initialized = false;
+      this.#syncToChatDate();
     }
   }
 
@@ -296,7 +356,7 @@ export class ChatView extends ReactiveElement {
     this.#cancelHistoryRestoreFrame();
     this.#historyRestoreFrame = window.requestAnimationFrame(() => {
       this.#historyRestoreFrame = null;
-      this.#initialize();
+      this.#syncToChatDate();
     });
   }
 
@@ -307,8 +367,29 @@ export class ChatView extends ReactiveElement {
     }
   }
 
+  #scheduleSync() {
+    if (this.#pendingSyncFrame != null) {
+      return;
+    }
+    this.#pendingSyncFrame = window.requestAnimationFrame(() => {
+      this.#pendingSyncFrame = null;
+      this.#syncToChatDate();
+    });
+  }
+
+  #cancelSyncFrame() {
+    if (this.#pendingSyncFrame != null) {
+      window.cancelAnimationFrame(this.#pendingSyncFrame);
+      this.#pendingSyncFrame = null;
+    }
+  }
+
   #updateStreamingState(forceScroll = false) {
     if (!this.#chat || !this.#chatForm) return;
+
+    if (typeof this.#chatForm.setStreaming !== "function") {
+      return;
+    }
 
     const msgId = findCurrentMsgId(this.#chat);
     this.#state.currentStreamMsgId = msgId;
@@ -329,6 +410,14 @@ export class ChatView extends ReactiveElement {
 
     const apply = (stream) => {
       if (!stream) return;
+      if (window?.customElements?.upgrade) {
+        try {
+          window.customElements.upgrade(stream);
+        } catch (err) {
+          console.error("Failed to upgrade llm-stream element", err);
+        }
+      }
+
       stream.scrollToBottom = (...args) => this.#scrollToBottom?.(...args);
     };
 
@@ -344,7 +433,9 @@ export class ChatView extends ReactiveElement {
     if (this.#state) {
       this.#state.currentStreamMsgId = detail.userMsgId || null;
     }
-    this.#chatForm?.setStreaming(true);
+    if (this.#chatForm && typeof this.#chatForm.setStreaming === "function") {
+      this.#chatForm.setStreaming(true);
+    }
     this.#scrollToBottom?.(true);
   }
 
@@ -353,7 +444,9 @@ export class ChatView extends ReactiveElement {
     if (this.#state) {
       this.#state.currentStreamMsgId = null;
     }
-    this.#chatForm?.setStreaming(false);
+    if (this.#chatForm && typeof this.#chatForm.setStreaming === "function") {
+      this.#chatForm.setStreaming(false);
+    }
     if (detail.status !== "aborted") {
       this.#scrollToBottom?.(true);
     }

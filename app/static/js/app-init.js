@@ -14,8 +14,7 @@ function registerHtmxHeaderHooks(csrfToken) {
       headers["X-CSRFToken"] = csrfToken;
     }
 
-    const chat = document.getElementById("chat");
-    const activeDate = chat?.dataset?.date;
+    const activeDate = document.body?.dataset?.activeDay;
     if (activeDate) {
       headers["X-Active-Day"] = activeDate;
     }
