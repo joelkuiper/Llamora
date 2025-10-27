@@ -46,15 +46,35 @@ class LocalDB:
         atexit.register(self._atexit_close)
 
     def _atexit_close(self) -> None:
-        if self.pool is not None:
+        if self.pool is None:
+            return
+
+        logger = logging.getLogger(__name__)
+        pool = self.pool
+
+        try:
             try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    loop.create_task(self.pool.close())
-                else:
-                    loop.run_until_complete(self.pool.close())
-            except Exception:
-                pass
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+
+            if loop is None:
+                try:
+                    asyncio.run(pool.close())
+                except RuntimeError:
+                    new_loop = asyncio.new_event_loop()
+                    try:
+                        new_loop.run_until_complete(pool.close())
+                    finally:
+                        new_loop.close()
+            elif loop.is_running():
+                loop.create_task(pool.close())
+            else:
+                loop.run_until_complete(pool.close())
+        except Exception:
+            logger.exception("Failed to close SQLite connection pool during shutdown")
+        else:
+            self.pool = None
 
     def __del__(self):
         self._atexit_close()
