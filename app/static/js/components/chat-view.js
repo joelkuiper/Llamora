@@ -10,6 +10,15 @@ import { createListenerBag } from "../utils/events.js";
 
 const TYPING_INDICATOR_SELECTOR = "#typing-indicator";
 
+function activateAnimations(node) {
+  if (!node || node.nodeType !== Node.ELEMENT_NODE) return;
+
+  node.classList?.remove("no-anim");
+  node.querySelectorAll?.(".no-anim").forEach((el) => {
+    el.classList.remove("no-anim");
+  });
+}
+
 function findCurrentMsgId(chat) {
   if (!chat) return null;
   const indicator = chat.querySelector(TYPING_INDICATOR_SELECTOR);
@@ -68,7 +77,6 @@ export class ChatView extends HTMLElement {
   #formController = null;
   #scrollController = null;
   #streamController = null;
-  #observer = null;
   #state = null;
   #chat = null;
   #scrollToBottom = null;
@@ -154,19 +162,7 @@ export class ChatView extends HTMLElement {
     this.#chatListeners = createListenerBag();
     this.#chatListeners.add(chat, "htmx:afterSwap", this.#afterSwapHandler);
 
-    this.#observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        mutation.addedNodes.forEach((node) => {
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            node.classList?.remove("no-anim");
-            node.querySelectorAll?.(".no-anim").forEach((el) =>
-              el.classList.remove("no-anim")
-            );
-          }
-        });
-      }
-    });
-    this.#observer.observe(chat, { childList: true });
+    activateAnimations(chat);
 
     renderAllMarkdown(chat);
     initTagPopovers(chat);
@@ -199,9 +195,6 @@ export class ChatView extends HTMLElement {
     this.#formController = null;
 
 
-    this.#observer?.disconnect();
-    this.#observer = null;
-
     this.#chatListeners?.abort();
     this.#chatListeners = null;
 
@@ -212,6 +205,11 @@ export class ChatView extends HTMLElement {
 
   #handleChatAfterSwap(event) {
     if (!this.#chat) return;
+
+    const target = event.target;
+    if (target === this.#chat || target.classList?.contains("message")) {
+      activateAnimations(target);
+    }
 
     renderAllMarkdown(this.#chat);
     initTagPopovers(this.#chat);
