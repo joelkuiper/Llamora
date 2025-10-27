@@ -1,7 +1,7 @@
 import { ChatFormController } from "../chat/form-controller.js";
 import { ScrollController } from "../chat/scroll-controller.js";
 import { StreamController } from "../chat/stream-controller.js";
-import { renderAllMarkdown } from "../markdown.js";
+import { MarkdownObserver } from "../chat/markdown-observer.js";
 import { initDayNav } from "../day.js";
 import { scrollToHighlight } from "../ui.js";
 import { setTimezoneCookie } from "../timezone.js";
@@ -81,14 +81,17 @@ export class ChatView extends HTMLElement {
   #scrollToBottom = null;
   #midnightCleanup = null;
   #afterSwapHandler;
+  #beforeSwapHandler;
   #pageShowHandler;
   #connectionListeners = null;
   #chatListeners = null;
+  #markdownObserver = null;
   #initialized = false;
 
   constructor() {
     super();
     this.#afterSwapHandler = (event) => this.#handleChatAfterSwap(event);
+    this.#beforeSwapHandler = (event) => this.#handleChatBeforeSwap(event);
     this.#pageShowHandler = (event) => this.#handlePageShow(event);
   }
 
@@ -156,10 +159,12 @@ export class ChatView extends HTMLElement {
     this.#chatListeners?.abort();
     this.#chatListeners = createListenerBag();
     this.#chatListeners.add(chat, "htmx:afterSwap", this.#afterSwapHandler);
+    this.#chatListeners.add(chat, "htmx:beforeSwap", this.#beforeSwapHandler);
 
     activateAnimations(chat);
 
-    renderAllMarkdown(chat);
+    this.#markdownObserver = new MarkdownObserver({ root: chat });
+    this.#markdownObserver.start();
     this.#updateStreamingState();
 
     initDayNav();
@@ -187,6 +192,8 @@ export class ChatView extends HTMLElement {
     this.#formController?.destroy();
     this.#formController = null;
 
+    this.#markdownObserver?.stop();
+    this.#markdownObserver = null;
 
     this.#chatListeners?.abort();
     this.#chatListeners = null;
@@ -194,6 +201,15 @@ export class ChatView extends HTMLElement {
     this.#chat = null;
     this.#scrollToBottom = null;
     this.#state = null;
+  }
+
+  #handleChatBeforeSwap(event) {
+    if (!this.#chat || !this.#markdownObserver) return;
+
+    const swapTargets = this.#collectSwapTargets(event);
+    if (swapTargets.includes(this.#chat)) {
+      this.#markdownObserver.pause();
+    }
   }
 
   #handleChatAfterSwap(event) {
@@ -219,7 +235,7 @@ export class ChatView extends HTMLElement {
       }
     });
 
-    renderAllMarkdown(this.#chat, swapTargets);
+    this.#markdownObserver?.resume(swapTargets);
 
     if (swapTargets.includes(this.#chat)) {
       this.#updateStreamingState(true);

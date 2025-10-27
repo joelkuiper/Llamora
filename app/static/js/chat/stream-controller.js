@@ -1,4 +1,3 @@
-import { renderMarkdown } from "../markdown.js";
 import { positionTypingIndicator } from "../typing-indicator.js";
 import { createListenerBag } from "../utils/events.js";
 
@@ -69,14 +68,25 @@ export class StreamController {
     const contentDiv = wrap.querySelector(".markdown-body");
     if (!sink || !contentDiv) return;
 
-    const renderNow = () => {
-      let text = (sink.textContent || "").replace(/\[newline\]/g, "\n");
+    const renderNow = (shouldReposition = true) => {
       const typing = wrap.querySelector(TYPING_INDICATOR_SELECTOR);
-      contentDiv.innerHTML = renderMarkdown(text);
-      contentDiv.dataset.rendered = "true";
-      if (typing) {
-        positionTypingIndicator(contentDiv, typing);
+      const text = (sink.textContent || "").replace(/\[newline\]/g, "\n");
+
+      if (typing?.parentNode) {
+        typing.parentNode.removeChild(typing);
       }
+
+      delete contentDiv.dataset.rendered;
+      contentDiv.textContent = text;
+
+      if (typing && shouldReposition) {
+        requestAnimationFrame(() => {
+          positionTypingIndicator(contentDiv, typing);
+          this.scrollToBottom();
+        });
+        return true;
+      }
+      return false;
     };
 
     const scheduleRender = (fn) => {
@@ -91,8 +101,10 @@ export class StreamController {
 
     if (type === "message") {
       scheduleRender(() => {
-        renderNow();
-        this.scrollToBottom();
+        const hadTyping = renderNow(true);
+        if (!hadTyping) {
+          this.scrollToBottom();
+        }
       });
       return;
     }
@@ -103,7 +115,7 @@ export class StreamController {
         cancelAnimationFrame(rid);
         this.sseRenders.delete(wrap);
       }
-      renderNow();
+      const hadTyping = renderNow(false);
 
       const indicator = wrap.querySelector(TYPING_INDICATOR_SELECTOR);
       if (indicator && !indicator.classList.contains("stopped")) {
@@ -123,7 +135,9 @@ export class StreamController {
           placeholder.remove();
         }
       }
-      this.scrollToBottom();
+      if (!hadTyping) {
+        this.scrollToBottom();
+      }
     }
   }
 
