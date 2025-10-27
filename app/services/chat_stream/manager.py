@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from collections.abc import AsyncIterator
 from contextlib import suppress
 from typing import Callable
@@ -97,7 +98,7 @@ class PendingResponse(ResponsePipelineCallbacks):
         self.reply_to = reply_to if reply_to is not None else user_msg_id
         self.meta_extra = meta_extra or {}
         self.cancelled = False
-        self.created_at = asyncio.get_event_loop().time()
+        self.created_at = time.monotonic()
         self.assistant_msg_id: str | None = None
         self._cleanup = on_cleanup
         self._cleanup_called = False
