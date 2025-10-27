@@ -1,4 +1,5 @@
 import { flashHighlight, SPINNER } from "../ui.js";
+import { createListenerBag } from "../utils/events.js";
 
 const SPINNER_FRAMES = SPINNER.frames;
 const SPINNER_INTERVAL = SPINNER.interval;
@@ -12,13 +13,15 @@ const getEventTarget = (evt) => {
 };
 
 export class SearchOverlay extends HTMLElement {
-  #listenerController = null;
-  #observer = null;
+  #listeners = null;
+  #overlayListeners = null;
   #spinnerIntervalId = null;
   #spinnerFrame = 0;
   #resultsEl = null;
   #inputEl = null;
   #spinnerEl = null;
+  #beforeRequestHandler;
+  #afterRequestHandler;
   #afterSwapHandler;
   #inputHandler;
   #keydownHandler;
@@ -26,6 +29,8 @@ export class SearchOverlay extends HTMLElement {
 
   constructor() {
     super();
+    this.#beforeRequestHandler = (event) => this.#handleBeforeRequest(event);
+    this.#afterRequestHandler = (event) => this.#handleAfterRequest(event);
     this.#afterSwapHandler = (event) => this.#handleAfterSwap(event);
     this.#inputHandler = () => this.#handleInput();
     this.#keydownHandler = (event) => this.#handleKeydown(event);
@@ -37,43 +42,37 @@ export class SearchOverlay extends HTMLElement {
     this.#inputEl = this.querySelector("#search-input");
     this.#spinnerEl = this.querySelector("#search-spinner");
 
-    this.#setupSpinnerObserver();
+    this.#stopSpinner();
+    this.#deactivateOverlayListeners();
 
-    if (this.#listenerController) {
-      this.#listenerController.abort();
+    if (this.#listeners) {
+      this.#listeners.abort();
     }
 
-    this.#listenerController = new AbortController();
-    const { signal } = this.#listenerController;
+    this.#listeners = createListenerBag();
+    const listeners = this.#listeners;
 
     if (this.#inputEl) {
-      this.#inputEl.addEventListener("input", this.#inputHandler, { signal });
+      listeners.add(this.#inputEl, "input", this.#inputHandler);
     }
 
-    document.body.addEventListener("htmx:afterSwap", this.#afterSwapHandler, {
-      signal,
-    });
-    document.addEventListener("keydown", this.#keydownHandler, { signal });
-    document.addEventListener("click", this.#documentClickHandler, { signal });
+    listeners.add(this, "htmx:beforeRequest", this.#beforeRequestHandler);
+    listeners.add(this, "htmx:afterRequest", this.#afterRequestHandler);
+    listeners.add(this, "htmx:sendError", this.#afterRequestHandler);
+    listeners.add(this, "htmx:responseError", this.#afterRequestHandler);
+    listeners.add(this, "htmx:afterSwap", this.#afterSwapHandler);
   }
 
   disconnectedCallback() {
     this.#closeResults(false, { immediate: true });
 
-    if (this.#listenerController) {
-      this.#listenerController.abort();
-      this.#listenerController = null;
+    this.#deactivateOverlayListeners();
+    if (this.#listeners) {
+      this.#listeners.abort();
+      this.#listeners = null;
     }
 
-    if (this.#observer) {
-      this.#observer.disconnect();
-      this.#observer = null;
-    }
-
-    if (this.#spinnerIntervalId !== null) {
-      clearInterval(this.#spinnerIntervalId);
-      this.#spinnerIntervalId = null;
-    }
+    this.#stopSpinner();
 
     this.#spinnerFrame = 0;
     if (this.#spinnerEl) {
@@ -84,44 +83,67 @@ export class SearchOverlay extends HTMLElement {
     this.#spinnerEl = null;
   }
 
-  #setupSpinnerObserver() {
-    if (this.#observer) {
-      this.#observer.disconnect();
-      this.#observer = null;
-    }
+  #startSpinner() {
+    const spinner = this.#spinnerEl;
+    if (!spinner || this.#spinnerIntervalId !== null) return;
 
+    this.#spinnerFrame = 0;
+    spinner.textContent = SPINNER_FRAMES[this.#spinnerFrame];
+    this.#spinnerIntervalId = window.setInterval(() => {
+      this.#spinnerFrame = (this.#spinnerFrame + 1) % SPINNER_FRAMES.length;
+      spinner.textContent = SPINNER_FRAMES[this.#spinnerFrame];
+    }, SPINNER_INTERVAL);
+  }
+
+  #stopSpinner() {
     if (this.#spinnerIntervalId !== null) {
       clearInterval(this.#spinnerIntervalId);
       this.#spinnerIntervalId = null;
     }
 
-    const spinner = this.#spinnerEl;
-    if (!spinner) return;
+    if (this.#spinnerEl) {
+      this.#spinnerFrame = 0;
+      this.#spinnerEl.textContent = "";
+    }
+  }
 
-    const update = () => {
-      if (spinner.classList.contains("htmx-request")) {
-        if (this.#spinnerIntervalId === null) {
-          this.#spinnerFrame = 0;
-          spinner.textContent = SPINNER_FRAMES[this.#spinnerFrame];
-          this.#spinnerIntervalId = window.setInterval(() => {
-            this.#spinnerFrame = (this.#spinnerFrame + 1) % SPINNER_FRAMES.length;
-            spinner.textContent = SPINNER_FRAMES[this.#spinnerFrame];
-          }, SPINNER_INTERVAL);
-        }
-      } else if (this.#spinnerIntervalId !== null) {
-        clearInterval(this.#spinnerIntervalId);
-        this.#spinnerIntervalId = null;
-        this.#spinnerFrame = 0;
-        spinner.textContent = "";
-      }
-    };
+  #activateOverlayListeners() {
+    if (this.#overlayListeners || !this.isConnected) return;
 
-    update();
-    this.#observer = new MutationObserver(update);
-    this.#observer.observe(spinner, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
+    const bag = createListenerBag();
+    const doc = this.ownerDocument ?? document;
+    bag.add(doc, "keydown", this.#keydownHandler);
+    bag.add(doc, "click", this.#documentClickHandler);
+    this.#overlayListeners = bag;
+  }
+
+  #deactivateOverlayListeners() {
+    if (this.#overlayListeners) {
+      this.#overlayListeners.abort();
+      this.#overlayListeners = null;
+    }
+  }
+
+  #handleBeforeRequest(event) {
+    const source = event.target;
+    if (!(source instanceof Element) || !this.contains(source)) return;
+
+    const wrap = this.#resultsEl;
+    if (wrap) {
+      wrap.setAttribute("aria-busy", "true");
+    }
+    this.#startSpinner();
+  }
+
+  #handleAfterRequest(event) {
+    const source = event.target;
+    if (!(source instanceof Element) || !this.contains(source)) return;
+
+    const wrap = this.#resultsEl;
+    if (wrap) {
+      wrap.removeAttribute("aria-busy");
+    }
+    this.#stopSpinner();
   }
 
   #handleAfterSwap(evt) {
@@ -131,6 +153,7 @@ export class SearchOverlay extends HTMLElement {
     const panel = wrap.querySelector(".sr-panel");
     if (!panel) {
       wrap.classList.remove("is-open");
+      this.#deactivateOverlayListeners();
       return;
     }
 
@@ -145,6 +168,7 @@ export class SearchOverlay extends HTMLElement {
       () => {
         panel.classList.remove("pop-enter");
         wrap.classList.add("is-open");
+        this.#activateOverlayListeners();
       },
       { once: true }
     );
@@ -220,6 +244,8 @@ export class SearchOverlay extends HTMLElement {
       wrap.classList.remove("is-open");
       wrap.removeAttribute("aria-busy");
       wrap.innerHTML = "";
+      this.#deactivateOverlayListeners();
+      this.#stopSpinner();
     };
 
     if (!panel) {
