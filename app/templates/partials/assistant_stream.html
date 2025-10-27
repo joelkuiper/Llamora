@@ -3,29 +3,23 @@
 {%- if sse_url is none -%}
 {%- set sse_url = url_for('chat.sse_reply', date=day, user_msg_id=user_msg_id, user_time=user_time) -%}
 {%- endif -%}
-<div id="msg-{{ user_msg_id }}"
-     class="message assistant-stream"
-     data-user-msg-id="{{ user_msg_id }}"
-     data-assistant-msg-id=""
-     hx-ext="sse"
-     sse-close="done"
-     sse-connect="{{ sse_url }}">
-  <span sse-close="error">
-    {# data-assistant-msg-id will be set by client JS once streaming completes #}
-    <span class="raw-response" sse-swap="message" hidden hx-swap="beforeend"></span>
-
-    <span class="markdown-body">
-      <span id="typing-indicator"
-            {%- if stop_url %}
+<llm-stream id="msg-{{ user_msg_id }}"
+            class="message assistant-stream"
             data-user-msg-id="{{ user_msg_id }}"
-            data-stop-url="{{ stop_url }}"
-            {%- endif %}
-            sse-swap="done"
-            hx-swap="none">
-        <span class="cursor">❚</span>
-      </span>
+            data-assistant-msg-id=""
+            data-sse-url="{{ sse_url }}">
+  <span class="raw-response" hidden></span>
+
+  <div class="markdown-body">
+    <span id="typing-indicator"
+          data-user-msg-id="{{ user_msg_id }}"
+          {%- if stop_url %}
+          data-stop-url="{{ stop_url }}"
+          {%- endif %}>
+      <span class="cursor">❚</span>
     </span>
-    <div class="meta-chips-placeholder"></div>
-  </span>
-</div>
+  </div>
+
+  <div class="meta-chips-placeholder"></div>
+</llm-stream>
 {%- endmacro %}

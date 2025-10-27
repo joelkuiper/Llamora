@@ -6,7 +6,7 @@ import { scrollToHighlight } from "../ui.js";
 import { setTimezoneCookie } from "../timezone.js";
 import { createListenerBag } from "../utils/events.js";
 import "./chat-form.js";
-import "./chat-stream.js";
+import "./llm-stream.js";
 
 const TYPING_INDICATOR_SELECTOR = "#typing-indicator";
 
@@ -76,7 +76,6 @@ function scheduleMidnightRefresh(chat) {
 export class ChatView extends HTMLElement {
   #chatForm = null;
   #scrollController = null;
-  #chatStream = null;
   #state = null;
   #chat = null;
   #scrollToBottom = null;
@@ -158,19 +157,18 @@ export class ChatView extends HTMLElement {
     this.#scrollController = new ScrollController({ root: document, chat });
     this.#scrollToBottom = this.#scrollController.init() || (() => {});
 
-    this.#chatStream = chat;
-    if (this.#chatStream) {
-      this.#chatStream.state = this.#state;
-      this.#chatStream.setStreaming = (streaming) =>
-        this.#chatForm?.setStreaming(streaming);
-      this.#chatStream.scrollToBottom = (...args) =>
-        this.#scrollToBottom?.(...args);
-    }
+    this.#configureStreams(chat);
 
     this.#chatListeners?.abort();
     this.#chatListeners = createListenerBag();
     this.#chatListeners.add(chat, "htmx:afterSwap", this.#afterSwapHandler);
     this.#chatListeners.add(chat, "htmx:beforeSwap", this.#beforeSwapHandler);
+    this.#chatListeners.add(chat, "llm-stream:start", (event) =>
+      this.#handleStreamStart(event)
+    );
+    this.#chatListeners.add(chat, "llm-stream:complete", (event) =>
+      this.#handleStreamComplete(event)
+    );
 
     activateAnimations(chat);
 
@@ -207,7 +205,6 @@ export class ChatView extends HTMLElement {
     this.#chatListeners = null;
 
     this.#chat = null;
-    this.#chatStream = null;
     this.#scrollToBottom = null;
     this.#chatForm = null;
     this.#state = null;
@@ -246,6 +243,10 @@ export class ChatView extends HTMLElement {
     });
 
     this.#markdownObserver?.resume(swapTargets);
+
+    swapTargets.forEach((target) => {
+      this.#configureStreams(target);
+    });
 
     if (swapTargets.includes(this.#chat)) {
       this.#updateStreamingState(true);
@@ -295,6 +296,42 @@ export class ChatView extends HTMLElement {
   }
 
   #handleMarkdownRendered(el) {
-    this.#chatStream?.handleMarkdownRendered(el);
+    const stream = el?.closest?.("llm-stream");
+    stream?.handleMarkdownRendered(el);
+  }
+
+  #configureStreams(root) {
+    if (!root) return;
+
+    const apply = (stream) => {
+      if (!stream) return;
+      stream.scrollToBottom = (...args) => this.#scrollToBottom?.(...args);
+    };
+
+    if (root instanceof Element && root.matches("llm-stream")) {
+      apply(root);
+    }
+
+    root.querySelectorAll?.("llm-stream").forEach((stream) => apply(stream));
+  }
+
+  #handleStreamStart(event) {
+    const detail = event?.detail || {};
+    if (this.#state) {
+      this.#state.currentStreamMsgId = detail.userMsgId || null;
+    }
+    this.#chatForm?.setStreaming(true);
+    this.#scrollToBottom?.(true);
+  }
+
+  #handleStreamComplete(event) {
+    const detail = event?.detail || {};
+    if (this.#state) {
+      this.#state.currentStreamMsgId = null;
+    }
+    this.#chatForm?.setStreaming(false);
+    if (detail.status !== "aborted") {
+      this.#scrollToBottom?.(true);
+    }
   }
 }

@@ -238,16 +238,12 @@ class ChatFormElement extends HTMLElement {
     if (!this.#chat) return;
     const indicator = this.#chat.querySelector("#typing-indicator");
     const stopEndpoint = indicator?.dataset.stopUrl;
-    const wrap = indicator?.closest(".assistant-stream");
-    if (wrap) {
-      wrap.dispatchEvent(new Event("htmx:abort"));
-      wrap.removeAttribute("hx-ext");
-      wrap.removeAttribute("sse-connect");
-      wrap.removeAttribute("sse-close");
-      if (indicator) {
-        indicator.classList.add("stopped");
-        setTimeout(() => indicator.remove(), 1000);
-      }
+    const stream = indicator?.closest("llm-stream");
+    if (stream && typeof stream.abort === "function") {
+      stream.abort();
+    } else if (indicator) {
+      indicator.classList.add("stopped");
+      setTimeout(() => indicator.remove(), 1000);
     }
     if (stopEndpoint) {
       htmx.ajax("POST", stopEndpoint, { swap: "none" });
