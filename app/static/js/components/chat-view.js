@@ -199,16 +199,55 @@ export class ChatView extends HTMLElement {
   #handleChatAfterSwap(event) {
     if (!this.#chat) return;
 
-    const target = event.target;
-    if (target === this.#chat || target.classList?.contains("message")) {
-      activateAnimations(target);
-    }
+    const swapTargets = this.#collectSwapTargets(event);
 
-    renderAllMarkdown(this.#chat);
+    swapTargets.forEach((target) => {
+      if (target === this.#chat) {
+        activateAnimations(target);
+        return;
+      }
 
-    if (event.target === this.#chat) {
+      if (target?.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+        target.querySelectorAll?.(".message").forEach((node) => {
+          activateAnimations(node);
+        });
+        return;
+      }
+
+      if (target?.classList?.contains("message")) {
+        activateAnimations(target);
+      }
+    });
+
+    renderAllMarkdown(this.#chat, swapTargets);
+
+    if (swapTargets.includes(this.#chat)) {
       this.#updateStreamingState(true);
     }
+  }
+
+  #collectSwapTargets(event) {
+    const nodes = new Set();
+
+    const addNode = (node) => {
+      if (!node || !(node instanceof Node)) return;
+      nodes.add(node);
+    };
+
+    addNode(event.target);
+
+    const detail = event.detail || {};
+
+    addNode(detail.target);
+    addNode(detail.swapTarget);
+
+    if (detail.targets && typeof detail.targets[Symbol.iterator] === "function") {
+      for (const node of detail.targets) {
+        addNode(node);
+      }
+    }
+
+    return Array.from(nodes);
   }
 
   #handlePageShow(event) {
