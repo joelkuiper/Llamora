@@ -17,6 +17,7 @@ class ChatFormElement extends ReactiveElement {
   #connected = false;
   #initialized = false;
   #shouldRestoreFocus = false;
+  #pendingStreamingState = null;
 
   connectedCallback() {
     super.connectedCallback();
@@ -93,6 +94,12 @@ class ChatFormElement extends ReactiveElement {
     this.#bindEvents();
 
     this.#initialized = true;
+
+    if (this.#pendingStreamingState !== null) {
+      const pending = this.#pendingStreamingState;
+      this.#pendingStreamingState = null;
+      this.setStreaming(pending);
+    }
   }
 
   #teardown() {
@@ -203,6 +210,11 @@ class ChatFormElement extends ReactiveElement {
   }
 
   setStreaming(streaming) {
+    if (!this.#initialized) {
+      this.#pendingStreamingState = streaming;
+      return;
+    }
+
     if (!this.#button || !this.#textarea) return;
 
     if (!this.#isToday) {
