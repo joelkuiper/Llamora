@@ -3,19 +3,43 @@ from dotenv import load_dotenv
 from quart_wtf import CSRFProtect
 import os
 import logging
-import asyncio
 import secrets
-from contextlib import suppress
-from app.services.container import AppServices
+from app.services.container import AppLifecycle, AppServices
 
 load_dotenv()
 
 def create_app():
+    services = AppServices.create()
+
+    from .services.auth_helpers import dek_store
+
+    lifecycle = AppLifecycle(services, dek_store)
+
+    async def _ensure_registration_token(app: Quart) -> None:
+        if not app.config.get("DISABLE_REGISTRATION"):
+            app.config["REGISTRATION_TOKEN"] = None
+            return
+
+        if await services.db.users.users_table_empty():
+            token = secrets.token_urlsafe(32)
+            app.config["REGISTRATION_TOKEN"] = token
+            server = app.config.get("SERVER_NAME")
+            scheme = app.config.get("PREFERRED_URL_SCHEME", "http")
+            if server:
+                url = f"{scheme}://{server}/register?token={token}"
+            else:
+                url = f"/register?token={token}"
+            app.logger.warning(
+                "Registration disabled but no users exist. One-time URL: %s",
+                url,
+            )
+        else:
+            app.config["REGISTRATION_TOKEN"] = None
+
     app = Quart(__name__)
     app.secret_key = os.getenv("LLAMORA_SECRET_KEY")
     app.config.from_object("config")
 
-    services = AppServices.create()
     app.extensions["llamora"] = services
 
     logging.basicConfig(
@@ -65,72 +89,32 @@ def create_app():
             return ""
         return hashlib.sha256(f"{uid}:{t}".encode("utf-8")).hexdigest()
 
-    from .services.auth_helpers import load_user, dek_store
+    from .services.auth_helpers import load_user
 
     app.before_request(load_user)
-    app.before_serving(services.db.init)
-    app.after_serving(services.db.close)
+    app.extensions["llamora_lifecycle"] = lifecycle
 
-    search_api = services.search_api
-    llm_service = services.llm_service
+    def _install_lifecycle() -> None:
+        if hasattr(app, "lifecycle"):
 
-    @app.before_serving
-    async def _start_search_api() -> None:
-        await search_api.start()
+            @app.lifecycle  # type: ignore[misc]
+            async def _lifespan(app: Quart):
+                async with lifecycle:
+                    await _ensure_registration_token(app)
+                    yield
 
-    @app.after_serving
-    async def _stop_search_api() -> None:
-        await search_api.stop()
+        else:
 
-    @app.before_serving
-    async def _start_llm_service() -> None:
-        await llm_service.start()
+            @app.before_serving
+            async def _start_lifecycle() -> None:
+                await lifecycle.start()
+                await _ensure_registration_token(app)
 
-    @app.after_serving
-    async def _stop_llm_service() -> None:
-        await llm_service.stop()
+            @app.after_serving
+            async def _stop_lifecycle() -> None:
+                await lifecycle.stop()
 
-    @app.before_serving
-    async def _print_registration_link():
-        if app.config.get("DISABLE_REGISTRATION"):
-            if await services.db.users.users_table_empty():
-                token = secrets.token_urlsafe(32)
-                app.config["REGISTRATION_TOKEN"] = token
-                server = app.config.get("SERVER_NAME")
-                scheme = app.config.get("PREFERRED_URL_SCHEME", "http")
-                if server:
-                    url = f"{scheme}://{server}/register?token={token}"
-                else:
-                    url = f"/register?token={token}"
-                app.logger.warning(
-                    "Registration disabled but no users exist. One-time URL: %s",
-                    url,
-                )
-            else:
-                app.config["REGISTRATION_TOKEN"] = None
-
-    maintenance_task: asyncio.Task | None = None
-
-    async def _maintenance_loop():
-        try:
-            while True:
-                await asyncio.sleep(60)
-                dek_store.expire()
-                await services.search_api.maintenance_tick()
-        except asyncio.CancelledError:
-            pass
-
-    @app.before_serving
-    async def _start_maintenance():
-        nonlocal maintenance_task
-        maintenance_task = asyncio.create_task(_maintenance_loop())
-
-    @app.after_serving
-    async def _stop_maintenance():
-        if maintenance_task:
-            maintenance_task.cancel()
-            with suppress(asyncio.CancelledError):
-                await maintenance_task
+    _install_lifecycle()
 
     @app.errorhandler(404)
     async def not_found(e):
