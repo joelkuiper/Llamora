@@ -1,23 +1,27 @@
 import asyncio
 import logging
-from collections.abc import AsyncIterator, Awaitable, Callable
+import sys
+from collections.abc import AsyncIterator
 from contextlib import suppress
-from html import escape
+from pathlib import Path
+from typing import Callable
 
 from llm.client import LLMClient
 
-from app.services.chat_meta import ChatMetaParser, build_meta
+from app.services.chat_meta import ChatMetaParser
+
+sys.modules[__name__].__path__ = [str(Path(__file__).with_name("chat_stream"))]
+
+from app.services.chat_stream.pipeline import (
+    AssistantMessageWriter,
+    LLMStreamError,
+    PipelineResult,
+    ResponsePipeline,
+    ResponsePipelineCallbacks,
+)
 
 
 logger = logging.getLogger(__name__)
-
-
-class LLMStreamError(Exception):
-    """Raised when the LLM reports an error while streaming."""
-
-
-class AssistantMessagePersistenceError(Exception):
-    """Raised when the assistant response cannot be persisted."""
 
 
 class LLMStreamSession:
@@ -63,116 +67,7 @@ class LLMStreamSession:
         await self._llm.abort(self.user_msg_id)
 
 
-class AssistantMessageWriter:
-    """Handles persistence of assistant responses."""
-
-    def __init__(self, db) -> None:
-        self._db = db
-
-    async def save(
-        self,
-        uid: str,
-        content: str,
-        dek: bytes,
-        meta: dict,
-        reply_to: str,
-        date: str,
-    ) -> str:
-        append = getattr(self._db, "append_message", None)
-        if append is None and hasattr(self._db, "messages"):
-            append = getattr(self._db.messages, "append_message", None)
-        if append is None:
-            raise AssistantMessagePersistenceError(
-                "Database does not support append_message"
-            )
-        try:
-            return await append(
-                uid,
-                "assistant",
-                content,
-                dek,
-                meta,
-                reply_to=reply_to,
-                created_date=date,
-            )
-        except Exception as exc:  # pragma: no cover - defensive
-            raise AssistantMessagePersistenceError(
-                str(exc) or "Failed to save response"
-            ) from exc
-
-
-class ResponseStreamWorker:
-    """Consumes an LLM session and forwards visible text to a callback."""
-
-    def __init__(
-        self,
-        session: LLMStreamSession,
-        parser: ChatMetaParser,
-        on_visible: Callable[[str, str], Awaitable[None]],
-    ) -> None:
-        self._session = session
-        self._parser = parser
-        self._on_visible = on_visible
-
-    async def run(self) -> str:
-        """Stream chunks until completion and return the accumulated text."""
-
-        full_response = ""
-        async for chunk in self._session:
-            visible = self._parser.feed(chunk)
-            if visible:
-                full_response += visible
-                await self._on_visible(visible, full_response)
-            if self._parser.meta_complete:
-                break
-        return full_response
-
-
-class AssistantResponsePersister:
-    """Persists assistant responses with consistent logging."""
-
-    def __init__(
-        self,
-        writer: AssistantMessageWriter,
-        uid: str,
-        reply_to: str,
-        date: str,
-    ) -> None:
-        self._writer = writer
-        self._uid = uid
-        self._reply_to = reply_to
-        self._date = date
-
-    async def persist(
-        self,
-        content: str,
-        dek: bytes,
-        meta: dict | None,
-        *,
-        partial: bool = False,
-    ) -> tuple[str | None, bool]:
-        if not content.strip():
-            return None, False
-
-        label = "partial assistant message" if partial else "assistant message"
-        try:
-            message_id = await self._writer.save(
-                self._uid,
-                content,
-                dek,
-                meta or {},
-                self._reply_to,
-                self._date,
-            )
-        except AssistantMessagePersistenceError:
-            logger.exception("Failed to save %s", label)
-            return None, True
-
-        logger.debug("Saved %s %s", label, message_id)
-        return message_id, False
-
-
-class PendingResponse:
+class PendingResponse(ResponsePipelineCallbacks):
     """Tracks an in-flight assistant reply to a user's message."""
 
     def __init__(
@@ -213,165 +108,48 @@ class PendingResponse:
         self._session = LLMStreamSession(
             llm, user_msg_id, history, params, context, prompt
         )
-        self._writer = AssistantMessageWriter(db)
         self._parser = ChatMetaParser()
         self._visible_total = ""
-        self._pending_ttl = pending_ttl
+        self._pipeline = ResponsePipeline(
+            session=self._session,
+            parser=self._parser,
+            writer=AssistantMessageWriter(db),
+            uid=uid,
+            reply_to=self.reply_to,
+            date=self.date,
+            dek=self.dek,
+            meta_extra=self.meta_extra,
+            timeout=pending_ttl,
+        )
         logger.debug("Starting generation for user message %s", user_msg_id)
         self._task = asyncio.create_task(
-            self._generate(uid), name=f"pending:{user_msg_id}"
+            self._run_pipeline(), name=f"pending:{user_msg_id}"
         )
         self._task.add_done_callback(lambda _: self._invoke_cleanup())
 
-    async def _generate(self, uid: str) -> None:
-        worker = ResponseStreamWorker(
-            self._session, self._parser, self._on_visible_chunk
-        )
-        persister = AssistantResponsePersister(
-            self._writer, uid, self.reply_to, self.date
-        )
-        async with asyncio.TaskGroup() as tg:
-            stream_task = tg.create_task(
-                self._run_stream(worker), name=f"stream:{self.user_msg_id}"
-            )
-            tg.create_task(
-                self._finalize_from_stream(persister, stream_task),
-                name=f"finalize:{self.user_msg_id}",
-            )
+    async def _run_pipeline(self) -> None:
+        try:
+            await self._pipeline.run(self)
+        finally:
+            self._invoke_cleanup()
 
-    async def _run_stream(self, worker: ResponseStreamWorker) -> str:
-        if self._pending_ttl and self._pending_ttl > 0:
-            timeout_ctx = getattr(asyncio, "timeout", None)
-            if timeout_ctx is not None:
-                async with timeout_ctx(self._pending_ttl):
-                    return await worker.run()
-            return await asyncio.wait_for(worker.run(), self._pending_ttl)
-        return await worker.run()
-
-    async def _on_visible_chunk(self, chunk: str, total: str) -> None:
+    async def on_visible(self, chunk: str, total: str) -> None:
         self._visible_total = total
         async with self._cond:
             self.text = total
             self._cond.notify_all()
 
-    async def _finalize_from_stream(
-        self,
-        persister: AssistantResponsePersister,
-        stream_task: asyncio.Task[str],
-    ) -> None:
-        try:
-            full_response = await stream_task
-        except asyncio.CancelledError:
-            self.cancelled = True
-            await self._finalize_cancelled(persister)
-            return
-        except asyncio.TimeoutError:
-            logger.warning("Streaming timed out for %s", self.user_msg_id)
-            self.cancelled = True
-            self.error = True
-            self.error_message = "The response took too long and was cancelled."
-            with suppress(Exception):
-                await self._session.abort()
-            await self._finalize_cancelled(persister)
-            return
-        except LLMStreamError as exc:
-            self.error = True
-            self.error_message = str(exc) or "Unknown error"
-            await self._finalize_with_text(
-                persister,
-                f"<span class='error'>{escape(self.error_message)}</span>",
-                error_meta=True,
-            )
-            return
-        except Exception as exc:  # pragma: no cover - defensive
-            logger.exception("Error during LLM streaming")
-            self.error = True
-            self.error_message = str(exc) or "An unexpected error occurred."
-            await self._finalize_with_text(
-                persister,
-                self._visible_total
-                + f"<span class='error'>{escape(self.error_message)}</span>",
-                error_meta=True,
-            )
-            return
-
-        if self.cancelled:
-            await self._finalize_cancelled(persister)
-            return
-
-        await self._finalize_success(persister, full_response)
-
-    async def _finalize_success(
-        self,
-        persister: AssistantResponsePersister,
-        full_response: str,
-    ) -> None:
-        final_text = full_response + self._parser.flush_visible_tail()
-        meta = build_meta(self._parser, meta_extra=self.meta_extra, error=self.error)
-        assistant_msg_id, failed = await persister.persist(
-            final_text, self.dek, meta
-        )
-        if assistant_msg_id:
-            self.assistant_msg_id = assistant_msg_id
-        if failed:
-            final_text = self._append_persistence_warning(final_text)
-            self.error = True
-            meta = build_meta(self._parser, meta_extra=self.meta_extra, error=True)
-        await self._complete(final_text, meta)
-
-    async def _finalize_cancelled(
-        self, persister: AssistantResponsePersister
-    ) -> None:
-        final_text = self._visible_total + self._parser.flush_visible_tail()
-        if self.error_message:
-            final_text += f"<span class='error'>{escape(self.error_message)}</span>"
-        meta: dict = {"error": True} if self.error else {}
-        if self.meta_extra:
-            meta.update(self.meta_extra)
-        assistant_msg_id, failed = await persister.persist(
-            final_text, self.dek, meta, partial=True
-        )
-        if assistant_msg_id:
-            self.assistant_msg_id = assistant_msg_id
-        if failed:
-            final_text = self._append_persistence_warning(final_text)
-            self.error = True
-        await self._complete(final_text, None)
-
-    async def _finalize_with_text(
-        self,
-        persister: AssistantResponsePersister,
-        final_text: str,
-        *,
-        error_meta: bool,
-    ) -> None:
-        meta = build_meta(
-            self._parser,
-            meta_extra=self.meta_extra,
-            error=error_meta or self.error,
-        )
-        assistant_msg_id, failed = await persister.persist(
-            final_text, self.dek, meta
-        )
-        if assistant_msg_id:
-            self.assistant_msg_id = assistant_msg_id
-        if failed:
-            final_text = self._append_persistence_warning(final_text)
-            self.error = True
-            meta["error"] = True
-        await self._complete(final_text, meta)
-
-    @staticmethod
-    def _append_persistence_warning(text: str) -> str:
-        return text + "<span class='error'>⚠️ Failed to save response.</span>"
-
-    async def _complete(self, final_text: str, meta: dict | None) -> None:
+    async def on_finished(self, result: PipelineResult) -> None:
+        self.error = result.error
+        self.error_message = result.error_message or ""
+        self.cancelled = result.cancelled
+        if result.assistant_message_id:
+            self.assistant_msg_id = result.assistant_message_id
         async with self._cond:
-            self.text = final_text
-            self.meta = meta
+            self.text = result.final_text
+            self.meta = result.meta
             self.done = True
             self._cond.notify_all()
-        self._invoke_cleanup()
 
     def _invoke_cleanup(self) -> None:
         if not self._cleanup_called:
@@ -383,7 +161,7 @@ class PendingResponse:
 
     async def cancel(self) -> None:
         self.cancelled = True
-        await self._session.abort()
+        await self._pipeline.request_cancel()
         await self._await_task_completion()
         self._invoke_cleanup()
 
@@ -512,12 +290,11 @@ class ChatStreamManager:
 
 
 __all__ = [
-    "LLMStreamError",
-    "AssistantMessagePersistenceError",
     "LLMStreamSession",
-    "AssistantMessageWriter",
-    "ResponseStreamWorker",
-    "AssistantResponsePersister",
     "PendingResponse",
     "ChatStreamManager",
+    "ResponsePipeline",
+    "PipelineResult",
+    "AssistantMessageWriter",
+    "LLMStreamError",
 ]
