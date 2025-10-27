@@ -384,13 +384,39 @@ class PendingResponse:
     async def cancel(self) -> None:
         self.cancelled = True
         await self._session.abort()
-        if not self._task.done():
+        await self._await_task_completion()
+        self._invoke_cleanup()
+
+    async def _await_task_completion(self) -> None:
+        """Wait for the generation task to finish persisting state.
+
+        When a user stops a stream we want to persist whatever text was already
+        generated.  ``PendingResponse`` normally finalises this work inside the
+        background task stored in ``self._task``.  Previously we cancelled that
+        task immediately which could prevent the cancellation finaliser from
+        running, resulting in the partial response never being saved.  By
+        allowing the task a brief grace period to wrap up we ensure the partial
+        message is written to the database.  If the task is still running after
+        the timeout we fall back to cancelling it to avoid hanging.
+        """
+
+        if self._task.done():
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+            return
+
+        try:
+            await asyncio.wait_for(self._task, timeout=2.0)
+        except asyncio.TimeoutError:
             self._task.cancel()
             try:
                 await self._task
             except asyncio.CancelledError:
                 pass
-        self._invoke_cleanup()
+        except asyncio.CancelledError:
+            pass
 
     async def stream(self):
         sent = 0
