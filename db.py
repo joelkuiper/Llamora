@@ -2,6 +2,7 @@ import os
 import asyncio
 import logging
 import atexit
+from typing import TypeVar
 
 import aiosqlite
 
@@ -28,6 +29,9 @@ from app.db.tags import TagsRepository
 from app.db.vectors import VectorsRepository
 
 
+RepositoryT = TypeVar("RepositoryT")
+
+
 class LocalDB:
     """Facade around SQLite repositories with shared connection pooling."""
 
@@ -35,10 +39,10 @@ class LocalDB:
         self.db_path = db_path or os.getenv("LLAMORA_DB_PATH", "state.sqlite3")
         self.pool: SQLiteConnectionPool | None = None
         self.search_api = None
-        self.users: UsersRepository | None = None
-        self.messages: MessagesRepository | None = None
-        self.tags: TagsRepository | None = None
-        self.vectors: VectorsRepository | None = None
+        self._users: UsersRepository | None = None
+        self._messages: MessagesRepository | None = None
+        self._tags: TagsRepository | None = None
+        self._vectors: VectorsRepository | None = None
         atexit.register(self._atexit_close)
 
     def _atexit_close(self) -> None:
@@ -57,8 +61,8 @@ class LocalDB:
 
     def set_search_api(self, api) -> None:
         self.search_api = api
-        if self.messages:
-            self.messages.set_on_message_appended(self._on_message_appended)
+        if self._messages:
+            self._messages.set_on_message_appended(self._on_message_appended)
 
     async def init(self) -> None:
         is_new = not os.path.exists(self.db_path)
@@ -74,10 +78,10 @@ class LocalDB:
         if self.pool is not None:
             await self.pool.close()
             self.pool = None
-        self.users = None
-        self.messages = None
-        self.tags = None
-        self.vectors = None
+        self._users = None
+        self._messages = None
+        self._tags = None
+        self._vectors = None
 
     async def _connection_factory(self):
         conn = await aiosqlite.connect(self.db_path, timeout=DB_TIMEOUT)
@@ -173,15 +177,54 @@ class LocalDB:
     def _configure_repositories(self) -> None:
         if not self.pool:
             raise RuntimeError("Connection pool not initialized")
-        self.users = UsersRepository(self.pool)
-        self.messages = MessagesRepository(self.pool, encrypt_message, decrypt_message)
-        self.tags = TagsRepository(
+        self._users = UsersRepository(self.pool)
+        self._messages = MessagesRepository(
+            self.pool, encrypt_message, decrypt_message
+        )
+        self._tags = TagsRepository(
             self.pool,
             encrypt_message,
             decrypt_message,
         )
-        self.vectors = VectorsRepository(self.pool, encrypt_vector, decrypt_vector)
-        self.messages.set_on_message_appended(self._on_message_appended)
+        self._vectors = VectorsRepository(self.pool, encrypt_vector, decrypt_vector)
+        self._messages.set_on_message_appended(self._on_message_appended)
+
+    def _require_repository(
+        self, repository: RepositoryT | None, name: str
+    ) -> RepositoryT:
+        if repository is None:
+            raise RuntimeError(
+                f"{name} repository is not initialised; call init() before accessing it."
+            )
+        return repository
+
+    @property
+    def users(self) -> UsersRepository:
+        """Return the users repository.
+
+        Raises a :class:`RuntimeError` when accessed before the database has been
+        initialised so configuration errors are caught early.
+        """
+
+        return self._require_repository(self._users, "Users")
+
+    @property
+    def messages(self) -> MessagesRepository:
+        """Return the messages repository."""
+
+        return self._require_repository(self._messages, "Messages")
+
+    @property
+    def tags(self) -> TagsRepository:
+        """Return the tags repository."""
+
+        return self._require_repository(self._tags, "Tags")
+
+    @property
+    def vectors(self) -> VectorsRepository:
+        """Return the vectors repository."""
+
+        return self._require_repository(self._vectors, "Vectors")
 
     async def _on_message_appended(
         self, user_id: str, message_id: str, plaintext: str, dek: bytes
@@ -190,10 +233,3 @@ class LocalDB:
             await self.search_api.enqueue_index_job(
                 user_id, message_id, plaintext, dek
             )
-
-    def __getattr__(self, name: str):
-        for repo_name in ("users", "messages", "tags", "vectors"):
-            repo = object.__getattribute__(self, repo_name)
-            if repo and hasattr(repo, name):
-                return getattr(repo, name)
-        raise AttributeError(f"{type(self).__name__!s} has no attribute {name!r}")
