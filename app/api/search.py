@@ -14,6 +14,8 @@ from app.services.lexical_reranker import LexicalReranker
 from app.services.vector_search import VectorSearchService
 
 
+TOKEN_PATTERN = re.compile(r"\S+")
+
 logger = logging.getLogger(__name__)
 
 
@@ -71,7 +73,7 @@ class SearchAPI:
             user_id, dek, query, k1, k2
         )
 
-        tokens = [t for t in dict.fromkeys(re.findall(r"\S+", query)) if t]
+        tokens = [t for t in dict.fromkeys(TOKEN_PATTERN.findall(query)) if t]
         boosts: dict[str, float] = {}
         if tokens:
             tag_hashes = [
