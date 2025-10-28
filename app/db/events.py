@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections import defaultdict
 from typing import Awaitable, Callable, Dict, List
@@ -26,12 +27,15 @@ class RepositoryEventBus:
         if not handlers:
             return
 
-        for handler in handlers:
-            try:
-                await handler(*args, **kwargs)
-            except Exception:  # pragma: no cover - defensive logging
-                self._logger.exception(
-                    "Repository event handler failed for event '%s'", event
+        coroutines = [handler(*args, **kwargs) for handler in handlers]
+        results = await asyncio.gather(*coroutines, return_exceptions=True)
+
+        for result in results:
+            if isinstance(result, Exception):
+                self._logger.error(
+                    "Repository event handler failed for event '%s'",
+                    event,
+                    exc_info=result,
                 )
 
     def clear(self) -> None:
