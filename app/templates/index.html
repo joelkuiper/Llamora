@@ -105,8 +105,12 @@
 
     <div class="app-container">
       <div id="content">
-        {% set tpl = content_template if content_template is defined else 'partials/chat.html' %}
-        {% include tpl %}
+        {% if chat_html is defined %}
+          {{ chat_html|safe }}
+        {% else %}
+          {% set tpl = content_template if content_template is defined else 'partials/chat.html' %}
+          {% include tpl %}
+        {% endif %}
       </div>
     </div>
 

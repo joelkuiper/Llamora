@@ -1,12 +1,13 @@
 from quart import Blueprint, redirect, request, url_for, render_template, make_response
+from markupsafe import Markup
 from app.services.container import get_services
 from app.services.auth_helpers import (
     login_required,
     get_current_user,
 )
-from app.services.chat_context import get_chat_context
 from app.services.time import local_date
 from app.services.calendar import get_month_context
+from app.routes.chat import render_chat
 
 days_bp = Blueprint("days", __name__)
 
@@ -22,19 +23,18 @@ async def index():
 
 
 async def _render_day(date: str, target: str | None):
-    user = await get_current_user()
-    uid = user["id"]
-    context = await get_chat_context(user, date)
+    render_result = await render_chat(date, oob=False, scroll_target=target)
+    chat_markup = Markup(render_result.html)
     html = await render_template(
         "index.html",
-        user=user,
-        day=date,
-        content_template="partials/chat.html",
+        day=render_result.active_date,
+        chat_html=chat_markup,
         scroll_target=target,
-        **context,
     )
-    resp = await make_response(html)
-    await _db().users.update_state(uid, active_date=date)
+    resp = await make_response(html, 200)
+    await _db().users.update_state(
+        render_result.user_id, active_date=render_result.active_date
+    )
     return resp
 
 
