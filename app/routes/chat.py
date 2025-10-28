@@ -42,6 +42,13 @@ from app.services.time import (
 chat_bp = Blueprint("chat", __name__)
 
 
+SSE_HEADERS = {
+    "Cache-Control": "no-cache",
+    "X-Accel-Buffering": "no",
+    "Connection": "keep-alive",
+}
+
+
 def _db():
     return get_services().db
 
@@ -180,7 +187,11 @@ async def sse_opening(date: str):
             yield f"event: error\ndata: {replace_newline(escape(msg))}\n\n"
             yield "event: done\ndata: {}\n\n"
 
-        return Response(error_stream(), mimetype="text/event-stream")
+        return Response(
+            error_stream(),
+            mimetype="text/event-stream",
+            headers=SSE_HEADERS,
+        )
     stream_id = f"opening:{uid}:{today_iso}"
     manager = _chat_stream_manager()
     pending = manager.start_stream(
@@ -195,7 +206,11 @@ async def sse_opening(date: str):
         meta_extra={"auto_opening": True},
     )
 
-    return Response(stream_pending_reply(pending), mimetype="text/event-stream")
+    return Response(
+        stream_pending_reply(pending),
+        mimetype="text/event-stream",
+        headers=SSE_HEADERS,
+    )
 
 
 @chat_bp.route("/c/<date>/message", methods=["POST"])
@@ -251,13 +266,16 @@ async def sse_reply(user_msg_id: str, date: str):
     if not history:
         logger.warning("History not found for user message %s", user_msg_id)
         return Response(
-            "event: error\ndata: Invalid ID\n\n", mimetype="text/event-stream"
+            "event: error\ndata: Invalid ID\n\n",
+            mimetype="text/event-stream",
+            headers=SSE_HEADERS,
         )
 
     if existing_assistant_msg:
         return Response(
             stream_saved_reply(existing_assistant_msg),
             mimetype="text/event-stream",
+            headers=SSE_HEADERS,
         )
 
     params = normalize_llm_config(
@@ -283,5 +301,7 @@ async def sse_reply(user_msg_id: str, date: str):
         )
 
     return Response(
-        stream_pending_reply(pending_response), mimetype="text/event-stream"
+        stream_pending_reply(pending_response),
+        mimetype="text/event-stream",
+        headers=SSE_HEADERS,
     )
