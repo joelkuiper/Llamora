@@ -1,6 +1,9 @@
 import { createListenerBag } from "../utils/events.js";
 
 export class ScrollController {
+  #initSuppressed = false;
+  #initReleaseFrame = null;
+
   constructor({
     root = document,
     chat,
@@ -42,6 +45,7 @@ export class ScrollController {
 
     this.autoScrollEnabled = this.isUserNearBottom();
     this.lastScrollTop = this.container.scrollTop;
+    this.#initSuppressed = true;
 
     this.listeners?.abort();
     this.listeners = createListenerBag();
@@ -65,6 +69,8 @@ export class ScrollController {
     this.toggleScrollBtn();
     requestAnimationFrame(() => this.toggleScrollBtn());
 
+    this.#scheduleInitRelease();
+
     this.alignScrollButton();
 
     return (force = false) => this.scrollToBottom(force);
@@ -72,6 +78,9 @@ export class ScrollController {
 
   destroy() {
     if (!this.container || !this.chat) return;
+
+    this.#cancelInitRelease();
+    this.#initSuppressed = false;
 
     this.listeners?.abort();
     this.listeners = null;
@@ -92,6 +101,21 @@ export class ScrollController {
   }
 
   toggleScrollBtn() {
+    if (this.#initSuppressed) {
+      // During HTMX swaps the container can report a zero scroll offset before
+      // settling back to the persisted position. Delay showing the button until
+      // the layout has stabilized and we're sure the view is pinned to the
+      // bottom so it doesn't flash during initialization.
+      if (typeof this.scrollBtnContainer?.setVisible === "function") {
+        this.scrollBtnContainer.setVisible(false);
+        return;
+      }
+
+      this.scrollBtn?.classList.remove("visible");
+      this.scrollBtnContainer?.classList.remove("visible");
+      return;
+    }
+
     const shouldShow = !this.isUserNearBottom(150);
     if (typeof this.scrollBtnContainer?.setVisible === "function") {
       this.scrollBtnContainer.setVisible(shouldShow);
@@ -158,5 +182,51 @@ export class ScrollController {
       window.setTimeout(() => this.scrollBtn?.classList.remove("clicked"), 300);
     }
     this.scrollToBottom(true);
+  }
+
+  #scheduleInitRelease() {
+    if (!this.container) return;
+
+    this.#cancelInitRelease();
+
+    const now =
+      typeof performance !== "undefined" &&
+      typeof performance.now === "function"
+        ? () => performance.now()
+        : () => Date.now();
+    const start = now();
+    const frame = { raf: null };
+    this.#initReleaseFrame = frame;
+
+    const releaseWhenReady = () => {
+      if (this.#initReleaseFrame !== frame) return;
+
+      const nearBottom = this.isUserNearBottom(10);
+      const timedOut = now() - start >= 500;
+
+      // Wait for the HTMX swap to settle back near the previous scroll
+      // position before letting the button become visible. Fall back to a
+      // short timeout so manual scrolls that intentionally leave the bottom
+      // still reveal the control.
+      if (nearBottom || timedOut) {
+        this.#initReleaseFrame = null;
+        this.#initSuppressed = false;
+        this.toggleScrollBtn();
+        return;
+      }
+
+      frame.raf = requestAnimationFrame(releaseWhenReady);
+    };
+
+    frame.raf = requestAnimationFrame(releaseWhenReady);
+  }
+
+  #cancelInitRelease() {
+    const frame = this.#initReleaseFrame;
+    if (!frame) return;
+    if (frame.raf != null) {
+      cancelAnimationFrame(frame.raf);
+    }
+    this.#initReleaseFrame = null;
   }
 }
