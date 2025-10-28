@@ -10,6 +10,7 @@ from httpx import HTTPError
 
 from config import DEFAULT_LLM_REQUEST, GRAMMAR_FILE
 from .process_manager import LlamafileProcessManager
+from .prompt_template import build_prompt
 
 
 class SSEEvent(NamedTuple):
@@ -207,8 +208,6 @@ class LLMClient:
     ) -> list[dict[str, Any]]:
         if not history:
             return history
-        from llm.prompt_template import build_prompt
-
         lo, hi = 0, len(history)
         while lo < hi:
             mid = (lo + hi) // 2
@@ -246,8 +245,6 @@ class LLMClient:
                     yield {"type": "error", "data": f"Prompt error: {e}"}
                     return
             try:
-                from llm.prompt_template import build_prompt
-
                 prompt = build_prompt(history, **ctx)
             except Exception as e:
                 self.logger.exception("Failed to build prompt")
