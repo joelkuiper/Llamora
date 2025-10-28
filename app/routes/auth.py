@@ -44,6 +44,20 @@ _login_failures: TTLCache = TTLCache(
 )
 
 
+PASSWORD_ERROR_MESSAGES: dict[PasswordValidationError, str] = {
+    PasswordValidationError.MISSING: "All fields are required",
+    PasswordValidationError.MAX_LENGTH: "Input exceeds max length",
+    PasswordValidationError.MISMATCH: "Passwords do not match",
+    PasswordValidationError.WEAK: "Password is too weak",
+}
+
+
+def _password_error_message(error: PasswordValidationError | None) -> str:
+    if not error:
+        return "Invalid input"
+    return PASSWORD_ERROR_MESSAGES.get(error, "Invalid input")
+
+
 def _db():
     return get_services().db
 
@@ -148,13 +162,7 @@ async def register():
             min_strength=3,
         )
         if password_error:
-            message_map = {
-                PasswordValidationError.MISSING: "All fields are required",
-                PasswordValidationError.MAX_LENGTH: "Input exceeds max length",
-                PasswordValidationError.MISMATCH: "Passwords do not match",
-                PasswordValidationError.WEAK: "Password is too weak",
-            }
-            message = message_map.get(password_error, "Invalid input")
+            message = _password_error_message(password_error)
             return await render_template("register.html", error=message)
 
         if len(username) > max_user:
@@ -417,13 +425,7 @@ async def change_password():
         min_strength=3,
     )
     if password_error:
-        message_map = {
-            PasswordValidationError.MISSING: "All fields are required",
-            PasswordValidationError.MAX_LENGTH: "Input exceeds max length",
-            PasswordValidationError.MISMATCH: "Passwords do not match",
-            PasswordValidationError.WEAK: "Password is too weak",
-        }
-        message = message_map.get(password_error, "Invalid input")
+        message = _password_error_message(password_error)
         return await _render_profile_page(user, pw_error=message)
 
     try:
