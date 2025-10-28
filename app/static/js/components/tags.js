@@ -25,6 +25,8 @@ export class Tags extends HTMLElement {
   #afterRequestHandler;
   #afterSwapHandler;
   #suggestionsSwapHandler;
+  #chipActivationHandler;
+  #chipKeydownHandler;
 
   constructor() {
     super();
@@ -35,6 +37,8 @@ export class Tags extends HTMLElement {
     this.#afterRequestHandler = () => this.#handleAfterRequest();
     this.#afterSwapHandler = (event) => this.#handleAfterSwap(event);
     this.#suggestionsSwapHandler = () => this.#handleSuggestionsSwap();
+    this.#chipActivationHandler = (event) => this.#handleChipActivation(event);
+    this.#chipKeydownHandler = (event) => this.#handleChipKeydown(event);
   }
 
   connectedCallback() {
@@ -61,6 +65,12 @@ export class Tags extends HTMLElement {
       signal,
     });
     this.#suggestions?.addEventListener("htmx:afterSwap", this.#suggestionsSwapHandler, {
+      signal,
+    });
+    this.#tagContainer.addEventListener("click", this.#chipActivationHandler, {
+      signal,
+    });
+    this.#tagContainer.addEventListener("keydown", this.#chipKeydownHandler, {
       signal,
     });
 
@@ -224,6 +234,35 @@ export class Tags extends HTMLElement {
       delete this.#suggestions.dataset.loaded;
     }
     this.#popover?.update();
+  }
+
+  #handleChipActivation(event) {
+    const label = event.target.closest?.(".chip-label");
+    if (!label || !(label instanceof HTMLElement)) return;
+
+    const searchInput = document.getElementById("search-input");
+    if (!searchInput) return;
+
+    const value = label.textContent?.trim();
+    if (!value) return;
+
+    searchInput.value = value;
+    if (typeof searchInput.focus === "function") {
+      try {
+        searchInput.focus({ preventScroll: true });
+      } catch (error) {
+        searchInput.focus();
+      }
+    }
+  }
+
+  #handleChipKeydown(event) {
+    if (![" ", "Enter"].includes(event.key)) return;
+    const label = event.target.closest?.(".chip-label");
+    if (!label) return;
+
+    event.preventDefault();
+    label.click();
   }
 }
 

@@ -6,8 +6,7 @@
        hx-get="{{ url_for('search.search') }}?q={{ display | urlencode }}"
        hx-target="#search-results"
        hx-indicator="#search-spinner"
-       hx-swap="innerHTML"
-       hx-on:click="var i=document.getElementById('search-input');i.value=this.textContent;i.focus()">{{ display }}</a>
+       hx-swap="innerHTML">{{ display }}</a>
     {% if msg_id %}
     <button class="chip-remove"
             hx-delete="{{ url_for('tags.remove_tag', msg_id=msg_id, tag_hash=tag_hash) }}"
