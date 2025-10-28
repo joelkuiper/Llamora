@@ -25,7 +25,7 @@ def local_date() -> datetime.date:
     try:
         return datetime.now(ZoneInfo(tz)).date()
     except Exception:
-        return datetime.utcnow().date()
+        return datetime.now(timezone.utc).date()
 
 
 def part_of_day(dt: datetime) -> str:
@@ -68,9 +68,9 @@ def date_and_part(user_time: str, tz: str) -> tuple[str, str]:
     try:
         dt = datetime.fromisoformat(user_time.replace("Z", "+00:00"))
     except Exception:
-        dt = datetime.utcnow().replace(tzinfo=ZoneInfo("UTC"))
+        dt = datetime.now(timezone.utc)
     try:
         dt_local = dt.astimezone(ZoneInfo(tz))
     except Exception:
-        dt_local = dt.astimezone(ZoneInfo("UTC"))
+        dt_local = dt.astimezone(timezone.utc)
     return format_date(dt_local), part_of_day(dt_local)
