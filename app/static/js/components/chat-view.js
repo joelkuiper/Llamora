@@ -178,10 +178,12 @@ export class ChatView extends ReactiveElement {
 
     this.#chatForm = this.querySelector("chat-form");
     if (this.#chatForm) {
-      this.#chatForm.chat = chat;
-      this.#chatForm.container = container;
-      this.#chatForm.state = this.#state;
-      this.#chatForm.date = activeDay;
+      this.#wireChatForm(this.#chatForm, {
+        chat,
+        container,
+        state: this.#state,
+        date: activeDay,
+      });
     }
 
     if (this.#chatForm?.isToday) {
@@ -344,7 +346,26 @@ export class ChatView extends ReactiveElement {
     this.#historyRestoreFrame = window.requestAnimationFrame(() => {
       this.#historyRestoreFrame = null;
       this.#syncToChatDate();
+      if (this.#chatForm) {
+        this.#wireChatForm(this.#chatForm, {
+          chat: this.#chat,
+          container: document.getElementById("content-wrapper"),
+          state: this.#state,
+          date: this.#lastRenderedDay,
+        });
+      }
     });
+  }
+
+  async #wireChatForm(chatForm, { chat, container, state, date }) {
+    if (!chatForm) return;
+    await customElements.whenDefined("chat-form");
+    if (!chatForm.isConnected) return;
+    customElements.upgrade(chatForm);
+    chatForm.container = container;
+    chatForm.chat = chat;
+    chatForm.state = state;
+    chatForm.date = date;
   }
 
   #cancelHistoryRestoreFrame() {

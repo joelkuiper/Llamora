@@ -76,10 +76,18 @@ class ChatFormElement extends ReactiveElement {
   }
 
   #maybeInit() {
-    if (!this.#connected) return;
-    if (this.#initialized) return;
-    if (!this.#form || !this.#textarea || !this.#button) return;
-    if (!this.#state || !this.#chat || !this.#date) return;
+    if (!this.#connected) {
+      return;
+    }
+    if (this.#initialized) {
+      return;
+    }
+    if (!this.#form || !this.#textarea || !this.#button) {
+      return;
+    }
+    if (!this.#state || !this.#chat || !this.#date) {
+      return;
+    }
 
     const now = new Date();
     const pad = (n) => String(n).padStart(2, "0");
