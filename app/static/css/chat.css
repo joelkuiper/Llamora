@@ -240,19 +240,20 @@ body {
   }
 }
 
-#scroll-bottom-container {
+scroll-bottom-button {
   left: var(--chat-center, 50%);  /* pixel value set by JS */
   transform: translateX(-50%);
   position: fixed;
   bottom: 5rem;
   pointer-events: none;
+  display: block;
 }
 
-#scroll-bottom-container.visible {
+scroll-bottom-button.visible {
   pointer-events: auto;
 }
 
-#scroll-bottom {
+scroll-bottom-button .scroll-btn {
   width: 2.75rem;
   height: 2.75rem;
   border-radius: 50%;
@@ -271,7 +272,7 @@ body {
   z-index: 1000;
   cursor: pointer;
 
-  &.visible {
+  scroll-bottom-button.visible & {
     opacity: 0.9;
     pointer-events: auto;
     animation: appear 180ms ease-out, breathe 6s ease-in-out 400ms infinite;

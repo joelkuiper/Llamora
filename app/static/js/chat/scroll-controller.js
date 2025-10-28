@@ -5,13 +5,25 @@ export class ScrollController {
     root = document,
     chat,
     containerSelector = "#content-wrapper",
-    buttonSelector = "#scroll-bottom",
+    buttonSelector = "scroll-bottom-button, #scroll-bottom",
   }) {
     this.root = root;
     this.chat = chat;
     this.container = root.querySelector(containerSelector);
-    this.scrollBtn = root.querySelector(buttonSelector);
-    this.scrollBtnContainer = this.scrollBtn?.parentElement || null;
+    this.scrollElement = root.querySelector(buttonSelector);
+    this.scrollBtn =
+      this.scrollElement?.button ??
+      (typeof this.scrollElement?.querySelector === "function"
+        ? this.scrollElement.querySelector("button")
+        : null);
+    if (!this.scrollBtn && this.scrollElement instanceof HTMLButtonElement) {
+      this.scrollBtn = this.scrollElement;
+    }
+    this.scrollBtnContainer =
+      this.scrollElement instanceof HTMLElement &&
+      !this.scrollElement.matches("button")
+        ? this.scrollElement
+        : this.scrollBtn?.parentElement || null;
     this.autoScrollEnabled = true;
     this.lastScrollTop = 0;
     this.listeners = null;
@@ -46,12 +58,12 @@ export class ScrollController {
 
     if (this.scrollBtn) {
       bag.add(this.scrollBtn, "click", this.onScrollBtnClick);
+    } else if (this.scrollElement) {
+      bag.add(this.scrollElement, "click", this.onScrollBtnClick);
     }
 
-    requestAnimationFrame(() => {
-      this.toggleScrollBtn();
-      requestAnimationFrame(() => this.toggleScrollBtn());
-    });
+    this.toggleScrollBtn();
+    requestAnimationFrame(() => this.toggleScrollBtn());
 
     this.alignScrollButton();
 
@@ -65,6 +77,9 @@ export class ScrollController {
     this.listeners = null;
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
+    this.scrollElement = null;
+    this.scrollBtn = null;
+    this.scrollBtnContainer = null;
   }
 
   isUserNearBottom(threshold = 0) {
@@ -77,14 +92,15 @@ export class ScrollController {
   }
 
   toggleScrollBtn() {
-    if (!this.scrollBtn) return;
-    if (this.isUserNearBottom(150)) {
-      this.scrollBtn.classList.remove("visible");
-      this.scrollBtnContainer?.classList.remove("visible");
-    } else {
-      this.scrollBtn.classList.add("visible");
-      this.scrollBtnContainer?.classList.add("visible");
+    const shouldShow = !this.isUserNearBottom(150);
+    if (typeof this.scrollBtnContainer?.setVisible === "function") {
+      this.scrollBtnContainer.setVisible(shouldShow);
+      return;
     }
+
+    const action = shouldShow ? "add" : "remove";
+    this.scrollBtn?.classList[action]("visible");
+    this.scrollBtnContainer?.classList[action]("visible");
   }
 
   scrollToBottom(force = false) {
@@ -135,9 +151,12 @@ export class ScrollController {
   }
 
   onScrollBtnClick() {
-    if (!this.scrollBtn) return;
-    this.scrollBtn.classList.add("clicked");
+    if (!this.scrollBtn && !this.scrollBtnContainer) return;
+    this.scrollBtnContainer?.pulse?.();
+    if (this.scrollBtn && !this.scrollBtnContainer?.pulse) {
+      this.scrollBtn.classList.add("clicked");
+      window.setTimeout(() => this.scrollBtn?.classList.remove("clicked"), 300);
+    }
     this.scrollToBottom(true);
-    setTimeout(() => this.scrollBtn?.classList.remove("clicked"), 300);
   }
 }
