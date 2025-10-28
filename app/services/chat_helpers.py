@@ -152,10 +152,15 @@ async def stream_pending_reply(pending_response):
         return
 
     if pending_response.meta is not None:
-        # Placeholder for emitting structured metadata (e.g., tags)
-        pass
+        try:
+            meta_payload = orjson.dumps(pending_response.meta).decode()
+        except TypeError:
+            meta_payload = "{}"
+        safe_meta = replace_newline(escape(meta_payload, quote=False))
+        yield f"event: meta\ndata: {safe_meta}\n\n"
 
     payload = orjson.dumps(
         {"assistant_msg_id": pending_response.assistant_msg_id}
     ).decode()
-    yield f"event: done\ndata: {payload}\n\n"
+    safe_payload = replace_newline(escape(payload, quote=False))
+    yield f"event: done\ndata: {safe_payload}\n\n"

@@ -18,6 +18,16 @@ function parseDonePayload(data) {
   }
 }
 
+function parseMetaPayload(data) {
+  if (!data) return null;
+  try {
+    return JSON.parse(data);
+  } catch (err) {
+    console.error("Failed to parse meta payload", err);
+    return null;
+  }
+}
+
 function revealMetaChips(container, scrollToBottom) {
   if (!container || !container.hidden) return;
 
@@ -63,15 +73,18 @@ class LlmStreamElement extends HTMLElement {
   #sink = null;
   #markdown = null;
   #typingIndicator = null;
+  #meta = null;
   #boundHandleMessage;
   #boundHandleDone;
   #boundHandleError;
+  #boundHandleMeta;
 
   constructor() {
     super();
     this.#boundHandleMessage = (event) => this.#handleMessage(event);
     this.#boundHandleDone = (event) => this.#handleDone(event);
     this.#boundHandleError = (event) => this.#handleError(event);
+    this.#boundHandleMeta = (event) => this.#handleMeta(event);
   }
 
   connectedCallback() {
@@ -135,6 +148,7 @@ class LlmStreamElement extends HTMLElement {
 
     this.dataset.streaming = "true";
     this.setAttribute("aria-busy", "true");
+    this.#meta = null;
     this.dispatchEvent(
       new CustomEvent("llm-stream:start", {
         bubbles: true,
@@ -159,6 +173,7 @@ class LlmStreamElement extends HTMLElement {
     this.#eventSource.addEventListener("message", this.#boundHandleMessage);
     this.#eventSource.addEventListener("done", this.#boundHandleDone);
     this.#eventSource.addEventListener("error", this.#boundHandleError);
+    this.#eventSource.addEventListener("meta", this.#boundHandleMeta);
   }
 
   #closeEventSource() {
@@ -166,6 +181,7 @@ class LlmStreamElement extends HTMLElement {
     this.#eventSource.removeEventListener("message", this.#boundHandleMessage);
     this.#eventSource.removeEventListener("done", this.#boundHandleDone);
     this.#eventSource.removeEventListener("error", this.#boundHandleError);
+    this.#eventSource.removeEventListener("meta", this.#boundHandleMeta);
     this.#eventSource.close();
     this.#eventSource = null;
   }
@@ -215,6 +231,27 @@ class LlmStreamElement extends HTMLElement {
 
     this.#renderNow({ repositionTyping: false, shouldScroll: true });
     this.#finalize({ status: "error", message: data || "" });
+  }
+
+  #handleMeta(event) {
+    const raw = decodeChunk(event?.data || "");
+    if (!raw) return;
+
+    const meta = parseMetaPayload(raw);
+    if (!meta) return;
+
+    this.#meta = meta;
+    this.dispatchEvent(
+      new CustomEvent("llm-stream:meta", {
+        bubbles: true,
+        composed: true,
+        detail: {
+          element: this,
+          meta,
+          userMsgId: this.userMsgId,
+        },
+      })
+    );
   }
 
   #scheduleRender({ repositionTyping = false, shouldScroll = false } = {}) {
@@ -296,6 +333,7 @@ class LlmStreamElement extends HTMLElement {
           status,
           assistantMsgId,
           message,
+          meta: this.#meta,
           userMsgId: this.userMsgId,
         },
       })
