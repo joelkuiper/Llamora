@@ -7,6 +7,7 @@ import orjson
 from config import (
     INDEX_WORKER_MAX_QUEUE_SIZE,
     MAX_SEARCH_QUERY_LENGTH,
+    MAX_TAG_LENGTH,
     PROGRESSIVE_K1,
     PROGRESSIVE_K2,
 )
@@ -80,7 +81,19 @@ class SearchAPI:
             logger.debug("No candidates found for user %s; returning empty result set", user_id)
             return []
 
-        tokens = [t for t in dict.fromkeys(TOKEN_PATTERN.findall(query)) if t]
+        seen_tokens: set[str] = set()
+        tokens: list[str] = []
+        for raw in TOKEN_PATTERN.findall(query):
+            token = raw.strip()
+            if not token:
+                continue
+            if token.startswith("#"):
+                token = "#" + token.lstrip("#")
+            token = token[:MAX_TAG_LENGTH]
+            if not token or token in seen_tokens:
+                continue
+            seen_tokens.add(token)
+            tokens.append(token)
         boosts: dict[str, float] = {}
         if tokens:
             tag_hashes = [
