@@ -5,6 +5,8 @@ import hashlib
 from aiosqlitepool import SQLiteConnectionPool
 from ulid import ULID
 
+from config import MAX_TAG_LENGTH
+
 from .base import BaseRepository
 from .events import RepositoryEventBus, MESSAGE_TAGS_CHANGED_EVENT
 from .utils import cached_tag_name
@@ -27,7 +29,7 @@ class TagsRepository(BaseRepository):
     async def resolve_or_create_tag(
         self, user_id: str, tag_name: str, dek: bytes
     ) -> bytes:
-        tag_name = tag_name.strip()[:64]
+        tag_name = tag_name.strip()[:MAX_TAG_LENGTH]
         if not tag_name:
             raise ValueError("Empty tag")
         tag_hash = hashlib.sha256(f"{user_id}:{tag_name}".encode("utf-8")).digest()
