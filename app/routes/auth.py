@@ -190,7 +190,7 @@ async def register():
         pw_salt, pw_nonce, pw_cipher = wrap_key(dek, password)
         rc_salt, rc_nonce, rc_cipher = wrap_key(dek, recovery_code)
 
-        await _db().users.create_user(
+        user_id = await _db().users.create_user(
             username,
             password_hash,
             pw_salt,
@@ -201,9 +201,6 @@ async def register():
             rc_cipher,
         )
 
-        # Fetch the newly created user so we can establish a session
-        user = await _db().users.get_user_by_username(username)
-
         if current_app.config.get("DISABLE_REGISTRATION"):
             current_app.config["REGISTRATION_TOKEN"] = None
 
@@ -213,7 +210,7 @@ async def register():
             next_url=url_for("days.index"),
         )
         resp = await make_response(html)
-        set_secure_cookie(resp, "uid", str(user["id"]))
+        set_secure_cookie(resp, "uid", str(user_id))
         set_dek(resp, dek)
         return resp
 
