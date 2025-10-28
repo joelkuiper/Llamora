@@ -26,6 +26,8 @@ def find_existing_assistant_reply(
 ) -> Mapping[str, Any] | None:
     """Locate an assistant reply paired with ``user_msg_id`` in ``history``."""
 
+    expect_adjacent_reply = False
+
     for message in history:
         if (
             message.get("reply_to") == user_msg_id
@@ -33,15 +35,12 @@ def find_existing_assistant_reply(
         ):
             return message
 
-    for index, message in enumerate(history):
-        if message.get("id") == user_msg_id:
-            next_index = index + 1
-            if (
-                next_index < len(history)
-                and history[next_index].get("role") == "assistant"
-            ):
-                return history[next_index]
-            break
+        if expect_adjacent_reply:
+            if message.get("role") == "assistant":
+                return message
+            expect_adjacent_reply = False
+
+        expect_adjacent_reply = message.get("id") == user_msg_id
 
     return None
 
