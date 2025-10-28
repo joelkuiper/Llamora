@@ -97,7 +97,8 @@ class VectorSearchService:
             if mid not in seen:
                 seen.add(mid)
                 dedup_ids.append(mid)
-            if mid not in id_cos:
+            existing = id_cos.get(mid)
+            if existing is None or cos > existing:
                 id_cos[mid] = cos
 
         rows = await self.index_store.hydrate_messages(user_id, dedup_ids, dek)
