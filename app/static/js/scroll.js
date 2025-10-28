@@ -157,6 +157,8 @@ export function initScrollMemory(wrapperSelector = "#content-wrapper") {
     document.addEventListener(markdownEvent, markdownListener);
   };
 
+  let skipNextRestore = false;
+
   const restore = () => {
     ensureContainer();
     if (!container) return;
@@ -183,7 +185,21 @@ export function initScrollMemory(wrapperSelector = "#content-wrapper") {
     }
   };
 
-  window.addEventListener("app:scroll-target-consumed", restore);
+  const maybeRestore = () => {
+    if (skipNextRestore) {
+      skipNextRestore = false;
+      return;
+    }
+    restore();
+  };
+
+  window.addEventListener("app:scroll-target-consumed", (event) => {
+    if (event.detail?.target) {
+      skipNextRestore = true;
+      return;
+    }
+    maybeRestore();
+  });
 
   restore();
 
@@ -221,7 +237,7 @@ export function initScrollMemory(wrapperSelector = "#content-wrapper") {
     for (const source of possibleSources) {
       const wrapper = resolveWrapperFromNode(source);
       if (wrapper) {
-        restore();
+        maybeRestore();
         return;
       }
     }
