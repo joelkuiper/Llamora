@@ -12,6 +12,7 @@ from html import escape
 import logging
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+from dataclasses import dataclass
 
 from llm.prompt_template import build_opening_prompt
 
@@ -52,7 +53,18 @@ def _chat_stream_manager():
 logger = logging.getLogger(__name__)
 
 
-async def render_chat(date, oob=False, scroll_target: str | None = None):
+@dataclass(slots=True)
+class ChatRenderResult:
+    html: str
+    active_date: str
+    user_id: str
+
+
+async def render_chat(
+    date: str,
+    oob: bool = False,
+    scroll_target: str | None = None,
+) -> ChatRenderResult:
     user = await get_current_user()
     context = await get_chat_context(user, date)
     html = await render_template(
@@ -64,17 +76,23 @@ async def render_chat(date, oob=False, scroll_target: str | None = None):
         **context,
     )
 
-    return html
+    return ChatRenderResult(html=html, active_date=date, user_id=user["id"])
 
 
-async def _render_chat_htmx(target: str | None, date: str, push_url: str):
-    html = await render_chat(date, False, scroll_target=target)
-    resp = await make_response(html, 200)
+async def _build_chat_response(
+    *,
+    date: str,
+    target: str | None,
+    push_url: str,
+) -> Response:
+    render_result = await render_chat(date, oob=False, scroll_target=target)
+    resp = await make_response(render_result.html, 200)
     if target:
         push_url = f"{push_url}?target={target}"
     resp.headers["HX-Push-Url"] = push_url
-    user = await get_current_user()
-    await _db().users.update_state(user["id"], active_date=date)
+    await _db().users.update_state(
+        render_result.user_id, active_date=render_result.active_date
+    )
     return resp
 
 
@@ -83,7 +101,7 @@ async def _render_chat_htmx(target: str | None, date: str, push_url: str):
 async def chat_htmx(date):
     target = request.args.get("target")
     push_url = url_for("days.day", date=date)
-    return await _render_chat_htmx(target, date, push_url)
+    return await _build_chat_response(date=date, target=target, push_url=push_url)
 
 
 @chat_bp.route("/c/today")
@@ -92,7 +110,7 @@ async def chat_htmx_today():
     target = request.args.get("target")
     date = local_date().isoformat()
     push_url = url_for("days.day_today")
-    return await _render_chat_htmx(target, date, push_url)
+    return await _build_chat_response(date=date, target=target, push_url=push_url)
 
 
 @chat_bp.route("/c/stop/<user_msg_id>", methods=["POST"])
