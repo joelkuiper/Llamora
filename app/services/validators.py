@@ -1,7 +1,35 @@
 import asyncio
+from datetime import date, datetime
 from enum import Enum, auto
 import re
 from zxcvbn import zxcvbn
+
+
+def parse_iso_date(raw: str) -> str:
+    """Parse ISO formatted dates, returning a normalised ``YYYY-MM-DD`` string.
+
+    The validator accepts either a bare ISO date (``YYYY-MM-DD``) or an ISO
+    datetime string. The datetime variant is truncated to the date component.
+    ``ValueError`` is raised for any unparseable input.
+    """
+
+    if not isinstance(raw, str):
+        raise ValueError("Date value must be a string")
+
+    value = raw.strip()
+    if not value:
+        raise ValueError("Date value is empty")
+
+    try:
+        return date.fromisoformat(value).isoformat()
+    except ValueError:
+        pass
+
+    try:
+        normalised = value.replace("Z", "+00:00")
+        return datetime.fromisoformat(normalised).date().isoformat()
+    except ValueError as exc:
+        raise ValueError(f"Invalid ISO date: {raw}") from exc
 
 
 class PasswordValidationError(Enum):

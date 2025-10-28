@@ -1,4 +1,12 @@
-from quart import Blueprint, redirect, request, url_for, render_template, make_response
+from quart import (
+    Blueprint,
+    redirect,
+    request,
+    url_for,
+    render_template,
+    make_response,
+    abort,
+)
 from markupsafe import Markup
 from app.services.container import get_services
 from app.services.auth_helpers import (
@@ -6,6 +14,7 @@ from app.services.auth_helpers import (
     get_current_user,
 )
 from app.services.time import local_date
+from app.services.validators import parse_iso_date
 from app.services.calendar import get_month_context
 from app.routes.chat import render_chat
 
@@ -49,8 +58,12 @@ async def day_today():
 @days_bp.route("/d/<date>")
 @login_required
 async def day(date):
+    try:
+        normalized_date = parse_iso_date(date)
+    except ValueError:
+        abort(400, description="Invalid date")
     target = request.args.get("target")
-    return await _render_day(date, target)
+    return await _render_day(normalized_date, target)
 
 
 @days_bp.route("/calendar")

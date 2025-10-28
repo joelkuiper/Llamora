@@ -37,6 +37,7 @@ from app.services.time import (
     format_date,
     part_of_day,
 )
+from app.services.validators import parse_iso_date
 
 
 chat_bp = Blueprint("chat", __name__)
@@ -106,9 +107,15 @@ async def _build_chat_response(
 @chat_bp.route("/c/<date>")
 @login_required
 async def chat_htmx(date):
+    try:
+        normalized_date = parse_iso_date(date)
+    except ValueError:
+        abort(400, description="Invalid date")
     target = request.args.get("target")
-    push_url = url_for("days.day", date=date)
-    return await _build_chat_response(date=date, target=target, push_url=push_url)
+    push_url = url_for("days.day", date=normalized_date)
+    return await _build_chat_response(
+        date=normalized_date, target=target, push_url=push_url
+    )
 
 
 @chat_bp.route("/c/today")
@@ -260,11 +267,16 @@ async def sse_reply(user_msg_id: str, date: str):
     is sent in a final ``done`` event.
     """
 
+    try:
+        normalized_date = parse_iso_date(date)
+    except ValueError:
+        abort(400, description="Invalid date")
+
     user = await get_current_user()
     uid = user["id"]
     dek = get_dek()
     history, existing_assistant_msg, actual_date = await locate_message_and_reply(
-        _db(), uid, dek, date, user_msg_id
+        _db(), uid, dek, normalized_date, user_msg_id
     )
 
     if not history:
@@ -297,7 +309,7 @@ async def sse_reply(user_msg_id: str, date: str):
         pending_response = manager.start_stream(
             user_msg_id,
             uid,
-            actual_date or date,
+            actual_date or normalized_date,
             history,
             dek,
             params,
