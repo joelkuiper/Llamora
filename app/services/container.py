@@ -11,6 +11,7 @@ from typing import Any
 from quart import current_app
 
 from db import LocalDB
+from config import MESSAGE_INDEX_MAX_ELEMENTS
 from app.api.search import SearchAPI
 from app.services.lexical_reranker import LexicalReranker
 from app.services.vector_search import VectorSearchService
@@ -33,7 +34,9 @@ class AppServices:
     @classmethod
     def create(cls) -> "AppServices":
         db = LocalDB()
-        vector_search = VectorSearchService(db)
+        vector_search = VectorSearchService(
+            db, index_max_elements=MESSAGE_INDEX_MAX_ELEMENTS
+        )
         lexical_reranker = LexicalReranker()
         search_api = SearchAPI(db, vector_search, lexical_reranker)
         llm_service = LLMService(db)

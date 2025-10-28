@@ -12,6 +12,7 @@ from config import (
     PROGRESSIVE_ROUNDS,
     POOR_MATCH_MAX_COS,
     POOR_MATCH_MIN_HITS,
+    MESSAGE_INDEX_MAX_ELEMENTS,
 )
 from app.embed.model import async_embed_texts
 from app.index.message_ann import MessageIndexStore
@@ -23,8 +24,8 @@ logger = logging.getLogger(__name__)
 class VectorSearchService:
     """Handles ANN index access and progressive warm-up for message search."""
 
-    def __init__(self, db):
-        self.index_store = MessageIndexStore(db)
+    def __init__(self, db, index_max_elements: int = MESSAGE_INDEX_MAX_ELEMENTS):
+        self.index_store = MessageIndexStore(db, max_elements=index_max_elements)
 
     def _quality_satisfied(self, ids: List[str], cosines: List[float], k2: int) -> bool:
         if len(ids) < k2:

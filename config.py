@@ -41,6 +41,11 @@ MESSAGE_HISTORY_CACHE_MAXSIZE = int(
 )
 MESSAGE_HISTORY_CACHE_TTL = int(os.getenv("LLAMORA_MESSAGE_HISTORY_CACHE_TTL", 60))
 
+# Vector search index configuration
+MESSAGE_INDEX_MAX_ELEMENTS = int(
+    os.getenv("LLAMORA_MESSAGE_INDEX_MAX_ELEMENTS", 100_000)
+)
+
 
 # Only allow a limited subset of parameters to be forwarded to the LLM from the client-side
 ALLOWED_LLM_CONFIG_KEYS = {"temperature"}

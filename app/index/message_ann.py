@@ -87,11 +87,13 @@ class MessageIndexStore:
         ttl: int = 600,
         warm_limit: int = 1000,
         maintenance_interval: float = 60.0,
+        max_elements: int = 100_000,
     ):
         self.db = db
         self.ttl = ttl
         self.warm_limit = warm_limit
         self.maintenance_interval = maintenance_interval
+        self.max_elements = max_elements
         self.indexes: Dict[str, MessageIndex] = {}
         self.cursors: Dict[str, Optional[str]] = {}
         self.locks: Dict[str, asyncio.Lock] = {}
@@ -125,7 +127,7 @@ class MessageIndexStore:
             if idx is not None:
                 return idx
             dim = await self._get_default_dim()
-            fresh = MessageIndex(dim)
+            fresh = MessageIndex(dim, self.max_elements)
             self.indexes[user_id] = fresh
             return fresh
 
@@ -134,7 +136,7 @@ class MessageIndexStore:
         vecs = (await async_embed_texts(texts)).astype(np.float32)
         if idx is None:
             dim = vecs.shape[1]
-            idx = MessageIndex(dim)
+            idx = MessageIndex(dim, self.max_elements)
         idx.add_batch(ids, vecs)
         await self.db.vectors.store_vectors_batch(
             user_id,
@@ -167,7 +169,7 @@ class MessageIndexStore:
                     "Warming index for user %s with %d vectors", user_id, len(rows)
                 )
                 dim = rows[0]["vec"].shape[0]
-                idx = MessageIndex(dim)
+                idx = MessageIndex(dim, self.max_elements)
                 ids = [r["id"] for r in rows]
                 vecs = np.array([r["vec"] for r in rows], dtype=np.float32)
                 if vecs.ndim == 1:
@@ -202,7 +204,7 @@ class MessageIndexStore:
 
             logger.debug("No existing data for user %s, creating empty index", user_id)
             dim = await self._get_default_dim()
-            idx = MessageIndex(dim)
+            idx = MessageIndex(dim, self.max_elements)
             latest = await self.db.messages.get_user_latest_id(user_id)
             self.cursors[user_id] = latest
             self.indexes[user_id] = idx
