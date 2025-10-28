@@ -72,8 +72,10 @@ export function startButtonSpinner(btn, loadingText = "Loading") {
 export function stopButtonSpinner(btn) {
   const id = btn && btn.dataset.spinnerId;
   if (id) clearInterval(Number(id));
-  if (btn && btn.dataset.originalText)
+  if (btn && "originalText" in btn.dataset) {
     btn.textContent = btn.dataset.originalText;
+    btn.removeAttribute("data-original-text");
+  }
   if (btn) {
     btn.disabled = false;
     btn.removeAttribute("aria-busy");

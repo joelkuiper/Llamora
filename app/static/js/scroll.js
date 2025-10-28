@@ -7,6 +7,54 @@ export function initScrollMemory(wrapperSelector = "#content-wrapper") {
   let container = null;
   let scrollListenerAttachedTo = null;
   let markdownListener = null;
+  let storageErrorLogged = false;
+
+  const logStorageError = (error) => {
+    if (storageErrorLogged) return;
+    storageErrorLogged = true;
+    if (typeof console !== "undefined" && console.warn) {
+      console.warn("Scroll memory storage disabled", error);
+    }
+  };
+
+  const getStorage = () => {
+    try {
+      if (typeof window === "undefined") return null;
+      return window.sessionStorage ?? null;
+    } catch (error) {
+      logStorageError(error);
+      return null;
+    }
+  };
+
+  const safeSet = (key, value) => {
+    try {
+      const storage = getStorage();
+      storage?.setItem?.(key, value);
+    } catch (error) {
+      logStorageError(error);
+    }
+  };
+
+  const safeGet = (key) => {
+    try {
+      const storage = getStorage();
+      if (!storage?.getItem) return null;
+      return storage.getItem(key);
+    } catch (error) {
+      logStorageError(error);
+      return null;
+    }
+  };
+
+  const safeRemove = (key) => {
+    try {
+      const storage = getStorage();
+      storage?.removeItem?.(key);
+    } catch (error) {
+      logStorageError(error);
+    }
+  };
 
   const getKey = () => {
     const activeDay = document.body?.dataset?.activeDay;
@@ -21,7 +69,7 @@ export function initScrollMemory(wrapperSelector = "#content-wrapper") {
     if (!target || typeof target.scrollTop !== "number") {
       return;
     }
-    sessionStorage.setItem(getKey(), String(target.scrollTop));
+    safeSet(getKey(), String(target.scrollTop));
   };
 
   const ensureContainer = () => {
@@ -48,7 +96,7 @@ export function initScrollMemory(wrapperSelector = "#content-wrapper") {
   const save = () => {
     const el = document.getElementById(wrapperId);
     if (!el || typeof el.scrollTop !== "number") return;
-    sessionStorage.setItem(getKey(), String(el.scrollTop));
+    safeSet(getKey(), String(el.scrollTop));
   };
 
   const detachMarkdownListener = () => {
@@ -99,7 +147,7 @@ export function initScrollMemory(wrapperSelector = "#content-wrapper") {
         return;
       }
 
-      const saved = sessionStorage.getItem(key);
+      const saved = safeGet(key);
       detachMarkdownListener();
       if (saved !== null) {
         applySavedScroll(saved);
@@ -129,7 +177,7 @@ export function initScrollMemory(wrapperSelector = "#content-wrapper") {
       return;
     }
 
-    const saved = sessionStorage.getItem(key);
+    const saved = safeGet(key);
     if (saved !== null) {
       applySavedScroll(saved);
     }
