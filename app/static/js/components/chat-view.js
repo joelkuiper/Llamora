@@ -91,6 +91,7 @@ export class ChatView extends ReactiveElement {
   #markdownObserver = null;
   #initialized = false;
   #lastRenderedDay = null;
+  #chatFormReady = Promise.resolve();
 
   constructor() {
     super();
@@ -177,13 +178,24 @@ export class ChatView extends ReactiveElement {
     });
 
     this.#chatForm = this.querySelector("chat-form");
+    let chatFormReady = Promise.resolve();
     if (this.#chatForm) {
-      this.#wireChatForm(this.#chatForm, {
+      const currentForm = this.#chatForm;
+      chatFormReady = this.#wireChatForm(currentForm, {
         chat,
         container,
         state: this.#state,
         date: activeDay,
       });
+      this.#chatFormReady = chatFormReady.then(() => {
+        if (this.#chatForm !== currentForm) return;
+        const currentMsgId = this.#state?.currentStreamMsgId ?? null;
+        if (typeof this.#chatForm.setStreaming === "function") {
+          this.#chatForm.setStreaming(Boolean(currentMsgId));
+        }
+      });
+    } else {
+      this.#chatFormReady = Promise.resolve();
     }
 
     if (this.#chatForm?.isToday) {
@@ -212,7 +224,7 @@ export class ChatView extends ReactiveElement {
       onRender: (el) => this.#handleMarkdownRendered(el),
     });
     this.#markdownObserver.start();
-    this.#updateStreamingState();
+    chatFormReady.then(() => this.#updateStreamingState());
 
     initDayNav(chat, { activeDay, label: activeDayLabel });
     scrollToHighlight(this.dataset.scrollTarget);
@@ -262,6 +274,7 @@ export class ChatView extends ReactiveElement {
     this.#scrollToBottom = null;
     this.#chatForm = null;
     this.#state = null;
+    this.#chatFormReady = Promise.resolve();
   }
 
   #handleChatBeforeSwap(event) {
@@ -347,12 +360,23 @@ export class ChatView extends ReactiveElement {
       this.#historyRestoreFrame = null;
       this.#syncToChatDate();
       if (this.#chatForm) {
-        this.#wireChatForm(this.#chatForm, {
+        const currentForm = this.#chatForm;
+        const chatFormReady = this.#wireChatForm(currentForm, {
           chat: this.#chat,
           container: document.getElementById("content-wrapper"),
           state: this.#state,
           date: this.#lastRenderedDay,
         });
+        this.#chatFormReady = chatFormReady.then(() => {
+          if (this.#chatForm !== currentForm) return;
+          const currentMsgId = this.#state?.currentStreamMsgId ?? null;
+          if (typeof this.#chatForm.setStreaming === "function") {
+            this.#chatForm.setStreaming(Boolean(currentMsgId));
+          }
+        });
+        this.#chatFormReady.then(() => this.#updateStreamingState());
+      } else {
+        this.#chatFormReady = Promise.resolve();
       }
     });
   }
@@ -375,7 +399,11 @@ export class ChatView extends ReactiveElement {
     }
   }
 
-  #updateStreamingState(forceScroll = false) {
+  async #updateStreamingState(forceScroll = false) {
+    if (!this.#chat || !this.#chatForm) return;
+
+    await this.#chatFormReady;
+
     if (!this.#chat || !this.#chatForm) return;
 
     const msgId = findCurrentMsgId(this.#chat);
