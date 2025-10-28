@@ -122,7 +122,6 @@ class PendingResponse(ResponsePipelineCallbacks):
         self._task = asyncio.create_task(
             self._run_pipeline(), name=f"pending:{user_msg_id}"
         )
-        self._task.add_done_callback(lambda _: self._invoke_cleanup())
 
     async def _run_pipeline(self) -> None:
         try:
@@ -160,7 +159,6 @@ class PendingResponse(ResponsePipelineCallbacks):
         self.cancelled = True
         await self._pipeline.request_cancel()
         await self._await_task_completion()
-        self._invoke_cleanup()
 
     async def _await_task_completion(self) -> None:
         """Wait for the generation task to finish persisting state.
