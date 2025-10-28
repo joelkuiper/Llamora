@@ -35,6 +35,12 @@ DB_TIMEOUT = float(os.getenv("LLAMORA_DB_TIMEOUT", 5))
 DB_BUSY_TIMEOUT = int(os.getenv("LLAMORA_DB_BUSY_TIMEOUT", 5000))  # milliseconds
 DB_MMAP_SIZE = int(os.getenv("LLAMORA_DB_MMAP_SIZE", 10 * 1024 * 1024))
 
+# Message history caching
+MESSAGE_HISTORY_CACHE_MAXSIZE = int(
+    os.getenv("LLAMORA_MESSAGE_HISTORY_CACHE_MAXSIZE", 256)
+)
+MESSAGE_HISTORY_CACHE_TTL = int(os.getenv("LLAMORA_MESSAGE_HISTORY_CACHE_TTL", 60))
+
 
 # Only allow a limited subset of parameters to be forwarded to the LLM from the client-side
 ALLOWED_LLM_CONFIG_KEYS = {"temperature"}

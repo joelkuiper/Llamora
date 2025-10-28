@@ -6,8 +6,8 @@ from aiosqlitepool import SQLiteConnectionPool
 from ulid import ULID
 
 from .base import BaseRepository
+from .events import RepositoryEventBus, MESSAGE_TAGS_CHANGED_EVENT
 from .utils import cached_tag_name
-
 
 class TagsRepository(BaseRepository):
     """Operations for encrypted tag metadata and associations."""
@@ -17,10 +17,12 @@ class TagsRepository(BaseRepository):
         pool: SQLiteConnectionPool,
         encrypt_message,
         decrypt_message,
+        event_bus: RepositoryEventBus | None = None,
     ) -> None:
         super().__init__(pool)
         self._encrypt_message = encrypt_message
         self._decrypt_message = decrypt_message
+        self._event_bus = event_bus
 
     async def resolve_or_create_tag(
         self, user_id: str, tag_name: str, dek: bytes
@@ -52,12 +54,16 @@ class TagsRepository(BaseRepository):
     ) -> None:
         async with self.pool.connection() as conn:
 
+            changed = False
+
             async def _tx():
+                nonlocal changed
                 cursor = await conn.execute(
                     "INSERT OR IGNORE INTO tag_message_xref (user_id, tag_hash, message_id, ulid) VALUES (?, ?, ?, ?)",
                     (user_id, tag_hash, message_id, str(ULID())),
                 )
                 if cursor.rowcount:
+                    changed = True
                     await conn.execute(
                         "UPDATE tags SET seen = seen + 1, last_seen = CURRENT_TIMESTAMP WHERE user_id = ? AND tag_hash = ?",
                         (user_id, tag_hash),
@@ -65,23 +71,41 @@ class TagsRepository(BaseRepository):
 
             await self._run_in_transaction(conn, _tx)
 
+        if changed and self._event_bus:
+            await self._event_bus.emit(
+                MESSAGE_TAGS_CHANGED_EVENT,
+                user_id=user_id,
+                message_id=message_id,
+            )
+
     async def unlink_tag_message(
         self, user_id: str, tag_hash: bytes, message_id: str
     ) -> None:
         async with self.pool.connection() as conn:
 
+            changed = False
+
             async def _tx():
+                nonlocal changed
                 cursor = await conn.execute(
                     "DELETE FROM tag_message_xref WHERE user_id = ? AND tag_hash = ? AND message_id = ?",
                     (user_id, tag_hash, message_id),
                 )
                 if cursor.rowcount:
+                    changed = True
                     await conn.execute(
                         "UPDATE tags SET seen = CASE WHEN seen > 0 THEN seen - 1 ELSE 0 END WHERE user_id = ? AND tag_hash = ?",
                         (user_id, tag_hash),
                     )
 
             await self._run_in_transaction(conn, _tx)
+
+        if changed and self._event_bus:
+            await self._event_bus.emit(
+                MESSAGE_TAGS_CHANGED_EVENT,
+                user_id=user_id,
+                message_id=message_id,
+            )
 
     async def get_tags_for_message(
         self, user_id: str, message_id: str, dek: bytes

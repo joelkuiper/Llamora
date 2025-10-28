@@ -23,6 +23,7 @@ from app.services.crypto import (
     decrypt_vector,
 )
 from app.db.base import run_in_transaction
+from app.db.events import RepositoryEventBus
 from app.db.users import UsersRepository
 from app.db.messages import MessagesRepository
 from app.db.tags import TagsRepository
@@ -43,6 +44,7 @@ class LocalDB:
         self._messages: MessagesRepository | None = None
         self._tags: TagsRepository | None = None
         self._vectors: VectorsRepository | None = None
+        self._events: RepositoryEventBus | None = None
         atexit.register(self._atexit_close)
 
     def _atexit_close(self) -> None:
@@ -102,6 +104,7 @@ class LocalDB:
         self._messages = None
         self._tags = None
         self._vectors = None
+        self._events = None
 
     async def _connection_factory(self):
         conn = await aiosqlite.connect(self.db_path, timeout=DB_TIMEOUT)
@@ -197,14 +200,16 @@ class LocalDB:
     def _configure_repositories(self) -> None:
         if not self.pool:
             raise RuntimeError("Connection pool not initialized")
+        self._events = RepositoryEventBus()
         self._users = UsersRepository(self.pool)
         self._messages = MessagesRepository(
-            self.pool, encrypt_message, decrypt_message
+            self.pool, encrypt_message, decrypt_message, self._events
         )
         self._tags = TagsRepository(
             self.pool,
             encrypt_message,
             decrypt_message,
+            self._events,
         )
         self._vectors = VectorsRepository(self.pool, encrypt_vector, decrypt_vector)
         self._messages.set_on_message_appended(self._on_message_appended)

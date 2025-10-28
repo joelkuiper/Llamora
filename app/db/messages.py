@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import asyncio
+import copy
 from typing import Callable, Awaitable
 
 import orjson
 from aiosqlitepool import SQLiteConnectionPool
 from ulid import ULID
 
+from cachetools import TTLCache
+
+from config import MESSAGE_HISTORY_CACHE_MAXSIZE, MESSAGE_HISTORY_CACHE_TTL
+
 from .base import BaseRepository
+from .events import RepositoryEventBus, MESSAGE_TAGS_CHANGED_EVENT
 from .utils import cached_tag_name
 
 MessageAppendedCallback = Callable[[str, str, str, bytes], Awaitable[None]]
@@ -20,14 +27,73 @@ class MessagesRepository(BaseRepository):
         pool: SQLiteConnectionPool,
         encrypt_message,
         decrypt_message,
+        event_bus: RepositoryEventBus | None = None,
     ) -> None:
         super().__init__(pool)
         self._encrypt_message = encrypt_message
         self._decrypt_message = decrypt_message
         self._on_message_appended: MessageAppendedCallback | None = None
+        self._event_bus = event_bus
+        self._history_cache: TTLCache[tuple[str, str], list[dict]] = TTLCache(
+            maxsize=MESSAGE_HISTORY_CACHE_MAXSIZE,
+            ttl=MESSAGE_HISTORY_CACHE_TTL,
+        )
+        self._history_cache_lock = asyncio.Lock()
+        if self._event_bus:
+            self._event_bus.subscribe(
+                MESSAGE_TAGS_CHANGED_EVENT, self._handle_message_tags_changed
+            )
 
     def set_on_message_appended(self, callback: MessageAppendedCallback | None) -> None:
         self._on_message_appended = callback
+
+    async def _get_cached_history(
+        self, user_id: str, created_date: str
+    ) -> list[dict] | None:
+        async with self._history_cache_lock:
+            cached = self._history_cache.get((user_id, created_date))
+            if cached is None:
+                return None
+            return copy.deepcopy(cached)
+
+    async def _store_history_cache(
+        self, user_id: str, created_date: str, history: list[dict]
+    ) -> None:
+        async with self._history_cache_lock:
+            self._history_cache[(user_id, created_date)] = copy.deepcopy(history)
+
+    async def _append_message_to_cache(
+        self, user_id: str, created_date: str, message: dict
+    ) -> None:
+        key = (user_id, created_date)
+        async with self._history_cache_lock:
+            cached = self._history_cache.get(key)
+            if cached is None:
+                return
+
+            new_entry = copy.deepcopy(message)
+            new_id = new_entry.get("id")
+            inserted = False
+            for idx, existing in enumerate(cached):
+                existing_id = existing.get("id")
+                if existing_id == new_id:
+                    cached[idx] = new_entry
+                    inserted = True
+                    break
+                if existing_id and new_id and existing_id > new_id:
+                    cached.insert(idx, new_entry)
+                    inserted = True
+                    break
+            if not inserted:
+                cached.append(new_entry)
+
+            self._history_cache[key] = cached
+
+    async def _invalidate_history_cache(
+        self, user_id: str, created_date: str
+    ) -> None:
+        async with self._history_cache_lock:
+            self._history_cache.pop((user_id, created_date), None)
 
     def _rows_to_messages(
         self, rows, user_id: str, dek: bytes
@@ -97,6 +163,28 @@ class MessagesRepository(BaseRepository):
                 sql,
                 tuple(params),
             )
+
+            cursor = await conn.execute(
+                "SELECT created_at, created_date FROM messages WHERE id = ?",
+                (msg_id,),
+            )
+            row = await cursor.fetchone()
+
+        created_at = row["created_at"] if row else None
+        created_date = row["created_date"] if row else created_date
+
+        message_entry = {
+            "id": msg_id,
+            "created_at": created_at,
+            "role": role,
+            "reply_to": reply_to,
+            "message": record.get("message", ""),
+            "meta": record.get("meta", {}),
+            "tags": [],
+        }
+
+        if created_date:
+            await self._append_message_to_cache(user_id, created_date, message_entry)
 
         if self._on_message_appended:
             await self._on_message_appended(user_id, msg_id, plaintext, dek)
@@ -223,6 +311,10 @@ class MessagesRepository(BaseRepository):
     async def get_history(
         self, user_id: str, created_date: str, dek: bytes
     ) -> list[dict]:
+        cached = await self._get_cached_history(user_id, created_date)
+        if cached is not None:
+            return cached
+
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
@@ -277,6 +369,7 @@ class MessagesRepository(BaseRepository):
                 current["tags"].append(
                     {"name": tag_name, "hash": row["tag_hash"].hex()}
                 )
+        await self._store_history_cache(user_id, created_date, history)
         return history
 
     async def get_days_with_messages(
@@ -303,3 +396,10 @@ class MessagesRepository(BaseRepository):
             )
             row = await cursor.fetchone()
         return bool(row)
+
+    async def _handle_message_tags_changed(
+        self, *, user_id: str, message_id: str
+    ) -> None:
+        created_date = await self.get_message_date(user_id, message_id)
+        if created_date:
+            await self._invalidate_history_cache(user_id, created_date)
