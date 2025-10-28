@@ -32,21 +32,29 @@ class TagsRepository(BaseRepository):
             raise ValueError("Empty tag")
         tag_hash = hashlib.sha256(f"{user_id}:{tag_name}".encode("utf-8")).digest()
         async with self.pool.connection() as conn:
-            cursor = await conn.execute(
-                "SELECT 1 FROM tags WHERE user_id = ? AND tag_hash = ?",
-                (user_id, tag_hash),
-            )
-            row = await cursor.fetchone()
-            if not row:
-                nonce, ct, alg = self._encrypt_message(
-                    dek, user_id, tag_hash.hex(), tag_name
+            async def _tx():
+                cursor = await conn.execute(
+                    """
+                    INSERT INTO tags (user_id, tag_hash, name_ct, name_nonce, alg)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(user_id, tag_hash) DO NOTHING
+                    """,
+                    (user_id, tag_hash, b"", b"", ""),
                 )
-                await self._run_in_transaction(
-                    conn,
-                    conn.execute,
-                    "INSERT INTO tags (user_id, tag_hash, name_ct, name_nonce, alg) VALUES (?, ?, ?, ?, ?)",
-                    (user_id, tag_hash, ct, nonce, alg.decode()),
-                )
+                if cursor.rowcount:
+                    nonce, ct, alg = self._encrypt_message(
+                        dek, user_id, tag_hash.hex(), tag_name
+                    )
+                    await conn.execute(
+                        """
+                        UPDATE tags
+                        SET name_ct = ?, name_nonce = ?, alg = ?
+                        WHERE user_id = ? AND tag_hash = ?
+                        """,
+                        (ct, nonce, alg.decode(), user_id, tag_hash),
+                    )
+
+            await self._run_in_transaction(conn, _tx)
         return tag_hash
 
     async def xref_tag_message(
