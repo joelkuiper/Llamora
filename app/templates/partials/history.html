@@ -1,6 +1,11 @@
 {% from 'partials/assistant_stream.html' import assistant_stream %}
 {% from 'partials/meta_chips.html' import render_meta_chips %}
-<div id="chat" data-date="{{ day }}" data-long-date="{{ day|long_date }}">
+<div id="chat"
+     data-date="{{ day }}"
+     data-long-date="{{ day|long_date }}"
+     role="log"
+     aria-live="polite"
+     aria-relevant="additions">
   {% if not history|length and not is_today %}
   <div class="no-content">Nothing was written this day.</div>
   {% endif %}

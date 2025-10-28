@@ -35,7 +35,7 @@
     hx-on::after-settle="window.appInit?.initGlobalShell()"
     data-csrf-token="{{ csrf_token() }}">
 
-    <div id="errors" hx-swap="beforeend"></div>
+    <div id="errors" role="alert" aria-live="assertive" aria-atomic="true" hx-swap="beforeend"></div>
     <header id="search-container">
 
       <div id="branding">

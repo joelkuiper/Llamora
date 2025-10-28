@@ -28,6 +28,9 @@ function showServerError() {
 
   const box = document.createElement("div");
   box.className = "error-box";
+  box.setAttribute("role", "alert");
+  box.setAttribute("aria-live", "assertive");
+  box.setAttribute("aria-atomic", "true");
   box.textContent = "⚠️ Unable to reach server.";
 
   const btn = document.createElement("button");

@@ -134,6 +134,7 @@ class LlmStreamElement extends HTMLElement {
     if (this.#eventSource || !this.sseUrl) return;
 
     this.dataset.streaming = "true";
+    this.setAttribute("aria-busy", "true");
     this.dispatchEvent(
       new CustomEvent("llm-stream:start", {
         bubbles: true,
@@ -262,6 +263,7 @@ class LlmStreamElement extends HTMLElement {
 
     this.dataset.streaming = "false";
     this.removeAttribute("data-sse-url");
+    this.removeAttribute("aria-busy");
 
     this.#cancelRender();
     this.#closeEventSource();
