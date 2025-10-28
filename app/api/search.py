@@ -5,6 +5,7 @@ import re
 import orjson
 
 from config import (
+    INDEX_WORKER_MAX_QUEUE_SIZE,
     MAX_SEARCH_QUERY_LENGTH,
     PROGRESSIVE_K1,
     PROGRESSIVE_K2,
@@ -31,7 +32,9 @@ class SearchAPI:
         self.db = db
         self.vector_search = vector_search or VectorSearchService(db)
         self.lexical_reranker = lexical_reranker or LexicalReranker()
-        self._index_worker = IndexWorker(self)
+        self._index_worker = IndexWorker(
+            self, max_queue_size=INDEX_WORKER_MAX_QUEUE_SIZE
+        )
 
     async def start(self) -> None:
         """Start background services for the search API."""

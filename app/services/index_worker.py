@@ -14,10 +14,15 @@ logger = logging.getLogger(__name__)
 Job = Tuple[str, str, str, bytes]
 
 
+DEFAULT_MAX_QUEUE_SIZE = 1024
+
+
 class IndexWorker:
     """Background worker that indexes messages for search."""
 
-    def __init__(self, search_api: "SearchAPI", *, max_queue_size: int = 0) -> None:
+    def __init__(
+        self, search_api: "SearchAPI", *, max_queue_size: int = DEFAULT_MAX_QUEUE_SIZE
+    ) -> None:
         self._search_api = search_api
         self._queue: asyncio.Queue[Job | None] = asyncio.Queue(maxsize=max_queue_size)
         self._task: asyncio.Task | None = None
@@ -42,7 +47,11 @@ class IndexWorker:
 
     async def enqueue(self, user_id: str, message_id: str, plaintext: str, dek: bytes) -> None:
         """Queue a message for indexing."""
-        await self._queue.put((user_id, message_id, plaintext, dek))
+        try:
+            self._queue.put_nowait((user_id, message_id, plaintext, dek))
+        except asyncio.QueueFull:
+            logger.warning("Index queue full; waiting for free slot")
+            await self._queue.put((user_id, message_id, plaintext, dek))
 
     async def _run(self) -> None:
         maxsize = self._queue.maxsize

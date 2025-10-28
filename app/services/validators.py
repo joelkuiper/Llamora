@@ -1,3 +1,4 @@
+import asyncio
 from enum import Enum, auto
 import re
 from zxcvbn import zxcvbn
@@ -14,7 +15,7 @@ class PasswordValidationError(Enum):
     DISALLOWED_MATCH = auto()
 
 
-def validate_password(
+async def validate_password(
     password: str | None,
     *,
     confirm: str | None = None,
@@ -54,7 +55,7 @@ def validate_password(
         return PasswordValidationError.MISMATCH
 
     if min_strength is not None:
-        strength = zxcvbn(pw)
+        strength = await asyncio.to_thread(zxcvbn, pw)
         if strength.get("score", 0) < min_strength:
             return PasswordValidationError.WEAK
 

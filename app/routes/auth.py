@@ -1,3 +1,5 @@
+import asyncio
+
 from quart import (
     Blueprint,
     render_template,
@@ -103,7 +105,7 @@ async def password_strength_check():
 
     suggestions: list[str] = []
     try:
-        strength = zxcvbn(pw)
+        strength = await asyncio.to_thread(zxcvbn, pw)
         score = int(strength.get("score", 0))
         feedback = strength.get("feedback")
         if not isinstance(feedback, dict):
@@ -154,7 +156,7 @@ async def register():
                 "register.html", error="All fields are required", username=username
             )
 
-        password_error = validate_password(
+        password_error = await validate_password(
             password,
             confirm=confirm,
             require_confirm=True,
@@ -336,7 +338,7 @@ async def reset_password():
         if len(username) > max_user:
             return await render_template("reset_password.html", error="Invalid input")
 
-        password_error = validate_password(
+        password_error = await validate_password(
             password,
             confirm=confirm,
             require_confirm=True,
@@ -425,7 +427,7 @@ async def change_password():
     if len(current) > max_pass:
         return await _render_profile_page(user, pw_error="Input exceeds max length")
 
-    password_error = validate_password(
+    password_error = await validate_password(
         new,
         confirm=confirm,
         require_confirm=True,
