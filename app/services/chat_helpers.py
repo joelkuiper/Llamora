@@ -48,7 +48,7 @@ def find_existing_assistant_reply(
 async def locate_message_and_reply(
     db,
     user_id: str,
-    dek: str,
+    dek: bytes,
     date: str,
     user_msg_id: str,
 ):
