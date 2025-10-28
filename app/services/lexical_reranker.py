@@ -7,6 +7,8 @@ import ahocorasick
 from config import POOR_MATCH_MAX_COS
 
 
+TOKEN_PATTERN = re.compile(r"\w+")
+
 logger = logging.getLogger(__name__)
 
 
@@ -24,7 +26,7 @@ class LexicalReranker:
         automaton = ahocorasick.Automaton()
         automaton.add_word(lower_query, ("E", lower_query))
         tokens = [
-            t for t in dict.fromkeys(re.findall(r"\w+", lower_query)) if len(t) >= 2
+            t for t in dict.fromkeys(TOKEN_PATTERN.findall(lower_query)) if len(t) >= 2
         ]
         for tok in tokens:
             automaton.add_word(tok, ("T", tok))
