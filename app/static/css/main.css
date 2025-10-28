@@ -222,11 +222,14 @@ html, body {
     background-color 0.2s ease;
 }
 
+
 .btn:hover {
-  border-color: var(--accent-10);
+  border-color: var(--accent);
   box-shadow:
-    var(--inset-shadow-disabled),
-    0 0 0 2px var(--accent-05);
+    var(--raised-shadow),
+    0 0 0 3px var(--accent-20),
+    0 12px 28px var(--accent-10);
+  background: linear-gradient(0deg, rgba(59,167,246,0.16), rgba(59,167,246,0.12)) var(--color-bg);
 }
 
 .btn:focus,
@@ -252,14 +255,6 @@ html, body {
 
 .btn {
   font-weight: 600;
-  &:hover {
-    border-color: var(--accent);
-    box-shadow:
-      var(--raised-shadow),
-      0 0 0 3px var(--accent-20),
-      0 12px 28px var(--accent-10);
-    background: linear-gradient(0deg, rgba(59,167,246,0.16), rgba(59,167,246,0.12)) var(--color-bg);
-  }
 }
 
 .btn-primary {
