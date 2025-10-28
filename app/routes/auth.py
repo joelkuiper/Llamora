@@ -64,6 +64,14 @@ def _db():
     return get_services().db
 
 
+async def _hash_password(password: bytes) -> bytes:
+    return await asyncio.to_thread(pwhash.argon2id.str, password)
+
+
+async def _verify_password(hash_bytes: bytes, password: bytes) -> bool:
+    return await asyncio.to_thread(pwhash.argon2id.verify, hash_bytes, password)
+
+
 def _get_client_ip() -> str:
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
@@ -189,7 +197,7 @@ async def register():
             )
 
         password_bytes = password.encode("utf-8")
-        hash_bytes = pwhash.argon2id.str(password_bytes)
+        hash_bytes = await _hash_password(password_bytes)
         password_hash = hash_bytes.decode("utf-8")
 
         dek = generate_dek()
@@ -262,7 +270,7 @@ async def login():
         user = await _db().users.get_user_by_username(username)
         if user:
             try:
-                pwhash.argon2id.verify(
+                await _verify_password(
                     user["password_hash"].encode("utf-8"),
                     password.encode("utf-8"),
                 )
@@ -369,7 +377,7 @@ async def reset_password():
             )
 
         password_bytes = password.encode("utf-8")
-        hash_bytes = pwhash.argon2id.str(password_bytes)
+        hash_bytes = await _hash_password(password_bytes)
         password_hash = hash_bytes.decode("utf-8")
         pw_salt, pw_nonce, pw_cipher = wrap_key(dek, password)
         await _db().users.update_password_wrap(
@@ -439,7 +447,7 @@ async def change_password():
         return await _render_profile_page(user, pw_error=message)
 
     try:
-        pwhash.argon2id.verify(
+        await _verify_password(
             user["password_hash"].encode("utf-8"), current.encode("utf-8")
         )
     except Exception:
@@ -450,7 +458,7 @@ async def change_password():
         return await _render_profile_page(user, pw_error="Missing encryption key")
 
     password_bytes = new.encode("utf-8")
-    hash_bytes = pwhash.argon2id.str(password_bytes)
+    hash_bytes = await _hash_password(password_bytes)
     password_hash = hash_bytes.decode("utf-8")
     pw_salt, pw_nonce, pw_cipher = wrap_key(dek, new)
     await _db().users.update_password_wrap(
