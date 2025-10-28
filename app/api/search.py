@@ -73,6 +73,10 @@ class SearchAPI:
             user_id, dek, query, k1, k2
         )
 
+        if not candidates:
+            logger.debug("No candidates found for user %s; returning empty result set", user_id)
+            return []
+
         tokens = [t for t in dict.fromkeys(TOKEN_PATTERN.findall(query)) if t]
         boosts: dict[str, float] = {}
         if tokens:
