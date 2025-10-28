@@ -15,6 +15,7 @@
       {% if error %}<div class="error">{{ error }}</div>{% endif %}
       <form method="post">
           <input class="input" type="text" name="username" placeholder="Username"
+                 value="{{ username | default('', true) }}"
                  required pattern="^[A-Za-z0-9_]+$" maxlength="{{ config.MAX_USERNAME_LENGTH }}"/>
           {% from 'partials/password_field.html' import password_field with context %}
           {{ password_field('password', 'Password') }}

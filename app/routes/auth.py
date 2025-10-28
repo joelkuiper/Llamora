@@ -151,7 +151,7 @@ async def register():
         # Basic validations
         if not username:
             return await render_template(
-                "register.html", error="All fields are required"
+                "register.html", error="All fields are required", username=username
             )
 
         password_error = validate_password(
@@ -163,22 +163,27 @@ async def register():
         )
         if password_error:
             message = _password_error_message(password_error)
-            return await render_template("register.html", error=message)
+            return await render_template(
+                "register.html", error=message, username=username
+            )
 
         if len(username) > max_user:
             return await render_template(
-                "register.html", error="Input exceeds max length"
+                "register.html",
+                error="Input exceeds max length",
+                username=username,
             )
 
         if not re.fullmatch(r"^[A-Za-z0-9_]+$", username):
             return await render_template(
                 "register.html",
                 error="Username may only contain letters, digits, and underscores",
+                username=username,
             )
 
         if await _db().users.get_user_by_username(username):
             return await render_template(
-                "register.html", error="Username already exists"
+                "register.html", error="Username already exists", username=username
             )
 
         password_bytes = password.encode("utf-8")
@@ -246,7 +251,10 @@ async def login():
         if len(username) > max_user or len(password) > max_pass:
             _login_failures[cache_key] = attempts + 1
             return await render_template(
-                "login.html", error="Invalid credentials", return_url=return_url
+                "login.html",
+                error="Invalid credentials",
+                return_url=return_url,
+                username=username,
             )
 
         user = await _db().users.get_user_by_username(username)
@@ -287,7 +295,10 @@ async def login():
         current_app.logger.debug("Login failed for %s", username)
         _login_failures[cache_key] = attempts + 1
         return await render_template(
-            "login.html", error="Invalid credentials", return_url=return_url
+            "login.html",
+            error="Invalid credentials",
+            return_url=return_url,
+            username=username,
         )
 
     return_url = sanitize_return_path(request.args.get("return"))
