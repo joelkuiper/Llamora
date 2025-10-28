@@ -1,9 +1,26 @@
 import { startButtonSpinner, stopButtonSpinner } from "./ui.js";
 import { setTimezoneCookie } from "./timezone.js";
 
-function initForms() {
+const FORM_SELECTOR = ".form-container form, #profile-page form";
+
+export function initForms(root = document) {
   setTimezoneCookie();
-  document.querySelectorAll(".form-container form, #profile-page form").forEach((form) => {
+
+  const elements = [];
+  const scope = root instanceof Document ? root : root ?? document;
+
+  if (scope instanceof Element && scope.matches(FORM_SELECTOR)) {
+    elements.push(scope);
+  }
+
+  if (scope && typeof scope.querySelectorAll === "function") {
+    elements.push(...scope.querySelectorAll(FORM_SELECTOR));
+  }
+
+  elements.forEach((form) => {
+    if (form.dataset.initFormsBound === "1") return;
+    form.dataset.initFormsBound = "1";
+
     form.addEventListener("submit", async (e) => {
       const btn = form.querySelector('button[type="submit"]');
       if (!btn || btn.dataset.spinning === "1") return;
@@ -46,8 +63,31 @@ function initForms() {
   });
 }
 
+function registerHtmxHandlers() {
+  const body = document.body;
+  if (!body) return;
+
+  const handleHtmxEvent = (event) => {
+    const fragmentRoot = event.target ?? document;
+    initForms(fragmentRoot);
+  };
+
+  body.addEventListener("htmx:load", handleHtmxEvent);
+  body.addEventListener("htmx:afterSwap", handleHtmxEvent);
+}
+
+const onReady = () => {
+  initForms(document);
+  registerHtmxHandlers();
+};
+
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initForms);
+  document.addEventListener("DOMContentLoaded", onReady);
 } else {
-  initForms();
+  onReady();
+}
+
+if (typeof window !== "undefined") {
+  window.appInit = window.appInit || {};
+  window.appInit.initForms = initForms;
 }
