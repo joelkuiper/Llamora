@@ -55,8 +55,10 @@ export class SearchOverlay extends ReactiveElement {
       listeners.add(this.#inputEl, "input", this.#inputHandler);
     }
 
-    this.watchHtmxRequests(this, {
-      within: this,
+    const eventTarget = this.ownerDocument ?? document;
+
+    this.watchHtmxRequests(eventTarget, {
+      within: (event) => this.#isRelevantRequest(event),
       bag: listeners,
       onStart: this.#beforeRequestHandler,
       onEnd: this.#afterRequestHandler,
@@ -101,8 +103,7 @@ export class SearchOverlay extends ReactiveElement {
   }
 
   #handleBeforeRequest(event) {
-    const source = event.target;
-    if (!(source instanceof Element) || !this.contains(source)) return;
+    if (!this.#isRelevantRequest(event)) return;
 
     const wrap = this.#resultsEl;
     if (wrap) {
@@ -112,14 +113,29 @@ export class SearchOverlay extends ReactiveElement {
   }
 
   #handleAfterRequest(event) {
-    const source = event.target;
-    if (!(source instanceof Element) || !this.contains(source)) return;
+    if (!this.#isRelevantRequest(event)) return;
 
     const wrap = this.#resultsEl;
     if (wrap) {
       wrap.removeAttribute("aria-busy");
     }
     this.#stopSpinner();
+  }
+
+  #isRelevantRequest(event) {
+    const source = event?.target;
+    if (source instanceof Element && this.contains(source)) {
+      return true;
+    }
+
+    const detailTarget = event?.detail?.target;
+    const results = this.#resultsEl;
+
+    if (results && detailTarget instanceof Element) {
+      return detailTarget === results;
+    }
+
+    return false;
   }
 
   #handleAfterSwap(evt) {
