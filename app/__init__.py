@@ -63,7 +63,10 @@ def create_app():
 
     from datetime import datetime
     import hashlib
-    from .services.time import humanize as humanize_filter
+    from .services.time import (
+        humanize as humanize_filter,
+        format_date,
+    )
 
     app.template_filter("humanize")(humanize_filter)
 
@@ -73,13 +76,7 @@ def create_app():
             dt = datetime.fromisoformat(value)
         else:
             dt = value
-        day = dt.day
-        if 10 <= day % 100 <= 20:
-            suffix = "th"
-        else:
-            suffix = {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
-        month = dt.strftime("%B")
-        return f"{day}{suffix} of {month} {dt.year}"
+        return format_date(dt)
 
     @app.template_filter("tag_hash")
     def tag_hash_filter(tag, user_id=None):
