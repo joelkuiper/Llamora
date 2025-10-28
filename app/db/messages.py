@@ -154,21 +154,17 @@ class MessagesRepository(BaseRepository):
             placeholders = ", ".join(["?"] * len(columns))
             sql = (
                 f"INSERT INTO messages ({', '.join(columns)}) "
-                f"VALUES ({placeholders})"
+                f"VALUES ({placeholders}) "
+                "RETURNING created_at, created_date"
             )
 
-            await self._run_in_transaction(
-                conn,
-                conn.execute,
-                sql,
-                tuple(params),
-            )
+            async def _execute_and_fetch():
+                cursor = await conn.execute(sql, tuple(params))
+                row = await cursor.fetchone()
+                await cursor.close()
+                return row
 
-            cursor = await conn.execute(
-                "SELECT created_at, created_date FROM messages WHERE id = ?",
-                (msg_id,),
-            )
-            row = await cursor.fetchone()
+            row = await self._run_in_transaction(conn, _execute_and_fetch)
 
         created_at = row["created_at"] if row else None
         created_date = row["created_date"] if row else created_date
