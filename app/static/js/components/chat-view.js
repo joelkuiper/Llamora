@@ -101,6 +101,30 @@ export class ChatView extends ReactiveElement {
     this.#historyRestoreHandler = (event) => this.#handleHistoryRestore(event);
   }
 
+  #setRenderingState(isRendering) {
+    if (isRendering) {
+      this.setAttribute("data-rendering", "true");
+    } else {
+      this.removeAttribute("data-rendering");
+    }
+  }
+
+  #scheduleRenderingComplete(chat) {
+    const finalize = () => {
+      if (this.#chat === chat) {
+        this.#setRenderingState(false);
+      }
+    };
+
+    if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(finalize);
+      });
+    } else {
+      window.setTimeout(finalize, 0);
+    }
+  }
+
   connectedCallback() {
     super.connectedCallback();
     if (!this.style.display) {
@@ -136,6 +160,7 @@ export class ChatView extends ReactiveElement {
     setTimezoneCookie();
 
     if (!chat) {
+      this.#setRenderingState(false);
       this.#chat = null;
       this.#lastRenderedDay = null;
       if (document?.body?.dataset) {
@@ -144,6 +169,8 @@ export class ChatView extends ReactiveElement {
       }
       return;
     }
+
+    this.#setRenderingState(true);
 
     const container = document.getElementById("content-wrapper");
 
@@ -236,6 +263,7 @@ export class ChatView extends ReactiveElement {
     }
 
     this.#initialized = true;
+    this.#scheduleRenderingComplete(chat);
   }
 
   #syncToChatDate() {

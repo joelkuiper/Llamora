@@ -54,6 +54,9 @@ body {
   flex-direction: column;
   gap: var(--spacing-lg);
 
+  transition: opacity 180ms ease-in-out;
+  will-change: opacity;
+
   .error { color: var(--color-error-text-dark); }
 
   .no-content {
@@ -155,6 +158,11 @@ body {
     display: none;
   }
 
+}
+
+chat-view[data-rendering="true"] #chat {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .return-today {
