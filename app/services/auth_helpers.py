@@ -186,6 +186,14 @@ def get_dek():
         return None
 
 
+def sanitize_return_path(raw: str | None) -> str | None:
+    """Ensure the provided return path is safe for redirects."""
+
+    if raw and raw.startswith("/") and not raw.startswith("//"):
+        return raw
+    return None
+
+
 def _safe_return_path() -> str:
     """Determine a safe path to return to after login."""
 
@@ -199,7 +207,7 @@ def _safe_return_path() -> str:
     else:
         # full_path includes trailing '?' if there was no query string
         path = request.full_path if request.query_string else request.path
-    return path.rstrip("?") or "/"
+    return sanitize_return_path(path.rstrip("?")) or "/"
 
 
 def login_required(f):

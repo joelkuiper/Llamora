@@ -19,6 +19,7 @@ from app.services.auth_helpers import (
     clear_secure_cookie,
     set_dek,
     clear_session_dek,
+    sanitize_return_path,
 )
 from app.services.validators import validate_password, PasswordValidationError
 from app.services.crypto import (
@@ -213,16 +214,13 @@ async def register():
 
 @auth_bp.route("/login", methods=["GET", "POST"])
 async def login():
-    def _safe_return(url: str | None) -> str | None:
-        if url and url.startswith("/") and not url.startswith("//"):
-            return url
-        return None
-
     if request.method == "POST":
         form = await request.form
         username = form.get("username", "").strip()
         password = form.get("password", "")
-        return_url = _safe_return(form.get("return") or request.args.get("return"))
+        return_url = sanitize_return_path(
+            form.get("return") or request.args.get("return")
+        )
         current_app.logger.debug("Login attempt for %s", username)
 
         client_ip = _get_client_ip()
@@ -287,7 +285,7 @@ async def login():
             "login.html", error="Invalid credentials", return_url=return_url
         )
 
-    return_url = _safe_return(request.args.get("return"))
+    return_url = sanitize_return_path(request.args.get("return"))
     return await render_template("login.html", return_url=return_url)
 
 
