@@ -2,13 +2,5 @@
 <button class="overlay-close{% if extra_classes %} {{ extra_classes }}{% endif %}"
         type="button"
         aria-label="Close search results"
-        hx-get="/search"
-        hx-target="#search-results"
-        hx-indicator="#search-spinner"
-        hx-vals='{"q": ""}'
-        hx-swap="innerHTML"
-        hx-trigger="click delay:180ms"
-        hx-on:click="this.closest('#search-results')
-                     ?.querySelector('.sr-panel')
-                     ?.classList.add('pop-exit')">×</button>
+        data-action="close-search-overlay">×</button>
 {% endmacro %}

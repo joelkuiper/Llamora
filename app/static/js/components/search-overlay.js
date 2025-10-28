@@ -168,7 +168,9 @@ export class SearchOverlay extends ReactiveElement {
     const target = getEventTarget(evt);
     if (!target) return;
 
-    if (target.closest("#search-results .overlay-close")) {
+    const closeTrigger = target.closest('[data-action="close-search-overlay"]');
+    if (closeTrigger) {
+      wrap.querySelector(".sr-panel")?.classList.add("pop-exit");
       this.#closeResults(true);
       return;
     }
