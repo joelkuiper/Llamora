@@ -84,14 +84,27 @@ class UsersRepository(BaseRepository):
         return {}
 
     async def update_state(self, user_id: str, **updates) -> None:
-        state = await self.get_state(user_id)
-        for key, value in updates.items():
-            if value is None:
-                state.pop(key, None)
-            else:
-                state[key] = value
-        state_json = orjson.dumps(state)
         async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                "SELECT state FROM users WHERE id = ?", (user_id,)
+            )
+            row = await cursor.fetchone()
+
+            state: dict = {}
+            if row and row["state"]:
+                try:
+                    state = orjson.loads(row["state"])
+                except Exception:
+                    state = {}
+
+            for key, value in updates.items():
+                if value is None:
+                    state.pop(key, None)
+                else:
+                    state[key] = value
+
+            state_json = orjson.dumps(state)
+
             await self._run_in_transaction(
                 conn,
                 conn.execute,
