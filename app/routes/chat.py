@@ -169,11 +169,15 @@ async def sse_opening(date: str):
     pod = part_of_day(now)
     yesterday_iso = (now - timedelta(days=1)).date().isoformat()
     is_new = not await _db().messages.user_has_messages(uid)
-    yesterday_msgs = await _db().messages.get_history(uid, yesterday_iso, dek)
+
+    yesterday_msgs = await _db().messages.get_recent_history(
+        uid, yesterday_iso, dek, limit=20
+    )
+
     has_no_activity = not is_new and not yesterday_msgs
     try:
         prompt = build_opening_prompt(
-            yesterday_messages=yesterday_msgs[-20:],
+            yesterday_messages=yesterday_msgs,
             date=date_str,
             part_of_day=pod,
             is_new=is_new,

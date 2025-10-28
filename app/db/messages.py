@@ -120,6 +120,46 @@ class MessagesRepository(BaseRepository):
             )
         return messages
 
+    def _rows_to_history(self, rows, user_id: str, dek: bytes) -> list[dict]:
+        history: list[dict] = []
+        current: dict | None = None
+        for row in rows:
+            msg_id = row["id"]
+            if not history or history[-1]["id"] != msg_id:
+                record_json = self._decrypt_message(
+                    dek,
+                    user_id,
+                    msg_id,
+                    row["nonce"],
+                    row["ciphertext"],
+                    row["msg_alg"],
+                )
+                rec = orjson.loads(record_json)
+                current = {
+                    "id": msg_id,
+                    "created_at": row["created_at"],
+                    "role": row["role"],
+                    "reply_to": row["reply_to"],
+                    "message": rec.get("message", ""),
+                    "meta": rec.get("meta", {}),
+                    "tags": [],
+                }
+                history.append(current)
+            if row["tag_hash"] is not None and current is not None:
+                tag_name = cached_tag_name(
+                    user_id,
+                    row["tag_hash"],
+                    row["name_nonce"],
+                    row["name_ct"],
+                    row["tag_alg"].encode(),
+                    dek,
+                    self._decrypt_message,
+                )
+                current["tags"].append(
+                    {"name": tag_name, "hash": row["tag_hash"].hex()}
+                )
+        return history
+
     async def append_message(
         self,
         user_id: str,
@@ -328,45 +368,47 @@ class MessagesRepository(BaseRepository):
             )
             rows = await cursor.fetchall()
 
-        history: list[dict] = []
-        current: dict | None = None
-        for row in rows:
-            msg_id = row["id"]
-            if not history or history[-1]["id"] != msg_id:
-                record_json = self._decrypt_message(
-                    dek,
-                    user_id,
-                    msg_id,
-                    row["nonce"],
-                    row["ciphertext"],
-                    row["msg_alg"],
-                )
-                rec = orjson.loads(record_json)
-                current = {
-                    "id": msg_id,
-                    "created_at": row["created_at"],
-                    "role": row["role"],
-                    "reply_to": row["reply_to"],
-                    "message": rec.get("message", ""),
-                    "meta": rec.get("meta", {}),
-                    "tags": [],
-                }
-                history.append(current)
-            if row["tag_hash"] is not None and current is not None:
-                tag_name = cached_tag_name(
-                    user_id,
-                    row["tag_hash"],
-                    row["name_nonce"],
-                    row["name_ct"],
-                    row["tag_alg"].encode(),
-                    dek,
-                    self._decrypt_message,
-                )
-                current["tags"].append(
-                    {"name": tag_name, "hash": row["tag_hash"].hex()}
-                )
+        history = self._rows_to_history(rows, user_id, dek)
         await self._store_history_cache(user_id, created_date, history)
         return history
+
+    async def get_recent_history(
+        self, user_id: str, created_date: str, dek: bytes, limit: int
+    ) -> list[dict]:
+        if limit <= 0:
+            return []
+
+        cached = await self._get_cached_history(user_id, created_date)
+        if cached is not None:
+            return cached[-limit:]
+
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                """
+                WITH recent AS (
+                    SELECT m.id, m.created_at, m.role, m.reply_to, m.nonce,
+                           m.ciphertext, m.alg
+                    FROM messages m
+                    WHERE m.user_id = ? AND m.created_date = ?
+                    ORDER BY m.id DESC
+                    LIMIT ?
+                )
+                SELECT recent.id, recent.created_at, recent.role, recent.reply_to,
+                       recent.nonce, recent.ciphertext, recent.alg AS msg_alg,
+                       x.ulid AS tag_ulid,
+                       t.tag_hash, t.name_ct, t.name_nonce, t.alg AS tag_alg
+                FROM recent
+                LEFT JOIN tag_message_xref x
+                    ON x.message_id = recent.id AND x.user_id = ?
+                LEFT JOIN tags t
+                    ON t.user_id = x.user_id AND t.tag_hash = x.tag_hash
+                ORDER BY recent.id ASC, x.ulid ASC
+                """,
+                (user_id, created_date, limit, user_id),
+            )
+            rows = await cursor.fetchall()
+
+        return self._rows_to_history(rows, user_id, dek)
 
     async def get_days_with_messages(
         self, user_id: str, year: int, month: int
