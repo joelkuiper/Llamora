@@ -21,20 +21,10 @@ async def index():
     return redirect(url_for("days.day_today"), code=302)
 
 
-@days_bp.route("/d/today")
-@login_required
-async def day_today():
-    today = local_date().isoformat()
-    return await day(today)
-
-
-@days_bp.route("/d/<date>")
-@login_required
-async def day(date):
+async def _render_day(date: str, target: str | None):
     user = await get_current_user()
     uid = user["id"]
     context = await get_chat_context(user, date)
-    target = request.args.get("target")
     html = await render_template(
         "index.html",
         user=user,
@@ -46,6 +36,21 @@ async def day(date):
     resp = await make_response(html)
     await _db().users.update_state(uid, active_date=date)
     return resp
+
+
+@days_bp.route("/d/today")
+@login_required
+async def day_today():
+    today = local_date().isoformat()
+    target = request.args.get("target")
+    return await _render_day(today, target)
+
+
+@days_bp.route("/d/<date>")
+@login_required
+async def day(date):
+    target = request.args.get("target")
+    return await _render_day(date, target)
 
 
 @days_bp.route("/calendar")
