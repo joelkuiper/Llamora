@@ -131,12 +131,22 @@ async def chat_htmx_today():
 @login_required
 async def stop_generation(user_msg_id: str):
     logger.info("Stop requested for user message %s", user_msg_id)
+    user = await get_current_user()
+    dek = get_dek()
+    if not user or not dek:
+        logger.debug("Stop request without authenticated user")
+        abort(401)
+
+    if not await _db().messages.message_exists(user["id"], user_msg_id):
+        logger.warning("Stop request for unauthorized message %s", user_msg_id)
+        abort(404, description="message not found")
+
     manager = _chat_stream_manager()
     handled, was_pending = await manager.stop(user_msg_id)
     if not was_pending:
         logger.debug("No pending response for %s, aborting active stream", user_msg_id)
     if not handled:
-        logger.warning("Stop request for unknown user message %s", user_msg_id)
+        logger.debug("Stop request for %s not handled by manager", user_msg_id)
         return Response("unknown message id", status=404)
     logger.debug(
         "Stop request handled for %s (pending=%s)",
