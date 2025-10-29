@@ -223,6 +223,23 @@ class ChatStreamManager:
     def get(self, user_msg_id: str) -> PendingResponse | None:
         return self._pending.get(user_msg_id)
 
+    def _prune_stale_pending(self, now: float | None = None) -> None:
+        if not self._pending:
+            return
+
+        if now is None:
+            now = time.monotonic()
+
+        ttl = self._pending_ttl
+        stale_ids = [
+            user_msg_id
+            for user_msg_id, pending in self._pending.items()
+            if now - pending.created_at >= ttl
+        ]
+        for user_msg_id in stale_ids:
+            logger.debug("Dropping stale pending response %s", user_msg_id)
+            self._remove_pending(user_msg_id)
+
     def start_stream(
         self,
         user_msg_id: str,
@@ -237,6 +254,7 @@ class ChatStreamManager:
         reply_to: str | None = None,
         meta_extra: dict | None = None,
     ) -> PendingResponse:
+        self._prune_stale_pending()
         pending = self._pending.get(user_msg_id)
         if pending:
             return pending
@@ -268,6 +286,7 @@ class ChatStreamManager:
         if pending:
             logger.debug("Cancelling pending response %s", user_msg_id)
             await pending.cancel()
+            self._prune_stale_pending()
             return True, True
         handled = await self._llm.abort(user_msg_id)
         return handled, False
@@ -278,6 +297,7 @@ class ChatStreamManager:
     async def shutdown(self) -> None:
         """Cancel all in-flight responses and await their completion."""
 
+        self._prune_stale_pending()
         for pending in list(self._pending.values()):
             with suppress(Exception):
                 await pending.cancel()
