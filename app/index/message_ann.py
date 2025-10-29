@@ -23,6 +23,7 @@ class MessageIndex:
         self.idx_to_id: Dict[int, str] = {}
         self.next_idx = 0
         self.last_used = time.monotonic()
+        self.max_elements = max_elements
 
     def touch(self) -> None:
         self.last_used = time.monotonic()
@@ -48,6 +49,20 @@ class MessageIndex:
         vecs = np.asarray(vecs, dtype=np.float32)
 
         self.touch()
+
+        required = self.next_idx + len(ids)
+        current_capacity = self.max_elements
+        if required > current_capacity:
+            new_capacity = max(current_capacity * 2, required)
+            logger.warning(
+                "Resizing message index from %d to %d to accommodate %d new items",
+                current_capacity,
+                new_capacity,
+                len(ids),
+            )
+            self.index.resize_index(new_capacity)
+            self.max_elements = new_capacity
+
         idxs = np.arange(self.next_idx, self.next_idx + len(ids))
         logger.debug("Adding %d vectors starting at index %d", len(ids), self.next_idx)
         self.index.add_items(vecs, idxs)
