@@ -12,7 +12,6 @@ def dumps(
     default: Any | None = ...,
     option: int | None = ...,
 ) -> bytes: ...
-
 def loads(__obj: bytes | bytearray | memoryview | str) -> Any: ...
 
 __all__ = [

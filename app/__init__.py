@@ -8,6 +8,7 @@ from app.services.container import AppLifecycle, AppServices
 
 load_dotenv()
 
+
 def create_app():
     services = AppServices.create()
 

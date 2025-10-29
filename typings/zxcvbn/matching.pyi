@@ -2,7 +2,9 @@ from . import adjacency_graphs as adjacency_graphs
 from _typeshed import Incomplete
 from zxcvbn import scoring as scoring
 from zxcvbn.frequency_lists import FREQUENCY_LISTS as FREQUENCY_LISTS
-from zxcvbn.scoring import most_guessable_match_sequence as most_guessable_match_sequence
+from zxcvbn.scoring import (
+    most_guessable_match_sequence as most_guessable_match_sequence,
+)
 
 def build_ranked_dict(ordered_list): ...
 

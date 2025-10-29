@@ -30,9 +30,7 @@ async def search():
             MAX_SEARCH_QUERY_LENGTH,
         )
         query = query[:MAX_SEARCH_QUERY_LENGTH]
-        truncation_notice = (
-            f"Your search was truncated to the first {MAX_SEARCH_QUERY_LENGTH} characters."
-        )
+        truncation_notice = f"Your search was truncated to the first {MAX_SEARCH_QUERY_LENGTH} characters."
     if query:
         user = await get_current_user()
         if user is None:

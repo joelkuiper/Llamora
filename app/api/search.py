@@ -78,7 +78,9 @@ class SearchAPI:
         )
 
         if not candidates:
-            logger.debug("No candidates found for user %s; returning empty result set", user_id)
+            logger.debug(
+                "No candidates found for user %s; returning empty result set", user_id
+            )
             return []
 
         seen_tokens: set[str] = set()

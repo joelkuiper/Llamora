@@ -23,9 +23,7 @@ class LexicalReranker:
         tag_boosts: dict[str, float] | None = None,
     ) -> List[dict]:
         if not candidates:
-            logger.debug(
-                "Lexical reranker received no candidates for query %r", query
-            )
+            logger.debug("Lexical reranker received no candidates for query %r", query)
             return []
         lower_query = query.lower()
         automaton = ahocorasick.Automaton()

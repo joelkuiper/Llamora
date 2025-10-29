@@ -145,9 +145,7 @@ class VectorsRepository(BaseRepository):
             records.append((msg_id, user_id, dim, nonce, ct, alg))
         return records
 
-    def _decrypt_vector_rows(
-        self, rows, dek: bytes, user_id: str
-    ) -> list[dict]:
+    def _decrypt_vector_rows(self, rows, dek: bytes, user_id: str) -> list[dict]:
         vectors: list[dict] = []
         for row in rows:
             vec_bytes = self._decrypt_vector(

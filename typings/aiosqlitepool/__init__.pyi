@@ -1,4 +1,11 @@
 from .client import SQLiteConnectionPool as SQLiteConnectionPool
-from .exceptions import PoolClosedError as PoolClosedError, PoolConnectionAcquireTimeoutError as PoolConnectionAcquireTimeoutError
+from .exceptions import (
+    PoolClosedError as PoolClosedError,
+    PoolConnectionAcquireTimeoutError as PoolConnectionAcquireTimeoutError,
+)
 
-__all__ = ['SQLiteConnectionPool', 'PoolClosedError', 'PoolConnectionAcquireTimeoutError']
+__all__ = [
+    "SQLiteConnectionPool",
+    "PoolClosedError",
+    "PoolConnectionAcquireTimeoutError",
+]

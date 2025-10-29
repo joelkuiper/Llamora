@@ -90,6 +90,7 @@ class LocalDB:
     async def init(self) -> None:
         is_new = not os.path.exists(self.db_path)
         acquisition_timeout = int(DB_POOL_ACQUIRE_TIMEOUT)
+
         async def _connection_factory() -> SQLitePoolConnection:
             return cast(SQLitePoolConnection, await self._create_connection())
 
@@ -260,6 +261,4 @@ class LocalDB:
         self, user_id: str, message_id: str, plaintext: str, dek: bytes
     ) -> None:
         if self.search_api:
-            await self.search_api.enqueue_index_job(
-                user_id, message_id, plaintext, dek
-            )
+            await self.search_api.enqueue_index_job(user_id, message_id, plaintext, dek)

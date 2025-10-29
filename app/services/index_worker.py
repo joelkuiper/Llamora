@@ -45,7 +45,9 @@ class IndexWorker:
         finally:
             self._task = None
 
-    async def enqueue(self, user_id: str, message_id: str, plaintext: str, dek: bytes) -> None:
+    async def enqueue(
+        self, user_id: str, message_id: str, plaintext: str, dek: bytes
+    ) -> None:
         """Queue a message for indexing."""
         try:
             self._queue.put_nowait((user_id, message_id, plaintext, dek))

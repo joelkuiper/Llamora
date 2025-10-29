@@ -11,6 +11,7 @@ from .base import BaseRepository
 from .events import RepositoryEventBus, MESSAGE_TAGS_CHANGED_EVENT
 from .utils import cached_tag_name
 
+
 class TagsRepository(BaseRepository):
     """Operations for encrypted tag metadata and associations."""
 
@@ -34,6 +35,7 @@ class TagsRepository(BaseRepository):
             raise ValueError("Empty tag")
         tag_hash = hashlib.sha256(f"{user_id}:{tag_name}".encode("utf-8")).digest()
         async with self.pool.connection() as conn:
+
             async def _tx():
                 cursor = await conn.execute(
                     """
@@ -63,7 +65,6 @@ class TagsRepository(BaseRepository):
         self, user_id: str, tag_hash: bytes, message_id: str
     ) -> None:
         async with self.pool.connection() as conn:
-
             changed = False
 
             async def _tx():
@@ -92,7 +93,6 @@ class TagsRepository(BaseRepository):
         self, user_id: str, tag_hash: bytes, message_id: str
     ) -> None:
         async with self.pool.connection() as conn:
-
             changed = False
 
             async def _tx():

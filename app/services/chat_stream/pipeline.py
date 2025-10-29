@@ -25,10 +25,14 @@ class AssistantMessagePersistenceError(Exception):
 class ResponsePipelineCallbacks(Protocol):
     """Callbacks invoked as the pipeline progresses."""
 
-    async def on_visible(self, chunk: str, total: str) -> None:  # pragma: no cover - interface
+    async def on_visible(
+        self, chunk: str, total: str
+    ) -> None:  # pragma: no cover - interface
         ...
 
-    async def on_finished(self, result: "PipelineResult") -> None:  # pragma: no cover - interface
+    async def on_finished(
+        self, result: "PipelineResult"
+    ) -> None:  # pragma: no cover - interface
         ...
 
 
@@ -60,11 +64,15 @@ class AssistantMessageWriter:
         reply_to: str,
         date: str,
     ) -> str:
-        append: Callable[..., Awaitable[str]] | None = getattr(self._db, "append_message", None)
+        append: Callable[..., Awaitable[str]] | None = getattr(
+            self._db, "append_message", None
+        )
         if append is None and hasattr(self._db, "messages"):
             append = getattr(self._db.messages, "append_message", None)
         if append is None:
-            raise AssistantMessagePersistenceError("Database does not support append_message")
+            raise AssistantMessagePersistenceError(
+                "Database does not support append_message"
+            )
         try:
             return await append(
                 uid,
@@ -76,7 +84,9 @@ class AssistantMessageWriter:
                 created_date=date,
             )
         except Exception as exc:  # pragma: no cover - defensive
-            raise AssistantMessagePersistenceError(str(exc) or "Failed to save response") from exc
+            raise AssistantMessagePersistenceError(
+                str(exc) or "Failed to save response"
+            ) from exc
 
 
 class ResponsePipeline:
@@ -119,7 +129,10 @@ class ResponsePipeline:
             self._cancelled = True
             result = await self._finalize_cancelled(partial=True)
         except asyncio.TimeoutError:
-            logger.warning("Streaming timed out for %s", getattr(self._session, "user_msg_id", "<unknown>"))
+            logger.warning(
+                "Streaming timed out for %s",
+                getattr(self._session, "user_msg_id", "<unknown>"),
+            )
             self._cancelled = True
             self._error = True
             self._error_message = "The response took too long and was cancelled."
@@ -265,7 +278,9 @@ class ResponsePipeline:
             partial=partial,
         )
 
-    async def _finalize_with_text(self, final_text: str, *, error_meta: bool) -> PipelineResult:
+    async def _finalize_with_text(
+        self, final_text: str, *, error_meta: bool
+    ) -> PipelineResult:
         meta = build_meta(
             self._parser,
             meta_extra=self._meta_extra,

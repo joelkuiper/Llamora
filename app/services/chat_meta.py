@@ -205,7 +205,9 @@ def find_last_json_object(text: str) -> str | None:
     return None
 
 
-def build_meta(parser: ChatMetaParser, *, meta_extra: dict | None = None, error: bool = False) -> dict:
+def build_meta(
+    parser: ChatMetaParser, *, meta_extra: dict | None = None, error: bool = False
+) -> dict:
     """Assemble a metadata dictionary from parser output and extras."""
 
     candidates: list[str | None] = [parser.meta_payload]
@@ -235,4 +237,3 @@ __all__ = [
     "parse_meta_json",
     "recover_meta_payload",
 ]
-

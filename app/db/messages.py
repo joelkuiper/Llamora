@@ -89,9 +89,7 @@ class MessagesRepository(BaseRepository):
 
             self._history_cache[key] = cached
 
-    async def _invalidate_history_cache(
-        self, user_id: str, created_date: str
-    ) -> None:
+    async def _invalidate_history_cache(self, user_id: str, created_date: str) -> None:
         async with self._history_cache_lock:
             self._history_cache.pop((user_id, created_date), None)
 

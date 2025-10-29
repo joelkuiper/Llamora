@@ -62,4 +62,3 @@ async def get_month_context(
 
 
 __all__ = ["get_month_context"]
-

@@ -108,7 +108,9 @@ def build_conversation_context(
 ) -> Mapping[str, str]:
     """Compute contextual metadata for downstream LLM prompts."""
 
-    timestamp = user_time or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    timestamp = user_time or datetime.now(timezone.utc).isoformat().replace(
+        "+00:00", "Z"
+    )
     tz = tz_cookie or "UTC"
     date_str, part = date_and_part(timestamp, tz)
     return {"date": date_str, "part_of_day": part}
