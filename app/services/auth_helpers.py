@@ -2,7 +2,6 @@ import base64
 import os
 import secrets
 from functools import wraps
-from typing import Any, Protocol, cast
 
 import orjson
 from cachetools import TTLCache
@@ -32,18 +31,6 @@ DEK_STORAGE = os.getenv("LLAMORA_DEK_STORAGE", "cookie").lower()
 
 # Rough upper bound on concurrent sessions; adjust as needed
 dek_store = TTLCache(maxsize=1024, ttl=SESSION_TTL)
-
-
-class RequestWithUser(Protocol):
-    """Protocol representing a request object that stores a cached user."""
-
-    user: dict[str, Any] | None
-
-
-def _request_with_user() -> RequestWithUser:
-    return cast(RequestWithUser, request)
-
-
 def _get_cookie_data() -> dict:
     # If we've already got a merged state this request, return it
     if hasattr(g, "_secure_cookie_state"):
@@ -163,12 +150,6 @@ async def get_current_user():
     if hasattr(g, "_current_user"):
         return g._current_user
 
-    req = _request_with_user()
-
-    if hasattr(req, "user") and req.user is not None:
-        g._current_user = req.user
-        return g._current_user
-
     uid = get_secure_cookie("uid")
     if not uid:
         user = None
@@ -176,9 +157,7 @@ async def get_current_user():
         services = get_services()
         user = await services.db.users.get_user_by_id(uid)
 
-    req.user = user
-
-    g._current_user = req.user
+    g._current_user = user
     return g._current_user
 
 
@@ -256,8 +235,6 @@ def login_required(f):
 async def load_user():
     # Eager-load user info if needed in templates
     user = await get_current_user()
-    req = _request_with_user()
-    req.user = user
     if user:
         _ = get_dek()  # refresh session DEK TTL if present
         current_app.logger.debug("Loaded user %s for request", user["id"])
