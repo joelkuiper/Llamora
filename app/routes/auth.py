@@ -234,8 +234,8 @@ async def register():
         )
         resp = await make_response(html)
         assert isinstance(resp, Response)
-        resp = set_secure_cookie(resp, "uid", str(user_id))
-        resp = set_dek(resp, dek)
+        set_secure_cookie(resp, "uid", str(user_id))
+        set_dek(resp, dek)
         return resp
 
     return await render_template("register.html")
@@ -300,8 +300,8 @@ async def login():
                 redirect_value = redirect(redirect_url)
                 resp = await make_response(redirect_value)
                 assert isinstance(resp, Response)
-                resp = set_secure_cookie(resp, "uid", str(user["id"]))
-                resp = set_dek(resp, dek)
+                set_secure_cookie(resp, "uid", str(user["id"]))
+                set_dek(resp, dek)
                 if cache_key in _login_failures:
                     del _login_failures[cache_key]
                 current_app.logger.debug(
@@ -336,7 +336,7 @@ async def logout():
     assert isinstance(resp, Response)
 
     clear_session_dek()
-    resp = clear_secure_cookie(resp)
+    clear_secure_cookie(resp)
     return resp
 
 
@@ -514,6 +514,6 @@ async def delete_profile():
     await _db().users.delete_user(user["id"])
     resp = await make_response("", 204)
     assert isinstance(resp, Response)
-    resp = clear_secure_cookie(resp)
+    clear_secure_cookie(resp)
     resp.headers["HX-Redirect"] = "/login"
     return resp

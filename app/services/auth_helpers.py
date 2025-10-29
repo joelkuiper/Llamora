@@ -2,7 +2,6 @@ import base64
 import os
 import secrets
 from functools import wraps
-from typing import Any, Protocol, cast
 
 import orjson
 from cachetools import TTLCache
@@ -32,18 +31,6 @@ DEK_STORAGE = os.getenv("LLAMORA_DEK_STORAGE", "cookie").lower()
 
 # Rough upper bound on concurrent sessions; adjust as needed
 dek_store = TTLCache(maxsize=1024, ttl=SESSION_TTL)
-
-
-class RequestWithUser(Protocol):
-    """Protocol representing a request object that stores a cached user."""
-
-    user: dict[str, Any] | None
-
-
-def _request_with_user() -> RequestWithUser:
-    return cast(RequestWithUser, request)
-
-
 def _get_cookie_data() -> dict:
     # If we've already got a merged state this request, return it
     if hasattr(g, "_secure_cookie_state"):
@@ -116,33 +103,29 @@ def get_secure_cookie(name: str) -> str | None:
     return _get_cookie_data().get(name)
 
 
-def set_secure_cookie(response: Response, name: str, value: str | None) -> Response:
+def set_secure_cookie(response: Response, name: str, value: str | None) -> None:
     state = _cookie_state()  # start from cached/merged state
     if value is None:
         state.pop(name, None)  # delete key
     else:
         state[name] = value  # merge key
-    return _set_cookie_data(response, state)  # write back the full, merged dict
+    _set_cookie_data(response, state)  # write back the full, merged dict
 
 
-def clear_secure_cookie(response: Response) -> Response:
+def clear_secure_cookie(response: Response) -> None:
     # Ensure we delete the same cookie we set by matching its attributes.
     current_app.logger.debug("Deleting %s cookie", COOKIE_NAME)
     response.delete_cookie(COOKIE_NAME, path="/", samesite="Lax")
-    return response
 
 
-def set_dek(response: Response, dek: bytes) -> Response:
+def set_dek(response: Response, dek: bytes) -> None:
     if DEK_STORAGE == "session":
         sid = secrets.token_urlsafe(32)
         dek_store[sid] = dek
-        response = set_secure_cookie(response, "sid", sid)
-        response = set_secure_cookie(response, "dek", None)
+        set_secure_cookie(response, "sid", sid)
+        set_secure_cookie(response, "dek", None)
     else:
-        response = set_secure_cookie(
-            response, "dek", base64.b64encode(dek).decode("utf-8")
-        )
-    return response
+        set_secure_cookie(response, "dek", base64.b64encode(dek).decode("utf-8"))
 
 
 def clear_session_dek() -> None:
@@ -163,12 +146,6 @@ async def get_current_user():
     if hasattr(g, "_current_user"):
         return g._current_user
 
-    req = _request_with_user()
-
-    if hasattr(req, "user") and req.user is not None:
-        g._current_user = req.user
-        return g._current_user
-
     uid = get_secure_cookie("uid")
     if not uid:
         user = None
@@ -176,9 +153,7 @@ async def get_current_user():
         services = get_services()
         user = await services.db.users.get_user_by_id(uid)
 
-    req.user = user
-
-    g._current_user = req.user
+    g._current_user = user
     return g._current_user
 
 
@@ -256,8 +231,6 @@ def login_required(f):
 async def load_user():
     # Eager-load user info if needed in templates
     user = await get_current_user()
-    req = _request_with_user()
-    req.user = user
     if user:
         _ = get_dek()  # refresh session DEK TTL if present
         current_app.logger.debug("Loaded user %s for request", user["id"])
