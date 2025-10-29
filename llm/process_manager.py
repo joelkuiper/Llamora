@@ -80,7 +80,7 @@ class LlamafileProcessManager:
             self.proc = None
             self._launch_server()
             atexit.register(self.shutdown)
-            self._orig_signals: dict[int, signal.Handlers] = {}
+            self._orig_signals: dict[int, object] = {}
             for sig in (signal.SIGINT, signal.SIGTERM):
                 self._orig_signals[sig] = signal.getsignal(sig)
                 signal.signal(sig, self._handle_exit)
@@ -246,11 +246,12 @@ class LlamafileProcessManager:
                 self.logger.log(level, line.rstrip())
 
     def _launch_server(self) -> None:
-        if not getattr(self, "cmd", None):
+        cmd = getattr(self, "cmd", None)
+        if not cmd:
             return
-        self.logger.info("Starting llamafile with:" + " ".join(self.cmd))
+        self.logger.info("Starting llamafile with:" + " ".join(cmd))
         self.proc = subprocess.Popen(
-            self.cmd,
+            cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -301,7 +302,7 @@ class LlamafileProcessManager:
             if handler is signal.SIG_DFL:
                 signal.signal(signum, signal.SIG_DFL)
                 os.kill(os.getpid(), signum)
-            else:
+            elif callable(handler):
                 handler(signum, frame)
 
     def __del__(self):

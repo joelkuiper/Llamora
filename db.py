@@ -2,6 +2,7 @@ import os
 import asyncio
 import logging
 import atexit
+import os
 from typing import TypeVar
 
 import aiosqlite
@@ -88,10 +89,11 @@ class LocalDB:
 
     async def init(self) -> None:
         is_new = not os.path.exists(self.db_path)
+        acquisition_timeout = int(DB_POOL_ACQUIRE_TIMEOUT)
         self.pool = SQLiteConnectionPool(
             self._connection_factory,
             pool_size=DB_POOL_SIZE,
-            acquisition_timeout=DB_POOL_ACQUIRE_TIMEOUT,
+            acquisition_timeout=acquisition_timeout,
         )
         await self._ensure_schema(is_new)
         self._configure_repositories()
@@ -106,7 +108,7 @@ class LocalDB:
         self._vectors = None
         self._events = None
 
-    async def _connection_factory(self):
+    async def _connection_factory(self) -> aiosqlite.Connection:
         conn = await aiosqlite.connect(self.db_path, timeout=DB_TIMEOUT)
         await conn.execute(f"PRAGMA busy_timeout = {DB_BUSY_TIMEOUT}")
         await conn.execute(f"PRAGMA mmap_size = {DB_MMAP_SIZE}")

@@ -45,8 +45,9 @@ class MessageIndex:
         if not pairs:
             return
 
-        ids, vecs = zip(*pairs)
-        vecs = np.asarray(vecs, dtype=np.float32)
+        id_list, vec_list = zip(*pairs)
+        ids = list(id_list)
+        vecs = np.asarray(vec_list, dtype=np.float32)
 
         self.touch()
 
@@ -71,7 +72,7 @@ class MessageIndex:
             self.idx_to_id[int(idx)] = msg_id
         self.next_idx += len(ids)
 
-    def search(self, query_vec: np.ndarray, k: int):
+    def search(self, query_vec: np.ndarray, k: int) -> tuple[list[str], np.ndarray]:
         self.touch()
         query_vec = np.asarray(query_vec, dtype=np.float32)
         if query_vec.ndim == 1:
@@ -79,17 +80,18 @@ class MessageIndex:
         count = self.index.get_current_count()
         if count == 0:
             logger.debug("Search invoked on empty index")
-            return [], []
+            return [], np.array([], dtype=np.float32)
         k = min(k, count)
         ef = max(k, 64)
         self.index.set_ef(ef)
         logger.debug("Searching %d vectors with k=%d ef=%d", count, k, ef)
-        labels, dists = self.index.knn_query(query_vec, k=k)
-        ids = [
-            self.idx_to_id.get(int(label))
-            for label in labels[0]
-            if int(label) in self.idx_to_id
-        ]
+        labels_arr, dists = self.index.knn_query(query_vec, k=k)
+        ids: list[str] = []
+        for label in labels_arr[0]:
+            idx_label = int(label)
+            msg_id = self.idx_to_id.get(idx_label)
+            if msg_id is not None:
+                ids.append(msg_id)
         return ids, dists[0][: len(ids)]
 
 
@@ -126,6 +128,8 @@ class MessageIndexStore:
         async with self._default_dim_lock:
             if self._default_dim is None:
                 self._default_dim = (await async_embed_texts([""])).shape[1]
+        if self._default_dim is None:  # pragma: no cover - defensive
+            raise RuntimeError("Failed to determine embedding dimension")
         return self._default_dim
 
     async def _embed_and_store(

@@ -14,10 +14,14 @@ def _db():
 @login_required
 async def remove_tag(msg_id: str, tag_hash: str):
     user = await get_current_user()
+    if user is None:
+        abort(401)
+        raise AssertionError("unreachable")
     try:
         tag_hash_bytes = bytes.fromhex(tag_hash)
-    except ValueError:
+    except ValueError as exc:
         abort(400, description="invalid tag hash")
+        raise AssertionError("unreachable") from exc
     await _db().tags.unlink_tag_message(user["id"], tag_hash_bytes, msg_id)
     return "<span class='chip-tombstone'></span>"
 
@@ -26,6 +30,9 @@ async def remove_tag(msg_id: str, tag_hash: str):
 @login_required
 async def add_tag(msg_id: str):
     user = await get_current_user()
+    if user is None:
+        abort(401)
+        raise AssertionError("unreachable")
     form = await request.form
     tag = (form.get("tag") or "").strip()
     if tag and not tag.startswith("#"):
@@ -35,6 +42,9 @@ async def add_tag(msg_id: str):
     if len(tag) > MAX_TAG_LENGTH:
         abort(400, description="tag too long")
     dek = get_dek()
+    if dek is None:
+        abort(401, description="Missing encryption key")
+        raise AssertionError("unreachable")
     if not await _db().messages.message_exists(user["id"], msg_id):
         abort(404, description="message not found")
     tag_hash = await _db().tags.resolve_or_create_tag(user["id"], tag, dek)
@@ -49,7 +59,13 @@ async def add_tag(msg_id: str):
 @login_required
 async def get_tag_suggestions(msg_id: str):
     user = await get_current_user()
+    if user is None:
+        abort(401)
+        raise AssertionError("unreachable")
     dek = get_dek()
+    if dek is None:
+        abort(401, description="Missing encryption key")
+        raise AssertionError("unreachable")
     messages = await _db().messages.get_messages_by_ids(user["id"], [msg_id], dek)
     if not messages:
         abort(404, description="message not found")

@@ -24,6 +24,8 @@ async def get_chat_context(
 
     services = get_services()
     dek = get_dek()
+    if dek is None:
+        raise RuntimeError("Missing encryption key for chat context")
     history = await services.db.messages.get_history(user["id"], date, dek)
 
     today = local_date().isoformat()

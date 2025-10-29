@@ -23,3 +23,9 @@ dependencies = [
     "cachetools>=5.3.3",
     "orjson>=3.10.0",
 ]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.18.2",
+    "pyright>=1.1.407",
+]

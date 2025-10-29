@@ -1,5 +1,8 @@
-from datetime import datetime, timezone
+from __future__ import annotations
+
+from datetime import datetime, timezone, date
 from zoneinfo import ZoneInfo
+
 from quart import request
 import humanize as _humanize
 
@@ -19,7 +22,7 @@ def get_timezone() -> str:
     return "UTC"
 
 
-def local_date() -> datetime.date:
+def local_date() -> date:
     """Get the current date in the client's timezone."""
     tz = get_timezone()
     try:

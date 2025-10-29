@@ -1,6 +1,6 @@
 import logging
 
-from quart import Blueprint, render_template, request
+from quart import Blueprint, render_template, request, abort
 from app.services.container import get_search_api
 from app.services.auth_helpers import (
     login_required,
@@ -35,7 +35,13 @@ async def search():
         )
     if query:
         user = await get_current_user()
+        if user is None:
+            abort(401)
+            raise AssertionError("unreachable")
         dek = get_dek()
+        if dek is None:
+            abort(401, description="Missing encryption key")
+            raise AssertionError("unreachable")
         results = await get_search_api().search(user["id"], dek, query)
     logger.debug("Route returning %d results", len(results))
     return await render_template(

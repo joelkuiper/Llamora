@@ -94,6 +94,8 @@ class VectorSearchService:
         dedup_ids: List[str] = []
         id_cos: dict[str, float] = {}
         for mid, cos in zip(ids, cosines):
+            if mid is None:
+                continue
             if mid not in seen:
                 seen.add(mid)
                 dedup_ids.append(mid)

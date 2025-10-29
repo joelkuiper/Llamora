@@ -11,6 +11,7 @@ from quart import (
     make_response,
     abort,
 )
+from typing import Any, Mapping
 from nacl import pwhash
 from cachetools import TTLCache
 from app.services.auth_helpers import (
@@ -64,6 +65,13 @@ def _db():
     return get_services().db
 
 
+def _require_user(user: Mapping[str, Any] | None) -> Mapping[str, Any]:
+    if user is None:
+        abort(401)
+        raise AssertionError("unreachable")
+    return user
+
+
 async def _hash_password(password: bytes) -> bytes:
     return await asyncio.to_thread(pwhash.argon2id.str, password)
 
@@ -79,7 +87,7 @@ def _get_client_ip() -> str:
     return request.remote_addr or "unknown"
 
 
-async def _render_profile_page(user, **context):
+async def _render_profile_page(user: Mapping[str, Any], **context):
     context["user"] = user
     state = await _db().users.get_state(user["id"])
     context["day"] = state.get("active_date", local_date().isoformat())
@@ -391,7 +399,7 @@ async def reset_password():
 @auth_bp.route("/profile")
 @login_required
 async def profile():
-    user = await get_current_user()
+    user = _require_user(await get_current_user())
     await _db().users.update_state(user["id"], active_date=None)
     return await _render_profile_page(user)
 
@@ -399,10 +407,12 @@ async def profile():
 @auth_bp.route("/profile/data")
 @login_required
 async def download_user_data():
-    user = await get_current_user()
+    user = _require_user(await get_current_user())
     dek = get_dek()
-    if not dek:
-        return Response("Missing encryption key", status=400)
+    if dek is None:
+        response = await make_response("Missing encryption key")
+        response.status_code = 400
+        return response
 
     messages = await _db().messages.get_latest_messages(user["id"], 1000000, dek)
     user_data = {
@@ -416,13 +426,16 @@ async def download_user_data():
 
     payload = orjson.dumps(user_data)
     headers = {"Content-Disposition": "attachment; filename=user_data.json"}
-    return Response(payload, headers=headers, mimetype="application/json")
+    response = await make_response(payload)
+    response.headers.update(headers)
+    response.mimetype = "application/json"
+    return response
 
 
 @auth_bp.route("/profile/password", methods=["POST"])
 @login_required
 async def change_password():
-    user = await get_current_user()
+    user = _require_user(await get_current_user())
     form = await request.form
     current = form.get("current_password", "")
     new = form.get("new_password", "")
@@ -454,7 +467,7 @@ async def change_password():
         return await _render_profile_page(user, pw_error="Invalid current password")
 
     dek = get_dek()
-    if not dek:
+    if dek is None:
         return await _render_profile_page(user, pw_error="Missing encryption key")
 
     password_bytes = new.encode("utf-8")
@@ -471,9 +484,9 @@ async def change_password():
 @auth_bp.route("/profile/recovery", methods=["POST"])
 @login_required
 async def regen_recovery():
-    user = await get_current_user()
+    user = _require_user(await get_current_user())
     dek = get_dek()
-    if not dek:
+    if dek is None:
         return await _render_profile_page(user, rc_error="Missing encryption key")
 
     recovery_code = generate_recovery_code()
@@ -490,9 +503,9 @@ async def regen_recovery():
 @auth_bp.route("/profile", methods=["DELETE"])
 @login_required
 async def delete_profile():
-    user = await get_current_user()
+    user = _require_user(await get_current_user())
     await _db().users.delete_user(user["id"])
-    resp = Response(status=204)
+    resp = await make_response("", 204)
     clear_secure_cookie(resp)
     resp.headers["HX-Redirect"] = "/login"
     return resp

@@ -13,6 +13,7 @@ import logging
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from dataclasses import dataclass
+from typing import Any
 
 from llm.prompt_template import build_opening_prompt
 
@@ -61,6 +62,22 @@ def _chat_stream_manager():
 logger = logging.getLogger(__name__)
 
 
+async def _require_user() -> dict[str, Any]:
+    user = await get_current_user()
+    if user is None:
+        abort(401)
+        raise AssertionError("unreachable")
+    return user
+
+
+def _require_dek() -> bytes:
+    dek = get_dek()
+    if dek is None:
+        abort(401, description="Missing encryption key")
+        raise AssertionError("unreachable")
+    return dek
+
+
 @dataclass(slots=True)
 class ChatRenderResult:
     html: str
@@ -73,7 +90,7 @@ async def render_chat(
     oob: bool = False,
     scroll_target: str | None = None,
 ) -> ChatRenderResult:
-    user = await get_current_user()
+    user = await _require_user()
     context = await get_chat_context(user, date)
     html = await render_template(
         "partials/chat.html",
@@ -109,8 +126,9 @@ async def _build_chat_response(
 async def chat_htmx(date):
     try:
         normalized_date = parse_iso_date(date)
-    except ValueError:
+    except ValueError as exc:
         abort(400, description="Invalid date")
+        raise AssertionError("unreachable") from exc
     target = request.args.get("target")
     push_url = url_for("days.day", date=normalized_date)
     return await _build_chat_response(
@@ -133,9 +151,12 @@ async def stop_generation(user_msg_id: str):
     logger.info("Stop requested for user message %s", user_msg_id)
     user = await get_current_user()
     dek = get_dek()
-    if not user or not dek:
+    if user is None or dek is None:
         logger.debug("Stop request without authenticated user")
         abort(401)
+        raise AssertionError("unreachable")
+    assert user is not None
+    assert dek is not None
 
     if not await _db().messages.message_exists(user["id"], user_msg_id):
         logger.warning("Stop request for unauthorized message %s", user_msg_id)
@@ -159,8 +180,8 @@ async def stop_generation(user_msg_id: str):
 @chat_bp.get("/c/meta-chips/<msg_id>")
 @login_required
 async def meta_chips(msg_id: str):
-    user = await get_current_user()
-    dek = get_dek()
+    user = await _require_user()
+    dek = _require_dek()
     if not await _db().messages.message_exists(user["id"], msg_id):
         abort(404, description="message not found")
     tags = await _db().tags.get_tags_for_message(user["id"], msg_id, dek)
@@ -176,9 +197,9 @@ async def meta_chips(msg_id: str):
 @chat_bp.get("/c/opening/<date>")
 @login_required
 async def sse_opening(date: str):
-    user = await get_current_user()
+    user = await _require_user()
+    dek = _require_dek()
     uid = user["id"]
-    dek = get_dek()
     tz = get_timezone()
     now = datetime.now(ZoneInfo(tz))
     today_iso = now.date().isoformat()
@@ -240,9 +261,9 @@ async def send_message(date):
     form = await request.form
     user_text = form.get("message", "").strip()
     user_time = form.get("user_time")
-    user = await get_current_user()
+    user = await _require_user()
+    dek = _require_dek()
     uid = user["id"]
-    dek = get_dek()
 
     max_len = current_app.config["MAX_MESSAGE_LENGTH"]
 
@@ -279,12 +300,13 @@ async def sse_reply(user_msg_id: str, date: str):
 
     try:
         normalized_date = parse_iso_date(date)
-    except ValueError:
+    except ValueError as exc:
         abort(400, description="Invalid date")
+        raise AssertionError("unreachable") from exc
 
-    user = await get_current_user()
+    user = await _require_user()
+    dek = _require_dek()
     uid = user["id"]
-    dek = get_dek()
     history, existing_assistant_msg, actual_date = await locate_message_and_reply(
         _db(), uid, dek, normalized_date, user_msg_id
     )
@@ -304,14 +326,16 @@ async def sse_reply(user_msg_id: str, date: str):
             headers=SSE_HEADERS,
         )
 
-    params = normalize_llm_config(
+    params_raw = normalize_llm_config(
         request.args.get("config"),
         current_app.config.get("ALLOWED_LLM_CONFIG_KEYS", set()),
     )
+    params = dict(params_raw) if params_raw is not None else None
 
-    ctx = build_conversation_context(
+    ctx_mapping = build_conversation_context(
         request.args.get("user_time"), request.cookies.get("tz")
     )
+    ctx = dict(ctx_mapping)
 
     manager = _chat_stream_manager()
     pending_response = manager.get(user_msg_id)
