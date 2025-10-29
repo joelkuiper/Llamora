@@ -187,7 +187,11 @@ class LlamafileProcessManager:
         except ProcessLookupError:
             return False
         except PermissionError:
-            return True
+            # On some platforms (notably macOS) PIDs can be re-used by
+            # processes that we don't own between runs. In that case the
+            # permission error indicates we no longer control the process,
+            # so treat it as non-existent for our cleanup logic.
+            return False
 
     def _terminate_process(
         self, pid: int, pgid: int | None, *, force: bool = False
@@ -200,6 +204,13 @@ class LlamafileProcessManager:
                 os.kill(pid, sig)
         except ProcessLookupError:
             pass
+        except PermissionError:
+            self.logger.debug(
+                "Permission denied when attempting to signal process %s (pgid %s)",
+                pid,
+                pgid,
+                exc_info=True,
+            )
 
     def _cleanup_stale_process(self) -> None:
         state = self._read_state()
