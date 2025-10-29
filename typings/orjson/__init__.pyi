@@ -1,25 +1,23 @@
-from .orjson import *
-from .orjson import __version__ as __version__
+from typing import Any, Protocol
 
-__all__ = ['__version__', 'dumps', 'Fragment', 'JSONDecodeError', 'JSONEncodeError', 'loads', 'OPT_APPEND_NEWLINE', 'OPT_INDENT_2', 'OPT_NAIVE_UTC', 'OPT_NON_STR_KEYS', 'OPT_OMIT_MICROSECONDS', 'OPT_PASSTHROUGH_DATACLASS', 'OPT_PASSTHROUGH_DATETIME', 'OPT_PASSTHROUGH_SUBCLASS', 'OPT_SERIALIZE_DATACLASS', 'OPT_SERIALIZE_NUMPY', 'OPT_SERIALIZE_UUID', 'OPT_SORT_KEYS', 'OPT_STRICT_INTEGER', 'OPT_UTC_Z']
+class SupportsWrite(Protocol):
+    def write(self, __s: str) -> object: ...
 
-# Names in __all__ with no definition:
-#   Fragment
-#   JSONDecodeError
-#   JSONEncodeError
-#   OPT_APPEND_NEWLINE
-#   OPT_INDENT_2
-#   OPT_NAIVE_UTC
-#   OPT_NON_STR_KEYS
-#   OPT_OMIT_MICROSECONDS
-#   OPT_PASSTHROUGH_DATACLASS
-#   OPT_PASSTHROUGH_DATETIME
-#   OPT_PASSTHROUGH_SUBCLASS
-#   OPT_SERIALIZE_DATACLASS
-#   OPT_SERIALIZE_NUMPY
-#   OPT_SERIALIZE_UUID
-#   OPT_SORT_KEYS
-#   OPT_STRICT_INTEGER
-#   OPT_UTC_Z
-#   dumps
-#   loads
+class JSONDecodeError(ValueError): ...
+class JSONEncodeError(Exception): ...
+
+def dumps(
+    obj: Any,
+    *,
+    default: Any | None = ...,
+    option: int | None = ...,
+) -> bytes: ...
+
+def loads(__obj: bytes | bytearray | memoryview | str) -> Any: ...
+
+__all__ = [
+    "JSONDecodeError",
+    "JSONEncodeError",
+    "dumps",
+    "loads",
+]

@@ -1,12 +1,15 @@
-import os
 import base64
-import orjson
+import os
 import secrets
-from cachetools import TTLCache
-from quart import Response, request, redirect, g, current_app
-from urllib.parse import urlparse, quote
 from functools import wraps
+from typing import Any, Protocol, cast
+
+import orjson
+from cachetools import TTLCache
+from quart import Response, current_app, g, redirect, request
+from urllib.parse import quote, urlparse
 from nacl import secret
+
 from app.services.container import get_services
 from config import SESSION_TTL
 
@@ -29,6 +32,16 @@ DEK_STORAGE = os.getenv("LLAMORA_DEK_STORAGE", "cookie").lower()
 
 # Rough upper bound on concurrent sessions; adjust as needed
 dek_store = TTLCache(maxsize=1024, ttl=SESSION_TTL)
+
+
+class RequestWithUser(Protocol):
+    """Protocol representing a request object that stores a cached user."""
+
+    user: dict[str, Any] | None
+
+
+def _request_with_user() -> RequestWithUser:
+    return cast(RequestWithUser, request)
 
 
 def _get_cookie_data() -> dict:
@@ -64,12 +77,12 @@ def _cookie_state() -> dict:
     return g._secure_cookie_state
 
 
-def _set_cookie_data(response: Response, data: dict) -> None:
+def _set_cookie_data(response: Response, data: dict) -> Response:
     # If empty -> delete cookie to avoid storing an empty blob
     if not data:
         current_app.logger.debug("Clearing %s cookie", COOKIE_NAME)
         response.delete_cookie(COOKIE_NAME, path="/", samesite="Lax")
-        return
+        return response
     token = cookie_box.encrypt(orjson.dumps(data))
     b64 = base64.urlsafe_b64encode(token).decode("utf-8")
     # Only mark the cookie as secure when the current request is served
@@ -93,6 +106,7 @@ def _set_cookie_data(response: Response, data: dict) -> None:
         samesite="Lax",
         path="/",
     )
+    return response
 
 
 def get_secure_cookie(name: str) -> str | None:
@@ -102,29 +116,33 @@ def get_secure_cookie(name: str) -> str | None:
     return _get_cookie_data().get(name)
 
 
-def set_secure_cookie(response: Response, name: str, value: str | None) -> None:
+def set_secure_cookie(response: Response, name: str, value: str | None) -> Response:
     state = _cookie_state()  # start from cached/merged state
     if value is None:
         state.pop(name, None)  # delete key
     else:
         state[name] = value  # merge key
-    _set_cookie_data(response, state)  # write back the full, merged dict
+    return _set_cookie_data(response, state)  # write back the full, merged dict
 
 
-def clear_secure_cookie(response: Response) -> None:
+def clear_secure_cookie(response: Response) -> Response:
     # Ensure we delete the same cookie we set by matching its attributes.
     current_app.logger.debug("Deleting %s cookie", COOKIE_NAME)
     response.delete_cookie(COOKIE_NAME, path="/", samesite="Lax")
+    return response
 
 
-def set_dek(response: Response, dek: bytes) -> None:
+def set_dek(response: Response, dek: bytes) -> Response:
     if DEK_STORAGE == "session":
         sid = secrets.token_urlsafe(32)
         dek_store[sid] = dek
-        set_secure_cookie(response, "sid", sid)
-        set_secure_cookie(response, "dek", None)
+        response = set_secure_cookie(response, "sid", sid)
+        response = set_secure_cookie(response, "dek", None)
     else:
-        set_secure_cookie(response, "dek", base64.b64encode(dek).decode("utf-8"))
+        response = set_secure_cookie(
+            response, "dek", base64.b64encode(dek).decode("utf-8")
+        )
+    return response
 
 
 def clear_session_dek() -> None:
@@ -145,8 +163,10 @@ async def get_current_user():
     if hasattr(g, "_current_user"):
         return g._current_user
 
-    if hasattr(request, "user") and request.user is not None:
-        g._current_user = request.user
+    req = _request_with_user()
+
+    if hasattr(req, "user") and req.user is not None:
+        g._current_user = req.user
         return g._current_user
 
     uid = get_secure_cookie("uid")
@@ -156,9 +176,9 @@ async def get_current_user():
         services = get_services()
         user = await services.db.users.get_user_by_id(uid)
 
-    request.user = user
+    req.user = user
 
-    g._current_user = request.user
+    g._current_user = req.user
     return g._current_user
 
 
@@ -236,7 +256,8 @@ def login_required(f):
 async def load_user():
     # Eager-load user info if needed in templates
     user = await get_current_user()
-    request.user = user
+    req = _request_with_user()
+    req.user = user
     if user:
         _ = get_dek()  # refresh session DEK TTL if present
         current_app.logger.debug("Loaded user %s for request", user["id"])

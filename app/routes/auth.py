@@ -11,7 +11,7 @@ from quart import (
     make_response,
     abort,
 )
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 from nacl import pwhash
 from cachetools import TTLCache
 from app.services.auth_helpers import (
@@ -232,9 +232,9 @@ async def register():
             code=format_recovery_code(recovery_code),
             next_url=url_for("days.index"),
         )
-        resp = await make_response(html)
-        set_secure_cookie(resp, "uid", str(user_id))
-        set_dek(resp, dek)
+        resp: Response = await make_response(html)
+        resp = set_secure_cookie(resp, "uid", str(user_id))
+        resp = set_dek(resp, dek)
         return resp
 
     return await render_template("register.html")
@@ -296,9 +296,9 @@ async def login():
                         redirect_url = url_for("days.day", date=active_date)
                     else:
                         redirect_url = "/"
-                resp = redirect(redirect_url)
-                set_secure_cookie(resp, "uid", str(user["id"]))
-                set_dek(resp, dek)
+                resp = cast(Response, redirect(redirect_url))
+                resp = set_secure_cookie(resp, "uid", str(user["id"]))
+                resp = set_dek(resp, dek)
                 if cache_key in _login_failures:
                     del _login_failures[cache_key]
                 current_app.logger.debug(
@@ -328,10 +328,10 @@ async def logout():
     user = await get_current_user()
     current_app.logger.debug("Logout for user %s", user["id"] if user else None)
     next_url = "/login"
-    resp = redirect(next_url)
+    resp = cast(Response, redirect(next_url))
 
     clear_session_dek()
-    clear_secure_cookie(resp)
+    resp = clear_secure_cookie(resp)
     return resp
 
 
@@ -410,7 +410,7 @@ async def download_user_data():
     user = _require_user(await get_current_user())
     dek = get_dek()
     if dek is None:
-        response = await make_response("Missing encryption key")
+        response: Response = await make_response("Missing encryption key")
         response.status_code = 400
         return response
 
@@ -426,7 +426,7 @@ async def download_user_data():
 
     payload = orjson.dumps(user_data)
     headers = {"Content-Disposition": "attachment; filename=user_data.json"}
-    response = await make_response(payload)
+    response: Response = await make_response(payload)
     response.headers.update(headers)
     response.mimetype = "application/json"
     return response
@@ -505,7 +505,7 @@ async def regen_recovery():
 async def delete_profile():
     user = _require_user(await get_current_user())
     await _db().users.delete_user(user["id"])
-    resp = await make_response("", 204)
-    clear_secure_cookie(resp)
+    resp: Response = await make_response("", 204)
+    resp = clear_secure_cookie(resp)
     resp.headers["HX-Redirect"] = "/login"
     return resp

@@ -111,7 +111,7 @@ async def _build_chat_response(
     push_url: str,
 ) -> Response:
     render_result = await render_chat(date, oob=False, scroll_target=target)
-    resp = await make_response(render_result.html, 200)
+    resp: Response = await make_response(render_result.html, 200)
     if target:
         push_url = f"{push_url}?target={target}"
     resp.headers["HX-Push-Url"] = push_url
