@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import time
-from typing import Dict, Iterable, Optional
+from typing import Dict, Iterable, Optional, cast
 
 import hnswlib
 import numpy as np
@@ -85,7 +85,9 @@ class MessageIndex:
         ef = max(k, 64)
         self.index.set_ef(ef)
         logger.debug("Searching %d vectors with k=%d ef=%d", count, k, ef)
-        labels_arr, dists = self.index.knn_query(query_vec, k=k)
+        labels_arr, dists = cast(
+            tuple[np.ndarray, np.ndarray], self.index.knn_query(query_vec, k=k)
+        )
         ids: list[str] = []
         for label in labels_arr[0]:
             idx_label = int(label)

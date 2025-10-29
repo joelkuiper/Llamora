@@ -11,7 +11,7 @@ from quart import (
     make_response,
     abort,
 )
-from typing import Any, Mapping, cast
+from typing import Any, Mapping
 from nacl import pwhash
 from cachetools import TTLCache
 from app.services.auth_helpers import (
@@ -232,7 +232,8 @@ async def register():
             code=format_recovery_code(recovery_code),
             next_url=url_for("days.index"),
         )
-        resp: Response = await make_response(html)
+        resp = await make_response(html)
+        assert isinstance(resp, Response)
         resp = set_secure_cookie(resp, "uid", str(user_id))
         resp = set_dek(resp, dek)
         return resp
@@ -296,7 +297,9 @@ async def login():
                         redirect_url = url_for("days.day", date=active_date)
                     else:
                         redirect_url = "/"
-                resp = cast(Response, redirect(redirect_url))
+                redirect_value = redirect(redirect_url)
+                resp = await make_response(redirect_value)
+                assert isinstance(resp, Response)
                 resp = set_secure_cookie(resp, "uid", str(user["id"]))
                 resp = set_dek(resp, dek)
                 if cache_key in _login_failures:
@@ -328,7 +331,9 @@ async def logout():
     user = await get_current_user()
     current_app.logger.debug("Logout for user %s", user["id"] if user else None)
     next_url = "/login"
-    resp = cast(Response, redirect(next_url))
+    redirect_value = redirect(next_url)
+    resp = await make_response(redirect_value)
+    assert isinstance(resp, Response)
 
     clear_session_dek()
     resp = clear_secure_cookie(resp)
@@ -410,7 +415,8 @@ async def download_user_data():
     user = _require_user(await get_current_user())
     dek = get_dek()
     if dek is None:
-        response: Response = await make_response("Missing encryption key")
+        response = await make_response("Missing encryption key")
+        assert isinstance(response, Response)
         response.status_code = 400
         return response
 
@@ -426,7 +432,8 @@ async def download_user_data():
 
     payload = orjson.dumps(user_data)
     headers = {"Content-Disposition": "attachment; filename=user_data.json"}
-    response: Response = await make_response(payload)
+    response = await make_response(payload)
+    assert isinstance(response, Response)
     response.headers.update(headers)
     response.mimetype = "application/json"
     return response
@@ -505,7 +512,8 @@ async def regen_recovery():
 async def delete_profile():
     user = _require_user(await get_current_user())
     await _db().users.delete_user(user["id"])
-    resp: Response = await make_response("", 204)
+    resp = await make_response("", 204)
+    assert isinstance(resp, Response)
     resp = clear_secure_cookie(resp)
     resp.headers["HX-Redirect"] = "/login"
     return resp
