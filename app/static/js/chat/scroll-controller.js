@@ -3,6 +3,7 @@ import { createListenerBag } from "../utils/events.js";
 export class ScrollController {
   #initSuppressed = false;
   #initReleaseFrame = null;
+  #alignFrame = null;
 
   constructor({
     root = document,
@@ -32,6 +33,7 @@ export class ScrollController {
     this.listeners = null;
 
     this.alignScrollButton = this.alignScrollButton.bind(this);
+    this.alignScrollButtonNow = this.alignScrollButtonNow.bind(this);
     this.onScroll = this.onScroll.bind(this);
     this.onWheel = this.onWheel.bind(this);
     this.onTouchMove = this.onTouchMove.bind(this);
@@ -71,7 +73,7 @@ export class ScrollController {
 
     this.#scheduleInitRelease();
 
-    this.alignScrollButton();
+    this.alignScrollButtonNow();
 
     return (force = false) => this.scrollToBottom(force);
   }
@@ -81,6 +83,7 @@ export class ScrollController {
 
     this.#cancelInitRelease();
     this.#initSuppressed = false;
+    this.#cancelAlign();
 
     this.listeners?.abort();
     this.listeners = null;
@@ -137,6 +140,11 @@ export class ScrollController {
       });
     }
     this.toggleScrollBtn();
+    if (force) {
+      this.alignScrollButtonNow();
+    } else {
+      this.alignScrollButton();
+    }
   }
 
   updateScrollState(currentTop) {
@@ -150,7 +158,29 @@ export class ScrollController {
   }
 
   alignScrollButton() {
+    if (this.#alignFrame != null || !this.chat) {
+      return;
+    }
+
+    if (typeof requestAnimationFrame !== "function") {
+      this.alignScrollButtonNow();
+      return;
+    }
+
+    this.#alignFrame = requestAnimationFrame(() => {
+      this.#alignFrame = null;
+      this.alignScrollButtonNow();
+    });
+  }
+
+  alignScrollButtonNow() {
     if (!this.chat) return;
+
+    if (this.#alignFrame != null && typeof cancelAnimationFrame === "function") {
+      cancelAnimationFrame(this.#alignFrame);
+      this.#alignFrame = null;
+    }
+
     const rect = this.chat.getBoundingClientRect();
     const centerPx = rect.left + rect.width / 2;
     document.documentElement.style.setProperty("--chat-center", `${centerPx}px`);
@@ -228,5 +258,12 @@ export class ScrollController {
       cancelAnimationFrame(frame.raf);
     }
     this.#initReleaseFrame = null;
+  }
+
+  #cancelAlign() {
+    if (this.#alignFrame != null && typeof cancelAnimationFrame === "function") {
+      cancelAnimationFrame(this.#alignFrame);
+    }
+    this.#alignFrame = null;
   }
 }
