@@ -1,4 +1,4 @@
-from quart import Quart, render_template, make_response, request, g
+from quart import Quart, render_template, make_response, request
 from dotenv import load_dotenv
 from quart_wtf import CSRFProtect
 import os
@@ -82,8 +82,7 @@ def create_app():
     @app.template_filter("tag_hash")
     def tag_hash_filter(tag, user_id=None):
         t = tag.strip()[:64]
-        current_user = getattr(g, "_current_user", None) or {}
-        uid = user_id or current_user.get("id")
+        uid = user_id or (getattr(request, "user", {}) or {}).get("id")
         if not uid:
             return ""
         return hashlib.sha256(f"{uid}:{t}".encode("utf-8")).hexdigest()
