@@ -225,9 +225,11 @@ async def sse_opening(date: str):
     except Exception as exc:
         logger.exception("Failed to build opening prompt")
 
+        msg = f"⚠️ {exc}"
+        escaped_msg = replace_newline(escape(msg))
+
         async def error_stream():
-            msg = f"⚠️ {exc}"
-            yield f"event: error\ndata: {replace_newline(escape(msg))}\n\n"
+            yield f"event: error\ndata: {escaped_msg}\n\n"
             yield "event: done\ndata: {}\n\n"
 
         return Response(
