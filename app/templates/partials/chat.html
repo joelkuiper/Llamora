@@ -14,7 +14,7 @@
           <textarea class="input"
                     name="message"
                     rows="3"
-                    placeholder="{{ 'Write your thoughts here…' if is_today else 'This day has past.' }}"
+                    placeholder="{{ 'Write your thoughts here…' if is_today else 'This day has passed.' }}"
                     cols="40"
                     maxlength="{{ config.MAX_MESSAGE_LENGTH }}"></textarea>
           <input type="hidden" name="user_time" id="user-time" />
@@ -24,7 +24,7 @@
     </chat-form>
 
     {% else %}
-    <div class="return-today">This day has past.
+    <div class="return-today">This day has passed.
       <a
         href="{{ url_for('days.day_today') }}"
         hx-get="{{ url_for('chat.chat_htmx_today') }}"
