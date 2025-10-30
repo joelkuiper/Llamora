@@ -1,6 +1,7 @@
 import logging
 
 from quart import Blueprint, render_template, request, abort
+from app.api.search import InvalidSearchQuery
 from app.services.container import get_search_api
 from app.services.auth_helpers import (
     login_required,
@@ -19,19 +20,12 @@ search_bp = Blueprint("search", __name__)
 @login_required
 async def search():
     raw_query = request.args.get("q", "")
-    query = raw_query.strip()
     logger.debug("Route search raw query='%s'", raw_query)
-    results = []
+    results: list = []
     truncation_notice: str | None = None
-    if query and len(query) > MAX_SEARCH_QUERY_LENGTH:
-        logger.info(
-            "Search query length %d exceeds limit of %d; truncating",
-            len(query),
-            MAX_SEARCH_QUERY_LENGTH,
-        )
-        query = query[:MAX_SEARCH_QUERY_LENGTH]
-        truncation_notice = f"Your search was truncated to the first {MAX_SEARCH_QUERY_LENGTH} characters."
-    if query:
+    sanitized_query = ""
+
+    if raw_query:
         user = await get_current_user()
         if user is None:
             abort(401)
@@ -40,11 +34,26 @@ async def search():
         if dek is None:
             abort(401, description="Missing encryption key")
             raise AssertionError("unreachable")
-        results = await get_search_api().search(user["id"], dek, query)
+
+        try:
+            sanitized_query, results, truncated = await get_search_api().search(
+                user["id"], dek, raw_query
+            )
+        except InvalidSearchQuery:
+            logger.info("Discarding invalid search query for user %s", user["id"])
+            sanitized_query = ""
+            results = []
+            truncated = False
+
+        if truncated:
+            truncation_notice = (
+                f"Your search was truncated to the first {MAX_SEARCH_QUERY_LENGTH} characters."
+            )
+
     logger.debug("Route returning %d results", len(results))
     return await render_template(
         "partials/search_results.html",
         results=results,
-        has_query=bool(query),
+        has_query=bool(sanitized_query),
         truncation_notice=truncation_notice,
     )

@@ -21,6 +21,10 @@ TOKEN_PATTERN = re.compile(r"\S+")
 logger = logging.getLogger(__name__)
 
 
+class InvalidSearchQuery(ValueError):
+    """Exception raised when a provided search query is invalid."""
+
+
 class SearchAPI:
     """High level search interface operating on encrypted messages."""
 
@@ -57,35 +61,37 @@ class SearchAPI:
         query: str,
         k1: int = PROGRESSIVE_K1,
         k2: int = PROGRESSIVE_K2,
-    ):
+    ) -> tuple[str, list[dict], bool]:
         normalized = (query or "").strip()
         if not normalized:
             logger.info("Rejecting empty search query for user %s", user_id)
-            return []
+            raise InvalidSearchQuery("Search query must not be empty")
+
+        truncated = False
         if len(normalized) > MAX_SEARCH_QUERY_LENGTH:
             logger.info(
-                "Rejecting overlong search query (len=%d, limit=%d) for user %s",
+                "Truncating overlong search query (len=%d, limit=%d) for user %s",
                 len(normalized),
                 MAX_SEARCH_QUERY_LENGTH,
                 user_id,
             )
-            return []
+            normalized = normalized[:MAX_SEARCH_QUERY_LENGTH]
+            truncated = True
 
         logger.debug("Search requested by user %s with k1=%d k2=%d", user_id, k1, k2)
-        query = normalized
         candidates = await self.vector_search.search_candidates(
-            user_id, dek, query, k1, k2
+            user_id, dek, normalized, k1, k2
         )
 
         if not candidates:
             logger.debug(
                 "No candidates found for user %s; returning empty result set", user_id
             )
-            return []
+            return normalized, [], truncated
 
         seen_tokens: set[str] = set()
         tokens: list[str] = []
-        for raw in TOKEN_PATTERN.findall(query):
+        for raw in TOKEN_PATTERN.findall(normalized):
             token = raw.strip()
             if not token:
                 continue
@@ -109,9 +115,9 @@ class SearchAPI:
             for mid, hashes in tag_map.items():
                 boosts[mid] = 0.1 * len(hashes)
 
-        results = self.lexical_reranker.rerank(query, candidates, k2, boosts)
+        results = self.lexical_reranker.rerank(normalized, candidates, k2, boosts)
         logger.debug("Returning %d results for user %s", len(results), user_id)
-        return results
+        return normalized, results, truncated
 
     async def on_message_appended(
         self, user_id: str, msg_id: str, plaintext: str, dek: bytes
