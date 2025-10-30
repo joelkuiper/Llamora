@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone, date
 from zoneinfo import ZoneInfo
 
 from quart import request
 import humanize as _humanize
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_timezone() -> str:
@@ -15,10 +19,18 @@ def get_timezone() -> str:
     """
     tz = request.args.get("tz")
     if tz:
-        return tz
+        try:
+            ZoneInfo(tz)
+            return tz
+        except Exception:  # pragma: no cover - ZoneInfo raises various errors
+            logger.debug("Invalid timezone '%s' from query parameter", tz)
     tz_cookie = request.cookies.get("tz")
     if tz_cookie:
-        return tz_cookie
+        try:
+            ZoneInfo(tz_cookie)
+            return tz_cookie
+        except Exception:  # pragma: no cover - ZoneInfo raises various errors
+            logger.debug("Invalid timezone '%s' from cookie", tz_cookie)
     return "UTC"
 
 
