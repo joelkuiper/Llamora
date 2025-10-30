@@ -122,6 +122,21 @@ class PendingResponse(ResponsePipelineCallbacks):
         self._task = asyncio.create_task(
             self._run_pipeline(), name=f"pending:{user_msg_id}"
         )
+        self._task.add_done_callback(self._handle_task_result)
+
+    def _handle_task_result(self, task: asyncio.Task) -> None:
+        if task.cancelled():
+            return
+
+        exc = task.exception()
+        if exc is None:
+            return
+
+        logger.exception(
+            "Pending response pipeline task failed for %s",
+            self.user_msg_id,
+            exc_info=exc,
+        )
 
     async def _run_pipeline(self) -> None:
         try:
