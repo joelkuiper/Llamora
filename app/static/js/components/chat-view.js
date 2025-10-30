@@ -11,6 +11,15 @@ import "./llm-stream.js";
 
 const TYPING_INDICATOR_SELECTOR = "#typing-indicator";
 
+function formatDate(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 function activateAnimations(node) {
   if (!node || node.nodeType !== Node.ELEMENT_NODE) return;
 
@@ -33,8 +42,6 @@ function scheduleMidnightRefresh(chat) {
   let timeoutId = null;
   const listeners = createListenerBag();
 
-  const pad = (value) => String(value).padStart(2, "0");
-
   const runCheck = () => {
     if (timeoutId) {
       clearTimeout(timeoutId);
@@ -42,9 +49,7 @@ function scheduleMidnightRefresh(chat) {
     }
 
     const now = new Date();
-    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
-      now.getDate()
-    )}`;
+    const today = formatDate(now);
 
     if (chat.dataset.date !== today) {
       setTimezoneCookie();
@@ -225,7 +230,7 @@ export class ChatView extends ReactiveElement {
       this.#chatFormReady = Promise.resolve();
     }
 
-    if (this.#chatForm?.isToday) {
+    if (activeDay && activeDay === formatDate(new Date())) {
       this.#midnightCleanup = scheduleMidnightRefresh(chat);
     }
 
