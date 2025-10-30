@@ -154,7 +154,7 @@ class MessageIndexStore:
 
         texts = [m["message"] for m in msg_list]
         ids = [m["id"] for m in msg_list]
-        vecs = (await async_embed_texts(texts)).astype(np.float32)
+        vecs = await async_embed_texts(texts)
         if idx is None:
             dim = vecs.shape[1]
             idx = MessageIndex(dim, self.max_elements)
@@ -302,7 +302,7 @@ class MessageIndexStore:
         self, user_id: str, message_id: str, content: str, dek: bytes
     ) -> None:
         idx = await self.ensure_index(user_id, dek)
-        vec = (await async_embed_texts([content])).astype(np.float32)
+        vec = await async_embed_texts([content])
         lock = self._get_lock(user_id)
         async with lock:
             await self.db.vectors.store_vector(message_id, user_id, vec[0], dek)

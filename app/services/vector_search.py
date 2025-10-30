@@ -2,8 +2,6 @@ import logging
 import time
 from typing import List
 
-import numpy as np
-
 from config import (
     PROGRESSIVE_BATCH,
     PROGRESSIVE_K1,
@@ -70,12 +68,12 @@ class VectorSearchService:
             "Vector search requested by user %s with k1=%d k2=%d", user_id, k1, k2
         )
         index = await self.index_store.ensure_index(user_id, dek)
-        q_vec = (await async_embed_texts([query])).astype(np.float32).reshape(1, -1)
+        q_vec = (await async_embed_texts([query])).reshape(1, -1)
 
         current_k1 = k1
         start = time.monotonic()
         ids, dists = index.search(q_vec, current_k1)
-        cosines = [1 - d for d in dists]
+        cosines = (1.0 - dists).tolist()
         logger.debug("Initial vector search returned %d candidates", len(ids))
 
         rounds = 0
@@ -88,7 +86,7 @@ class VectorSearchService:
             if rounds == 1:
                 current_k1 = min(2 * current_k1, 512)
             ids, dists = index.search(q_vec, current_k1)
-            cosines = [1 - d for d in dists]
+            cosines = (1.0 - dists).tolist()
 
         seen = set()
         dedup_ids: List[str] = []
