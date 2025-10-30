@@ -21,7 +21,11 @@ LOGIN_LOCKOUT_TTL = int(os.getenv("LLAMORA_LOGIN_LOCKOUT_TTL", 15 * 60))
 LOGIN_FAILURE_CACHE_SIZE = int(os.getenv("LLAMORA_LOGIN_FAILURE_CACHE_SIZE", 2048))
 
 # Embedding configuration
+_EMBED_CONCURRENCY_DEFAULT = max(os.cpu_count() or 4, 1)
 EMBED_MODEL = os.getenv("LLAMORA_EMBED_MODEL", "BAAI/bge-small-en-v1.5")
+EMBED_CONCURRENCY = max(
+    int(os.getenv("LLAMORA_EMBED_CONCURRENCY", _EMBED_CONCURRENCY_DEFAULT)), 1
+)
 
 # Session and CSRF configuration
 SESSION_TTL = int(os.getenv("LLAMORA_SESSION_TTL", 7 * 24 * 60 * 60))

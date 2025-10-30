@@ -128,6 +128,7 @@ This project is an educational experiment and is **not** intended for production
      - `session` – stores the key in server memory with an inactivity timeout (`LLAMORA_SESSION_TTL`), more secure but users must log in again after restarts and stale sessions are purged.
    - `LLAMORA_SESSION_TTL` to set session expiration in seconds (defaults to 604800)
    - `LLAMORA_EMBED_MODEL` to override the default embedding model name
+   - `LLAMORA_EMBED_CONCURRENCY` to cap simultaneous embedding jobs (defaults to your CPU count, minimum 1)
    - `LLAMORA_MESSAGE_INDEX_MAX_ELEMENTS` to adjust the maximum ANN index capacity (defaults to `100000`); increase it for very large histories at the cost of additional memory
    - `LLAMORA_DISABLE_REGISTRATION` set to a truthy value (e.g., `1`, `true`, `yes`) to hide registration and block `/register` (prints a one-time link if no users exist)
    - `LLAMORA_PROMPT_FILE` to point to a Jinja2 prompt template (defaults to `llm/prompts/llamora_phi.j2`)
