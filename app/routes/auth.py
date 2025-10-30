@@ -302,6 +302,12 @@ async def login():
                 assert isinstance(resp, Response)
                 set_secure_cookie(resp, "uid", str(user["id"]))
                 set_dek(resp, dek)
+                services = get_services()
+                current_app.add_background_task(
+                    services.search_api.warm_index,
+                    str(user["id"]),
+                    dek,
+                )
                 if cache_key in _login_failures:
                     del _login_failures[cache_key]
                 current_app.logger.debug(

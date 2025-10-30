@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import re
+import time
 
 import orjson
 
@@ -39,6 +40,24 @@ class SearchAPI:
         self.lexical_reranker = lexical_reranker or LexicalReranker()
         self._index_worker = IndexWorker(
             self, max_queue_size=INDEX_WORKER_MAX_QUEUE_SIZE
+        )
+
+    async def warm_index(self, user_id: str, dek: bytes) -> None:
+        """Ensure the vector index for ``user_id`` is resident in memory."""
+
+        start = time.perf_counter()
+        logger.debug("Pre-warming vector index for user %s", user_id)
+        try:
+            await self.vector_search.index_store.ensure_index(user_id, dek)
+        except Exception:  # pragma: no cover - defensive logging
+            logger.exception("Vector index warm-up failed for user %s", user_id)
+            return
+
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        logger.info(
+            "Vector index warm-up completed for user %s in %.1fms",
+            user_id,
+            elapsed_ms,
         )
 
     async def start(self) -> None:
