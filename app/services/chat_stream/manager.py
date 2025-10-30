@@ -246,13 +246,40 @@ class ChatStreamManager:
             now = time.monotonic()
 
         ttl = self._pending_ttl
-        stale_ids = [
-            user_msg_id
+        stale_entries: list[tuple[str, PendingResponse]] = [
+            (user_msg_id, pending)
             for user_msg_id, pending in self._pending.items()
             if now - pending.created_at >= ttl
         ]
-        for user_msg_id in stale_ids:
+        for user_msg_id, pending in stale_entries:
             logger.debug("Dropping stale pending response %s", user_msg_id)
+            self._schedule_pending_cancellation(user_msg_id, pending)
+
+    def _schedule_pending_cancellation(
+        self, user_msg_id: str, pending: "PendingResponse"
+    ) -> None:
+        async def _cancel_and_remove() -> None:
+            try:
+                await pending.cancel()
+            except Exception:  # pragma: no cover - defensive
+                logger.exception(
+                    "Failed to cancel stale pending response %s", user_msg_id
+                )
+            finally:
+                self._remove_pending(user_msg_id)
+
+        loop = pending._task.get_loop()
+        if loop.is_running():
+            loop.call_soon_threadsafe(loop.create_task, _cancel_and_remove())
+        elif not loop.is_closed():
+            # If the loop isn't running we fall back to executing the cancellation
+            # synchronously so cleanup still occurs.  This keeps the method safe to
+            # call from synchronous contexts such as shutdown handlers.
+            loop.run_until_complete(_cancel_and_remove())
+        else:  # pragma: no cover - defensive
+            logger.warning(
+                "Event loop already closed while cancelling stale response %s", user_msg_id
+            )
             self._remove_pending(user_msg_id)
 
     def start_stream(
