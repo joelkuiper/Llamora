@@ -2,8 +2,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const codeEl = document.getElementById("recovery");
   const copyBtn = document.getElementById("copy");
   const downloadBtn = document.getElementById("download");
-  const qrBtn = document.getElementById("qr-toggle");
-  const qrCanvas = document.getElementById("qr-code");
   const acknowledge = document.getElementById("acknowledge");
   const continueBtn = document.getElementById("continue");
 
