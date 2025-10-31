@@ -375,19 +375,27 @@ export class SearchOverlay extends ReactiveElement {
 
   #closeResults(clearInput = false, options = {}) {
     const wrap = this.#resultsEl;
-    if (!wrap) return;
+    const finish = () => {
+      this.#spinnerController?.stop();
+      if (!wrap) {
+        return;
+      }
+      wrap.classList.remove("is-open");
+      wrap.removeAttribute("aria-busy");
+      wrap.innerHTML = "";
+      this.#deactivateOverlayListeners();
+    };
+
+    if (!wrap) {
+      finish();
+      return;
+    }
 
 
     const { immediate = false } = options;
     if (clearInput && this.#inputEl) this.#inputEl.value = "";
 
     const panel = wrap.querySelector(".sr-panel");
-    const finish = () => {
-      wrap.classList.remove("is-open");
-      wrap.removeAttribute("aria-busy");
-      wrap.innerHTML = "";
-      this.#deactivateOverlayListeners();
-    };
 
     if (!panel) {
       finish();
