@@ -1,6 +1,7 @@
 import atexit
 import logging
 import os
+import shlex
 import signal
 import socket
 import subprocess
@@ -283,7 +284,8 @@ class LlamafileProcessManager:
         cmd = getattr(self, "cmd", None)
         if not cmd:
             return
-        self.logger.info("Starting llamafile with:" + " ".join(cmd))
+        pretty_cmd = shlex.join(cmd)
+        self.logger.info("Starting llamafile with: %s", pretty_cmd)
         self.proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
