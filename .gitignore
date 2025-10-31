@@ -220,3 +220,6 @@ __marimo__/
 
 *.sqlite-shm
 *.sqlite-wal
+*.sqlite3-shm
+*.sqlite3-wal
+
