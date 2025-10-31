@@ -290,7 +290,10 @@ export class InlineAutocompleteController {
       : displayValue.toLowerCase();
     const fallbackIndex = normalizedDisplay.indexOf(match.token ?? "");
     const start = Math.max(0, match.tokenIndex ?? fallbackIndex);
-    const maskedLength = Math.min(value.length, Math.max(displayValue.length - start, 0));
+    const maxAvailable = Math.max(displayValue.length - start, 0);
+    const maskReference = match.matchLength ?? match.queryLength ?? match.token?.length ?? 0;
+    const maskBase = Math.min(maskReference, value.length);
+    const maskedLength = Math.min(maxAvailable, Math.max(0, maskBase));
     let leading = displayValue.slice(0, start);
     let masked = displayValue.slice(start, start + maskedLength);
     const trailing = displayValue.slice(start + maskedLength);
@@ -352,6 +355,8 @@ export class InlineAutocompleteController {
       return null;
     }
 
+    let bestMatch = null;
+
     for (const candidate of this.#candidates) {
       if (candidate.value.length <= rawValue.length) {
         continue;
@@ -360,13 +365,40 @@ export class InlineAutocompleteController {
         ? candidate.display ?? candidate.value
         : (candidate.display ?? candidate.value).toLowerCase();
       for (const token of candidate.normalizedTokens) {
-        if (token.startsWith(normalizedQuery)) {
-          const tokenIndex = haystack.indexOf(token);
-          return { candidate, token, tokenIndex };
+        if (!token.startsWith(normalizedQuery)) {
+          continue;
+        }
+
+        const tokenIndex = haystack.indexOf(token);
+        const comparableIndex = tokenIndex >= 0 ? tokenIndex : Infinity;
+        const bestTokenLength = bestMatch?.token?.length ?? Infinity;
+        const bestComparableIndex =
+          bestMatch?.tokenIndex != null && bestMatch.tokenIndex >= 0
+            ? bestMatch.tokenIndex
+            : Infinity;
+        const matchLength = Math.min(normalizedQuery.length, token.length);
+        const match = {
+          candidate,
+          token,
+          tokenIndex,
+          matchLength,
+          queryLength: normalizedQuery.length,
+        };
+
+        if (
+          !bestMatch ||
+          token.length < bestTokenLength ||
+          (token.length === bestTokenLength && comparableIndex < bestComparableIndex)
+        ) {
+          bestMatch = match;
+        }
+
+        if (token.length === normalizedQuery.length) {
+          return bestMatch;
         }
       }
     }
-    return null;
+    return bestMatch;
   }
 
   #handleKeydown(event) {

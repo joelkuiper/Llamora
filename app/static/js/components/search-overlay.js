@@ -12,20 +12,14 @@ const getEventTarget = (evt) => {
 
 const RECENT_REFRESH_MIN_MS = 5000;
 
-const SEARCH_AUTOCOMPLETE_PREFIX_RE = /^[#@]+/;
-
 const trimSearchValue = (value) => (typeof value === "string" ? value.trim() : "");
 
 const collapseSearchWhitespace = (value) =>
   trimSearchValue(value).replace(/\s+/g, " ");
 
-const stripSearchPrefix = (value) => value.replace(SEARCH_AUTOCOMPLETE_PREFIX_RE, "");
-
 const prepareSearchAutocompleteValue = (value) => {
   const collapsed = collapseSearchWhitespace(value);
-  if (!collapsed) return "";
-  const withoutPrefix = stripSearchPrefix(collapsed);
-  return withoutPrefix || collapsed;
+  return collapsed;
 };
 
 const buildSearchAutocompleteEntry = (value) => {
@@ -40,10 +34,6 @@ const buildSearchAutocompleteEntry = (value) => {
     const collapsed = collapseSearchWhitespace(base);
     if (collapsed) {
       tokens.add(collapsed);
-      const stripped = stripSearchPrefix(collapsed);
-      if (stripped) {
-        tokens.add(stripped);
-      }
     }
   };
 
@@ -53,24 +43,14 @@ const buildSearchAutocompleteEntry = (value) => {
     addToken(collapsed);
   }
 
-  const stripped = stripSearchPrefix(collapsed || trimmed);
-  if (stripped) {
-    addToken(stripped);
-  }
-
   (collapsed || trimmed)
     .split(/\s+/)
     .filter(Boolean)
     .forEach((part) => addToken(part));
 
-  if (stripped) {
-    stripped
-      .split(/\s+/)
-      .filter(Boolean)
-      .forEach((part) => addToken(part));
-  }
-
-  const tokenList = Array.from(tokens).filter(Boolean);
+  const tokenList = Array.from(tokens)
+    .filter(Boolean)
+    .sort((a, b) => a.length - b.length || a.localeCompare(b));
   if (!tokenList.length) {
     tokenList.push(trimmed);
   }

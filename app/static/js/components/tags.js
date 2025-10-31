@@ -7,14 +7,10 @@ const normalizeTag = (value) => {
   return trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
 };
 
-const TAG_AUTOCOMPLETE_PREFIX_RE = /^#+/;
-
 const prepareTagAutocompleteValue = (value) => {
   if (typeof value !== "string") return "";
   const trimmed = value.trim();
-  if (!trimmed) return "";
-  const withoutPrefix = trimmed.replace(TAG_AUTOCOMPLETE_PREFIX_RE, "");
-  return withoutPrefix || trimmed;
+  return trimmed;
 };
 
 export class Tags extends HTMLElement {
@@ -297,8 +293,7 @@ export class Tags extends HTMLElement {
         return;
       }
       seen.add(text);
-      const plain = text.startsWith("#") ? text.slice(1) : text;
-      entries.push({ value: text, display: text, tokens: [text, plain] });
+      entries.push({ value: text, display: text, tokens: [text] });
     });
 
     this.#autocomplete.setCandidates(entries);
