@@ -4,12 +4,13 @@ from quart_wtf import CSRFProtect
 import os
 import logging
 import secrets
-from app.services.container import AppLifecycle, AppServices
 
 load_dotenv()
 
 
 def create_app():
+    from app.services.container import AppLifecycle, AppServices
+
     services = AppServices.create()
 
     from .services.auth_helpers import dek_store
@@ -63,7 +64,8 @@ def create_app():
     app.register_blueprint(tags_bp)
 
     from datetime import datetime
-    import hashlib
+    from app.util.tags import canonicalize as canonicalize_tag, display as display_tag
+    from app.util.tags import tag_hash as compute_tag_hash
     from .services.time import (
         humanize as humanize_filter,
         format_date,
@@ -79,14 +81,19 @@ def create_app():
             dt = value
         return format_date(dt)
 
+    app.jinja_env.globals["display"] = display_tag
+
     @app.template_filter("tag_hash")
     def tag_hash_filter(tag, user_id=None):
-        t = tag.strip()[:64]
         current_user = getattr(g, "_current_user", None) or {}
         uid = user_id or current_user.get("id")
         if not uid:
             return ""
-        return hashlib.sha256(f"{uid}:{t}".encode("utf-8")).hexdigest()
+        try:
+            canonical = canonicalize_tag(tag)
+        except ValueError:
+            return ""
+        return compute_tag_hash(uid, canonical).hex()
 
     from .services.auth_helpers import load_user
 

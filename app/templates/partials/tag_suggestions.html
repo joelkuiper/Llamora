@@ -1,8 +1,9 @@
 {% for tag in suggestions %}
 <button type="button" class="tag-suggestion"
+        data-tag="{{ tag }}"
         hx-post="{{ url_for('tags.add_tag', msg_id=msg_id) }}"
         hx-target="#msg-tags-{{ msg_id }}"
         hx-swap="beforeend"
         hx-vals='{"tag": {{ tag|tojson }} }'
-        hx-on:after-request="this.remove()">{{ tag }}</button>
+        hx-on:after-request="this.remove()">{{ display(tag) }}</button>
 {% endfor %}

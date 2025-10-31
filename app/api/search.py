@@ -1,4 +1,3 @@
-import hashlib
 import logging
 import re
 import time
@@ -13,8 +12,9 @@ from config import (
     PROGRESSIVE_K2,
 )
 from app.services.index_worker import IndexWorker
-from app.services.lexical_reranker import LexicalReranker
 from app.services.vector_search import VectorSearchService
+from app.services.lexical_reranker import LexicalReranker
+from app.util.tags import canonicalize, tag_hash
 
 
 TOKEN_PATTERN = re.compile(r"\S+")
@@ -114,19 +114,18 @@ class SearchAPI:
             token = raw.strip()
             if not token:
                 continue
-            if token.startswith("#"):
-                token = "#" + token.lstrip("#")
-            token = token[:MAX_TAG_LENGTH]
-            if not token or token in seen_tokens:
+            try:
+                canonical = canonicalize(token)
+            except ValueError:
                 continue
-            seen_tokens.add(token)
-            tokens.append(token)
+            canonical_lower = canonical.lower()
+            if canonical_lower in seen_tokens:
+                continue
+            seen_tokens.add(canonical_lower)
+            tokens.append(canonical)
         boosts: dict[str, float] = {}
         if tokens:
-            tag_hashes = [
-                hashlib.sha256(f"{user_id}:{t}".encode("utf-8")).digest()
-                for t in tokens
-            ]
+            tag_hashes = [tag_hash(user_id, t) for t in tokens]
             message_ids = [c["id"] for c in candidates]
             tag_map = await self.db.tags.get_messages_with_tag_hashes(
                 user_id, tag_hashes, message_ids

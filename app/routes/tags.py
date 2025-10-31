@@ -2,6 +2,7 @@ from quart import Blueprint, request, abort, render_template, jsonify
 from app.services.container import get_services
 from app.services.auth_helpers import login_required, get_current_user, get_dek
 from config import MAX_TAG_LENGTH
+from app.util.tags import canonicalize, display
 
 tags_bp = Blueprint("tags", __name__)
 
@@ -34,23 +35,27 @@ async def add_tag(msg_id: str):
         abort(401)
         raise AssertionError("unreachable")
     form = await request.form
-    tag = (form.get("tag") or "").strip()
-    if tag and not tag.startswith("#"):
-        tag = f"#{tag}"
-    if not tag:
+    raw_tag = (form.get("tag") or "").strip()
+    if len(raw_tag) > MAX_TAG_LENGTH:
+        raw_tag = raw_tag[:MAX_TAG_LENGTH]
+    try:
+        canonical = canonicalize(raw_tag)
+    except ValueError:
         abort(400, description="empty tag")
-    if len(tag) > MAX_TAG_LENGTH:
-        abort(400, description="tag too long")
+        raise AssertionError("unreachable")
     dek = get_dek()
     if dek is None:
         abort(401, description="Missing encryption key")
         raise AssertionError("unreachable")
     if not await _db().messages.message_exists(user["id"], msg_id):
         abort(404, description="message not found")
-    tag_hash = await _db().tags.resolve_or_create_tag(user["id"], tag, dek)
+    tag_hash = await _db().tags.resolve_or_create_tag(user["id"], canonical, dek)
     await _db().tags.xref_tag_message(user["id"], tag_hash, msg_id)
     html = await render_template(
-        "partials/tag_chip.html", keyword=tag, tag_hash=tag_hash.hex(), msg_id=msg_id
+        "partials/tag_chip.html",
+        keyword=canonical,
+        tag_hash=tag_hash.hex(),
+        msg_id=msg_id,
     )
     return html
 
@@ -72,28 +77,34 @@ async def get_tag_suggestions(msg_id: str):
     meta = messages[0].get("meta", {})
     keywords = meta.get("keywords") or []
     existing = await _db().tags.get_tags_for_message(user["id"], msg_id, dek)
-    existing_names = {t["name"] for t in existing}
+    existing_names = {
+        (t.get("name") or "").strip().lower()
+        for t in existing
+        if (t.get("name") or "").strip()
+    }
 
     meta_suggestions: set[str] = set()
     for kw in keywords:
-        kw = (kw or "").strip()
-        if kw and not kw.startswith("#"):
-            kw = f"#{kw}"
-        kw = kw[:MAX_TAG_LENGTH]
-        if kw:
-            meta_suggestions.add(kw)
+        try:
+            canonical_kw = canonicalize(kw)
+        except ValueError:
+            continue
+        meta_suggestions.add(canonical_kw)
 
     frecent_tags = await _db().tags.get_tag_frecency(user["id"], 3, 0.0001, dek)
-    frecent_suggestions = {
-        t["name"] if t["name"].startswith("#") else f"#{t['name']}"
-        for t in frecent_tags
-    }
+    frecent_suggestions = {t["name"] for t in frecent_tags if (t.get("name"))}
 
     combined = meta_suggestions | frecent_suggestions
-    combined = [name for name in combined if name not in existing_names]
+    combined = [
+        name
+        for name in combined
+        if name and name.strip().lower() not in existing_names
+    ]
 
     html = await render_template(
-        "partials/tag_suggestions.html", suggestions=combined, msg_id=msg_id
+        "partials/tag_suggestions.html",
+        suggestions=combined,
+        msg_id=msg_id,
     )
     return html
 
@@ -128,53 +139,51 @@ async def autocomplete_tags():
         abort(404, description="message not found")
         raise AssertionError("unreachable")
 
-    query = (request.args.get("q") or "").strip()[:MAX_TAG_LENGTH]
+    raw_query = (request.args.get("q") or "").strip()[:MAX_TAG_LENGTH]
+    canonical_limit = max(0, MAX_TAG_LENGTH - 1)
+    query_canonical = raw_query.lstrip("#").strip()
+    if canonical_limit:
+        query_canonical = query_canonical[:canonical_limit]
 
     existing = await _db().tags.get_tags_for_message(user["id"], msg_id, dek)
     excluded: set[str] = set()
     for tag in existing:
-        name = (tag.get("name") or "").strip()
+        name = (tag.get("name") or "").strip().lower()
         if not name:
             continue
-        normalized = name.lower()
-        excluded.add(normalized)
-        if normalized.startswith("#"):
-            excluded.add(normalized[1:])
-        else:
-            excluded.add(f"#{normalized}")
+        excluded.add(name)
 
     results = await _db().tags.search_tags(
         user["id"],
         dek,
         limit=limit,
-        prefix=query or None,
+        prefix=query_canonical or None,
         exclude_names=excluded,
     )
 
     payload = []
     seen: set[str] = set()
-    prefix_lower = query.lower()
-    prefix_plain = prefix_lower[1:] if prefix_lower.startswith("#") else prefix_lower
+    prefix_lower = query_canonical.lower()
     for entry in results:
         name = (entry.get("name") or "").strip()
         if not name:
             continue
-        if not name.startswith("#"):
-            name = f"#{name}"
-        name = name[:MAX_TAG_LENGTH]
-        normalized = name.lower()
+        canonical_name = name[:canonical_limit] if canonical_limit else name
+        lower_name = canonical_name.lower()
         if prefix_lower:
-            matches = normalized.startswith(prefix_lower)
-            if not matches and prefix_plain:
-                plain = normalized[1:] if normalized.startswith("#") else normalized
-                matches = plain.startswith(prefix_plain)
-            if not matches:
+            if not lower_name.startswith(prefix_lower):
                 continue
-        if normalized in excluded:
+        if lower_name in excluded:
             continue
-        if normalized in seen:
+        if lower_name in seen:
             continue
-        seen.add(normalized)
-        payload.append({"name": name, "hash": entry.get("hash")})
+        seen.add(lower_name)
+        payload.append(
+            {
+                "name": canonical_name,
+                "display": display(canonical_name),
+                "hash": entry.get("hash"),
+            }
+        )
 
     return jsonify({"results": payload})

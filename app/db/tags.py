@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-import hashlib
-
 from aiosqlitepool import SQLiteConnectionPool
 from ulid import ULID
-
-from config import MAX_TAG_LENGTH
 
 from .base import BaseRepository
 from .events import RepositoryEventBus, MESSAGE_TAGS_CHANGED_EVENT
 from .utils import cached_tag_name
+from app.util.tags import canonicalize, tag_hash
 
 
 class TagsRepository(BaseRepository):
@@ -30,10 +27,8 @@ class TagsRepository(BaseRepository):
     async def resolve_or_create_tag(
         self, user_id: str, tag_name: str, dek: bytes
     ) -> bytes:
-        tag_name = tag_name.strip()[:MAX_TAG_LENGTH]
-        if not tag_name:
-            raise ValueError("Empty tag")
-        tag_hash = hashlib.sha256(f"{user_id}:{tag_name}".encode("utf-8")).digest()
+        canonical = canonicalize(tag_name)
+        digest = tag_hash(user_id, canonical)
         async with self.pool.connection() as conn:
 
             async def _tx():
@@ -43,11 +38,11 @@ class TagsRepository(BaseRepository):
                     VALUES (?, ?, ?, ?, ?)
                     ON CONFLICT(user_id, tag_hash) DO NOTHING
                     """,
-                    (user_id, tag_hash, b"", b"", ""),
+                    (user_id, digest, b"", b"", ""),
                 )
                 if cursor.rowcount:
                     nonce, ct, alg = self._encrypt_message(
-                        dek, user_id, tag_hash.hex(), tag_name
+                        dek, user_id, digest.hex(), canonical
                     )
                     await conn.execute(
                         """
@@ -55,11 +50,11 @@ class TagsRepository(BaseRepository):
                         SET name_ct = ?, name_nonce = ?, alg = ?
                         WHERE user_id = ? AND tag_hash = ?
                         """,
-                        (ct, nonce, alg.decode(), user_id, tag_hash),
+                        (ct, nonce, alg.decode(), user_id, digest),
                     )
 
             await self._run_in_transaction(conn, _tx)
-        return tag_hash
+        return digest
 
     async def xref_tag_message(
         self, user_id: str, tag_hash: bytes, message_id: str
@@ -204,10 +199,9 @@ class TagsRepository(BaseRepository):
             return []
 
         normalized_prefix = (prefix or "").strip()
+        if normalized_prefix.startswith("#"):
+            normalized_prefix = normalized_prefix[1:]
         prefix_lower = normalized_prefix.lower()
-        prefix_without_hash = (
-            prefix_lower[1:] if prefix_lower.startswith("#") else prefix_lower
-        )
 
         excluded: set[str] = set()
         if exclude_names:
@@ -258,24 +252,21 @@ class TagsRepository(BaseRepository):
                     if not tag_name:
                         continue
 
-                    normalized = tag_name.lower()
-                    plain = normalized[1:] if normalized.startswith("#") else normalized
+                    canonical = tag_name
+                    normalized = canonical.lower()
 
-                    if normalized in excluded or plain in excluded:
+                    if normalized in excluded:
                         continue
                     if normalized in seen:
                         continue
 
                     if prefix_lower:
-                        matches = normalized.startswith(prefix_lower)
-                        if not matches and prefix_without_hash:
-                            matches = plain.startswith(prefix_without_hash)
-                        if not matches:
+                        if not normalized.startswith(prefix_lower):
                             continue
 
                     results.append(
                         {
-                            "name": tag_name,
+                            "name": canonical,
                             "hash": row["tag_hash"].hex(),
                             "frequency": row["frequency"],
                             "last_seen": row["last_seen"],

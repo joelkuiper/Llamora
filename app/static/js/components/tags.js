@@ -4,10 +4,26 @@ import { InlineAutocompleteController } from "../utils/inline-autocomplete.js";
 const BaseHTMLElement =
   typeof HTMLElement !== "undefined" ? HTMLElement : class {};
 
-const normalizeTag = (value) => {
-  const trimmed = value.trim();
+const canonicalizeTag = (value, limit = null) => {
+  if (typeof value !== "string") return "";
+  let trimmed = value.trim();
   if (!trimmed) return "";
-  return trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
+  if (trimmed.startsWith("#")) {
+    trimmed = trimmed.slice(1);
+  }
+  trimmed = trimmed.trim();
+  if (!trimmed) return "";
+  if (Number.isFinite(limit) && limit > 0) {
+    trimmed = trimmed.slice(0, limit);
+    trimmed = trimmed.trim();
+    if (!trimmed) return "";
+  }
+  return trimmed;
+};
+
+const displayTag = (canonical) => {
+  const name = typeof canonical === "string" ? canonical.trim() : "";
+  return name ? `#${name}` : "#";
 };
 
 const prepareTagAutocompleteValue = (value) => {
@@ -18,19 +34,20 @@ const prepareTagAutocompleteValue = (value) => {
 
 export const mergeTagCandidateValues = (
   remoteCandidates = [],
-  localCandidates = []
+  localCandidates = [],
+  limit = null
 ) => {
   const merged = [];
   const seen = new Set();
 
   const add = (value) => {
     if (typeof value !== "string") return;
-    const normalized = normalizeTag(value);
-    if (!normalized) return;
-    const key = normalized.toLowerCase();
+    const canonical = canonicalizeTag(value, limit);
+    if (!canonical) return;
+    const key = canonical.toLowerCase();
     if (seen.has(key)) return;
     seen.add(key);
-    merged.push(normalized);
+    merged.push(canonical);
   };
 
   remoteCandidates.forEach(add);
@@ -208,10 +225,15 @@ export class Tags extends BaseHTMLElement {
   }
 
   #getExistingTags() {
-    if (!this.#tagContainer) return [];
-    return Array.from(this.#tagContainer.querySelectorAll(".chip-label"))
-      .map((el) => el.textContent?.trim().toLowerCase())
-      .filter(Boolean);
+    const seen = new Set();
+    if (!this.#tagContainer) return seen;
+    const limit = this.#getCanonicalMaxLength();
+    this.#tagContainer.querySelectorAll(".chip-label").forEach((el) => {
+      const canonical = canonicalizeTag(el.textContent ?? "", limit);
+      if (!canonical) return;
+      seen.add(canonical.toLowerCase());
+    });
+    return seen;
   }
 
   #handleInputFocus() {
@@ -225,9 +247,14 @@ export class Tags extends BaseHTMLElement {
       this.#submit.disabled = true;
       return;
     }
-    const normalized = normalizeTag(raw).toLowerCase();
+    const limit = this.#getCanonicalMaxLength();
+    const canonical = canonicalizeTag(raw, limit);
+    if (!canonical) {
+      this.#submit.disabled = true;
+      return;
+    }
     const existing = this.#getExistingTags();
-    this.#submit.disabled = existing.includes(normalized);
+    this.#submit.disabled = existing.has(canonical.toLowerCase());
   }
 
   #handleConfigRequest(event) {
@@ -237,18 +264,20 @@ export class Tags extends BaseHTMLElement {
       event.preventDefault();
       return;
     }
-    const normalized = normalizeTag(raw);
-    if (!normalized) {
+    const limit = this.#getCanonicalMaxLength();
+    const canonical = canonicalizeTag(raw, limit);
+    if (!canonical) {
       event.preventDefault();
       return;
     }
     const existing = this.#getExistingTags();
-    if (existing.includes(normalized.toLowerCase())) {
+    if (existing.has(canonical.toLowerCase())) {
       event.preventDefault();
       return;
     }
-    this.#input.value = normalized;
-    event.detail.parameters.tag = normalized;
+    const display = displayTag(canonical);
+    this.#input.value = display;
+    event.detail.parameters.tag = canonical;
   }
 
   #handleAfterRequest() {
@@ -270,10 +299,18 @@ export class Tags extends BaseHTMLElement {
           () => chip.classList.remove("chip-enter"),
           { once: true }
         );
-        const label = chip.querySelector(".chip-label")?.textContent?.trim().toLowerCase();
-        if (label && this.#suggestions) {
+        const limit = this.#getCanonicalMaxLength();
+        const label = chip
+          .querySelector(".chip-label")
+          ?.textContent?.trim();
+        const canonical = canonicalizeTag(label ?? "", limit)?.toLowerCase();
+        if (canonical && this.#suggestions) {
           this.#suggestions.querySelectorAll(".tag-suggestion").forEach((btn) => {
-            if (btn.textContent?.trim().toLowerCase() === label) {
+            const btnCanonical = canonicalizeTag(
+              btn.dataset.tag ?? btn.textContent ?? "",
+              limit
+            )?.toLowerCase();
+            if (btnCanonical === canonical) {
               btn.remove();
             }
           });
@@ -335,16 +372,29 @@ export class Tags extends BaseHTMLElement {
         if (!text) {
           return;
         }
-        domValues.push(text);
+        const canonical = canonicalizeTag(
+          btn.dataset.tag ?? text,
+          this.#getCanonicalMaxLength()
+        );
+        if (!canonical) return;
+        domValues.push(canonical);
       });
     }
 
-    const values = mergeTagCandidateValues(this.#remoteCandidates, domValues);
-    const entries = values.map((value) => ({
-      value,
-      display: value,
-      tokens: [value],
-    }));
+    const limit = this.#getCanonicalMaxLength();
+    const values = mergeTagCandidateValues(
+      this.#remoteCandidates,
+      domValues,
+      limit
+    );
+    const entries = values.map((canonical) => {
+      const value = displayTag(canonical);
+      return {
+        value,
+        display: value,
+        tokens: [value],
+      };
+    });
 
     this.#autocomplete.setCandidates(entries);
   }
@@ -432,21 +482,18 @@ export class Tags extends BaseHTMLElement {
         if (controller.signal.aborted) return;
         const items = Array.isArray(body?.results) ? body.results : [];
         const values = [];
+        const limit = this.#getCanonicalMaxLength();
         for (const item of items) {
-          let name = null;
+          let source = null;
           if (typeof item === "string") {
-            name = item;
+            source = item;
           } else if (item && typeof item.name === "string") {
-            name = item.name;
+            source = item.name;
           }
-          if (!name) continue;
-          let normalized = normalizeTag(name);
-          if (!normalized) continue;
-          const maxLen = this.#getInputMaxLength();
-          if (maxLen) {
-            normalized = normalized.slice(0, maxLen);
-          }
-          values.push(normalized);
+          if (!source) continue;
+          const canonical = canonicalizeTag(source, limit);
+          if (!canonical) continue;
+          values.push(canonical);
         }
         this.#autocompleteCache?.set(key, values);
         if (this.#lastAutocompleteQueryKey === key) {
@@ -523,9 +570,21 @@ export class Tags extends BaseHTMLElement {
     return null;
   }
 
+  #getCanonicalMaxLength() {
+    const inputLimit = this.#getInputMaxLength();
+    if (!inputLimit || inputLimit <= 1) {
+      return null;
+    }
+    return inputLimit - 1;
+  }
+
   #buildCacheKey(query) {
     const msgId = this.dataset?.msgId ?? "";
-    const normalized = (query ?? "").trim().toLowerCase();
+    const limit = this.#getCanonicalMaxLength();
+    const canonical = canonicalizeTag(query ?? "", limit);
+    const normalized = canonical
+      ? canonical.toLowerCase()
+      : (query ?? "").trim().toLowerCase();
     return `${msgId}::${normalized}`;
   }
 
