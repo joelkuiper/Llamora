@@ -233,8 +233,12 @@
   opacity: 1;
   transform: translateY(0) scale(1) rotateX(0);
   transform-origin: top center;
-  will-change: opacity, transform;
   pointer-events: auto;
+}
+
+#search-results > .search-results-status > .sr-panel.pop-enter,
+#search-results > .search-results-status > .sr-panel.pop-exit {
+  will-change: opacity, transform;
 }
 
 #search-results:not(.is-open) > .search-results-status > .sr-panel.htmx-added {

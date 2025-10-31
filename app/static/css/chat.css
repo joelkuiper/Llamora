@@ -55,7 +55,6 @@ body {
   gap: var(--spacing-lg);
 
   transition: opacity 180ms ease-in-out;
-  will-change: opacity;
 
   .error { color: var(--color-error-text-dark); }
 
