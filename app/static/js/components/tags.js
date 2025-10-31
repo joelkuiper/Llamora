@@ -1,6 +1,9 @@
 import { createPopover } from "../popover.js";
 import { InlineAutocompleteController } from "../utils/inline-autocomplete.js";
 
+const BaseHTMLElement =
+  typeof HTMLElement !== "undefined" ? HTMLElement : class {};
+
 const normalizeTag = (value) => {
   const trimmed = value.trim();
   if (!trimmed) return "";
@@ -13,7 +16,30 @@ const prepareTagAutocompleteValue = (value) => {
   return trimmed;
 };
 
-export class Tags extends HTMLElement {
+export const mergeTagCandidateValues = (
+  remoteCandidates = [],
+  localCandidates = []
+) => {
+  const merged = [];
+  const seen = new Set();
+
+  const add = (value) => {
+    if (typeof value !== "string") return;
+    const normalized = normalizeTag(value);
+    if (!normalized) return;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    merged.push(normalized);
+  };
+
+  remoteCandidates.forEach(add);
+  localCandidates.forEach(add);
+
+  return merged;
+};
+
+export class Tags extends BaseHTMLElement {
   #popover = null;
   #button = null;
   #popoverEl = null;
@@ -29,24 +55,36 @@ export class Tags extends HTMLElement {
   #buttonClickHandler;
   #closeClickHandler;
   #inputHandler;
+  #inputFocusHandler;
   #configRequestHandler;
   #afterRequestHandler;
   #afterSwapHandler;
   #suggestionsSwapHandler;
   #chipActivationHandler;
   #chipKeydownHandler;
-
+  #remoteCandidates = [];
+  #autocompleteCache = null;
+  #autocompleteFetchTimer = null;
+  #autocompleteFetchController = null;
+  #lastAutocompleteQueryKey = null;
+  #pendingAutocompleteQueryKey = null;
+  
   constructor() {
     super();
     this.#buttonClickHandler = () => this.#togglePopover();
     this.#closeClickHandler = (event) => this.#handleCloseClick(event);
-    this.#inputHandler = () => this.#updateSubmitState();
+    this.#inputHandler = () => {
+      this.#updateSubmitState();
+      this.#scheduleAutocompleteFetch();
+    };
+    this.#inputFocusHandler = () => this.#handleInputFocus();
     this.#configRequestHandler = (event) => this.#handleConfigRequest(event);
     this.#afterRequestHandler = () => this.#handleAfterRequest();
     this.#afterSwapHandler = (event) => this.#handleAfterSwap(event);
     this.#suggestionsSwapHandler = () => this.#handleSuggestionsSwap();
     this.#chipActivationHandler = (event) => this.#handleChipActivation(event);
     this.#chipKeydownHandler = (event) => this.#handleChipKeydown(event);
+    this.#autocompleteCache = new Map();
   }
 
   connectedCallback() {
@@ -63,6 +101,7 @@ export class Tags extends HTMLElement {
     const { signal } = this.#listeners;
 
     this.#input.addEventListener("input", this.#inputHandler, { signal });
+    this.#input.addEventListener("focus", this.#inputFocusHandler, { signal });
     this.#form.addEventListener("htmx:configRequest", this.#configRequestHandler, {
       signal,
     });
@@ -128,6 +167,7 @@ export class Tags extends HTMLElement {
           htmx.trigger(this.#suggestions, "tag-popover:show");
         }
         this.#input?.focus();
+        this.#scheduleAutocompleteFetch({ immediate: true });
         this.#updateAutocompleteCandidates();
       },
       onHide: () => {
@@ -138,6 +178,8 @@ export class Tags extends HTMLElement {
           this.#suggestions.innerHTML = "";
           delete this.#suggestions.dataset.loaded;
         }
+        this.#cancelPendingAutocompleteFetch();
+        this.#remoteCandidates = [];
         this.#autocomplete?.clearCandidates();
       },
     });
@@ -170,6 +212,10 @@ export class Tags extends HTMLElement {
     return Array.from(this.#tagContainer.querySelectorAll(".chip-label"))
       .map((el) => el.textContent?.trim().toLowerCase())
       .filter(Boolean);
+  }
+
+  #handleInputFocus() {
+    this.#scheduleAutocompleteFetch({ immediate: true });
   }
 
   #updateSubmitState() {
@@ -234,11 +280,11 @@ export class Tags extends HTMLElement {
         }
       }
       this.#updateSubmitState();
-      this.#updateAutocompleteCandidates();
+      this.#invalidateAutocompleteCache({ immediate: true });
     } else if (target.classList?.contains("chip-tombstone")) {
       target.remove();
       this.#updateSubmitState();
-      this.#updateAutocompleteCandidates();
+      this.#invalidateAutocompleteCache({ immediate: true });
     }
   }
 
@@ -276,27 +322,211 @@ export class Tags extends HTMLElement {
       this.#autocomplete.destroy();
     }
     this.#autocomplete = null;
+    this.#cancelPendingAutocompleteFetch({ resetQueryKey: true });
+    this.#remoteCandidates = [];
   }
 
   #updateAutocompleteCandidates() {
     if (!this.#autocomplete) return;
-    if (!this.#suggestions) {
-      this.#autocomplete.clearCandidates();
+    const domValues = [];
+    if (this.#suggestions) {
+      this.#suggestions.querySelectorAll(".tag-suggestion").forEach((btn) => {
+        const text = btn.textContent?.trim();
+        if (!text) {
+          return;
+        }
+        domValues.push(text);
+      });
+    }
+
+    const values = mergeTagCandidateValues(this.#remoteCandidates, domValues);
+    const entries = values.map((value) => ({
+      value,
+      display: value,
+      tokens: [value],
+    }));
+
+    this.#autocomplete.setCandidates(entries);
+  }
+
+  #scheduleAutocompleteFetch({ immediate = false } = {}) {
+    if (!this.#input) return;
+    const url = this.#getAutocompleteUrl();
+    const msgId = this.dataset?.msgId ?? "";
+    if (!url || !msgId) return;
+
+    let query = prepareTagAutocompleteValue(this.#input.value ?? "");
+    const maxLength = this.#getInputMaxLength();
+    if (maxLength) {
+      query = query.slice(0, maxLength);
+    }
+
+    const cacheKey = this.#buildCacheKey(query);
+
+    if (!immediate && this.#pendingAutocompleteQueryKey === cacheKey && this.#autocompleteFetchTimer) {
       return;
     }
 
-    const seen = new Set();
-    const entries = [];
-    this.#suggestions.querySelectorAll(".tag-suggestion").forEach((btn) => {
-      const text = btn.textContent?.trim();
-      if (!text || seen.has(text)) {
-        return;
-      }
-      seen.add(text);
-      entries.push({ value: text, display: text, tokens: [text] });
-    });
+    this.#pendingAutocompleteQueryKey = cacheKey;
 
-    this.#autocomplete.setCandidates(entries);
+    if (this.#autocompleteFetchTimer) {
+      globalThis.clearTimeout(this.#autocompleteFetchTimer);
+      this.#autocompleteFetchTimer = null;
+    }
+
+    const delay = immediate ? 0 : 200;
+    this.#autocompleteFetchTimer = globalThis.setTimeout(() => {
+      this.#autocompleteFetchTimer = null;
+      this.#requestAutocomplete(query, cacheKey);
+    }, delay);
+  }
+
+  #requestAutocomplete(query, cacheKey) {
+    const url = this.#getAutocompleteUrl();
+    const msgId = this.dataset?.msgId ?? "";
+    if (!url || !msgId) {
+      this.#remoteCandidates = [];
+      this.#updateAutocompleteCandidates();
+      return;
+    }
+
+    const key = cacheKey ?? this.#buildCacheKey(query);
+    this.#lastAutocompleteQueryKey = key;
+
+    if (this.#autocompleteCache?.has(key)) {
+      const cached = this.#autocompleteCache.get(key) ?? [];
+      this.#remoteCandidates = cached.slice();
+      this.#updateAutocompleteCandidates();
+      return;
+    }
+
+    if (this.#autocompleteFetchController) {
+      this.#autocompleteFetchController.abort();
+    }
+
+    const controller = new AbortController();
+    this.#autocompleteFetchController = controller;
+
+    const params = new URLSearchParams();
+    params.set("msg_id", msgId);
+    if (query) {
+      params.set("q", query);
+    }
+    const limit = this.#getAutocompleteLimit();
+    if (limit) {
+      const clamped = Math.min(Math.max(limit, 1), 50);
+      params.set("limit", String(clamped));
+    }
+
+    fetch(`${url}?${params.toString()}`, {
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+        return response.json();
+      })
+      .then((body) => {
+        if (controller.signal.aborted) return;
+        const items = Array.isArray(body?.results) ? body.results : [];
+        const values = [];
+        for (const item of items) {
+          let name = null;
+          if (typeof item === "string") {
+            name = item;
+          } else if (item && typeof item.name === "string") {
+            name = item.name;
+          }
+          if (!name) continue;
+          let normalized = normalizeTag(name);
+          if (!normalized) continue;
+          const maxLen = this.#getInputMaxLength();
+          if (maxLen) {
+            normalized = normalized.slice(0, maxLen);
+          }
+          values.push(normalized);
+        }
+        this.#autocompleteCache?.set(key, values);
+        if (this.#lastAutocompleteQueryKey === key) {
+          this.#remoteCandidates = values;
+          this.#updateAutocompleteCandidates();
+        }
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        if (typeof console !== "undefined" && typeof console.debug === "function") {
+          console.debug("Failed to fetch tag autocomplete suggestions", error);
+        }
+        if (this.#lastAutocompleteQueryKey === key) {
+          this.#remoteCandidates = [];
+          this.#updateAutocompleteCandidates();
+        }
+      })
+      .finally(() => {
+        if (this.#autocompleteFetchController === controller) {
+          this.#autocompleteFetchController = null;
+        }
+      });
+  }
+
+  #cancelPendingAutocompleteFetch({ resetQueryKey = false } = {}) {
+    if (this.#autocompleteFetchTimer !== null) {
+      globalThis.clearTimeout(this.#autocompleteFetchTimer);
+      this.#autocompleteFetchTimer = null;
+    }
+    if (this.#autocompleteFetchController) {
+      this.#autocompleteFetchController.abort();
+      this.#autocompleteFetchController = null;
+    }
+    if (resetQueryKey) {
+      this.#pendingAutocompleteQueryKey = null;
+      this.#lastAutocompleteQueryKey = null;
+    }
+  }
+
+  #clearAutocompleteCache() {
+    this.#autocompleteCache?.clear();
+    this.#pendingAutocompleteQueryKey = null;
+    this.#lastAutocompleteQueryKey = null;
+  }
+
+  #invalidateAutocompleteCache({ immediate = false } = {}) {
+    this.#clearAutocompleteCache();
+    this.#remoteCandidates = [];
+    this.#updateAutocompleteCandidates();
+    this.#scheduleAutocompleteFetch({ immediate });
+  }
+
+  #getAutocompleteUrl() {
+    return this.dataset?.autocompleteUrl ?? "";
+  }
+
+  #getAutocompleteLimit() {
+    const raw = this.dataset?.autocompleteLimit ?? "";
+    const value = Number.parseInt(raw, 10);
+    if (Number.isFinite(value) && value > 0) {
+      return value;
+    }
+    return null;
+  }
+
+  #getInputMaxLength() {
+    const attr = this.#input?.getAttribute("maxlength") ?? "";
+    const value = Number.parseInt(attr, 10);
+    if (Number.isFinite(value) && value > 0) {
+      return value;
+    }
+    return null;
+  }
+
+  #buildCacheKey(query) {
+    const msgId = this.dataset?.msgId ?? "";
+    const normalized = (query ?? "").trim().toLowerCase();
+    return `${msgId}::${normalized}`;
   }
 
   #handleChipActivation(event) {
@@ -329,6 +559,6 @@ export class Tags extends HTMLElement {
   }
 }
 
-if (!customElements.get("meta-chips")) {
+if (typeof customElements !== "undefined" && !customElements.get("meta-chips")) {
   customElements.define("meta-chips", Tags);
 }

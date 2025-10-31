@@ -17,7 +17,11 @@
 {%- endmacro %}
 
 {% macro render_meta_chips(msg_id, tags=[], hidden=False) -%}
-  <meta-chips class="meta-chips" data-msg-id="{{ msg_id }}" {% if hidden %}hidden{% endif %}>
+  <meta-chips class="meta-chips"
+              data-msg-id="{{ msg_id }}"
+              data-autocomplete-url="{{ url_for('tags.autocomplete_tags') }}"
+              data-autocomplete-limit="12"
+              {% if hidden %}hidden{% endif %}>
     <button
       data-tooltip-title="Add tags"
       type="button"

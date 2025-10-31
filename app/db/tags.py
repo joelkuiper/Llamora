@@ -188,6 +188,110 @@ class TagsRepository(BaseRepository):
             )
         return tags
 
+    async def search_tags(
+        self,
+        user_id: str,
+        dek: bytes,
+        *,
+        limit: int = 15,
+        prefix: str | None = None,
+        lambda_: float = 0.0001,
+        exclude_names: set[str] | None = None,
+    ) -> list[dict]:
+        """Return recent/frequent tags optionally filtered by a prefix."""
+
+        if limit <= 0:
+            return []
+
+        normalized_prefix = (prefix or "").strip()
+        prefix_lower = normalized_prefix.lower()
+        prefix_without_hash = (
+            prefix_lower[1:] if prefix_lower.startswith("#") else prefix_lower
+        )
+
+        excluded: set[str] = set()
+        if exclude_names:
+            for name in exclude_names:
+                if not name:
+                    continue
+                trimmed = name.strip().lower()
+                if not trimmed:
+                    continue
+                excluded.add(trimmed)
+
+        batch_size = max(limit * 3, 25) if prefix_lower else max(limit * 2, 25)
+        seen: set[str] = set()
+        results: list[dict] = []
+
+        async with self.pool.connection() as conn:
+            offset = 0
+            while len(results) < limit:
+                cursor = await conn.execute(
+                    """
+                    SELECT tag_hash, name_ct, name_nonce, alg,
+                           seen AS frequency,
+                           last_seen,
+                           seen / exp(? * (julianday('now') - julianday(last_seen)) * 86400) AS frecency
+                    FROM tags
+                    WHERE user_id = ?
+                    ORDER BY frecency DESC, last_seen DESC
+                    LIMIT ? OFFSET ?
+                    """,
+                    (lambda_, user_id, batch_size, offset),
+                )
+                rows = await cursor.fetchall()
+                if not rows:
+                    break
+                offset += batch_size
+
+                for row in rows:
+                    tag_name = cached_tag_name(
+                        user_id,
+                        row["tag_hash"],
+                        row["name_nonce"],
+                        row["name_ct"],
+                        row["alg"].encode(),
+                        dek,
+                        self._decrypt_message,
+                    )
+                    tag_name = (tag_name or "").strip()
+                    if not tag_name:
+                        continue
+
+                    normalized = tag_name.lower()
+                    plain = normalized[1:] if normalized.startswith("#") else normalized
+
+                    if normalized in excluded or plain in excluded:
+                        continue
+                    if normalized in seen:
+                        continue
+
+                    if prefix_lower:
+                        matches = normalized.startswith(prefix_lower)
+                        if not matches and prefix_without_hash:
+                            matches = plain.startswith(prefix_without_hash)
+                        if not matches:
+                            continue
+
+                    results.append(
+                        {
+                            "name": tag_name,
+                            "hash": row["tag_hash"].hex(),
+                            "frequency": row["frequency"],
+                            "last_seen": row["last_seen"],
+                            "frecency": row["frecency"],
+                        }
+                    )
+                    seen.add(normalized)
+
+                    if len(results) >= limit:
+                        break
+
+                if len(rows) < batch_size:
+                    break
+
+        return results
+
     async def get_messages_with_tag_hashes(
         self, user_id: str, tag_hashes: list[bytes], message_ids: list[str]
     ) -> dict[str, set[bytes]]:
