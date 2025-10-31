@@ -1,0 +1,97 @@
+[default]
+APP_NAME = "Llamora"
+# Development default; replace with your own value in production.
+SECRET_KEY = "O7T_mOBS765PydhqWAhH1RArhWBEp6hu28Uhf2gN0Xs"
+LOG_LEVEL = "INFO"
+
+[default.FEATURES]
+disable_registration = false
+
+[default.LIMITS]
+max_tag_length = 64
+max_username_length = 30
+max_password_length = 128
+min_password_length = 8
+max_message_length = 1000
+max_search_query_length = 512
+
+[default.SEARCH]
+recent_limit = 50
+recent_suggestion_limit = 8
+message_index_max_elements = 100000
+
+[default.SEARCH.progressive]
+k1 = 128
+k2 = 10
+rounds = 3
+batch_size = 1000
+max_ms = 1500
+poor_match_max_cos = 0.28
+poor_match_min_hits = 3
+
+[default.AUTH]
+max_login_attempts = 5
+login_lockout_ttl = 900
+login_failure_cache_size = 2048
+
+[default.SESSION]
+ttl = 604800
+
+[default.MESSAGES.history_cache]
+maxsize = 256
+ttl = 60
+
+[default.DATABASE]
+path = "state.sqlite3"
+pool_size = 25
+pool_acquire_timeout = 10
+timeout = 5.0
+busy_timeout = 5000
+mmap_size = 10485760
+
+[default.EMBEDDING]
+model = "BAAI/bge-small-en-v1.5"
+concurrency = 0
+
+[default.LLM.server]
+llamafile_path = ""
+host = null
+
+[default.LLM.server.args]
+server = true
+nobrowser = true
+threads = 0
+n_gpu_layers = 999
+gpu = "auto"
+ctx_size = 8192
+
+[default.LLM.request]
+n_predict = 1024
+stream = true
+stop = ["<|im_start|>", "<|im_end|>", "<|endoftext|>", "<|end|>"]
+n_keep = -1
+cache_prompt = true
+
+[default.LLM]
+allowed_config_keys = ["temperature"]
+
+[default.PROMPTS]
+prompt_file = ""
+grammar_file = ""
+
+[default.COOKIES]
+name = "llamora"
+# Development default; replace with your own value in production.
+secret = "K3aRvB6X6lXe9iWvL99XQqSlqSkJ3YTaxqz81uB_ihw="
+
+[default.CRYPTO]
+dek_storage = "cookie"
+
+[default.WORKERS.index_worker]
+max_queue_size = 1024
+
+[development]
+DEBUG = true
+
+[production]
+DEBUG = false

@@ -39,6 +39,7 @@ from llamora.app.services.time import (
     part_of_day,
 )
 from llamora.app.services.validators import parse_iso_date
+from llamora.settings import settings
 
 
 chat_bp = Blueprint("chat", __name__)
@@ -268,7 +269,7 @@ async def send_message(date):
     dek = _require_dek()
     uid = user["id"]
 
-    max_len = current_app.config["MAX_MESSAGE_LENGTH"]
+    max_len = int(settings.LIMITS.max_message_length)
 
     if not user_text or len(user_text) > max_len:
         abort(400, description="Message is empty or too long.")
@@ -331,7 +332,7 @@ async def sse_reply(user_msg_id: str, date: str):
 
     params_raw = normalize_llm_config(
         request.args.get("config"),
-        current_app.config.get("ALLOWED_LLM_CONFIG_KEYS", set()),
+        set(settings.LLM.allowed_config_keys),
     )
     params = dict(params_raw) if params_raw is not None else None
 

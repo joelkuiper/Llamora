@@ -8,7 +8,7 @@ from llamora.app.services.auth_helpers import (
     get_current_user,
     get_dek,
 )
-from llamora.config import MAX_SEARCH_QUERY_LENGTH, RECENT_SEARCH_SUGGESTION_LIMIT
+from llamora.settings import settings
 
 
 logger = logging.getLogger(__name__)
@@ -51,8 +51,10 @@ async def search():
             )
 
         if truncated:
+            limit = int(settings.LIMITS.max_search_query_length)
             truncation_notice = (
-                f"Your search was truncated to the first {MAX_SEARCH_QUERY_LENGTH} characters."
+                "Your search was truncated to the first "
+                f"{limit} characters."
             )
 
     logger.debug("Route returning %d results", len(results))
@@ -78,6 +80,6 @@ async def recent_searches():
         raise AssertionError("unreachable")
 
     queries = await get_services().db.search_history.get_recent_searches(
-        user["id"], RECENT_SEARCH_SUGGESTION_LIMIT, dek
+        user["id"], int(settings.SEARCH.recent_suggestion_limit), dek
     )
     return jsonify({"recent": queries})

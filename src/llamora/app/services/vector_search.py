@@ -2,16 +2,7 @@ import logging
 import time
 from typing import List
 
-from llamora.config import (
-    PROGRESSIVE_BATCH,
-    PROGRESSIVE_K1,
-    PROGRESSIVE_K2,
-    PROGRESSIVE_MAX_MS,
-    PROGRESSIVE_ROUNDS,
-    POOR_MATCH_MAX_COS,
-    POOR_MATCH_MIN_HITS,
-    MESSAGE_INDEX_MAX_ELEMENTS,
-)
+from llamora.settings import settings
 from llamora.app.embed.model import async_embed_texts
 from llamora.app.index.message_ann import MessageIndexStore
 
@@ -22,17 +13,23 @@ logger = logging.getLogger(__name__)
 class VectorSearchService:
     """Handles ANN index access and progressive warm-up for message search."""
 
-    def __init__(self, db, index_max_elements: int = MESSAGE_INDEX_MAX_ELEMENTS):
-        self.index_store = MessageIndexStore(db, max_elements=index_max_elements)
+    def __init__(self, db, index_max_elements: int | None = None):
+        max_elements = index_max_elements or int(
+            settings.SEARCH.message_index_max_elements
+        )
+        self.index_store = MessageIndexStore(db, max_elements=max_elements)
 
     def _quality_satisfied(self, ids: List[str], cosines: List[float], k2: int) -> bool:
         if len(ids) < k2:
             return False
         if not cosines:
             return False
+        cfg = settings.SEARCH.progressive
         max_cos = max(cosines)
-        hits = sum(c >= POOR_MATCH_MAX_COS for c in cosines)
-        return max_cos >= POOR_MATCH_MAX_COS and hits >= POOR_MATCH_MIN_HITS
+        hits = sum(c >= float(cfg.poor_match_max_cos) for c in cosines)
+        return max_cos >= float(cfg.poor_match_max_cos) and hits >= int(
+            cfg.poor_match_min_hits
+        )
 
     def _should_continue(
         self,
@@ -44,10 +41,11 @@ class VectorSearchService:
     ) -> bool:
         if self._quality_satisfied(ids, cosines, k2):
             return False
-        if rounds >= PROGRESSIVE_ROUNDS:
+        cfg = settings.SEARCH.progressive
+        if rounds >= int(cfg.rounds):
             return False
         elapsed_ms = (time.monotonic() - start) * 1000
-        if elapsed_ms >= PROGRESSIVE_MAX_MS:
+        if elapsed_ms >= float(cfg.max_ms):
             logger.debug(
                 "Stopping vector backfill after %d rounds due to time budget (%.1fms)",
                 rounds,
@@ -61,8 +59,8 @@ class VectorSearchService:
         user_id: str,
         dek: bytes,
         query: str,
-        k1: int = PROGRESSIVE_K1,
-        k2: int = PROGRESSIVE_K2,
+        k1: int = int(settings.SEARCH.progressive.k1),
+        k2: int = int(settings.SEARCH.progressive.k2),
     ) -> List[dict]:
         logger.debug(
             "Vector search requested by user %s with k1=%d k2=%d", user_id, k1, k2
@@ -78,7 +76,9 @@ class VectorSearchService:
 
         rounds = 0
         while self._should_continue(start, rounds, ids, cosines, k2):
-            added = await self.index_store.expand_older(user_id, dek, PROGRESSIVE_BATCH)
+            added = await self.index_store.expand_older(
+                user_id, dek, int(settings.SEARCH.progressive.batch_size)
+            )
             logger.debug("Backfill round %d added %d vectors", rounds + 1, added)
             if added <= 0:
                 break

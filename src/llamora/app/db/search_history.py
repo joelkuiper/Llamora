@@ -4,7 +4,7 @@ import hashlib
 
 from aiosqlitepool import SQLiteConnectionPool
 
-from llamora.config import RECENT_SEARCH_LIMIT
+from llamora.settings import settings
 from .base import BaseRepository
 
 
@@ -58,7 +58,7 @@ class SearchHistoryRepository(BaseRepository):
                         LIMIT ?
                       )
                     """,
-                    (user_id, user_id, RECENT_SEARCH_LIMIT),
+                    (user_id, user_id, int(settings.SEARCH.recent_limit)),
                 )
 
             await self._run_in_transaction(conn, _tx)

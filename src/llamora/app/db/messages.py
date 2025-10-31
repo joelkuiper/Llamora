@@ -10,7 +10,7 @@ from ulid import ULID
 
 from cachetools import TTLCache
 
-from llamora.config import MESSAGE_HISTORY_CACHE_MAXSIZE, MESSAGE_HISTORY_CACHE_TTL
+from llamora.settings import settings
 
 from .base import BaseRepository
 from .events import RepositoryEventBus, MESSAGE_TAGS_CHANGED_EVENT
@@ -34,9 +34,10 @@ class MessagesRepository(BaseRepository):
         self._decrypt_message = decrypt_message
         self._on_message_appended: MessageAppendedCallback | None = None
         self._event_bus = event_bus
+        history_cache_cfg = settings.MESSAGES.history_cache
         self._history_cache: TTLCache[tuple[str, str], list[dict]] = TTLCache(
-            maxsize=MESSAGE_HISTORY_CACHE_MAXSIZE,
-            ttl=MESSAGE_HISTORY_CACHE_TTL,
+            maxsize=int(history_cache_cfg.maxsize),
+            ttl=int(history_cache_cfg.ttl),
         )
         self._history_cache_lock = asyncio.Lock()
         if self._event_bus:

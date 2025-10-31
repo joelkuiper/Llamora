@@ -3,21 +3,16 @@ from functools import lru_cache
 
 import numpy as np
 from fastembed import TextEmbedding
-from quart import current_app
 
-from llamora import config
+from llamora.settings import settings
 
-_embed_semaphore = asyncio.Semaphore(max(config.EMBED_CONCURRENCY, 1))
+_embed_semaphore = asyncio.Semaphore(int(settings.EMBEDDING.concurrency))
 
 
 @lru_cache(maxsize=1)
 def _get_model() -> TextEmbedding:
     # downloads once to ~/.cache; CPU-only and fast
-    try:
-        model_name = current_app.config.get("EMBED_MODEL", config.EMBED_MODEL)
-    except RuntimeError:
-        model_name = config.EMBED_MODEL
-    return TextEmbedding(model_name=model_name)
+    return TextEmbedding(model_name=settings.EMBEDDING.model)
 
 
 def embed_texts(texts: list[str]) -> np.ndarray:

@@ -3,13 +3,15 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
 from llamora.app.services.time import humanize
-from llamora.config import PROMPT_FILE
+from llamora.settings import settings
 from llamora.util import resolve_data_path
 
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
-prompt_path = resolve_data_path(PROMPT_FILE, fallback_dir=PROMPTS_DIR)
+prompt_path = resolve_data_path(
+    settings.PROMPTS.prompt_file, fallback_dir=PROMPTS_DIR
+)
 env = Environment(
     loader=FileSystemLoader(prompt_path.parent),
     autoescape=False,

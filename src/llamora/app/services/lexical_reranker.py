@@ -4,7 +4,7 @@ from typing import List
 
 import ahocorasick
 
-from llamora.config import POOR_MATCH_MAX_COS
+from llamora.settings import settings
 
 
 TOKEN_PATTERN = re.compile(r"\w+")
@@ -71,7 +71,7 @@ class LexicalReranker:
             snippet = self._build_snippet(content, merged)
 
             cosine = cand["cosine"]
-            poor = cosine < POOR_MATCH_MAX_COS
+            poor = cosine < float(settings.SEARCH.progressive.poor_match_max_cos)
             status = (
                 "exact"
                 if exact

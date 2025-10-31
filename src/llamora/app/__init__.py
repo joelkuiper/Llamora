@@ -1,11 +1,9 @@
 from quart import Quart, render_template, make_response, request, g
-from dotenv import load_dotenv
 from quart_wtf import CSRFProtect
-import os
 import logging
 import secrets
 
-load_dotenv()
+from llamora.settings import settings
 
 
 def create_app():
@@ -39,13 +37,27 @@ def create_app():
             app.config["REGISTRATION_TOKEN"] = None
 
     app = Quart(__name__)
-    app.secret_key = os.getenv("LLAMORA_SECRET_KEY")
-    app.config.from_object("llamora.config")
+    app.secret_key = settings.SECRET_KEY
+    app.config.update(
+        APP_NAME=settings.APP_NAME,
+        DISABLE_REGISTRATION=bool(settings.FEATURES.disable_registration),
+        MAX_USERNAME_LENGTH=int(settings.LIMITS.max_username_length),
+        MAX_PASSWORD_LENGTH=int(settings.LIMITS.max_password_length),
+        MIN_PASSWORD_LENGTH=int(settings.LIMITS.min_password_length),
+        MAX_MESSAGE_LENGTH=int(settings.LIMITS.max_message_length),
+        MAX_TAG_LENGTH=int(settings.LIMITS.max_tag_length),
+        MAX_SEARCH_QUERY_LENGTH=int(settings.LIMITS.max_search_query_length),
+        ALLOWED_LLM_CONFIG_KEYS=set(settings.LLM.allowed_config_keys),
+        SESSION_TTL=int(settings.SESSION.ttl),
+        PERMANENT_SESSION_LIFETIME=settings.SESSION.permanent_lifetime,
+        WTF_CSRF_TIME_LIMIT=settings.SESSION.csrf_time_limit,
+        EMBED_MODEL=settings.EMBEDDING.model,
+    )
 
     app.extensions["llamora"] = services
 
     logging.basicConfig(
-        level=os.getenv("LOG_LEVEL", "INFO"),
+        level=settings.LOG_LEVEL,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 

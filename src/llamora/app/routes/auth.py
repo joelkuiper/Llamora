@@ -33,8 +33,8 @@ from llamora.app.services.crypto import (
     format_recovery_code,
 )
 from llamora.app.services.container import get_services
+from llamora.settings import settings
 import re
-from llamora import config
 import orjson
 from zxcvbn import zxcvbn
 from llamora.app.services.time import local_date
@@ -42,8 +42,8 @@ from llamora.app.services.time import local_date
 auth_bp = Blueprint("auth", __name__)
 
 _login_failures: TTLCache = TTLCache(
-    maxsize=config.LOGIN_FAILURE_CACHE_SIZE,
-    ttl=config.LOGIN_LOCKOUT_TTL,
+    maxsize=int(settings.AUTH.login_failure_cache_size),
+    ttl=int(settings.AUTH.login_lockout_ttl),
 )
 
 
@@ -105,7 +105,7 @@ async def password_strength_check():
     form = await request.form
     field = form.get("password_field", "password")
     raw = form.get(field, "") or ""
-    pw = raw.strip()[: config.MAX_PASSWORD_LENGTH]
+    pw = raw.strip()[: int(settings.LIMITS.max_password_length)]
 
     # Short-circuit obviously empty input to avoid zxcvbn edge-case crashes
     if not pw:
@@ -151,7 +151,7 @@ async def password_strength_check():
 
 @auth_bp.route("/register", methods=["GET", "POST"])
 async def register():
-    if current_app.config.get("DISABLE_REGISTRATION"):
+    if settings.FEATURES.disable_registration:
         token = request.args.get("token")
         reg_token = current_app.config.get("REGISTRATION_TOKEN")
         if not reg_token or token != reg_token:
@@ -163,8 +163,8 @@ async def register():
         password = form.get("password", "")
         confirm = form.get("confirm_password", "")
 
-        max_user = current_app.config["MAX_USERNAME_LENGTH"]
-        max_pass = current_app.config["MAX_PASSWORD_LENGTH"]
+        max_user = int(settings.LIMITS.max_username_length)
+        max_pass = int(settings.LIMITS.max_password_length)
 
         # Basic validations
         if not username:
@@ -224,7 +224,7 @@ async def register():
             rc_cipher,
         )
 
-        if current_app.config.get("DISABLE_REGISTRATION"):
+        if settings.FEATURES.disable_registration:
             current_app.config["REGISTRATION_TOKEN"] = None
 
         html = await render_template(
@@ -255,7 +255,7 @@ async def login():
         client_ip = _get_client_ip()
         cache_key = (username or "", client_ip)
         attempts = _login_failures.get(cache_key, 0)
-        if attempts >= current_app.config["MAX_LOGIN_ATTEMPTS"]:
+        if attempts >= int(settings.AUTH.max_login_attempts):
             current_app.logger.warning(
                 "Login locked for %s from %s after %s attempts",
                 username,
@@ -264,8 +264,8 @@ async def login():
             )
             return Response("Too many login attempts. Try again later.", status=429)
 
-        max_user = current_app.config["MAX_USERNAME_LENGTH"]
-        max_pass = current_app.config["MAX_PASSWORD_LENGTH"]
+        max_user = int(settings.LIMITS.max_username_length)
+        max_pass = int(settings.LIMITS.max_password_length)
 
         if len(username) > max_user or len(password) > max_pass:
             _login_failures[cache_key] = attempts + 1
@@ -355,9 +355,9 @@ async def reset_password():
         password = form.get("new_password", "")
         confirm = form.get("confirm_password", "")
 
-        max_user = current_app.config["MAX_USERNAME_LENGTH"]
-        max_pass = current_app.config["MAX_PASSWORD_LENGTH"]
-        min_pass = current_app.config["MIN_PASSWORD_LENGTH"]
+        max_user = int(settings.LIMITS.max_username_length)
+        max_pass = int(settings.LIMITS.max_password_length)
+        min_pass = int(settings.LIMITS.min_password_length)
 
         if not username or not recovery:
             return await render_template("reset_password.html", error="Invalid input")
@@ -454,7 +454,7 @@ async def change_password():
     new = form.get("new_password", "")
     confirm = form.get("confirm_password", "")
 
-    max_pass = current_app.config["MAX_PASSWORD_LENGTH"]
+    max_pass = int(settings.LIMITS.max_password_length)
     if not current:
         return await _render_profile_page(user, pw_error="All fields are required")
 

@@ -1,5 +1,4 @@
 import base64
-import os
 import secrets
 from functools import wraps
 
@@ -10,9 +9,9 @@ from urllib.parse import quote, urlparse
 from nacl import secret
 
 from llamora.app.services.container import get_services
-from llamora.config import SESSION_TTL
+from llamora.settings import settings
 
-cookie_secret = os.environ.get("LLAMORA_COOKIE_SECRET")
+cookie_secret = str(settings.COOKIES.secret or "")
 if not cookie_secret or len(cookie_secret) % 4 != 0:
     raise RuntimeError("Set LLAMORA_COOKIE_SECRET to a 32-byte base64 string")
 
@@ -24,13 +23,13 @@ except Exception as exc:
 if len(cookie_key) != secret.SecretBox.KEY_SIZE:
     raise RuntimeError("Set LLAMORA_COOKIE_SECRET to a 32-byte base64 string")
 
-COOKIE_NAME = os.environ.get("LLAMORA_COOKIE_NAME", "llamora")
+COOKIE_NAME = str(settings.COOKIES.name)
 cookie_box = secret.SecretBox(cookie_key)
 
-DEK_STORAGE = os.getenv("LLAMORA_DEK_STORAGE", "cookie").lower()
+DEK_STORAGE = str(settings.CRYPTO.dek_storage).lower()
 
 # Rough upper bound on concurrent sessions; adjust as needed
-dek_store = TTLCache(maxsize=1024, ttl=SESSION_TTL)
+dek_store = TTLCache(maxsize=1024, ttl=int(settings.SESSION.ttl))
 def _get_cookie_data() -> dict:
     # If we've already got a merged state this request, return it
     if hasattr(g, "_secure_cookie_state"):

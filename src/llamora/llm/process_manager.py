@@ -7,13 +7,32 @@ import subprocess
 import tempfile
 import threading
 import time
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 import httpx
 import orjson
 
-from llamora.config import LLM_SERVER
+from llamora.settings import settings
+
+
+def _to_plain_dict(data: Any) -> dict[str, Any]:
+    if data is None:
+        return {}
+    if hasattr(data, "to_dict"):
+        data = data.to_dict()
+    if isinstance(data, Mapping):
+        return dict(data)
+    return {}
+
+
+def _normalise_arg_keys(args: dict[str, Any]) -> dict[str, Any]:
+    normalised: dict[str, Any] = {}
+    for key, value in args.items():
+        key_str = str(key).replace("-", "_").lower()
+        normalised[key_str] = value
+    return normalised
 
 
 def _server_args_to_cli(args: dict[str, Any]) -> list[str]:
@@ -46,9 +65,13 @@ class LlamafileProcessManager:
         self.restart_attempts = 0
         self.max_restarts = 3
 
-        host = LLM_SERVER.get("host")
-        llamafile_path = LLM_SERVER.get("llamafile_path")
-        cfg_server_args = {**LLM_SERVER.get("args", {}), **(server_args or {})}
+        server_cfg = settings.LLM.server
+        host = server_cfg.get("host")
+        llamafile_path = server_cfg.get("llamafile_path")
+        cfg_server_args = _normalise_arg_keys(
+            _to_plain_dict(server_cfg.get("args", {}))
+        )
+        cfg_server_args.update(_normalise_arg_keys(_to_plain_dict(server_args)))
 
         self._ctx_size = cfg_server_args.get("ctx_size")
 
@@ -61,18 +84,18 @@ class LlamafileProcessManager:
             self.logger.info("Using external llama server at %s", host)
         else:
             if not llamafile_path:
-                raise ValueError("LLAMORA_LLAMAFILE environment variable not set")
+                raise ValueError(
+                    "Configure settings.LLM.server.llamafile_path or set "
+                    "LLAMORA_LLM__SERVER__LLAMAFILE_PATH"
+                )
 
             self._cleanup_stale_process()
 
+            command_args = {**cfg_server_args, "port": self.port}
             self.cmd = [
                 "sh",
                 llamafile_path,
-                "--server",
-                "--nobrowser",
-                "--port",
-                str(self.port),
-                *_server_args_to_cli(cfg_server_args),
+                *_server_args_to_cli(command_args),
             ]
 
             self.server_url = f"http://127.0.0.1:{self.port}"

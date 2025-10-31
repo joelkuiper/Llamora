@@ -1,8 +1,8 @@
 from quart import Blueprint, request, abort, render_template, jsonify
 from llamora.app.services.container import get_services
 from llamora.app.services.auth_helpers import login_required, get_current_user, get_dek
-from llamora.config import MAX_TAG_LENGTH
 from llamora.app.util.tags import canonicalize, display
+from llamora.settings import settings
 
 tags_bp = Blueprint("tags", __name__)
 
@@ -36,8 +36,9 @@ async def add_tag(msg_id: str):
         raise AssertionError("unreachable")
     form = await request.form
     raw_tag = (form.get("tag") or "").strip()
-    if len(raw_tag) > MAX_TAG_LENGTH:
-        raw_tag = raw_tag[:MAX_TAG_LENGTH]
+    max_tag_length = int(settings.LIMITS.max_tag_length)
+    if len(raw_tag) > max_tag_length:
+        raw_tag = raw_tag[:max_tag_length]
     try:
         canonical = canonicalize(raw_tag)
     except ValueError:

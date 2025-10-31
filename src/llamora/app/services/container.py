@@ -11,11 +11,11 @@ from typing import Any
 from quart import current_app
 
 from llamora.persistence.local_db import LocalDB
-from llamora.config import MESSAGE_INDEX_MAX_ELEMENTS
 from llamora.app.api.search import SearchAPI
 from llamora.app.services.lexical_reranker import LexicalReranker
 from llamora.app.services.vector_search import VectorSearchService
 from llamora.app.services.llm_service import LLMService
+from llamora.settings import settings
 
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ class AppServices:
     def create(cls) -> "AppServices":
         db = LocalDB()
         vector_search = VectorSearchService(
-            db, index_max_elements=MESSAGE_INDEX_MAX_ELEMENTS
+            db, index_max_elements=int(settings.SEARCH.message_index_max_elements)
         )
         lexical_reranker = LexicalReranker()
         search_api = SearchAPI(db, vector_search, lexical_reranker)

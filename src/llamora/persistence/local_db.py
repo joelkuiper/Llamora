@@ -5,17 +5,10 @@ import os
 from typing import TypeVar, cast
 
 import aiosqlite
-
-from llamora.config import (
-    MAX_USERNAME_LENGTH,
-    DB_POOL_SIZE,
-    DB_POOL_ACQUIRE_TIMEOUT,
-    DB_TIMEOUT,
-    DB_BUSY_TIMEOUT,
-    DB_MMAP_SIZE,
-)
 from aiosqlitepool import SQLiteConnectionPool
 from aiosqlitepool.protocols import Connection as SQLitePoolConnection
+
+from llamora.settings import settings
 
 from llamora.app.services.crypto import (
     encrypt_message,
@@ -39,7 +32,7 @@ class LocalDB:
     """Facade around SQLite repositories with shared connection pooling."""
 
     def __init__(self, db_path: str | None = None):
-        self.db_path = db_path or os.getenv("LLAMORA_DB_PATH", "state.sqlite3")
+        self.db_path = str(db_path or settings.DATABASE.path)
         self.pool: SQLiteConnectionPool | None = None
         self.search_api = None
         self._users: UsersRepository | None = None
@@ -91,14 +84,14 @@ class LocalDB:
 
     async def init(self) -> None:
         is_new = not os.path.exists(self.db_path)
-        acquisition_timeout = int(DB_POOL_ACQUIRE_TIMEOUT)
+        acquisition_timeout = int(settings.DATABASE.pool_acquire_timeout)
 
         async def _connection_factory() -> SQLitePoolConnection:
             return cast(SQLitePoolConnection, await self._create_connection())
 
         self.pool = SQLiteConnectionPool(
             _connection_factory,
-            pool_size=DB_POOL_SIZE,
+            pool_size=int(settings.DATABASE.pool_size),
             acquisition_timeout=acquisition_timeout,
         )
         await self._ensure_schema(is_new)
@@ -116,9 +109,11 @@ class LocalDB:
         self._events = None
 
     async def _create_connection(self) -> aiosqlite.Connection:
-        conn = await aiosqlite.connect(self.db_path, timeout=DB_TIMEOUT)
-        await conn.execute(f"PRAGMA busy_timeout = {DB_BUSY_TIMEOUT}")
-        await conn.execute(f"PRAGMA mmap_size = {DB_MMAP_SIZE}")
+        conn = await aiosqlite.connect(
+            self.db_path, timeout=float(settings.DATABASE.timeout)
+        )
+        await conn.execute(f"PRAGMA busy_timeout = {int(settings.DATABASE.busy_timeout)}")
+        await conn.execute(f"PRAGMA mmap_size = {int(settings.DATABASE.mmap_size)}")
         await conn.execute("PRAGMA foreign_keys = ON")
         await conn.execute("PRAGMA journal_mode = WAL")
         await conn.execute("PRAGMA synchronous = NORMAL")
@@ -141,7 +136,7 @@ class LocalDB:
                 f"""
                 CREATE TABLE IF NOT EXISTS users (
                     id TEXT PRIMARY KEY,
-                    username TEXT UNIQUE NOT NULL CHECK(length(username) <= {MAX_USERNAME_LENGTH}),
+                    username TEXT UNIQUE NOT NULL CHECK(length(username) <= {int(settings.LIMITS.max_username_length)}),
                     password_hash TEXT NOT NULL,
                     dek_pw_salt BLOB NOT NULL,
                     dek_pw_nonce BLOB NOT NULL,

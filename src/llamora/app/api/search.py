@@ -4,13 +4,7 @@ import time
 
 import orjson
 
-from llamora.config import (
-    INDEX_WORKER_MAX_QUEUE_SIZE,
-    MAX_SEARCH_QUERY_LENGTH,
-    MAX_TAG_LENGTH,
-    PROGRESSIVE_K1,
-    PROGRESSIVE_K2,
-)
+from llamora.settings import settings
 from llamora.app.services.index_worker import IndexWorker
 from llamora.app.services.vector_search import VectorSearchService
 from llamora.app.services.lexical_reranker import LexicalReranker
@@ -39,7 +33,7 @@ class SearchAPI:
         self.vector_search = vector_search or VectorSearchService(db)
         self.lexical_reranker = lexical_reranker or LexicalReranker()
         self._index_worker = IndexWorker(
-            self, max_queue_size=INDEX_WORKER_MAX_QUEUE_SIZE
+            self, max_queue_size=int(settings.WORKERS.index_worker.max_queue_size)
         )
 
     async def warm_index(self, user_id: str, dek: bytes) -> None:
@@ -78,8 +72,8 @@ class SearchAPI:
         user_id: str,
         dek: bytes,
         query: str,
-        k1: int = PROGRESSIVE_K1,
-        k2: int = PROGRESSIVE_K2,
+        k1: int = int(settings.SEARCH.progressive.k1),
+        k2: int = int(settings.SEARCH.progressive.k2),
     ) -> tuple[str, list[dict], bool]:
         normalized = (query or "").strip()
         if not normalized:
@@ -87,14 +81,15 @@ class SearchAPI:
             raise InvalidSearchQuery("Search query must not be empty")
 
         truncated = False
-        if len(normalized) > MAX_SEARCH_QUERY_LENGTH:
+        max_query_length = int(settings.LIMITS.max_search_query_length)
+        if len(normalized) > max_query_length:
             logger.info(
                 "Truncating overlong search query (len=%d, limit=%d) for user %s",
                 len(normalized),
-                MAX_SEARCH_QUERY_LENGTH,
+                max_query_length,
                 user_id,
             )
-            normalized = normalized[:MAX_SEARCH_QUERY_LENGTH]
+            normalized = normalized[:max_query_length]
             truncated = True
 
         logger.debug("Search requested by user %s with k1=%d k2=%d", user_id, k1, k2)

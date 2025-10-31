@@ -8,12 +8,16 @@ import httpx
 import orjson
 from httpx import HTTPError
 
-from llamora.config import DEFAULT_LLM_REQUEST, GRAMMAR_FILE
+from llamora.settings import settings
 from llamora.util import resolve_data_path
 from .process_manager import LlamafileProcessManager
 from .prompt_template import build_prompt
 
 LLM_DIR = Path(__file__).resolve().parent
+GRAMMAR_PATH = resolve_data_path(
+    settings.PROMPTS.grammar_file, fallback_dir=LLM_DIR
+)
+DEFAULT_LLM_REQUEST = dict(settings.LLM.request)
 
 
 class SSEEvent(NamedTuple):
@@ -177,8 +181,7 @@ class LLMClient:
             "Cache-Control": "no-cache",
         }
 
-        grammar_path = resolve_data_path(GRAMMAR_FILE, fallback_dir=LLM_DIR)
-        with open(grammar_path, "r", encoding="utf-8") as gf:
+        with open(GRAMMAR_PATH, "r", encoding="utf-8") as gf:
             self.grammar = gf.read()
 
     @property

@@ -1,0 +1,3 @@
+[default]
+# Local developer overrides live here. This file is ignored in production
+# deployments and can be used for machine-specific tweaks.

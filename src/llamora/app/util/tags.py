@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 
-from llamora.config import MAX_TAG_LENGTH
+from llamora.settings import settings
 
 
 def canonicalize(raw: str) -> str:
@@ -15,7 +15,8 @@ def canonicalize(raw: str) -> str:
         value = value[1:].strip()
     if not value:
         raise ValueError("Empty tag")
-    value = value[:MAX_TAG_LENGTH].strip()
+    max_length = int(settings.LIMITS.max_tag_length)
+    value = value[:max_length].strip()
     if not value:
         raise ValueError("Empty tag")
     return value
