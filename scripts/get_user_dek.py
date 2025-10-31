@@ -7,18 +7,10 @@ import argparse
 import asyncio
 import base64
 import getpass
-import sys
-from pathlib import Path
 from typing import TYPE_CHECKING
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = SCRIPT_DIR.parent
-
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
 if TYPE_CHECKING:  # pragma: no cover - import for type checking only
-    from db import LocalDB
+    from llamora.persistence.local_db import LocalDB
 
 
 async def _fetch_user_dek(db: "LocalDB", username: str, password: str) -> bytes:
@@ -29,7 +21,7 @@ async def _fetch_user_dek(db: "LocalDB", username: str, password: str) -> bytes:
             "PyNaCl is required to verify credentials. Install the project's dependencies."
         ) from exc
 
-    from app.services.crypto import unwrap_key
+    from llamora.app.services.crypto import unwrap_key
 
     user = await db.users.get_user_by_username(username)
     if not user:
@@ -65,7 +57,7 @@ async def _fetch_user_dek(db: "LocalDB", username: str, password: str) -> bytes:
 
 
 async def _run(args: argparse.Namespace) -> None:
-    from db import LocalDB
+    from llamora.persistence.local_db import LocalDB
 
     password = getpass.getpass(prompt="Password: ")
     if not password:

@@ -60,7 +60,7 @@ This project has **several limitations** by design. It's important to understand
 - **Input/Output Filtering:** Aside from Markdown sanitization, there's no content filtering on user inputs or AI outputs. The model could potentially produce inappropriate content if prompted. There is also nothing preventing prompt injections (where a user could ask the assistant to ignore its system prompt). Since this is a closed environment (local model, one user), that wasn't a focus. But it's something to consider if expanded; e.g., using moderation models or guardrails if it were public.
 
 - **Model and Performance:** The app loads the model into RAM when it starts. Large models (even quantized) can be slow or consume a lot of memory. The example model (Phi 3.5 mini) is relatively small, but anything larger might make the app sluggish or not fit in memory depending on your hardware. There's no mechanism to swap models on the fly; it's a static single model. Generation parameters such as temperature or top-k can be provided via the client or the ``LLAMORA_LLM_REQUEST`` environment variable, while server settings like context window or GPU usage are set with ``LLAMORA_LLAMA_ARGS``.
-See [config.py](./config.py) for more details.
+See [src/llamora/config.py](./src/llamora/config.py) for more details.
 
 - **Data safety** If the user forgets both the password and the recovery token, all data is forever lost. This is by design, but it puts a heavy burden on the user and strays from the expected.
 ---
@@ -83,7 +83,7 @@ Alternatively set `LLAMORA_LLAMA_HOST` to the address of a running Llama file (e
 3. Start the server:
 
    ```bash
-   uv run quart --app main run
+   uv run quart --app llamora:create_app run
    ```
 
    If the server starts correctly it will log something like `Running on http://127.0.0.1:5000`. The first time it will download an embedding model from HuggingFace, so first startup might be slow.
@@ -98,9 +98,9 @@ Since Qwen uses a slightly different prompt format and sampling parameters you m
 
 ```
 LLAMORA_LLAMAFILE=<path to model>/Qwen3-4B-Instruct-2507-Q5_K_M.llamafile \
-LLAMORA_PROMPT_FILE=llm/prompts/llamora_chatml.j2  \
+LLAMORA_PROMPT_FILE=src/llamora/llm/prompts/llamora_chatml.j2  \
 LLAMORA_LLM_REQUEST='{"temperature": 0.7, "top_p": 0.8, "top_k": 20, "min_p": 0}' \
-uv run quart --app main run
+uv run quart --app llamora:create_app run
 ```
 
 ### Deployment (not recommended)
@@ -131,8 +131,8 @@ This project is an educational experiment and is **not** intended for production
    - `LLAMORA_EMBED_CONCURRENCY` to cap simultaneous embedding jobs (defaults to your CPU count, minimum 1)
    - `LLAMORA_MESSAGE_INDEX_MAX_ELEMENTS` to adjust the maximum ANN index capacity (defaults to `100000`); increase it for very large histories at the cost of additional memory
    - `LLAMORA_DISABLE_REGISTRATION` set to a truthy value (e.g., `1`, `true`, `yes`) to hide registration and block `/register` (prints a one-time link if no users exist)
-   - `LLAMORA_PROMPT_FILE` to point to a Jinja2 prompt template (defaults to `llm/prompts/llamora_phi.j2`)
-   - `LLAMORA_GRAMMAR_FILE` to specify a grammar file (defaults to `llm/meta_grammar.bnf`)
+   - `LLAMORA_PROMPT_FILE` to point to a Jinja2 prompt template (defaults to `src/llamora/llm/prompts/llamora_phi.j2`)
+   - `LLAMORA_GRAMMAR_FILE` to specify a grammar file (defaults to `src/llamora/llm/meta_grammar.bnf`)
 
 
 ❗ **This project is a personal learning experiment. It is not production-ready. Deploying this project as-is is discouraged. Use at your own risk.**

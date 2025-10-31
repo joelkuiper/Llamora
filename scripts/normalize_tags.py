@@ -21,19 +21,10 @@ import argparse
 import asyncio
 import base64
 import logging
-import sys
-from pathlib import Path
 from typing import Dict, Tuple
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = SCRIPT_DIR.parent
-
-if str(REPO_ROOT) not in sys.path:
-    # Ensure the repository root is importable when executing the script
-    sys.path.insert(0, str(REPO_ROOT))
-
-from db import LocalDB
-from app.util.tags import canonicalize
+from llamora.persistence.local_db import LocalDB
+from llamora.app.util.tags import canonicalize
 
 
 logger = logging.getLogger(__name__)
