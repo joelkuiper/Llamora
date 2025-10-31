@@ -75,6 +75,7 @@ export class SearchOverlay extends ReactiveElement {
   #afterSwapHandler;
   #inputHandler;
   #keydownHandler;
+  #globalKeydownHandler;
   #documentClickHandler;
   #focusHandler;
   #recentFetchPromise = null;
@@ -88,6 +89,7 @@ export class SearchOverlay extends ReactiveElement {
     this.#afterSwapHandler = (event) => this.#handleAfterSwap(event);
     this.#inputHandler = () => this.#handleInput();
     this.#keydownHandler = (event) => this.#handleKeydown(event);
+    this.#globalKeydownHandler = (event) => this.#handleGlobalKeydown(event);
     this.#documentClickHandler = (event) => this.#handleDocumentClick(event);
     this.#focusHandler = () => this.#handleInputFocus();
   }
@@ -114,6 +116,8 @@ export class SearchOverlay extends ReactiveElement {
     }
 
     const eventTarget = this.ownerDocument ?? document;
+
+    listeners.add(eventTarget, "keydown", this.#globalKeydownHandler);
 
     this.watchHtmxRequests(eventTarget, {
       within: (event) => this.#isRelevantRequest(event),
@@ -320,7 +324,133 @@ export class SearchOverlay extends ReactiveElement {
   #handleKeydown(evt) {
     if (evt.key === "Escape") {
       this.#closeResults(true);
+      return;
     }
+
+    if (!this.#resultsEl) {
+      return;
+    }
+
+    const isArrowDown = evt.key === "ArrowDown";
+    const isArrowUp = evt.key === "ArrowUp";
+    const isEnter = evt.key === "Enter";
+
+    if (!isArrowDown && !isArrowUp && !isEnter) {
+      return;
+    }
+
+    const target = evt.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+
+    const resultsWrap = this.#resultsEl;
+    const isInputFocused = target === this.#inputEl;
+    const isInResults = resultsWrap.contains(target);
+
+    if (!isInputFocused && !isInResults) {
+      return;
+    }
+
+    const links = this.#getResultLinks();
+    if (!links.length) {
+      return;
+    }
+
+    const doc = this.ownerDocument ?? document;
+    const activeElement = doc.activeElement;
+    const activeLink =
+      activeElement instanceof Element
+        ? activeElement.closest("#search-results a[data-target]")
+        : null;
+
+    if (isArrowDown) {
+      evt.preventDefault();
+
+      if (isInputFocused || !activeLink) {
+        this.#focusResultAt(0, links);
+        return;
+      }
+
+      const currentIndex = links.indexOf(activeLink);
+      if (currentIndex === -1) {
+        this.#focusResultAt(0, links);
+        return;
+      }
+
+      if (currentIndex < links.length - 1) {
+        this.#focusResultAt(currentIndex + 1, links);
+      }
+      return;
+    }
+
+    if (isArrowUp) {
+      evt.preventDefault();
+
+      if (isInputFocused && links.length) {
+        this.#focusResultAt(links.length - 1, links);
+        return;
+      }
+
+      if (!activeLink) {
+        this.#focusResultAt(links.length - 1, links);
+        return;
+      }
+
+      const currentIndex = links.indexOf(activeLink);
+      if (currentIndex <= 0) {
+        this.#inputEl?.focus({ preventScroll: true });
+        return;
+      }
+
+      this.#focusResultAt(currentIndex - 1, links);
+      return;
+    }
+
+    if (isEnter && activeLink instanceof HTMLElement) {
+      evt.preventDefault();
+      activeLink.click();
+    }
+  }
+
+  #handleGlobalKeydown(evt) {
+    if (evt.defaultPrevented) return;
+    if (evt.key !== "/") return;
+    if (evt.ctrlKey || evt.metaKey || evt.altKey) return;
+
+    const target = evt.target;
+    if (target instanceof Element) {
+      const tagName = target.tagName;
+      if (
+        tagName === "INPUT" ||
+        tagName === "TEXTAREA" ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+    }
+
+    this.#inputEl?.focus({ preventScroll: true });
+    if (this.#inputEl) {
+      this.#inputEl.select();
+    }
+    evt.preventDefault();
+  }
+
+  #getResultLinks() {
+    if (!this.#resultsEl) return [];
+    return Array.from(
+      this.#resultsEl.querySelectorAll(".search-results-list a[data-target]")
+    );
+  }
+
+  #focusResultAt(index, links = null) {
+    const list = links ?? this.#getResultLinks();
+    if (!list.length) return null;
+    const clampedIndex = Math.max(0, Math.min(index, list.length - 1));
+    const target = list[clampedIndex];
+    target?.focus({ preventScroll: true });
+    return target ?? null;
   }
 
   #handleDocumentClick(evt) {
