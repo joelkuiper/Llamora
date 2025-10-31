@@ -1,4 +1,7 @@
-<li class="{{ item.css_class }}" role="option">
+<li class="search-result-item{% if item.css_class %} {{ item.css_class }}{% endif %}"
+    role="option"
+    data-result-index="{{ loop.index0 }}"
+    tabindex="-1">
   <a href="{{ url_for('days.day', date=item.created_at[:10]) }}?target=msg-{{ item.id }}"
      hx-get="{{ url_for('chat.chat_htmx', date=item.created_at[:10]) }}?target=msg-{{ item.id }}"
      hx-target="#content-wrapper"
@@ -23,5 +26,6 @@
       {%- endfor -%}
       {%- if item.snippet.trailing_ellipsis %}…{% endif -%}
     </div>
+    <span class="search-result-hint" aria-hidden="true">Press Enter to open</span>
   </a>
 </li>
