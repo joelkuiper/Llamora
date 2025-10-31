@@ -19,10 +19,7 @@
   {% if items %}
   <div class="sr-panel search-results-overlay">
     {{ overlay_close_button() }}
-    <ul id="search-results-list"
-        class="search-results-list"
-        role="listbox"
-        data-result-count="{{ result_count }}">
+    <ul class="search-results-list" role="listbox">
       {% for item in items %}
       {% include 'partials/search_result_item.html' %}
       {% endfor %}
