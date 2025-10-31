@@ -73,7 +73,11 @@ export class ScrollController {
 
     this.#scheduleInitRelease();
 
-    this.alignScrollButtonNow();
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => this.alignScrollButtonNow());
+    } else {
+      this.alignScrollButtonNow();
+    }
 
     return (force = false) => this.scrollToBottom(force);
   }
