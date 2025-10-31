@@ -151,6 +151,40 @@ html, body {
   font-weight: normal;
 }
 
+.inline-autocomplete {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+  flex: 1 1 auto;
+}
+
+.inline-autocomplete__input {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  background-color: transparent !important;
+}
+
+.inline-autocomplete__ghost {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+  color: inherit;
+  opacity: 0.35;
+  white-space: pre;
+  z-index: 1;
+  padding: 0;
+}
+
+.inline-autocomplete__ghost .inline-autocomplete__mask {
+  color: transparent;
+}
+
+.inline-autocomplete--empty .inline-autocomplete__ghost {
+  display: none;
+}
+
 #branding {
   display: flex;
   align-items: center;

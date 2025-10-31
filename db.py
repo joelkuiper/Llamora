@@ -29,6 +29,7 @@ from app.db.users import UsersRepository
 from app.db.messages import MessagesRepository
 from app.db.tags import TagsRepository
 from app.db.vectors import VectorsRepository
+from app.db.search_history import SearchHistoryRepository
 
 
 RepositoryT = TypeVar("RepositoryT")
@@ -45,6 +46,7 @@ class LocalDB:
         self._messages: MessagesRepository | None = None
         self._tags: TagsRepository | None = None
         self._vectors: VectorsRepository | None = None
+        self._search_history: SearchHistoryRepository | None = None
         self._events: RepositoryEventBus | None = None
         atexit.register(self._atexit_close)
 
@@ -110,6 +112,7 @@ class LocalDB:
         self._messages = None
         self._tags = None
         self._vectors = None
+        self._search_history = None
         self._events = None
 
     async def _create_connection(self) -> aiosqlite.Connection:
@@ -194,12 +197,25 @@ class LocalDB:
                     PRIMARY KEY(user_id, tag_hash, message_id)
                 );
 
+                CREATE TABLE IF NOT EXISTS search_history (
+                    user_id TEXT NOT NULL,
+                    query_hash BLOB(32) NOT NULL,
+                    query_nonce BLOB(24) NOT NULL,
+                    query_ct BLOB NOT NULL,
+                    alg TEXT NOT NULL,
+                    usage_count INTEGER DEFAULT 1,
+                    last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY(user_id, query_hash)
+                );
+
                 CREATE INDEX IF NOT EXISTS idx_messages_user_date ON messages(user_id, created_date);
                 CREATE INDEX IF NOT EXISTS idx_messages_reply_to ON messages(reply_to);
                 CREATE INDEX IF NOT EXISTS idx_vectors_user_id ON vectors(user_id);
 
                 CREATE INDEX IF NOT EXISTS idx_tag_message_hash ON tag_message_xref(user_id, tag_hash);
                 CREATE INDEX IF NOT EXISTS idx_tag_message_message ON tag_message_xref(user_id, message_id);
+                CREATE INDEX IF NOT EXISTS idx_search_history_user_last_used
+                    ON search_history(user_id, last_used DESC);
                 """,
             )
 
@@ -218,6 +234,9 @@ class LocalDB:
             self._events,
         )
         self._vectors = VectorsRepository(self.pool, encrypt_vector, decrypt_vector)
+        self._search_history = SearchHistoryRepository(
+            self.pool, encrypt_message, decrypt_message
+        )
         self._messages.set_on_message_appended(self._on_message_appended)
 
     def _require_repository(
@@ -256,6 +275,12 @@ class LocalDB:
         """Return the vectors repository."""
 
         return self._require_repository(self._vectors, "Vectors")
+
+    @property
+    def search_history(self) -> SearchHistoryRepository:
+        """Return the search history repository."""
+
+        return self._require_repository(self._search_history, "Search history")
 
     async def _on_message_appended(
         self, user_id: str, message_id: str, plaintext: str, dek: bytes

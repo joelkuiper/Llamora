@@ -1,9 +1,20 @@
 import { createPopover } from "../popover.js";
+import { InlineAutocompleteController } from "../utils/inline-autocomplete.js";
 
 const normalizeTag = (value) => {
   const trimmed = value.trim();
   if (!trimmed) return "";
   return trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
+};
+
+const TAG_AUTOCOMPLETE_PREFIX_RE = /^#+/;
+
+const prepareTagAutocompleteValue = (value) => {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const withoutPrefix = trimmed.replace(TAG_AUTOCOMPLETE_PREFIX_RE, "");
+  return withoutPrefix || trimmed;
 };
 
 export class Tags extends HTMLElement {
@@ -18,6 +29,7 @@ export class Tags extends HTMLElement {
   #closeButton = null;
   #tagContainer = null;
   #listeners = null;
+  #autocomplete = null;
   #buttonClickHandler;
   #closeClickHandler;
   #inputHandler;
@@ -44,10 +56,12 @@ export class Tags extends HTMLElement {
   connectedCallback() {
     this.#cacheElements();
     this.#teardownListeners();
+    this.#destroyAutocomplete();
 
     if (!this.#button || !this.#popoverEl || !this.#form || !this.#input || !this.#submit || !this.#tagContainer) {
       return;
     }
+
 
     this.#listeners = new AbortController();
     const { signal } = this.#listeners;
@@ -76,11 +90,13 @@ export class Tags extends HTMLElement {
 
     this.#initPopover();
     this.#updateSubmitState();
+    this.#initAutocomplete();
   }
 
   disconnectedCallback() {
     this.#destroyPopover();
     this.#teardownListeners();
+    this.#destroyAutocomplete();
   }
 
   #cacheElements() {
@@ -116,6 +132,7 @@ export class Tags extends HTMLElement {
           htmx.trigger(this.#suggestions, "tag-popover:show");
         }
         this.#input?.focus();
+        this.#updateAutocompleteCandidates();
       },
       onHide: () => {
         this.#button.classList.remove("active");
@@ -125,6 +142,7 @@ export class Tags extends HTMLElement {
           this.#suggestions.innerHTML = "";
           delete this.#suggestions.dataset.loaded;
         }
+        this.#autocomplete?.clearCandidates();
       },
     });
   }
@@ -220,9 +238,11 @@ export class Tags extends HTMLElement {
         }
       }
       this.#updateSubmitState();
+      this.#updateAutocompleteCandidates();
     } else if (target.classList?.contains("chip-tombstone")) {
       target.remove();
       this.#updateSubmitState();
+      this.#updateAutocompleteCandidates();
     }
   }
 
@@ -234,6 +254,54 @@ export class Tags extends HTMLElement {
       delete this.#suggestions.dataset.loaded;
     }
     this.#popover?.update();
+    this.#updateAutocompleteCandidates();
+  }
+
+  #initAutocomplete() {
+    if (!this.#input) return;
+    this.#input.setAttribute("autocomplete", "off");
+    this.#input.setAttribute("autocapitalize", "off");
+    this.#input.setAttribute("autocorrect", "off");
+    this.#input.setAttribute("spellcheck", "false");
+    this.#input.setAttribute("data-lpignore", "true");
+    this.#input.setAttribute("data-1p-ignore", "true");
+    this.#autocomplete = new InlineAutocompleteController(this.#input, {
+      prepareQuery: prepareTagAutocompleteValue,
+      prepareCandidate: prepareTagAutocompleteValue,
+      onCommit: () => {
+        this.#updateSubmitState();
+      },
+    });
+    this.#updateAutocompleteCandidates();
+  }
+
+  #destroyAutocomplete() {
+    if (this.#autocomplete) {
+      this.#autocomplete.destroy();
+    }
+    this.#autocomplete = null;
+  }
+
+  #updateAutocompleteCandidates() {
+    if (!this.#autocomplete) return;
+    if (!this.#suggestions) {
+      this.#autocomplete.clearCandidates();
+      return;
+    }
+
+    const seen = new Set();
+    const entries = [];
+    this.#suggestions.querySelectorAll(".tag-suggestion").forEach((btn) => {
+      const text = btn.textContent?.trim();
+      if (!text || seen.has(text)) {
+        return;
+      }
+      seen.add(text);
+      const plain = text.startsWith("#") ? text.slice(1) : text;
+      entries.push({ value: text, display: text, tokens: [text, plain] });
+    });
+
+    this.#autocomplete.setCandidates(entries);
   }
 
   #handleChipActivation(event) {

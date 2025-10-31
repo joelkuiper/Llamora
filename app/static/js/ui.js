@@ -25,6 +25,7 @@ export function createInlineSpinner(
 
   const start = () => {
     if (!spinnerEl || intervalId !== null) return;
+    spinnerEl.classList.add("htmx-request");
     intervalId = spin(spinnerEl, text);
   };
 
@@ -34,6 +35,7 @@ export function createInlineSpinner(
       intervalId = null;
     }
     if (spinnerEl) {
+      spinnerEl.classList.remove("htmx-request");
       spinnerEl.textContent = "";
     }
   };

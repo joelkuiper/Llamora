@@ -1,5 +1,6 @@
-import { flashHighlight, createInlineSpinner, clearScrollTarget } from "../ui.js";
+import { flashHighlight, clearScrollTarget } from "../ui.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
+import { InlineAutocompleteController } from "../utils/inline-autocomplete.js";
 
 const getEventTarget = (evt) => {
   const target = evt.target;
@@ -9,19 +10,95 @@ const getEventTarget = (evt) => {
   return target?.parentElement ?? null;
 };
 
+const RECENT_REFRESH_MIN_MS = 5000;
+
+const SEARCH_AUTOCOMPLETE_PREFIX_RE = /^[#@]+/;
+
+const trimSearchValue = (value) => (typeof value === "string" ? value.trim() : "");
+
+const collapseSearchWhitespace = (value) =>
+  trimSearchValue(value).replace(/\s+/g, " ");
+
+const stripSearchPrefix = (value) => value.replace(SEARCH_AUTOCOMPLETE_PREFIX_RE, "");
+
+const prepareSearchAutocompleteValue = (value) => {
+  const collapsed = collapseSearchWhitespace(value);
+  if (!collapsed) return "";
+  const withoutPrefix = stripSearchPrefix(collapsed);
+  return withoutPrefix || collapsed;
+};
+
+const buildSearchAutocompleteEntry = (value) => {
+  const trimmed = trimSearchValue(value);
+  if (!trimmed) return null;
+
+  const tokens = new Set();
+  const addToken = (token) => {
+    const base = trimSearchValue(token);
+    if (!base) return;
+    tokens.add(base);
+    const collapsed = collapseSearchWhitespace(base);
+    if (collapsed) {
+      tokens.add(collapsed);
+      const stripped = stripSearchPrefix(collapsed);
+      if (stripped) {
+        tokens.add(stripped);
+      }
+    }
+  };
+
+  addToken(trimmed);
+  const collapsed = collapseSearchWhitespace(trimmed);
+  if (collapsed && collapsed !== trimmed) {
+    addToken(collapsed);
+  }
+
+  const stripped = stripSearchPrefix(collapsed || trimmed);
+  if (stripped) {
+    addToken(stripped);
+  }
+
+  (collapsed || trimmed)
+    .split(/\s+/)
+    .filter(Boolean)
+    .forEach((part) => addToken(part));
+
+  if (stripped) {
+    stripped
+      .split(/\s+/)
+      .filter(Boolean)
+      .forEach((part) => addToken(part));
+  }
+
+  const tokenList = Array.from(tokens).filter(Boolean);
+  if (!tokenList.length) {
+    tokenList.push(trimmed);
+  }
+
+  return {
+    value: trimmed,
+    display: trimmed,
+    tokens: tokenList,
+  };
+};
+
 export class SearchOverlay extends ReactiveElement {
   #listeners = null;
   #overlayListeners = null;
-  #spinnerController = null;
   #resultsEl = null;
   #inputEl = null;
   #spinnerEl = null;
+  #autocomplete = null;
   #beforeRequestHandler;
   #afterRequestHandler;
   #afterSwapHandler;
   #inputHandler;
   #keydownHandler;
   #documentClickHandler;
+  #focusHandler;
+  #recentFetchPromise = null;
+  #recentLoaded = false;
+  #recentFetchedAt = 0;
 
   constructor() {
     super();
@@ -31,6 +108,7 @@ export class SearchOverlay extends ReactiveElement {
     this.#inputHandler = () => this.#handleInput();
     this.#keydownHandler = (event) => this.#handleKeydown(event);
     this.#documentClickHandler = (event) => this.#handleDocumentClick(event);
+    this.#focusHandler = () => this.#handleInputFocus();
   }
 
   connectedCallback() {
@@ -38,14 +116,6 @@ export class SearchOverlay extends ReactiveElement {
     this.#resultsEl = this.querySelector("#search-results");
     this.#inputEl = this.querySelector("#search-input");
     this.#spinnerEl = this.querySelector("#search-spinner");
-
-    if (!this.#spinnerController) {
-      this.#spinnerController = createInlineSpinner(this.#spinnerEl);
-    } else {
-      this.#spinnerController.setElement(this.#spinnerEl);
-    }
-
-    this.#stopSpinner();
     this.#deactivateOverlayListeners();
 
     this.#listeners = this.resetListenerBag(this.#listeners);
@@ -53,6 +123,8 @@ export class SearchOverlay extends ReactiveElement {
 
     if (this.#inputEl) {
       listeners.add(this.#inputEl, "input", this.#inputHandler);
+      listeners.add(this.#inputEl, "focus", this.#focusHandler);
+      this.#initAutocomplete();
     }
 
     const eventTarget = this.ownerDocument ?? document;
@@ -72,20 +144,11 @@ export class SearchOverlay extends ReactiveElement {
     this.#deactivateOverlayListeners();
     this.#listeners = this.disposeListenerBag(this.#listeners);
 
-    this.#stopSpinner();
-    this.#spinnerController?.setElement(null);
+    this.#destroyAutocomplete();
     this.#resultsEl = null;
     this.#inputEl = null;
     this.#spinnerEl = null;
     super.disconnectedCallback();
-  }
-
-  #startSpinner() {
-    this.#spinnerController?.start();
-  }
-
-  #stopSpinner() {
-    this.#spinnerController?.stop();
   }
 
   #activateOverlayListeners() {
@@ -104,22 +167,24 @@ export class SearchOverlay extends ReactiveElement {
 
   #handleBeforeRequest(event) {
     if (!this.#isRelevantRequest(event)) return;
-
     const wrap = this.#resultsEl;
     if (wrap) {
       wrap.setAttribute("aria-busy", "true");
     }
-    this.#startSpinner();
+    if (this.#spinnerEl) {
+      this.#spinnerEl.classList.add("htmx-request");
+    }
   }
 
   #handleAfterRequest(event) {
     if (!this.#isRelevantRequest(event)) return;
-
     const wrap = this.#resultsEl;
     if (wrap) {
       wrap.removeAttribute("aria-busy");
     }
-    this.#stopSpinner();
+    if (this.#spinnerEl) {
+      this.#spinnerEl.classList.remove("htmx-request");
+    }
   }
 
   #isRelevantRequest(event) {
@@ -142,15 +207,20 @@ export class SearchOverlay extends ReactiveElement {
     const wrap = this.#resultsEl;
     if (!wrap || evt.detail?.target !== wrap) return;
 
+
     const panel = wrap.querySelector(".sr-panel");
     if (!panel) {
       wrap.classList.remove("is-open");
       this.#deactivateOverlayListeners();
+      this.#addCurrentQueryToAutocomplete();
+      this.#loadRecentSearches();
       return;
     }
 
     if (wrap.classList.contains("is-open")) {
       panel.classList.remove("htmx-added");
+      this.#addCurrentQueryToAutocomplete();
+      this.#loadRecentSearches();
       return;
     }
 
@@ -164,11 +234,102 @@ export class SearchOverlay extends ReactiveElement {
       },
       { once: true }
     );
+    this.#addCurrentQueryToAutocomplete();
+    this.#loadRecentSearches();
   }
 
   #handleInput() {
     if (!this.#inputEl || this.#inputEl.value.trim()) return;
     this.#closeResults();
+  }
+
+  #handleInputFocus() {
+    this.#loadRecentSearches();
+  }
+
+  #initAutocomplete() {
+    if (!this.#inputEl) return;
+    this.#autocomplete?.destroy();
+    this.#autocomplete = new InlineAutocompleteController(this.#inputEl, {
+      minLength: 1,
+      emitInputEvent: false,
+      prepareQuery: prepareSearchAutocompleteValue,
+      prepareCandidate: prepareSearchAutocompleteValue,
+      onCommit: () => {
+        this.#addCurrentQueryToAutocomplete();
+      },
+    });
+  }
+
+  #destroyAutocomplete() {
+    if (this.#autocomplete) {
+      this.#autocomplete.destroy();
+    }
+    this.#autocomplete = null;
+  }
+
+  #loadRecentSearches(force = false) {
+    if (!this.#inputEl) return;
+    if (this.#recentFetchPromise) {
+      return this.#recentFetchPromise;
+    }
+
+    const now = Date.now();
+    if (!force && this.#recentLoaded && now - this.#recentFetchedAt < RECENT_REFRESH_MIN_MS) {
+      return;
+    }
+
+    const promise = fetch("/search/recent", {
+      headers: { Accept: "application/json" },
+      credentials: "same-origin",
+    })
+      .then((response) => {
+        if (!response.ok) {
+          return null;
+        }
+        return response.json().catch(() => null);
+      })
+      .then((payload) => {
+        if (!payload || !Array.isArray(payload.recent)) {
+          return;
+        }
+        const unique = [];
+        for (const value of payload.recent) {
+          if (typeof value !== "string") continue;
+          const trimmed = value.trim();
+          if (!trimmed || unique.includes(trimmed)) continue;
+          unique.push(trimmed);
+        }
+        const entries = unique
+          .map((value) => buildSearchAutocompleteEntry(value))
+          .filter(Boolean);
+        if (entries.length) {
+          this.#autocomplete?.setCandidates(entries);
+        } else {
+          this.#autocomplete?.clearCandidates();
+        }
+        this.#recentLoaded = true;
+        this.#recentFetchedAt = Date.now();
+      })
+      .catch((error) => {
+      })
+      .finally(() => {
+        this.#recentFetchPromise = null;
+      });
+
+    this.#recentFetchPromise = promise;
+    return promise;
+  }
+
+  #addCurrentQueryToAutocomplete() {
+    if (!this.#autocomplete || !this.#inputEl) return;
+    const value = this.#inputEl.value?.trim();
+    if (!value) return;
+    const entry = buildSearchAutocompleteEntry(value);
+    if (!entry) {
+      return;
+    }
+    this.#autocomplete.addCandidate(entry);
   }
 
   #handleKeydown(evt) {
@@ -231,6 +392,7 @@ export class SearchOverlay extends ReactiveElement {
     const wrap = this.#resultsEl;
     if (!wrap) return;
 
+
     const { immediate = false } = options;
     if (clearInput && this.#inputEl) this.#inputEl.value = "";
 
@@ -240,7 +402,6 @@ export class SearchOverlay extends ReactiveElement {
       wrap.removeAttribute("aria-busy");
       wrap.innerHTML = "";
       this.#deactivateOverlayListeners();
-      this.#stopSpinner();
     };
 
     if (!panel) {
