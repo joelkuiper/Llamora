@@ -303,3 +303,36 @@ class TagsRepository(BaseRepository):
         for row in rows:
             mapping.setdefault(row["message_id"], set()).add(row["tag_hash"])
         return mapping
+
+    async def get_recent_messages_for_tag_hashes(
+        self,
+        user_id: str,
+        tag_hashes: list[bytes],
+        *,
+        limit: int | None = None,
+    ) -> list[str]:
+        """Return recent message IDs associated with any of ``tag_hashes``."""
+
+        if not tag_hashes:
+            return []
+        if limit is not None and limit <= 0:
+            return []
+
+        tag_placeholders = ",".join("?" * len(tag_hashes))
+        sql = f"""
+            SELECT message_id, MAX(ulid) AS latest_ulid
+            FROM tag_message_xref
+            WHERE user_id = ? AND tag_hash IN ({tag_placeholders})
+            GROUP BY message_id
+            ORDER BY latest_ulid DESC
+        """
+        params: list[object] = [user_id, *tag_hashes]
+        if limit is not None:
+            sql += " LIMIT ?"
+            params.append(limit)
+
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(sql, params)
+            rows = await cursor.fetchall()
+
+        return [row["message_id"] for row in rows]
