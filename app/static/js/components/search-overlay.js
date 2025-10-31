@@ -1,4 +1,4 @@
-import { flashHighlight, clearScrollTarget } from "../ui.js";
+import { flashHighlight, clearScrollTarget, createInlineSpinner } from "../ui.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 import { InlineAutocompleteController } from "../utils/inline-autocomplete.js";
 
@@ -88,6 +88,7 @@ export class SearchOverlay extends ReactiveElement {
   #resultsEl = null;
   #inputEl = null;
   #spinnerEl = null;
+  #spinnerController = null;
   #autocomplete = null;
   #beforeRequestHandler;
   #afterRequestHandler;
@@ -116,6 +117,11 @@ export class SearchOverlay extends ReactiveElement {
     this.#resultsEl = this.querySelector("#search-results");
     this.#inputEl = this.querySelector("#search-input");
     this.#spinnerEl = this.querySelector("#search-spinner");
+    if (!this.#spinnerController) {
+      this.#spinnerController = createInlineSpinner(this.#spinnerEl);
+    } else {
+      this.#spinnerController.setElement(this.#spinnerEl);
+    }
     this.#deactivateOverlayListeners();
 
     this.#listeners = this.resetListenerBag(this.#listeners);
@@ -145,6 +151,9 @@ export class SearchOverlay extends ReactiveElement {
     this.#listeners = this.disposeListenerBag(this.#listeners);
 
     this.#destroyAutocomplete();
+    this.#spinnerController?.stop();
+    this.#spinnerController?.setElement(null);
+    this.#spinnerController = null;
     this.#resultsEl = null;
     this.#inputEl = null;
     this.#spinnerEl = null;
@@ -171,9 +180,7 @@ export class SearchOverlay extends ReactiveElement {
     if (wrap) {
       wrap.setAttribute("aria-busy", "true");
     }
-    if (this.#spinnerEl) {
-      this.#spinnerEl.classList.add("htmx-request");
-    }
+    this.#spinnerController?.start();
   }
 
   #handleAfterRequest(event) {
@@ -182,9 +189,7 @@ export class SearchOverlay extends ReactiveElement {
     if (wrap) {
       wrap.removeAttribute("aria-busy");
     }
-    if (this.#spinnerEl) {
-      this.#spinnerEl.classList.remove("htmx-request");
-    }
+    this.#spinnerController?.stop();
   }
 
   #isRelevantRequest(event) {
