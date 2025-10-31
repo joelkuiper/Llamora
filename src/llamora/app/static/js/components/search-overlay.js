@@ -81,6 +81,45 @@ export class SearchOverlay extends ReactiveElement {
   #recentLoaded = false;
   #recentFetchedAt = 0;
 
+  #setInputExpanded(expanded) {
+    if (!this.#inputEl) return;
+    this.#inputEl.setAttribute("aria-expanded", expanded ? "true" : "false");
+  }
+
+  #markResultsOpen() {
+    const wrap = this.#resultsEl;
+    if (!wrap) {
+      this.#setInputExpanded(true);
+      return;
+    }
+    wrap.hidden = false;
+    wrap.removeAttribute("hidden");
+    if ("inert" in wrap) {
+      wrap.inert = false;
+    }
+    wrap.removeAttribute("inert");
+    this.#setInputExpanded(true);
+  }
+
+  #markResultsClosed({ hidden = true } = {}) {
+    const wrap = this.#resultsEl;
+    this.#setInputExpanded(false);
+    if (!wrap) {
+      return;
+    }
+    const shouldHide = Boolean(hidden);
+    wrap.hidden = shouldHide;
+    if (shouldHide) {
+      wrap.setAttribute("hidden", "");
+    } else {
+      wrap.removeAttribute("hidden");
+    }
+    if ("inert" in wrap) {
+      wrap.inert = true;
+    }
+    wrap.setAttribute("inert", "");
+  }
+
   constructor() {
     super();
     this.#beforeRequestHandler = (event) => this.#handleBeforeRequest(event);
@@ -97,6 +136,14 @@ export class SearchOverlay extends ReactiveElement {
     this.#resultsEl = this.querySelector("#search-results");
     this.#inputEl = this.querySelector("#search-input");
     this.#spinnerEl = this.querySelector("#search-spinner");
+    if (this.#inputEl && !this.#inputEl.hasAttribute("aria-controls")) {
+      this.#inputEl.setAttribute("aria-controls", "search-results");
+    }
+    if (this.#resultsEl?.classList.contains("is-open")) {
+      this.#markResultsOpen();
+    } else {
+      this.#markResultsClosed();
+    }
     if (!this.#spinnerController) {
       this.#spinnerController = createInlineSpinner(this.#spinnerEl);
     } else {
@@ -192,16 +239,17 @@ export class SearchOverlay extends ReactiveElement {
     const wrap = this.#resultsEl;
     if (!wrap || evt.detail?.target !== wrap) return;
 
-
     const panel = wrap.querySelector(".sr-panel");
     if (!panel) {
       wrap.classList.remove("is-open");
+      this.#markResultsClosed();
       this.#deactivateOverlayListeners();
       this.#addCurrentQueryToAutocomplete();
       this.#loadRecentSearches();
       return;
     }
 
+    this.#markResultsOpen();
     if (wrap.classList.contains("is-open")) {
       panel.classList.remove("htmx-added");
       this.#addCurrentQueryToAutocomplete();
@@ -215,6 +263,7 @@ export class SearchOverlay extends ReactiveElement {
       () => {
         panel.classList.remove("pop-enter");
         wrap.classList.add("is-open");
+        this.#markResultsOpen();
         this.#activateOverlayListeners();
       },
       { once: true }
@@ -319,7 +368,7 @@ export class SearchOverlay extends ReactiveElement {
 
   #handleKeydown(evt) {
     if (evt.key === "Escape") {
-      this.#closeResults(true);
+      this.#closeResults(true, { focusInput: true });
     }
   }
 
@@ -360,7 +409,8 @@ export class SearchOverlay extends ReactiveElement {
 
     if (link.dataset.date === currentId) {
       evt.preventDefault();
-      this.#closeResults(true);
+      const shouldRefocus = !(evt instanceof MouseEvent) || evt.detail === 0;
+      this.#closeResults(true, { focusInput: shouldRefocus });
       const el = document.getElementById(targetId);
       if (el) {
         history.pushState(null, "", `${window.location.pathname}?target=${targetId}`);
@@ -375,15 +425,20 @@ export class SearchOverlay extends ReactiveElement {
 
   #closeResults(clearInput = false, options = {}) {
     const wrap = this.#resultsEl;
+    const { immediate = false, focusInput = false } = options;
     const finish = () => {
       this.#spinnerController?.stop();
-      if (!wrap) {
-        return;
+      const results = this.#resultsEl ?? wrap;
+      if (results) {
+        results.classList.remove("is-open");
+        results.removeAttribute("aria-busy");
+        results.innerHTML = "";
       }
-      wrap.classList.remove("is-open");
-      wrap.removeAttribute("aria-busy");
-      wrap.innerHTML = "";
+      this.#markResultsClosed();
       this.#deactivateOverlayListeners();
+      if (focusInput && this.#inputEl) {
+        this.#inputEl.focus();
+      }
     };
 
     if (!wrap) {
@@ -391,9 +446,9 @@ export class SearchOverlay extends ReactiveElement {
       return;
     }
 
-
-    const { immediate = false } = options;
     if (clearInput && this.#inputEl) this.#inputEl.value = "";
+
+    this.#markResultsClosed({ hidden: immediate });
 
     const panel = wrap.querySelector(".sr-panel");
 

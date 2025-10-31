@@ -134,6 +134,33 @@ html, body {
   color: var(--brand-text);
 }
 
+.skip-link {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -120%);
+  background: var(--color-white);
+  color: var(--brand-text);
+  padding: 0.5rem 1rem;
+  border: 2px solid var(--accent);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  text-decoration: none;
+  font-weight: 600;
+  z-index: 1000;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+  transform: translate(-50%, 0.5rem);
+  opacity: 1;
+  outline: none;
+  pointer-events: auto;
+}
+
 .visually-hidden {
   position: absolute !important;
   width: 1px;

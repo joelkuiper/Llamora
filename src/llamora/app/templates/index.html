@@ -35,6 +35,7 @@
     hx-on::after-settle="window.appInit?.initGlobalShell()"
     data-csrf-token="{{ csrf_token() }}">
 
+    <a class="skip-link" href="#content-wrapper">Skip to main content</a>
     <div id="errors" role="alert" aria-live="assertive" aria-atomic="true" hx-swap="beforeend"></div>
     <header id="search-container">
 
@@ -70,7 +71,7 @@
         <div class="search-wrap">
           <search-overlay>
             {% include 'partials/search_form.html' %}
-            <section id="search-results">
+            <section id="search-results" hidden inert>
               {% include 'partials/search_results.html' %}
             </section>
           </search-overlay>
