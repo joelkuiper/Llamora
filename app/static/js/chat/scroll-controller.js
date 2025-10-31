@@ -73,10 +73,22 @@ export class ScrollController {
 
     this.#scheduleInitRelease();
 
-    if (typeof requestAnimationFrame === "function") {
-      requestAnimationFrame(() => this.alignScrollButtonNow());
+    const scheduleAlignment = () => {
+      if (typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(() => this.alignScrollButtonNow());
+      } else {
+        this.alignScrollButtonNow();
+      }
+    };
+
+    if (document.readyState === "complete") {
+      scheduleAlignment();
     } else {
-      this.alignScrollButtonNow();
+      const onLoad = () => {
+        window.removeEventListener("load", onLoad);
+        scheduleAlignment();
+      };
+      window.addEventListener("load", onLoad, { once: true });
     }
 
     return (force = false) => this.scrollToBottom(force);
@@ -186,6 +198,10 @@ export class ScrollController {
     }
 
     const rect = this.chat.getBoundingClientRect();
+    if (rect.width === 0) {
+      return;
+    }
+
     const centerPx = rect.left + rect.width / 2;
     document.documentElement.style.setProperty("--chat-center", `${centerPx}px`);
   }
