@@ -1,6 +1,7 @@
 import { flashHighlight, clearScrollTarget, createInlineSpinner } from "../ui.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 import { InlineAutocompleteController } from "../utils/inline-autocomplete.js";
+import { createShortcutBag } from "../utils/global-shortcuts.js";
 
 const getEventTarget = (evt) => {
   const target = evt.target;
@@ -75,12 +76,12 @@ export class SearchOverlay extends ReactiveElement {
   #afterSwapHandler;
   #inputHandler;
   #keydownHandler;
-  #globalKeydownHandler;
   #documentClickHandler;
   #focusHandler;
   #recentFetchPromise = null;
   #recentLoaded = false;
   #recentFetchedAt = 0;
+  #shortcutBag = null;
 
   constructor() {
     super();
@@ -89,7 +90,6 @@ export class SearchOverlay extends ReactiveElement {
     this.#afterSwapHandler = (event) => this.#handleAfterSwap(event);
     this.#inputHandler = () => this.#handleInput();
     this.#keydownHandler = (event) => this.#handleKeydown(event);
-    this.#globalKeydownHandler = (event) => this.#handleGlobalKeydown(event);
     this.#documentClickHandler = (event) => this.#handleDocumentClick(event);
     this.#focusHandler = () => this.#handleInputFocus();
   }
@@ -115,9 +115,9 @@ export class SearchOverlay extends ReactiveElement {
       this.#initAutocomplete();
     }
 
-    const eventTarget = this.ownerDocument ?? document;
+    this.#registerShortcuts();
 
-    listeners.add(eventTarget, "keydown", this.#globalKeydownHandler);
+    const eventTarget = this.ownerDocument ?? document;
 
     this.watchHtmxRequests(eventTarget, {
       within: (event) => this.#isRelevantRequest(event),
@@ -138,10 +138,32 @@ export class SearchOverlay extends ReactiveElement {
     this.#spinnerController?.stop();
     this.#spinnerController?.setElement(null);
     this.#spinnerController = null;
+    this.#shortcutBag?.abort();
+    this.#shortcutBag = null;
     this.#resultsEl = null;
     this.#inputEl = null;
     this.#spinnerEl = null;
     super.disconnectedCallback();
+  }
+
+  #registerShortcuts() {
+    if (!this.isConnected) return;
+    this.#shortcutBag?.abort();
+    this.#shortcutBag = createShortcutBag();
+    if (!this.#inputEl) {
+      return;
+    }
+
+    this.#shortcutBag.add({
+      key: "/",
+      handler: () => {
+        this.#inputEl?.focus({ preventScroll: true });
+        if (this.#inputEl) {
+          this.#inputEl.select();
+        }
+      },
+      preventDefault: true,
+    });
   }
 
   #activateOverlayListeners() {
@@ -411,30 +433,6 @@ export class SearchOverlay extends ReactiveElement {
       evt.preventDefault();
       activeLink.click();
     }
-  }
-
-  #handleGlobalKeydown(evt) {
-    if (evt.defaultPrevented) return;
-    if (evt.key !== "/") return;
-    if (evt.ctrlKey || evt.metaKey || evt.altKey) return;
-
-    const target = evt.target;
-    if (target instanceof Element) {
-      const tagName = target.tagName;
-      if (
-        tagName === "INPUT" ||
-        tagName === "TEXTAREA" ||
-        target.isContentEditable
-      ) {
-        return;
-      }
-    }
-
-    this.#inputEl?.focus({ preventScroll: true });
-    if (this.#inputEl) {
-      this.#inputEl.select();
-    }
-    evt.preventDefault();
   }
 
   #getResultLinks() {

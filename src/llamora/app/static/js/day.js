@@ -26,14 +26,14 @@ function formatLongDate(date) {
   return `${day}${ordinalSuffix(day)} of ${month} ${year}`;
 }
 
-function formatIsoDate(date) {
+export function formatIsoDate(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
-function parseDateFromSource(value) {
+export function parseDateFromSource(value) {
   if (typeof value !== "string") return null;
   const parts = value.split("-");
   if (parts.length !== 3) return null;
@@ -54,6 +54,25 @@ function parseDateFromSource(value) {
     return null;
   }
   return { date, year: y, month: m, day: d };
+}
+
+export function navigateToDate(dateStr) {
+  if (typeof dateStr !== "string" || !dateStr) {
+    return false;
+  }
+
+  const targetId = "#content-wrapper";
+  if (window.htmx) {
+    window.htmx.ajax("GET", `/c/${dateStr}`, {
+      target: targetId,
+      swap: "outerHTML",
+      pushUrl: `/d/${dateStr}`,
+    });
+    return true;
+  }
+
+  window.location.assign(`/d/${dateStr}`);
+  return true;
 }
 
 function updateNavButton(button, { disabled, tooltip, onClick }) {
@@ -124,20 +143,12 @@ export function initDayNav(chat, options = {}) {
   updateNavButton(prevBtn, {
     disabled: false,
     tooltip: prevIso === yesterdayIso ? "Yesterday" : "Previous day",
-    onClick: () => navigate(prevIso),
+    onClick: () => navigateToDate(prevIso),
   });
 
   updateNavButton(nextBtn, {
     disabled: nextDate > today,
     tooltip: nextDate > today ? null : "Next day",
-    onClick: nextDate > today ? null : () => navigate(nextIso),
+    onClick: nextDate > today ? null : () => navigateToDate(nextIso),
   });
-
-  function navigate(dateStr) {
-    htmx.ajax("GET", `/c/${dateStr}`, {
-      target: "#content-wrapper",
-      swap: "outerHTML",
-      pushUrl: `/d/${dateStr}`,
-    });
-  }
 }

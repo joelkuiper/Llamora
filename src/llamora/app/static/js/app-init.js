@@ -1,4 +1,5 @@
 import { initScrollMemory } from "./scroll.js";
+import { initGlobalShortcuts } from "./global-shortcuts.js";
 
 let headersRegistered = false;
 let offlineHandlerRegistered = false;
@@ -79,6 +80,7 @@ function init() {
   registerHtmxHeaderHooks(csrfToken);
   registerOfflineHandler();
   initGlobalShell();
+  initGlobalShortcuts();
 
   window.appInit = {
     ...(window.appInit || {}),
