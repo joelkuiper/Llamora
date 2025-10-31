@@ -140,10 +140,8 @@ async def autocomplete_tags():
         raise AssertionError("unreachable")
 
     raw_query = (request.args.get("q") or "").strip()[:MAX_TAG_LENGTH]
-    canonical_limit = max(0, MAX_TAG_LENGTH - 1)
     query_canonical = raw_query.lstrip("#").strip()
-    if canonical_limit:
-        query_canonical = query_canonical[:canonical_limit]
+    query_canonical = query_canonical[:MAX_TAG_LENGTH].strip()
 
     existing = await _db().tags.get_tags_for_message(user["id"], msg_id, dek)
     excluded: set[str] = set()
@@ -168,7 +166,7 @@ async def autocomplete_tags():
         name = (entry.get("name") or "").strip()
         if not name:
             continue
-        canonical_name = name[:canonical_limit] if canonical_limit else name
+        canonical_name = name[:MAX_TAG_LENGTH].strip()
         lower_name = canonical_name.lower()
         if prefix_lower:
             if not lower_name.startswith(prefix_lower):

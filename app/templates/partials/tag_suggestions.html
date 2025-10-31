@@ -1,9 +1,10 @@
 {% for tag in suggestions %}
+{% set canonical_value = display(tag) %}
 <button type="button" class="tag-suggestion"
-        data-tag="{{ tag }}"
+        data-tag="{{ canonical_value }}"
         hx-post="{{ url_for('tags.add_tag', msg_id=msg_id) }}"
         hx-target="#msg-tags-{{ msg_id }}"
         hx-swap="beforeend"
-        hx-vals='{"tag": {{ tag|tojson }} }'
-        hx-on:after-request="this.remove()">{{ display(tag) }}</button>
+        hx-vals='{"tag": {{ canonical_value|tojson }} }'
+        hx-on:after-request="this.remove()">{{ canonical_value }}</button>
 {% endfor %}

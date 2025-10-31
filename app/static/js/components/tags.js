@@ -5,32 +5,18 @@ const BaseHTMLElement =
   typeof HTMLElement !== "undefined" ? HTMLElement : class {};
 
 const canonicalizeTag = (value, limit = null) => {
-  if (typeof value !== "string") return "";
-  let trimmed = value.trim();
-  if (!trimmed) return "";
-  if (trimmed.startsWith("#")) {
-    trimmed = trimmed.slice(1);
-  }
-  trimmed = trimmed.trim();
-  if (!trimmed) return "";
+  const text = `${value ?? ""}`.replace(/^#/, "").trim();
+  if (!text) return "";
   if (Number.isFinite(limit) && limit > 0) {
-    trimmed = trimmed.slice(0, limit);
-    trimmed = trimmed.trim();
-    if (!trimmed) return "";
+    return text.slice(0, limit).trim();
   }
-  return trimmed;
+  return text;
 };
 
-const displayTag = (canonical) => {
-  const name = typeof canonical === "string" ? canonical.trim() : "";
-  return name ? `#${name}` : "#";
-};
+const displayTag = (canonical) => `${canonical ?? ""}`.trim();
 
-const prepareTagAutocompleteValue = (value) => {
-  if (typeof value !== "string") return "";
-  const trimmed = value.trim();
-  return trimmed;
-};
+const prepareTagAutocompleteValue = (value) =>
+  `${value ?? ""}`.replace(/^#/, "").trim();
 
 export const mergeTagCandidateValues = (
   remoteCandidates = [],
@@ -41,7 +27,6 @@ export const mergeTagCandidateValues = (
   const seen = new Set();
 
   const add = (value) => {
-    if (typeof value !== "string") return;
     const canonical = canonicalizeTag(value, limit);
     if (!canonical) return;
     const key = canonical.toLowerCase();
@@ -388,10 +373,11 @@ export class Tags extends BaseHTMLElement {
       limit
     );
     const entries = values.map((canonical) => {
-      const value = displayTag(canonical);
+      const value = canonical;
+      const display = displayTag(canonical);
       return {
         value,
-        display: value,
+        display,
         tokens: [value],
       };
     });
@@ -572,10 +558,10 @@ export class Tags extends BaseHTMLElement {
 
   #getCanonicalMaxLength() {
     const inputLimit = this.#getInputMaxLength();
-    if (!inputLimit || inputLimit <= 1) {
+    if (!inputLimit || inputLimit <= 0) {
       return null;
     }
-    return inputLimit - 1;
+    return inputLimit;
   }
 
   #buildCacheKey(query) {
