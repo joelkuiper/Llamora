@@ -19,10 +19,12 @@ Compose a single calm greeting that summarizes yesterday for the user in a few s
 
 The conversation below is from yesterday. If themes appear in the conversation below, gently acknowledge them without quoting or listing. Close with a soft invitation to begin.
 
-{% for m in yesterday_messages -%}
-{{ m['created_at'] | humanize }}
+{% for group in yesterday_message_groups -%}
+{{ group['humanized'] }}
+{% for m in group['messages'] -%}
 {{ "You" if m['role'] == "assistant" else "user" }}: {{ m['message']|trim }}
 
+{% endfor %}
 {% endfor %}
 {% endif %}
 {% endif %}
