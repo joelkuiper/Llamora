@@ -199,7 +199,7 @@ chat-view[data-rendering="true"] #chat {
 #message-form {
   max-width: 60rem;
   margin: 0 auto var(--spacing-xl);
-  background: var(--color-bg);
+  background: var(--glass-bg-strong);
   border-radius: var(--radius-lg);
   box-shadow: var(--raised-shadow);
   padding: var(--spacing-md);
@@ -221,6 +221,21 @@ chat-view[data-rendering="true"] #chat {
       overflow: hidden;
       outline: none;
       font-family: var(--font-base);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--glass-bg-alt);
+      color: var(--glass-text-stronger);
+      box-shadow:
+        inset 1px 1px 2px var(--shadow-dark-02),
+        inset -1px -1px 2px var(--shadow-light-60);
+
+      &:focus {
+        border-color: var(--accent);
+        box-shadow:
+          0 0 0 2px var(--accent-10),
+          inset 1px 1px 2px var(--shadow-dark-02),
+          inset -1px -1px 2px var(--shadow-light-60);
+      }
     }
 
     button {

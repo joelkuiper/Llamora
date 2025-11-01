@@ -163,8 +163,8 @@
     background: var(--glass-bg-alt);
     overflow: hidden;
     box-shadow:
-      inset 2px 2px 5px rgba(0,0,0,0.05),
-      inset -2px -2px 5px rgba(255,255,255,0.7);
+      inset 2px 2px 6px var(--shadow-dark-02),
+      inset -2px -2px 6px var(--shadow-light-60);
     transition: border-color var(--motion-fade) ease, box-shadow var(--motion-lilt) ease, background var(--motion-fade) ease;
 
     &:hover {
@@ -174,11 +174,11 @@
 
     &:focus-within {
       border-color: var(--accent);
-      background: var(--color-white);
+      background: var(--glass-bg-alt-hover);
       box-shadow:
         0 0 0 2px var(--accent-20),
-        inset 2px 2px 5px rgba(0,0,0,0.05),
-        inset -2px -2px 5px rgba(255,255,255,0.75);
+        inset 2px 2px 6px var(--shadow-dark-02),
+        inset -2px -2px 6px var(--shadow-light-60);
     }
 
     /* Input half */
@@ -203,8 +203,8 @@
       flex: 0 0 auto;
       padding: 0 14px;
       border: 0;
-      background: linear-gradient(0deg, rgba(255,255,255,0.92), rgba(255,255,255,0.98));
-      color: var(--glass-text-strong);
+      background: linear-gradient(0deg, var(--glass-bg-alt), var(--glass-bg-strong));
+      color: var(--glass-text-stronger);
       font-weight: 600;
       font-size: 14px;
       cursor: pointer;
@@ -216,7 +216,7 @@
           var(--raised-shadow),
           0 0 0 3px var(--accent-20),
           0 12px 28px var(--accent-10);
-        background: linear-gradient(0deg, rgba(59,167,246,0.16), rgba(59,167,246,0.12)) var(--color-bg);
+        background: linear-gradient(0deg, var(--accent-10), transparent) var(--glass-bg-alt);
       }
 
 

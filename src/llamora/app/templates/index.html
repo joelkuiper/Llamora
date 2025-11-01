@@ -40,7 +40,10 @@
     <header id="search-container">
 
       <div id="branding">
-        <img class="logo" src="{{url_for('static', filename='img/logo.svg')}}" alt="Logo">
+        <picture>
+          <source srcset="{{ url_for('static', filename='img/logo-dark.svg') }}" media="(prefers-color-scheme: dark)">
+          <img class="logo" src="{{ url_for('static', filename='img/logo.svg') }}" alt="{{ config.APP_NAME }} logo">
+        </picture>
         <h1>{{ config.APP_NAME }}</h1>
       </div>
 

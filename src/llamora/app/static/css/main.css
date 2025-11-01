@@ -162,7 +162,7 @@
   --accent-30-dark: rgba(90,164,255,0.42);
   --accent-60-dark: rgba(131,186,255,0.60);
   --accent-drop-shadow-dark: rgba(90,164,255,0.35);
-  --highlight-color-dark: #564300;
+  --highlight-color-dark: rgba(252, 204, 83, 0.8);
 
   --shadow-dark-dark: rgba(0,0,0,0.65);
   --shadow-dark-02-dark: rgba(0,0,0,0.38);
@@ -384,7 +384,13 @@ html, body {
 #branding {
   display: flex;
   align-items: center;
+  gap: var(--spacing-sm);
   opacity: 0.6;
+
+  picture {
+    display: flex;
+    align-items: center;
+  }
 
   h1 {
     font-weight: lighter;
