@@ -198,8 +198,8 @@ export class ChatView extends ReactiveElement {
     }
 
     chat.querySelectorAll?.(".markdown-body").forEach((el) => {
-      if (el?.dataset?.rendered) {
-        delete el.dataset.rendered;
+      if (el?.dataset?.rendered === "true") {
+        return;
       }
 
       if (!el?.querySelector?.("#typing-indicator")) {

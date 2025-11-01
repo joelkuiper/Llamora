@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from llamora.app.services.container import get_services
 from llamora.app.services.auth_helpers import get_dek
+from llamora.app.services.container import get_services
+from llamora.app.services.markdown import render_markdown_to_html
 from llamora.app.services.time import local_date
 
 
@@ -27,6 +28,10 @@ async def get_chat_context(
     if dek is None:
         raise RuntimeError("Missing encryption key for chat context")
     history = await services.db.messages.get_history(user["id"], date, dek)
+
+    for entry in history:
+        message = entry.get("message", "") if isinstance(entry, dict) else ""
+        entry["message_html"] = render_markdown_to_html(message)
 
     today = local_date().isoformat()
     is_today = date == today

@@ -11,7 +11,14 @@
   {% endif %}
   {% for msg in history %}
   <div id="msg-{{ msg['id'] }}" class="message {{ 'assistant' if msg['role'] != 'user' else 'user'}}">
-    <div class="markdown-body">{{ msg.message }}</div>
+    {% set rendered = msg.get('message_html') %}
+    <div class="markdown-body"{% if rendered is not none %} data-rendered="true"{% endif %}>
+      {% if rendered is not none %}
+      {{ rendered | safe }}
+      {% else %}
+      {{ msg.message }}
+      {% endif %}
+    </div>
     {% if msg['role'] != 'user' and not msg.get('meta', {}).get('error') %}
     {{ render_meta_chips(msg['id'], msg.get('tags', [])) }}
     {% endif %}

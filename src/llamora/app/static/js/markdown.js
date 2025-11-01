@@ -6,6 +6,15 @@ export function renderMarkdown(text) {
 export function renderMarkdownInElement(el, text) {
   if (!el) return;
 
+  const hasPreRenderedHtml =
+    el.dataset.rendered === "true" &&
+    el.dataset.markdownSource === undefined &&
+    (text === undefined || text === null);
+
+  if (hasPreRenderedHtml) {
+    return;
+  }
+
   let src = text;
   if (src === undefined || src === null) {
     if (el.dataset.markdownSource !== undefined) {
