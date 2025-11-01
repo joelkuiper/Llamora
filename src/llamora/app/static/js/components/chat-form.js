@@ -132,7 +132,7 @@ class ChatFormElement extends ReactiveElement {
     if (!this.#isToday) {
       this.#textarea.disabled = true;
       this.#button.disabled = true;
-      this.#textarea.placeholder = "This day has past.";
+      this.#textarea.placeholder = "This day has passed.";
     }
   }
 
