@@ -25,10 +25,72 @@
 #calendar-label {
   margin-left: var(--spacing-sm);
   font-family: var(--font-base);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+#calendar-label::after {
+  content: "";
+  position: absolute;
+  inset: -0.2rem -0.45rem;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
 }
 
 @media (max-width: 975px) {
   #calendar-label { display: none; }
+}
+
+/* Add/remove .text-glow-flash on #calendar-label to trigger a subtle glow pulse */
+:root{
+  --cal-glow-dur: .6s;
+  --cal-glow-ease: cubic-bezier(.2,.8,.2,1);
+}
+
+/* Base ensures crisp text before/after the glow */
+#calendar-label{
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  text-shadow: none;
+}
+
+/* Trigger class */
+#calendar-label.text-glow-flash{
+  animation: calTextGlow var(--cal-glow-dur) var(--cal-glow-ease);
+}
+
+@keyframes calTextGlow{
+  0%{
+    color: var(--color-text);
+    text-shadow: 0 0 0 rgba(31,151,242,0);
+    filter: none;
+  }
+  35%{
+    color: var(--accent);
+    text-shadow:
+      0 0 .2rem  var(--accent-20),
+      0 0 .45rem var(--accent-30),
+      0 0 .9rem  var(--accent-30);
+    filter: saturate(1.05);
+  }
+  100%{
+    color: var(--color-text);
+    text-shadow: none;
+    filter: none;
+  }
+}
+
+/* Reduced-motion: just a quick color emphasis, no glow ramp */
+@media (prefers-reduced-motion: reduce){
+  #calendar-label.text-glow-flash{ animation: calTextGlowReduce .4s ease-out; }
+  @keyframes calTextGlowReduce{
+    0%   { color: var(--accent); text-shadow: none; }
+    100% { color: var(--color-text); text-shadow: none; }
+  }
 }
 
 

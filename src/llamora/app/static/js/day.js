@@ -16,6 +16,16 @@ function ordinalSuffix(day) {
   }
 }
 
+const LABEL_FLASH_CLASS = "text-glow-flash";
+
+function triggerLabelFlash(node) {
+  if (!node) return;
+  node.classList.remove(LABEL_FLASH_CLASS);
+  // Force reflow so the animation can replay when the class is re-added.
+  void node.offsetWidth; // eslint-disable-line no-void
+  node.classList.add(LABEL_FLASH_CLASS);
+}
+
 function formatLongDate(date) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
     return "";
@@ -116,7 +126,11 @@ export function initDayNav(chat, options = {}) {
       document.body?.dataset?.activeDayLabel ||
       (currentDate ? formatLongDate(currentDate) : activeDaySource);
     if (typeof labelText === "string") {
+      const previousLabel = labelNode.textContent;
       labelNode.textContent = labelText;
+      if (previousLabel !== labelText) {
+        triggerLabelFlash(labelNode);
+      }
     }
   }
 
