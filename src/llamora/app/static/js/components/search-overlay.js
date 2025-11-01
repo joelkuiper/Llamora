@@ -63,6 +63,28 @@ const buildSearchAutocompleteEntry = (value) => {
   };
 };
 
+const buildSearchTagAutocompleteEntry = (tag) => {
+  const canonical = trimSearchValue(tag);
+  if (!canonical) return null;
+
+  const entry = buildSearchAutocompleteEntry(`${canonical}`);
+  if (!entry) return null;
+
+  const tokenSet = new Set(entry.tokens ?? []);
+  tokenSet.add(canonical);
+  const collapsedCanonical = collapseSearchWhitespace(canonical);
+  if (collapsedCanonical) {
+    tokenSet.add(collapsedCanonical);
+    collapsedCanonical
+      .split(/\s+/)
+      .filter(Boolean)
+      .forEach((part) => tokenSet.add(part));
+  }
+
+  entry.tokens = Array.from(tokenSet);
+  return entry;
+};
+
 export class SearchOverlay extends ReactiveElement {
   #listeners = null;
   #overlayListeners = null;
@@ -301,19 +323,48 @@ export class SearchOverlay extends ReactiveElement {
         return response.json().catch(() => null);
       })
       .then((payload) => {
-        if (!payload || !Array.isArray(payload.recent)) {
+        if (!payload) {
           return;
         }
-        const unique = [];
-        for (const value of payload.recent) {
+
+        const recent = Array.isArray(payload.recent) ? payload.recent : [];
+        const frecentTags = Array.isArray(payload.frecent_tags)
+          ? payload.frecent_tags
+          : [];
+
+        const entries = [];
+        const seenKeys = new Set();
+        const pushEntry = (entry) => {
+          if (!entry || typeof entry.value !== "string") {
+            return;
+          }
+          const normalized = prepareSearchAutocompleteValue(entry.value)?.toLowerCase();
+          if (!normalized) {
+            return;
+          }
+          if (seenKeys.has(normalized)) {
+            return;
+          }
+          seenKeys.add(normalized);
+          entries.push(entry);
+        };
+
+        for (const value of recent) {
           if (typeof value !== "string") continue;
-          const trimmed = value.trim();
-          if (!trimmed || unique.includes(trimmed)) continue;
-          unique.push(trimmed);
+          const entry = buildSearchAutocompleteEntry(value);
+          if (entry) {
+            pushEntry(entry);
+          }
         }
-        const entries = unique
-          .map((value) => buildSearchAutocompleteEntry(value))
-          .filter(Boolean);
+
+        for (const tag of frecentTags) {
+          if (typeof tag !== "string") continue;
+          const entry = buildSearchTagAutocompleteEntry(tag);
+          if (entry) {
+            pushEntry(entry);
+          }
+        }
+
         if (entries.length) {
           this.#autocomplete?.setCandidates(entries);
         } else {

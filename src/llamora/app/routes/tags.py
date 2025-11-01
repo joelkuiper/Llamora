@@ -3,6 +3,10 @@ from llamora.app.services.container import get_services
 from llamora.app.services.auth_helpers import login_required, get_current_user, get_dek
 from llamora.app.util.tags import canonicalize, display
 from llamora.settings import settings
+from llamora.app.utils.frecency import (
+    DEFAULT_FRECENCY_DECAY,
+    resolve_frecency_lambda,
+)
 
 tags_bp = Blueprint("tags", __name__)
 
@@ -92,7 +96,12 @@ async def get_tag_suggestions(msg_id: str):
             continue
         meta_suggestions.add(canonical_kw)
 
-    frecent_tags = await _db().tags.get_tag_frecency(user["id"], 3, 0.0001, dek)
+    decay_constant = resolve_frecency_lambda(
+        request.args.get("lambda"), default=DEFAULT_FRECENCY_DECAY
+    )
+    frecent_tags = await _db().tags.get_tag_frecency(
+        user["id"], 3, decay_constant, dek
+    )
     frecent_suggestions = {t["name"] for t in frecent_tags if (t.get("name"))}
 
     combined = meta_suggestions | frecent_suggestions
@@ -153,11 +162,17 @@ async def autocomplete_tags():
             continue
         excluded.add(name)
 
+    lambda_param = request.args.get("lambda")
+    decay_constant = resolve_frecency_lambda(
+        lambda_param, default=DEFAULT_FRECENCY_DECAY
+    )
+
     results = await _db().tags.search_tags(
         user["id"],
         dek,
         limit=limit,
         prefix=query_canonical or None,
+        lambda_=decay_constant,
         exclude_names=excluded,
     )
 

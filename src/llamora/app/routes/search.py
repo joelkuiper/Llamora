@@ -1,4 +1,6 @@
+import asyncio
 import logging
+from typing import Any
 
 from quart import Blueprint, render_template, request, abort, jsonify
 from llamora.app.api.search import InvalidSearchQuery
@@ -9,6 +11,10 @@ from llamora.app.services.auth_helpers import (
     get_dek,
 )
 from llamora.settings import settings
+from llamora.app.utils.frecency import (
+    resolve_frecency_lambda,
+    DEFAULT_FRECENCY_DECAY,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -64,6 +70,7 @@ async def search():
         has_query=bool(sanitized_query),
         truncation_notice=truncation_notice,
     )
+FRECENT_TAG_LAMBDA = DEFAULT_FRECENCY_DECAY
 
 
 @search_bp.get("/search/recent")
@@ -79,7 +86,35 @@ async def recent_searches():
         abort(401, description="Missing encryption key")
         raise AssertionError("unreachable")
 
-    queries = await get_services().db.search_history.get_recent_searches(
-        user["id"], int(settings.SEARCH.recent_suggestion_limit), dek
+    limit = int(settings.SEARCH.recent_suggestion_limit)
+    lambda_param: Any = request.args.get("lambda")
+    decay_constant = resolve_frecency_lambda(lambda_param, default=FRECENT_TAG_LAMBDA)
+    history_repo = get_services().db.search_history
+    tags_repo = get_services().db.tags
+
+    recent_task = history_repo.get_recent_searches(user["id"], limit, dek)
+    frecent_task = tags_repo.get_tag_frecency(
+        user["id"], limit, decay_constant, dek
     )
-    return jsonify({"recent": queries})
+
+    queries, frecent_rows = await asyncio.gather(recent_task, frecent_task)
+
+    frecent_tags: list[str] = []
+    seen_tags: set[str] = set()
+    for row in frecent_rows:
+        name = (row.get("name") or "").strip()
+        if not name:
+            continue
+        key = name.lower()
+        if key in seen_tags:
+            continue
+        seen_tags.add(key)
+        frecent_tags.append(name)
+
+    return jsonify(
+        {
+            "recent": queries,
+            "frecent_tags": frecent_tags,
+            "lambda": decay_constant,
+        }
+    )

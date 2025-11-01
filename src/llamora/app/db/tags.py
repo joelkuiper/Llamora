@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from aiosqlitepool import SQLiteConnectionPool
 from ulid import ULID
 
@@ -7,6 +9,7 @@ from .base import BaseRepository
 from .events import RepositoryEventBus, MESSAGE_TAGS_CHANGED_EVENT
 from .utils import cached_tag_name
 from llamora.app.util.tags import canonicalize, tag_hash
+from llamora.app.utils.frecency import DEFAULT_FRECENCY_DECAY, resolve_frecency_lambda
 
 
 class TagsRepository(BaseRepository):
@@ -143,8 +146,9 @@ class TagsRepository(BaseRepository):
         return tags
 
     async def get_tag_frecency(
-        self, user_id: str, limit: int, lambda_: float, dek: bytes
+        self, user_id: str, limit: int, lambda_: Any, dek: bytes
     ) -> list[dict]:
+        decay_constant = resolve_frecency_lambda(lambda_, default=DEFAULT_FRECENCY_DECAY)
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
@@ -157,7 +161,7 @@ class TagsRepository(BaseRepository):
                 ORDER BY frecency DESC
                 LIMIT ?
                 """,
-                (lambda_, user_id, limit),
+                (decay_constant, user_id, limit),
             )
             rows = await cursor.fetchall()
 
@@ -190,7 +194,7 @@ class TagsRepository(BaseRepository):
         *,
         limit: int = 15,
         prefix: str | None = None,
-        lambda_: float = 0.0001,
+        lambda_: Any = DEFAULT_FRECENCY_DECAY,
         exclude_names: set[str] | None = None,
     ) -> list[dict]:
         """Return recent/frequent tags optionally filtered by a prefix."""
@@ -217,6 +221,8 @@ class TagsRepository(BaseRepository):
         seen: set[str] = set()
         results: list[dict] = []
 
+        decay_constant = resolve_frecency_lambda(lambda_, default=DEFAULT_FRECENCY_DECAY)
+
         async with self.pool.connection() as conn:
             offset = 0
             while len(results) < limit:
@@ -231,7 +237,7 @@ class TagsRepository(BaseRepository):
                     ORDER BY frecency DESC, last_seen DESC
                     LIMIT ? OFFSET ?
                     """,
-                    (lambda_, user_id, batch_size, offset),
+                    (decay_constant, user_id, batch_size, offset),
                 )
                 rows = await cursor.fetchall()
                 if not rows:
