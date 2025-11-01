@@ -4,10 +4,20 @@ import logging
 import secrets
 
 from llamora.settings import settings
+from .services.config_validation import validate_settings
+
+
+logger = logging.getLogger(__name__)
 
 
 def create_app():
     from .services.container import AppLifecycle, AppServices
+
+    errors = validate_settings()
+    if errors:
+        for message in errors:
+            logger.error("Configuration error: %s", message)
+        raise RuntimeError("Invalid application configuration")
 
     services = AppServices.create()
 
