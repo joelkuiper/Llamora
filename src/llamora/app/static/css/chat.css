@@ -71,7 +71,7 @@ body {
     border: 1px solid var(--border);
     padding: var(--spacing-lg) var(--spacing-xl);
     border-radius: var(--radius-lg);
-    max-width: 90%;
+    max-width: min(68ch, 90%);
     line-height: 1.5;
     font-size: var(--font-size);
     background: var(--color-bg);
