@@ -100,7 +100,7 @@
       padding: 0 var(--spacing-md);
       border: 1px solid var(--border);
       border-radius: var(--radius-md);
-      background: var(--color-white);
+      background: var(--color-bg-alt);
       color: var(--color-text);
       box-shadow: var(--inset-shadow);
       transition: border-color var(--motion-hover) ease, box-shadow var(--motion-hover) ease, background var(--motion-hover) ease;
@@ -111,7 +111,7 @@
         outline: none;
         border-color: var(--accent-20);
         box-shadow: var(--raised-shadow), 0 0 0 2px var(--accent-10);
-        background: var(--color-white);
+        background: var(--color-bg);
       }
     }
 
