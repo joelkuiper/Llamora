@@ -185,6 +185,14 @@ chat-view[data-rendering="true"] #chat {
       color: var(--accent);
       text-decoration-color: var(--accent-60);
     }
+    &:focus-visible {
+      color: var(--accent);
+      text-decoration-color: var(--accent-60);
+      background-color: var(--accent-05);
+      outline: 2px solid var(--accent-40);
+      outline-offset: 2px;
+      border-radius: var(--radius-sm);
+    }
   }
 }
 
