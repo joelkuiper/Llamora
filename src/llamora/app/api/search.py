@@ -68,14 +68,9 @@ class SearchAPI:
     ) -> None:
         await self._index_worker.enqueue(user_id, message_id, plaintext, dek)
 
-    async def search(
-        self,
-        user_id: str,
-        dek: bytes,
-        query: str,
-        k1: int = int(settings.SEARCH.progressive.k1),
-        k2: int = int(settings.SEARCH.progressive.k2),
-    ) -> tuple[str, list[dict], bool]:
+    def _normalize_query(self, user_id: str, query: str) -> tuple[str, bool]:
+        """Return the normalized query text and whether truncation occurred."""
+
         normalized = (query or "").strip()
         if not normalized:
             logger.info("Rejecting empty search query for user %s", user_id)
@@ -93,19 +88,10 @@ class SearchAPI:
             normalized = normalized[:max_query_length]
             truncated = True
 
-        logger.debug("Search requested by user %s with k1=%d k2=%d", user_id, k1, k2)
-        candidates = await self.vector_search.search_candidates(
-            user_id, dek, normalized, k1, k2
-        )
+        return normalized, truncated
 
-        candidate_map: OrderedDict[str, dict] = OrderedDict()
-        for cand in candidates:
-            mid = cand.get("id")
-            if not mid:
-                continue
-            existing = candidate_map.get(mid)
-            if existing is None or cand.get("cosine", 0.0) > existing.get("cosine", 0.0):
-                candidate_map[mid] = cand
+    def _tokenize_query(self, normalized: str) -> list[str]:
+        """Return unique canonical tokens extracted from ``normalized``."""
 
         seen_tokens: set[str] = set()
         tokens: list[str] = []
@@ -122,42 +108,106 @@ class SearchAPI:
                 continue
             seen_tokens.add(canonical_lower)
             tokens.append(canonical)
+        return tokens
+
+    async def _hydrate_candidates(
+        self,
+        user_id: str,
+        dek: bytes,
+        candidate_map: OrderedDict[str, dict],
+        tag_hashes: list[bytes],
+        limit: int,
+    ) -> None:
+        """Ensure candidates referenced by ``tag_hashes`` are present."""
+
+        if not tag_hashes:
+            return
+
+        tag_message_ids = await self.db.tags.get_recent_messages_for_tag_hashes(
+            user_id, tag_hashes, limit=limit
+        )
+        if not tag_message_ids:
+            return
+
+        missing_ids = [mid for mid in tag_message_ids if mid not in candidate_map]
+        if not missing_ids:
+            return
+
+        rows = await self.vector_search.index_store.hydrate_messages(
+            user_id, missing_ids, dek
+        )
+        row_map = {row["id"]: row for row in rows}
+
+        for mid in tag_message_ids:
+            if mid in candidate_map:
+                continue
+            row = row_map.get(mid)
+            if not row:
+                continue
+            candidate_map[mid] = {
+                "id": row["id"],
+                "created_at": row["created_at"],
+                "role": row["role"],
+                "content": row.get("message", ""),
+                "cosine": 0.0,
+            }
+
+    async def _compute_tag_boosts(
+        self,
+        user_id: str,
+        candidate_map: OrderedDict[str, dict],
+        tag_hashes: list[bytes],
+    ) -> dict[str, float]:
+        """Compute tag-based boost multipliers for ``candidate_map``."""
+
+        if not candidate_map or not tag_hashes:
+            return {}
+
+        message_ids = list(candidate_map.keys())
+        if not message_ids:
+            return {}
+
+        tag_map = await self.db.tags.get_messages_with_tag_hashes(
+            user_id, tag_hashes, message_ids
+        )
+        boosts: dict[str, float] = {}
+        for mid, hashes in tag_map.items():
+            count = len(hashes)
+            if count > 0:
+                boosts[mid] = 1.0 + 0.1 * (count - 1)
+        return boosts
+
+    async def search(
+        self,
+        user_id: str,
+        dek: bytes,
+        query: str,
+        k1: int = int(settings.SEARCH.progressive.k1),
+        k2: int = int(settings.SEARCH.progressive.k2),
+    ) -> tuple[str, list[dict], bool]:
+        normalized, truncated = self._normalize_query(user_id, query)
+
+        logger.debug("Search requested by user %s with k1=%d k2=%d", user_id, k1, k2)
+        candidates = await self.vector_search.search_candidates(
+            user_id, dek, normalized, k1, k2
+        )
+
+        candidate_map: OrderedDict[str, dict] = OrderedDict()
+        for cand in candidates:
+            mid = cand.get("id")
+            if not mid:
+                continue
+            existing = candidate_map.get(mid)
+            if existing is None or cand.get("cosine", 0.0) > existing.get("cosine", 0.0):
+                candidate_map[mid] = cand
+
+        tokens = self._tokenize_query(normalized)
         boosts: dict[str, float] = {}
         if tokens:
             tag_hashes = [tag_hash(user_id, t) for t in tokens]
             limit = max(k2, len(candidate_map), 1)
-            tag_message_ids = await self.db.tags.get_recent_messages_for_tag_hashes(
-                user_id, tag_hashes, limit=limit
-            )
-
-            missing_ids = [mid for mid in tag_message_ids if mid not in candidate_map]
-            if missing_ids:
-                rows = await self.vector_search.index_store.hydrate_messages(
-                    user_id, missing_ids, dek
-                )
-                row_map = {row["id"]: row for row in rows}
-                for mid in tag_message_ids:
-                    if mid not in candidate_map:
-                        row = row_map.get(mid)
-                        if not row:
-                            continue
-                        candidate_map[mid] = {
-                            "id": row["id"],
-                            "created_at": row["created_at"],
-                            "role": row["role"],
-                            "content": row.get("message", ""),
-                            "cosine": 0.0,
-                        }
-
-            message_ids = list(candidate_map.keys())
-            if message_ids:
-                tag_map = await self.db.tags.get_messages_with_tag_hashes(
-                    user_id, tag_hashes, message_ids
-                )
-                for mid, hashes in tag_map.items():
-                    count = len(hashes)
-                    if count > 0:
-                        boosts[mid] = 1.0 + 0.1 * (count - 1)
+            await self._hydrate_candidates(user_id, dek, candidate_map, tag_hashes, limit)
+            boosts = await self._compute_tag_boosts(user_id, candidate_map, tag_hashes)
 
         if not candidate_map:
             logger.debug(
