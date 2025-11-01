@@ -51,6 +51,16 @@ SSE_HEADERS = {
 }
 
 
+def make_sse_response(stream: Any) -> Response:
+    """Create a standardized SSE response.
+
+    Any future SSE endpoints should call this helper to ensure headers remain
+    consistent across the application.
+    """
+
+    return Response(stream, mimetype="text/event-stream", headers=SSE_HEADERS)
+
+
 def _db():
     return get_services().db
 
@@ -225,11 +235,7 @@ async def sse_opening(date: str):
             yield f"event: error\ndata: {escaped_msg}\n\n"
             yield "event: done\ndata: {}\n\n"
 
-        return Response(
-            error_stream(),
-            mimetype="text/event-stream",
-            headers=SSE_HEADERS,
-        )
+        return make_sse_response(error_stream())
     stream_id = f"opening:{uid}:{today_iso}"
     manager = _chat_stream_manager()
     pending = manager.start_stream(
@@ -244,11 +250,7 @@ async def sse_opening(date: str):
         meta_extra={"auto_opening": True},
     )
 
-    return Response(
-        stream_pending_reply(pending),
-        mimetype="text/event-stream",
-        headers=SSE_HEADERS,
-    )
+    return make_sse_response(stream_pending_reply(pending))
 
 
 @chat_bp.route("/c/<date>/message", methods=["POST"])
@@ -309,18 +311,10 @@ async def sse_reply(user_msg_id: str, date: str):
 
     if not history:
         logger.warning("History not found for user message %s", user_msg_id)
-        return Response(
-            "event: error\ndata: Invalid ID\n\n",
-            mimetype="text/event-stream",
-            headers=SSE_HEADERS,
-        )
+        return make_sse_response("event: error\ndata: Invalid ID\n\n")
 
     if existing_assistant_msg:
-        return Response(
-            stream_saved_reply(existing_assistant_msg),
-            mimetype="text/event-stream",
-            headers=SSE_HEADERS,
-        )
+        return make_sse_response(stream_saved_reply(existing_assistant_msg))
 
     params_raw = normalize_llm_config(
         request.args.get("config"),
@@ -346,8 +340,4 @@ async def sse_reply(user_msg_id: str, date: str):
             ctx,
         )
 
-    return Response(
-        stream_pending_reply(pending_response),
-        mimetype="text/event-stream",
-        headers=SSE_HEADERS,
-    )
+    return make_sse_response(stream_pending_reply(pending_response))
