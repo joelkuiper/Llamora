@@ -8,8 +8,6 @@ from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any
 
-from quart import current_app
-
 from llamora.persistence.local_db import LocalDB
 from llamora.app.api.search import SearchAPI
 from llamora.app.services.lexical_reranker import LexicalReranker
@@ -83,9 +81,14 @@ class AppLifecycle:
             logger.debug(
                 "Starting application lifecycle: db.init -> search_api.start -> llm_service.ensure_started"
             )
-            await self._services.db.init()
-            await self._services.search_api.start()
-            await self._services.llm_service.ensure_started()
+            try:
+                await self._services.db.init()
+                await self._services.search_api.start()
+                await self._services.llm_service.ensure_started()
+            except Exception:
+                with suppress(Exception):
+                    await self._services.db.close()
+                raise
             self._maintenance_task = asyncio.create_task(
                 self._maintenance_loop(),
                 name="llamora-maintenance",
@@ -113,9 +116,29 @@ class AppLifecycle:
             with suppress(asyncio.CancelledError):
                 await maintenance_task
 
-        await self._services.llm_service.ensure_stopped()
-        await self._services.search_api.stop()
-        await self._services.db.close()
+        errors: list[Exception] = []
+
+        try:
+            await self._services.llm_service.ensure_stopped()
+        except Exception as exc:  # pragma: no cover - defensive logging occurs below
+            logger.exception("Failed to stop LLM service cleanly")
+            errors.append(exc)
+
+        try:
+            await self._services.search_api.stop()
+        except Exception as exc:  # pragma: no cover - defensive logging occurs below
+            logger.exception("Failed to stop search API cleanly")
+            errors.append(exc)
+
+        try:
+            await self._services.db.close()
+        except Exception as exc:
+            logger.exception("Failed to close database cleanly")
+            errors.append(exc)
+
+        if errors:
+            raise errors[0]
+
         logger.info("Application lifecycle stopped")
 
     async def _maintenance_loop(self) -> None:
@@ -139,6 +162,8 @@ class AppLifecycle:
 
 def get_services() -> AppServices:
     """Return the lazily initialised :class:`AppServices` container."""
+
+    from quart import current_app
 
     services = current_app.extensions.get("llamora")
     if services is None:

@@ -1,16 +1,23 @@
-from quart import Quart, render_template, make_response, request, g
-from quart_wtf import CSRFProtect
+from __future__ import annotations
+
 import logging
 import secrets
+from typing import TYPE_CHECKING
 
 from llamora.settings import settings
 from .services.config_validation import validate_settings
+
+
+if TYPE_CHECKING:  # pragma: no cover - import for static analysis only
+    from quart import Quart
 
 
 logger = logging.getLogger(__name__)
 
 
 def create_app():
+    from quart import Quart, render_template, make_response, request, g
+    from quart_wtf import CSRFProtect
     from .services.container import AppLifecycle, AppServices
 
     errors = validate_settings()
