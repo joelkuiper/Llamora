@@ -27,7 +27,7 @@
 
   <!-- Neumorphic circle base -->
   <g filter="url(#softShadow)">
-    <circle cx="256" cy="256" r="180" fill="#f5f5f5" />
+    <circle cx="256" cy="256" r="180" fill="none" />
     <circle cx="256" cy="256" r="180" fill="none" filter="url(#innerLight)"/>
   </g>
 
