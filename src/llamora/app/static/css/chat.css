@@ -39,7 +39,7 @@ body {
 
 /* Main chat panel */
 #content-wrapper {
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--subtle-raised-shadow);
   border: 1px solid var(--border);
   z-index: 1;
   padding: var(--spacing-xl) var(--spacing-xl) 3rem var(--spacing-xl);
