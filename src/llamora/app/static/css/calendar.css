@@ -1,12 +1,10 @@
 #calendar-control {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;
+  justify-content: center;
   gap: var(--spacing-xs);
-  z-index: 6000;               /* above chat */
+  z-index: 6000; /* above chat */
 }
 
 #next-day[disabled] {

@@ -9,6 +9,16 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
+  flex-wrap: wrap;
+  row-gap: var(--spacing-sm);
+
+  #branding {
+    flex: 1 1 0;
+  }
+
+  #calendar-control {
+    flex-shrink: 0;
+  }
 
   .header-right {
     margin-left: auto;
@@ -16,6 +26,21 @@
     align-items: center;
     gap: var(--spacing-md);
     position: relative;
+    flex: 1 1 0;
+    justify-content: flex-end;
+  }
+
+  @media (max-width: 960px) {
+    gap: var(--spacing-sm);
+
+    #calendar-control {
+      flex: 1 0 100%;
+      justify-content: center;
+    }
+
+    .header-right {
+      flex: 1 1 100%;
+    }
   }
 
   .search-wrap { position: relative; }
@@ -29,8 +54,8 @@
     position: relative;
     display: flex;
     align-items: center;
-    /* width: clamp(18rem, 32vw, 24rem); */
-    width: 18rem;
+    width: clamp(16rem, 30vw, 20rem);
+    max-width: 100%;
   }
 
   #search-input {
