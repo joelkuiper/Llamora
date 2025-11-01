@@ -24,6 +24,7 @@ dependencies = [
     "markdown-it-py>=3.0.0",
     "mdit-py-plugins>=0.4.0",
     "bleach>=6.1.0",
+    "transformers>=4.48.0",
 ]
 
 [dependency-groups]

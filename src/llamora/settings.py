@@ -101,6 +101,10 @@ DEFAULTS: dict[str, Any] = {
         },
         "request": DEFAULT_LLM_REQUEST,
         "allowed_config_keys": ["temperature"],
+        "tokenizer": {
+            "model": "Qwen/Qwen3-4B-Instruct-2507",
+            "trust_remote_code": True,
+        },
     },
     "PROMPTS": {
         "prompt_file": str(PACKAGE_DIR / "llm" / "prompts" / "llamora_phi.j2"),

@@ -14,6 +14,7 @@ from llamora.settings import settings
 from llamora.util import resolve_data_path
 from .process_manager import LlamafileProcessManager
 from .prompt_template import build_prompt
+from .tokenizers.tokenizer import count_tokens as qwen_count_tokens
 
 LLM_DIR = Path(__file__).resolve().parent
 GRAMMAR_PATH = resolve_data_path(
@@ -212,11 +213,7 @@ class LLMClient:
         await self._client.aclose()
 
     async def _count_tokens(self, text: str) -> int:
-        resp = await self._client.post(
-            f"{self.server_url}/tokenize", json={"content": text}
-        )
-        resp.raise_for_status()
-        return len(resp.json().get("tokens", []))
+        return await asyncio.to_thread(qwen_count_tokens, text)
 
     @staticmethod
     def _fingerprint(data: Any) -> str:
