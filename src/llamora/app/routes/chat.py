@@ -8,7 +8,6 @@ from quart import (
     abort,
     url_for,
 )
-from html import escape
 import logging
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -27,9 +26,9 @@ from llamora.app.services.chat_helpers import (
     build_conversation_context,
     locate_message_and_reply,
     normalize_llm_config,
-    replace_newline,
     stream_pending_reply,
     stream_saved_reply,
+    format_sse_event,
 )
 from llamora.app.services.time import (
     local_date,
@@ -229,13 +228,12 @@ async def sse_opening(date: str):
         logger.exception("Failed to build opening prompt")
 
         msg = f"⚠️ {exc}"
-        escaped_msg = replace_newline(escape(msg))
 
-        async def error_stream():
-            yield f"event: error\ndata: {escaped_msg}\n\n"
-            yield "event: done\ndata: {}\n\n"
+        async def stream_error_events():
+            yield format_sse_event("error", msg)
+            yield format_sse_event("done", {})
 
-        return make_sse_response(error_stream())
+        return make_sse_response(stream_error_events())
     stream_id = f"opening:{uid}:{today_iso}"
     manager = _chat_stream_manager()
     pending = manager.start_stream(
