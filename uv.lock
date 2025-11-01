@@ -489,7 +489,6 @@ dependencies = [
     { name = "python-ulid" },
     { name = "quart" },
     { name = "quart-wtforms" },
-    { name = "requests" },
     { name = "zxcvbn" },
 ]
 
@@ -517,7 +516,6 @@ requires-dist = [
     { name = "python-ulid", specifier = ">=3.0.0" },
     { name = "quart", specifier = ">=0.20.0" },
     { name = "quart-wtforms", specifier = ">=1.0.3" },
-    { name = "requests", specifier = ">=2.32.4" },
     { name = "zxcvbn", specifier = ">=4.4.2" },
 ]
 
