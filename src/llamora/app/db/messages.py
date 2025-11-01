@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-import copy
-from typing import Callable, Awaitable
+from types import MappingProxyType
+from typing import Any, Awaitable, Callable, Mapping, Sequence, cast
 
 import orjson
 from aiosqlitepool import SQLiteConnectionPool
@@ -13,10 +13,39 @@ from cachetools import TTLCache
 from llamora.settings import settings
 
 from .base import BaseRepository
-from .events import RepositoryEventBus, MESSAGE_TAGS_CHANGED_EVENT
+from .events import (
+    RepositoryEventBus,
+    MESSAGE_HISTORY_CHANGED_EVENT,
+    MESSAGE_TAGS_CHANGED_EVENT,
+)
 from .utils import cached_tag_name
 
 MessageAppendedCallback = Callable[[str, str, str, bytes], Awaitable[None]]
+
+FrozenHistory = tuple[Mapping[str, Any], ...]
+_INVALID_HISTORY_SENTINEL = object()
+
+
+def _freeze_history(history: Sequence[Mapping[str, Any] | dict[str, Any]]) -> FrozenHistory:
+    frozen_messages: list[Mapping[str, Any]] = []
+    for message in history:
+        # Normalise to a plain dict so the cached payload cannot be mutated.
+        raw_message = dict(message)
+        tags = raw_message.get("tags") or []
+        raw_message["tags"] = tuple(MappingProxyType(dict(tag)) for tag in tags)
+        raw_message["meta"] = MappingProxyType(dict(raw_message.get("meta") or {}))
+        frozen_messages.append(MappingProxyType(raw_message))
+    return tuple(frozen_messages)
+
+
+def _thaw_history(history: FrozenHistory) -> list[dict[str, Any]]:
+    thawed: list[dict[str, Any]] = []
+    for message in history:
+        hydrated = dict(message)
+        hydrated["tags"] = [dict(tag) for tag in message.get("tags", ())]
+        hydrated["meta"] = dict(message.get("meta", {}))
+        thawed.append(hydrated)
+    return thawed
 
 
 class MessagesRepository(BaseRepository):
@@ -35,7 +64,9 @@ class MessagesRepository(BaseRepository):
         self._on_message_appended: MessageAppendedCallback | None = None
         self._event_bus = event_bus
         history_cache_cfg = settings.MESSAGES.history_cache
-        self._history_cache: TTLCache[tuple[str, str], list[dict]] = TTLCache(
+        self._history_cache: TTLCache[
+            tuple[str, str], FrozenHistory | object
+        ] = TTLCache(
             maxsize=int(history_cache_cfg.maxsize),
             ttl=int(history_cache_cfg.ttl),
         )
@@ -51,48 +82,67 @@ class MessagesRepository(BaseRepository):
     async def _get_cached_history(
         self, user_id: str, created_date: str
     ) -> list[dict] | None:
+        key = (user_id, created_date)
         async with self._history_cache_lock:
-            cached = self._history_cache.get((user_id, created_date))
-            if cached is None:
-                return None
-            return copy.deepcopy(cached)
+            cached = self._history_cache.get(key)
+
+        if cached is None or cached is _INVALID_HISTORY_SENTINEL:
+            return None
+
+        frozen = cast(FrozenHistory, cached)
+        return _thaw_history(frozen)
 
     async def _store_history_cache(
         self, user_id: str, created_date: str, history: list[dict]
     ) -> None:
+        frozen = _freeze_history(history)
         async with self._history_cache_lock:
-            self._history_cache[(user_id, created_date)] = copy.deepcopy(history)
+            self._history_cache[(user_id, created_date)] = frozen
 
     async def _append_message_to_cache(
         self, user_id: str, created_date: str, message: dict
     ) -> None:
         key = (user_id, created_date)
-        async with self._history_cache_lock:
-            cached = self._history_cache.get(key)
-            if cached is None:
+        while True:
+            async with self._history_cache_lock:
+                cached = self._history_cache.get(key)
+
+            if cached is None or cached is _INVALID_HISTORY_SENTINEL:
                 return
 
-            new_entry = copy.deepcopy(message)
+            frozen = cast(FrozenHistory, cached)
+            history = _thaw_history(frozen)
+
+            new_entry = dict(message)
+            new_entry["tags"] = list(new_entry.get("tags", []))
             new_id = new_entry.get("id")
             inserted = False
-            for idx, existing in enumerate(cached):
+
+            for idx, existing in enumerate(history):
                 existing_id = existing.get("id")
                 if existing_id == new_id:
-                    cached[idx] = new_entry
+                    history[idx] = new_entry
                     inserted = True
                     break
                 if existing_id and new_id and existing_id > new_id:
-                    cached.insert(idx, new_entry)
+                    history.insert(idx, new_entry)
                     inserted = True
                     break
-            if not inserted:
-                cached.append(new_entry)
 
-            self._history_cache[key] = cached
+            if not inserted:
+                history.append(new_entry)
+
+            updated = _freeze_history(history)
+
+            async with self._history_cache_lock:
+                current = self._history_cache.get(key)
+                if current is cached:
+                    self._history_cache[key] = updated
+                    return
 
     async def _invalidate_history_cache(self, user_id: str, created_date: str) -> None:
         async with self._history_cache_lock:
-            self._history_cache.pop((user_id, created_date), None)
+            self._history_cache[(user_id, created_date)] = _INVALID_HISTORY_SENTINEL
 
     def _rows_to_messages(
         self, rows, user_id: str, dek: bytes
@@ -220,6 +270,14 @@ class MessagesRepository(BaseRepository):
 
         if created_date:
             await self._append_message_to_cache(user_id, created_date, message_entry)
+            if self._event_bus:
+                await self._event_bus.emit_for_message_date(
+                    MESSAGE_HISTORY_CHANGED_EVENT,
+                    user_id=user_id,
+                    created_date=created_date,
+                    message_id=msg_id,
+                    reason="insert",
+                )
 
         if self._on_message_appended:
             await self._on_message_appended(user_id, msg_id, plaintext, dek)
@@ -243,6 +301,24 @@ class MessagesRepository(BaseRepository):
             )
             row = await cursor.fetchone()
         return row["created_date"] if row else None
+
+    async def invalidate_history_for_message(
+        self, user_id: str, message_id: str, *, reason: str = "invalidate"
+    ) -> None:
+        created_date = await self.get_message_date(user_id, message_id)
+        if not created_date:
+            return
+
+        await self._invalidate_history_cache(user_id, created_date)
+
+        if self._event_bus:
+            await self._event_bus.emit_for_message_date(
+                MESSAGE_HISTORY_CHANGED_EVENT,
+                user_id=user_id,
+                created_date=created_date,
+                message_id=message_id,
+                reason=reason,
+            )
 
     async def get_message_with_reply(
         self, user_id: str, message_id: str
@@ -437,6 +513,8 @@ class MessagesRepository(BaseRepository):
     async def _handle_message_tags_changed(
         self, *, user_id: str, message_id: str
     ) -> None:
-        created_date = await self.get_message_date(user_id, message_id)
-        if created_date:
-            await self._invalidate_history_cache(user_id, created_date)
+        await self.invalidate_history_for_message(
+            user_id,
+            message_id,
+            reason="tags-changed",
+        )
