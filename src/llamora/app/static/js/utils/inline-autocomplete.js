@@ -8,6 +8,97 @@ const DEFAULT_OPTIONS = {
   onCommit: null,
 };
 
+function isInlineWrapper(node) {
+  return node instanceof HTMLElement && node.classList.contains("inline-autocomplete");
+}
+
+function pruneAncestorWrappers(wrapper) {
+  let ancestor = wrapper?.parentElement;
+  while (isInlineWrapper(ancestor)) {
+    const parentNode = ancestor.parentNode;
+    if (!parentNode) {
+      break;
+    }
+
+    const staleGhosts = ancestor.querySelectorAll(".inline-autocomplete__ghost");
+    for (const node of staleGhosts) {
+      node.remove();
+    }
+
+    const children = Array.from(ancestor.childNodes);
+    parentNode.insertBefore(wrapper, ancestor);
+    for (const child of children) {
+      if (child !== wrapper) {
+        parentNode.insertBefore(child, ancestor);
+      }
+    }
+    parentNode.removeChild(ancestor);
+    ancestor = wrapper.parentElement;
+  }
+}
+
+function resetGhost(wrapper) {
+  if (!wrapper) return null;
+  const existingGhosts = wrapper.querySelectorAll(".inline-autocomplete__ghost");
+  for (const node of existingGhosts) {
+    node.remove();
+  }
+
+  const ghost = document.createElement("span");
+  ghost.className = "inline-autocomplete__ghost";
+  ghost.setAttribute("aria-hidden", "true");
+  wrapper.appendChild(ghost);
+  return ghost;
+}
+
+function releaseAncestorEmptyClasses(wrapper) {
+  let current = wrapper;
+  while (current instanceof HTMLElement) {
+    if (current.classList.contains("inline-autocomplete")) {
+      current.classList.remove("inline-autocomplete--empty");
+    }
+    current = current.parentElement;
+  }
+}
+
+export function ensureInlineAutocompleteElements(input) {
+  if (!(input instanceof HTMLElement)) return null;
+  const parent = input.parentNode;
+  if (!parent) return null;
+
+  let wrapper = null;
+
+  const directParent = input.parentElement;
+  if (isInlineWrapper(directParent)) {
+    wrapper = directParent;
+  } else {
+    const closestWrapper = input.closest(".inline-autocomplete");
+    if (isInlineWrapper(closestWrapper)) {
+      wrapper = closestWrapper;
+      if (wrapper !== input.parentElement) {
+        wrapper.appendChild(input);
+      }
+    }
+  }
+
+  if (wrapper) {
+    pruneAncestorWrappers(wrapper);
+    const ghost = resetGhost(wrapper);
+    wrapper.classList.add("inline-autocomplete");
+    releaseAncestorEmptyClasses(wrapper);
+    input.classList.add("inline-autocomplete__input");
+    return { wrapper, ghost, ownsWrapper: false };
+  }
+
+  wrapper = document.createElement("span");
+  wrapper.className = "inline-autocomplete inline-autocomplete--empty";
+  parent.insertBefore(wrapper, input);
+  wrapper.appendChild(input);
+  const ghost = resetGhost(wrapper);
+  input.classList.add("inline-autocomplete__input");
+  return { wrapper, ghost, ownsWrapper: true };
+}
+
 function asArray(entry) {
   if (entry == null) return [];
   if (Array.isArray(entry)) return entry;
@@ -34,6 +125,7 @@ export class InlineAutocompleteController {
   #ghost;
   #candidates;
   #currentSuggestion;
+  #ownsWrapper;
   #inputHandler;
   #keydownHandler;
   #blurHandler;
@@ -51,6 +143,7 @@ export class InlineAutocompleteController {
     this.#candidates = [];
     this.#rawEntries = [];
     this.#currentSuggestion = null;
+    this.#ownsWrapper = false;
 
 
     this.#wrapInput();
@@ -67,6 +160,7 @@ export class InlineAutocompleteController {
     this.#currentSuggestion = null;
     this.#ghost = null;
     this.#wrapper = null;
+    this.#ownsWrapper = false;
     this.#input = null;
   }
 
@@ -153,26 +247,12 @@ export class InlineAutocompleteController {
   #wrapInput() {
     if (this.#wrapper) return;
     const input = this.#input;
-    const parent = input?.parentNode;
-    if (!parent) return;
+    const prepared = ensureInlineAutocompleteElements(input);
+    if (!prepared) return;
 
-    const wrapper = document.createElement("span");
-    wrapper.className = "inline-autocomplete inline-autocomplete--empty";
-
-    parent.insertBefore(wrapper, input);
-
-    wrapper.appendChild(input);
-
-    const ghost = document.createElement("span");
-    ghost.className = "inline-autocomplete__ghost";
-    ghost.setAttribute("aria-hidden", "true");
-    wrapper.appendChild(ghost);
-
-    input.classList.add("inline-autocomplete__input");
-
-    this.#wrapper = wrapper;
-    this.#ghost = ghost;
-
+    this.#wrapper = prepared.wrapper;
+    this.#ghost = prepared.ghost;
+    this.#ownsWrapper = prepared.ownsWrapper;
   }
 
   #unwrapInput() {
@@ -181,6 +261,14 @@ export class InlineAutocompleteController {
     if (!input || !wrapper) return;
 
     input.classList.remove("inline-autocomplete__input");
+
+    if (this.#ghost && this.#ghost.parentNode === wrapper) {
+      wrapper.removeChild(this.#ghost);
+    }
+
+    if (!this.#ownsWrapper) {
+      return;
+    }
 
     const parent = wrapper.parentNode;
     if (parent) {
