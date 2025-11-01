@@ -175,8 +175,6 @@ export class ChatView extends ReactiveElement {
       return;
     }
 
-    this.#setRenderingState(true);
-
     const container = document.getElementById("content-wrapper");
 
     this.#state = { currentStreamMsgId: null };
@@ -315,6 +313,7 @@ export class ChatView extends ReactiveElement {
 
     const swapTargets = this.#collectSwapTargets(event);
     if (swapTargets.includes(this.#chat)) {
+      this.#setRenderingState(true);
       this.#markdownObserver.pause();
     }
   }
@@ -350,6 +349,7 @@ export class ChatView extends ReactiveElement {
 
     if (swapTargets.includes(this.#chat)) {
       this.#updateStreamingState(true);
+      this.#scheduleRenderingComplete(this.#chat);
     }
 
     this.#syncToChatDate();
