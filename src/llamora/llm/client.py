@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import logging
 from pathlib import Path
 from contextlib import asynccontextmanager, suppress
@@ -8,6 +9,7 @@ import httpx
 import orjson
 from httpx import HTTPError
 
+from cachetools import LRUCache
 from llamora.settings import settings
 from llamora.util import resolve_data_path
 from .process_manager import LlamafileProcessManager
@@ -18,6 +20,7 @@ GRAMMAR_PATH = resolve_data_path(
     settings.PROMPTS.grammar_file, fallback_dir=LLM_DIR
 )
 DEFAULT_LLM_REQUEST = dict(settings.LLM.request)
+HISTORY_TOKEN_CACHE_SIZE = 32
 
 
 class SSEEvent(NamedTuple):
@@ -180,6 +183,12 @@ class LLMClient:
             "Accept-Encoding": "identity",
             "Cache-Control": "no-cache",
         }
+        # Cached cumulative token counts keyed by (history_hash, context_hash).
+        # The cache lets adjacent requests within the same stream reuse
+        # tokenisation results instead of repeatedly calling the HTTP endpoint.
+        self._history_token_cache: LRUCache[
+            tuple[str, str], tuple[int, ...]
+        ] = LRUCache(maxsize=HISTORY_TOKEN_CACHE_SIZE)
 
         with open(GRAMMAR_PATH, "r", encoding="utf-8") as gf:
             self.grammar = gf.read()
@@ -209,22 +218,67 @@ class LLMClient:
         resp.raise_for_status()
         return len(resp.json().get("tokens", []))
 
+    @staticmethod
+    def _fingerprint(data: Any) -> str:
+        def _default(obj: Any) -> str:
+            return repr(obj)
+
+        payload = orjson.dumps(
+            data, option=orjson.OPT_SORT_KEYS, default=_default
+        )
+        return hashlib.blake2b(payload, digest_size=16).hexdigest()
+
+    def _token_cache_key(self, history: list[dict[str, Any]], context: dict[str, Any]) -> tuple[str, str]:
+        history_hash = self._fingerprint(history)
+        context_hash = self._fingerprint(context)
+        return history_hash, context_hash
+
+    async def _get_token_counts(
+        self, history: list[dict[str, Any]], context: dict[str, Any]
+    ) -> tuple[int, ...]:
+        """Return cached cumulative token counts for each history suffix.
+
+        The cache is keyed by a stable hash of the history and context values.
+        Any mutation to either input results in a new key, automatically
+        invalidating stale entries. Counts are eagerly computed for each suffix
+        so that subsequent `_trim_history` calls can be serviced without extra
+        HTTP tokenisation requests.
+        """
+        key = self._token_cache_key(history, context)
+        cached = self._history_token_cache.get(key)
+        if cached is not None and len(cached) == len(history):
+            return cached
+
+        counts = list(cached) if cached is not None else []
+        for idx in range(len(counts), len(history)):
+            prompt = build_prompt(history[idx:], **context)
+            tokens = await self._count_tokens(prompt)
+            counts.append(tokens)
+
+        result = tuple(counts)
+        self._history_token_cache[key] = result
+        return result
+
     async def _trim_history(
         self, history: list[dict[str, Any]], max_input: int, context: dict[str, Any]
     ) -> list[dict[str, Any]]:
+        """Trim the conversation history to respect the model context window.
+
+        The function reuses cached token counts where possible, ensuring the
+        number of tokenisation calls is bounded by the history length for a
+        given history/context pair. Any change to the history or rendering
+        context yields a different cache key, forcing token counts to be
+        recomputed for the new inputs.
+        """
         if not history:
             return history
-        lo, hi = 0, len(history)
-        while lo < hi:
-            mid = (lo + hi) // 2
-            slice_history = history[mid:]
-            prompt = build_prompt(slice_history, **context)
-            tokens = await self._count_tokens(prompt)
+        ctx = dict(context)
+        token_counts = await self._get_token_counts(history, ctx)
+
+        for start_idx, tokens in enumerate(token_counts):
             if tokens <= max_input:
-                hi = mid
-            else:
-                lo = mid + 1
-        return history[lo:]
+                return history[start_idx:]
+        return []
 
     async def stream_response(
         self,
