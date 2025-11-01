@@ -7,8 +7,6 @@ from quart import (
     make_response,
     abort,
 )
-from markupsafe import Markup
-from llamora.app.services.container import get_services
 from llamora.app.services.auth_helpers import (
     login_required,
     get_current_user,
@@ -21,10 +19,6 @@ from llamora.app.routes.chat import render_chat
 days_bp = Blueprint("days", __name__)
 
 
-def _db():
-    return get_services().db
-
-
 @days_bp.route("/")
 @login_required
 async def index():
@@ -32,18 +26,15 @@ async def index():
 
 
 async def _render_day(date: str, target: str | None):
-    render_result = await render_chat(date, oob=False, scroll_target=target)
-    chat_markup = Markup(render_result.html)
+    chat_response = await render_chat(date, oob=False, scroll_target=target)
+    chat_html = chat_response.get_data(as_text=True)
     html = await render_template(
         "index.html",
-        day=render_result.active_date,
-        chat_html=chat_markup,
+        day=date,
+        chat_html=chat_html,
         scroll_target=target,
     )
     resp = await make_response(html, 200)
-    await _db().users.update_state(
-        render_result.user_id, active_date=render_result.active_date
-    )
     return resp
 
 
