@@ -38,8 +38,8 @@
   pointer-events: none;
 }
 
-@media (max-width: 975px) {
-  #calendar-label { display: none; }
+@media (max-width: 920px) {
+  #calendar-label { display: none !important; }
 }
 
 /* Add/remove .text-glow-flash on #calendar-label to trigger a subtle glow pulse */
