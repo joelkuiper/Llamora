@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
 from datetime import datetime, timezone
 from html import escape
+from types import MappingProxyType
 from typing import Any, Iterable, Mapping, Sequence
 
 import orjson
+from quart import Response
+from werkzeug.datastructures import Headers
 
 from llamora.app.services.time import date_and_part
 
@@ -150,13 +154,6 @@ def build_conversation_context(
     return {"date": date_str, "part_of_day": part}
 
 
-async def stream_saved_reply(message: Mapping[str, Any]):
-    """Yield SSE events for an already-saved assistant message."""
-
-    yield format_sse_event("message", message.get("message", ""))
-    yield format_sse_event("done", {"assistant_msg_id": message.get("id")})
-
-
 def _error_events(pending_response, chunk: str | None = None):
     """Yield SSE events for an errored streaming response."""
 
@@ -165,26 +162,103 @@ def _error_events(pending_response, chunk: str | None = None):
     yield format_sse_event("done", {})
 
 
-async def stream_pending_reply(pending_response):
-    """Stream chunks for an active LLM response using the SSE contract."""
+class StreamSession(Response):
+    """Facade for Server-Sent Event responses.
 
-    async for chunk in pending_response.stream():
+    ``StreamSession`` encapsulates the boilerplate required to stream chat
+    responses over SSE.  It standardises headers, formatting, and pending
+    response lifecycle management so callers only need to select the desired
+    flavour of stream.
+    """
+
+    _SSE_HEADERS = MappingProxyType(
+        {
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        }
+    )
+
+    def __init__(
+        self,
+        body,
+        *,
+        status: int = 200,
+        headers: Mapping[str, Any] | None = None,
+    ) -> None:
+        merged_headers = Headers(headers or {})
+        for key, value in self._SSE_HEADERS.items():
+            if key not in merged_headers:
+                merged_headers[key] = value
+        super().__init__(body, status=status, mimetype="text/event-stream", headers=merged_headers)
+
+    @classmethod
+    def pending(cls, pending_response) -> "StreamSession":
+        """Create a streaming response for an in-flight pending reply."""
+
+        async def _body():
+            try:
+                async for event in cls._stream_pending(pending_response):
+                    yield event
+            finally:
+                if not pending_response.done and not pending_response.cancelled:
+                    with suppress(Exception):
+                        await pending_response.cancel()
+
+        return cls(_body())
+
+    @classmethod
+    def saved(cls, message: Mapping[str, Any]) -> "StreamSession":
+        """Create a streaming response for a saved assistant message."""
+
+        async def _body():
+            async for event in cls._stream_saved(message):
+                yield event
+
+        return cls(_body())
+
+    @classmethod
+    def error(cls, message: Any) -> "StreamSession":
+        """Create a streaming response for an error payload."""
+
+        async def _body():
+            yield format_sse_event("error", message)
+            yield format_sse_event("done", {})
+
+        return cls(_body())
+
+    @classmethod
+    def raw(cls, payload: str) -> "StreamSession":
+        """Create a streaming response from a pre-formatted SSE payload."""
+
+        return cls(payload)
+
+    @staticmethod
+    async def _stream_saved(message: Mapping[str, Any]):
+        yield format_sse_event("message", message.get("message", ""))
+        yield format_sse_event("done", {"assistant_msg_id": message.get("id")})
+
+    @staticmethod
+    async def _stream_pending(pending_response):
+        async for chunk in pending_response.stream():
+            if pending_response.error:
+                for event in _error_events(pending_response, chunk):
+                    yield event
+                return
+
+            if chunk:
+                yield format_sse_event("message", chunk)
+
         if pending_response.error:
-            for event in _error_events(pending_response, chunk):
+            for event in _error_events(pending_response):
                 yield event
             return
 
-        if chunk:
-            yield format_sse_event("message", chunk)
+        if pending_response.meta is not None:
+            yield format_sse_event("meta", pending_response.meta)
 
-    if pending_response.error:
-        for event in _error_events(pending_response):
-            yield event
-        return
+        yield format_sse_event(
+            "done", {"assistant_msg_id": pending_response.assistant_msg_id}
+        )
 
-    if pending_response.meta is not None:
-        yield format_sse_event("meta", pending_response.meta)
 
-    yield format_sse_event(
-        "done", {"assistant_msg_id": pending_response.assistant_msg_id}
-    )

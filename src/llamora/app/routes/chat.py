@@ -3,7 +3,6 @@ from quart import (
     render_template,
     request,
     Response,
-    current_app,
     make_response,
     abort,
     url_for,
@@ -23,12 +22,10 @@ from llamora.app.services.auth_helpers import (
 )
 from llamora.app.services.chat_context import get_chat_context
 from llamora.app.services.chat_helpers import (
+    StreamSession,
     build_conversation_context,
     locate_message_and_reply,
     normalize_llm_config,
-    stream_pending_reply,
-    stream_saved_reply,
-    format_sse_event,
 )
 from llamora.app.services.time import (
     local_date,
@@ -41,23 +38,6 @@ from llamora.settings import settings
 
 
 chat_bp = Blueprint("chat", __name__)
-
-
-SSE_HEADERS = {
-    "Cache-Control": "no-cache",
-    "X-Accel-Buffering": "no",
-    "Connection": "keep-alive",
-}
-
-
-def make_sse_response(stream: Any) -> Response:
-    """Create a standardized SSE response.
-
-    Any future SSE endpoints should call this helper to ensure headers remain
-    consistent across the application.
-    """
-
-    return Response(stream, mimetype="text/event-stream", headers=SSE_HEADERS)
 
 
 def _db():
@@ -229,11 +209,7 @@ async def sse_opening(date: str):
 
         msg = f"⚠️ {exc}"
 
-        async def stream_error_events():
-            yield format_sse_event("error", msg)
-            yield format_sse_event("done", {})
-
-        return make_sse_response(stream_error_events())
+        return StreamSession.error(msg)
     stream_id = f"opening:{uid}:{today_iso}"
     manager = _chat_stream_manager()
     pending = manager.start_stream(
@@ -248,7 +224,7 @@ async def sse_opening(date: str):
         meta_extra={"auto_opening": True},
     )
 
-    return make_sse_response(stream_pending_reply(pending))
+    return StreamSession.pending(pending)
 
 
 @chat_bp.route("/c/<date>/message", methods=["POST"])
@@ -309,10 +285,10 @@ async def sse_reply(user_msg_id: str, date: str):
 
     if not history:
         logger.warning("History not found for user message %s", user_msg_id)
-        return make_sse_response("event: error\ndata: Invalid ID\n\n")
+        return StreamSession.error("Invalid ID")
 
     if existing_assistant_msg:
-        return make_sse_response(stream_saved_reply(existing_assistant_msg))
+        return StreamSession.saved(existing_assistant_msg)
 
     params_raw = normalize_llm_config(
         request.args.get("config"),
@@ -338,4 +314,4 @@ async def sse_reply(user_msg_id: str, date: str):
             ctx,
         )
 
-    return make_sse_response(stream_pending_reply(pending_response))
+    return StreamSession.pending(pending_response)
