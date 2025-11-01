@@ -35,10 +35,8 @@ body {
 
 /* Main chat panel */
 #content-wrapper {
-  box-shadow:
-    -4px 0 8px var(--shadow-dark),
-    0 0 0 1px var(--shadow-light-60) inset;
-  border: 1px solid var(--border-strong);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--border);
   z-index: 1;
   padding: var(--spacing-xl) var(--spacing-xl) 3rem var(--spacing-xl);
   flex: 1;
