@@ -229,12 +229,42 @@ chat-view[data-rendering="true"] #chat {
     .btn.stopping::before {
       content: "\23F9"; /* ⏹ */
     }
+    .btn.stopping {
+      background: linear-gradient(
+        135deg,
+        var(--accent-15) 0%,
+        var(--accent-05) 55%,
+        var(--color-bg) 100%
+      );
+      background-size: 220% 220%;
+      background-position: 50% 0%;
+      animation: stopping-wave 2.4s ease-in-out infinite;
+      will-change: background-position, filter;
+    }
+
+    .btn.stopping:active {
+      animation-play-state: paused;
+    }
+
+    .btn.stopping:focus,
+    .btn.stopping:focus-visible {
+      animation-play-state: paused;
+      background-position: 50% 50%;
+    }
 
     textarea:disabled,
     button:disabled {
       opacity: 0.5;
       cursor: default;
     }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .input-wrapper .btn.stopping {
+    animation: none;
+    background-position: 50% 50%;
+    filter: none;
   }
 }
 
@@ -330,6 +360,17 @@ scroll-bottom-button .scroll-btn {
 @keyframes appear {
   from { transform: none scale(0.92); opacity: 0; }
   to   { transform: none scale(1);     opacity: 0.9; }
+}
+
+@keyframes stopping-wave {
+  0%, 100% {
+    background-position: 50% 0%;
+    filter: saturate(105%);
+  }
+  50% {
+    background-position: 50% 100%;
+    filter: saturate(125%);
+  }
 }
 
 @keyframes breathe {
