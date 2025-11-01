@@ -1,6 +1,8 @@
 import asyncio
 import logging
 import time
+from heapq import heappop, heappush
+from itertools import count
 from collections.abc import AsyncIterator
 from contextlib import suppress
 from typing import Callable
@@ -231,6 +233,8 @@ class ChatStreamManager:
         self._db = db
         self._pending_ttl = pending_ttl
         self._pending: dict[str, PendingResponse] = {}
+        self._pending_heap: list[tuple[float, int, str, PendingResponse]] = []
+        self._heap_counter = count()
 
     def set_db(self, db) -> None:
         self._db = db
@@ -239,19 +243,32 @@ class ChatStreamManager:
         return self._pending.get(user_msg_id)
 
     def _prune_stale_pending(self, now: float | None = None) -> None:
-        if not self._pending:
+        if not self._pending_heap:
             return
 
         if now is None:
             now = time.monotonic()
 
         ttl = self._pending_ttl
-        stale_entries: list[tuple[str, PendingResponse]] = [
-            (user_msg_id, pending)
-            for user_msg_id, pending in self._pending.items()
-            if now - pending.created_at >= ttl
-        ]
-        for user_msg_id, pending in stale_entries:
+        heap = self._pending_heap
+        while heap:
+            expiry, _, user_msg_id, pending = heap[0]
+            if expiry > now:
+                break
+
+            heappop(heap)
+            current = self._pending.get(user_msg_id)
+            if current is not pending:
+                continue
+
+            actual_expiry = pending.created_at + ttl
+            if actual_expiry > now:
+                heappush(
+                    heap,
+                    (actual_expiry, next(self._heap_counter), user_msg_id, pending),
+                )
+                continue
+
             logger.debug("Dropping stale pending response %s", user_msg_id)
             self._schedule_pending_cancellation(user_msg_id, pending)
 
@@ -321,14 +338,23 @@ class ChatStreamManager:
             meta_extra,
         )
         self._pending[user_msg_id] = pending
+        heappush(
+            self._pending_heap,
+            (
+                pending.created_at + self._pending_ttl,
+                next(self._heap_counter),
+                user_msg_id,
+                pending,
+            ),
+        )
         return pending
 
     async def stop(self, user_msg_id: str) -> tuple[bool, bool]:
+        self._prune_stale_pending()
         pending = self._pending.get(user_msg_id)
         if pending:
             logger.debug("Cancelling pending response %s", user_msg_id)
             await pending.cancel()
-            self._prune_stale_pending()
             return True, True
         handled = await self._llm.abort(user_msg_id)
         return handled, False
@@ -344,6 +370,7 @@ class ChatStreamManager:
             with suppress(Exception):
                 await pending.cancel()
         self._pending.clear()
+        self._pending_heap.clear()
 
 
 __all__ = ["ChatStreamManager", "LLMStreamSession", "PendingResponse"]
