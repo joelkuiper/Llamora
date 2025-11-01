@@ -9,7 +9,7 @@ from .base import BaseRepository
 from .events import RepositoryEventBus, MESSAGE_TAGS_CHANGED_EVENT
 from .utils import cached_tag_name
 from llamora.app.util.tags import canonicalize, tag_hash
-from llamora.app.utils.frecency import DEFAULT_FRECENCY_DECAY, resolve_frecency_lambda
+from llamora.app.util.frecency import DEFAULT_FRECENCY_DECAY, resolve_frecency_lambda
 
 
 class TagsRepository(BaseRepository):

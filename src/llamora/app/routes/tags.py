@@ -3,7 +3,7 @@ from llamora.app.services.container import get_services
 from llamora.app.services.auth_helpers import login_required, get_current_user, get_dek
 from llamora.app.util.tags import canonicalize, display
 from llamora.settings import settings
-from llamora.app.utils.frecency import (
+from llamora.app.util.frecency import (
     DEFAULT_FRECENCY_DECAY,
     resolve_frecency_lambda,
 )

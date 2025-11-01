@@ -11,7 +11,7 @@ from llamora.app.services.auth_helpers import (
     get_dek,
 )
 from llamora.settings import settings
-from llamora.app.utils.frecency import (
+from llamora.app.util.frecency import (
     resolve_frecency_lambda,
     DEFAULT_FRECENCY_DECAY,
 )
