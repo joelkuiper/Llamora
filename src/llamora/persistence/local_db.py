@@ -1,7 +1,7 @@
 import asyncio
 import atexit
 import logging
-import os
+from pathlib import Path
 from typing import TypeVar, cast
 
 import aiosqlite
@@ -32,7 +32,9 @@ class LocalDB:
     """Facade around SQLite repositories with shared connection pooling."""
 
     def __init__(self, db_path: str | None = None):
-        self.db_path = str(db_path or settings.DATABASE.path)
+        raw_path = Path(db_path or settings.DATABASE.path)
+        self.db_path = raw_path.expanduser().resolve(strict=False)
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.pool: SQLiteConnectionPool | None = None
         self.search_api = None
         self._users: UsersRepository | None = None
@@ -78,7 +80,7 @@ class LocalDB:
             self._messages.set_on_message_appended(self._on_message_appended)
 
     async def init(self) -> None:
-        is_new = not os.path.exists(self.db_path)
+        is_new = not self.db_path.exists()
         acquisition_timeout = int(settings.DATABASE.pool_acquire_timeout)
 
         async def _connection_factory() -> SQLitePoolConnection:
