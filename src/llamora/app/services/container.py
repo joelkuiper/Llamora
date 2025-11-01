@@ -80,15 +80,18 @@ class AppLifecycle:
             if self._started:
                 return
 
-            logger.debug("Starting application lifecycle")
+            logger.debug(
+                "Starting application lifecycle: db.init -> search_api.start -> llm_service.ensure_started"
+            )
             await self._services.db.init()
             await self._services.search_api.start()
-            await self._services.llm_service.start()
+            await self._services.llm_service.ensure_started()
             self._maintenance_task = asyncio.create_task(
                 self._maintenance_loop(),
                 name="llamora-maintenance",
             )
             self._started = True
+            logger.info("Application lifecycle started")
 
     async def stop(self) -> None:
         """Stop services and cancel background maintenance."""
@@ -98,7 +101,9 @@ class AppLifecycle:
             if not self._started:
                 return
 
-            logger.debug("Stopping application lifecycle")
+            logger.debug(
+                "Stopping application lifecycle: cancel maintenance -> llm_service.ensure_stopped -> search_api.stop -> db.close"
+            )
             maintenance_task = self._maintenance_task
             self._maintenance_task = None
             self._started = False
@@ -108,9 +113,10 @@ class AppLifecycle:
             with suppress(asyncio.CancelledError):
                 await maintenance_task
 
-        await self._services.llm_service.stop()
+        await self._services.llm_service.ensure_stopped()
         await self._services.search_api.stop()
         await self._services.db.close()
+        logger.info("Application lifecycle stopped")
 
     async def _maintenance_loop(self) -> None:
         try:

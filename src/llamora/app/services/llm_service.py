@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any
 
 from llamora.llm.client import LLMClient
 from llamora.llm.process_manager import LlamafileProcessManager
 
 from .chat_stream import ChatStreamManager
+
+
+logger = logging.getLogger(__name__)
 
 
 class LLMService:
@@ -19,20 +23,29 @@ class LLMService:
         self._process_manager: LlamafileProcessManager | None = None
         self._llm: LLMClient | None = None
         self._chat_stream_manager: ChatStreamManager | None = None
-        self._lock: asyncio.Lock | None = None
+        self._lock = asyncio.Lock()
 
     async def start(self) -> None:
         """Initialise the llamafile stack if it is not already running."""
 
+        await self.ensure_started()
+
+    async def stop(self) -> None:
+        """Tear down the llamafile stack."""
+
+        await self.ensure_stopped()
+
+    async def ensure_started(self) -> None:
+        """Ensure that the llamafile stack has been started."""
+
         if self._llm is not None:
             return
-
-        if self._lock is None:
-            self._lock = asyncio.Lock()
 
         async with self._lock:
             if self._llm is not None:
                 return
+
+            logger.debug("Initialising LLM service stack")
 
             process_manager = LlamafileProcessManager()
             await asyncio.to_thread(process_manager.ensure_server_running)
@@ -45,15 +58,17 @@ class LLMService:
             self._llm = llm_client
             self._chat_stream_manager = chat_stream_manager
 
-    async def stop(self) -> None:
-        """Tear down the llamafile stack."""
+            logger.info("LLM service stack started")
 
-        lock = self._lock
-        if lock is None:
-            self._lock = asyncio.Lock()
-            lock = self._lock
+    async def ensure_stopped(self) -> None:
+        """Ensure that the llamafile stack has been stopped."""
 
-        async with lock:
+        async with self._lock:
+            if self._llm is None and self._process_manager is None:
+                return
+
+            logger.debug("Tearing down LLM service stack")
+
             chat_stream_manager = self._chat_stream_manager
             llm_client = self._llm
             process_manager = self._process_manager
@@ -70,6 +85,8 @@ class LLMService:
 
         if process_manager is not None:
             await asyncio.to_thread(process_manager.shutdown)
+
+        logger.info("LLM service stack stopped")
 
     @property
     def process_manager(self) -> LlamafileProcessManager:
