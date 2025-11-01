@@ -21,6 +21,40 @@ def replace_newline(value: str) -> str:
     )
 
 
+def _serialize_payload(payload: Any) -> tuple[str, bool]:
+    """Serialize a payload for SSE transmission."""
+
+    if payload is None:
+        return "", True
+
+    if isinstance(payload, (bytes, bytearray)):
+        payload = payload.decode("utf-8", "replace")
+
+    if isinstance(payload, str):
+        return payload, True
+
+    if isinstance(payload, Mapping) or isinstance(payload, Sequence):
+        try:
+            serialized = orjson.dumps(payload).decode()
+        except TypeError:
+            if isinstance(payload, Mapping):
+                serialized = "{}"
+            else:
+                serialized = "[]"
+        return serialized, False
+
+    return str(payload), True
+
+
+def format_sse_event(event_type: str, payload: Any) -> str:
+    """Format a Server-Sent Event payload with consistent escaping."""
+
+    serialized, escape_quotes = _serialize_payload(payload)
+    if serialized:
+        serialized = replace_newline(escape(serialized, quote=escape_quotes))
+    return f"event: {event_type}\ndata: {serialized}\n\n"
+
+
 def find_existing_assistant_reply(
     history: Sequence[Mapping[str, Any]], user_msg_id: str
 ) -> Mapping[str, Any] | None:
@@ -119,20 +153,16 @@ def build_conversation_context(
 async def stream_saved_reply(message: Mapping[str, Any]):
     """Yield SSE events for an already-saved assistant message."""
 
-    escaped_message = replace_newline(escape(message.get("message", "")))
-    yield f"event: message\ndata: {escaped_message}\n\n"
-
-    payload = orjson.dumps({"assistant_msg_id": message.get("id")}).decode()
-    yield f"event: done\ndata: {escape(payload)}\n\n"
+    yield format_sse_event("message", message.get("message", ""))
+    yield format_sse_event("done", {"assistant_msg_id": message.get("id")})
 
 
 def _error_events(pending_response, chunk: str | None = None):
     """Yield SSE events for an errored streaming response."""
 
     message = chunk or pending_response.text or pending_response.error_message or ""
-    formatted = replace_newline(escape(message)) if message else ""
-    yield f"event: error\ndata: {formatted}\n\n"
-    yield "event: done\ndata: {}\n\n"
+    yield format_sse_event("error", message)
+    yield format_sse_event("done", {})
 
 
 async def stream_pending_reply(pending_response):
@@ -145,8 +175,7 @@ async def stream_pending_reply(pending_response):
             return
 
         if chunk:
-            formatted_chunk = replace_newline(escape(chunk))
-            yield f"event: message\ndata: {formatted_chunk}\n\n"
+            yield format_sse_event("message", chunk)
 
     if pending_response.error:
         for event in _error_events(pending_response):
@@ -154,15 +183,8 @@ async def stream_pending_reply(pending_response):
         return
 
     if pending_response.meta is not None:
-        try:
-            meta_payload = orjson.dumps(pending_response.meta).decode()
-        except TypeError:
-            meta_payload = "{}"
-        safe_meta = replace_newline(escape(meta_payload, quote=False))
-        yield f"event: meta\ndata: {safe_meta}\n\n"
+        yield format_sse_event("meta", pending_response.meta)
 
-    payload = orjson.dumps(
-        {"assistant_msg_id": pending_response.assistant_msg_id}
-    ).decode()
-    safe_payload = replace_newline(escape(payload, quote=False))
-    yield f"event: done\ndata: {safe_payload}\n\n"
+    yield format_sse_event(
+        "done", {"assistant_msg_id": pending_response.assistant_msg_id}
+    )
