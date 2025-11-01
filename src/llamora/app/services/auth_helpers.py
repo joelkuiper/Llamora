@@ -30,6 +30,13 @@ DEK_STORAGE = str(settings.CRYPTO.dek_storage).lower()
 
 # Rough upper bound on concurrent sessions; adjust as needed
 dek_store = TTLCache(maxsize=1024, ttl=int(settings.SESSION.ttl))
+
+# Cache snapshots of user rows keyed by the authentication cookies so rapid
+# successive requests (such as static asset fetches) do not repeatedly hit the
+# database. The TTL is intentionally short so recent changes propagate quickly
+# while still covering bursts of concurrent asset requests.
+_user_snapshot_cache: TTLCache = TTLCache(maxsize=2048, ttl=60)
+_MISSING_USER = object()
 def _get_cookie_data() -> dict:
     # If we've already got a merged state this request, return it
     if hasattr(g, "_secure_cookie_state"):
@@ -139,6 +146,16 @@ def clear_session_dek() -> None:
             dek_store.pop(sid, None)
 
 
+def _user_cache_key(uid: str) -> tuple[str, str]:
+    """Build a cache key incorporating the session marker if available."""
+
+    if DEK_STORAGE == "session":
+        sid = get_secure_cookie("sid")
+        return (uid, sid or "")
+    dek = get_secure_cookie("dek")
+    return (uid, dek or "")
+
+
 async def get_current_user():
     """Return the current user for the request, caching the lookup."""
 
@@ -149,8 +166,14 @@ async def get_current_user():
     if not uid:
         user = None
     else:
-        services = get_services()
-        user = await services.db.users.get_user_by_id(uid)
+        cache_key = _user_cache_key(uid)
+        if cache_key in _user_snapshot_cache:
+            cached = _user_snapshot_cache[cache_key]
+            user = None if cached is _MISSING_USER else cached
+        else:
+            services = get_services()
+            user = await services.db.users.get_user_by_id(uid)
+            _user_snapshot_cache[cache_key] = user if user else _MISSING_USER
 
     g._current_user = user
     return g._current_user
@@ -229,6 +252,16 @@ def login_required(f):
 
 async def load_user():
     # Eager-load user info if needed in templates
+    endpoint = request.endpoint or ""
+    if endpoint == "static" or endpoint.endswith(".static"):
+        current_app.logger.debug("Skipping user load for static endpoint %s", endpoint)
+        return
+
+    path = request.path
+    if path.startswith("/static/") or path in {"/health", "/healthz", "/ready"}:
+        current_app.logger.debug("Skipping user load for lightweight path %s", path)
+        return
+
     user = await get_current_user()
     if user:
         _ = get_dek()  # refresh session DEK TTL if present
