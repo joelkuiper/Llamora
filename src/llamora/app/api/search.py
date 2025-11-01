@@ -1,6 +1,7 @@
 import logging
 import re
 import time
+from collections import OrderedDict
 
 import orjson
 
@@ -97,8 +98,7 @@ class SearchAPI:
             user_id, dek, normalized, k1, k2
         )
 
-        candidate_map: dict[str, dict] = {}
-        ordered_ids: list[str] = []
+        candidate_map: OrderedDict[str, dict] = OrderedDict()
         for cand in candidates:
             mid = cand.get("id")
             if not mid:
@@ -106,8 +106,6 @@ class SearchAPI:
             existing = candidate_map.get(mid)
             if existing is None or cand.get("cosine", 0.0) > existing.get("cosine", 0.0):
                 candidate_map[mid] = cand
-            if mid not in ordered_ids:
-                ordered_ids.append(mid)
 
         seen_tokens: set[str] = set()
         tokens: list[str] = []
@@ -127,7 +125,7 @@ class SearchAPI:
         boosts: dict[str, float] = {}
         if tokens:
             tag_hashes = [tag_hash(user_id, t) for t in tokens]
-            limit = max(k2, len(ordered_ids), 1)
+            limit = max(k2, len(candidate_map), 1)
             tag_message_ids = await self.db.tags.get_recent_messages_for_tag_hashes(
                 user_id, tag_hashes, limit=limit
             )
@@ -150,10 +148,8 @@ class SearchAPI:
                             "content": row.get("message", ""),
                             "cosine": 0.0,
                         }
-                        if mid not in ordered_ids:
-                            ordered_ids.append(mid)
 
-            message_ids = [mid for mid in ordered_ids if mid in candidate_map]
+            message_ids = list(candidate_map.keys())
             if message_ids:
                 tag_map = await self.db.tags.get_messages_with_tag_hashes(
                     user_id, tag_hashes, message_ids
@@ -169,16 +165,7 @@ class SearchAPI:
             )
             return normalized, [], truncated
 
-        ordered_candidates: list[dict] = []
-        seen_order: set[str] = set()
-        for mid in ordered_ids:
-            if mid in candidate_map and mid not in seen_order:
-                ordered_candidates.append(candidate_map[mid])
-                seen_order.add(mid)
-        for mid, cand in candidate_map.items():
-            if mid not in seen_order:
-                ordered_candidates.append(cand)
-                seen_order.add(mid)
+        ordered_candidates = list(candidate_map.values())
 
         results = self.lexical_reranker.rerank(
             normalized, ordered_candidates, k2, boosts
