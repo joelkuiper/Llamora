@@ -1,5 +1,7 @@
 
 :root {
+  color-scheme: light;
+
   /* Base colors */
   --color-bg: #fafafa;
   --color-bg-alt: #f6f6f6;
@@ -140,6 +142,180 @@
   --brand-warm: #b52d10;
   --brand-warm-08: color-mix(in srgb, var(--brand-warm), transparent 92%);
   --brand-warm-20: color-mix(in srgb, var(--brand-warm), transparent 80%);
+
+  /* Dark theme values */
+  --color-bg-dark: #0f172a;
+  --color-bg-alt-dark: #122036;
+  --color-user-bg-dark: #182a45;
+  --color-text-dark: #dbeafe;
+  --color-heading-dark: #f8fbff;
+  --color-user-text-dark: #e8f0ff;
+  --color-assistant-text-dark: #cbd5f5;
+  --color-assistant-bg-dark: #142338;
+
+  --accent-dark: #5aa4ff;
+  --accent-hover-dark: #7ab4ff;
+  --accent-active-dark: #95c4ff;
+  --accent-05-dark: rgba(90,164,255,0.16);
+  --accent-10-dark: rgba(90,164,255,0.22);
+  --accent-20-dark: rgba(90,164,255,0.32);
+  --accent-30-dark: rgba(90,164,255,0.42);
+  --accent-60-dark: rgba(131,186,255,0.60);
+  --accent-drop-shadow-dark: rgba(90,164,255,0.35);
+  --highlight-color-dark: #564300;
+
+  --shadow-dark-dark: rgba(0,0,0,0.65);
+  --shadow-dark-02-dark: rgba(0,0,0,0.38);
+  --shadow-light-dark: rgba(255,255,255,0.12);
+  --shadow-light-60-dark: rgba(255,255,255,0.24);
+  --raised-shadow-dark: 0 12px 28px rgba(0,0,0,0.55), 0 4px 12px rgba(0,0,0,0.35);
+  --subtle-raised-shadow-dark: 0 4px 12px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.28);
+  --inset-shadow-dark: inset 1px 1px 2px rgba(255,255,255,0.04),
+                       inset -1px -1px 2px rgba(0,0,0,0.45);
+  --inset-shadow-disabled-dark: inset 1px 1px 2px rgba(255,255,255,0.02),
+                                inset -1px -1px 2px rgba(0,0,0,0.35);
+  --border-dark: rgba(148,163,184,0.32);
+  --border-strong-dark: rgba(148,163,184,0.58);
+  --border-user-dark: rgba(90,164,255,0.45);
+  --color-text-muted-dark: #94a3b8;
+
+  --color-error-bg-dark: #2f1a24;
+  --color-error-bg-alt-dark: #3b202b;
+  --color-error-text-dark: #ffb3c1;
+  --color-error-text-strong-dark: #ffd5db;
+  --color-error-hover-dark: #ff8fa3;
+
+  --color-success-bg-dark: #0f2e25;
+  --color-success-bg-alt-dark: #13352c;
+  --color-success-text-dark: #9ff7ca;
+
+  --color-danger-dark: #ff5a7a;
+  --color-danger-bg-dark: #361826;
+  --color-danger-mix-dark: #ff8aa7;
+  --danger-15-dark: rgba(255,90,122,0.25);
+  --danger-20-dark: rgba(255,90,122,0.30);
+  --danger-25-dark: rgba(255,90,122,0.36);
+
+  --scroll-btn-color-dark: rgba(255,255,255,0.72);
+
+  --glass-bg-dark: rgba(15,23,42,0.72);
+  --glass-bg-hover-dark: rgba(30,41,59,0.78);
+  --glass-bg-strong-dark: rgba(11,18,34,0.85);
+  --glass-bg-strong-hover-dark: rgba(17,24,40,0.90);
+  --glass-bg-alt-dark: rgba(18,28,45,0.92);
+  --glass-bg-alt-hover-dark: rgba(30,41,59,0.94);
+  --glass-fallback-bg-dark: #111a2c;
+  --glass-text-muted-dark: rgba(226,232,240,0.72);
+  --glass-text-strong-dark: rgba(226,232,240,0.85);
+  --glass-text-stronger-dark: rgba(248,250,255,0.95);
+
+  --chip-remove-bg-dark: rgba(148,163,184,0.45);
+  --chip-remove-bg-hover-dark: rgba(148,163,184,0.80);
+
+  --password-strength-1-dark: #ff8080;
+  --password-strength-2-dark: #ffd166;
+  --password-strength-3-dark: #7dd3fc;
+  --password-strength-4-dark: #34d399;
+
+  --pulse-bg-start-dark: rgba(15,23,42,0.85);
+  --pulse-bg-mid-dark: rgba(15,23,42,0.75);
+  --pulse-bg-end-dark: rgba(15,23,42,0.85);
+
+  --overlay-close-bg-dark: rgba(255,255,255,0.08);
+  --overlay-close-hover-bg-dark: rgba(148,163,184,0.18);
+
+  --brand-text-dark: #e2e8f0;
+  --brand-bg-dark: #0b1120;
+  --brand-muted-dark: #475569;
+  --brand-accent-dark: #7aa2f7;
+  --brand-accent-08-dark: color-mix(in srgb, var(--brand-accent-dark), transparent 92%);
+  --brand-accent-15-dark: color-mix(in srgb, var(--brand-accent-dark), transparent 85%);
+  --brand-accent-25-dark: color-mix(in srgb, var(--brand-accent-dark), transparent 75%);
+  --brand-warm-dark: #f97316;
+  --brand-warm-08-dark: color-mix(in srgb, var(--brand-warm-dark), transparent 92%);
+  --brand-warm-20-dark: color-mix(in srgb, var(--brand-warm-dark), transparent 80%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --color-bg: var(--color-bg-dark);
+    --color-bg-alt: var(--color-bg-alt-dark);
+    --color-user-bg: var(--color-user-bg-dark);
+    --color-text: var(--color-text-dark);
+    --color-heading: var(--color-heading-dark);
+    --color-user-text: var(--color-user-text-dark);
+    --color-assistant-text: var(--color-assistant-text-dark);
+    --color-assistant-bg: var(--color-assistant-bg-dark);
+    --color-text-muted: var(--color-text-muted-dark);
+    --accent: var(--accent-dark);
+    --accent-hover: var(--accent-hover-dark);
+    --accent-active: var(--accent-active-dark);
+    --accent-05: var(--accent-05-dark);
+    --accent-10: var(--accent-10-dark);
+    --accent-20: var(--accent-20-dark);
+    --accent-30: var(--accent-30-dark);
+    --accent-60: var(--accent-60-dark);
+    --accent-drop-shadow: var(--accent-drop-shadow-dark);
+    --highlight-color: var(--highlight-color-dark);
+    --shadow-dark: var(--shadow-dark-dark);
+    --shadow-dark-02: var(--shadow-dark-02-dark);
+    --shadow-light: var(--shadow-light-dark);
+    --shadow-light-60: var(--shadow-light-60-dark);
+    --raised-shadow: var(--raised-shadow-dark);
+    --subtle-raised-shadow: var(--subtle-raised-shadow-dark);
+    --inset-shadow: var(--inset-shadow-dark);
+    --inset-shadow-disabled: var(--inset-shadow-disabled-dark);
+    --border: var(--border-dark);
+    --border-strong: var(--border-strong-dark);
+    --border-user: var(--border-user-dark);
+    --color-error-bg: var(--color-error-bg-dark);
+    --color-error-bg-alt: var(--color-error-bg-alt-dark);
+    --color-error-text: var(--color-error-text-dark);
+    --color-error-text-dark: var(--color-error-text-strong-dark);
+    --color-error-hover: var(--color-error-hover-dark);
+    --color-success-bg: var(--color-success-bg-dark);
+    --color-success-bg-alt: var(--color-success-bg-alt-dark);
+    --color-success-text: var(--color-success-text-dark);
+    --color-danger: var(--color-danger-dark);
+    --color-danger-bg: var(--color-danger-bg-dark);
+    --color-danger-mix: var(--color-danger-mix-dark);
+    --danger-15: var(--danger-15-dark);
+    --danger-20: var(--danger-20-dark);
+    --danger-25: var(--danger-25-dark);
+    --scroll-btn-color: var(--scroll-btn-color-dark);
+    --glass-bg: var(--glass-bg-dark);
+    --glass-bg-hover: var(--glass-bg-hover-dark);
+    --glass-bg-strong: var(--glass-bg-strong-dark);
+    --glass-bg-strong-hover: var(--glass-bg-strong-hover-dark);
+    --glass-bg-alt: var(--glass-bg-alt-dark);
+    --glass-bg-alt-hover: var(--glass-bg-alt-hover-dark);
+    --glass-fallback-bg: var(--glass-fallback-bg-dark);
+    --glass-text-muted: var(--glass-text-muted-dark);
+    --glass-text-strong: var(--glass-text-strong-dark);
+    --glass-text-stronger: var(--glass-text-stronger-dark);
+    --chip-remove-bg: var(--chip-remove-bg-dark);
+    --chip-remove-bg-hover: var(--chip-remove-bg-hover-dark);
+    --password-strength-1: var(--password-strength-1-dark);
+    --password-strength-2: var(--password-strength-2-dark);
+    --password-strength-3: var(--password-strength-3-dark);
+    --password-strength-4: var(--password-strength-4-dark);
+    --pulse-bg-start: var(--pulse-bg-start-dark);
+    --pulse-bg-mid: var(--pulse-bg-mid-dark);
+    --pulse-bg-end: var(--pulse-bg-end-dark);
+    --overlay-close-bg: var(--overlay-close-bg-dark);
+    --overlay-close-hover-bg: var(--overlay-close-hover-bg-dark);
+    --brand-text: var(--brand-text-dark);
+    --brand-bg: var(--brand-bg-dark);
+    --brand-muted: var(--brand-muted-dark);
+    --brand-accent: var(--brand-accent-dark);
+    --brand-accent-08: var(--brand-accent-08-dark);
+    --brand-accent-15: var(--brand-accent-15-dark);
+    --brand-accent-25: var(--brand-accent-25-dark);
+    --brand-warm: var(--brand-warm-dark);
+    --brand-warm-08: var(--brand-warm-08-dark);
+    --brand-warm-20: var(--brand-warm-20-dark);
+  }
 }
 
 * { box-sizing: border-box; }
