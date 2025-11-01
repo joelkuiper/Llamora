@@ -199,7 +199,7 @@ chat-view[data-rendering="true"] #chat {
 #message-form {
   max-width: 60rem;
   margin: 0 auto var(--spacing-xl);
-  background: var(--glass-bg-strong);
+  background: var(--glass-bg-opaque);
   border-radius: var(--radius-lg);
   box-shadow: var(--raised-shadow);
   padding: var(--spacing-md);
