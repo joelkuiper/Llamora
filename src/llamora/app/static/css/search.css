@@ -23,7 +23,7 @@
   box-shadow: var(--raised-shadow);
   outline: none;
   font-family: var(--font-base);
-  transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.05s ease;
+  transition: box-shadow var(--motion-fade) ease, border-color var(--motion-fade) ease, transform var(--motion-tap) ease;
 
   &:hover {
     border-color: var(--accent-10);
@@ -82,12 +82,12 @@
   font-size: 1rem;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.2s ease-in-out;
+  transition: opacity var(--motion-gentle) ease-in-out;
   transition-delay: 0s;
 
   &.htmx-request {
     opacity: 1;
-    transition-delay: 0.2s;
+    transition-delay: var(--motion-gentle);
   }
 }
 
@@ -160,7 +160,7 @@
   text-decoration: none;
     color: inherit;
     border: 1px solid transparent; /* for a crisp hover edge */
-    transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    transition: background var(--motion-hover) ease, border-color var(--motion-hover) ease, box-shadow var(--motion-hover) ease;
   }
 
   .search-result-meta {

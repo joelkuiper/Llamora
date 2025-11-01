@@ -101,6 +101,26 @@
   --pulse-bg-mid: rgba(235,235,235,0.8);
   --pulse-bg-end: rgba(250,250,250,0.85);
 
+  --motion-tap: 50ms;            /* ultra-fast tap highlights */
+  --motion-snap: 60ms;           /* springy flicks */
+  --motion-press: 80ms;          /* micro interactions */
+  --motion-toggle: 100ms;        /* quick affordance toggles */
+  --motion-tight: 120ms;         /* compact hover/press combos */
+  --motion-hover: 150ms;         /* standard hover transitions */
+  --motion-lull: 160ms;          /* default UI fades */
+  --motion-fade: 180ms;          /* default fade/entry timing */
+  --motion-gentle: 200ms;        /* multi-property hover/focus */
+  --motion-lilt: 220ms;          /* soft easing for glass UI */
+  --motion-calm: 250ms;          /* slightly longer emphasis */
+  --motion-pulse: 280ms;         /* tactile pulse feedback */
+  --motion-sigh: 300ms;          /* modal fades and scroll CTA */
+  --motion-delay-short: 400ms;   /* delayed looping starts */
+  --motion-delay-medium: 500ms;  /* staggered reveals */
+  --motion-blink: 1s;            /* caret/typing indicator */
+  --motion-exhale: 1.2s;         /* easing out subtle exits */
+  --motion-wave: 2.4s;           /* animated gradients */
+  --motion-breathe: 6s;          /* ambient breathing loops */
+
   /* Overlay close */
   --overlay-close-bg: rgba(0,0,0,0.10);
   --overlay-close-hover-bg: rgba(0,0,0,0.18);
@@ -227,19 +247,19 @@ html, body {
 
 
 .pop-enter {
-  animation: lull-in 160ms ease both;
+  animation: lull-in var(--motion-lull) ease both;
 }
 
 .pop-exit {
-  animation: lull-out 160ms ease both;
+  animation: lull-out var(--motion-lull) ease both;
 }
 
 .fade-enter {
-  animation: fade-in 160ms ease both;
+  animation: fade-in var(--motion-lull) ease both;
 }
 
 .fade-exit {
-  animation: fade-out 160ms ease both;
+  animation: fade-out var(--motion-lull) ease both;
 }
 
 @keyframes fade-in {
@@ -263,10 +283,10 @@ html, body {
   box-shadow: var(--inset-shadow);
   cursor: pointer;
   transition:
-    box-shadow 0.2s ease,
-    border-color 0.2s ease,
-    transform 0.08s ease,
-    background-color 0.2s ease;
+    box-shadow var(--motion-gentle) ease,
+    border-color var(--motion-gentle) ease,
+    transform var(--motion-press) ease,
+    background-color var(--motion-gentle) ease;
 }
 
 
@@ -366,10 +386,10 @@ html, body {
   font-size: var(--font-size);
   box-shadow: var(--inset-shadow);
   transition:
-    box-shadow 0.25s ease,
-    border-color 0.2s ease,
-    background-color 0.2s ease,
-    transform 0.05s ease;
+    box-shadow var(--motion-calm) ease,
+    border-color var(--motion-gentle) ease,
+    background-color var(--motion-gentle) ease,
+    transform var(--motion-tap) ease;
 }
 
 .input::placeholder { opacity: 0.65; }
@@ -412,8 +432,8 @@ input[type="checkbox"] {
   box-shadow: var(--inset-shadow);
   cursor: pointer;
   position: relative;
-  transition: box-shadow 0.2s ease, border-color 0.2s ease,
-    background-color 0.2s ease;
+  transition: box-shadow var(--motion-gentle) ease, border-color var(--motion-gentle) ease,
+    background-color var(--motion-gentle) ease;
 }
 
 input[type="checkbox"]::after {
@@ -540,7 +560,7 @@ input[type="checkbox"]:focus {
   border-radius: var(--radius-sm);
   color: var(--color-heading);
   opacity: 0.45;
-  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+  transition: background var(--motion-gentle) ease, color var(--motion-gentle) ease, transform var(--motion-gentle) ease, opacity var(--motion-gentle) ease;
 
   &:hover {
     background: var(--accent-10);
@@ -612,7 +632,7 @@ input[type="checkbox"]:focus {
   color: var(--color-text);
   font-size: 0.85rem;
   opacity: 0;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--motion-hover) ease;
 }
 
 .tooltip {
@@ -626,7 +646,7 @@ input[type="checkbox"]:focus {
 .suggestion-wrapper:focus-within .password-suggestions,
 .password-suggestions:hover {
   opacity: 1;
-  transition-delay: 0.5s;
+  transition-delay: var(--motion-delay-medium);
 }
 
 .tooltip .tooltip-inner,
@@ -635,7 +655,7 @@ input[type="checkbox"]:focus {
 }
 
 .tooltip .tooltip-inner {
-  transition: transform 0.1s ease;
+  transition: transform var(--motion-toggle) ease;
 }
 
 
@@ -687,7 +707,7 @@ input[type="checkbox"]:focus {
     padding: var(--spacing-sm);
     z-index: 10;
     pointer-events: none;
-    transition: opacity 0.15s ease, transform 0.1s ease;
+    transition: opacity var(--motion-hover) ease, transform var(--motion-toggle) ease;
   }
 
   .password-suggestions strong {
@@ -704,7 +724,7 @@ input[type="checkbox"]:focus {
   .suggestion-wrapper:focus-within .password-suggestions,
   .password-suggestions:hover {
     pointer-events: auto;
-    transition-delay: 0.5s, 0s;
+    transition-delay: var(--motion-delay-medium), 0s;
   }
 
   .strength-meter {
@@ -720,7 +740,7 @@ input[type="checkbox"]:focus {
       height: 100%;
       width: 0%;
       border-radius: inherit;
-      transition: width 0.3s ease;
+      transition: width var(--motion-sigh) ease;
     }
 
     .bar.strength-0,

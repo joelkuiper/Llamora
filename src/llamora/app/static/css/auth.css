@@ -74,7 +74,7 @@
   a {
     color: var(--color-text);
     text-decoration: underline;
-    transition: color 0.15s ease, text-shadow 0.15s ease;
+    transition: color var(--motion-hover) ease, text-shadow var(--motion-hover) ease;
     &:hover {
       color: var(--accent);
       text-shadow: 0 0 0 rgba(0,0,0,0); /* crisp hover without blur */

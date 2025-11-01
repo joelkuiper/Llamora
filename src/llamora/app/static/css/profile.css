@@ -29,7 +29,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    transition: background .18s ease, box-shadow .18s ease, transform .05s ease;
+    transition: background var(--motion-fade) ease, box-shadow var(--motion-fade) ease, transform var(--motion-tap) ease;
 
     svg {
       width: 16px;
@@ -103,7 +103,7 @@
       background: var(--color-white);
       color: var(--color-text);
       box-shadow: var(--inset-shadow);
-      transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+      transition: border-color var(--motion-hover) ease, box-shadow var(--motion-hover) ease, background var(--motion-hover) ease;
 
       &::placeholder { opacity: .7; }
 

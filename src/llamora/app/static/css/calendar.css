@@ -84,7 +84,7 @@
 
 /* Reduced-motion: just a quick color emphasis, no glow ramp */
 @media (prefers-reduced-motion: reduce){
-  #calendar-label.text-glow-flash{ animation: calTextGlowReduce .4s ease-out; }
+  #calendar-label.text-glow-flash{ animation: calTextGlowReduce var(--motion-delay-short) ease-out; }
   @keyframes calTextGlowReduce{
     0%   { color: var(--accent); text-shadow: none; }
     100% { color: var(--color-text); text-shadow: none; }
@@ -100,7 +100,7 @@
   border: 1px solid var(--border);
   background: var(--color-bg);
   cursor: pointer;
-  transition: background .12s, border-color .12s, box-shadow .12s, transform .06s;
+  transition: background var(--motion-tight), border-color var(--motion-tight), box-shadow var(--motion-tight), transform var(--motion-snap);
 
   &:hover {
     background: linear-gradient(0deg, rgba(59,167,246,0.08), rgba(59,167,246,0.06)) var(--color-bg);
@@ -161,7 +161,7 @@
       border: 1px solid var(--accent-20);
       background: var(--color-bg);
       box-shadow: var(--subtle-raised-shadow);
-      transition: background .12s, border-color .12s, box-shadow .12s, transform .06s;
+      transition: background var(--motion-tight), border-color var(--motion-tight), box-shadow var(--motion-tight), transform var(--motion-snap);
 
       &:hover {
         cursor: pointer;
@@ -213,11 +213,11 @@
       text-decoration: none;
       color: var(--color-text);
       transition:
-        background .12s,
-        border-color .12s,
-        color .12s,
-        transform .06s,
-        box-shadow .12s;
+        background var(--motion-tight),
+        border-color var(--motion-tight),
+        color var(--motion-tight),
+        transform var(--motion-snap),
+        box-shadow var(--motion-tight);
     }
 
     td a:not(.no-messages),
