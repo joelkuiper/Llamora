@@ -9,9 +9,7 @@
   align-items: center;
   gap: var(--spacing-lg);
   flex-wrap: nowrap;
-}
 
-#search-container {
   #branding,
   .header-right {
     flex: 1 1 0;
@@ -38,9 +36,9 @@
 
   .header-right > .search-wrap {
     position: relative;
-    flex: 1 1 clamp(8rem, 32vw, 22rem);
+    flex: 1 1 clamp(7rem, 28vw, 18rem);
     min-width: 5.5rem;
-    max-width: 26rem;
+    max-width: 18rem;
   }
 
   .header-right > .user-actions {
