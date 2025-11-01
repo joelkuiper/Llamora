@@ -27,7 +27,7 @@ async def index():
 
 async def _render_day(date: str, target: str | None):
     chat_response = await render_chat(date, oob=False, scroll_target=target)
-    chat_html = chat_response.get_data(as_text=True)
+    chat_html = await chat_response.get_data(as_text=True)
     html = await render_template(
         "index.html",
         day=date,
