@@ -51,24 +51,7 @@ class LocalDB:
         pool = self.pool
 
         try:
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                loop = None
-
-            if loop is None:
-                try:
-                    asyncio.run(pool.close())
-                except RuntimeError:
-                    new_loop = asyncio.new_event_loop()
-                    try:
-                        new_loop.run_until_complete(pool.close())
-                    finally:
-                        new_loop.close()
-            elif loop.is_running():
-                loop.create_task(pool.close())
-            else:
-                loop.run_until_complete(pool.close())
+            self._run_pool_close_sync(pool)
         except Exception:
             logger.exception("Failed to close SQLite connection pool during shutdown")
         else:
@@ -76,6 +59,18 @@ class LocalDB:
 
     def __del__(self):
         self._atexit_close()
+
+    def _run_pool_close_sync(self, pool: SQLiteConnectionPool) -> None:
+        if hasattr(asyncio, "Runner"):
+            with asyncio.Runner() as runner:  # type: ignore[attr-defined]
+                runner.run(pool.close())
+            return
+
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(pool.close())
+        finally:
+            loop.close()
 
     def set_search_api(self, api) -> None:
         self.search_api = api
