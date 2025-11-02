@@ -64,7 +64,10 @@ def _load_tokenizer() -> PreTrainedTokenizerBase:
                 raise ValueError(
                     "LLM.tokenizer configuration must define a model identifier"
                 )
-            kwargs = {str(k): _normalise_model_identifier(v) if isinstance(v, Path) else v for k, v in cfg_dict.items()}
+            kwargs = {
+                str(k): _normalise_model_identifier(v) if isinstance(v, Path) else v
+                for k, v in cfg_dict.items()
+            }
             kwargs.setdefault("trust_remote_code", True)
         else:
             raise ValueError("LLM.tokenizer must be a string or mapping")
