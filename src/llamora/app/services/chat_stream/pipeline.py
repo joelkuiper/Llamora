@@ -119,6 +119,7 @@ class ResponsePipeline:
         self._cancelled = False
         self._error = False
         self._error_message: str | None = None
+        self._first_chunk = True
 
     async def run(self, callbacks: ResponsePipelineCallbacks) -> PipelineResult:
         """Execute the pipeline and notify callbacks."""
@@ -187,6 +188,9 @@ class ResponsePipeline:
             full_response = ""
             async for chunk in self._fetch_chunks():
                 visible = self._parse_chunk(chunk)
+                if self._first_chunk:
+                    visible = visible.lstrip()
+                    self._first_chunk = False
                 if visible:
                     full_response += visible
                     self._visible_total = full_response
@@ -209,8 +213,13 @@ class ResponsePipeline:
                 break
             yield chunk
 
-    def _parse_chunk(self, chunk: str) -> str:
-        text = chunk if isinstance(chunk, str) else str(chunk)
+    def _parse_chunk(self, chunk: str | memoryview | bytes | bytearray) -> str:
+        if isinstance(chunk, memoryview):
+            text = chunk.tobytes().decode("utf-8", errors="replace")
+        elif isinstance(chunk, (bytes, bytearray)):
+            text = chunk.decode("utf-8", errors="replace")
+        else:
+            text = chunk if isinstance(chunk, str) else str(chunk)
         return self._parser.feed(text)
 
     async def _persist(

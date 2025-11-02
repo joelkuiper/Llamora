@@ -260,7 +260,14 @@ class StreamSession(Response):
                 return
 
             if chunk:
-                yield format_sse_event("message", chunk)
+                if isinstance(chunk, memoryview):
+                    text = chunk.tobytes().decode("utf-8", errors="replace")
+                elif isinstance(chunk, (bytes, bytearray)):
+                    text = chunk.decode("utf-8", errors="replace")
+                else:
+                    text = str(chunk)
+                if text:
+                    yield format_sse_event("message", text)
 
         if pending_response.error:
             for event in _error_events(pending_response):
