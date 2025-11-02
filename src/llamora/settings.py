@@ -100,6 +100,11 @@ DEFAULTS: dict[str, Any] = {
             "args": DEFAULT_LLM_ARGS,
         },
         "request": DEFAULT_LLM_REQUEST,
+        "stream": {
+            "buffer_window_ms": 75,
+            "buffer_min_bytes": 96,
+            "buffer_max_bytes": 512,
+        },
         "allowed_config_keys": ["temperature"],
         "tokenizer": {
             "model": "Qwen/Qwen3-4B-Instruct-2507",
