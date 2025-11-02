@@ -141,6 +141,7 @@
   }
 }
 
+
 .search-result-item a:hover {
   background: var(--glass-bg-hover);
   border-color: var(--accent);
@@ -148,7 +149,17 @@
     var(--inset-shadow),
     0 0 0 2px var(--accent-20),
     0 8px 24px var(--accent-10);
+}
 
+.search-result-item a:focus-visible {
+  background: var(--glass-bg-hover);
+  border-color: var(--accent);
+  box-shadow:
+    var(--inset-shadow),
+    0 0 0 2px var(--accent-20),
+    0 8px 24px var(--accent-10);
+  outline: 2px solid var(--accent-20);
+  outline-offset: 2px;
 }
 
 .search-result-item a {
