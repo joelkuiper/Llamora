@@ -75,11 +75,6 @@ stop = ["<|im_start|>", "<|im_end|>", "<|endoftext|>", "<|end|>"]
 n_keep = -1
 cache_prompt = true
 
-[default.LLM.stream]
-buffer_window_ms = 75
-buffer_min_bytes = 96
-buffer_max_bytes = 512
-
 [default.LLM]
 allowed_config_keys = ["temperature"]
 

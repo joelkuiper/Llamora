@@ -6,7 +6,6 @@ import math
 from contextlib import suppress
 from datetime import datetime, timezone
 from html import escape
-from time import monotonic
 from types import MappingProxyType
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -15,7 +14,6 @@ from quart import Response
 from werkzeug.datastructures import Headers
 
 from llamora.app.services.time import date_and_part
-from llamora.settings import settings
 
 
 def replace_newline(value: str) -> str:
@@ -255,64 +253,14 @@ class StreamSession(Response):
 
     @staticmethod
     async def _stream_pending(pending_response):
-        stream_cfg = getattr(settings.LLM, "stream", {}) or {}
-        window_ms = float(stream_cfg.get("buffer_window_ms", 75.0))
-        window_seconds = max(window_ms / 1000.0, 0.01)
-        min_bytes = int(stream_cfg.get("buffer_min_bytes", 96))
-        max_bytes = int(stream_cfg.get("buffer_max_bytes", max(min_bytes, 512)))
-        min_bytes = max(min_bytes, 1)
-        max_bytes = max(max_bytes, min_bytes)
+        async for chunk in pending_response.stream():
+            if pending_response.error:
+                for event in _error_events(pending_response, chunk):
+                    yield event
+                return
 
-        buffer: list[str] = []
-        buffered_len = 0
-        buffer_started_at: float | None = None
-
-        def drain_buffer() -> str | None:
-            nonlocal buffer, buffered_len, buffer_started_at
-            if not buffer:
-                return None
-            combined = "".join(buffer)
-            buffer.clear()
-            buffered_len = 0
-            buffer_started_at = None
-            return combined
-
-        try:
-            async for chunk in pending_response.stream():
-                if pending_response.error:
-                    drained = drain_buffer()
-                    if drained:
-                        yield format_sse_event("message", drained)
-                    for event in _error_events(pending_response, chunk):
-                        yield event
-                    return
-
-                if not chunk:
-                    continue
-
-                if buffer_started_at is None:
-                    buffer_started_at = monotonic()
-
-                buffer.append(chunk)
-                buffered_len += len(chunk)
-
-                now = monotonic()
-                should_flush = False
-                if buffered_len >= max_bytes:
-                    should_flush = True
-                elif buffered_len >= min_bytes:
-                    should_flush = True
-                elif now - buffer_started_at >= window_seconds:
-                    should_flush = True
-
-                if should_flush:
-                    drained = drain_buffer()
-                    if drained:
-                        yield format_sse_event("message", drained)
-        finally:
-            drained = drain_buffer()
-            if drained:
-                yield format_sse_event("message", drained)
+            if chunk:
+                yield format_sse_event("message", chunk)
 
         if pending_response.error:
             for event in _error_events(pending_response):
