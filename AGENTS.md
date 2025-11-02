@@ -5,7 +5,6 @@
 * Fully offline. Local LLM only (`llama.cpp` or `llamafile`).
 * Use Python 3.11+, managed via `uv`. Always `uv run …`.
 * No tests. Manual QA only.
-* No new deps. Use stdlib or `llamora.util`.
 * No bundler. ES modules + CSS are handcrafted.
 * Logs via `logger = getLogger(__name__)`, not `print`.
 
