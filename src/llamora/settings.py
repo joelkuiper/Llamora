@@ -107,7 +107,7 @@ DEFAULTS: dict[str, Any] = {
         },
     },
     "PROMPTS": {
-        "prompt_file": str(PACKAGE_DIR / "llm" / "prompts" / "llamora_phi.j2"),
+        "prompt_file": str(PACKAGE_DIR / "llm" / "prompts" / "llamora_chatml.j2"),
         "grammar_file": str(PACKAGE_DIR / "llm" / "meta_grammar.bnf"),
     },
     "COOKIES": {
@@ -239,7 +239,7 @@ settings.set(
 if not settings.get("PROMPTS.prompt_file"):
     settings.set(
         "PROMPTS.prompt_file",
-        str(PACKAGE_DIR / "llm" / "prompts" / "llamora_phi.j2"),
+        str(PACKAGE_DIR / "llm" / "prompts" / "llamora_chatml.j2"),
     )
 if not settings.get("PROMPTS.grammar_file"):
     settings.set(
