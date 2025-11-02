@@ -109,16 +109,12 @@ async def get_tag_suggestions(msg_id: str):
     decay_constant = resolve_frecency_lambda(
         request.args.get("lambda"), default=DEFAULT_FRECENCY_DECAY
     )
-    frecent_tags = await _db().tags.get_tag_frecency(
-        user["id"], 3, decay_constant, dek
-    )
+    frecent_tags = await _db().tags.get_tag_frecency(user["id"], 3, decay_constant, dek)
     frecent_suggestions = {t["name"] for t in frecent_tags if (t.get("name"))}
 
     combined = meta_suggestions | frecent_suggestions
     combined = [
-        name
-        for name in combined
-        if name and name.strip().lower() not in existing_names
+        name for name in combined if name and name.strip().lower() not in existing_names
     ]
 
     html = await render_template(

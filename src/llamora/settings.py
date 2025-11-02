@@ -209,16 +209,21 @@ def _normalise_cookie_secret() -> None:
     try:
         decoded = base64.b64decode(secret_text, altchars=b"-_", validate=True)
     except (binascii.Error, ValueError) as exc:
-        raise RuntimeError("Set LLAMORA_COOKIE_SECRET to a 32-byte base64 string") from exc
+        raise RuntimeError(
+            "Set LLAMORA_COOKIE_SECRET to a 32-byte base64 string"
+        ) from exc
 
     if len(decoded) != 32:
         raise RuntimeError("Set LLAMORA_COOKIE_SECRET to a 32-byte base64 string")
+
 
 _normalise_secret_key()
 _normalise_cookie_secret()
 
 
-server_args = _normalise_mapping_keys(_coerce_mapping(settings.get("LLM.server.args", {})))
+server_args = _normalise_mapping_keys(
+    _coerce_mapping(settings.get("LLM.server.args", {}))
+)
 settings.set(
     "LLM.server.args",
     {

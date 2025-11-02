@@ -128,7 +128,9 @@ class LocalDB:
         conn = await aiosqlite.connect(
             self.db_path, timeout=float(settings.DATABASE.timeout)
         )
-        await conn.execute(f"PRAGMA busy_timeout = {int(settings.DATABASE.busy_timeout)}")
+        await conn.execute(
+            f"PRAGMA busy_timeout = {int(settings.DATABASE.busy_timeout)}"
+        )
         await conn.execute(f"PRAGMA mmap_size = {int(settings.DATABASE.mmap_size)}")
         await conn.execute("PRAGMA foreign_keys = ON")
         await conn.execute("PRAGMA journal_mode = WAL")

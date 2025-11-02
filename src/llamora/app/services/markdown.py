@@ -102,4 +102,3 @@ def render_markdown_to_html(markdown: str) -> str:
     html = renderer.render(markdown or "")
     sanitized = cleaner.clean(html)
     return sanitized
-

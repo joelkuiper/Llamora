@@ -28,7 +28,9 @@ FrozenHistory = tuple[Mapping[str, Any], ...]
 _INVALID_HISTORY_SENTINEL = object()
 
 
-def _freeze_history(history: Sequence[Mapping[str, Any] | dict[str, Any]]) -> FrozenHistory:
+def _freeze_history(
+    history: Sequence[Mapping[str, Any] | dict[str, Any]],
+) -> FrozenHistory:
     frozen_messages: list[Mapping[str, Any]] = []
     for message in history:
         # Normalise to a plain dict so the cached payload cannot be mutated.
@@ -66,11 +68,11 @@ class MessagesRepository(BaseRepository):
         self._on_message_appended: MessageAppendedCallback | None = None
         self._event_bus = event_bus
         history_cache_cfg = settings.MESSAGES.history_cache
-        self._history_cache: TTLCache[
-            tuple[str, str], FrozenHistory | object
-        ] = TTLCache(
-            maxsize=int(history_cache_cfg.maxsize),
-            ttl=int(history_cache_cfg.ttl),
+        self._history_cache: TTLCache[tuple[str, str], FrozenHistory | object] = (
+            TTLCache(
+                maxsize=int(history_cache_cfg.maxsize),
+                ttl=int(history_cache_cfg.ttl),
+            )
         )
         self._history_cache_lock = asyncio.Lock()
         if self._event_bus:

@@ -303,9 +303,7 @@ class MessageIndexStore:
     ) -> None:
         await self.bulk_index([(user_id, message_id, content, dek)])
 
-    async def bulk_index(
-        self, entries: Iterable[tuple[str, str, str, bytes]]
-    ) -> None:
+    async def bulk_index(self, entries: Iterable[tuple[str, str, str, bytes]]) -> None:
         items = list(entries)
         if not items:
             return

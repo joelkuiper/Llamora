@@ -17,9 +17,7 @@ from .chat_template import build_chat_messages, render_chat_prompt
 from .tokenizers.tokenizer import count_tokens, history_suffix_token_totals
 
 LLM_DIR = Path(__file__).resolve().parent
-GRAMMAR_PATH = resolve_data_path(
-    settings.PROMPTS.grammar_file, fallback_dir=LLM_DIR
-)
+GRAMMAR_PATH = resolve_data_path(settings.PROMPTS.grammar_file, fallback_dir=LLM_DIR)
 DEFAULT_LLM_REQUEST = dict(settings.LLM.request)
 HISTORY_TOKEN_CACHE_SIZE = 32
 
@@ -192,9 +190,9 @@ class LLMClient:
         # Cached cumulative token counts keyed by (history_hash, context_hash).
         # The cache lets adjacent requests within the same stream reuse
         # tokenisation results instead of repeatedly calling the HTTP endpoint.
-        self._history_token_cache: LRUCache[
-            tuple[str, str], tuple[int, ...]
-        ] = LRUCache(maxsize=HISTORY_TOKEN_CACHE_SIZE)
+        self._history_token_cache: LRUCache[tuple[str, str], tuple[int, ...]] = (
+            LRUCache(maxsize=HISTORY_TOKEN_CACHE_SIZE)
+        )
 
         with open(GRAMMAR_PATH, "r", encoding="utf-8") as gf:
             self.grammar = gf.read()
@@ -226,11 +224,15 @@ class LLMClient:
             return repr(obj)
 
         payload = orjson.dumps(
-            data, option=orjson.OPT_SORT_KEYS, default=_default
+            data,
+            option=getattr(orjson, "OPT_SORT_KEYS", 0),
+            default=_default,
         )
         return hashlib.blake2b(payload, digest_size=16).hexdigest()
 
-    def _token_cache_key(self, history: list[dict[str, Any]], context: dict[str, Any]) -> tuple[str, str]:
+    def _token_cache_key(
+        self, history: list[dict[str, Any]], context: dict[str, Any]
+    ) -> tuple[str, str]:
         history_hash = self._fingerprint(history)
         context_hash = self._fingerprint(context)
         return history_hash, context_hash

@@ -10,7 +10,7 @@ from quart import (
 import logging
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-from typing import Any
+from typing import Any, Mapping
 
 from llamora.llm.chat_template import build_opening_messages, render_chat_prompt
 
@@ -54,7 +54,7 @@ def _chat_stream_manager():
 logger = logging.getLogger(__name__)
 
 
-async def _require_user() -> dict[str, Any]:
+async def _require_user() -> Mapping[str, Any]:
     manager = _cookies()
     user = await manager.get_current_user()
     if user is None:

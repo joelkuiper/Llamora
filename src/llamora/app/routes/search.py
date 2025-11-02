@@ -63,8 +63,7 @@ async def search():
         if truncated:
             limit = int(settings.LIMITS.max_search_query_length)
             truncation_notice = (
-                "Your search was truncated to the first "
-                f"{limit} characters."
+                f"Your search was truncated to the first {limit} characters."
             )
 
     logger.debug("Route returning %d results", len(results))
@@ -74,6 +73,8 @@ async def search():
         has_query=bool(sanitized_query),
         truncation_notice=truncation_notice,
     )
+
+
 FRECENT_TAG_LAMBDA = DEFAULT_FRECENCY_DECAY
 
 
@@ -98,9 +99,7 @@ async def recent_searches():
     tags_repo = get_services().db.tags
 
     recent_task = history_repo.get_recent_searches(user["id"], limit, dek)
-    frecent_task = tags_repo.get_tag_frecency(
-        user["id"], limit, decay_constant, dek
-    )
+    frecent_task = tags_repo.get_tag_frecency(user["id"], limit, decay_constant, dek)
 
     queries, frecent_rows = await asyncio.gather(recent_task, frecent_task)
 

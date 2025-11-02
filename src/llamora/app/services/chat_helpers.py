@@ -190,7 +190,9 @@ class StreamSession(Response):
         for key, value in self._SSE_HEADERS.items():
             if key not in merged_headers:
                 merged_headers[key] = value
-        super().__init__(body, status=status, mimetype="text/event-stream", headers=merged_headers)
+        super().__init__(
+            body, status=status, mimetype="text/event-stream", headers=merged_headers
+        )
 
     @classmethod
     def pending(cls, pending_response) -> "StreamSession":
@@ -260,5 +262,3 @@ class StreamSession(Response):
         yield format_sse_event(
             "done", {"assistant_msg_id": pending_response.assistant_msg_id}
         )
-
-

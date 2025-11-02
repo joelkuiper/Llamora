@@ -236,6 +236,7 @@ class PendingResponse(ResponsePipelineCallbacks):
         self._total_len = len(total)
         self._visible_total = total
 
+
 class ChatStreamManager:
     def __init__(
         self,
@@ -309,7 +310,8 @@ class ChatStreamManager:
             loop.run_until_complete(_cancel_and_remove())
         else:  # pragma: no cover - defensive
             logger.warning(
-                "Event loop already closed while cancelling stale response %s", user_msg_id
+                "Event loop already closed while cancelling stale response %s",
+                user_msg_id,
             )
             self._remove_pending(user_msg_id)
 

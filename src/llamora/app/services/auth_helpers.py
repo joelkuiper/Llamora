@@ -35,9 +35,7 @@ class SecureCookieManager:
         self.cookie_name = cookie_name
         self.cookie_box = secret.SecretBox(key)
         self.dek_storage = dek_storage.lower()
-        self.dek_store: TTLCache[str, bytes] = TTLCache(
-            maxsize=1024, ttl=session_ttl
-        )
+        self.dek_store: TTLCache[str, bytes] = TTLCache(maxsize=1024, ttl=session_ttl)
         self._user_snapshot_cache: TTLCache[tuple[str, str], Any] = TTLCache(
             maxsize=user_cache_maxsize,
             ttl=user_cache_ttl,
@@ -47,9 +45,7 @@ class SecureCookieManager:
     def _decode_cookie_secret(raw_secret: str) -> bytes:
         secret_value = str(raw_secret or "")
         if not secret_value or len(secret_value) % 4 != 0:
-            raise RuntimeError(
-                "Set LLAMORA_COOKIE_SECRET to a 32-byte base64 string"
-            )
+            raise RuntimeError("Set LLAMORA_COOKIE_SECRET to a 32-byte base64 string")
         try:
             key = base64.b64decode(secret_value, altchars=b"-_", validate=True)
         except Exception as exc:  # pragma: no cover - defensive guard
@@ -57,9 +53,7 @@ class SecureCookieManager:
                 "Set LLAMORA_COOKIE_SECRET to a 32-byte base64 string"
             ) from exc
         if len(key) != secret.SecretBox.KEY_SIZE:
-            raise RuntimeError(
-                "Set LLAMORA_COOKIE_SECRET to a 32-byte base64 string"
-            )
+            raise RuntimeError("Set LLAMORA_COOKIE_SECRET to a 32-byte base64 string")
         return key
 
     def _get_cookie_data(self) -> dict[str, Any]:
@@ -219,17 +213,13 @@ class SecureCookieManager:
 
         path = request.path
         if path.startswith("/static/") or path in {"/health", "/healthz", "/ready"}:
-            current_app.logger.debug(
-                "Skipping user load for lightweight path %s", path
-            )
+            current_app.logger.debug("Skipping user load for lightweight path %s", path)
             return
 
         user = await self.get_current_user()
         if user:
             _ = self.get_dek()
-            current_app.logger.debug(
-                "Loaded user %s for request", user["id"]
-            )
+            current_app.logger.debug("Loaded user %s for request", user["id"])
         else:
             current_app.logger.debug("No user loaded for request")
 

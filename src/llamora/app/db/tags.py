@@ -148,7 +148,9 @@ class TagsRepository(BaseRepository):
     async def get_tag_frecency(
         self, user_id: str, limit: int, lambda_: Any, dek: bytes
     ) -> list[dict]:
-        decay_constant = resolve_frecency_lambda(lambda_, default=DEFAULT_FRECENCY_DECAY)
+        decay_constant = resolve_frecency_lambda(
+            lambda_, default=DEFAULT_FRECENCY_DECAY
+        )
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
@@ -221,7 +223,9 @@ class TagsRepository(BaseRepository):
         seen: set[str] = set()
         results: list[dict] = []
 
-        decay_constant = resolve_frecency_lambda(lambda_, default=DEFAULT_FRECENCY_DECAY)
+        decay_constant = resolve_frecency_lambda(
+            lambda_, default=DEFAULT_FRECENCY_DECAY
+        )
 
         async with self.pool.connection() as conn:
             offset = 0

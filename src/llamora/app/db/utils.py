@@ -18,9 +18,7 @@ def cached_tag_name(
 ) -> str:
     """Decrypt and cache tag names by hash."""
 
-    plaintext = decrypt_message(
-        dek, user_id, tag_hash.hex(), name_nonce, name_ct, alg
-    )
+    plaintext = decrypt_message(dek, user_id, tag_hash.hex(), name_nonce, name_ct, alg)
     raw = (plaintext or "").strip()
     if not raw:
         return ""

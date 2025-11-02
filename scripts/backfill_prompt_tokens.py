@@ -6,7 +6,7 @@ import argparse
 import asyncio
 import base64
 import logging
-from typing import Dict, Iterable, Tuple
+from typing import Dict, Sequence, Tuple
 
 import orjson
 
@@ -120,12 +120,12 @@ async def _backfill_user(
                     message = "" if raw_message is None else str(raw_message)
             else:
                 logger.debug(
-                    "Unexpected payload type %s for message %s", type(payload), row["id"]
+                    "Unexpected payload type %s for message %s",
+                    type(payload),
+                    row["id"],
                 )
 
-            tokens = await asyncio.to_thread(
-                count_message_tokens, row["role"], message
-            )
+            tokens = await asyncio.to_thread(count_message_tokens, row["role"], message)
 
             if dry_run:
                 updated += 1
@@ -219,7 +219,7 @@ def _positive_int(value: str) -> int:
     return parsed
 
 
-def main(argv: Iterable[str] | None = None) -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--user",

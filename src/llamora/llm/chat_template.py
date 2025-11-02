@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from itertools import groupby
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence, cast
 
 from llamora.app.services.time import humanize
 
@@ -27,8 +27,8 @@ ANSWER_REQUIREMENTS = (
     "Every answer must always have exactly two parts, in this order:\n\n"
     "  - A natural language reply to the user. Do not wrap it in JSON.\n"
     "  - Immediately after, output the tag `<meta>` followed by a single "
-    "valid JSON object with the following shape: {\"emoji\":\"…\","
-    "\"keywords\":[\"#tag\",…]} and close it with `</meta>`."
+    'valid JSON object with the following shape: {"emoji":"…",'
+    '"keywords":["#tag",…]} and close it with `</meta>`.'
 )
 
 
@@ -63,17 +63,35 @@ class ChatPromptSeries:
 def _normalise_tokens(raw: Any) -> tuple[int, ...]:
     if isinstance(raw, (list, tuple)):
         sequence = raw
-    elif hasattr(raw, 'tolist'):
+    elif hasattr(raw, "tolist"):
         sequence = raw.tolist()
     else:  # pragma: no cover - defensive
-        raise TypeError(
-            'Tokenizer.apply_chat_template returned unsupported token data'
-        )
+        raise TypeError("Tokenizer.apply_chat_template returned unsupported token data")
 
     try:
         return tuple(int(token) for token in sequence)
     except (TypeError, ValueError) as exc:  # pragma: no cover - defensive
-        raise TypeError('Tokenizer tokens must be integers') from exc
+        raise TypeError("Tokenizer tokens must be integers") from exc
+
+
+def _coerce_chat_messages(
+    messages: Sequence[Mapping[str, Any] | dict[str, Any]],
+) -> list[dict[str, str]]:
+    normalised: list[dict[str, str]] = []
+    for raw in messages:
+        data = cast(Mapping[str, Any], raw)
+        role = _normalise_text(data.get("role"))
+        content_source = data.get("content")
+        if content_source is None:
+            content_source = data.get("message")
+        content = _normalise_text(content_source)
+        normalised.append(
+            {
+                "role": role or "user",
+                "content": content,
+            }
+        )
+    return normalised
 
 
 def _render_chat_prompt(
@@ -82,7 +100,7 @@ def _render_chat_prompt(
     add_generation_prompt: bool = True,
 ) -> ChatPromptRender:
     tokenizer = get_tokenizer()
-    message_list = list(messages)
+    message_list = _coerce_chat_messages(messages)
 
     prompt = tokenizer.apply_chat_template(
         message_list,
@@ -90,7 +108,7 @@ def _render_chat_prompt(
         add_generation_prompt=add_generation_prompt,
     )
     if not isinstance(prompt, str):  # pragma: no cover - defensive
-        raise TypeError('Tokenizer.apply_chat_template returned unexpected output')
+        raise TypeError("Tokenizer.apply_chat_template returned unexpected output")
 
     token_data = tokenizer.apply_chat_template(
         message_list,
@@ -122,7 +140,7 @@ def _context_lines(date: str | None, part_of_day: str | None) -> list[str]:
 
 
 def _format_yesterday_messages(
-    yesterday_messages: Sequence[Mapping[str, Any] | dict[str, Any]]
+    yesterday_messages: Sequence[Mapping[str, Any] | dict[str, Any]],
 ) -> Iterable[str]:
     for humanized, grouped in groupby(
         yesterday_messages, key=lambda message: humanize(message["created_at"])
@@ -217,10 +235,7 @@ def _build_opening_recap_message(
 
     recap_lines = list(_format_yesterday_messages(yesterday_messages))
     if not recap_lines:
-        return (
-            "Yesterday recap:\n"
-            "- No messages were captured yesterday."
-        )
+        return "Yesterday recap:\n- No messages were captured yesterday."
 
     lines = ["Yesterday recap:", ""]
     lines.extend(recap_lines)
@@ -239,9 +254,7 @@ def build_chat_messages(
         history=history,
     )
 
-    messages: list[dict[str, str]] = [
-        {"role": "system", "content": system_message}
-    ]
+    messages: list[dict[str, str]] = [{"role": "system", "content": system_message}]
 
     for entry in history:
         role = _normalise_text(entry.get("role")) or "user"

@@ -239,7 +239,9 @@ class SearchAPI:
             if not mid:
                 continue
             existing = candidate_map.get(mid)
-            if existing is None or cand.get("cosine", 0.0) > existing.get("cosine", 0.0):
+            if existing is None or cand.get("cosine", 0.0) > existing.get(
+                "cosine", 0.0
+            ):
                 candidate_map[mid] = cand
 
         tokens = self._tokenize_query(normalized)
@@ -247,7 +249,9 @@ class SearchAPI:
         if tokens:
             tag_hashes = [tag_hash(user_id, t) for t in tokens]
             limit = max(k2, len(candidate_map), 1)
-            await self._hydrate_candidates(user_id, dek, candidate_map, tag_hashes, limit)
+            await self._hydrate_candidates(
+                user_id, dek, candidate_map, tag_hashes, limit
+            )
             boosts = await self._compute_tag_boosts(user_id, candidate_map, tag_hashes)
 
         if not candidate_map:

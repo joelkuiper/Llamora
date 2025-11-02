@@ -28,10 +28,15 @@ class SearchHistoryRepository(BaseRepository):
         if not normalized:
             return
 
-        query_hash = hashlib.sha256(f"{user_id}:{normalized.lower()}".encode("utf-8")).digest()
-        nonce, ct, alg = self._encrypt_message(dek, user_id, query_hash.hex(), normalized)
+        query_hash = hashlib.sha256(
+            f"{user_id}:{normalized.lower()}".encode("utf-8")
+        ).digest()
+        nonce, ct, alg = self._encrypt_message(
+            dek, user_id, query_hash.hex(), normalized
+        )
 
         async with self.pool.connection() as conn:
+
             async def _tx() -> None:
                 await conn.execute(
                     """

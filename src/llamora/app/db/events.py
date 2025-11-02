@@ -22,7 +22,9 @@ class RepositoryEventBus:
         """Register a handler to be invoked when *event* is emitted."""
         self._handlers[event].append(handler)
 
-    def subscribe_for_user(self, event: str, user_id: str, handler: EventHandler) -> None:
+    def subscribe_for_user(
+        self, event: str, user_id: str, handler: EventHandler
+    ) -> None:
         """Register *handler* for a specific ``(event, user_id)`` combination."""
         self.subscribe(self._user_event(event, user_id), handler)
 

@@ -14,7 +14,9 @@ FRECENCY_LAMBDAS: dict[str, float] = {
 DEFAULT_FRECENCY_DECAY: float = FRECENCY_LAMBDAS["week"]
 
 
-def resolve_frecency_lambda(value: Any, *, default: float = DEFAULT_FRECENCY_DECAY) -> float:
+def resolve_frecency_lambda(
+    value: Any, *, default: float = DEFAULT_FRECENCY_DECAY
+) -> float:
     """Resolve a frecency decay constant.
 
     Accepts a float, an int, or a string key referencing :data:`FRECENCY_LAMBDAS`.
