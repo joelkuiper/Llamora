@@ -60,3 +60,10 @@ include = [
     "src/llamora",
     "frontend/static",
 ]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+include = ["src"]
+ignore = ["frontend", "doc/screenshots"]
+useLibraryCodeForTypes = true

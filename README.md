@@ -155,6 +155,18 @@ Restart the server after saving changes; Dynaconf merges `settings.local.toml`, 
 
 ---
 
+## Development
+
+Use Pyright for static type checking. The configuration lives in `pyproject.toml`, so the standardized command is:
+
+```bash
+uv run pyright
+```
+
+Pyright is scoped to the `src` directory and skips the `frontend` and `doc/screenshots` assets defined in the ignore list.
+
+---
+
 ### Deployment (not recommended)
 
 Llamora is a personal experiment and **not production-ready**.
