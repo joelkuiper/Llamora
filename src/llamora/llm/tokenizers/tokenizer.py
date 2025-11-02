@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from functools import lru_cache
 from pathlib import Path
 from threading import Lock
 from typing import Any
@@ -14,10 +13,10 @@ from llamora.settings import settings
 
 __all__ = [
     "count_tokens",
+    "get_tokenizer",
     "format_message_fragment",
     "count_message_tokens",
     "format_vibes_text",
-    "history_suffix_token_totals",
 ]
 
 _TOKENIZER: PreTrainedTokenizerBase | None = None
@@ -32,7 +31,7 @@ def _normalise_model_identifier(raw: Any) -> str:
     return str(raw)
 
 
-def _load_tokenizer() -> PreTrainedTokenizerBase:
+def get_tokenizer() -> PreTrainedTokenizerBase:
     """Load and cache the Hugging Face tokenizer defined in the settings."""
 
     global _TOKENIZER
@@ -81,7 +80,7 @@ def _load_tokenizer() -> PreTrainedTokenizerBase:
 def count_tokens(prompt: str) -> int:
     """Return the number of tokens produced by the configured tokenizer."""
 
-    tokenizer = _load_tokenizer()
+    tokenizer = get_tokenizer()
     encoded = tokenizer.encode(prompt, add_special_tokens=False)
     return len(encoded)
 
@@ -123,14 +122,6 @@ def _format_vibes_line(display_emojis: Sequence[str]) -> str:
     return f"Emoji vibes for this conversation: {joined}\n"
 
 
-@lru_cache(maxsize=256)
-def _count_vibes_tokens(display_emojis: tuple[str, ...]) -> int:
-    if not display_emojis:
-        return 0
-    text = _format_vibes_line(display_emojis)
-    return count_tokens(text)
-
-
 def format_vibes_text(history: Sequence[Mapping[str, Any] | dict[str, Any]]) -> str:
     """Render the optional emoji vibes line for ``history``.
 
@@ -147,36 +138,3 @@ def format_vibes_text(history: Sequence[Mapping[str, Any] | dict[str, Any]]) -> 
 
     display = tuple(reversed(emojis[-5:]))
     return _format_vibes_line(display)
-
-
-def history_suffix_token_totals(
-    history: Sequence[Mapping[str, Any] | dict[str, Any]]
-) -> list[int]:
-    """Return cumulative token totals for each history suffix.
-
-    Each element ``i`` corresponds to the number of tokens contributed by
-    ``history[i:]`` when rendered inside the chat prompt template. Counts
-    include both the message fragments and the optional emoji vibes line.
-    """
-
-    if not history:
-        return []
-
-    totals = [0] * len(history)
-    running = 0
-    display_emojis: list[str] = []
-
-    for offset in range(len(history) - 1, -1, -1):
-        raw_entry = history[offset]
-        entry = _coerce_mapping(raw_entry)
-        entry_tokens = int(entry.get("prompt_tokens") or 0)
-        running += max(entry_tokens, 0)
-
-        emoji = _extract_emoji(entry)
-        if emoji and len(display_emojis) < 5:
-            display_emojis.append(emoji)
-
-        vibe_tokens = _count_vibes_tokens(tuple(display_emojis))
-        totals[offset] = running + vibe_tokens
-
-    return totals

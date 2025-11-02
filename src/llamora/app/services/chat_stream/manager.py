@@ -33,14 +33,14 @@ class LLMStreamSession:
         history: list[dict],
         params: dict | None,
         context: dict | None,
-        prompt: str | None,
+        messages: list[dict[str, str]] | None,
     ) -> None:
         self._llm = llm
         self.user_msg_id = user_msg_id
         self._history = history
         self._params = params
         self._context = context or {}
-        self._prompt = prompt
+        self._messages = messages
         self._first_chunk = True
 
     async def __aiter__(self) -> AsyncIterator[str]:
@@ -49,7 +49,7 @@ class LLMStreamSession:
             self._history,
             self._params,
             self._context,
-            prompt=self._prompt,
+            messages=self._messages,
         ):
             if isinstance(chunk, dict) and chunk.get("type") == "error":
                 logger.info("Error chunk received for %s: %s", self.user_msg_id, chunk)
@@ -82,7 +82,7 @@ class PendingResponse(ResponsePipelineCallbacks):
         pending_ttl: int,
         params: dict | None = None,
         context: dict | None = None,
-        prompt: str | None = None,
+        messages: list[dict[str, str]] | None = None,
         reply_to: str | None = None,
         meta_extra: dict | None = None,
     ) -> None:
@@ -96,7 +96,7 @@ class PendingResponse(ResponsePipelineCallbacks):
         self.dek = dek
         self.meta: dict | None = None
         self.context = context or {}
-        self.prompt = prompt
+        self.messages = messages
         self.reply_to = reply_to if reply_to is not None else user_msg_id
         self.meta_extra = meta_extra or {}
         self.cancelled = False
@@ -105,7 +105,7 @@ class PendingResponse(ResponsePipelineCallbacks):
         self._cleanup = on_cleanup
         self._cleanup_called = False
         self._session = LLMStreamSession(
-            llm, user_msg_id, history, params, context, prompt
+            llm, user_msg_id, history, params, context, messages
         )
         self._parser = ChatMetaParser()
         self._visible_total = ""
@@ -309,7 +309,7 @@ class ChatStreamManager:
         params: dict | None = None,
         context: dict | None = None,
         *,
-        prompt: str | None = None,
+        messages: list[dict[str, str]] | None = None,
         reply_to: str | None = None,
         meta_extra: dict | None = None,
     ) -> PendingResponse:
@@ -333,7 +333,7 @@ class ChatStreamManager:
             self._pending_ttl,
             params,
             context,
-            prompt,
+            messages,
             reply_to,
             meta_extra,
         )

@@ -13,8 +13,8 @@ from cachetools import LRUCache
 from llamora.settings import settings
 from llamora.util import resolve_data_path
 from .process_manager import LlamafileProcessManager
-from .prompt_template import build_prompt
-from .tokenizers.tokenizer import count_tokens, history_suffix_token_totals
+from .chat_template import build_chat_messages, render_chat_prompt
+from .tokenizers.tokenizer import count_tokens
 
 LLM_DIR = Path(__file__).resolve().parent
 GRAMMAR_PATH = resolve_data_path(
@@ -252,13 +252,12 @@ class LLMClient:
             return cached
 
         counts = list(cached) if cached is not None else []
-        base_prompt = build_prompt([], **context)
-        base_tokens = await self._count_tokens(base_prompt)
-
-        suffix_totals = history_suffix_token_totals(history)
         for idx in range(len(counts), len(history)):
-            suffix_tokens = suffix_totals[idx] if suffix_totals else 0
-            counts.append(base_tokens + suffix_tokens)
+            suffix_history = history[idx:]
+            messages = build_chat_messages(suffix_history, **context)
+            prompt_text = render_chat_prompt(messages)
+            tokens = await self._count_tokens(prompt_text)
+            counts.append(tokens)
 
         result = tuple(counts)
         self._history_token_cache[key] = result
@@ -291,13 +290,15 @@ class LLMClient:
         history: list[dict[str, Any]] | None = None,
         params: dict[str, Any] | None = None,
         context: dict[str, Any] | None = None,
-        prompt: str | None = None,
+        messages: list[dict[str, Any]] | None = None,
     ) -> AsyncGenerator[Any, None]:
         self.process_manager.ensure_server_running()
 
         cfg = {**self.default_request, **(params or {})}
 
-        if prompt is None:
+        prompt_text: str | None = None
+
+        if messages is None:
             history = history or []
             ctx = context or {}
             n_predict = cfg.get("n_predict")
@@ -310,13 +311,19 @@ class LLMClient:
                     yield {"type": "error", "data": f"Prompt error: {e}"}
                     return
             try:
-                prompt = build_prompt(history, **ctx)
+                messages = build_chat_messages(history, **ctx)
             except Exception as e:
-                self.logger.exception("Failed to build prompt")
+                self.logger.exception("Failed to build prompt messages")
                 yield {"type": "error", "data": f"Prompt error: {e}"}
                 return
+        try:
+            prompt_text = render_chat_prompt(messages)
+        except Exception as e:
+            self.logger.exception("Failed to render chat prompt")
+            yield {"type": "error", "data": f"Prompt error: {e}"}
+            return
 
-        payload = {"prompt": prompt, **cfg, "grammar": self.grammar}
+        payload = {"prompt": prompt_text, **cfg, "grammar": self.grammar}
         if msg_id:
             payload.setdefault("id", str(msg_id))
 

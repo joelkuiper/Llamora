@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from typing import Any
 
-from llamora.llm.prompt_template import build_opening_prompt
+from llamora.llm.chat_template import build_opening_messages
 
 from llamora.app.services.container import get_services
 from llamora.app.services.auth_helpers import (
@@ -197,7 +197,7 @@ async def sse_opening(date: str):
 
     has_no_activity = not is_new and not yesterday_msgs
     try:
-        prompt = build_opening_prompt(
+        opening_messages = build_opening_messages(
             yesterday_messages=yesterday_msgs,
             date=date_str,
             part_of_day=pod,
@@ -219,7 +219,7 @@ async def sse_opening(date: str):
         [],
         dek,
         context=None,
-        prompt=prompt,
+        messages=opening_messages,
         reply_to=None,
         meta_extra={"auto_opening": True},
     )

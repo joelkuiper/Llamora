@@ -236,11 +236,6 @@ settings.set(
     },
 )
 
-if not settings.get("PROMPTS.prompt_file"):
-    settings.set(
-        "PROMPTS.prompt_file",
-        str(PACKAGE_DIR / "llm" / "prompts" / "llamora_chatml.j2"),
-    )
 if not settings.get("PROMPTS.grammar_file"):
     settings.set(
         "PROMPTS.grammar_file",
