@@ -23,7 +23,7 @@ Follow these notes to extend or repair the system without breaking its calmness 
 * `config/` holds Dynaconf configuration. Follow the `LLAMORA_<SECTION>__<SUBSECTION>` pattern when introducing new keys.
 * `sql/schema.sql` defines the SQLite database. Changes must remain compatible with encrypted payloads.
 * `scripts/` provides small maintenance utilities and reference patterns for database operations.
-* Static files live in `src/llamora/app/static/`. Templates and partials are under `src/llamora/app/templates/`.
+* Static files live in `frontend/static/`. Templates and partials are under `src/llamora/app/templates/`.
 
 ---
 
@@ -52,11 +52,11 @@ Follow these notes to extend or repair the system without breaking its calmness 
 ---
 
 ## Frontend Conventions
-* Front-end code lives in `src/llamora/app/static/`.
+* Front-end code lives in `frontend/static/`.
 * The interface is server-rendered HTML enhanced with **HTMX**. Use attributes like `hx-get`, `hx-swap`, and `hx-target` rather than custom fetch code.
 * Streaming responses use **Server-Sent Events (SSE)** through `hx-ext="sse"`.
 * JavaScript files are plain **ES modules** loaded with `type="module"`. Avoid third-party code and prefer small, clear functions.
-* Prefer to use web components for UI widgets, (see `src/llamora/app/static/js/components`)
+* Prefer to use web components for UI widgets, (see `frontend/static/js/components`)
 * CSS uses a **design-token system** in `main.css`. Extend `--color-*`, `--accent-*`, etc. variables instead of adding fixed constants.
 * CSS uses nesting which is supported in modern browsers, follow that convention.
 * Templates rely on partials under `src/llamora/app/templates/partials`. Always reuse fragments rather than duplicating markup.

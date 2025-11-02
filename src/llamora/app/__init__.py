@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import secrets
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from llamora.settings import settings
@@ -63,7 +64,18 @@ def create_app():
         else:
             app.config["REGISTRATION_TOKEN"] = None
 
-    app = Quart(__name__)
+    module_path = Path(__file__).resolve()
+    project_root = module_path.parents[2]
+    static_dir = project_root / "frontend" / "static"
+    if not static_dir.exists():
+        project_root = module_path.parents[3]
+        static_dir = project_root / "frontend" / "static"
+
+    app = Quart(
+        __name__,
+        static_folder=str(static_dir),
+        static_url_path="/static",
+    )
     app.secret_key = settings.SECRET_KEY
     app.config.update(
         APP_NAME=settings.APP_NAME,

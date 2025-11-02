@@ -65,6 +65,12 @@ Configuration is managed by [Dynaconf](https://www.dynaconf.com/); see
 [`src/llamora/settings.py`](./src/llamora/settings.py) for details.
 
 - **Data safety** If the user forgets both the password and the recovery token, all data is forever lost. This is by design, but it puts a heavy burden on the user and strays from the expected.
+
+## Repository Layout
+
+- `frontend/static/` holds the CSS, JavaScript, and image assets served by Quart.
+- `src/llamora/app/templates/` contains Jinja templates and partials referenced by the front end.
+- `config/` captures Dynaconf configuration that wires settings into the application at runtime.
 ---
 
 ## Running the App
