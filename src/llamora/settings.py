@@ -100,6 +100,9 @@ DEFAULTS: dict[str, Any] = {
             "args": DEFAULT_LLM_ARGS,
         },
         "request": DEFAULT_LLM_REQUEST,
+        "stream": {
+            "pending_ttl": 300,
+        },
         "allowed_config_keys": ["temperature"],
         "tokenizer": {
             "model": "Qwen/Qwen3-4B-Instruct-2507",

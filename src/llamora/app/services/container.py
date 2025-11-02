@@ -37,7 +37,16 @@ class AppServices:
         )
         lexical_reranker = LexicalReranker()
         search_api = SearchAPI(db, vector_search, lexical_reranker)
-        llm_service = LLMService(db)
+        pending_ttl_raw = settings.get("LLM.stream.pending_ttl", 300)
+        try:
+            pending_ttl = int(pending_ttl_raw)
+        except (TypeError, ValueError):
+            logger.warning(
+                "Invalid LLM.stream.pending_ttl value %r; using default of 300 seconds",
+                pending_ttl_raw,
+            )
+            pending_ttl = 300
+        llm_service = LLMService(db, pending_ttl=pending_ttl)
         db.set_search_api(search_api)
         return cls(
             db=db,

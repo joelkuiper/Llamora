@@ -75,6 +75,9 @@ stop = ["<|im_start|>", "<|im_end|>", "<|endoftext|>", "<|end|>"]
 n_keep = -1
 cache_prompt = true
 
+[default.LLM.stream]
+pending_ttl = 300
+
 [default.LLM]
 allowed_config_keys = ["temperature"]
 

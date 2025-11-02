@@ -18,12 +18,13 @@ logger = logging.getLogger(__name__)
 class LLMService:
     """Own the llamafile process, client, and chat streaming manager."""
 
-    def __init__(self, db: Any) -> None:
+    def __init__(self, db: Any, *, pending_ttl: int = 300) -> None:
         self._db = db
         self._process_manager: LlamafileProcessManager | None = None
         self._llm: LLMClient | None = None
         self._chat_stream_manager: ChatStreamManager | None = None
         self._lock = asyncio.Lock()
+        self._pending_ttl = pending_ttl
 
     async def start(self) -> None:
         """Initialise the llamafile stack if it is not already running."""
@@ -51,7 +52,9 @@ class LLMService:
             await asyncio.to_thread(process_manager.ensure_server_running)
             llm_client = LLMClient(process_manager)
 
-            chat_stream_manager = ChatStreamManager(llm_client)
+            chat_stream_manager = ChatStreamManager(
+                llm_client, pending_ttl=self._pending_ttl
+            )
             chat_stream_manager.set_db(self._db)
 
             self._process_manager = process_manager
