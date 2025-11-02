@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS messages (
     nonce BLOB NOT NULL,
     ciphertext BLOB NOT NULL,
     alg BLOB NOT NULL,
+    prompt_tokens INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_date TEXT DEFAULT (date('now')),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE

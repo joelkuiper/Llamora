@@ -10,6 +10,8 @@ from ulid import ULID
 
 from cachetools import TTLCache
 
+from llamora.llm.tokenizers.tokenizer import count_message_tokens
+
 from llamora.settings import settings
 
 from .base import BaseRepository
@@ -165,6 +167,7 @@ class MessagesRepository(BaseRepository):
                     "role": row["role"],
                     "message": rec.get("message", ""),
                     "meta": rec.get("meta", {}),
+                    "prompt_tokens": int(row["prompt_tokens"] or 0),
                 }
             )
         return messages
@@ -191,6 +194,7 @@ class MessagesRepository(BaseRepository):
                     "reply_to": row["reply_to"],
                     "message": rec.get("message", ""),
                     "meta": rec.get("meta", {}),
+                    "prompt_tokens": int(row["prompt_tokens"] or 0),
                     "tags": [],
                 }
                 history.append(current)
@@ -223,6 +227,9 @@ class MessagesRepository(BaseRepository):
         record = {"message": message, "meta": meta or {}}
         plaintext = orjson.dumps(record).decode()
         nonce, ct, alg = self._encrypt_message(dek, user_id, msg_id, plaintext)
+        prompt_tokens = await asyncio.to_thread(
+            count_message_tokens, role, record.get("message", "")
+        )
 
         async with self.pool.connection() as conn:
             columns = [
@@ -233,8 +240,18 @@ class MessagesRepository(BaseRepository):
                 "nonce",
                 "ciphertext",
                 "alg",
+                "prompt_tokens",
             ]
-            params: list = [msg_id, user_id, role, reply_to, nonce, ct, alg]
+            params: list = [
+                msg_id,
+                user_id,
+                role,
+                reply_to,
+                nonce,
+                ct,
+                alg,
+                prompt_tokens,
+            ]
 
             if created_date:
                 columns.append("created_date")
@@ -265,6 +282,7 @@ class MessagesRepository(BaseRepository):
             "reply_to": reply_to,
             "message": record.get("message", ""),
             "meta": record.get("meta", {}),
+            "prompt_tokens": prompt_tokens,
             "tags": [],
         }
 
@@ -355,7 +373,8 @@ class MessagesRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT m.id, m.role, m.nonce, m.ciphertext, m.alg, m.created_at
+                SELECT m.id, m.role, m.nonce, m.ciphertext, m.alg, m.created_at,
+                       m.prompt_tokens
                 FROM messages m
                 WHERE m.user_id = ?
                 ORDER BY m.id DESC
@@ -373,7 +392,8 @@ class MessagesRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT m.id, m.role, m.nonce, m.ciphertext, m.alg, m.created_at
+                SELECT m.id, m.role, m.nonce, m.ciphertext, m.alg, m.created_at,
+                       m.prompt_tokens
                 FROM messages m
                 WHERE m.user_id = ? AND m.id < ?
                 ORDER BY m.id DESC
@@ -409,7 +429,8 @@ class MessagesRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 f"""
-                SELECT m.id, m.created_at, m.role, m.nonce, m.ciphertext, m.alg
+                SELECT m.id, m.created_at, m.role, m.nonce, m.ciphertext, m.alg,
+                       m.prompt_tokens
                 FROM messages m
                 WHERE m.user_id = ? AND m.id IN ({placeholders})
                 """,
@@ -431,6 +452,7 @@ class MessagesRepository(BaseRepository):
                 """
                 SELECT m.id, m.created_at, m.role, m.reply_to, m.nonce,
                        m.ciphertext, m.alg AS msg_alg,
+                       m.prompt_tokens,
                        x.ulid AS tag_ulid,
                        t.tag_hash, t.name_ct, t.name_nonce, t.alg AS tag_alg
                 FROM messages m
@@ -462,7 +484,7 @@ class MessagesRepository(BaseRepository):
                 """
                 WITH recent AS (
                     SELECT m.id, m.created_at, m.role, m.reply_to, m.nonce,
-                           m.ciphertext, m.alg
+                           m.ciphertext, m.alg, m.prompt_tokens
                     FROM messages m
                     WHERE m.user_id = ? AND m.created_date = ?
                     ORDER BY m.id DESC
@@ -470,6 +492,7 @@ class MessagesRepository(BaseRepository):
                 )
                 SELECT recent.id, recent.created_at, recent.role, recent.reply_to,
                        recent.nonce, recent.ciphertext, recent.alg AS msg_alg,
+                       recent.prompt_tokens,
                        x.ulid AS tag_ulid,
                        t.tag_hash, t.name_ct, t.name_nonce, t.alg AS tag_alg
                 FROM recent

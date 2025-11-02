@@ -14,7 +14,7 @@ from llamora.settings import settings
 from llamora.util import resolve_data_path
 from .process_manager import LlamafileProcessManager
 from .prompt_template import build_prompt
-from .tokenizers.tokenizer import count_tokens as qwen_count_tokens
+from .tokenizers.tokenizer import count_tokens, history_suffix_token_totals
 
 LLM_DIR = Path(__file__).resolve().parent
 GRAMMAR_PATH = resolve_data_path(
@@ -213,7 +213,7 @@ class LLMClient:
         await self._client.aclose()
 
     async def _count_tokens(self, text: str) -> int:
-        return await asyncio.to_thread(qwen_count_tokens, text)
+        return await asyncio.to_thread(count_tokens, text)
 
     @staticmethod
     def _fingerprint(data: Any) -> str:
@@ -247,10 +247,13 @@ class LLMClient:
             return cached
 
         counts = list(cached) if cached is not None else []
+        base_prompt = build_prompt([], **context)
+        base_tokens = await self._count_tokens(base_prompt)
+
+        suffix_totals = history_suffix_token_totals(history)
         for idx in range(len(counts), len(history)):
-            prompt = build_prompt(history[idx:], **context)
-            tokens = await self._count_tokens(prompt)
-            counts.append(tokens)
+            suffix_tokens = suffix_totals[idx] if suffix_totals else 0
+            counts.append(base_tokens + suffix_tokens)
 
         result = tuple(counts)
         self._history_token_cache[key] = result
