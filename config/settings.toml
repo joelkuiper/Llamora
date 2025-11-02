@@ -12,7 +12,7 @@ max_tag_length = 64
 max_username_length = 30
 max_password_length = 128
 min_password_length = 8
-max_message_length = 1000
+max_message_length = 5000
 max_search_query_length = 512
 
 [default.SEARCH]
