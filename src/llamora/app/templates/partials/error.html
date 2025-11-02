@@ -1,6 +1,15 @@
-<div id="errors">
-  <div class="error-box">
-    ⚠️ {{ message }}
-    <button class="close-error" onclick="this.parentElement.remove()" aria-label="Close error">&times;</button>
+{% macro alert(message, tone='danger', dismissible=True) %}
+  {% set icons = {'danger': '⚠️', 'success': '✓', 'info': 'ℹ️'} %}
+  {% set icon = icons.get(tone, icons['info']) %}
+  <div class="alert alert--{{ tone }}" role="alert">
+    <span class="alert__icon" aria-hidden="true">{{ icon }}</span>
+    <div class="alert__message">{{ message }}</div>
+    {% if dismissible %}
+    <button class="alert__close" type="button" onclick="this.closest('.alert').remove()" aria-label="Dismiss alert">&times;</button>
+    {% endif %}
   </div>
-</div>
+{% endmacro %}
+
+{% if message is defined %}
+  {{ alert(message) }}
+{% endif %}

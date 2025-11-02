@@ -189,7 +189,7 @@ class ChatFormElement extends ReactiveElement {
     if (this.#errors) {
       const onErrorsAfterSwap = () => {
         requestAnimationFrame(() => {
-          if (document.querySelector("#errors .error-box")) {
+          if (document.querySelector("#errors .alert")) {
             this.setStreaming(false);
           }
         });

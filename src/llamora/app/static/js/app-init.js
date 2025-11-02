@@ -27,21 +27,30 @@ function showServerError() {
   const errors = document.getElementById("errors");
   if (!errors) return;
 
-  const box = document.createElement("div");
-  box.className = "error-box";
-  box.setAttribute("role", "alert");
-  box.setAttribute("aria-live", "assertive");
-  box.setAttribute("aria-atomic", "true");
-  box.textContent = "⚠️ Unable to reach server.";
+  const alert = document.createElement("div");
+  alert.className = "alert alert--danger";
+  alert.setAttribute("role", "alert");
+  alert.setAttribute("aria-live", "assertive");
+  alert.setAttribute("aria-atomic", "true");
+
+  const icon = document.createElement("span");
+  icon.className = "alert__icon";
+  icon.setAttribute("aria-hidden", "true");
+  icon.textContent = "⚠️";
+
+  const message = document.createElement("div");
+  message.className = "alert__message";
+  message.textContent = "Unable to reach server.";
 
   const btn = document.createElement("button");
-  btn.className = "close-error";
-  btn.setAttribute("aria-label", "Close error");
+  btn.className = "alert__close";
+  btn.type = "button";
+  btn.setAttribute("aria-label", "Dismiss alert");
   btn.textContent = "×";
-  btn.addEventListener("click", () => box.remove());
+  btn.addEventListener("click", () => alert.remove());
 
-  box.appendChild(btn);
-  errors.appendChild(box);
+  alert.append(icon, message, btn);
+  errors.appendChild(alert);
 }
 
 function registerOfflineHandler() {

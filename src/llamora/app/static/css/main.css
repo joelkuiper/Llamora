@@ -660,39 +660,79 @@ input[type="checkbox"]:focus {
   transition: all 0.3 ease;
 }
 
-/* Errors */
+/* Alerts */
 #errors {
   position: sticky;
   top: 0;
   z-index: 1000;
+  display: grid;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  margin: 0 auto;
+  width: min(100%, 64rem);
+}
 
-  .error-box {
-    position: relative;
-    background-color: var(--color-error-bg);
+.alert {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-lg) var(--spacing-sm) var(--spacing-md);
+  width: 100%;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  box-shadow: var(--subtle-raised-shadow);
+  font-family: var(--font-base);
+  font-weight: 600;
+  line-height: 1.4;
+  transition: transform var(--motion-hover) ease, box-shadow var(--motion-hover) ease;
+  background: var(--color-bg-alt);
+  color: var(--color-text);
+
+  &.alert--danger {
+    background: var(--color-error-bg);
     color: var(--color-error-text);
-    padding: var(--spacing-sm) var(--spacing-md);
-    text-align: center;
-    font-weight: bold;
-    border-bottom: 2px solid var(--color-error-text);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
-    font-family: var(--font-base);
-    margin: -0.5em;
+    border-color: var(--color-error-border);
+  }
 
-    .close-error {
-      position: absolute;
-      top: 0.8rem;
-      right: 1em;
-      background: none;
-      border: none;
-      font-size: 1.2rem;
-      color: var(--color-error-text);
-      cursor: pointer;
-      padding: 0;
-      line-height: 1;
+  &.alert--success {
+    background: var(--color-success-bg);
+    color: var(--color-success-text);
+    border-color: color-mix(in srgb, var(--color-success-text), transparent 70%);
+  }
 
-      &:hover { color: var(--color-error-hover); }
-    }
+  &:hover {
+    box-shadow: var(--raised-shadow);
+  }
+}
+
+.alert__icon {
+  font-size: 1.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.alert__message {
+  min-width: 0;
+}
+
+.alert__close {
+  border: none;
+  background: none;
+  color: inherit;
+  font-size: 1.4rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: var(--spacing-xs);
+  border-radius: var(--radius-sm);
+  transition: background var(--motion-hover) ease, color var(--motion-hover) ease;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--accent-hover);
+    background: color-mix(in srgb, currentColor, transparent 88%);
   }
 }
 

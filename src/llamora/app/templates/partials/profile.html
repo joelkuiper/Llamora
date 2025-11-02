@@ -1,4 +1,5 @@
 {% from 'partials/password_field.html' import password_field with context %}
+{% from 'partials/error.html' import alert %}
 <main id="content-wrapper">
   <section id="profile-page">
     <header class="profile-header">
@@ -12,9 +13,9 @@
     <section class="profile-section">
       <h2>Change Password</h2>
       {% if pw_error %}
-        <div class="error">{{ pw_error }}</div>
+        {{ alert(pw_error) }}
       {% elif pw_success %}
-        <div class="success">Password updated</div>
+        {{ alert('Password updated', tone='success') }}
       {% endif %}
       <form method="post" action="{{ url_for('auth.change_password') }}"
             hx-post="{{ url_for('auth.change_password') }}"
@@ -30,7 +31,7 @@
 
     <section class="profile-section">
       <h2>Recovery</h2>
-      {% if rc_error %}<div class="error">{{ rc_error }}</div>{% endif %}
+      {% if rc_error %}{{ alert(rc_error) }}{% endif %}
       <form method="post" action="{{ url_for('auth.regen_recovery') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
         <button class="btn" type="submit" data-loading="Generating">Generate New Recovery Code</button>

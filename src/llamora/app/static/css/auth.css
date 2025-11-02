@@ -37,22 +37,8 @@
   }
 
   /* Alerts */
-  .error,
-  .success {
-    padding: var(--spacing-sm);
-    border-radius: var(--radius-sm);
-    text-align: center;
-    font-weight: 600;
+  .alert {
     margin-bottom: var(--spacing-sm);
-    border: 1px solid var(--border);
-  }
-  .error {
-    background-color: var(--color-error-bg);
-    color: var(--color-error-text);
-  }
-  .success {
-    background-color: var(--color-success-bg);
-    color: var(--color-success-text);
   }
 
   h2 {

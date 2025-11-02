@@ -128,23 +128,7 @@
   }
 
   /* ------- Messages ------- */
-  .error,
-  .success {
-    padding: var(--spacing-sm);
-    border-radius: var(--radius-md);
-    text-align: center;
-    font-weight: 600;
-    border: 1px solid var(--border);
+  .alert {
     margin-bottom: var(--spacing-sm);
-  }
-
-  .error {
-    background-color: var(--color-error-bg-alt);
-    color: var(--color-error-text-dark);
-  }
-
-  .success {
-    background-color: var(--color-success-bg-alt);
-    color: var(--color-success-text);
   }
 }
