@@ -42,6 +42,25 @@ class ChatMetaParser:
 
         if not self._found_start:
             idx = data.find(self.sentinel_start)
+            end_idx = data.find(self.sentinel_end)
+            if end_idx != -1 and (idx == -1 or end_idx < idx):
+                visible = data[:end_idx]
+                remainder = data[end_idx + len(self.sentinel_end) :]
+                candidate = extract_json_candidate(remainder)
+                trailing = ""
+                if candidate:
+                    candidate_idx = remainder.find(candidate)
+                    meta_fragment = remainder[: candidate_idx + len(candidate)]
+                    trailing = remainder[candidate_idx + len(candidate) :]
+                else:
+                    meta_fragment = remainder
+                self._found_start = True
+                self._meta_buffer += meta_fragment
+                if candidate:
+                    self._meta_complete = True
+                if trailing:
+                    visible += trailing
+                return visible
             if idx != -1:
                 visible = data[:idx]
                 data = data[idx + len(self.sentinel_start) :]
@@ -81,7 +100,7 @@ class ChatMetaParser:
     def _split_visible_tail(self, data: str) -> tuple[str, str]:
         if not data:
             return "", ""
-        minimal_keep = max(len(self.sentinel_start) - 1, 0)
+        minimal_keep = max(len(self.sentinel_end), len(self.sentinel_start) - 1, 0)
         stripped = data.rstrip("\r\n")
         trailing_newlines = data[len(stripped) :]
         last_newline = stripped.rfind("\n")
@@ -90,20 +109,30 @@ class ChatMetaParser:
         else:
             tail = stripped + trailing_newlines
         original_tail = tail
+        candidate = extract_json_candidate(tail)
+        if candidate:
+            candidate_idx = tail.rfind(candidate)
+            if candidate_idx != -1:
+                prefix = tail[:candidate_idx]
+                kept = tail[candidate_idx:]
+                if len(kept) > self.tail_limit:
+                    kept = kept[-self.tail_limit :]
+                base_visible = data[: len(data) - len(original_tail)]
+                return base_visible + prefix, kept
         if "{" in tail:
             brace_idx = tail.find("{")
             prefix = tail[:brace_idx]
-            tail = tail[brace_idx:]
-            if len(tail) > self.tail_limit:
-                tail = tail[-self.tail_limit :]
+            kept = tail[brace_idx:]
+            if len(kept) > self.tail_limit:
+                kept = kept[-self.tail_limit :]
             base_visible = data[: len(data) - len(original_tail)]
-            return base_visible + prefix, tail
-        tail = tail[-minimal_keep:]
-        if not tail and minimal_keep:
-            tail = data[-minimal_keep:]
-        if len(data) <= len(tail):
+            return base_visible + prefix, kept
+        kept_tail = tail[-minimal_keep:]
+        if not kept_tail and minimal_keep:
+            kept_tail = data[-minimal_keep:]
+        if len(data) <= len(kept_tail):
             return "", data
-        return data[: len(data) - len(tail)], tail
+        return data[: len(data) - len(kept_tail)], kept_tail
 
     def _maybe_claim_orphan_meta(self) -> None:
         if self._found_start or self._orphan_meta:
@@ -116,6 +145,7 @@ class ChatMetaParser:
             return
         if not {"emoji", "keywords"}.issubset(meta.keys()):
             return
+        self._found_start = True
         self._meta_buffer = candidate
         self._meta_complete = True
         self._orphan_meta = True
