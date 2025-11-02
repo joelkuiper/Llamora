@@ -22,7 +22,7 @@ The conversation below is from yesterday. If themes appear in the conversation b
 {% for group in yesterday_message_groups -%}
 {{ group['humanized'] }}
 {% for m in group['messages'] -%}
-{{ "You" if m['role'] == "assistant" else "user" }}: {{ m['message']|trim }}
+({{ "You" if m['role'] == "assistant" else "user" }}) {{ m['message']|trim }}
 
 {% endfor %}
 {% endfor %}
