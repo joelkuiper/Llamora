@@ -22,6 +22,7 @@ class ChatMetaParser:
 
     sentinel_start: str = "<meta>"
     sentinel_end: str = "</meta>"
+    tail_limit: int = 256
 
     def __post_init__(self) -> None:
         self._found_start = False
@@ -29,6 +30,7 @@ class ChatMetaParser:
         self._meta_buffer: str = ""
         self._tail: str = ""
         self._raw_buffer: str = ""
+        self._orphan_meta = False
 
     def feed(self, chunk: str) -> str:
         """Process a chunk and return the user-visible portion."""
@@ -46,13 +48,9 @@ class ChatMetaParser:
                 self._found_start = True
                 self._meta_buffer += data
             else:
-                keep = len(data) - len(self.sentinel_start) + 1
-                if keep > 0:
-                    visible = data[:keep]
-                    self._tail = data[keep:]
-                    return visible
-                self._tail = data
-                return ""
+                visible, self._tail = self._split_visible_tail(data)
+                self._maybe_claim_orphan_meta()
+                return visible
         else:
             self._meta_buffer += data
 
@@ -74,11 +72,54 @@ class ChatMetaParser:
     def flush_visible_tail(self) -> str:
         """Return any buffered visible text when no meta was found."""
 
-        if self._found_start:
+        if self._found_start or self._orphan_meta:
             return ""
         remainder = self._tail
         self._tail = ""
         return remainder
+
+    def _split_visible_tail(self, data: str) -> tuple[str, str]:
+        if not data:
+            return "", ""
+        minimal_keep = max(len(self.sentinel_start) - 1, 0)
+        stripped = data.rstrip("\r\n")
+        trailing_newlines = data[len(stripped) :]
+        last_newline = stripped.rfind("\n")
+        if last_newline != -1:
+            tail = stripped[last_newline + 1 :] + trailing_newlines
+        else:
+            tail = stripped + trailing_newlines
+        original_tail = tail
+        if "{" in tail:
+            brace_idx = tail.find("{")
+            prefix = tail[:brace_idx]
+            tail = tail[brace_idx:]
+            if len(tail) > self.tail_limit:
+                tail = tail[-self.tail_limit :]
+            base_visible = data[: len(data) - len(original_tail)]
+            return base_visible + prefix, tail
+        tail = tail[-minimal_keep:]
+        if not tail and minimal_keep:
+            tail = data[-minimal_keep:]
+        if len(data) <= len(tail):
+            return "", data
+        return data[: len(data) - len(tail)], tail
+
+    def _maybe_claim_orphan_meta(self) -> None:
+        if self._found_start or self._orphan_meta:
+            return
+        candidate = extract_json_candidate(self._tail)
+        if not candidate:
+            return
+        meta = parse_meta_json(candidate)
+        if not isinstance(meta, dict):
+            return
+        if not {"emoji", "keywords"}.issubset(meta.keys()):
+            return
+        self._meta_buffer = candidate
+        self._meta_complete = True
+        self._orphan_meta = True
+        self._tail = ""
 
     @property
     def meta_complete(self) -> bool:
