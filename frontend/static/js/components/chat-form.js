@@ -144,8 +144,11 @@ class ChatFormElement extends ReactiveElement {
 
     const onAfterRequest = () => {
       if (!this.#draftKey) return;
-      sessionStorage.removeItem(this.#draftKey);
-      this.#resizeTextarea({ forceScroll: true });
+      requestAnimationFrame(() => {
+        if (!this.#draftKey) return;
+        sessionStorage.removeItem(this.#draftKey);
+        this.#resizeTextarea({ forceScroll: true });
+      });
     };
     bag.add(this.#form, "htmx:afterRequest", onAfterRequest);
 
