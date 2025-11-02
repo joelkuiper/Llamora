@@ -3,7 +3,7 @@ import hashlib
 import logging
 from pathlib import Path
 from contextlib import asynccontextmanager, suppress
-from typing import Any, AsyncGenerator, AsyncIterator, NamedTuple
+from typing import Any, AsyncGenerator, NamedTuple
 
 import httpx
 import orjson
@@ -14,7 +14,6 @@ from llamora.settings import settings
 from llamora.util import resolve_data_path
 from .process_manager import LlamafileProcessManager
 from .chat_template import build_chat_messages, render_chat_prompt
-from .ring_buffer import RingBuffer, RingBufferCursor
 from .tokenizers.tokenizer import count_tokens, history_suffix_token_totals
 
 LLM_DIR = Path(__file__).resolve().parent
@@ -84,26 +83,18 @@ class _CompletionStream:
     def __init__(self, client: "LLMClient", payload: dict[str, Any]) -> None:
         self._client = client
         self._payload = payload
-        self._buffer = RingBuffer()
-        self._control: asyncio.Queue[Any] = asyncio.Queue()
+        self._queue: asyncio.Queue[Any] = asyncio.Queue()
         self._sentinel = object()
         self.task: asyncio.Task[None] = asyncio.create_task(self._run())
 
-    def open_cursor(self) -> RingBufferCursor:
-        return self._buffer.open_cursor()
+    async def _emit(self, item: Any) -> None:
+        await self._queue.put(item)
 
-    async def iter_events(self) -> AsyncIterator[Any]:
-        cursor = self.open_cursor()
+    def _emit_nowait(self, item: Any) -> None:
         try:
-            async for view in cursor:
-                yield view
-        finally:
-            await cursor.aclose()
-        while True:
-            item = await self._control.get()
-            if item is self._sentinel:
-                break
-            yield item
+            self._queue.put_nowait(item)
+        except asyncio.QueueFull:
+            pass
 
     async def _run(self) -> None:
         parser = SSEStreamParser()
@@ -121,11 +112,7 @@ class _CompletionStream:
                     events = parser.feed_line(line)
                     for event in events:
                         if event.type == "content" and event.data is not None:
-                            try:
-                                await self._buffer.write(event.data.encode("utf-8"))
-                            except asyncio.CancelledError:
-                                stopped = True
-                                break
+                            await self._emit(event.data)
                         elif event.type == "stop":
                             stopped = True
                             break
@@ -135,11 +122,7 @@ class _CompletionStream:
                 if not stopped:
                     for event in parser.finalize():
                         if event.type == "content" and event.data is not None:
-                            try:
-                                await self._buffer.write(event.data.encode("utf-8"))
-                            except asyncio.CancelledError:
-                                stopped = True
-                                break
+                            await self._emit(event.data)
                         elif event.type == "stop":
                             stopped = True
 
@@ -149,23 +132,27 @@ class _CompletionStream:
                         if parser.saw_content
                         else "LLM server disconnected"
                     )
-                    await self._control.put({"type": "error", "data": msg})
+                    await self._emit({"type": "error", "data": msg})
         except HTTPError as e:
             self._client.process_manager.ensure_server_running()
-            await self._control.put({"type": "error", "data": f"HTTP error: {e}"})
+            await self._emit({"type": "error", "data": f"HTTP error: {e}"})
         except asyncio.CancelledError:
             raise
         except Exception as e:
-            await self._control.put({"type": "error", "data": f"Unexpected error: {e}"})
+            await self._emit({"type": "error", "data": f"Unexpected error: {e}"})
         finally:
-            await self._buffer.close()
-            await self._control.put(self._sentinel)
+            self._emit_nowait(self._sentinel)
 
-    def __aiter__(self) -> AsyncIterator[Any]:
-        return self.iter_events()
+    def __aiter__(self) -> "_CompletionStream":
+        return self
+
+    async def __anext__(self) -> Any:
+        item = await self._queue.get()
+        if item is self._sentinel:
+            raise StopAsyncIteration
+        return item
 
     async def aclose(self) -> None:
-        await self._buffer.close()
         if not self.task.done():
             self.task.cancel()
             with suppress(asyncio.CancelledError):
@@ -295,14 +282,14 @@ class LLMClient:
                 return history[start_idx:]
         return []
 
-    async def _prepare_stream_payload(
+    async def stream_response(
         self,
         msg_id: str,
         history: list[dict[str, Any]] | None = None,
         params: dict[str, Any] | None = None,
         context: dict[str, Any] | None = None,
         messages: list[dict[str, Any]] | None = None,
-    ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    ) -> AsyncGenerator[Any, None]:
         self.process_manager.ensure_server_running()
 
         cfg = {**self.default_request, **(params or {})}
@@ -319,58 +306,35 @@ class LLMClient:
                     history = await self._trim_history(history, max_input, ctx)
                 except Exception as e:
                     self.logger.exception("Failed to trim history")
-                    return None, {"type": "error", "data": f"Prompt error: {e}"}
+                    yield {"type": "error", "data": f"Prompt error: {e}"}
+                    return
             try:
                 messages = build_chat_messages(history, **ctx)
             except Exception as e:
                 self.logger.exception("Failed to build prompt messages")
-                return None, {"type": "error", "data": f"Prompt error: {e}"}
+                yield {"type": "error", "data": f"Prompt error: {e}"}
+                return
         try:
             prompt_text = render_chat_prompt(messages)
         except Exception as e:
             self.logger.exception("Failed to render chat prompt")
-            return None, {"type": "error", "data": f"Prompt error: {e}"}
+            yield {"type": "error", "data": f"Prompt error: {e}"}
+            return
 
         payload = {"prompt": prompt_text, **cfg, "grammar": self.grammar}
         if msg_id:
             payload.setdefault("id", str(msg_id))
-        return payload, None
 
-    @asynccontextmanager
-    async def _open_stream_with_payload(
-        self,
-        msg_id: str,
-        payload: dict[str, Any],
-    ) -> AsyncGenerator[_CompletionStream, None]:
         async with self._acquire_slot(msg_id) as slot_id:
-            request = dict(payload)
-            request.setdefault("slot_id", slot_id)
-            stream = _CompletionStream(self, request)
-            
+            payload.setdefault("slot_id", slot_id)
+            stream = _CompletionStream(self, payload)
+
             try:
                 async with self._track_stream(msg_id, stream.task):
-                    yield stream
+                    async for item in stream:
+                        yield item
             finally:
                 await stream.aclose()
-
-    async def stream_response(
-        self,
-        msg_id: str,
-        history: list[dict[str, Any]] | None = None,
-        params: dict[str, Any] | None = None,
-        context: dict[str, Any] | None = None,
-        messages: list[dict[str, Any]] | None = None,
-    ) -> AsyncGenerator[Any, None]:
-        payload, error = await self._prepare_stream_payload(
-            msg_id, history, params, context, messages
-        )
-        if error is not None or payload is None:
-            yield error or {"type": "error", "data": "Prompt error"}
-            return
-
-        async with self._open_stream_with_payload(msg_id, payload) as stream:
-            async for item in stream.iter_events():
-                yield item
 
     async def abort(self, msg_id: str) -> bool:
         slot_id: int | None = None

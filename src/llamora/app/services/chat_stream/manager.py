@@ -3,9 +3,10 @@ import logging
 import time
 from heapq import heappop, heappush
 from itertools import count
+from collections import deque
 from collections.abc import AsyncIterator
-from contextlib import AsyncExitStack, suppress
-from typing import Any, Callable
+from contextlib import suppress
+from typing import Callable
 
 from llamora.llm.client import LLMClient
 
@@ -41,71 +42,29 @@ class LLMStreamSession:
         self._params = params
         self._context = context or {}
         self._messages = messages
-        self._stream_lock = asyncio.Lock()
-        self._stream = None
-        self._exit_stack: AsyncExitStack | None = None
-        self._prep_error: dict | None = None
+        self._first_chunk = True
 
-    async def __aiter__(self) -> AsyncIterator[Any]:
-        async for chunk in self._iterate_stream():
+    async def __aiter__(self) -> AsyncIterator[str]:
+        async for chunk in self._llm.stream_response(
+            self.user_msg_id,
+            self._history,
+            self._params,
+            self._context,
+            messages=self._messages,
+        ):
             if isinstance(chunk, dict) and chunk.get("type") == "error":
                 logger.info("Error chunk received for %s: %s", self.user_msg_id, chunk)
                 raise LLMStreamError(chunk.get("data", "Unknown error"))
-            yield chunk
+            text = chunk
+            if not isinstance(text, str):
+                text = str(text)
+            if self._first_chunk:
+                text = text.lstrip()
+                self._first_chunk = False
+            yield text
 
     async def abort(self) -> None:
         await self._llm.abort(self.user_msg_id)
-
-    async def open_reader(self):
-        stream = await self._ensure_stream()
-        if stream is None:
-            return None
-        return stream.open_cursor()
-
-    async def aclose(self) -> None:
-        if self._exit_stack is not None:
-            await self._exit_stack.aclose()
-            self._exit_stack = None
-            self._stream = None
-
-    async def _iterate_stream(self):
-        stream = await self._ensure_stream()
-        if stream is None:
-            if self._prep_error is not None:
-                yield self._prep_error
-            return
-        async for item in stream.iter_events():
-            yield item
-
-    async def _ensure_stream(self):
-        if self._prep_error is not None:
-            return None
-        if self._stream is not None:
-            return self._stream
-        async with self._stream_lock:
-            if self._prep_error is not None:
-                return None
-            if self._stream is not None:
-                return self._stream
-            payload, error = await self._llm._prepare_stream_payload(
-                self.user_msg_id,
-                self._history,
-                self._params,
-                self._context,
-                self._messages,
-            )
-            if error is not None or payload is None:
-                self._prep_error = error or {
-                    "type": "error",
-                    "data": "Prompt error",
-                }
-                return None
-            self._exit_stack = AsyncExitStack()
-            stream = await self._exit_stack.enter_async_context(
-                self._llm._open_stream_with_payload(self.user_msg_id, payload)
-            )
-            self._stream = stream
-            return stream
 
 
 class PendingResponse(ResponsePipelineCallbacks):
@@ -134,6 +93,7 @@ class PendingResponse(ResponsePipelineCallbacks):
         self.done = False
         self.error = False
         self.error_message = ""
+        self._cond = asyncio.Condition()
         self.dek = dek
         self.meta: dict | None = None
         self.context = context or {}
@@ -143,10 +103,10 @@ class PendingResponse(ResponsePipelineCallbacks):
         self.cancelled = False
         self.created_at = time.monotonic()
         self.assistant_msg_id: str | None = None
+        self._chunks: deque[str] = deque()
         self._total_len = 0
         self._cleanup = on_cleanup
         self._cleanup_called = False
-        self._tail_bytes: bytes = b""
         self._session = LLMStreamSession(
             llm, user_msg_id, history, params, context, messages
         )
@@ -187,15 +147,15 @@ class PendingResponse(ResponsePipelineCallbacks):
         try:
             await self._pipeline.run(self)
         finally:
-            with suppress(Exception):
-                await self._session.aclose()
             self._invoke_cleanup()
 
     async def on_visible(self, chunk: str, total: str) -> None:
         self._visible_total = total
-        if chunk:
-            self._tail_bytes = b""
-        self._store_total_text(total)
+        async with self._cond:
+            if chunk:
+                self._chunks.append(chunk)
+            self._store_total_text(total)
+            self._cond.notify_all()
 
     async def on_finished(self, result: PipelineResult) -> None:
         self.error = result.error
@@ -203,14 +163,16 @@ class PendingResponse(ResponsePipelineCallbacks):
         self.cancelled = result.cancelled
         if result.assistant_message_id:
             self.assistant_msg_id = result.assistant_message_id
-        final_text = result.final_text
-        if final_text:
-            remaining = final_text[self._total_len :]
-            if remaining:
-                self._tail_bytes = remaining.encode("utf-8")
-        self._store_total_text(final_text)
-        self.meta = result.meta
-        self.done = True
+        async with self._cond:
+            final_text = result.final_text
+            if final_text:
+                remaining = final_text[self._total_len :]
+                if remaining:
+                    self._chunks.append(remaining)
+            self._store_total_text(final_text)
+            self.meta = result.meta
+            self.done = True
+            self._cond.notify_all()
 
     def _invoke_cleanup(self) -> None:
         if not self._cleanup_called:
@@ -257,28 +219,17 @@ class PendingResponse(ResponsePipelineCallbacks):
             pass
 
     async def stream(self):
-        reader = await self._session.open_reader()
-        if reader is None:
-            if self._tail_bytes:
-                yield memoryview(self._tail_bytes)
-            return
-        first_chunk = True
-        try:
-            async for view in reader:
-                chunk_view = view
-                if first_chunk:
-                    first_chunk = False
-                    text = view.tobytes().decode("utf-8", errors="replace")
-                    stripped = text.lstrip()
-                    if not stripped:
-                        continue
-                    if stripped != text:
-                        chunk_view = memoryview(stripped.encode("utf-8"))
-                yield chunk_view
-        finally:
-            await reader.aclose()
-        if self._tail_bytes:
-            yield memoryview(self._tail_bytes)
+        while True:
+            async with self._cond:
+                while not self._chunks and not self.done:
+                    await self._cond.wait()
+                if self._chunks:
+                    chunk = self._chunks.popleft()
+                else:
+                    if self.done:
+                        break
+                    continue
+            yield chunk
 
     def _store_total_text(self, total: str) -> None:
         self.text = total
