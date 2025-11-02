@@ -188,7 +188,7 @@
     thead th {
       font-weight: 600;
       padding: .35rem 0 .25rem;
-      color: var(--color-bot-text);
+      color: var(--color-text-muted);
       text-align: center;
     }
 
