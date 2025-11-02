@@ -58,12 +58,12 @@
   --color-text-muted: #757575;
 
   /* Status colors */
-  --color-error-bg: #ffe9ea;
-  --color-error-bg-alt: #ffeded;
-  --color-error-text: #8e0014;
-  --color-error-text-dark: #7f0013;
-  --color-error-hover: #6b0011;
-  --color-success-bg: #e9fff2;
+  --color-error-bg: #ffe5e8;
+  --color-error-bg-alt: #ffdce0;
+  --color-error-text: #9a0016;
+  --color-error-hover: #630010;
+  --color-error-border: #d8001d;
+  --color-success-bg: #e6fff1;
   --color-success-bg-alt: #ecfff4;
   --color-success-text: #0a6a37;
   --color-danger: #c8002e;
@@ -299,6 +299,7 @@
     --glass-bg-alt: var(--glass-bg-alt-dark);
     --glass-bg-alt-hover: var(--glass-bg-alt-hover-dark);
     --glass-fallback-bg: var(--glass-fallback-bg-dark);
+    --glass-bg-opaque: var(--glass-fallback-bg-dark);
     --glass-text-muted: var(--glass-text-muted-dark);
     --glass-text-strong: var(--glass-text-strong-dark);
     --glass-text-stronger: var(--glass-text-stronger-dark);

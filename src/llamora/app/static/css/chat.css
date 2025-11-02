@@ -58,7 +58,7 @@ body {
 
   transition: opacity var(--motion-fade) ease-in-out;
 
-  .error { color: var(--color-error-text-dark); }
+  .error { color: var(--color-error-text); }
 
   .no-content {
     opacity: 0.8;
@@ -102,7 +102,7 @@ body {
     &.message--error {
       border-color: var(--color-error-text);
       background: var(--color-error-bg);
-      color: var(--color-error-text-dark);
+      color: var(--color-error-text);
     }
   }
 
