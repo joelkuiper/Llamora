@@ -178,6 +178,8 @@ class LLMClient:
         )
         self._active_streams: dict[str, asyncio.Task[None]] = {}
         self._streams_lock = asyncio.Lock()
+        self.parallel_slots = max(1, getattr(process_manager, "parallel_slots", 1))
+        self._slot_semaphore = asyncio.Semaphore(self.parallel_slots)
         self._sse_headers = {
             "Accept": "text/event-stream",
             "Connection": "keep-alive",
@@ -312,15 +314,18 @@ class LLMClient:
                 return
 
         payload = {"prompt": prompt, **cfg, "grammar": self.grammar}
+        if msg_id:
+            payload.setdefault("id", str(msg_id))
 
-        stream = _CompletionStream(self, payload)
+        async with self._acquire_slot():
+            stream = _CompletionStream(self, payload)
 
-        try:
-            async with self._track_stream(msg_id, stream.task):
-                async for item in stream:
-                    yield item
-        finally:
-            await stream.aclose()
+            try:
+                async with self._track_stream(msg_id, stream.task):
+                    async for item in stream:
+                        yield item
+            finally:
+                await stream.aclose()
 
     async def abort(self, msg_id: str) -> bool:
         async with self._streams_lock:
@@ -351,3 +356,11 @@ class LLMClient:
                 current = self._active_streams.get(msg_id)
                 if current is task:
                     self._active_streams.pop(msg_id, None)
+
+    @asynccontextmanager
+    async def _acquire_slot(self) -> AsyncGenerator[None, None]:
+        await self._slot_semaphore.acquire()
+        try:
+            yield
+        finally:
+            self._slot_semaphore.release()

@@ -45,7 +45,7 @@ It’s both a technical playground and a design experiment: a lightweight journa
 
 This project has **several limitations** by design. It's important to understand them if you plan to use or extend this code:
 
-- **Limited Scalability:** By default, Llamora processes requests with a single worker (the llama.cpp/llamafile server). For heavy traffic, consider running multiple instances or a dedicated model service.
+- **Limited Scalability:** Llamora mirrors the llama.cpp/llamafile server's available parallel slots (configure via `LLAMORA_LLM__SERVER__PARALLEL`, set `parallel` under `[default.LLM.server]` in `settings.toml`, or use the server's `--parallel` flag). Without tuning this often means a single in-flight request. For heavy traffic, consider running multiple instances or a dedicated model service.
 
 - **No API or External Interface:** The app doesn't expose an API for programmatic access, it's purely a web interface. That's fine for interactive use, but if you wanted to use this as a backend service, you'd have to add JSON endpoints or similar.
 
@@ -59,7 +59,7 @@ This project has **several limitations** by design. It's important to understand
 
 - **Input/Output Filtering:** Aside from Markdown sanitization, there's no content filtering on user inputs or AI outputs. The model could potentially produce inappropriate content if prompted. There is also nothing preventing prompt injections (where a user could ask the assistant to ignore its system prompt). Since this is a closed environment (local model, one user), that wasn't a focus. But it's something to consider if expanded; e.g., using moderation models or guardrails if it were public.
 
-- **Model and Performance:** The app loads the model into RAM when it starts. Large models (even quantized) can be slow or consume a lot of memory. The example configuration targets [Qwen3-4B-Instruct](https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507), but anything larger might make the app sluggish or not fit in memory depending on your hardware. There's no mechanism to swap models on the fly; it's a static single model. Generation parameters such as temperature or top-k can be provided via the client or overrides like ``LLAMORA_LLM__REQUEST__TEMPERATURE`` and ``LLAMORA_LLM__REQUEST__TOP_K``, while server settings like context window or GPU usage are set with keys such as ``LLAMORA_LLM__SERVER__ARGS__CTX_SIZE``.
+- **Model and Performance:** The app loads the model into RAM when it starts. Large models (even quantized) can be slow or consume a lot of memory. The example configuration targets [Qwen3-4B-Instruct](https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507), but anything larger might make the app sluggish or not fit in memory depending on your hardware. There's no mechanism to swap models on the fly; it's a static single model. Generation parameters such as temperature or top-k can be provided via the client or overrides like ``LLAMORA_LLM__REQUEST__TEMPERATURE`` and ``LLAMORA_LLM__REQUEST__TOP_K``, while server settings like context window or GPU usage are set with keys such as ``LLAMORA_LLM__SERVER__ARGS__CTX_SIZE``. Set ``LLAMORA_LLM__SERVER__PARALLEL`` (or add ``parallel = N`` under ``[default.LLM.server]``) or the server's ``--parallel`` to control how many conversations can stream concurrently.
 Configuration is managed by [Dynaconf](https://www.dynaconf.com/); see
 [`config/settings.toml`](./config/settings.toml) and
 [`src/llamora/settings.py`](./src/llamora/settings.py) for details.

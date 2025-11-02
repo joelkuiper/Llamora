@@ -58,6 +58,7 @@ llamafile_path = ""
 # When set, connect to an existing llama.cpp/llamafile server (e.g., http://127.0.0.1:8081 from
 # `llama-server --hf Qwen/Qwen3-4B-Instruct-2507`).
 host = null
+parallel = 1
 
 [default.LLM.server.args]
 server = true

@@ -49,6 +49,16 @@ def _server_args_to_cli(args: dict[str, Any]) -> list[str]:
     return cli_args
 
 
+def _coerce_parallel(value: Any, default: int = 1) -> int:
+    try:
+        if value is None:
+            raise ValueError
+        slots = int(value)
+    except (TypeError, ValueError):
+        return max(default, 1)
+    return max(slots, 1)
+
+
 def _find_free_port() -> int:
     """Return an available TCP port on localhost."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -66,7 +76,8 @@ class LlamafileProcessManager:
         self.restart_attempts = 0
         self.max_restarts = 3
 
-        server_cfg = settings.LLM.server
+        raw_server_cfg = settings.get("LLM.server") or settings.LLM.server
+        server_cfg = _normalise_arg_keys(_to_plain_dict(raw_server_cfg))
         host = server_cfg.get("host")
         llamafile_path = server_cfg.get("llamafile_path")
         cfg_server_args = _normalise_arg_keys(
@@ -75,6 +86,12 @@ class LlamafileProcessManager:
         cfg_server_args.update(_normalise_arg_keys(_to_plain_dict(server_args)))
 
         self._ctx_size = cfg_server_args.get("ctx_size")
+        args_parallel = cfg_server_args.get("parallel")
+        default_parallel = _coerce_parallel(args_parallel)
+        configured_parallel = server_cfg.get("parallel")
+        self._parallel_slots = _coerce_parallel(
+            configured_parallel, default=default_parallel
+        )
 
         self._state_file = Path(tempfile.gettempdir()) / "llamora_llm_state.json"
 
@@ -115,6 +132,10 @@ class LlamafileProcessManager:
 
     def base_url(self) -> str:
         return self.server_url
+
+    @property
+    def parallel_slots(self) -> int:
+        return self._parallel_slots
 
     def ensure_server_running(self) -> None:
         if getattr(self, "cmd", None) is None:
