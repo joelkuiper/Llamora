@@ -81,6 +81,27 @@ const onReady = () => {
   registerHtmxHandlers();
 };
 
+function resetSpinningButtons(scope = document) {
+  if (!scope) return;
+
+  const forms = [];
+  const searchRoot = scope instanceof Document ? scope : scope ?? document;
+
+  if (searchRoot instanceof HTMLFormElement && searchRoot.matches(FORM_SELECTOR)) {
+    forms.push(searchRoot);
+  }
+
+  if (searchRoot && typeof searchRoot.querySelectorAll === "function") {
+    forms.push(...searchRoot.querySelectorAll(FORM_SELECTOR));
+  }
+
+  forms.forEach((form) => {
+    form.querySelectorAll('button[data-spinning="1"]').forEach((btn) => {
+      stopButtonSpinner(btn);
+    });
+  });
+}
+
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", onReady);
 } else {
@@ -90,4 +111,10 @@ if (document.readyState === "loading") {
 if (typeof window !== "undefined") {
   window.appInit = window.appInit || {};
   window.appInit.initForms = initForms;
+
+  window.addEventListener("pageshow", (event) => {
+    // When navigating back to a cached page, make sure any submit buttons are reset.
+    const scope = event.target instanceof Document ? event.target : document;
+    resetSpinningButtons(scope);
+  });
 }
