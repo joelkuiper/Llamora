@@ -145,6 +145,8 @@ secret = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
 Restart the server after saving changes; Dynaconf merges `settings.local.toml`, `.secrets.toml`, `.env`, and process environment variables (prefixed with `LLAMORA_`), with the environment taking precedence last.
 
+---
+
 ### Deployment (not recommended)
 
 Llamora is a personal experiment and **not production-ready**.
