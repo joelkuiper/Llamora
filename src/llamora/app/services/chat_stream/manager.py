@@ -3,6 +3,7 @@ import logging
 import time
 from heapq import heappop, heappush
 from itertools import count
+from collections import deque
 from collections.abc import AsyncIterator
 from contextlib import suppress
 from typing import Callable
@@ -102,6 +103,8 @@ class PendingResponse(ResponsePipelineCallbacks):
         self.cancelled = False
         self.created_at = time.monotonic()
         self.assistant_msg_id: str | None = None
+        self._chunks: deque[str] = deque()
+        self._total_len = 0
         self._cleanup = on_cleanup
         self._cleanup_called = False
         self._session = LLMStreamSession(
@@ -149,7 +152,9 @@ class PendingResponse(ResponsePipelineCallbacks):
     async def on_visible(self, chunk: str, total: str) -> None:
         self._visible_total = total
         async with self._cond:
-            self.text = total
+            if chunk:
+                self._chunks.append(chunk)
+            self._store_total_text(total)
             self._cond.notify_all()
 
     async def on_finished(self, result: PipelineResult) -> None:
@@ -159,7 +164,12 @@ class PendingResponse(ResponsePipelineCallbacks):
         if result.assistant_message_id:
             self.assistant_msg_id = result.assistant_message_id
         async with self._cond:
-            self.text = result.final_text
+            final_text = result.final_text
+            if final_text:
+                remaining = final_text[self._total_len :]
+                if remaining:
+                    self._chunks.append(remaining)
+            self._store_total_text(final_text)
             self.meta = result.meta
             self.done = True
             self._cond.notify_all()
@@ -209,18 +219,22 @@ class PendingResponse(ResponsePipelineCallbacks):
             pass
 
     async def stream(self):
-        sent = 0
         while True:
             async with self._cond:
-                while len(self.text) == sent and not self.done:
+                while not self._chunks and not self.done:
                     await self._cond.wait()
-                chunk = self.text[sent:]
-                sent = len(self.text)
-                if chunk:
-                    yield chunk
-                if self.done:
-                    break
+                if self._chunks:
+                    chunk = self._chunks.popleft()
+                else:
+                    if self.done:
+                        break
+                    continue
+            yield chunk
 
+    def _store_total_text(self, total: str) -> None:
+        self.text = total
+        self._total_len = len(total)
+        self._visible_total = total
 
 class ChatStreamManager:
     def __init__(
