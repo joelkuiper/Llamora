@@ -1,4 +1,5 @@
 import asyncio
+import os
 from functools import lru_cache
 
 import numpy as np
@@ -6,7 +7,9 @@ from fastembed import TextEmbedding
 
 from llamora.settings import settings
 
-_embed_semaphore = asyncio.Semaphore(int(settings.EMBEDDING.concurrency))
+_embed_semaphore = asyncio.Semaphore(
+    settings.EMBEDDING.concurrency or os.cpu_count() or 1
+)
 
 
 @lru_cache(maxsize=1)
