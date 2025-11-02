@@ -14,7 +14,7 @@ from llamora.settings import settings
 from llamora.util import resolve_data_path
 from .process_manager import LlamafileProcessManager
 from .chat_template import build_chat_messages, render_chat_prompt
-from .tokenizers.tokenizer import count_tokens
+from .tokenizers.tokenizer import count_tokens, history_suffix_token_totals
 
 LLM_DIR = Path(__file__).resolve().parent
 GRAMMAR_PATH = resolve_data_path(
@@ -251,15 +251,9 @@ class LLMClient:
         if cached is not None and len(cached) == len(history):
             return cached
 
-        counts = list(cached) if cached is not None else []
-        for idx in range(len(counts), len(history)):
-            suffix_history = history[idx:]
-            messages = build_chat_messages(suffix_history, **context)
-            prompt_text = render_chat_prompt(messages)
-            tokens = await self._count_tokens(prompt_text)
-            counts.append(tokens)
-
-        result = tuple(counts)
+        ctx = dict(context or {})
+        totals = history_suffix_token_totals(history, context=ctx)
+        result = tuple(totals)
         self._history_token_cache[key] = result
         return result
 

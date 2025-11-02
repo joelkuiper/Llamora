@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from itertools import groupby
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -29,6 +30,75 @@ ANSWER_REQUIREMENTS = (
     "valid JSON object with the following shape: {\"emoji\":\"…\","
     "\"keywords\":[\"#tag\",…]} and close it with `</meta>`."
 )
+
+
+@dataclass(frozen=True)
+class ChatPromptRender:
+    """Container for a rendered prompt and its tokenisation."""
+
+    prompt: str
+    tokens: tuple[int, ...]
+
+    @property
+    def token_count(self) -> int:
+        return len(self.tokens)
+
+
+@dataclass(frozen=True)
+class ChatPromptSeries:
+    """Collection of rendered prompts for the base and history suffixes."""
+
+    base: ChatPromptRender
+    suffixes: tuple[ChatPromptRender, ...]
+
+    @property
+    def base_token_count(self) -> int:
+        return self.base.token_count
+
+    @property
+    def suffix_token_counts(self) -> tuple[int, ...]:
+        return tuple(render.token_count for render in self.suffixes)
+
+
+def _normalise_tokens(raw: Any) -> tuple[int, ...]:
+    if isinstance(raw, (list, tuple)):
+        sequence = raw
+    elif hasattr(raw, 'tolist'):
+        sequence = raw.tolist()
+    else:  # pragma: no cover - defensive
+        raise TypeError(
+            'Tokenizer.apply_chat_template returned unsupported token data'
+        )
+
+    try:
+        return tuple(int(token) for token in sequence)
+    except (TypeError, ValueError) as exc:  # pragma: no cover - defensive
+        raise TypeError('Tokenizer tokens must be integers') from exc
+
+
+def _render_chat_prompt(
+    messages: Sequence[Mapping[str, Any] | dict[str, Any]],
+    *,
+    add_generation_prompt: bool = True,
+) -> ChatPromptRender:
+    tokenizer = get_tokenizer()
+    message_list = list(messages)
+
+    prompt = tokenizer.apply_chat_template(
+        message_list,
+        tokenize=False,
+        add_generation_prompt=add_generation_prompt,
+    )
+    if not isinstance(prompt, str):  # pragma: no cover - defensive
+        raise TypeError('Tokenizer.apply_chat_template returned unexpected output')
+
+    token_data = tokenizer.apply_chat_template(
+        message_list,
+        tokenize=True,
+        add_generation_prompt=add_generation_prompt,
+    )
+    tokens = _normalise_tokens(token_data)
+    return ChatPromptRender(prompt=prompt, tokens=tokens)
 
 
 def _normalise_text(value: Any) -> str:
@@ -172,10 +242,23 @@ def build_opening_messages(
 def render_chat_prompt(messages: Sequence[Mapping[str, Any] | dict[str, Any]]) -> str:
     """Render ``messages`` to a prompt using the tokenizer's chat template."""
 
-    tokenizer = get_tokenizer()
-    prompt = tokenizer.apply_chat_template(
-        list(messages), tokenize=False, add_generation_prompt=True
-    )
-    if not isinstance(prompt, str):  # pragma: no cover - defensive
-        raise TypeError("Tokenizer.apply_chat_template returned unexpected output")
-    return prompt
+    return _render_chat_prompt(messages).prompt
+
+
+def render_chat_prompt_series(
+    history: Sequence[Mapping[str, Any] | dict[str, Any]],
+    **context: Any,
+) -> ChatPromptSeries:
+    """Render prompts for the base system message and each history suffix."""
+
+    ctx_history = list(history)
+    base_messages = build_chat_messages((), **context)
+    base_render = _render_chat_prompt(base_messages)
+
+    suffix_renders: list[ChatPromptRender] = []
+    for idx in range(len(ctx_history)):
+        suffix_history = ctx_history[idx:]
+        messages = build_chat_messages(suffix_history, **context)
+        suffix_renders.append(_render_chat_prompt(messages))
+
+    return ChatPromptSeries(base=base_render, suffixes=tuple(suffix_renders))

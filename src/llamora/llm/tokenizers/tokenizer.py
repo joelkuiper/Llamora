@@ -16,6 +16,7 @@ __all__ = [
     "get_tokenizer",
     "format_message_fragment",
     "count_message_tokens",
+    "history_suffix_token_totals",
     "format_vibes_text",
 ]
 
@@ -96,8 +97,34 @@ def format_message_fragment(role: str, message: str) -> str:
 def count_message_tokens(role: str, message: str) -> int:
     """Return the token count for a single history entry."""
 
-    fragment = format_message_fragment(role, message)
-    return count_tokens(fragment)
+    from llamora.llm.chat_template import render_chat_prompt_series
+
+    history = ({"role": role, "message": message},)
+    series = render_chat_prompt_series(history)
+    totals = series.suffix_token_counts
+    if not totals:
+        return 0
+    return max(0, totals[0] - series.base_token_count)
+
+
+def history_suffix_token_totals(
+    history: Sequence[Mapping[str, Any] | dict[str, Any]],
+    *,
+    context: Mapping[str, Any] | None = None,
+    **context_kwargs: Any,
+) -> tuple[int, ...]:
+    """Return cumulative token totals for each suffix of ``history``."""
+
+    from llamora.llm.chat_template import render_chat_prompt_series
+
+    ctx: dict[str, Any] = {}
+    if context:
+        ctx.update(context)
+    if context_kwargs:
+        ctx.update(context_kwargs)
+
+    series = render_chat_prompt_series(history, **ctx)
+    return series.suffix_token_counts
 
 
 def _coerce_mapping(entry: Mapping[str, Any] | dict[str, Any]) -> Mapping[str, Any]:
