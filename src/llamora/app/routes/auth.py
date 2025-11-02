@@ -15,13 +15,8 @@ from typing import Any, Mapping
 from nacl import pwhash
 from cachetools import TTLCache
 from llamora.app.services.auth_helpers import (
-    set_secure_cookie,
+    get_secure_cookie_manager,
     login_required,
-    get_current_user,
-    get_dek,
-    clear_secure_cookie,
-    set_dek,
-    clear_session_dek,
     sanitize_return_path,
 )
 from llamora.app.services.validators import validate_password, PasswordValidationError
@@ -63,6 +58,10 @@ def _password_error_message(error: PasswordValidationError | None) -> str:
 
 def _db():
     return get_services().db
+
+
+def _cookies():
+    return get_secure_cookie_manager()
 
 
 def _require_user(user: Mapping[str, Any] | None) -> Mapping[str, Any]:
@@ -234,8 +233,9 @@ async def register():
         )
         resp = await make_response(html)
         assert isinstance(resp, Response)
-        set_secure_cookie(resp, "uid", str(user_id))
-        set_dek(resp, dek)
+        manager = _cookies()
+        manager.set_secure_cookie(resp, "uid", str(user_id))
+        manager.set_dek(resp, dek)
         return resp
 
     return await render_template("register.html")
@@ -300,8 +300,9 @@ async def login():
                 redirect_value = redirect(redirect_url)
                 resp = await make_response(redirect_value)
                 assert isinstance(resp, Response)
-                set_secure_cookie(resp, "uid", str(user["id"]))
-                set_dek(resp, dek)
+                manager = _cookies()
+                manager.set_secure_cookie(resp, "uid", str(user["id"]))
+                manager.set_dek(resp, dek)
                 services = get_services()
                 current_app.add_background_task(
                     services.search_api.warm_index,
@@ -334,15 +335,16 @@ async def login():
 
 @auth_bp.route("/logout", methods=["POST"])
 async def logout():
-    user = await get_current_user()
+    manager = _cookies()
+    user = await manager.get_current_user()
     current_app.logger.debug("Logout for user %s", user["id"] if user else None)
     next_url = "/login"
     redirect_value = redirect(next_url)
     resp = await make_response(redirect_value)
     assert isinstance(resp, Response)
 
-    clear_session_dek()
-    clear_secure_cookie(resp)
+    manager.clear_session_dek()
+    manager.clear_secure_cookie(resp)
     return resp
 
 
@@ -410,7 +412,8 @@ async def reset_password():
 @auth_bp.route("/profile")
 @login_required
 async def profile():
-    user = _require_user(await get_current_user())
+    manager = _cookies()
+    user = _require_user(await manager.get_current_user())
     await _db().users.update_state(user["id"], active_date=None)
     return await _render_profile_page(user)
 
@@ -418,8 +421,9 @@ async def profile():
 @auth_bp.route("/profile/data")
 @login_required
 async def download_user_data():
-    user = _require_user(await get_current_user())
-    dek = get_dek()
+    manager = _cookies()
+    user = _require_user(await manager.get_current_user())
+    dek = manager.get_dek()
     if dek is None:
         response = await make_response("Missing encryption key")
         assert isinstance(response, Response)
@@ -448,7 +452,8 @@ async def download_user_data():
 @auth_bp.route("/profile/password", methods=["POST"])
 @login_required
 async def change_password():
-    user = _require_user(await get_current_user())
+    manager = _cookies()
+    user = _require_user(await manager.get_current_user())
     form = await request.form
     current = form.get("current_password", "")
     new = form.get("new_password", "")
@@ -479,7 +484,7 @@ async def change_password():
     except Exception:
         return await _render_profile_page(user, pw_error="Invalid current password")
 
-    dek = get_dek()
+    dek = manager.get_dek()
     if dek is None:
         return await _render_profile_page(user, pw_error="Missing encryption key")
 
@@ -497,8 +502,9 @@ async def change_password():
 @auth_bp.route("/profile/recovery", methods=["POST"])
 @login_required
 async def regen_recovery():
-    user = _require_user(await get_current_user())
-    dek = get_dek()
+    manager = _cookies()
+    user = _require_user(await manager.get_current_user())
+    dek = manager.get_dek()
     if dek is None:
         return await _render_profile_page(user, rc_error="Missing encryption key")
 
@@ -516,10 +522,11 @@ async def regen_recovery():
 @auth_bp.route("/profile", methods=["DELETE"])
 @login_required
 async def delete_profile():
-    user = _require_user(await get_current_user())
+    manager = _cookies()
+    user = _require_user(await manager.get_current_user())
     await _db().users.delete_user(user["id"])
     resp = await make_response("", 204)
     assert isinstance(resp, Response)
-    clear_secure_cookie(resp)
+    manager.clear_secure_cookie(resp)
     resp.headers["HX-Redirect"] = "/login"
     return resp

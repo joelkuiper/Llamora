@@ -6,9 +6,8 @@ from quart import Blueprint, render_template, request, abort, jsonify
 from llamora.app.api.search import InvalidSearchQuery
 from llamora.app.services.container import get_search_api, get_services
 from llamora.app.services.auth_helpers import (
+    get_secure_cookie_manager,
     login_required,
-    get_current_user,
-    get_dek,
 )
 from llamora.settings import settings
 from llamora.app.util.frecency import (
@@ -22,6 +21,10 @@ logger = logging.getLogger(__name__)
 search_bp = Blueprint("search", __name__)
 
 
+def _cookies():
+    return get_secure_cookie_manager()
+
+
 @search_bp.get("/search")
 @login_required
 async def search():
@@ -32,11 +35,12 @@ async def search():
     sanitized_query = ""
 
     if raw_query:
-        user = await get_current_user()
+        manager = _cookies()
+        user = await manager.get_current_user()
         if user is None:
             abort(401)
             raise AssertionError("unreachable")
-        dek = get_dek()
+        dek = manager.get_dek()
         if dek is None:
             abort(401, description="Missing encryption key")
             raise AssertionError("unreachable")
@@ -76,12 +80,13 @@ FRECENT_TAG_LAMBDA = DEFAULT_FRECENCY_DECAY
 @search_bp.get("/search/recent")
 @login_required
 async def recent_searches():
-    user = await get_current_user()
+    manager = _cookies()
+    user = await manager.get_current_user()
     if user is None:
         abort(401)
         raise AssertionError("unreachable")
 
-    dek = get_dek()
+    dek = manager.get_dek()
     if dek is None:
         abort(401, description="Missing encryption key")
         raise AssertionError("unreachable")

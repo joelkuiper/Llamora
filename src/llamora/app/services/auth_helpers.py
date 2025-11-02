@@ -1,6 +1,7 @@
 import base64
 import secrets
 from functools import wraps
+from typing import Any, Mapping
 
 import orjson
 from cachetools import TTLCache
@@ -9,220 +10,279 @@ from urllib.parse import quote, urlparse
 from nacl import secret
 
 from llamora.app.services.container import get_services
-from llamora.settings import settings
 
-cookie_secret = str(settings.COOKIES.secret or "")
-if not cookie_secret or len(cookie_secret) % 4 != 0:
-    raise RuntimeError("Set LLAMORA_COOKIE_SECRET to a 32-byte base64 string")
-
-try:
-    cookie_key = base64.b64decode(cookie_secret, altchars=b"-_", validate=True)
-except Exception as exc:
-    raise RuntimeError("Set LLAMORA_COOKIE_SECRET to a 32-byte base64 string") from exc
-
-if len(cookie_key) != secret.SecretBox.KEY_SIZE:
-    raise RuntimeError("Set LLAMORA_COOKIE_SECRET to a 32-byte base64 string")
-
-COOKIE_NAME = str(settings.COOKIES.name)
-cookie_box = secret.SecretBox(cookie_key)
-
-DEK_STORAGE = str(settings.CRYPTO.dek_storage).lower()
-
-# Rough upper bound on concurrent sessions; adjust as needed
-dek_store = TTLCache(maxsize=1024, ttl=int(settings.SESSION.ttl))
-
-# Cache snapshots of user rows keyed by the authentication cookies so rapid
-# successive requests (such as static asset fetches) do not repeatedly hit the
-# database. The TTL is intentionally short so recent changes propagate quickly
-# while still covering bursts of concurrent asset requests.
-_user_snapshot_cache: TTLCache = TTLCache(maxsize=2048, ttl=60)
+SECURE_COOKIE_MANAGER_KEY = "llamora_secure_cookie_manager"
 _MISSING_USER = object()
-def _get_cookie_data() -> dict:
-    # If we've already got a merged state this request, return it
-    if hasattr(g, "_secure_cookie_state"):
-        return g._secure_cookie_state
 
-    raw = request.cookies.get(COOKIE_NAME)
-    if not raw:
-        current_app.logger.debug("No %s cookie present", COOKIE_NAME)
-        return {}
 
-    try:
-        token = base64.urlsafe_b64decode(raw)
-        decrypted = cookie_box.decrypt(token).decode("utf-8")
-        data = orjson.loads(decrypted)
-        g._secure_cookie_state = data  # cache for later calls
-        current_app.logger.debug(
-            "Loaded %s cookie with keys %s", COOKIE_NAME, list(data.keys())
+class SecureCookieManager:
+    """Manage secure cookie handling and DEK storage."""
+
+    _cookie_state_attr = "_secure_cookie_state"
+    _current_user_attr = "_current_user"
+
+    def __init__(
+        self,
+        *,
+        cookie_name: str,
+        cookie_secret: str,
+        dek_storage: str,
+        session_ttl: int,
+        user_cache_ttl: int = 60,
+        user_cache_maxsize: int = 2048,
+    ) -> None:
+        key = self._decode_cookie_secret(cookie_secret)
+        self.cookie_name = cookie_name
+        self.cookie_box = secret.SecretBox(key)
+        self.dek_storage = dek_storage.lower()
+        self.dek_store: TTLCache[str, bytes] = TTLCache(
+            maxsize=1024, ttl=session_ttl
         )
-        return data
-    except Exception:
-        current_app.logger.debug(
-            "Failed to decode %s cookie", COOKIE_NAME, exc_info=True
+        self._user_snapshot_cache: TTLCache[tuple[str, str], Any] = TTLCache(
+            maxsize=user_cache_maxsize,
+            ttl=user_cache_ttl,
         )
-        return {}
 
+    @staticmethod
+    def _decode_cookie_secret(raw_secret: str) -> bytes:
+        secret_value = str(raw_secret or "")
+        if not secret_value or len(secret_value) % 4 != 0:
+            raise RuntimeError(
+                "Set LLAMORA_COOKIE_SECRET to a 32-byte base64 string"
+            )
+        try:
+            key = base64.b64decode(secret_value, altchars=b"-_", validate=True)
+        except Exception as exc:  # pragma: no cover - defensive guard
+            raise RuntimeError(
+                "Set LLAMORA_COOKIE_SECRET to a 32-byte base64 string"
+            ) from exc
+        if len(key) != secret.SecretBox.KEY_SIZE:
+            raise RuntimeError(
+                "Set LLAMORA_COOKIE_SECRET to a 32-byte base64 string"
+            )
+        return key
 
-def _cookie_state() -> dict:
-    """Per-request merged cookie state."""
-    if not hasattr(g, "_secure_cookie_state"):
-        g._secure_cookie_state = _get_cookie_data()
-    return g._secure_cookie_state
+    def _get_cookie_data(self) -> dict[str, Any]:
+        if hasattr(g, self._cookie_state_attr):
+            return getattr(g, self._cookie_state_attr)
 
+        raw = request.cookies.get(self.cookie_name)
+        if not raw:
+            current_app.logger.debug("No %s cookie present", self.cookie_name)
+            return {}
 
-def _set_cookie_data(response: Response, data: dict) -> Response:
-    # If empty -> delete cookie to avoid storing an empty blob
-    if not data:
-        current_app.logger.debug("Clearing %s cookie", COOKIE_NAME)
-        response.delete_cookie(COOKIE_NAME, path="/", samesite="Lax")
+        try:
+            token = base64.urlsafe_b64decode(raw)
+            decrypted = self.cookie_box.decrypt(token).decode("utf-8")
+            data = orjson.loads(decrypted)
+            setattr(g, self._cookie_state_attr, data)
+            current_app.logger.debug(
+                "Loaded %s cookie with keys %s",
+                self.cookie_name,
+                list(data.keys()),
+            )
+            return data
+        except Exception:
+            current_app.logger.debug(
+                "Failed to decode %s cookie",
+                self.cookie_name,
+                exc_info=True,
+            )
+            return {}
+
+    def _cookie_state(self) -> dict[str, Any]:
+        if not hasattr(g, self._cookie_state_attr):
+            setattr(g, self._cookie_state_attr, self._get_cookie_data())
+        return getattr(g, self._cookie_state_attr)
+
+    def _set_cookie_data(self, response: Response, data: dict[str, Any]) -> Response:
+        if not data:
+            current_app.logger.debug("Clearing %s cookie", self.cookie_name)
+            response.delete_cookie(self.cookie_name, path="/", samesite="Lax")
+            if hasattr(g, self._cookie_state_attr):
+                setattr(g, self._cookie_state_attr, {})
+            return response
+
+        token = self.cookie_box.encrypt(orjson.dumps(data))
+        b64 = base64.urlsafe_b64encode(token).decode("utf-8")
+        current_app.logger.debug(
+            "Setting %s cookie (secure=%s) with keys %s",
+            self.cookie_name,
+            request.is_secure,
+            list(data.keys()),
+        )
+        response.set_cookie(
+            self.cookie_name,
+            b64,
+            httponly=True,
+            secure=request.is_secure,
+            samesite="Lax",
+            path="/",
+        )
+        setattr(g, self._cookie_state_attr, data)
         return response
-    token = cookie_box.encrypt(orjson.dumps(data))
-    b64 = base64.urlsafe_b64encode(token).decode("utf-8")
-    # Only mark the cookie as secure when the current request is served
-    # over HTTPS. When running the application locally without TLS the
-    # "secure" flag would prevent the browser from storing the cookie at all
-    # which leads to a successful login immediately redirecting back to the
-    # login page. Detect the scheme from the request so development setups
-    # using plain HTTP continue to function while production deployments
-    # still benefit from secure cookies.
-    current_app.logger.debug(
-        "Setting %s cookie (secure=%s) with keys %s",
-        COOKIE_NAME,
-        request.is_secure,
-        list(data.keys()),
-    )
-    response.set_cookie(
-        COOKIE_NAME,
-        b64,
-        httponly=True,
-        secure=request.is_secure,
-        samesite="Lax",
-        path="/",
-    )
-    return response
+
+    def get_secure_cookie(self, name: str) -> str | None:
+        if hasattr(g, self._cookie_state_attr):
+            state = getattr(g, self._cookie_state_attr)
+        else:
+            state = self._get_cookie_data()
+        return state.get(name) if isinstance(state, dict) else None
+
+    def set_secure_cookie(
+        self, response: Response, name: str, value: str | None
+    ) -> Response:
+        state = self._cookie_state()
+        if value is None:
+            state.pop(name, None)
+        else:
+            state[name] = value
+        return self._set_cookie_data(response, state)
+
+    def clear_secure_cookie(self, response: Response) -> None:
+        current_app.logger.debug("Deleting %s cookie", self.cookie_name)
+        response.delete_cookie(self.cookie_name, path="/", samesite="Lax")
+        if hasattr(g, self._cookie_state_attr):
+            setattr(g, self._cookie_state_attr, {})
+
+    def set_dek(self, response: Response, dek: bytes) -> None:
+        if self.dek_storage == "session":
+            sid = secrets.token_urlsafe(32)
+            self.dek_store[sid] = dek
+            self.set_secure_cookie(response, "sid", sid)
+            self.set_secure_cookie(response, "dek", None)
+        else:
+            encoded = base64.b64encode(dek).decode("utf-8")
+            self.set_secure_cookie(response, "dek", encoded)
+
+    def clear_session_dek(self) -> None:
+        if self.dek_storage == "session":
+            sid = self.get_secure_cookie("sid")
+            if sid:
+                self.dek_store.pop(sid, None)
+
+    def _user_cache_key(self, uid: str) -> tuple[str, str]:
+        if self.dek_storage == "session":
+            sid = self.get_secure_cookie("sid")
+            return (uid, sid or "")
+        dek = self.get_secure_cookie("dek")
+        return (uid, dek or "")
+
+    async def get_current_user(self) -> Mapping[str, Any] | None:
+        if hasattr(g, self._current_user_attr):
+            return getattr(g, self._current_user_attr)
+
+        uid = self.get_secure_cookie("uid")
+        if not uid:
+            user = None
+        else:
+            cache_key = self._user_cache_key(uid)
+            if cache_key in self._user_snapshot_cache:
+                cached = self._user_snapshot_cache[cache_key]
+                user = None if cached is _MISSING_USER else cached
+            else:
+                services = get_services()
+                user = await services.db.users.get_user_by_id(uid)
+                self._user_snapshot_cache[cache_key] = (
+                    user if user is not None else _MISSING_USER
+                )
+
+        setattr(g, self._current_user_attr, user)
+        return user
+
+    def get_dek(self) -> bytes | None:
+        if self.dek_storage == "session":
+            sid = self.get_secure_cookie("sid")
+            if not sid:
+                return None
+            self.dek_store.expire()
+            dek = self.dek_store.get(sid)
+            if dek is not None:
+                self.dek_store[sid] = dek
+            return dek
+
+        data = self.get_secure_cookie("dek")
+        if not data:
+            return None
+        try:
+            return base64.b64decode(data)
+        except Exception:
+            return None
+
+    async def load_user(self) -> None:
+        endpoint = request.endpoint or ""
+        if endpoint == "static" or endpoint.endswith(".static"):
+            current_app.logger.debug(
+                "Skipping user load for static endpoint %s", endpoint
+            )
+            return
+
+        path = request.path
+        if path.startswith("/static/") or path in {"/health", "/healthz", "/ready"}:
+            current_app.logger.debug(
+                "Skipping user load for lightweight path %s", path
+            )
+            return
+
+        user = await self.get_current_user()
+        if user:
+            _ = self.get_dek()
+            current_app.logger.debug(
+                "Loaded user %s for request", user["id"]
+            )
+        else:
+            current_app.logger.debug("No user loaded for request")
+
+
+def get_secure_cookie_manager() -> SecureCookieManager:
+    manager = current_app.extensions.get(SECURE_COOKIE_MANAGER_KEY)
+    if manager is None:
+        raise RuntimeError("Secure cookie manager is not initialised")
+    return manager
 
 
 def get_secure_cookie(name: str) -> str | None:
-    # Prefer in-request state if we've already touched it
-    if hasattr(g, "_secure_cookie_state"):
-        return g._secure_cookie_state.get(name)
-    return _get_cookie_data().get(name)
+    return get_secure_cookie_manager().get_secure_cookie(name)
 
 
-def set_secure_cookie(response: Response, name: str, value: str | None) -> None:
-    state = _cookie_state()  # start from cached/merged state
-    if value is None:
-        state.pop(name, None)  # delete key
-    else:
-        state[name] = value  # merge key
-    _set_cookie_data(response, state)  # write back the full, merged dict
+def set_secure_cookie(response: Response, name: str, value: str | None) -> Response:
+    return get_secure_cookie_manager().set_secure_cookie(response, name, value)
 
 
 def clear_secure_cookie(response: Response) -> None:
-    # Ensure we delete the same cookie we set by matching its attributes.
-    current_app.logger.debug("Deleting %s cookie", COOKIE_NAME)
-    response.delete_cookie(COOKIE_NAME, path="/", samesite="Lax")
+    get_secure_cookie_manager().clear_secure_cookie(response)
 
 
 def set_dek(response: Response, dek: bytes) -> None:
-    if DEK_STORAGE == "session":
-        sid = secrets.token_urlsafe(32)
-        dek_store[sid] = dek
-        set_secure_cookie(response, "sid", sid)
-        set_secure_cookie(response, "dek", None)
-    else:
-        set_secure_cookie(response, "dek", base64.b64encode(dek).decode("utf-8"))
+    get_secure_cookie_manager().set_dek(response, dek)
 
 
 def clear_session_dek() -> None:
-    """Remove the DEK from the server-side store if session storage is used.
-
-    When the DEK is stored in cookies, the entire secure cookie is cleared
-    elsewhere so no extra work is needed here.
-    """
-    if DEK_STORAGE == "session":
-        sid = get_secure_cookie("sid")
-        if sid:
-            dek_store.pop(sid, None)
+    get_secure_cookie_manager().clear_session_dek()
 
 
-def _user_cache_key(uid: str) -> tuple[str, str]:
-    """Build a cache key incorporating the session marker if available."""
-
-    if DEK_STORAGE == "session":
-        sid = get_secure_cookie("sid")
-        return (uid, sid or "")
-    dek = get_secure_cookie("dek")
-    return (uid, dek or "")
+async def get_current_user() -> Mapping[str, Any] | None:
+    return await get_secure_cookie_manager().get_current_user()
 
 
-async def get_current_user():
-    """Return the current user for the request, caching the lookup."""
-
-    if hasattr(g, "_current_user"):
-        return g._current_user
-
-    uid = get_secure_cookie("uid")
-    if not uid:
-        user = None
-    else:
-        cache_key = _user_cache_key(uid)
-        if cache_key in _user_snapshot_cache:
-            cached = _user_snapshot_cache[cache_key]
-            user = None if cached is _MISSING_USER else cached
-        else:
-            services = get_services()
-            user = await services.db.users.get_user_by_id(uid)
-            _user_snapshot_cache[cache_key] = user if user else _MISSING_USER
-
-    g._current_user = user
-    return g._current_user
-
-
-def get_dek():
-    """Retrieve the DEK from storage.
-
-    In session mode this refreshes the entry's TTL so active sessions stay
-    valid.
-    """
-    if DEK_STORAGE == "session":
-        sid = get_secure_cookie("sid")
-        if not sid:
-            return None
-        dek_store.expire()
-        dek = dek_store.get(sid)
-        if dek is not None:
-            dek_store[sid] = dek  # refresh TTL
-        return dek
-    data = get_secure_cookie("dek")
-    if not data:
-        return None
-    try:
-        return base64.b64decode(data)
-    except Exception:
-        return None
+def get_dek() -> bytes | None:
+    return get_secure_cookie_manager().get_dek()
 
 
 def sanitize_return_path(raw: str | None) -> str | None:
-    """Ensure the provided return path is safe for redirects."""
-
     if raw and raw.startswith("/") and not raw.startswith("//"):
         return raw
     return None
 
 
 def _safe_return_path() -> str:
-    """Determine a safe path to return to after login."""
-
     if request.headers.get("HX-Request"):
-        # HTMX sends the current URL in this header
         current = request.headers.get("HX-Current-URL", "/")
         parsed = urlparse(current)
         path = parsed.path or "/"
         if parsed.query:
             path += f"?{parsed.query}"
     else:
-        # full_path includes trailing '?' if there was no query string
         path = request.full_path if request.query_string else request.path
     return sanitize_return_path(path.rstrip("?")) or "/"
 
@@ -230,12 +290,13 @@ def _safe_return_path() -> str:
 def login_required(f):
     @wraps(f)
     async def wrapper(*args, **kwargs):
+        manager = get_secure_cookie_manager()
         return_path = _safe_return_path()
         login_url = f"/login?return={quote(return_path, safe='')}"
 
-        user = await get_current_user()
-        dek = get_dek() if user else None
-        if not user or not dek:
+        user = await manager.get_current_user()
+        dek = manager.get_dek() if user else None
+        if not user or dek is None:
             current_app.logger.debug(
                 "Unauthenticated access or missing DEK to %s", request.path
             )
@@ -250,21 +311,5 @@ def login_required(f):
     return wrapper
 
 
-async def load_user():
-    # Eager-load user info if needed in templates
-    endpoint = request.endpoint or ""
-    if endpoint == "static" or endpoint.endswith(".static"):
-        current_app.logger.debug("Skipping user load for static endpoint %s", endpoint)
-        return
-
-    path = request.path
-    if path.startswith("/static/") or path in {"/health", "/healthz", "/ready"}:
-        current_app.logger.debug("Skipping user load for lightweight path %s", path)
-        return
-
-    user = await get_current_user()
-    if user:
-        _ = get_dek()  # refresh session DEK TTL if present
-        current_app.logger.debug("Loaded user %s for request", user["id"])
-    else:
-        current_app.logger.debug("No user loaded for request")
+async def load_user() -> None:
+    await get_secure_cookie_manager().load_user()

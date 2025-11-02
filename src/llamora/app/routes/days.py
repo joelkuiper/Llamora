@@ -8,8 +8,8 @@ from quart import (
     abort,
 )
 from llamora.app.services.auth_helpers import (
+    get_secure_cookie_manager,
     login_required,
-    get_current_user,
 )
 from llamora.app.services.time import local_date
 from llamora.app.services.validators import parse_iso_date
@@ -17,6 +17,10 @@ from llamora.app.services.calendar import get_month_context
 from llamora.app.routes.chat import render_chat
 
 days_bp = Blueprint("days", __name__)
+
+
+def _cookies():
+    return get_secure_cookie_manager()
 
 
 @days_bp.route("/")
@@ -61,7 +65,8 @@ async def day(date):
 @days_bp.route("/calendar")
 @login_required
 async def calendar_view():
-    user = await get_current_user()
+    manager = _cookies()
+    user = await manager.get_current_user()
     if user is None:
         abort(401)
         raise AssertionError("unreachable")
@@ -92,7 +97,8 @@ async def calendar_view():
 @days_bp.route("/calendar/<int:year>/<int:month>")
 @login_required
 async def calendar_month(year: int, month: int):
-    user = await get_current_user()
+    manager = _cookies()
+    user = await manager.get_current_user()
     if user is None:
         abort(401)
         raise AssertionError("unreachable")

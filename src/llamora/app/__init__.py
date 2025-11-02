@@ -28,9 +28,19 @@ def create_app():
 
     services = AppServices.create()
 
-    from .services.auth_helpers import dek_store
+    from .services.auth_helpers import (
+        SecureCookieManager,
+        SECURE_COOKIE_MANAGER_KEY,
+    )
 
-    lifecycle = AppLifecycle(services, dek_store)
+    cookie_manager = SecureCookieManager(
+        cookie_name=str(settings.COOKIES.name),
+        cookie_secret=str(settings.COOKIES.secret or ""),
+        dek_storage=str(settings.CRYPTO.dek_storage),
+        session_ttl=int(settings.SESSION.ttl),
+    )
+
+    lifecycle = AppLifecycle(services, cookie_manager.dek_store)
 
     async def _ensure_registration_token(app: Quart) -> None:
         if not app.config.get("DISABLE_REGISTRATION"):
@@ -72,6 +82,7 @@ def create_app():
     )
 
     app.extensions["llamora"] = services
+    app.extensions[SECURE_COOKIE_MANAGER_KEY] = cookie_manager
 
     logging.basicConfig(
         level=settings.LOG_LEVEL,

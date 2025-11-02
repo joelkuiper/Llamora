@@ -1,6 +1,9 @@
 from quart import Blueprint, request, abort, render_template, jsonify
 from llamora.app.services.container import get_services
-from llamora.app.services.auth_helpers import login_required, get_current_user, get_dek
+from llamora.app.services.auth_helpers import (
+    get_secure_cookie_manager,
+    login_required,
+)
 from llamora.app.util.tags import canonicalize, display
 from llamora.settings import settings
 from llamora.app.util.frecency import (
@@ -15,10 +18,15 @@ def _db():
     return get_services().db
 
 
+def _cookies():
+    return get_secure_cookie_manager()
+
+
 @tags_bp.delete("/t/<msg_id>/<tag_hash>")
 @login_required
 async def remove_tag(msg_id: str, tag_hash: str):
-    user = await get_current_user()
+    manager = _cookies()
+    user = await manager.get_current_user()
     if user is None:
         abort(401)
         raise AssertionError("unreachable")
@@ -34,7 +42,8 @@ async def remove_tag(msg_id: str, tag_hash: str):
 @tags_bp.post("/t/<msg_id>")
 @login_required
 async def add_tag(msg_id: str):
-    user = await get_current_user()
+    manager = _cookies()
+    user = await manager.get_current_user()
     if user is None:
         abort(401)
         raise AssertionError("unreachable")
@@ -48,7 +57,7 @@ async def add_tag(msg_id: str):
     except ValueError:
         abort(400, description="empty tag")
         raise AssertionError("unreachable")
-    dek = get_dek()
+    dek = manager.get_dek()
     if dek is None:
         abort(401, description="Missing encryption key")
         raise AssertionError("unreachable")
@@ -68,11 +77,12 @@ async def add_tag(msg_id: str):
 @tags_bp.get("/t/suggestions/<msg_id>")
 @login_required
 async def get_tag_suggestions(msg_id: str):
-    user = await get_current_user()
+    manager = _cookies()
+    user = await manager.get_current_user()
     if user is None:
         abort(401)
         raise AssertionError("unreachable")
-    dek = get_dek()
+    dek = manager.get_dek()
     if dek is None:
         abort(401, description="Missing encryption key")
         raise AssertionError("unreachable")
@@ -122,12 +132,13 @@ async def get_tag_suggestions(msg_id: str):
 @tags_bp.get("/tags/autocomplete")
 @login_required
 async def autocomplete_tags():
-    user = await get_current_user()
+    manager = _cookies()
+    user = await manager.get_current_user()
     if user is None:
         abort(401)
         raise AssertionError("unreachable")
 
-    dek = get_dek()
+    dek = manager.get_dek()
     if dek is None:
         abort(401, description="Missing encryption key")
         raise AssertionError("unreachable")

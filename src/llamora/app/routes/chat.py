@@ -16,9 +16,8 @@ from llamora.llm.chat_template import build_opening_messages
 
 from llamora.app.services.container import get_services
 from llamora.app.services.auth_helpers import (
+    get_secure_cookie_manager,
     login_required,
-    get_current_user,
-    get_dek,
 )
 from llamora.app.services.chat_context import get_chat_context
 from llamora.app.services.chat_helpers import (
@@ -44,6 +43,10 @@ def _db():
     return get_services().db
 
 
+def _cookies():
+    return get_secure_cookie_manager()
+
+
 def _chat_stream_manager():
     return get_services().llm_service.chat_stream_manager
 
@@ -52,7 +55,8 @@ logger = logging.getLogger(__name__)
 
 
 async def _require_user() -> dict[str, Any]:
-    user = await get_current_user()
+    manager = _cookies()
+    user = await manager.get_current_user()
     if user is None:
         abort(401)
         raise AssertionError("unreachable")
@@ -60,7 +64,8 @@ async def _require_user() -> dict[str, Any]:
 
 
 def _require_dek() -> bytes:
-    dek = get_dek()
+    manager = _cookies()
+    dek = manager.get_dek()
     if dek is None:
         abort(401, description="Missing encryption key")
         raise AssertionError("unreachable")
@@ -132,8 +137,9 @@ async def chat_htmx_today():
 @login_required
 async def stop_generation(user_msg_id: str):
     logger.info("Stop requested for user message %s", user_msg_id)
-    user = await get_current_user()
-    dek = get_dek()
+    manager = _cookies()
+    user = await manager.get_current_user()
+    dek = manager.get_dek()
     if user is None or dek is None:
         logger.debug("Stop request without authenticated user")
         abort(401)
