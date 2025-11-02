@@ -14,10 +14,10 @@ body {
 
 #content {
   display: flex;
-  flex-direction: column; /* header on top, chat below */
+  flex-direction: column;
   flex: 1 1 auto;
-  min-width: 0;  /* prevent overflow in flex layouts */
-  min-height: 0; /* critical so the child can shrink and scroll */
+  min-width: 0;
+  min-height: 0;
 }
 
 .app-container {

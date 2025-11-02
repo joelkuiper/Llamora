@@ -92,23 +92,19 @@
 }
 
 
+.btn-pill {
+  border-radius: 999px;
+}
+
 .cal-nav-btn {
   flex: 0 0 2rem;
-  width: 2rem; height: 2rem;
-  display: grid; place-items: center;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--color-bg);
-  cursor: pointer;
-  transition: background var(--motion-tight), border-color var(--motion-tight), box-shadow var(--motion-tight), transform var(--motion-snap);
-
-  &:hover {
-    background: linear-gradient(0deg, rgba(59,167,246,0.08), rgba(59,167,246,0.06)) var(--color-bg);
-    border-color: var(--accent-20);
-    box-shadow: 0 0 0 2px var(--accent-10);
-  }
-  &:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-20); }
-  &:active { transform: translateY(1px); }
+  inline-size: 2rem;
+  block-size: 2rem;
+  min-inline-size: 2rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  font-size: 0.7rem;
 }
 
 #calendar {
