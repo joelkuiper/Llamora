@@ -28,7 +28,8 @@
     box-shadow var(--motion-gentle) ease,
     border-color var(--motion-gentle) ease,
     transform var(--motion-press) ease,
-    background-color var(--motion-gentle) ease;
+    background-color var(--motion-gentle) ease,
+    opacity var(--motion-fade) ease;
   display: inline-flex;
   align-items: center;
   position: relative;
@@ -69,6 +70,20 @@
 
 .meta-chip.htmx-swapping {
   animation: chip-pop-out var(--motion-hover) ease forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meta-chip.chip-enter,
+  .meta-chips.chip-enter,
+  .meta-chip.htmx-added {
+    animation: none;
+    opacity: 1;
+  }
+
+  .meta-chip.htmx-swapping {
+    animation: none;
+    opacity: 0;
+  }
 }
 
 
