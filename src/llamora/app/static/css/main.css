@@ -672,6 +672,12 @@ input[type="checkbox"]:focus {
   width: min(100%, 64rem);
 }
 
+#errors:empty {
+  display: none;
+  padding: 0;
+  margin: 0;
+}
+
 .alert {
   position: relative;
   display: grid;
