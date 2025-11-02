@@ -77,6 +77,8 @@ body {
     line-height: 1.5;
     font-size: var(--font-size);
     background: var(--color-bg);
+    /* content-visibility: auto; */
+    /* contain-intrinsic-size: inherit; */
 
     code { white-space: pre-line; }
 
