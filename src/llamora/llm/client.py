@@ -180,6 +180,9 @@ class LLMClient:
         self._streams_lock = asyncio.Lock()
         self.parallel_slots = max(1, getattr(process_manager, "parallel_slots", 1))
         self._slot_semaphore = asyncio.Semaphore(self.parallel_slots)
+        self._slot_queue: asyncio.LifoQueue[int] = asyncio.LifoQueue()
+        for slot_id in range(self.parallel_slots):
+            self._slot_queue.put_nowait(slot_id)
         self._sse_headers = {
             "Accept": "text/event-stream",
             "Connection": "keep-alive",
@@ -317,7 +320,8 @@ class LLMClient:
         if msg_id:
             payload.setdefault("id", str(msg_id))
 
-        async with self._acquire_slot():
+        async with self._acquire_slot() as slot_id:
+            payload.setdefault("slot_id", slot_id)
             stream = _CompletionStream(self, payload)
 
             try:
@@ -358,9 +362,13 @@ class LLMClient:
                     self._active_streams.pop(msg_id, None)
 
     @asynccontextmanager
-    async def _acquire_slot(self) -> AsyncGenerator[None, None]:
+    async def _acquire_slot(self) -> AsyncGenerator[int, None]:
         await self._slot_semaphore.acquire()
+        slot_id: int | None = None
         try:
-            yield
+            slot_id = await self._slot_queue.get()
+            yield slot_id
         finally:
+            if slot_id is not None:
+                self._slot_queue.put_nowait(slot_id)
             self._slot_semaphore.release()
