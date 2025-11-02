@@ -117,11 +117,13 @@ DEFAULTS: dict[str, Any] = {
     "CRYPTO": {
         "dek_storage": "cookie",
     },
-    "WORKERS": {
-        "index_worker": {
-            "max_queue_size": 1024,
-        }
-    },
+        "WORKERS": {
+            "index_worker": {
+                "max_queue_size": 1024,
+                "batch_size": 32,
+                "flush_interval": 0.05,
+            }
+        },
 }
 
 settings = Dynaconf(

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import time
 from typing import TYPE_CHECKING, Tuple
 
 if TYPE_CHECKING:  # pragma: no cover - type checking only
@@ -28,6 +29,8 @@ class IndexWorker:
         *,
         max_queue_size: int = DEFAULT_MAX_QUEUE_SIZE,
         enqueue_timeout: float | None = DEFAULT_ENQUEUE_TIMEOUT,
+        batch_size: int = 1,
+        flush_interval: float = 0.1,
     ) -> None:
         self._search_api = search_api
         self._queue: asyncio.Queue[Job | None] = asyncio.Queue(maxsize=max_queue_size)
@@ -35,6 +38,8 @@ class IndexWorker:
         self._enqueue_timeout = enqueue_timeout
         self._backpressure_events = 0
         self._dropped_jobs = 0
+        self._batch_size = max(batch_size, 1)
+        self._flush_interval = max(flush_interval, 0.0)
 
     async def start(self) -> None:
         """Start processing indexing jobs."""
@@ -87,24 +92,53 @@ class IndexWorker:
                 with contextlib.suppress(asyncio.CancelledError):
                     await put_task
 
+    async def _flush_batch(self, batch: list[Job]) -> None:
+        if not batch:
+            return
+        start = time.perf_counter()
+        try:
+            await self._search_api.bulk_index(batch)
+        except Exception:  # pragma: no cover - defensive logging
+            logger.exception("Failed to index batch of %d messages", len(batch))
+        else:
+            elapsed_ms = (time.perf_counter() - start) * 1000
+            logger.info(
+                "Indexed %d messages in %.1fms (queue=%d, dropped=%d)",
+                len(batch),
+                elapsed_ms,
+                self._queue.qsize(),
+                self._dropped_jobs,
+            )
+        finally:
+            for _ in batch:
+                self._queue.task_done()
+
     async def _run(self) -> None:
         maxsize = self._queue.maxsize
+        batch: list[Job] = []
+        flush_interval = self._flush_interval if self._flush_interval > 0 else None
         while True:
-            job = await self._queue.get()
-            if job is None:
-                self._queue.task_done()
-                break
-            user_id, message_id, plaintext, dek = job
+            timeout = flush_interval if batch and flush_interval is not None else None
+            timed_out = False
             try:
-                await self._search_api.on_message_appended(
-                    user_id, message_id, plaintext, dek
-                )
-            except Exception:  # pragma: no cover - defensive logging
-                logger.exception(
-                    "Failed to index message %s for user %s", message_id, user_id
-                )
-            finally:
-                self._queue.task_done()
+                job = await asyncio.wait_for(self._queue.get(), timeout=timeout)
+            except asyncio.TimeoutError:
+                job = None
+                timed_out = True
+
+            if job is None:
+                if batch:
+                    await self._flush_batch(batch)
+                    batch = []
+                if not timed_out:
+                    self._queue.task_done()
+                    break
+                continue
+
+            batch.append(job)
+            if len(batch) >= self._batch_size:
+                await self._flush_batch(batch)
+                batch = []
         # Drain any remaining sentinels.
         while not self._queue.empty():
             try:

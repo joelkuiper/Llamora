@@ -92,6 +92,8 @@ dek_storage = "cookie"
 
 [default.WORKERS.index_worker]
 max_queue_size = 1024
+batch_size = 32
+flush_interval = 0.05
 
 [development]
 DEBUG = true

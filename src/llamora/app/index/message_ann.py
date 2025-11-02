@@ -301,17 +301,46 @@ class MessageIndexStore:
     async def index_message(
         self, user_id: str, message_id: str, content: str, dek: bytes
     ) -> None:
-        idx = await self.ensure_index(user_id, dek)
-        vec = await async_embed_texts([content])
-        lock = self._get_lock(user_id)
-        async with lock:
-            await self.db.vectors.store_vector(message_id, user_id, vec[0], dek)
-            if not idx.contains(message_id):
-                idx.add_batch([message_id], vec)
-                current = self.cursors.get(user_id)
-                if current is None or message_id < current:
-                    self.cursors[user_id] = message_id
-            self.indexes[user_id] = idx
+        await self.bulk_index([(user_id, message_id, content, dek)])
+
+    async def bulk_index(
+        self, entries: Iterable[tuple[str, str, str, bytes]]
+    ) -> None:
+        items = list(entries)
+        if not items:
+            return
+
+        texts = [content for _, _, content, _ in items]
+        vecs = await async_embed_texts(texts)
+        if vecs.shape[0] != len(items):  # pragma: no cover - defensive
+            raise ValueError("Embedding count does not match input items")
+
+        per_user: Dict[str, list[tuple[str, np.ndarray, bytes]]] = {}
+        for (user_id, msg_id, _, dek), vec in zip(items, vecs):
+            per_user.setdefault(user_id, []).append((msg_id, vec, dek))
+
+        logger.debug(
+            "Bulk indexing %d messages across %d users", len(items), len(per_user)
+        )
+
+        for user_id, user_entries in per_user.items():
+            dek = user_entries[0][2]
+            idx = await self.ensure_index(user_id, dek)
+            lock = self._get_lock(user_id)
+            ids = [mid for mid, _, _ in user_entries]
+            vec_arr = np.asarray([vec for _, vec, _ in user_entries], dtype=np.float32)
+            async with lock:
+                await self.db.vectors.store_vectors_batch(
+                    user_id,
+                    [(mid, vec) for mid, vec, _ in user_entries],
+                    dek,
+                )
+                idx.add_batch(ids, vec_arr)
+                for mid in ids:
+                    current = self.cursors.get(user_id)
+                    if current is None or mid < current:
+                        self.cursors[user_id] = mid
+                self.indexes[user_id] = idx
 
     def _evict_idle(self) -> None:
         now = time.monotonic()

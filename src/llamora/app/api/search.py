@@ -2,6 +2,7 @@ import logging
 import re
 import time
 from collections import OrderedDict
+from typing import Sequence, Tuple
 
 import orjson
 
@@ -21,6 +22,9 @@ class InvalidSearchQuery(ValueError):
     """Exception raised when a provided search query is invalid."""
 
 
+IndexJob = Tuple[str, str, str, bytes]
+
+
 class SearchAPI:
     """High level search interface operating on encrypted messages."""
 
@@ -34,7 +38,10 @@ class SearchAPI:
         self.vector_search = vector_search or VectorSearchService(db)
         self.lexical_reranker = lexical_reranker or LexicalReranker()
         self._index_worker = IndexWorker(
-            self, max_queue_size=int(settings.WORKERS.index_worker.max_queue_size)
+            self,
+            max_queue_size=int(settings.WORKERS.index_worker.max_queue_size),
+            batch_size=int(settings.WORKERS.index_worker.batch_size),
+            flush_interval=float(settings.WORKERS.index_worker.flush_interval),
         )
 
     async def warm_index(self, user_id: str, dek: bytes) -> None:
@@ -67,6 +74,40 @@ class SearchAPI:
         self, user_id: str, message_id: str, plaintext: str, dek: bytes
     ) -> None:
         await self._index_worker.enqueue(user_id, message_id, plaintext, dek)
+
+    async def bulk_index(self, jobs: Sequence[IndexJob]) -> None:
+        if not jobs:
+            return
+
+        start = time.perf_counter()
+        decode_fallbacks = 0
+        parsed: list[IndexJob] = []
+        for user_id, msg_id, plaintext, dek in jobs:
+            content = plaintext
+            try:
+                record = orjson.loads(plaintext)
+            except orjson.JSONDecodeError:
+                decode_fallbacks += 1
+                logger.debug(
+                    "Failed to decode plaintext for message %s (user %s)",
+                    msg_id,
+                    user_id,
+                )
+            else:
+                content = record.get("message", content)
+            parsed.append((user_id, msg_id, content, dek))
+
+        await self.vector_search.index_store.bulk_index(parsed)
+
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        logger.info(
+            "Bulk indexed %d messages for %d users in %.1fms (decode_fallbacks=%d, dropped=%d)",
+            len(parsed),
+            len({job[0] for job in parsed}),
+            elapsed_ms,
+            decode_fallbacks,
+            self._index_worker.dropped_jobs,
+        )
 
     def _normalize_query(self, user_id: str, query: str) -> tuple[str, bool]:
         """Return the normalized query text and whether truncation occurred."""
@@ -226,15 +267,7 @@ class SearchAPI:
     async def on_message_appended(
         self, user_id: str, msg_id: str, plaintext: str, dek: bytes
     ) -> None:
-        try:
-            record = orjson.loads(plaintext)
-            content = record.get("message", "")
-        except orjson.JSONDecodeError:
-            logger.debug(
-                "Failed to decode plaintext for message %s (user %s)", msg_id, user_id
-            )
-            content = plaintext
-        await self.vector_search.append_message(user_id, msg_id, content, dek)
+        await self.bulk_index([(user_id, msg_id, plaintext, dek)])
 
     async def maintenance_tick(self) -> None:
         await self.vector_search.maintenance_tick()
