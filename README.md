@@ -105,13 +105,14 @@ Configuration is managed by [Dynaconf](https://www.dynaconf.com/); see
 3. Start the web app:
 
    ```bash
-   uv run quart --app llamora:create_app run
+   uv run llamora-server
    ```
 
    If the server starts correctly it will log something like `Running on http://127.0.0.1:5000`.
 
    - Set `QUART_DEBUG=1` for automatic reloading on code changes.
    - Set `LOG_LEVEL=DEBUG` for debug logging
+   - Override the bind address with `LLAMORA_APP__HOST=0.0.0.0` or the port with `LLAMORA_APP__PORT=8000`
 
 ### A note on model selection
 Qwen3-4B-Instruct has become the baseline for Llamora because it follows instructions reliably while still fitting on consumer hardware. Running it with llama.cpp is as simple as:
@@ -131,7 +132,7 @@ LLAMORA_LLM__REQUEST__MIN_P=0 \
 LLAMORA_COOKIES__SECRET="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" \
 QUART_DEBUG=1 \
 SERVER_NAME=http://localhost:5000/ \
-uv run quart --app llamora:create_app run
+uv run llamora-server
 ```
 
 Each name mirrors the nested structure in [`config/settings.toml`](./config/settings.toml): double underscores split into sections (`LLAMORA_LLM__REQUEST__TEMPERATURE` maps to `settings.LLM.request.temperature`). Dynaconf reads `.env` automatically, so you can move those lines into an env file instead of inlining them. To persist overrides in TOML, edit `config/settings.local.toml` with tables that match the same hierarchy:
@@ -181,7 +182,7 @@ export LLAMORA_FEATURES__DISABLE_REGISTRATION=true
 Then start:
 
 ```bash
-uv run quart --app llamora:create_app run
+uv run llamora-server
 ```
 
 Use `.env` or `config/settings.local.toml` for persistent configuration.

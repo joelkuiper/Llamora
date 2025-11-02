@@ -27,6 +27,9 @@ dependencies = [
     "transformers>=4.48.0",
 ]
 
+[project.scripts]
+llamora-server = "llamora.__main__:main"
+
 [dependency-groups]
 dev = [
     "mypy>=1.18.2",
