@@ -235,8 +235,11 @@ class ChatFormElement extends ReactiveElement {
       this.#streamFocusListeners = this.disposeListenerBag(
         this.#streamFocusListeners
       );
+      const active = document.activeElement;
       this.#shouldRestoreFocus = !!(
-        this.#form && this.#form.contains(document.activeElement)
+        !active ||
+        active === document.body ||
+        this.#form?.contains(active)
       );
       if (this.#shouldRestoreFocus) {
         const bag = this.resetListenerBag(this.#streamFocusListeners);
