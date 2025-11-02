@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from contextlib import suppress
 from datetime import datetime, timezone
 from html import escape
@@ -223,11 +224,21 @@ class StreamSession(Response):
     def error(cls, message: Any) -> "StreamSession":
         """Create a streaming response for an error payload."""
 
-        async def _body():
-            yield format_sse_event("error", message)
-            yield format_sse_event("done", {})
+        return cls(cls._error_stream(message))
 
-        return cls(_body())
+    @classmethod
+    def backpressure(
+        cls, message: Any, retry_after: float | int
+    ) -> "StreamSession":
+        """Create an error stream that advertises a retry delay."""
+
+        retry_seconds = max(1, int(math.ceil(float(retry_after))))
+        headers = {"Retry-After": str(retry_seconds)}
+        return cls(
+            cls._error_stream(message),
+            status=429,
+            headers=headers,
+        )
 
     @classmethod
     def raw(cls, payload: str) -> "StreamSession":
@@ -262,3 +273,8 @@ class StreamSession(Response):
         yield format_sse_event(
             "done", {"assistant_msg_id": pending_response.assistant_msg_id}
         )
+
+    @staticmethod
+    async def _error_stream(message: Any):
+        yield format_sse_event("error", message)
+        yield format_sse_event("done", {})

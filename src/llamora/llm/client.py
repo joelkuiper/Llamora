@@ -176,6 +176,8 @@ class LLMClient:
         )
         self._active_streams: dict[str, asyncio.Task[None]] = {}
         self._streams_lock = asyncio.Lock()
+        self._active_slots: dict[str, int] = {}
+        self._slots_released_by_abort: set[str] = set()
         self.parallel_slots = max(1, getattr(process_manager, "parallel_slots", 1))
         self._slot_semaphore = asyncio.Semaphore(self.parallel_slots)
         self._slot_queue: asyncio.LifoQueue[int] = asyncio.LifoQueue()
@@ -323,7 +325,7 @@ class LLMClient:
         if msg_id:
             payload.setdefault("id", str(msg_id))
 
-        async with self._acquire_slot() as slot_id:
+        async with self._acquire_slot(msg_id) as slot_id:
             payload.setdefault("slot_id", slot_id)
             stream = _CompletionStream(self, payload)
 
@@ -335,8 +337,15 @@ class LLMClient:
                 await stream.aclose()
 
     async def abort(self, msg_id: str) -> bool:
+        slot_id: int | None = None
         async with self._streams_lock:
             task = self._active_streams.pop(msg_id, None)
+            slot_id = self._active_slots.pop(msg_id, None)
+            if slot_id is not None:
+                self._slots_released_by_abort.add(msg_id)
+        if slot_id is not None:
+            self._slot_queue.put_nowait(slot_id)
+            self._slot_semaphore.release()
         if task is not None:
             self.logger.info("Aborting stream %s", msg_id)
             try:
@@ -346,9 +355,11 @@ class LLMClient:
             except Exception:
                 self.logger.exception("Error closing stream %s", msg_id)
             return True
-        else:
-            self.logger.debug("No active stream to abort for %s", msg_id)
-            return False
+        if slot_id is not None:
+            self.logger.info("Cancelled pending slot for %s", msg_id)
+            return True
+        self.logger.debug("No active stream to abort for %s", msg_id)
+        return False
 
     @asynccontextmanager
     async def _track_stream(
@@ -365,13 +376,24 @@ class LLMClient:
                     self._active_streams.pop(msg_id, None)
 
     @asynccontextmanager
-    async def _acquire_slot(self) -> AsyncGenerator[int, None]:
+    async def _acquire_slot(self, msg_id: str) -> AsyncGenerator[int, None]:
         await self._slot_semaphore.acquire()
         slot_id: int | None = None
         try:
             slot_id = await self._slot_queue.get()
+            async with self._streams_lock:
+                self._active_slots[msg_id] = slot_id
             yield slot_id
         finally:
-            if slot_id is not None:
+            release_slot = True
+            async with self._streams_lock:
+                if msg_id in self._slots_released_by_abort:
+                    release_slot = False
+                    self._slots_released_by_abort.discard(msg_id)
+                else:
+                    self._active_slots.pop(msg_id, None)
+            if slot_id is not None and release_slot:
                 self._slot_queue.put_nowait(slot_id)
-            self._slot_semaphore.release()
+                self._slot_semaphore.release()
+            elif release_slot:
+                self._slot_semaphore.release()

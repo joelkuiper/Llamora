@@ -237,6 +237,14 @@ class PendingResponse(ResponsePipelineCallbacks):
         self._visible_total = total
 
 
+class StreamCapacityError(RuntimeError):
+    """Raised when no parallel slots are available for a new stream."""
+
+    def __init__(self, retry_after: float, message: str | None = None) -> None:
+        self.retry_after = retry_after
+        super().__init__(message or "Streaming capacity exhausted")
+
+
 class ChatStreamManager:
     def __init__(
         self,
@@ -337,6 +345,11 @@ class ChatStreamManager:
         if self._db is None:
             raise RuntimeError("ChatStreamManager database is not configured")
 
+        max_slots = max(1, int(getattr(self._llm, "parallel_slots", 1)))
+        active_pending = sum(1 for item in self._pending.values() if not item.done)
+        if active_pending >= max_slots:
+            raise StreamCapacityError(retry_after=1.0)
+
         pending = PendingResponse(
             user_msg_id,
             uid,
@@ -389,4 +402,9 @@ class ChatStreamManager:
         self._pending_heap.clear()
 
 
-__all__ = ["ChatStreamManager", "LLMStreamSession", "PendingResponse"]
+__all__ = [
+    "ChatStreamManager",
+    "LLMStreamSession",
+    "PendingResponse",
+    "StreamCapacityError",
+]

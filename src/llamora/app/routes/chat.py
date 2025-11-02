@@ -26,6 +26,7 @@ from llamora.app.services.chat_helpers import (
     locate_message_and_reply,
     normalize_llm_config,
 )
+from llamora.app.services.chat_stream.manager import StreamCapacityError
 from llamora.app.services.time import (
     local_date,
     get_timezone,
@@ -219,17 +220,23 @@ async def sse_opening(date: str):
         return StreamSession.error(msg)
     stream_id = f"opening:{uid}:{today_iso}"
     manager = _chat_stream_manager()
-    pending = manager.start_stream(
-        stream_id,
-        uid,
-        today_iso,
-        [],
-        dek,
-        context=None,
-        messages=opening_messages,
-        reply_to=None,
-        meta_extra={"auto_opening": True},
-    )
+    try:
+        pending = manager.start_stream(
+            stream_id,
+            uid,
+            today_iso,
+            [],
+            dek,
+            context=None,
+            messages=opening_messages,
+            reply_to=None,
+            meta_extra={"auto_opening": True},
+        )
+    except StreamCapacityError as exc:
+        return StreamSession.backpressure(
+            "The assistant is busy. Please try again in a moment.",
+            exc.retry_after,
+        )
 
     return StreamSession.pending(pending)
 
@@ -311,14 +318,20 @@ async def sse_reply(user_msg_id: str, date: str):
     manager = _chat_stream_manager()
     pending_response = manager.get(user_msg_id)
     if not pending_response:
-        pending_response = manager.start_stream(
-            user_msg_id,
-            uid,
-            actual_date or normalized_date,
-            history,
-            dek,
-            params,
-            ctx,
-        )
+        try:
+            pending_response = manager.start_stream(
+                user_msg_id,
+                uid,
+                actual_date or normalized_date,
+                history,
+                dek,
+                params,
+                ctx,
+            )
+        except StreamCapacityError as exc:
+            return StreamSession.backpressure(
+                "The assistant is busy. Please try again in a moment.",
+                exc.retry_after,
+            )
 
     return StreamSession.pending(pending_response)
