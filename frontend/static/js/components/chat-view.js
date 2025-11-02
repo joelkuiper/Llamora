@@ -411,6 +411,7 @@ export class ChatView extends ReactiveElement {
       } else {
         this.#chatFormReady = Promise.resolve();
       }
+      this.#resumeDormantStreams();
     });
   }
 
@@ -468,6 +469,23 @@ export class ChatView extends ReactiveElement {
     }
 
     root.querySelectorAll?.("llm-stream").forEach((stream) => apply(stream));
+  }
+
+  #resumeDormantStreams() {
+    if (!this.#chat) return;
+
+    const resume = (stream) => {
+      if (!stream || stream.dataset?.streaming !== "true") return;
+      if (typeof stream.resume === "function") {
+        stream.resume();
+      }
+    };
+
+    if (this.#chat instanceof Element && this.#chat.matches("llm-stream")) {
+      resume(this.#chat);
+    }
+
+    this.#chat.querySelectorAll?.("llm-stream").forEach((stream) => resume(stream));
   }
 
   #handleStreamStart(event) {

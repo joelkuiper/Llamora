@@ -127,6 +127,23 @@ class LlmStreamElement extends HTMLElement {
     this.#finalize({ status: "aborted" });
   }
 
+  get isStreaming() {
+    return this.dataset.streaming === "true";
+  }
+
+  isStreamDormant() {
+    return this.isStreaming && !this.#eventSource && !this.#completed;
+  }
+
+  resume() {
+    if (!this.isStreamDormant()) {
+      return false;
+    }
+
+    this.#startStream();
+    return true;
+  }
+
   handleMarkdownRendered(el) {
     if (!el || el !== this.#markdown) return;
     const pending = this.#pendingTyping;
