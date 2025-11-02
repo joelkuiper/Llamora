@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ config.APP_NAME }}{% block title %}{% endblock %}</title>
+    <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}" type="image/x-icon">
+
+    <script defer src="{{ url_for('static', filename='js/vendor/htmx.min.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/vendor/htmx-ext-sse.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/vendor/htmx-ext-response-targets.js') }}"></script>
+
+    <script defer src="{{ url_for('static', filename='js/vendor/marked.umd.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/vendor/purify.min.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/vendor/popper.min.jsm.js') }}"></script>
+
+    <script defer type="module" src="{{ url_for('static', filename='js/tooltip.js') }}"></script>
+    <script defer type="module" src="{{ url_for('static', filename='js/components/calendar.js') }}"></script>
+    <script defer type="module" src="{{ url_for('static', filename='js/app-init.js') }}"></script>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/header.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/search.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/meta-chips.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/calendar.css') }}">
+
+    {% block head_extra %}{% endblock %}
+  </head>
+  <body
+    hx-ext="response-targets"
+    hx-target-5*="#errors"
+    hx-target-4*="#errors"
+    hx-on::after-settle="window.appInit?.initGlobalShell()"
+    data-csrf-token="{{ csrf_token() }}">
+
+    <div id="errors" role="alert" aria-live="assertive" aria-atomic="true" hx-swap="beforeend"></div>
+    <header id="search-container">
+      {% block header %}{% endblock %}
+    </header>
+
+    <div class="app-container">
+      {% block content %}{% endblock %}
+    </div>
+
+    {% block body_scripts %}{% endblock %}
+  </body>
+</html>
