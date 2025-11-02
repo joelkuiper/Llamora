@@ -10,7 +10,8 @@
   <div class="no-content">Nothing was written this day.</div>
   {% endif %}
   {% for msg in history %}
-  <div id="msg-{{ msg['id'] }}" class="message {{ 'assistant' if msg['role'] != 'user' else 'user'}}">
+  {% set is_error = msg.get('meta', {}).get('error') %}
+  <div id="msg-{{ msg['id'] }}" class="message {{ 'assistant' if msg['role'] != 'user' else 'user'}}{% if is_error %} message--error{% endif %}">
     {% set rendered = msg.get('message_html') %}
     <div class="markdown-body"{% if rendered is not none %} data-rendered="true"{% endif %}>
       {% if rendered is not none %}

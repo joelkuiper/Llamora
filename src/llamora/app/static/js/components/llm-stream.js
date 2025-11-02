@@ -230,6 +230,7 @@ class LlmStreamElement extends HTMLElement {
     }
 
     this.#renderNow({ repositionTyping: false, shouldScroll: true });
+    this.#markAsError();
     this.#finalize({ status: "error", message: data || "" });
   }
 
@@ -317,6 +318,10 @@ class LlmStreamElement extends HTMLElement {
       this.#typingIndicator = null;
     }
 
+    if (status === "error") {
+      this.#markAsError();
+    }
+
     if (status === "done" && assistantMsgId) {
       this.#loadMetaChips(assistantMsgId);
     } else {
@@ -364,6 +369,11 @@ class LlmStreamElement extends HTMLElement {
     } catch (err) {
       console.error("failed to load meta chips", err);
     }
+  }
+
+  #markAsError() {
+    this.dataset.error = "true";
+    this.classList.add("message--error");
   }
 }
 

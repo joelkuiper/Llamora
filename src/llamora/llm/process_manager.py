@@ -119,11 +119,11 @@ class LlamafileProcessManager:
     def ensure_server_running(self) -> None:
         if getattr(self, "cmd", None) is None:
             if not self._is_server_healthy():
-                raise RuntimeError("llamafile server is unavailable")
+                raise RuntimeError("LLM service is unavailable")
             return
 
         if self.proc is None:
-            raise RuntimeError("llamafile process not started")
+            raise RuntimeError("LLM service process not started")
 
         if self.proc.poll() is not None or not self._is_server_healthy():
             self._restart_server()
@@ -273,7 +273,7 @@ class LlamafileProcessManager:
             except Exception:
                 pass
             time.sleep(0.1)
-        raise RuntimeError("llamafile server failed to start")
+        raise RuntimeError("LLM service failed to start")
 
     def _log_stream(self, stream, level: int) -> None:
         for line in iter(stream.readline, ""):
@@ -320,7 +320,7 @@ class LlamafileProcessManager:
         if not getattr(self, "cmd", None):
             raise RuntimeError("Cannot restart external server")
         if self.restart_attempts >= self.max_restarts:
-            raise RuntimeError("llamafile server repeatedly crashed")
+            raise RuntimeError("LLM service repeatedly crashed")
         self.restart_attempts += 1
         self.logger.warning(
             "Restarting llamafile server (attempt %d)", self.restart_attempts

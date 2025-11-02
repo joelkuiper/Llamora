@@ -98,6 +98,12 @@ body {
       word-break: break-word;
       background: var(--color-assistant-bg);
     }
+
+    &.message--error {
+      border-color: var(--color-error-text);
+      background: var(--color-error-bg);
+      color: var(--color-error-text-dark);
+    }
   }
 
   /* Markdown refinements */

@@ -142,7 +142,7 @@ class ResponsePipeline:
             self._error = True
             self._error_message = str(exc) or "Unknown error"
             result = await self._finalize_with_text(
-                f"<span class='error'>{escape(self._error_message)}</span>",
+                self._append_status_line("", self._error_message),
                 error_meta=True,
             )
         except Exception as exc:  # pragma: no cover - defensive
@@ -150,8 +150,7 @@ class ResponsePipeline:
             self._error = True
             self._error_message = str(exc) or "An unexpected error occurred."
             result = await self._finalize_with_text(
-                self._visible_total
-                + f"<span class='error'>{escape(self._error_message)}</span>",
+                self._append_status_line(self._visible_total, self._error_message),
                 error_meta=True,
             )
         else:
@@ -260,7 +259,7 @@ class ResponsePipeline:
     async def _finalize_cancelled(self, *, partial: bool) -> PipelineResult:
         final_text = self._visible_total + self._parser.flush_visible_tail()
         if self._error_message:
-            final_text += f"<span class='error'>{escape(self._error_message)}</span>"
+            final_text = self._append_status_line(final_text, self._error_message)
         meta: dict = {"error": True} if self._error else {}
         if self._meta_extra:
             meta.update(self._meta_extra)
@@ -303,7 +302,18 @@ class ResponsePipeline:
 
     @staticmethod
     def _append_persistence_warning(text: str) -> str:
-        return text + "<span class='error'>⚠️ Failed to save response.</span>"
+        return ResponsePipeline._append_status_line(text, "Failed to save response.")
+
+    @staticmethod
+    def _append_status_line(text: str, message: str) -> str:
+        if not message:
+            return text
+        safe_message = escape(message)
+        if text:
+            separator = "\n\n" if not text.endswith("\n") else "\n"
+        else:
+            separator = ""
+        return f"{text}{separator}⚠️ {safe_message}"
 
 
 __all__ = [
