@@ -1,36 +1,31 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{{ config.APP_NAME }} | Register</title>
-    <script src="{{url_for('static', filename='js/vendor/htmx.min.js')}}"></script>
-    <link rel="stylesheet" href="{{url_for('static', filename='css/main.css')}}" />
-    <link rel="stylesheet" href="{{url_for('static', filename='css/auth.css')}}" />
-    <link rel="icon" href="{{url_for('static', filename='img/favicon.ico')}}" type="image/x-icon">
-  </head>
-  <body>
-    <div class="form-container">
-      <h1>Register</h1>
-      {% if error %}<div class="error">{{ error }}</div>{% endif %}
-      <form method="post">
-          <input class="input" type="text" name="username" placeholder="Username"
-                 value="{{ username | default('', true) }}"
-                 required pattern="^[A-Za-z0-9_]+$" maxlength="{{ config.MAX_USERNAME_LENGTH }}"/>
-          {% from 'partials/password_field.html' import password_field with context %}
-          {{ password_field('password', 'Password') }}
-          <input class="input" type="password"
-                 name="confirm_password"
-                 placeholder="Confirm password"
-                 required
-                 />
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button class="btn btn-primary" type="submit" data-loading="Creating account">Create account</button>
-        </form>
-      <br>
-      <p>Already have an account? <a href="{{ url_for('auth.login') }}">Login</a></p>
-    </div>
-      <script type="module" src="{{ url_for('static', filename='js/password-strength.js') }}"></script>
-      <script type="module" src="{{ url_for('static', filename='js/forms.js') }}"></script>
-  </body>
-</html>
+{% extends 'layouts/auth_base.html' %}
+
+{% block title %} | Register{% endblock %}
+
+{% block head_extra %}
+<script src="{{ url_for('static', filename='js/vendor/htmx.min.js') }}"></script>
+{% endblock %}
+
+{% block form %}
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  <form method="post">
+    <input class="input" type="text" name="username" placeholder="Username"
+           value="{{ username | default('', true) }}"
+           required pattern="^[A-Za-z0-9_]+$" maxlength="{{ config.MAX_USERNAME_LENGTH }}" />
+    {% from 'partials/password_field.html' import password_field with context %}
+    {{ password_field('password', 'Password') }}
+    <input class="input" type="password"
+           name="confirm_password"
+           placeholder="Confirm password"
+           required />
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <button class="btn btn-primary" type="submit" data-loading="Creating account">Create account</button>
+  </form>
+  <br />
+  <p>Already have an account? <a href="{{ url_for('auth.login') }}">Login</a></p>
+{% endblock %}
+
+{% block body_scripts %}
+<script type="module" src="{{ url_for('static', filename='js/password-strength.js') }}"></script>
+<script type="module" src="{{ url_for('static', filename='js/forms.js') }}"></script>
+{% endblock %}

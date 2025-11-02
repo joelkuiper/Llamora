@@ -1,47 +1,41 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{{ config.APP_NAME }} | Recovery Code</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}" />
-    <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}" type="image/x-icon" />
-  </head>
-  <body>
-    <div class="form-container">
-      <h1>Recovery Code</h1>
-      <p class="warning">
-        This code is the only way to get back into your account if you lose your password.
-        Keep it somewhere safe. Without it, your data cannot be recovered.
-      </p>
+{% extends 'layouts/auth_base.html' %}
 
-      <pre id="recovery">{{ code }}</pre>
-      <div class="recovery-actions">
-        <button class="btn" id="copy">Copy</button>
-        <button class="btn" id="download">Download</button>
-      </div>
-      <div class="acknowledge">
-        <label class="acknowledge-label">
-          <input type="checkbox" id="acknowledge" />
-          <span>
-            I understand: anyone with this code can access my account.
-            If I lose it, I won’t be able to recover my data.
-            I will store it securely.
-          </span>
-        </label>
-      </div>
-      <p class="continue">
-        <button
-          class="btn btn-primary"
-          id="continue"
-          disabled
-          data-next="{{ next_url }}"
-        >
-          Continue
-        </button>
-      </p>
-    </div>
-    <script type="module" src="{{ url_for('static', filename='js/recovery.js') }}"></script>
-  </body>
-</html>
+{% block title %} | Recovery Code{% endblock %}
+
+{% block form %}
+  <h1>Recovery Code</h1>
+  <p class="warning">
+    This code is the only way to get back into your account if you lose your password.
+    Keep it somewhere safe. Without it, your data cannot be recovered.
+  </p>
+
+  <pre id="recovery">{{ code }}</pre>
+  <div class="recovery-actions">
+    <button class="btn" id="copy">Copy</button>
+    <button class="btn" id="download">Download</button>
+  </div>
+  <div class="acknowledge">
+    <label class="acknowledge-label">
+      <input type="checkbox" id="acknowledge" />
+      <span>
+        I understand: anyone with this code can access my account.
+        If I lose it, I won’t be able to recover my data.
+        I will store it securely.
+      </span>
+    </label>
+  </div>
+  <p class="continue">
+    <button
+      class="btn btn-primary"
+      id="continue"
+      disabled
+      data-next="{{ next_url }}"
+    >
+      Continue
+    </button>
+  </p>
+{% endblock %}
+
+{% block body_scripts %}
+<script type="module" src="{{ url_for('static', filename='js/recovery.js') }}"></script>
+{% endblock %}

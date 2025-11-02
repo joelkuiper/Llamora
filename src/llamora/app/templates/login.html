@@ -1,44 +1,30 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{{ config.APP_NAME }} | Login</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}" />
-    <link rel="icon" href="{{url_for('static', filename='img/favicon.ico')}}" type="image/x-icon">
-  </head>
-  <body>
-    <div class="form-container">
-    <div id="branding">
-      <picture>
-        <source srcset="{{ url_for('static', filename='img/logo-dark.svg') }}" media="(prefers-color-scheme: dark)">
-        <img class="logo" src="{{ url_for('static', filename='img/logo.svg') }}" alt="{{ config.APP_NAME }} logo">
-      </picture>
-      <h1>{{ config.APP_NAME }}</h1>
-    </div>
+{% extends 'layouts/auth_base.html' %}
 
-      {% if error %}
-      <div class="error">{{ error }}</div>
-      {% endif %}
-      <form method="post">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          {% if return_url %}
-          <input type="hidden" name="return" value="{{ return_url }}">
-          {% endif %}
-          <input class="input" type="text" name="username" placeholder="Username"
-                 value="{{ username | default('', true) }}"
-                 required pattern="^\S+$" maxlength="{{ config.MAX_USERNAME_LENGTH }}" />
-          <input class="input" type="password" name="password" placeholder="Password"
-                 required maxlength="{{ config.MAX_PASSWORD_LENGTH }}" />
-          <button class="btn btn-primary" type="submit" data-loading="Logging in">Login</button>
-        </form>
-      <br>
-      {% if not config.DISABLE_REGISTRATION %}
-      <p>Need an account? <a href="{{ url_for('auth.register') }}">Register</a></p>
-      {% endif %}
-      <p><a href="{{ url_for('auth.reset_password') }}">Forgot password?</a></p>
-    </div>
-      <script type="module" src="{{ url_for('static', filename='js/forms.js') }}"></script>
-  </body>
-</html>
+{% block title %} | Login{% endblock %}
+
+{% block form %}
+  {% if error %}
+  <div class="error">{{ error }}</div>
+  {% endif %}
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    {% if return_url %}
+    <input type="hidden" name="return" value="{{ return_url }}" />
+    {% endif %}
+    <input class="input" type="text" name="username" placeholder="Username"
+           value="{{ username | default('', true) }}"
+           required pattern="^\S+$" maxlength="{{ config.MAX_USERNAME_LENGTH }}" />
+    <input class="input" type="password" name="password" placeholder="Password"
+           required maxlength="{{ config.MAX_PASSWORD_LENGTH }}" />
+    <button class="btn btn-primary" type="submit" data-loading="Logging in">Login</button>
+  </form>
+  <br />
+  {% if not config.DISABLE_REGISTRATION %}
+  <p>Need an account? <a href="{{ url_for('auth.register') }}">Register</a></p>
+  {% endif %}
+  <p><a href="{{ url_for('auth.reset_password') }}">Forgot password?</a></p>
+{% endblock %}
+
+{% block body_scripts %}
+<script type="module" src="{{ url_for('static', filename='js/forms.js') }}"></script>
+{% endblock %}
