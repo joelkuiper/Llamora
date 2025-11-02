@@ -121,7 +121,7 @@ Qwen3-4B-Instruct has become the baseline for Llamora because it follows instruc
 llama-server --hf Qwen/Qwen3-4B-Instruct-2507 --port 8081 --host 127.0.0.1
 ```
 
-The default prompt template now targets ChatML, so Qwen works out of the box. You only need environment overrides for sampling preferences or context length tweaks:
+The default prompt template targets ChatML, so Qwen works out of the box. You may only need environment overrides for sampling preferences or context length tweaks:
 
 ```
 LLAMORA_LLM__SERVER__HOST=http://127.0.0.1:8081 \
