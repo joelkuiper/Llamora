@@ -186,15 +186,44 @@ def _build_opening_system_message(
                 "Compose a single calm greeting that summarizes yesterday for "
                 "the user in a few sentences.",
                 "",
-                "The conversation below is from yesterday. If themes appear in "
-                "the conversation below, gently acknowledge them without "
+                "Use the recap provided below to ground your greeting. If "
+                "themes appear in the recap, gently acknowledge them without "
                 "quoting or listing. Close with a soft invitation to begin.",
                 "",
             ]
         )
-        lines.extend(list(_format_yesterday_messages(yesterday_messages)))
 
     lines.extend(["", ANSWER_REQUIREMENTS])
+    return "\n".join(lines).strip()
+
+
+def _build_opening_recap_message(
+    yesterday_messages: Sequence[Mapping[str, Any] | dict[str, Any]],
+    *,
+    is_new: bool,
+    has_no_activity: bool,
+) -> str:
+    if is_new:
+        return (
+            "Yesterday recap:\n"
+            "- The user is beginning their first conversation with you."
+        )
+
+    if has_no_activity:
+        return (
+            "Yesterday recap:\n"
+            "- The user had no activity yesterday, so there are no messages to review."
+        )
+
+    recap_lines = list(_format_yesterday_messages(yesterday_messages))
+    if not recap_lines:
+        return (
+            "Yesterday recap:\n"
+            "- No messages were captured yesterday."
+        )
+
+    lines = ["Yesterday recap:", ""]
+    lines.extend(recap_lines)
     return "\n".join(lines).strip()
 
 
@@ -228,15 +257,26 @@ def build_opening_messages(
 ) -> list[dict[str, str]]:
     """Return chat messages for the automated opening greeting."""
 
+    is_new = bool(context.get("is_new"))
+    has_no_activity = bool(context.get("has_no_activity"))
     system_message = _build_opening_system_message(
         yesterday_messages,
         date=_normalise_text(context.get("date")) or None,
         part_of_day=_normalise_text(context.get("part_of_day")) or None,
-        is_new=bool(context.get("is_new")),
-        has_no_activity=bool(context.get("has_no_activity")),
+        is_new=is_new,
+        has_no_activity=has_no_activity,
+    )
+    recap_message = _build_opening_recap_message(
+        yesterday_messages,
+        is_new=is_new,
+        has_no_activity=has_no_activity,
     )
 
-    return [{"role": "system", "content": system_message}]
+    return [
+        {"role": "system", "content": system_message},
+        {"role": "user", "content": recap_message},
+        {"role": "assistant", "content": ""},
+    ]
 
 
 def render_chat_prompt(messages: Sequence[Mapping[str, Any] | dict[str, Any]]) -> str:

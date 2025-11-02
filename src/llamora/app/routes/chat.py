@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from typing import Any
 
-from llamora.llm.chat_template import build_opening_messages
+from llamora.llm.chat_template import build_opening_messages, render_chat_prompt
 
 from llamora.app.services.container import get_services
 from llamora.app.services.auth_helpers import (
@@ -210,8 +210,9 @@ async def sse_opening(date: str):
             is_new=is_new,
             has_no_activity=has_no_activity,
         )
+        _ = render_chat_prompt(opening_messages)
     except Exception as exc:
-        logger.exception("Failed to build opening prompt")
+        logger.exception("Failed to prepare opening prompt")
 
         msg = f"⚠️ {exc}"
 

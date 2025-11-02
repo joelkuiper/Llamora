@@ -117,13 +117,13 @@ DEFAULTS: dict[str, Any] = {
     "CRYPTO": {
         "dek_storage": "cookie",
     },
-        "WORKERS": {
-            "index_worker": {
-                "max_queue_size": 1024,
-                "batch_size": 32,
-                "flush_interval": 0.05,
-            }
-        },
+    "WORKERS": {
+        "index_worker": {
+            "max_queue_size": 1024,
+            "batch_size": 32,
+            "flush_interval": 0.05,
+        }
+    },
 }
 
 settings = Dynaconf(
@@ -154,8 +154,8 @@ def _ensure_defaults(prefix: str, defaults: dict[str, Any]) -> None:
             if existing is _MISSING:
                 settings.set(dotted, value.copy())
                 existing = settings.get(dotted, _MISSING)
-            # Only recurse when the stored value looks like a mapping to avoid
-            # clobbering user-provided primitives.
+                # Only recurse when the stored value looks like a mapping to avoid
+                # clobbering user-provided primitives.
             if isinstance(existing, Mapping):
                 _ensure_defaults(dotted, value)
             continue
@@ -183,7 +183,7 @@ def _normalise_mapping_keys(data: dict[str, Any]) -> dict[str, Any]:
         key_str = str(key).replace("-", "_").lower()
         if isinstance(value, Mapping):
             value = _normalise_mapping_keys(_coerce_mapping(value))
-        normalised[key_str] = value
+            normalised[key_str] = value
     return normalised
 
 
@@ -260,10 +260,10 @@ settings.set(
 embedding_concurrency = int(settings.get("EMBEDDING.concurrency", 0))
 if embedding_concurrency <= 0:
     embedding_concurrency = _cpu_count()
-settings.set("EMBEDDING.concurrency", embedding_concurrency)
-settings.set(
-    "WORKERS.index_worker.max_queue_size",
-    int(settings.get("WORKERS.index_worker.max_queue_size", 0)),
-)
+    settings.set("EMBEDDING.concurrency", embedding_concurrency)
+    settings.set(
+        "WORKERS.index_worker.max_queue_size",
+        int(settings.get("WORKERS.index_worker.max_queue_size", 0)),
+    )
 
 __all__ = ["settings"]
