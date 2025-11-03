@@ -4,6 +4,10 @@ APP_NAME = "Llamora"
 SECRET_KEY = "O7T_mOBS765PydhqWAhH1RArhWBEp6hu28Uhf2gN0Xs"
 LOG_LEVEL = "INFO"
 
+[default.APP]
+host = "127.0.0.1"
+port = 5000
+
 [default.FEATURES]
 disable_registration = false
 

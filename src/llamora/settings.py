@@ -42,6 +42,10 @@ DEFAULTS: dict[str, Any] = {
     "APP_NAME": "Llamora",
     "SECRET_KEY": None,
     "LOG_LEVEL": "INFO",
+    "APP": {
+        "host": "127.0.0.1",
+        "port": 5000,
+    },
     "FEATURES": {
         "disable_registration": False,
     },

@@ -113,7 +113,10 @@ Configuration is managed by [Dynaconf](https://www.dynaconf.com/); see
 
    - Set `QUART_DEBUG=1` for automatic reloading on code changes.
    - Set `LOG_LEVEL=DEBUG` for debug logging
-   - Override the bind address with `LLAMORA_APP__HOST=0.0.0.0` or the port with `LLAMORA_APP__PORT=8000`
+   - Override the bind address with `LLAMORA_APP__HOST=0.0.0.0` or the port with `LLAMORA_APP__PORT=8000`.
+     These values are loaded from Dynaconf when you start the bundled runner (`uv run llamora-server`
+     or `uv run python -m llamora`). If you launch the app via `quart run`, use Quart's
+     `--host` / `--port` flags instead because that entrypoint does not read Llamora's settings.
 
 ### A note on model selection
 Qwen3-4B-Instruct has become the baseline for Llamora because it follows instructions reliably while still fitting on consumer hardware. Running it with llama.cpp is as simple as:
