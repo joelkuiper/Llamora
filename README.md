@@ -80,10 +80,10 @@ Configuration is managed by [Dynaconf](https://www.dynaconf.com/); see
 ### Requirements
 
 - [uv](https://docs.astral.sh/uv/)
-- a local [llama.cpp](https://github.com/ggerganov/llama.cpp) build (or prebuilt release) so you can run `llama-server --hf Qwen/Qwen3-4B-Instruct-2507`
-- optionally, a [llamafile](https://github.com/Mozilla-Ocho/llamafile) binary if you prefer an all-in-one executable instead of running llama.cpp yourself
-- a relatively fast computer (ideally with a strong GPU)
-- A relatively modern browser
+- A local [llama.cpp](https://github.com/ggerganov/llama.cpp) build (or prebuilt release) so you can run `llama-server --hf Qwen/Qwen3-4B-Instruct-2507`. Qwen3-4B-Instruct has become the baseline for Llamora because it follows instructions reliably while still fitting on consumer hardware.
+- Optionally, a [llamafile](https://github.com/Mozilla-Ocho/llamafile) binary if you prefer an all-in-one executable instead of running llama.cpp yourself.
+- A relatively fast computer (ideally with a strong GPU).
+- A relatively modern browser.
 
 ### Quick Start
 
@@ -118,37 +118,19 @@ Configuration is managed by [Dynaconf](https://www.dynaconf.com/); see
      or `uv run python -m llamora`). If you launch the app via `quart run`, use Quart's
      `--host` / `--port` flags instead because that entrypoint does not read Llamora's settings.
 
-### A note on model selection
-Qwen3-4B-Instruct has become the baseline for Llamora because it follows instructions reliably while still fitting on consumer hardware. Running it with llama.cpp is as simple as:
-
-```
-llama-server -hf  unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M  --port 8081 --host 127.0.0.1
-```
-
-The default prompt template targets ChatML, so Qwen works out of the box. You may only need environment overrides for sampling preferences or context length tweaks:
+### A note on configuration
+Example run with env vars:
 
 ```
 LLAMORA_LLM__SERVER__HOST=http://127.0.0.1:8081 \
+LLAMORA_LLM__SERVER__ARGS__CTX_SIZE=10000
+LLAMORA_APP__PORT=5050 \
 LLAMORA_COOKIES__SECRET="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" \
 QUART_DEBUG=1 \
 uv run llamora-server
 ```
 
-Each name mirrors the nested structure in [`config/settings.toml`](./config/settings.toml): double underscores split into sections (`LLAMORA_LLM__REQUEST__TEMPERATURE` maps to `settings.LLM.request.temperature`). Dynaconf reads `.env` automatically, so you can move those lines into an env file instead of inlining them. To persist overrides in TOML, edit `config/settings.local.toml` with tables that match the same hierarchy:
-
-```toml
-[default.LLM.server]
-host = "http://127.0.0.1:8081"
-
-[default.LLM.request]
-temperature = 0.7
-top_p = 0.8
-top_k = 20
-min_p = 0
-
-[default.COOKIES]
-secret = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
-```
+Each name mirrors the nested structure in [`config/settings.toml`](./config/settings.toml): double underscores split into sections (e.g. `LLAMORA_LLM__REQUEST__TEMPERATURE` maps to `settings.LLM.request.temperature`). Dynaconf reads `.env` automatically, so you can move those lines into an env file instead of inlining them. To persist overrides in TOML, edit `config/settings.local.toml` with tables that match the same hierarchy.
 
 Restart the server after saving changes; Dynaconf merges `settings.local.toml`, `.secrets.toml`, `.env`, and process environment variables (prefixed with `LLAMORA_`), with the environment taking precedence last.
 
@@ -184,7 +166,6 @@ export LLAMORA_SESSION__TTL=604800
 Optional overrides follow the same structure, e.g.:
 
 ```bash
-export LLAMORA_LLM__REQUEST__TEMPERATURE=0.7
 export LLAMORA_FEATURES__DISABLE_REGISTRATION=true
 ```
 
