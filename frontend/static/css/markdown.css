@@ -1,7 +1,13 @@
 .markdown-body {
   display: contents;
-  p,
-  pre { padding: 0; margin: 0; }
+
+  > p:first-of-type,
+  > p:last-of-type,
+  > pre:first-of-type,
+  > pre:last-of-type {
+    margin: 0;
+    padding: 0;
+  }
 
 
   table {
