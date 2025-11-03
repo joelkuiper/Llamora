@@ -164,7 +164,7 @@ uv run pyright
 ### Deployment (not recommended)
 
 Llamora is a personal experiment and **not production-ready**.
-If you still deploy it, set the required secrets and runtime vars using the new double-underscore format:
+If you still deploy it, set the required secrets and runtime vars using the double-underscore format:
 
 ```bash
 # Required
