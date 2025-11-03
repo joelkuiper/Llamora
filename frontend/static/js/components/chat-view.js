@@ -207,6 +207,12 @@ export class ChatView extends ReactiveElement {
       } else {
         delete document.body.dataset.activeDayLabel;
       }
+
+      document.dispatchEvent(
+        new CustomEvent("chat:active-day-ready", {
+          detail: { activeDay, activeDayLabel },
+        })
+      );
     }
 
     chat.querySelectorAll?.(".markdown-body").forEach((el) => {

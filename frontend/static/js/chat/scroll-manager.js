@@ -99,7 +99,18 @@ export class ScrollManager {
     });
 
     this.ensureElements();
-    this.restore();
+
+    const hasActiveDay = Boolean(document.body?.dataset?.activeDay);
+    if (hasActiveDay) {
+      this.restore();
+      return;
+    }
+
+    const resumeRestore = () => {
+      this.restore();
+    };
+
+    bag.add(document, "chat:active-day-ready", resumeRestore, { once: true });
   }
 
   stop() {
