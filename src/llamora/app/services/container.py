@@ -8,6 +8,8 @@ from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any
 
+from llamora.app.embed.model import async_embed_texts, _get_model
+
 from llamora.persistence.local_db import LocalDB
 from llamora.app.api.search import SearchAPI
 from llamora.app.services.lexical_reranker import LexicalReranker
@@ -98,6 +100,11 @@ class AppLifecycle:
                 with suppress(Exception):
                     await self._services.db.close()
                 raise
+
+            asyncio.create_task(
+                _warmup_embeddings(),
+                name="llamora-embedding-warmup",
+            )
             self._maintenance_task = asyncio.create_task(
                 self._maintenance_loop(),
                 name="llamora-maintenance",
@@ -196,3 +203,21 @@ def get_llm_service() -> LLMService:
     """Convenience accessor for the LLM service wrapper."""
 
     return get_services().llm_service
+
+
+async def _warmup_embeddings() -> None:
+    """Prime the embedding model cache in the background."""
+
+    cache_info = _get_model.cache_info()
+
+    if cache_info.currsize > 0:
+        logger.debug("Skipping embedding warm-up; model already cached")
+        return
+
+    logger.debug("Starting embedding warm-up")
+    try:
+        await async_embed_texts(["warmup"])
+    except Exception:  # pragma: no cover - defensive logging
+        logger.exception("Embedding warm-up failed")
+    else:
+        logger.debug("Embedding warm-up completed")
