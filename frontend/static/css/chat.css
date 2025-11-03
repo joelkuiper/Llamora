@@ -108,42 +108,6 @@ body {
     }
   }
 
-  /* Markdown refinements */
-  .markdown-body {
-    display: contents;
-    p,
-    pre { padding: 0; margin: 0; }
-
-    a {
-      color: var(--accent);
-      text-decoration: underline;
-      text-underline-offset: 2px;
-      text-decoration-thickness: .08em;
-      transition: color var(--motion-hover) ease, text-decoration-color var(--motion-hover) ease, background-color var(--motion-hover) ease;
-    }
-
-    a:hover {
-      text-decoration-color: var(--accent-60);
-      background-color: var(--accent-05);
-    }
-
-    pre,
-    code {
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-    }
-    pre { padding: var(--spacing-md); overflow: auto; }
-    code { padding: 0 .25em; }
-
-    blockquote {
-      margin: .75rem 0;
-      padding: .5rem .75rem;
-      border-left: 3px solid var(--accent-20);
-      background: var(--accent-05);
-      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-    }
-  }
-
   #typing-indicator {
     display: inline-block;
     font-weight: bold;
