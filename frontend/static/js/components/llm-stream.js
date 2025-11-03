@@ -4,6 +4,7 @@ import { IncrementalMarkdownRenderer } from "../chat/incremental-markdown-render
 import { scrollEvents } from "../chat/scroll-manager.js";
 
 const NEWLINE_REGEX = /\[newline\]/g;
+const RENDER_COOLDOWN_MS = 16;
 
 function decodeChunk(data) {
   return typeof data === "string" ? data.replace(NEWLINE_REGEX, "\n") : "";
@@ -75,6 +76,8 @@ class LlmStreamElement extends HTMLElement {
   #eventSource = null;
   #renderer = null;
   #renderFrame = null;
+  #renderCooldownTimer = null;
+  #pendingRenderOptions = null;
   #pendingTyping = null;
   #completed = false;
   #text = "";
@@ -207,10 +210,20 @@ class LlmStreamElement extends HTMLElement {
     this.#eventSource = null;
   }
 
-  #cancelRender() {
-    if (!this.#renderFrame) return;
-    cancelAnimationFrame(this.#renderFrame);
-    this.#renderFrame = null;
+  #cancelRender({ clearPending = true } = {}) {
+    if (this.#renderCooldownTimer) {
+      clearTimeout(this.#renderCooldownTimer);
+      this.#renderCooldownTimer = null;
+    }
+
+    if (this.#renderFrame) {
+      cancelAnimationFrame(this.#renderFrame);
+      this.#renderFrame = null;
+    }
+
+    if (clearPending) {
+      this.#pendingRenderOptions = null;
+    }
   }
 
   #handleMessage(event) {
@@ -277,11 +290,34 @@ class LlmStreamElement extends HTMLElement {
   }
 
   #scheduleRender({ repositionTyping = false, shouldScroll = false } = {}) {
-    this.#cancelRender();
-    this.#renderFrame = requestAnimationFrame(() => {
-      this.#renderFrame = null;
-      this.#renderNow({ repositionTyping, shouldScroll });
-    });
+    const pending = this.#pendingRenderOptions || {
+      repositionTyping: false,
+      shouldScroll: false,
+    };
+
+    this.#pendingRenderOptions = {
+      repositionTyping: pending.repositionTyping || repositionTyping,
+      shouldScroll: pending.shouldScroll || shouldScroll,
+    };
+
+    if (this.#renderCooldownTimer) {
+      return;
+    }
+
+    this.#renderCooldownTimer = window.setTimeout(() => {
+      this.#renderCooldownTimer = null;
+      this.#cancelRender({ clearPending: false });
+
+      this.#renderFrame = requestAnimationFrame(() => {
+        this.#renderFrame = null;
+        const options = this.#pendingRenderOptions || {
+          repositionTyping: false,
+          shouldScroll: false,
+        };
+        this.#pendingRenderOptions = null;
+        this.#renderNow(options);
+      });
+    }, RENDER_COOLDOWN_MS);
   }
 
   #renderNow({ repositionTyping = false, shouldScroll = false } = {}) {
