@@ -326,6 +326,8 @@ export class InlineAutocompleteController {
       "textAlign",
       "lineHeight",
       "borderRadius",
+      "transform",
+      "transformOrigin",
     ];
 
     for (const prop of properties) {
