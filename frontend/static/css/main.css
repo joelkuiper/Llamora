@@ -369,25 +369,10 @@ html, body {
   width: 100%;
   background-color: transparent !important;
 }
+.inline-autocomplete__input::selection {
+  background-color: color-mix(in srgb, var(--accent), transparent 82%);
 
-.inline-autocomplete__ghost {
-  position: absolute;
-  inset: 0;
-  display: block;
-  pointer-events: none;
   color: inherit;
-  opacity: 0.35;
-  white-space: pre;
-  z-index: 1;
-  padding: 0;
-}
-
-.inline-autocomplete__ghost .inline-autocomplete__mask {
-  color: transparent;
-}
-
-.inline-autocomplete--empty .inline-autocomplete__ghost {
-  display: none;
 }
 
 #branding {

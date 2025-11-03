@@ -20,11 +20,6 @@ function pruneAncestorWrappers(wrapper) {
       break;
     }
 
-    const staleGhosts = ancestor.querySelectorAll(".inline-autocomplete__ghost");
-    for (const node of staleGhosts) {
-      node.remove();
-    }
-
     const children = Array.from(ancestor.childNodes);
     parentNode.insertBefore(wrapper, ancestor);
     for (const child of children) {
@@ -35,20 +30,6 @@ function pruneAncestorWrappers(wrapper) {
     parentNode.removeChild(ancestor);
     ancestor = wrapper.parentElement;
   }
-}
-
-function resetGhost(wrapper) {
-  if (!wrapper) return null;
-  const existingGhosts = wrapper.querySelectorAll(".inline-autocomplete__ghost");
-  for (const node of existingGhosts) {
-    node.remove();
-  }
-
-  const ghost = document.createElement("span");
-  ghost.className = "inline-autocomplete__ghost";
-  ghost.setAttribute("aria-hidden", "true");
-  wrapper.appendChild(ghost);
-  return ghost;
 }
 
 function releaseAncestorEmptyClasses(wrapper) {
@@ -83,20 +64,18 @@ export function ensureInlineAutocompleteElements(input) {
 
   if (wrapper) {
     pruneAncestorWrappers(wrapper);
-    const ghost = resetGhost(wrapper);
     wrapper.classList.add("inline-autocomplete");
     releaseAncestorEmptyClasses(wrapper);
     input.classList.add("inline-autocomplete__input");
-    return { wrapper, ghost, ownsWrapper: false };
+    return { wrapper, ownsWrapper: false };
   }
 
   wrapper = document.createElement("span");
   wrapper.className = "inline-autocomplete inline-autocomplete--empty";
   parent.insertBefore(wrapper, input);
   wrapper.appendChild(input);
-  const ghost = resetGhost(wrapper);
   input.classList.add("inline-autocomplete__input");
-  return { wrapper, ghost, ownsWrapper: true };
+  return { wrapper, ownsWrapper: true };
 }
 
 function asArray(entry) {
@@ -109,30 +88,20 @@ function sanitizeString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function escapeHtml(value) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 export class InlineAutocompleteController {
   #input;
   #options;
   #wrapper;
-  #ghost;
   #candidates;
   #currentSuggestion;
   #ownsWrapper;
+  #typedPrefix;
+  #pendingDeletion;
   #inputHandler;
   #keydownHandler;
   #blurHandler;
   #focusHandler;
-  #resizeHandler;
   #rawEntries;
-  #pendingStyleSync;
 
   constructor(input, options = {}) {
     if (!(input instanceof HTMLInputElement)) {
@@ -145,11 +114,11 @@ export class InlineAutocompleteController {
     this.#rawEntries = [];
     this.#currentSuggestion = null;
     this.#ownsWrapper = false;
-
+    this.#typedPrefix = input.value ?? "";
+    this.#pendingDeletion = false;
 
     this.#wrapInput();
     this.#attachListeners();
-    this.#syncStyles();
     this.#updateSuggestion();
   }
 
@@ -159,11 +128,11 @@ export class InlineAutocompleteController {
     this.#candidates = [];
     this.#rawEntries = [];
     this.#currentSuggestion = null;
-    this.#ghost = null;
     this.#wrapper = null;
     this.#ownsWrapper = false;
     this.#input = null;
-    this.#pendingStyleSync = null;
+    this.#typedPrefix = "";
+    this.#pendingDeletion = false;
   }
 
   setCandidates(entries) {
@@ -253,7 +222,6 @@ export class InlineAutocompleteController {
     if (!prepared) return;
 
     this.#wrapper = prepared.wrapper;
-    this.#ghost = prepared.ghost;
     this.#ownsWrapper = prepared.ownsWrapper;
   }
 
@@ -263,10 +231,6 @@ export class InlineAutocompleteController {
     if (!input || !wrapper) return;
 
     input.classList.remove("inline-autocomplete__input");
-
-    if (this.#ghost && this.#ghost.parentNode === wrapper) {
-      wrapper.removeChild(this.#ghost);
-    }
 
     if (!this.#ownsWrapper) {
       return;
@@ -283,26 +247,19 @@ export class InlineAutocompleteController {
     const input = this.#input;
     if (!input) return;
 
-    this.#inputHandler = () => this.#updateSuggestion();
+    this.#inputHandler = (event) => this.#updateSuggestion({ fromUserInput: true, inputEvent: event });
     this.#keydownHandler = (event) => this.#handleKeydown(event);
     this.#blurHandler = () => {
-      this.#clearGhost();
-      this.#scheduleStyleSync();
+      this.#clearSuggestion({ restore: true });
     };
     this.#focusHandler = () => {
       this.#updateSuggestion();
-      this.#scheduleStyleSync();
     };
-    this.#resizeHandler = () => this.#syncStyles();
 
     input.addEventListener("input", this.#inputHandler);
     input.addEventListener("keydown", this.#keydownHandler);
     input.addEventListener("blur", this.#blurHandler);
     input.addEventListener("focus", this.#focusHandler);
-    if (typeof window !== "undefined") {
-      window.addEventListener("resize", this.#resizeHandler);
-    }
-
   }
 
   #detachListeners() {
@@ -313,69 +270,6 @@ export class InlineAutocompleteController {
       input.removeEventListener("blur", this.#blurHandler);
       input.removeEventListener("focus", this.#focusHandler);
     }
-    if (typeof window !== "undefined") {
-      window.removeEventListener("resize", this.#resizeHandler);
-      if (this.#pendingStyleSync != null) {
-        window.cancelAnimationFrame(this.#pendingStyleSync);
-        this.#pendingStyleSync = null;
-      }
-    }
-  }
-
-  #scheduleStyleSync() {
-    if (typeof window === "undefined") {
-      this.#syncStyles();
-      return;
-    }
-
-    if (this.#pendingStyleSync != null) {
-      return;
-    }
-
-    this.#pendingStyleSync = window.requestAnimationFrame(() => {
-      this.#pendingStyleSync = null;
-      this.#syncStyles();
-    });
-  }
-
-  #syncStyles() {
-    const input = this.#input;
-    const ghost = this.#ghost;
-    if (!input || !ghost) return;
-
-    const computed = window.getComputedStyle(input);
-    const properties = [
-      "fontSize",
-      "fontFamily",
-      "fontWeight",
-      "fontStyle",
-      "letterSpacing",
-      "textTransform",
-      "textAlign",
-      "lineHeight",
-      "borderRadius",
-      "transform",
-      "transformOrigin",
-    ];
-
-    for (const prop of properties) {
-      ghost.style[prop] = computed[prop];
-    }
-
-    const assignBoxValue = (property, value) => {
-      ghost.style[property] = value && value !== "auto" ? value : "0px";
-    };
-
-    ghost.style.color = computed.color;
-    ghost.style.paddingTop = computed.paddingTop;
-    ghost.style.paddingRight = computed.paddingRight;
-    ghost.style.paddingBottom = computed.paddingBottom;
-    ghost.style.paddingLeft = computed.paddingLeft;
-    assignBoxValue("left", computed.borderLeftWidth);
-    assignBoxValue("right", computed.borderRightWidth);
-    assignBoxValue("top", computed.borderTopWidth);
-    assignBoxValue("bottom", computed.borderBottomWidth);
-
   }
 
   #normalizeQuery(raw) {
@@ -388,78 +282,94 @@ export class InlineAutocompleteController {
     return this.#options.caseSensitive ? prepared : prepared.toLowerCase();
   }
 
-  #updateSuggestion() {
+  #updateSuggestion({ fromUserInput = false, inputEvent = null } = {}) {
     const input = this.#input;
     if (!input) return;
-    const value = input.value ?? "";
-    const match = this.#resolveMatch(value);
+    const rawValue = input.value ?? "";
+
+    if (fromUserInput) {
+      this.#typedPrefix = rawValue;
+      const inputType = inputEvent?.inputType ?? "";
+      if (inputType && inputType.startsWith("delete")) {
+        this.#pendingDeletion = true;
+        this.#currentSuggestion = null;
+        this.#wrapper?.classList.add("inline-autocomplete--empty");
+        if (typeof input.setSelectionRange === "function") {
+          const collapseIndex = rawValue.length;
+          input.setSelectionRange(collapseIndex, collapseIndex);
+        }
+        return;
+      }
+      this.#pendingDeletion = false;
+    } else if (this.#currentSuggestion == null) {
+      this.#typedPrefix = rawValue;
+    } else if (this.#typedPrefix == null) {
+      this.#typedPrefix = rawValue;
+    }
+
+    if (this.#pendingDeletion) {
+      return;
+    }
+
+    const prefix = this.#typedPrefix ?? "";
+    const match = this.#resolveMatch(prefix);
 
     if (!match) {
       this.#currentSuggestion = null;
-      this.#renderGhost();
       this.#wrapper?.classList.add("inline-autocomplete--empty");
+      if (input.value !== prefix) {
+        input.value = prefix;
+      }
+      if (typeof input.setSelectionRange === "function") {
+        const collapseIndex = prefix.length;
+        input.setSelectionRange(collapseIndex, collapseIndex);
+      }
       return;
     }
 
     const suggestion = match.candidate.value;
-    const displayValue = match.candidate.display ?? suggestion;
-    const normalizedDisplay = this.#options.caseSensitive
-      ? displayValue
-      : displayValue.toLowerCase();
-    const fallbackIndex = normalizedDisplay.indexOf(match.token ?? "");
-    const start = Math.max(0, match.tokenIndex ?? fallbackIndex);
-    const maxAvailable = Math.max(displayValue.length - start, 0);
-    const maskReference = match.matchLength ?? match.queryLength ?? match.token?.length ?? 0;
-    const maskBase = Math.min(maskReference, value.length);
-    const maskedLength = Math.min(maxAvailable, Math.max(0, maskBase));
-    let leading = displayValue.slice(0, start);
-    let masked = displayValue.slice(start, start + maskedLength);
-    const trailing = displayValue.slice(start + maskedLength);
-
-    if (!leading && !trailing) {
+    const typedLength = prefix.length;
+    if (!suggestion || suggestion.length <= typedLength) {
       this.#currentSuggestion = null;
-      this.#renderGhost();
       this.#wrapper?.classList.add("inline-autocomplete--empty");
+      if (input.value !== prefix) {
+        input.value = prefix;
+      }
+      if (typeof input.setSelectionRange === "function") {
+        input.setSelectionRange(typedLength, typedLength);
+      }
       return;
     }
 
     this.#currentSuggestion = suggestion;
-    this.#renderGhost({ leading, masked, trailing });
     this.#wrapper?.classList.remove("inline-autocomplete--empty");
+
+    if (input.value !== suggestion) {
+      input.value = suggestion;
+    }
+    if (typeof input.setSelectionRange === "function") {
+      input.setSelectionRange(typedLength, suggestion.length);
+    }
   }
 
-  #renderGhost(parts) {
-    if (!this.#ghost) return;
-    if (!parts) {
-      this.#ghost.textContent = "";
-      return;
-    }
-
-    const { leading = "", masked = "", trailing = "" } = parts;
-
-    if (!leading && !masked && !trailing) {
-      this.#ghost.textContent = "";
-      return;
-    }
-
-    let html = "";
-    if (leading) {
-      html += escapeHtml(leading);
-    }
-    if (masked) {
-      html += `<span class="inline-autocomplete__mask">${escapeHtml(masked)}</span>`;
-    }
-    if (trailing) {
-      html += escapeHtml(trailing);
-    }
-
-    this.#ghost.innerHTML = html;
-  }
-
-  #clearGhost() {
+  #clearSuggestion({ restore = false } = {}) {
     this.#currentSuggestion = null;
-    this.#renderGhost();
     this.#wrapper?.classList.add("inline-autocomplete--empty");
+    this.#pendingDeletion = false;
+
+    if (!restore) return;
+
+    const input = this.#input;
+    if (!input) return;
+
+    const prefix = this.#typedPrefix ?? "";
+    if (input.value !== prefix) {
+      input.value = prefix;
+    }
+    if (typeof input.setSelectionRange === "function") {
+      const collapseIndex = prefix.length;
+      input.setSelectionRange(collapseIndex, collapseIndex);
+    }
   }
 
   #resolveMatch(rawValue) {
@@ -537,7 +447,15 @@ export class InlineAutocompleteController {
   #applySuggestion(trigger) {
     const input = this.#input;
     if (!input || !this.#currentSuggestion) return;
-    input.value = this.#currentSuggestion;
+    const suggestion = this.#currentSuggestion;
+    input.value = suggestion;
+    this.#typedPrefix = suggestion;
+    if (typeof input.setSelectionRange === "function") {
+      const end = suggestion.length;
+      input.setSelectionRange(end, end);
+    }
+    const committed = suggestion;
+    this.#currentSuggestion = null;
     if (this.#options.emitInputEvent) {
       const evt = new Event("input", { bubbles: true, cancelable: false });
       input.dispatchEvent(evt);
@@ -545,7 +463,7 @@ export class InlineAutocompleteController {
     this.#updateSuggestion();
     if (typeof this.#options.onCommit === "function") {
       try {
-        this.#options.onCommit(this.#currentSuggestion, trigger);
+        this.#options.onCommit(committed, trigger);
       } catch (error) {
         // Ignore errors thrown by external commit handlers.
       }
