@@ -1,9 +1,9 @@
-import { initScrollMemory } from "./scroll.js";
+import { ScrollManager } from "./chat/scroll-manager.js";
 import { initGlobalShortcuts } from "./global-shortcuts.js";
 
 let headersRegistered = false;
 let offlineHandlerRegistered = false;
-let scrollInitialized = false;
+let scrollManager = null;
 
 function registerHtmxHeaderHooks(csrfToken) {
   if (headersRegistered) return;
@@ -59,10 +59,12 @@ function registerOfflineHandler() {
   offlineHandlerRegistered = true;
 }
 
-function ensureScrollMemory() {
-  if (scrollInitialized) return;
-  initScrollMemory();
-  scrollInitialized = true;
+function ensureScrollManager() {
+  if (!scrollManager) {
+    scrollManager = new ScrollManager();
+    scrollManager.start();
+  }
+  return scrollManager;
 }
 
 function initProfileClick() {
@@ -81,7 +83,7 @@ function initProfileClick() {
 
 export function initGlobalShell() {
   initProfileClick();
-  ensureScrollMemory();
+  ensureScrollManager();
 }
 
 function init() {
@@ -94,6 +96,7 @@ function init() {
   window.appInit = {
     ...(window.appInit || {}),
     initGlobalShell,
+    scroll: ensureScrollManager(),
   };
 }
 

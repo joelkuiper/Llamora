@@ -1,4 +1,4 @@
-import { ScrollController } from "../chat/scroll-controller.js";
+import { scrollEvents } from "../chat/scroll-manager.js";
 import { MarkdownObserver } from "../chat/markdown-observer.js";
 import { renderMarkdownInElement } from "../markdown.js";
 import { initDayNav } from "../day.js";
@@ -81,10 +81,10 @@ function scheduleMidnightRefresh(chat) {
 
 export class ChatView extends ReactiveElement {
   #chatForm = null;
-  #scrollController = null;
+  #scrollManager = null;
+  #scrollEventListeners = null;
   #state = null;
   #chat = null;
-  #scrollToBottom = null;
   #midnightCleanup = null;
   #afterSwapHandler;
   #beforeSwapHandler;
@@ -144,6 +144,17 @@ export class ChatView extends ReactiveElement {
       this.#historyRestoreHandler
     );
 
+    if (!this.#scrollManager) {
+      this.#scrollManager = window.appInit?.scroll ?? null;
+    }
+
+    this.#scrollEventListeners = this.resetListenerBag(this.#scrollEventListeners);
+    this.#scrollEventListeners.add(scrollEvents, "scroll:markdown-complete", () => {
+      if (this.#chat) {
+        this.#scheduleRenderingComplete(this.#chat);
+      }
+    });
+
     this.#syncToChatDate();
   }
 
@@ -151,6 +162,7 @@ export class ChatView extends ReactiveElement {
     this.#cancelHistoryRestoreFrame();
     this.#teardown();
     this.#connectionListeners = this.disposeListenerBag(this.#connectionListeners);
+    this.#scrollEventListeners = this.disposeListenerBag(this.#scrollEventListeners);
     this.#initialized = false;
     super.disconnectedCallback();
   }
@@ -232,10 +244,10 @@ export class ChatView extends ReactiveElement {
       this.#midnightCleanup = scheduleMidnightRefresh(chat);
     }
 
-    this.#scrollController = new ScrollController({ root: document, chat });
-    this.#scrollToBottom = this.#scrollController.init() || (() => {});
-
-    this.#configureStreams(chat);
+    if (!this.#scrollManager) {
+      this.#scrollManager = window.appInit?.scroll ?? null;
+    }
+    this.#scrollManager?.attachChat(chat);
 
     this.#chatListeners = this.resetListenerBag(this.#chatListeners);
     this.#chatListeners.add(chat, "htmx:afterSwap", this.#afterSwapHandler);
@@ -293,8 +305,9 @@ export class ChatView extends ReactiveElement {
       this.#midnightCleanup = null;
     }
 
-    this.#scrollController?.destroy();
-    this.#scrollController = null;
+    if (this.#scrollManager && this.#chat) {
+      this.#scrollManager.detachChat(this.#chat);
+    }
 
     this.#markdownObserver?.stop();
     this.#markdownObserver = null;
@@ -302,7 +315,6 @@ export class ChatView extends ReactiveElement {
     this.#chatListeners = this.disposeListenerBag(this.#chatListeners);
 
     this.#chat = null;
-    this.#scrollToBottom = null;
     this.#chatForm = null;
     this.#state = null;
     this.#chatFormReady = Promise.resolve();
@@ -342,10 +354,6 @@ export class ChatView extends ReactiveElement {
     });
 
     this.#markdownObserver?.resume(swapTargets);
-
-    swapTargets.forEach((target) => {
-      this.#configureStreams(target);
-    });
 
     if (swapTargets.includes(this.#chat)) {
       this.#updateStreamingState(true);
@@ -447,28 +455,13 @@ export class ChatView extends ReactiveElement {
     }
 
     if (forceScroll) {
-      this.#scrollToBottom?.(true);
+      this.#scrollManager?.scrollToBottom(true);
     }
   }
 
   #handleMarkdownRendered(el) {
     const stream = el?.closest?.("llm-stream");
     stream?.handleMarkdownRendered(el);
-  }
-
-  #configureStreams(root) {
-    if (!root) return;
-
-    const apply = (stream) => {
-      if (!stream) return;
-      stream.scrollToBottom = (...args) => this.#scrollToBottom?.(...args);
-    };
-
-    if (root instanceof Element && root.matches("llm-stream")) {
-      apply(root);
-    }
-
-    root.querySelectorAll?.("llm-stream").forEach((stream) => apply(stream));
   }
 
   #resumeDormantStreams() {
@@ -496,7 +489,11 @@ export class ChatView extends ReactiveElement {
     if (typeof this.#chatForm?.setStreaming === "function") {
       this.#chatForm.setStreaming(true);
     }
-    this.#scrollToBottom?.(true);
+    scrollEvents.dispatchEvent(
+      new CustomEvent("scroll:force-bottom", {
+        detail: { source: "stream:start" },
+      })
+    );
   }
 
   #handleStreamComplete(event) {
@@ -508,7 +505,11 @@ export class ChatView extends ReactiveElement {
       this.#chatForm.setStreaming(false);
     }
     if (detail.status !== "aborted") {
-      this.#scrollToBottom?.(true);
+      scrollEvents.dispatchEvent(
+        new CustomEvent("scroll:force-bottom", {
+          detail: { source: "stream:complete" },
+        })
+      );
     }
   }
 }

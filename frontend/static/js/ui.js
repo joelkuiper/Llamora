@@ -1,3 +1,5 @@
+import { scrollEvents } from "./chat/scroll-manager.js";
+
 export const SPINNER = {
   interval: 80,
   frames: ["⠋", "⠙", "⠚", "⠞", "⠖", "⠦", "⠴", "⠲", "⠳", "⠓"],
@@ -125,12 +127,14 @@ export function clearScrollTarget(target, options = {}) {
 
   if (emitEvent) {
     const detail = { target: target ?? null };
-    window.__appScrollTargetConsumed = detail;
-    window.dispatchEvent(
-      new CustomEvent("app:scroll-target-consumed", {
-        detail,
-      })
-    );
+    const manager = window.appInit?.scroll ?? null;
+    if (manager && typeof manager.notifyTargetConsumed === "function") {
+      manager.notifyTargetConsumed(detail.target);
+    } else {
+      scrollEvents.dispatchEvent(
+        new CustomEvent("scroll:target-consumed", { detail })
+      );
+    }
   }
 }
 
@@ -163,7 +167,14 @@ export function scrollToHighlight(fallbackTarget) {
     }
     const el = document.getElementById(target);
     if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      scrollEvents.dispatchEvent(
+        new CustomEvent("scroll:target", {
+          detail: {
+            id: target,
+            options: { behavior: "smooth", block: "center" },
+          },
+        })
+      );
       flashHighlight(el);
       clearScrollTarget(target);
     }

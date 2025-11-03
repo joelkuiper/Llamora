@@ -1,6 +1,7 @@
 import { renderMarkdown } from "../markdown.js";
 import { positionTypingIndicator } from "../typing-indicator.js";
 import { IncrementalMarkdownRenderer } from "../chat/incremental-markdown-renderer.js";
+import { scrollEvents } from "../chat/scroll-manager.js";
 
 const NEWLINE_REGEX = /\[newline\]/g;
 
@@ -28,7 +29,15 @@ function parseMetaPayload(data) {
   }
 }
 
-function revealMetaChips(container, scrollToBottom) {
+function requestScrollToBottom(detail = {}) {
+  scrollEvents.dispatchEvent(
+    new CustomEvent("scroll:force-bottom", {
+      detail: { source: "llm-stream", ...detail },
+    })
+  );
+}
+
+function revealMetaChips(container) {
   if (!container || !container.hidden) return;
 
   const parent = container.closest(".message");
@@ -56,7 +65,7 @@ function revealMetaChips(container, scrollToBottom) {
     "animationend",
     () => {
       container.classList.remove("chip-enter");
-      scrollToBottom();
+      requestScrollToBottom({ reason: "meta" });
     },
     { once: true }
   );
@@ -65,7 +74,6 @@ function revealMetaChips(container, scrollToBottom) {
 class LlmStreamElement extends HTMLElement {
   #eventSource = null;
   #renderer = null;
-  #scrollToBottom = () => {};
   #renderFrame = null;
   #pendingTyping = null;
   #completed = false;
@@ -110,10 +118,6 @@ class LlmStreamElement extends HTMLElement {
     this.#closeEventSource();
   }
 
-  set scrollToBottom(fn) {
-    this.#scrollToBottom = typeof fn === "function" ? fn : () => {};
-  }
-
   get userMsgId() {
     return this.dataset.userMsgId || null;
   }
@@ -156,7 +160,7 @@ class LlmStreamElement extends HTMLElement {
       this.#typingIndicator = typing;
     }
     if (shouldScroll) {
-      this.#scrollToBottom();
+      requestScrollToBottom({ reason: "markdown", element: this });
     }
   }
 
@@ -306,7 +310,7 @@ class LlmStreamElement extends HTMLElement {
       this.#pendingTyping = reposition;
       this.handleMarkdownRendered(this.#markdown);
     } else if (shouldScroll && changed) {
-      this.#scrollToBottom();
+      requestScrollToBottom({ reason: "render", element: this });
     }
 
     return changed;
@@ -373,7 +377,7 @@ class LlmStreamElement extends HTMLElement {
         "htmx:afterSwap",
         (event) => {
           if (event.target?.classList?.contains("meta-chips")) {
-            revealMetaChips(event.target, () => this.#scrollToBottom());
+            revealMetaChips(event.target);
           }
         },
         { once: true }

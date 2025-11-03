@@ -4,6 +4,7 @@ import {
   parseDateFromSource,
   navigateToDate,
 } from "./day.js";
+import { scrollEvents } from "./chat/scroll-manager.js";
 
 let registered = false;
 
@@ -108,18 +109,9 @@ const goToToday = () => {
 const toggleCalendar = () => clickIfEnabled("#calendar-btn");
 
 const scrollChatToBottom = () => {
-  const button = document.querySelector(
-    "scroll-bottom-button button, #scroll-bottom button, #scroll-bottom"
+  scrollEvents.dispatchEvent(
+    new CustomEvent("scroll:force-bottom", { detail: { source: "shortcut" } })
   );
-  if (!(button instanceof HTMLElement)) {
-    const container = document.getElementById("content-wrapper");
-    if (!container) {
-      return false;
-    }
-    container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
-    return true;
-  }
-  button.click();
   return true;
 };
 
