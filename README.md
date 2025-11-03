@@ -1,3 +1,4 @@
+
 # Llamora
 
 Llamora is an **experimental, local-first diary companion**.
@@ -89,7 +90,7 @@ Configuration is managed by [Dynaconf](https://www.dynaconf.com/); see
 1. Start a llama.cpp server in another terminal:
 
    ```bash
-   llama-server --hf Qwen/Qwen3-4B-Instruct-2507 --port 8081 --host 127.0.0.1
+   llama-server -hf  unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M --port 8081 --host 127.0.0.1
    ```
 
    This downloads the weights from Hugging Face on first launch and serves the HTTP API on `http://127.0.0.1:8081`. Adjust the host/port as needed. If you would rather run a self-contained executable, launch a llamafile with the same `--port` and point Llamora at it.
@@ -118,7 +119,7 @@ Configuration is managed by [Dynaconf](https://www.dynaconf.com/); see
 Qwen3-4B-Instruct has become the baseline for Llamora because it follows instructions reliably while still fitting on consumer hardware. Running it with llama.cpp is as simple as:
 
 ```
-llama-server --hf Qwen/Qwen3-4B-Instruct-2507 --port 8081 --host 127.0.0.1
+llama-server -hf  unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M  --port 8081 --host 127.0.0.1
 ```
 
 The default prompt template targets ChatML, so Qwen works out of the box. You may only need environment overrides for sampling preferences or context length tweaks:
@@ -127,7 +128,6 @@ The default prompt template targets ChatML, so Qwen works out of the box. You ma
 LLAMORA_LLM__SERVER__HOST=http://127.0.0.1:8081 \
 LLAMORA_COOKIES__SECRET="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" \
 QUART_DEBUG=1 \
-SERVER_NAME=http://localhost:5000/ \
 uv run llamora-server
 ```
 
