@@ -438,7 +438,11 @@ export class InlineAutocompleteController {
       this.#applySuggestion("enter");
     } else if (event.key === "ArrowRight") {
       const { selectionStart, selectionEnd, value } = this.#input;
-      if (selectionStart === value.length && selectionEnd === value.length) {
+      if (
+        typeof selectionEnd === "number" &&
+        selectionEnd === value.length &&
+        typeof selectionStart === "number"
+      ) {
         this.#applySuggestion("arrow");
       }
     }
