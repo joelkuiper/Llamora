@@ -12,9 +12,6 @@ function isInlineWrapper(node) {
   return node instanceof HTMLElement && node.classList.contains("inline-autocomplete");
 }
 
-const LINE_HEIGHT_CACHE = new Map();
-let metricsRoot = null;
-
 function pruneAncestorWrappers(wrapper) {
   let ancestor = wrapper?.parentElement;
   while (isInlineWrapper(ancestor)) {
@@ -38,92 +35,6 @@ function pruneAncestorWrappers(wrapper) {
     parentNode.removeChild(ancestor);
     ancestor = wrapper.parentElement;
   }
-}
-
-function clearLineHeightCache() {
-  LINE_HEIGHT_CACHE.clear();
-}
-
-function ensureMetricsRoot() {
-  if (metricsRoot && metricsRoot.isConnected) {
-    return metricsRoot;
-  }
-
-  const root = document.createElement("div");
-  root.style.position = "absolute";
-  root.style.visibility = "hidden";
-  root.style.pointerEvents = "none";
-  root.style.overflow = "hidden";
-  root.style.whiteSpace = "nowrap";
-  root.style.top = "0";
-  root.style.left = "0";
-  root.style.zIndex = "-1";
-
-  const parent = document.body ?? document.documentElement;
-  parent.appendChild(root);
-  metricsRoot = root;
-  return metricsRoot;
-}
-
-function resolveLineHeight(computed) {
-  const raw = computed.lineHeight;
-  if (typeof raw === "string") {
-    const trimmed = raw.trim();
-    if (trimmed && /px$/i.test(trimmed)) {
-      const value = Number.parseFloat(trimmed);
-      if (Number.isFinite(value)) {
-        return `${value}px`;
-      }
-    }
-  }
-
-  if (typeof document === "undefined") {
-    return typeof raw === "string" ? raw : "";
-  }
-
-  const signature = [
-    computed.fontFamily ?? "",
-    computed.fontSize ?? "",
-    computed.fontWeight ?? "",
-    computed.fontStyle ?? "",
-    computed.letterSpacing ?? "",
-    computed.textTransform ?? "",
-  ].join("|");
-
-  const cached = LINE_HEIGHT_CACHE.get(signature);
-  if (cached) {
-    return cached;
-  }
-
-  const root = ensureMetricsRoot();
-  const probe = document.createElement("span");
-  probe.textContent = "Hg";
-  const style = probe.style;
-  style.position = "absolute";
-  style.top = "0";
-  style.left = "0";
-  style.margin = "0";
-  style.padding = "0";
-  style.border = "0";
-  style.whiteSpace = "pre";
-  style.display = "inline-block";
-  style.fontFamily = computed.fontFamily;
-  style.fontSize = computed.fontSize;
-  style.fontWeight = computed.fontWeight;
-  style.fontStyle = computed.fontStyle;
-  style.letterSpacing = computed.letterSpacing;
-  style.textTransform = computed.textTransform;
-  style.lineHeight = computed.lineHeight;
-
-  root.appendChild(probe);
-  const rect = probe.getBoundingClientRect();
-  const measured = rect.height || probe.offsetHeight;
-  root.removeChild(probe);
-
-  const value = Number.isFinite(measured) && measured > 0 ? measured : Number.parseFloat(computed.fontSize) || 0;
-  const result = value ? `${value}px` : "0px";
-  LINE_HEIGHT_CACHE.set(signature, result);
-  return result;
 }
 
 function resetGhost(wrapper) {
@@ -382,10 +293,7 @@ export class InlineAutocompleteController {
       this.#updateSuggestion();
       this.#scheduleStyleSync();
     };
-    this.#resizeHandler = () => {
-      clearLineHeightCache();
-      this.#syncStyles();
-    };
+    this.#resizeHandler = () => this.#syncStyles();
 
     input.addEventListener("input", this.#inputHandler);
     input.addEventListener("keydown", this.#keydownHandler);
@@ -433,7 +341,6 @@ export class InlineAutocompleteController {
   #syncStyles() {
     const input = this.#input;
     const ghost = this.#ghost;
-    const wrapper = this.#wrapper;
     if (!input || !ghost) return;
 
     const computed = window.getComputedStyle(input);
@@ -445,6 +352,7 @@ export class InlineAutocompleteController {
       "letterSpacing",
       "textTransform",
       "textAlign",
+      "lineHeight",
       "borderRadius",
       "transform",
       "transformOrigin",
@@ -452,12 +360,6 @@ export class InlineAutocompleteController {
 
     for (const prop of properties) {
       ghost.style[prop] = computed[prop];
-    }
-
-    const lineHeight = resolveLineHeight(computed);
-    ghost.style.lineHeight = lineHeight;
-    if (wrapper) {
-      wrapper.style.lineHeight = lineHeight;
     }
 
     const assignBoxValue = (property, value) => {
