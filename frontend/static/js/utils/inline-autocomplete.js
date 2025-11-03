@@ -132,6 +132,7 @@ export class InlineAutocompleteController {
   #focusHandler;
   #resizeHandler;
   #rawEntries;
+  #pendingStyleSync;
 
   constructor(input, options = {}) {
     if (!(input instanceof HTMLInputElement)) {
@@ -162,6 +163,7 @@ export class InlineAutocompleteController {
     this.#wrapper = null;
     this.#ownsWrapper = false;
     this.#input = null;
+    this.#pendingStyleSync = null;
   }
 
   setCandidates(entries) {
@@ -283,8 +285,14 @@ export class InlineAutocompleteController {
 
     this.#inputHandler = () => this.#updateSuggestion();
     this.#keydownHandler = (event) => this.#handleKeydown(event);
-    this.#blurHandler = () => this.#clearGhost();
-    this.#focusHandler = () => this.#updateSuggestion();
+    this.#blurHandler = () => {
+      this.#clearGhost();
+      this.#scheduleStyleSync();
+    };
+    this.#focusHandler = () => {
+      this.#updateSuggestion();
+      this.#scheduleStyleSync();
+    };
     this.#resizeHandler = () => this.#syncStyles();
 
     input.addEventListener("input", this.#inputHandler);
@@ -307,7 +315,27 @@ export class InlineAutocompleteController {
     }
     if (typeof window !== "undefined") {
       window.removeEventListener("resize", this.#resizeHandler);
+      if (this.#pendingStyleSync != null) {
+        window.cancelAnimationFrame(this.#pendingStyleSync);
+        this.#pendingStyleSync = null;
+      }
     }
+  }
+
+  #scheduleStyleSync() {
+    if (typeof window === "undefined") {
+      this.#syncStyles();
+      return;
+    }
+
+    if (this.#pendingStyleSync != null) {
+      return;
+    }
+
+    this.#pendingStyleSync = window.requestAnimationFrame(() => {
+      this.#pendingStyleSync = null;
+      this.#syncStyles();
+    });
   }
 
   #syncStyles() {
