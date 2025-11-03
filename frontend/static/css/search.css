@@ -33,7 +33,7 @@
   }
 
   &:focus {
-    transform: translateY(-2px);
+    transform: translateY(-1px);
     border-color: var(--accent);
     box-shadow:
       var(--raised-shadow),
