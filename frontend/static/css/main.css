@@ -18,6 +18,7 @@
   --accent-active: #0e85de;
   --accent-05: rgba(54,166,244,0.05);
   --accent-10: rgba(54,166,244,0.10);
+  --accent-15: rgba(54,166,244,0.15);
   --accent-20: rgba(54,166,244,0.18);
   --accent-30: rgba(54,166,244,0.28);
   --accent-60: rgba(59,167,246,0.60);
@@ -158,6 +159,7 @@
   --accent-active-dark: #a0ceee;
   --accent-05-dark: rgba(111,183,230,0.12);
   --accent-10-dark: rgba(111,183,230,0.18);
+  --accent-15-dark: rgba(111,183,230,0.22);
   --accent-20-dark: rgba(111,183,230,0.26);
   --accent-30-dark: rgba(111,183,230,0.36);
   --accent-60-dark: rgba(140,196,235,0.58);
@@ -261,6 +263,7 @@
     --accent-active: var(--accent-active-dark);
     --accent-05: var(--accent-05-dark);
     --accent-10: var(--accent-10-dark);
+    --accent-15: var(--accent-15-dark);
     --accent-20: var(--accent-20-dark);
     --accent-30: var(--accent-30-dark);
     --accent-60: var(--accent-60-dark);

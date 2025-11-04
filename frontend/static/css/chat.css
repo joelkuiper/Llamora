@@ -181,22 +181,7 @@ chat-view[data-rendering="true"] #chat {
   position: relative;
 
   &.is-submitting {
-    box-shadow:
-      var(--raised-shadow),
-      inset 0 0 0 1px var(--accent-20);
-    transform: translateY(-1px);
-
-    /* subtle breathing highlight */
-    &::after {
-      content: "";
-      position: absolute;
-      inset: 3px;
-      border-radius: calc(var(--radius-lg) - 3px);
-      background: radial-gradient(circle at 18% 18%, rgba(54,166,244,0.15), transparent 58%);
-      mix-blend-mode: screen;
-      pointer-events: none;
-      animation: form-breathe var(--motion-breathe) ease-in-out infinite;
-    }
+    /* placeholder */
   }
 
   .input-wrapper {
@@ -229,7 +214,7 @@ chat-view[data-rendering="true"] #chat {
       }
 
       &:disabled {
-        background: color-mix(in srgb, var(--glass-bg-alt), white 3%);
+        background: color-mix(in srgb, var(--glass-bg-alt), var(--color-white) 3%);
       }
     }
 
@@ -252,20 +237,23 @@ chat-view[data-rendering="true"] #chat {
       transition: opacity 120ms ease-out, transform 120ms ease-out;
     }
 
-    /* submitting: swap arrow → spinner + add shimmer */
+    /* submitting: gradient in accent palette */
     .btn.submitting {
-      background:
-        linear-gradient(135deg, rgba(54,166,244,0.28) 0%, rgba(54,166,244,0.05) 55%, var(--glass-bg-alt) 100%);
+      background: linear-gradient(
+        135deg,
+        var(--accent-15) 0%,
+        var(--accent-05) 55%,
+        var(--glass-bg-alt) 100%
+      );
       background-size: 180% 180%;
-      animation: button-wave var(--motion-wave) ease-in-out infinite;
-      cursor: progress;
-      box-shadow: inset 0 0 0 1px rgba(54,166,244,0.18);
+      animation: button-wave calc(var(--motion-wave, 1.6s) * 1.05) ease-in-out infinite;
+      box-shadow:
+        inset 0 0 0 1px var(--accent-20),
+        0 0 8px var(--accent-drop-shadow);
     }
 
     .btn.submitting::before {
-      /* hide arrow while we spin */
       opacity: 0;
-      transform: translateY(-2px);
     }
 
     .btn.submitting::after {
@@ -274,17 +262,14 @@ chat-view[data-rendering="true"] #chat {
       width: 1.6rem;
       height: 1.6rem;
       border-radius: 999px;
-
-      border: 2.5px solid rgba(54,166,244,0.15);
-      border-top-color: rgba(54,166,244,0.75);
-      border-right-color: rgba(54,166,244,0.35);
-
+      border: 2.5px solid var(--accent-10);
+      border-top-color: var(--accent);
+      border-right-color: var(--accent-20);
       box-shadow:
-        0 0 6px rgba(54,166,244,0.35),
-        inset 0 0 3px rgba(255,255,255,0.45);
-
-      backdrop-filter: saturate(1.1);
+        0 0 6px var(--accent-drop-shadow),
+        inset 0 0 3px color-mix(in srgb, var(--color-white), transparent 55%);
       animation: spin 620ms linear infinite;
+      backdrop-filter: saturate(1.05);
       pointer-events: none;
     }
 
@@ -295,16 +280,6 @@ chat-view[data-rendering="true"] #chat {
     }
 
     .btn.stopping {
-      background: linear-gradient(
-        135deg,
-        var(--accent-15) 0%,
-        var(--accent-05) 55%,
-        var(--color-bg) 100%
-      );
-      background-size: 220% 220%;
-      background-position: 50% 0%;
-      animation: stopping-wave var(--motion-wave) ease-in-out infinite;
-      will-change: background-position, filter;
     }
 
     .btn.stopping:active {
@@ -476,7 +451,7 @@ scroll-bottom-button .scroll-btn {
   scroll-bottom-button .scroll-btn {
     scroll-bottom-button.visible & {
       animation: appear var(--motion-fade) ease-out,
-        breathe var(--motion-breathe) ease-in-out var(--motion-delay-short) infinite;
+                 breathe var(--motion-breathe) ease-in-out var(--motion-delay-short) infinite;
     }
   }
 
