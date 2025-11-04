@@ -177,7 +177,27 @@ chat-view[data-rendering="true"] #chat {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
-  transition: box-shadow var(--motion-sigh) ease;
+  transition: box-shadow var(--motion-sigh) ease, transform 140ms ease-out;
+  position: relative;
+
+  &.is-submitting {
+    box-shadow:
+      var(--raised-shadow),
+      inset 0 0 0 1px var(--accent-20);
+    transform: translateY(-1px);
+
+    /* subtle breathing highlight */
+    &::after {
+      content: "";
+      position: absolute;
+      inset: 3px;
+      border-radius: calc(var(--radius-lg) - 3px);
+      background: radial-gradient(circle at 18% 18%, rgba(54,166,244,0.15), transparent 58%);
+      mix-blend-mode: screen;
+      pointer-events: none;
+      animation: form-breathe var(--motion-breathe) ease-in-out infinite;
+    }
+  }
 
   .input-wrapper {
     display: flex;
@@ -207,6 +227,10 @@ chat-view[data-rendering="true"] #chat {
           inset 1px 1px 2px var(--shadow-dark-02),
           inset -1px -1px 2px var(--shadow-light-60);
       }
+
+      &:disabled {
+        background: color-mix(in srgb, var(--glass-bg-alt), white 3%);
+      }
     }
 
     button {
@@ -218,15 +242,58 @@ chat-view[data-rendering="true"] #chat {
       align-items: center;
       justify-content: center;
       position: relative;
+      overflow: hidden;
     }
 
+    /* default icon */
     .btn::before {
       content: "\27A4"; /* ➤ */
       pointer-events: none;
+      transition: opacity 120ms ease-out, transform 120ms ease-out;
     }
+
+    /* submitting: swap arrow → spinner + add shimmer */
+    .btn.submitting {
+      background:
+        linear-gradient(135deg, rgba(54,166,244,0.28) 0%, rgba(54,166,244,0.05) 55%, var(--glass-bg-alt) 100%);
+      background-size: 180% 180%;
+      animation: button-wave var(--motion-wave) ease-in-out infinite;
+      cursor: progress;
+      box-shadow: inset 0 0 0 1px rgba(54,166,244,0.18);
+    }
+
+    .btn.submitting::before {
+      /* hide arrow while we spin */
+      opacity: 0;
+      transform: translateY(-2px);
+    }
+
+    .btn.submitting::after {
+      content: "";
+      position: absolute;
+      width: 1.6rem;
+      height: 1.6rem;
+      border-radius: 999px;
+
+      border: 2.5px solid rgba(54,166,244,0.15);
+      border-top-color: rgba(54,166,244,0.75);
+      border-right-color: rgba(54,166,244,0.35);
+
+      box-shadow:
+        0 0 6px rgba(54,166,244,0.35),
+        inset 0 0 3px rgba(255,255,255,0.45);
+
+      backdrop-filter: saturate(1.1);
+      animation: spin 620ms linear infinite;
+      pointer-events: none;
+    }
+
     .btn.stopping::before {
       content: "\23F9"; /* ⏹ */
+      opacity: 1;
+      transform: none;
     }
+
     .btn.stopping {
       background: linear-gradient(
         135deg,
@@ -244,25 +311,40 @@ chat-view[data-rendering="true"] #chat {
       animation-play-state: paused;
     }
 
-    .btn.stopping:focus,
-    .btn.stopping:focus-visible {
-      animation-play-state: paused;
-      background-position: 50% 50%;
-    }
-
     textarea:disabled,
     button:disabled {
-      opacity: 0.5;
+      opacity: 0.6;
       cursor: default;
     }
   }
 }
 
+/* animations */
+@keyframes form-breathe {
+  0%   { opacity: 0.55; transform: scale(1); }
+  50%  { opacity: 0.85; transform: scale(1.01); }
+  100% { opacity: 0.55; transform: scale(1); }
+}
+
+@keyframes button-wave {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .input-wrapper .btn.stopping {
+  #message-form.is-submitting::after,
+  .input-wrapper .btn.submitting {
     animation: none;
     background-position: 50% 50%;
-    filter: none;
+  }
+  .input-wrapper .btn.submitting::after {
+    animation: none;
   }
 }
 
@@ -357,6 +439,15 @@ scroll-bottom-button .scroll-btn {
   50% {
     background-position: 50% 100%;
     filter: saturate(125%);
+  }
+}
+
+@keyframes submitting-wave {
+  0%, 100% {
+    background-position: 50% 0%;
+  }
+  50% {
+    background-position: 50% 90%;
   }
 }
 

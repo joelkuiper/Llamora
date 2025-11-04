@@ -18,6 +18,8 @@ class ChatFormElement extends ReactiveElement {
   #initialized = false;
   #shouldRestoreFocus = false;
   #pendingStreamingState = null;
+  #isSubmitting = false;
+  #isStreaming = false;
 
   connectedCallback() {
     super.connectedCallback();
@@ -111,6 +113,7 @@ class ChatFormElement extends ReactiveElement {
   }
 
   #teardown() {
+    this.#setSubmitting(false);
     this.#listeners = this.disposeListenerBag(this.#listeners);
     this.#stopListeners = this.disposeListenerBag(this.#stopListeners);
     this.#streamFocusListeners = this.disposeListenerBag(
@@ -118,6 +121,8 @@ class ChatFormElement extends ReactiveElement {
     );
     this.#shouldRestoreFocus = false;
     this.#initialized = false;
+    this.#isStreaming = false;
+    this.#isSubmitting = false;
   }
 
   #restoreDraft() {
@@ -152,6 +157,26 @@ class ChatFormElement extends ReactiveElement {
     };
     bag.add(this.#form, "htmx:afterRequest", onAfterRequest);
 
+    this.watchHtmxRequests(this.#form, {
+      bag,
+      within: this.#form,
+      onStart: () => {
+        if (!this.#isToday || this.#isStreaming) {
+          return;
+        }
+        this.#setSubmitting(true);
+      },
+      onEnd: (event) => {
+        if (
+          event?.type === "htmx:responseError" ||
+          event?.type === "htmx:sendError"
+        ) {
+          this.#setSubmitting(false);
+          this.setStreaming(false);
+        }
+      },
+    });
+
     const userTimeInput = this.#form.querySelector("#user-time");
     const onConfigRequest = (event) => {
       if (userTimeInput) {
@@ -172,7 +197,7 @@ class ChatFormElement extends ReactiveElement {
       if (this.#draftKey) {
         sessionStorage.setItem(this.#draftKey, this.#textarea.value);
       }
-      if (!this.#state?.currentStreamMsgId) {
+      if (!this.#state?.currentStreamMsgId && !this.#isSubmitting) {
         this.#button.disabled = !this.#textarea.value.trim();
       }
     };
@@ -182,7 +207,12 @@ class ChatFormElement extends ReactiveElement {
       if (e.isComposing || e.keyCode === 229) {
         return;
       }
-      if (e.key === "Enter" && !e.shiftKey) {
+      if (
+        e.key === "Enter" &&
+        !e.shiftKey &&
+        !this.#isSubmitting &&
+        !this.#isStreaming
+      ) {
         e.preventDefault();
         if (this.#textarea.value.trim()) {
           this.#form.requestSubmit();
@@ -236,6 +266,9 @@ class ChatFormElement extends ReactiveElement {
       this.#button.disabled = true;
       return;
     }
+
+    this.#isStreaming = !!streaming;
+    this.#setSubmitting(false);
 
     if (streaming) {
       this.#streamFocusListeners = this.disposeListenerBag(
@@ -326,6 +359,38 @@ class ChatFormElement extends ReactiveElement {
       this.#state.currentStreamMsgId = null;
     }
     this.setStreaming(false);
+  }
+
+  #setSubmitting(value) {
+    if (!this.#form || !this.#button || !this.#textarea) return;
+    if (value && !this.#isToday) {
+      return;
+    }
+
+    if (this.#isSubmitting === value) {
+      return;
+    }
+
+    this.#isSubmitting = value;
+
+    if (value) {
+      this.#form.classList.add("is-submitting");
+      this.#form.setAttribute("aria-busy", "true");
+      this.#button.classList.add("submitting");
+      this.#button.setAttribute("aria-busy", "true");
+      this.#textarea.disabled = true;
+      this.#button.disabled = true;
+    } else {
+      this.#form.classList.remove("is-submitting");
+      this.#form.removeAttribute("aria-busy");
+      this.#button.classList.remove("submitting");
+      this.#button.removeAttribute("aria-busy");
+      if (!this.#isToday || this.#isStreaming) {
+        return;
+      }
+      this.#textarea.disabled = false;
+      this.#button.disabled = !this.#textarea.value.trim();
+    }
   }
 }
 
