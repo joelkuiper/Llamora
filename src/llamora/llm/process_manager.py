@@ -86,6 +86,7 @@ class LlamafileProcessManager:
         cfg_server_args.update(_normalise_arg_keys(_to_plain_dict(server_args)))
 
         self._ctx_size = cfg_server_args.get("ctx_size")
+        self._server_props: dict[str, Any] | None = None
         args_parallel = cfg_server_args.get("parallel")
         default_parallel = _coerce_parallel(args_parallel)
         configured_parallel = server_cfg.get("parallel")
@@ -100,6 +101,7 @@ class LlamafileProcessManager:
             self.server_url = host
             self.cmd: list[str] | None = None
             self.logger.info("Using external llama server at %s", host)
+            self._refresh_server_metadata()
         else:
             if not llamafile_path:
                 raise ValueError(
@@ -130,6 +132,10 @@ class LlamafileProcessManager:
     def ctx_size(self) -> int | None:
         return self._ctx_size
 
+    @property
+    def server_props(self) -> dict[str, Any] | None:
+        return self._server_props
+
     def base_url(self) -> str:
         return self.server_url
 
@@ -141,6 +147,8 @@ class LlamafileProcessManager:
         if getattr(self, "cmd", None) is None:
             if not self._is_server_healthy():
                 raise RuntimeError("LLM service is unavailable")
+            if self._server_props is None or self._ctx_size is None:
+                self._refresh_server_metadata()
             return
 
         if self.proc is None:
@@ -148,6 +156,8 @@ class LlamafileProcessManager:
 
         if self.proc.poll() is not None or not self._is_server_healthy():
             self._restart_server()
+        elif self._server_props is None or self._ctx_size is None:
+            self._refresh_server_metadata()
 
     def shutdown(self) -> None:
         self.logger.info("Shutting called")
@@ -328,6 +338,7 @@ class LlamafileProcessManager:
             ).start()
         self._wait_until_ready()
         self._write_state()
+        self._refresh_server_metadata()
         self.restart_attempts = 0
 
     def _is_server_healthy(self) -> bool:
@@ -336,6 +347,55 @@ class LlamafileProcessManager:
             return resp.json().get("status") == "ok"
         except Exception:
             return False
+
+    def _refresh_server_metadata(self) -> None:
+        try:
+            resp = httpx.get(f"{self.server_url}/props", timeout=2.0)
+            resp.raise_for_status()
+        except Exception:
+            self.logger.debug("Failed to fetch llama server props", exc_info=True)
+            return
+
+        try:
+            data = resp.json()
+        except Exception:
+            self.logger.debug("Failed to parse llama server props", exc_info=True)
+            return
+
+        if not isinstance(data, Mapping):
+            return
+
+        self._server_props = dict(data)
+
+        ctx_size = None
+        default_settings = data.get("default_generation_settings")
+        if isinstance(default_settings, Mapping):
+            ctx_size = default_settings.get("n_ctx")
+            if ctx_size is None and isinstance(
+                default_settings.get("params"), Mapping
+            ):
+                ctx_size = default_settings["params"].get("n_ctx")
+        if ctx_size is None:
+            ctx_size = data.get("n_ctx")
+
+        try:
+            if ctx_size is not None:
+                ctx_value = int(ctx_size)
+                if ctx_value > 0:
+                    self._ctx_size = ctx_value
+        except (TypeError, ValueError):
+            self.logger.debug("Ignoring invalid ctx size from server props", exc_info=True)
+
+        total_slots = data.get("total_slots")
+        try:
+            if total_slots is not None:
+                slots_value = int(total_slots)
+                if slots_value > 0:
+                    self._parallel_slots = slots_value
+        except (TypeError, ValueError):
+            self.logger.debug(
+                "Ignoring invalid total_slots from server props", exc_info=True
+            )
 
     def _restart_server(self) -> None:
         if not getattr(self, "cmd", None):

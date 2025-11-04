@@ -185,6 +185,7 @@ class LLMClient:
         self.process_manager = process_manager
         self.default_request = {**DEFAULT_LLM_REQUEST, **(default_request or {})}
         self.ctx_size = process_manager.ctx_size
+        self.server_props = process_manager.server_props
         self._client = httpx.AsyncClient(
             timeout=None, transport=httpx.AsyncHTTPTransport(retries=0)
         )
