@@ -119,17 +119,32 @@ export class ChatView extends ReactiveElement {
     const finalize = () => {
       if (this.#chat === chat) {
         this.#setRenderingState(false);
-        this.#applyPendingScrollTarget();
+        this.#queuePendingScrollTarget();
       }
     };
 
-    if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(finalize);
-      });
-    } else {
-      window.setTimeout(finalize, 0);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(finalize);
+    });
+  }
+
+  #queuePendingScrollTarget() {
+    if (!this.#pendingScrollTarget) {
+      return;
     }
+
+    window.requestAnimationFrame(() => {
+      if (!this.#pendingScrollTarget) {
+        return;
+      }
+
+      if (this.hasAttribute("data-rendering")) {
+        this.#queuePendingScrollTarget();
+        return;
+      }
+
+      this.#applyPendingScrollTarget();
+    });
   }
 
   #applyPendingScrollTarget() {
@@ -144,12 +159,7 @@ export class ChatView extends ReactiveElement {
 
     const isVisible = this.offsetParent !== null && chat.offsetParent !== null;
     if (!isVisible) {
-      const schedule =
-        typeof window !== "undefined" && typeof window.requestAnimationFrame === "function"
-          ? window.requestAnimationFrame.bind(window)
-          : (callback) => window.setTimeout(callback, 16);
-
-      schedule(() => this.#applyPendingScrollTarget());
+      window.requestAnimationFrame(() => this.#applyPendingScrollTarget());
       return;
     }
 
@@ -220,6 +230,10 @@ export class ChatView extends ReactiveElement {
 
     this.#state = { currentStreamMsgId: null };
     this.#chat = chat;
+
+    if (this.#pendingScrollTarget) {
+      this.#queuePendingScrollTarget();
+    }
 
     const activeDay = chatDate || null;
     const activeDayLabel = chat?.dataset?.longDate ?? null;
