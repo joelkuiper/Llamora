@@ -97,6 +97,7 @@ export class ChatView extends ReactiveElement {
   #initialized = false;
   #lastRenderedDay = null;
   #chatFormReady = Promise.resolve();
+  #pendingScrollTarget = null;
 
   constructor() {
     super();
@@ -118,6 +119,7 @@ export class ChatView extends ReactiveElement {
     const finalize = () => {
       if (this.#chat === chat) {
         this.#setRenderingState(false);
+        this.#applyPendingScrollTarget();
       }
     };
 
@@ -128,6 +130,31 @@ export class ChatView extends ReactiveElement {
     } else {
       window.setTimeout(finalize, 0);
     }
+  }
+
+  #applyPendingScrollTarget() {
+    if (!this.#pendingScrollTarget) {
+      return;
+    }
+
+    const chat = this.#chat;
+    if (!chat || !this.isConnected) {
+      return;
+    }
+
+    const isVisible = this.offsetParent !== null && chat.offsetParent !== null;
+    if (!isVisible) {
+      const schedule =
+        typeof window !== "undefined" && typeof window.requestAnimationFrame === "function"
+          ? window.requestAnimationFrame.bind(window)
+          : (callback) => window.setTimeout(callback, 16);
+
+      schedule(() => this.#applyPendingScrollTarget());
+      return;
+    }
+
+    scrollToHighlight(this.#pendingScrollTarget);
+    this.#pendingScrollTarget = null;
   }
 
   connectedCallback() {
@@ -173,6 +200,8 @@ export class ChatView extends ReactiveElement {
   ) {
     this.#initialized = false;
     this.#teardown();
+
+    this.#pendingScrollTarget = this.dataset?.scrollTarget || null;
 
     setTimezoneCookie();
 
@@ -275,7 +304,6 @@ export class ChatView extends ReactiveElement {
     chatFormReady.then(() => this.#updateStreamingState());
 
     initDayNav(chat, { activeDay, label: activeDayLabel });
-    scrollToHighlight(this.dataset.scrollTarget);
 
     if (activeDayLabel) {
       document.title = activeDayLabel;
@@ -324,6 +352,7 @@ export class ChatView extends ReactiveElement {
     this.#chatForm = null;
     this.#state = null;
     this.#chatFormReady = Promise.resolve();
+    this.#pendingScrollTarget = null;
   }
 
   #handleChatBeforeSwap(event) {
