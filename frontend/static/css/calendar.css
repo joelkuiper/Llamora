@@ -20,6 +20,19 @@
   }
 }
 
+#calendar-btn #calendar-label {
+  --calendar-label-rest-color: var(--color-text);
+  --calendar-label-highlight-color: var(--accent);
+  color: var(--calendar-label-rest-color);
+  transition: color var(--motion-gentle) ease;
+}
+
+#calendar-btn:hover #calendar-label,
+#calendar-btn:focus-visible #calendar-label,
+#calendar-btn.active #calendar-label {
+  --calendar-label-rest-color: var(--accent);
+}
+
 #calendar-label {
   margin-left: var(--spacing-sm);
   font-family: var(--font-base);
@@ -63,12 +76,12 @@
 
 @keyframes calTextGlow{
   0%{
-    color: var(--color-text);
+    color: var(--calendar-label-rest-color);
     text-shadow: 0 0 0 rgba(31,151,242,0);
     filter: none;
   }
   35%{
-    color: var(--accent);
+    color: var(--calendar-label-highlight-color);
     text-shadow:
       0 0 .2rem  var(--accent-20),
       0 0 .45rem var(--accent-30),
@@ -76,7 +89,7 @@
     filter: saturate(1.05);
   }
   100%{
-    color: var(--color-text);
+    color: var(--calendar-label-rest-color);
     text-shadow: none;
     filter: none;
   }
@@ -86,8 +99,8 @@
 @media (prefers-reduced-motion: reduce){
   #calendar-label.text-glow-flash{ animation: calTextGlowReduce var(--motion-delay-short) ease-out; }
   @keyframes calTextGlowReduce{
-    0%   { color: var(--accent); text-shadow: none; }
-    100% { color: var(--color-text); text-shadow: none; }
+    0%   { color: var(--calendar-label-highlight-color); text-shadow: none; }
+    100% { color: var(--calendar-label-rest-color); text-shadow: none; }
   }
 }
 
