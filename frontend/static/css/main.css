@@ -647,14 +647,17 @@ input[type="checkbox"]:focus {
 
 /* Alerts */
 #errors {
-  position: sticky;
-  top: 0;
-  z-index: 1000;
+  position: fixed;
+  top: var(--spacing-lg);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2000;
   display: grid;
   gap: var(--spacing-sm);
-  padding: var(--spacing-sm);
-  margin: 0 auto;
-  width: min(100%, 64rem);
+  padding: 0 var(--spacing-md);
+  margin: 0;
+  width: min(92vw, 32rem);
+  pointer-events: none;
 }
 
 #errors:empty {
@@ -680,6 +683,8 @@ input[type="checkbox"]:focus {
   transition: transform var(--motion-hover) ease, box-shadow var(--motion-hover) ease;
   background: var(--color-bg-alt);
   color: var(--color-text);
+  pointer-events: auto;
+  animation: toast-in 160ms ease;
 
   &.alert--danger {
     background: var(--color-error-bg);
@@ -695,6 +700,10 @@ input[type="checkbox"]:focus {
 
   &:hover {
     box-shadow: var(--raised-shadow);
+  }
+
+  &.alert--leaving {
+    animation: toast-out 180ms ease forwards;
   }
 }
 
@@ -724,6 +733,30 @@ input[type="checkbox"]:focus {
   &:focus-visible {
     color: var(--accent-hover);
     background: color-mix(in srgb, currentColor, transparent 88%);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-0.5rem) scale(0.96);
   }
 }
 
