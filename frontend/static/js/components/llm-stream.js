@@ -235,6 +235,16 @@ class LlmStreamElement extends HTMLElement {
     if (this.#sink) {
       this.#sink.textContent = this.#text;
     }
+    const shouldEagerRender =
+      this.#markdown?.dataset.rendered !== "true" &&
+      !this.#renderCooldownTimer &&
+      !this.#renderFrame;
+
+    if (shouldEagerRender) {
+      this.#renderNow({ repositionTyping: true, shouldScroll: true });
+      return;
+    }
+
     this.#scheduleRender({ repositionTyping: true, shouldScroll: true });
   }
 
