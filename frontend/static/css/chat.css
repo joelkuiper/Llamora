@@ -375,7 +375,6 @@ scroll-bottom-button .scroll-btn {
   #chat {
     #typing-indicator {
       animation: blink var(--motion-blink) step-start infinite;
-      animation-delay: calc(var(--motion-blink) * -0.5);
     }
 
     #typing-indicator.stopped {
