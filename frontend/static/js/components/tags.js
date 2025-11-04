@@ -165,6 +165,7 @@ export class Tags extends BaseHTMLElement {
       getPanel: () => this.#panel,
       onShow: () => {
         this.#button.classList.add("active");
+        this.classList.add("popover-open");
         if (this.#suggestions && !this.#suggestions.dataset.loaded) {
           htmx.trigger(this.#suggestions, "tag-popover:show");
         }
@@ -176,6 +177,7 @@ export class Tags extends BaseHTMLElement {
         this.#button.classList.remove("active");
       },
       onHidden: () => {
+        this.classList.remove("popover-open");
         if (this.#suggestions) {
           this.#suggestions.innerHTML = "";
           delete this.#suggestions.dataset.loaded;
@@ -193,6 +195,7 @@ export class Tags extends BaseHTMLElement {
       this.#popover = null;
     }
     this.#button?.classList.remove("active");
+    this.classList.remove("popover-open");
   }
 
   #togglePopover() {

@@ -6,8 +6,16 @@
   /* flex-direction: row-reverse; */
   opacity: 0.66;
   transition: opacity var(--motion-gentle) ease;
-  &:hover {
+
+  &:hover,
+  &:focus-within,
+  &.popover-open {
     opacity: 1;
+  }
+
+  &.popover-open {
+    position: relative;
+    z-index: 1050;
   }
 }
 
@@ -16,13 +24,13 @@
 }
 
 .meta-chip {
-  background: var(--color-bg);
+  background: var(--glass-bg-alt);
   box-shadow: var(--inset-shadow);
   border-radius: var(--radius-md);
   font-size: 0.75rem;
   border: 1px solid var(--border);
   text-decoration: none;
-  color: var(--color-text);
+  color: var(--glass-text-stronger);
   cursor: pointer;
   transition:
     box-shadow var(--motion-gentle) ease,
@@ -44,7 +52,7 @@
   box-shadow:
     var(--raised-shadow),
     0 0 0 2px var(--accent-10);
-  background: linear-gradient(0deg, rgba(59,167,246,0.16), rgba(59,167,246,0.12)) var(--color-bg);
+  background: linear-gradient(0deg, rgba(59,167,246,0.16), rgba(59,167,246,0.12)) var(--glass-bg-alt);
 }
 
 .meta-chip:focus,
@@ -127,7 +135,7 @@
 }
 
 .add-tag-btn {
-  background: var(--color-bg);
+  background: var(--glass-bg-alt);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 2px 6px;
@@ -140,11 +148,11 @@
     border-color var(--motion-gentle) ease,
     transform var(--motion-press) ease,
     background-color var(--motion-gentle) ease;
+  color: var(--glass-text-stronger);
 
   &:active {
     transform: translateY(1px);
     box-shadow: var(--inset-shadow-disabled);
-
   }
 }
 
@@ -254,7 +262,7 @@
   }
 
   .tag-suggestion {
-    background: var(--color-bg);
+    background: var(--glass-bg-alt);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     padding: 2px 8px;
@@ -262,11 +270,12 @@
     box-shadow: var(--inset-shadow);
     cursor: pointer;
     transition: box-shadow var(--motion-gentle) ease, border-color var(--motion-fade) ease, background-color var(--motion-fade) ease, transform var(--motion-press) ease;
+    color: var(--glass-text-stronger);
 
     &:hover {
       border-color: var(--accent);
       box-shadow: var(--raised-shadow), 0 0 0 2px var(--accent-10);
-      background: linear-gradient(0deg, rgba(59,167,246,0.16), rgba(59,167,246,0.12)) var(--color-bg);
+      background: linear-gradient(0deg, rgba(59,167,246,0.16), rgba(59,167,246,0.12)) var(--glass-bg-alt);
     }
     &:active { transform: translateY(1px); }
   }
