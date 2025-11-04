@@ -23,7 +23,7 @@
               data-autocomplete-limit="12"
               {% if hidden %}hidden{% endif %}>
     <button
-      data-tooltip-title="Add tags"
+      data-tooltip-title="Add traces"
       type="button"
       class="add-tag-btn">
       <svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -45,7 +45,7 @@
               hx-swap="beforeend">
           <input type="text"
                  name="tag"
-                 placeholder="Add a tag"
+                 placeholder="Something memorable…"
                  maxlength="{{ config.MAX_TAG_LENGTH }}"
                  autocomplete="off">
           <button type="submit" disabled>Add</button>
