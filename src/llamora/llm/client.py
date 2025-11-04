@@ -133,6 +133,20 @@ class _CompletionStream:
                         else "LLM server disconnected"
                     )
                     await self._emit({"type": "error", "data": msg})
+        except httpx.HTTPStatusError as e:
+            response = e.response
+            status_line = str(e)
+            body: bytes | None = None
+            if response is not None:
+                status_line = f"{response.status_code} {response.reason_phrase or ''}".strip()
+                try:
+                    body = await response.aread()
+                except Exception:
+                    body = None
+            detail = self._client._normalize_response_detail(body, status_line)
+            self._client.logger.error("Completion request failed (%s): %s", status_line, detail)
+            self._client.process_manager.ensure_server_running()
+            await self._emit({"type": "error", "data": detail})
         except HTTPError as e:
             self._client.process_manager.ensure_server_running()
             await self._emit({"type": "error", "data": f"HTTP error: {e}"})
@@ -198,6 +212,73 @@ class LLMClient:
 
         with open(GRAMMAR_PATH, "r", encoding="utf-8") as gf:
             self.grammar = gf.read()
+
+    @staticmethod
+    def _normalize_response_detail(
+        body: bytes | str | None,
+        fallback: str,
+    ) -> str:
+        """Derive a human-readable error message from an HTTP response body."""
+
+        fallback = fallback.strip() or "HTTP error"
+        if body is None:
+            return fallback
+
+        if isinstance(body, (bytes, bytearray)):
+            text = body.decode("utf-8", "replace")
+        else:
+            text = str(body)
+
+        text = text.strip()
+        if not text:
+            return fallback
+
+        try:
+            payload = orjson.loads(text)
+        except Exception:
+            return text
+
+        if isinstance(payload, dict):
+            for key in ("detail", "message", "error"):
+                if key in payload:
+                    detail = LLMClient._stringify_detail(payload[key])
+                    if detail:
+                        return detail
+            detail = LLMClient._stringify_detail(payload)
+            if detail:
+                return detail
+            return fallback
+
+        detail = LLMClient._stringify_detail(payload)
+        return detail or fallback
+
+    @staticmethod
+    def _stringify_detail(value: Any) -> str | None:
+        """Convert nested JSON detail values into a readable string."""
+
+        if value is None:
+            return None
+        if isinstance(value, str):
+            value = value.strip()
+            return value or None
+        if isinstance(value, (bytes, bytearray)):
+            decoded = value.decode("utf-8", "replace").strip()
+            return decoded or None
+        if isinstance(value, (list, tuple, set)):
+            parts = [
+                part
+                for part in (LLMClient._stringify_detail(item) for item in value)
+                if part
+            ]
+            if parts:
+                return ", ".join(parts)
+            return None
+        if isinstance(value, dict):
+            try:
+                return orjson.dumps(value).decode()
+            except Exception:
+                return str(value)
+        return str(value).strip() or None
 
     @property
     def server_url(self) -> str:

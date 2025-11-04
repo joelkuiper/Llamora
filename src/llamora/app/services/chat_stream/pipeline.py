@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from html import escape
 from typing import Awaitable, Callable, Protocol
 
 from llamora.app.services.chat_meta import ChatMetaParser, build_meta
@@ -308,12 +307,12 @@ class ResponsePipeline:
     def _append_status_line(text: str, message: str) -> str:
         if not message:
             return text
-        safe_message = escape(message)
+        status_message = message
         if text:
             separator = "\n\n" if not text.endswith("\n") else "\n"
         else:
             separator = ""
-        return f"{text}{separator}⚠️ {safe_message}"
+        return f"{text}{separator}⚠️ {status_message}"
 
 
 __all__ = [
