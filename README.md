@@ -180,3 +180,39 @@ The system supports both llama.cpp servers and llamafile binaries through the sa
 * Type check: `uv run pyright`
 * Config lives in: `config/settings.toml` and `config/settings.local.toml`
 * Debug mode: `QUART_DEBUG=1`
+
+  
+---
+
+## Deployment (not recommended)
+
+Llamora is a personal experiment and **not production-ready**.
+If you still deploy it, set the required secrets and runtime vars:
+
+```bash
+# Required
+export LLAMORA_SECURITY__SECRET_KEY=$(openssl rand -hex 32)
+export LLAMORA_COOKIES__SECRET=$(openssl rand -base64 32)
+
+# Backend and runtime
+export LLAMORA_LLM__SERVER__HOST=http://127.0.0.1:8081
+export LLAMORA_DATABASE__PATH=data/llamora.sqlite3
+export LLAMORA_CRYPTO__DEK_STORAGE=session
+export LLAMORA_SESSION__TTL=604800
+```
+
+Optional overrides follow the same structure, e.g.:
+
+```bash
+export LLAMORA_FEATURES__DISABLE_REGISTRATION=true
+```
+
+Then start:
+
+```bash
+uv run llamora-server
+```
+
+Use `.env` or `config/settings.local.toml` for persistent configuration.
+
+❗ **This project is a personal learning experiment. It is not production-ready. Deploying this project as-is is discouraged. Use at your own risk.**
