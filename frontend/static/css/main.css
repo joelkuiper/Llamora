@@ -1,3 +1,6 @@
+/* ==========================================================================
+   Theme Tokens
+   ========================================================================= */
 
 :root {
   color-scheme: light;
@@ -246,6 +249,10 @@
 
 }
 
+/* ==========================================================================
+   Dark Theme Overrides
+   ========================================================================= */
+
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
@@ -330,6 +337,10 @@
   }
 }
 
+/* ==========================================================================
+   Base Elements
+   ========================================================================= */
+
 * { box-sizing: border-box; }
 
 html, body {
@@ -342,6 +353,7 @@ html, body {
   color: var(--brand-text);
 }
 
+/* Accessibility helpers */
 .visually-hidden {
   position: absolute !important;
   width: 1px;
@@ -397,59 +409,9 @@ html, body {
   }
 }
 
-/* Shared overlay animations */
-@keyframes lull-in {
-  from {
-    opacity: 0;
-    transform: translate3d(0, -6px, 0) scale(0.985);
-    filter: blur(1px) saturate(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-    filter: blur(0) saturate(1);
-  }
-}
-
-@keyframes lull-out {
-  from {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-    filter: blur(0) saturate(1);
-  }
-  to {
-    opacity: 0;
-    transform: translate3d(0, -6px, 0) scale(0.985);
-    filter: blur(1px) saturate(0.96);
-  }
-}
-
-
-.pop-enter {
-  animation: lull-in var(--motion-lull) ease both;
-}
-
-.pop-exit {
-  animation: lull-out var(--motion-lull) ease both;
-}
-
-.fade-enter {
-  animation: fade-in var(--motion-lull) ease both;
-}
-
-.fade-exit {
-  animation: fade-out var(--motion-lull) ease both;
-}
-
-@keyframes fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-@keyframes fade-out {
-  from { opacity: 1; }
-  to   { opacity: 0; }
-}
+/* ==========================================================================
+   Buttons & Form Controls
+   ========================================================================= */
 
 /* Utility classes */
 .btn {
@@ -648,6 +610,10 @@ input[type="checkbox"]:focus {
   transition: all 0.3 ease;
 }
 
+/* ==========================================================================
+   Feedback & Messaging
+   ========================================================================= */
+
 /* Alerts */
 #errors {
   position: fixed;
@@ -739,30 +705,6 @@ input[type="checkbox"]:focus {
   }
 }
 
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(-0.5rem) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes toast-out {
-  from {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-
-  to {
-    opacity: 0;
-    transform: translateY(-0.5rem) scale(0.96);
-  }
-}
-
 /* Full-page error */
 .error-page {
   height: 80vh;
@@ -795,17 +737,9 @@ input[type="checkbox"]:focus {
 }
 
 
-.no-anim {
-  animation: none !important;
-  transition: none !important;
-}
-
-/* Reduce motion preference */
-@media (prefers-reduced-motion: reduce) {
-  * { animation: none !important;
-      transition: none !important;
-    }
-}
+/* ==========================================================================
+   Interactive Elements
+   ========================================================================= */
 
 .icon-btn {
   background: none;
@@ -1014,5 +948,102 @@ input[type="checkbox"]:focus {
     .bar.strength-2 { background: var(--password-strength-2); }
     .bar.strength-3 { background: var(--password-strength-3); }
     .bar.strength-4 { background: var(--password-strength-4); }
+  }
+}
+
+/* ==========================================================================
+   Motion Utilities
+   ========================================================================= */
+
+.no-anim {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Reduce motion preference */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.pop-enter {
+  animation: lull-in var(--motion-lull) ease both;
+}
+
+.pop-exit {
+  animation: lull-out var(--motion-lull) ease both;
+}
+
+.fade-enter {
+  animation: fade-in var(--motion-lull) ease both;
+}
+
+.fade-exit {
+  animation: fade-out var(--motion-lull) ease both;
+}
+
+/* ==========================================================================
+   Animations
+   ========================================================================= */
+
+@keyframes lull-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -6px, 0) scale(0.985);
+    filter: blur(1px) saturate(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0) saturate(1);
+  }
+}
+
+@keyframes lull-out {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0) saturate(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(0, -6px, 0) scale(0.985);
+    filter: blur(1px) saturate(0.96);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-0.5rem) scale(0.96);
   }
 }
