@@ -74,7 +74,7 @@ You can write freely, think aloud, or stay in silence.
 ### Create and activate a virtual environment
 
    ```bash
-   uv venv
+   uv sync
    source .venv/bin/activate
    ```
 
