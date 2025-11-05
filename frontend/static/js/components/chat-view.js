@@ -97,6 +97,7 @@ export class ChatView extends ReactiveElement {
   #initialized = false;
   #lastRenderedDay = null;
   #chatFormReady = Promise.resolve();
+  #pendingScrollTarget = null;
 
   constructor() {
     super();
@@ -118,16 +119,52 @@ export class ChatView extends ReactiveElement {
     const finalize = () => {
       if (this.#chat === chat) {
         this.#setRenderingState(false);
+        this.#queuePendingScrollTarget();
       }
     };
 
-    if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(finalize);
-      });
-    } else {
-      window.setTimeout(finalize, 0);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(finalize);
+    });
+  }
+
+  #queuePendingScrollTarget() {
+    if (!this.#pendingScrollTarget) {
+      return;
     }
+
+    window.requestAnimationFrame(() => {
+      if (!this.#pendingScrollTarget) {
+        return;
+      }
+
+      if (this.hasAttribute("data-rendering")) {
+        this.#queuePendingScrollTarget();
+        return;
+      }
+
+      this.#applyPendingScrollTarget();
+    });
+  }
+
+  #applyPendingScrollTarget() {
+    if (!this.#pendingScrollTarget) {
+      return;
+    }
+
+    const chat = this.#chat;
+    if (!chat || !this.isConnected) {
+      return;
+    }
+
+    const isVisible = this.offsetParent !== null && chat.offsetParent !== null;
+    if (!isVisible) {
+      window.requestAnimationFrame(() => this.#applyPendingScrollTarget());
+      return;
+    }
+
+    scrollToHighlight(this.#pendingScrollTarget);
+    this.#pendingScrollTarget = null;
   }
 
   connectedCallback() {
@@ -174,6 +211,8 @@ export class ChatView extends ReactiveElement {
     this.#initialized = false;
     this.#teardown();
 
+    this.#pendingScrollTarget = this.dataset?.scrollTarget || null;
+
     setTimezoneCookie();
 
     if (!chat) {
@@ -191,6 +230,10 @@ export class ChatView extends ReactiveElement {
 
     this.#state = { currentStreamMsgId: null };
     this.#chat = chat;
+
+    if (this.#pendingScrollTarget) {
+      this.#queuePendingScrollTarget();
+    }
 
     const activeDay = chatDate || null;
     const activeDayLabel = chat?.dataset?.longDate ?? null;
@@ -275,7 +318,6 @@ export class ChatView extends ReactiveElement {
     chatFormReady.then(() => this.#updateStreamingState());
 
     initDayNav(chat, { activeDay, label: activeDayLabel });
-    scrollToHighlight(this.dataset.scrollTarget);
 
     if (activeDayLabel) {
       document.title = activeDayLabel;
@@ -324,6 +366,7 @@ export class ChatView extends ReactiveElement {
     this.#chatForm = null;
     this.#state = null;
     this.#chatFormReady = Promise.resolve();
+    this.#pendingScrollTarget = null;
   }
 
   #handleChatBeforeSwap(event) {
