@@ -108,7 +108,7 @@ Even embeddings and indexes are decrypted only in memory after login.
 
 Llamora’s configuration system is built on **Dynaconf**.
 Values are read in layers: defaults → `settings.local.toml` → `.env` → environment variables.
-Keys use **double underscores** to represent sections, for example:
+Keys use double underscores to represent sections, for example:
 
 ```
 LLAMORA_LLM__REQUEST__TEMPERATURE=0.7
