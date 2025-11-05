@@ -76,7 +76,10 @@ export class CalendarControl extends HTMLElement {
     document.body.addEventListener("htmx:historyRestore", handleSwap, { signal });
     const handleBeforeCache = () => {
       this.#teardownState();
-      this.#btn?.classList.remove("active");
+      if (this.#btn) {
+        this.#btn.classList.remove("active");
+        this.#btn.setAttribute("aria-expanded", "false");
+      }
       if (this.#pop) {
         this.#pop.hidden = true;
         this.#pop.innerHTML = "";
@@ -149,10 +152,12 @@ export class CalendarControl extends HTMLElement {
       getPanel: () => pop.querySelector("#calendar"),
       onShow: () => {
         btn.classList.add("active");
+        btn.setAttribute("aria-expanded", "true");
         htmx.trigger(pop, "calendar-popover:show");
       },
       onHide: () => {
         btn.classList.remove("active");
+        btn.setAttribute("aria-expanded", "false");
       },
       onHidden: () => {
         pop.innerHTML = "";

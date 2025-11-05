@@ -831,7 +831,7 @@ input[type="checkbox"]:focus {
     background: var(--accent-20);
     color: var(--accent-active);
     opacity: 1;
-    transform: scale(0.94);
+    transform: scale(0.98);
   }
 
   &:focus-visible {
