@@ -6,10 +6,7 @@ Just your words, your thoughts, and a model that listens quietly on your own mac
 
 Each day begins fresh at midnight, when Llamora opens a new page and offers a short reflection on the day before.
 You can write freely, think aloud, or stay in silence.
-The app responds with warmth and clarity, as if you were writing to a thoughtful friend.
 
-It’s a space for reflection, not performance.
-A small, calm place for language and presence.
 ---
 
 ### Screenshots
