@@ -827,6 +827,13 @@ input[type="checkbox"]:focus {
     transform: scale(1.1);
   }
 
+  &:active {
+    background: var(--accent-20);
+    color: var(--accent-active);
+    opacity: 1;
+    transform: scale(0.94);
+  }
+
   &:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
@@ -839,9 +846,10 @@ input[type="checkbox"]:focus {
 }
 
 .icon-btn.active {
-  background: var(--accent-10);
-  color: var(--accent);
+  background: var(--accent-15);
+  color: var(--accent-active);
   opacity: 1;
+  box-shadow: inset 0 0 0 1px var(--accent-30);
 }
 
 /* Generic overlay close button */
