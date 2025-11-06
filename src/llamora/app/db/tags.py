@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Sequence
 
 from aiosqlitepool import SQLiteConnectionPool
 from ulid import ULID
@@ -144,6 +144,54 @@ class TagsRepository(BaseRepository):
             )
             tags.append({"name": tag_name, "hash": row["tag_hash"].hex()})
         return tags
+
+    async def get_tags_for_messages(
+        self,
+        user_id: str,
+        message_ids: Sequence[str],
+        dek: bytes,
+    ) -> dict[str, list[dict]]:
+        """Return decrypted tags for each message in ``message_ids``."""
+
+        ids = [mid for mid in message_ids if mid]
+        if not ids:
+            return {}
+
+        placeholders = ",".join("?" for _ in ids)
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                f"""
+                SELECT x.message_id,
+                       t.tag_hash,
+                       t.name_ct,
+                       t.name_nonce,
+                       t.alg AS tag_alg,
+                       x.ulid
+                FROM tag_message_xref x
+                JOIN tags t
+                  ON t.user_id = x.user_id AND t.tag_hash = x.tag_hash
+                WHERE x.user_id = ? AND x.message_id IN ({placeholders})
+                ORDER BY x.message_id ASC, x.ulid ASC
+                """,
+                (user_id, *ids),
+            )
+            rows = await cursor.fetchall()
+
+        mapping: dict[str, list[dict]] = {}
+        for row in rows:
+            tag_name = cached_tag_name(
+                user_id,
+                row["tag_hash"],
+                row["name_nonce"],
+                row["name_ct"],
+                row["tag_alg"].encode(),
+                dek,
+                self._decrypt_message,
+            )
+            mapping.setdefault(row["message_id"], []).append(
+                {"name": tag_name, "hash": row["tag_hash"].hex()}
+            )
+        return mapping
 
     async def get_tag_frecency(
         self, user_id: str, limit: int, lambda_: Any, dek: bytes
@@ -293,26 +341,33 @@ class TagsRepository(BaseRepository):
 
         return results
 
-    async def get_messages_with_tag_hashes(
-        self, user_id: str, tag_hashes: list[bytes], message_ids: list[str]
-    ) -> dict[str, set[bytes]]:
-        if not tag_hashes or not message_ids:
+    async def get_tag_match_counts(
+        self, user_id: str, tag_hashes: Sequence[bytes], message_ids: Sequence[str]
+    ) -> dict[str, int]:
+        """Return the number of matching tag hashes for each ``message_id``."""
+
+        tags = [digest for digest in tag_hashes if digest]
+        ids = [mid for mid in message_ids if mid]
+        if not tags or not ids:
             return {}
-        tag_placeholders = ",".join("?" * len(tag_hashes))
-        msg_placeholders = ",".join("?" * len(message_ids))
+
+        tag_placeholders = ",".join("?" * len(tags))
+        msg_placeholders = ",".join("?" * len(ids))
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 f"""
-                SELECT message_id, tag_hash FROM tag_message_xref
-                WHERE user_id = ? AND tag_hash IN ({tag_placeholders}) AND message_id IN ({msg_placeholders})
+                SELECT message_id, COUNT(*) AS match_count
+                FROM tag_message_xref
+                WHERE user_id = ?
+                  AND tag_hash IN ({tag_placeholders})
+                  AND message_id IN ({msg_placeholders})
+                GROUP BY message_id
                 """,
-                (user_id, *tag_hashes, *message_ids),
+                (user_id, *tags, *ids),
             )
             rows = await cursor.fetchall()
-        mapping: dict[str, set[bytes]] = {}
-        for row in rows:
-            mapping.setdefault(row["message_id"], set()).add(row["tag_hash"])
-        return mapping
+
+        return {row["message_id"]: int(row["match_count"]) for row in rows}
 
     async def get_recent_messages_for_tag_hashes(
         self,

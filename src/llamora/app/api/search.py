@@ -2,7 +2,7 @@ import logging
 import re
 import time
 from collections import OrderedDict
-from typing import Sequence, Tuple
+from typing import Any, Sequence, Tuple
 
 import orjson
 
@@ -10,7 +10,7 @@ from llamora.settings import settings
 from llamora.app.services.index_worker import IndexWorker
 from llamora.app.services.vector_search import VectorSearchService
 from llamora.app.services.lexical_reranker import LexicalReranker
-from llamora.app.util.tags import canonicalize, tag_hash
+from llamora.app.util.tags import canonicalize, display, tag_hash
 
 
 TOKEN_PATTERN = re.compile(r"\S+")
@@ -208,15 +208,105 @@ class SearchAPI:
         if not message_ids:
             return {}
 
-        tag_map = await self.db.tags.get_messages_with_tag_hashes(
+        match_counts = await self.db.tags.get_tag_match_counts(
             user_id, tag_hashes, message_ids
         )
         boosts: dict[str, float] = {}
-        for mid, hashes in tag_map.items():
-            count = len(hashes)
+        for mid, count in match_counts.items():
             if count > 0:
                 boosts[mid] = 1.0 + 0.1 * (count - 1)
         return boosts
+
+    def _select_visible_tags(
+        self,
+        tags: list[dict[str, Any]],
+        max_visible: int = 3,
+    ) -> tuple[list[dict[str, Any]], bool]:
+        if not tags or max_visible <= 0:
+            return [], bool(tags)
+
+        indexes = list(range(len(tags)))
+        selected = indexes[:max_visible]
+        match_indexes = [idx for idx, tag in enumerate(tags) if tag.get("is_match")]
+
+        if match_indexes:
+            match_set = set(match_indexes)
+            selected_set = set(selected)
+            for idx in match_indexes:
+                if idx in selected_set:
+                    continue
+                replaced = False
+                for candidate in reversed(selected):
+                    if candidate in match_set:
+                        continue
+                    selected.remove(candidate)
+                    selected.append(idx)
+                    selected_set.remove(candidate)
+                    selected_set.add(idx)
+                    replaced = True
+                    break
+                if not replaced:
+                    # All selected entries are already matches; nothing to swap.
+                    continue
+
+        selected.sort()
+        visible = [tags[idx] for idx in selected]
+        return visible, len(tags) > len(visible)
+
+    def _prepare_tags(
+        self,
+        raw_tags: list[dict[str, Any]],
+        token_lookup: set[str],
+        max_visible: int = 3,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], bool]:
+        prepared: list[dict[str, Any]] = []
+        for tag in raw_tags:
+            name = str(tag.get("name") or "").strip()
+            if not name:
+                continue
+            try:
+                canonical = canonicalize(name)
+            except ValueError:
+                canonical = name.strip()
+            display_name = display(canonical)
+            normalized = canonical.lower()
+            prepared.append(
+                {
+                    "name": display_name,
+                    "hash": tag.get("hash"),
+                    "is_match": normalized in token_lookup,
+                }
+            )
+
+        visible, has_more = self._select_visible_tags(prepared, max_visible)
+        return prepared, visible, has_more
+
+    async def _attach_tags(
+        self,
+        user_id: str,
+        dek: bytes,
+        results: list[dict],
+        tokens: list[str],
+    ) -> None:
+        if not results:
+            return
+
+        message_ids = [res.get("id") for res in results if res.get("id")]
+        if not message_ids:
+            return
+
+        token_lookup = {token.lower() for token in tokens}
+        tag_map = await self.db.tags.get_tags_for_messages(user_id, message_ids, dek)
+
+        for res in results:
+            msg_id = res.get("id")
+            raw_tags = tag_map.get(msg_id, []) if msg_id else []
+            prepared, visible, has_more = self._prepare_tags(
+                raw_tags, token_lookup
+            )
+            res["tags"] = prepared
+            res["visible_tags"] = visible
+            res["has_more_tags"] = has_more
 
     async def search(
         self,
@@ -265,6 +355,7 @@ class SearchAPI:
         results = self.lexical_reranker.rerank(
             normalized, ordered_candidates, k2, boosts
         )
+        await self._attach_tags(user_id, dek, results, tokens)
         logger.debug("Returning %d results for user %s", len(results), user_id)
         return normalized, results, truncated
 
