@@ -2,7 +2,6 @@
   {% set canonical_value = display(keyword) %}
   <span class="meta-chip keyword">
     <a class="chip-label"
-       title="{{ canonical_value }}"
        href="{{ url_for('search.search') }}?q={{ canonical_value | urlencode }}"
        hx-get="{{ url_for('search.search') }}?q={{ canonical_value | urlencode }}"
        hx-target="#search-results"

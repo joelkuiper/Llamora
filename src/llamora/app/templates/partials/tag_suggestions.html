@@ -1,7 +1,6 @@
 {% for tag in suggestions %}
 {% set canonical_value = display(tag) %}
 <button type="button" class="tag-suggestion"
-        title="{{ canonical_value }}"
         data-tag="{{ canonical_value }}"
         hx-post="{{ url_for('tags.add_tag', msg_id=msg_id) }}"
         hx-target="#msg-tags-{{ msg_id }}"
