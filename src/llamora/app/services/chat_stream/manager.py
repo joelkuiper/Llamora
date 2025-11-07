@@ -88,6 +88,7 @@ class PendingResponse(ResponsePipelineCallbacks):
         meta_extra: dict | None = None,
     ) -> None:
         self.user_msg_id = user_msg_id
+        self._uid = uid
         self.date = date
         self.text = ""
         self.done = False
@@ -128,6 +129,10 @@ class PendingResponse(ResponsePipelineCallbacks):
             self._run_pipeline(), name=f"pending:{user_msg_id}"
         )
         self._task.add_done_callback(self._handle_task_result)
+
+    @property
+    def uid(self) -> str:
+        return self._uid
 
     def _handle_task_result(self, task: asyncio.Task) -> None:
         if task.cancelled():
@@ -262,8 +267,23 @@ class ChatStreamManager:
     def set_db(self, db) -> None:
         self._db = db
 
-    def get(self, user_msg_id: str) -> PendingResponse | None:
-        return self._pending.get(user_msg_id)
+    def get(self, user_msg_id: str, uid: str) -> PendingResponse | None:
+        pending = self._pending.get(user_msg_id)
+        if not pending:
+            return None
+
+        if pending.uid != uid:
+            logger.warning(
+                "UID mismatch for pending response %s (stored=%s, caller=%s)",
+                user_msg_id,
+                pending.uid,
+                uid,
+            )
+            self._pending.pop(user_msg_id, None)
+            self._schedule_pending_cancellation(user_msg_id, pending)
+            return None
+
+        return pending
 
     def _prune_stale_pending(self, now: float | None = None) -> None:
         if not self._pending_heap:
@@ -340,7 +360,17 @@ class ChatStreamManager:
         self._prune_stale_pending()
         pending = self._pending.get(user_msg_id)
         if pending:
-            return pending
+            if pending.uid == uid:
+                return pending
+
+            logger.warning(
+                "UID mismatch on start for %s (stored=%s, caller=%s)",
+                user_msg_id,
+                pending.uid,
+                uid,
+            )
+            self._pending.pop(user_msg_id, None)
+            self._schedule_pending_cancellation(user_msg_id, pending)
 
         if self._db is None:
             raise RuntimeError("ChatStreamManager database is not configured")
@@ -378,9 +408,20 @@ class ChatStreamManager:
         )
         return pending
 
-    async def stop(self, user_msg_id: str) -> tuple[bool, bool]:
+    async def stop(self, user_msg_id: str, uid: str) -> tuple[bool, bool]:
         self._prune_stale_pending()
         pending = self._pending.get(user_msg_id)
+        if pending and pending.uid != uid:
+            logger.warning(
+                "UID mismatch on stop for %s (stored=%s, caller=%s)",
+                user_msg_id,
+                pending.uid,
+                uid,
+            )
+            self._pending.pop(user_msg_id, None)
+            self._schedule_pending_cancellation(user_msg_id, pending)
+            pending = None
+
         if pending:
             logger.debug("Cancelling pending response %s", user_msg_id)
             await pending.cancel()

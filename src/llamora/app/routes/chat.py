@@ -153,7 +153,7 @@ async def stop_generation(user_msg_id: str):
         abort(404, description="message not found")
 
     manager = _chat_stream_manager()
-    handled, was_pending = await manager.stop(user_msg_id)
+    handled, was_pending = await manager.stop(user_msg_id, user["id"])
     if not was_pending:
         logger.debug("No pending response for %s, aborting active stream", user_msg_id)
     if not handled:
@@ -316,7 +316,7 @@ async def sse_reply(user_msg_id: str, date: str):
     ctx = dict(ctx_mapping)
 
     manager = _chat_stream_manager()
-    pending_response = manager.get(user_msg_id)
+    pending_response = manager.get(user_msg_id, uid)
     if not pending_response:
         try:
             pending_response = manager.start_stream(
