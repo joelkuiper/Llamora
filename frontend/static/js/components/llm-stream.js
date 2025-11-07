@@ -6,6 +6,7 @@ import { prefersReducedMotion } from "../utils/motion.js";
 
 const NEWLINE_REGEX = /\[newline\]/g;
 const RENDER_COOLDOWN_MS = 16;
+const FALLBACK_ERROR_MESSAGE = "The assistant ran into an error. Please try again.";
 
 function decodeChunk(data) {
   return typeof data === "string" ? data.replace(NEWLINE_REGEX, "\n") : "";
@@ -274,8 +275,16 @@ class LlmStreamElement extends HTMLElement {
     if (this.#completed) return;
 
     const data = decodeChunk(event?.data || "");
-    if (data) {
-      this.#text = data;
+    const trimmed = data.trim();
+    const hasExistingText = Boolean(this.#text && this.#text.trim());
+    const message = trimmed
+      ? trimmed
+      : hasExistingText
+        ? this.#text
+        : FALLBACK_ERROR_MESSAGE;
+
+    if (!hasExistingText || message !== this.#text) {
+      this.#text = message;
       if (this.#sink) {
         this.#sink.textContent = this.#text;
       }
@@ -283,7 +292,7 @@ class LlmStreamElement extends HTMLElement {
 
     this.#renderNow({ repositionTyping: false, shouldScroll: true });
     this.#markAsError();
-    this.#finalize({ status: "error", message: data || "" });
+    this.#finalize({ status: "error", message });
   }
 
   #handleMeta(event) {
