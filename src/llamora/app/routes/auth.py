@@ -527,6 +527,11 @@ async def delete_profile():
     await _db().users.delete_user(user["id"])
     resp = await make_response("", 204)
     assert isinstance(resp, Response)
+    manager.clear_session_dek()
+    if manager.dek_storage == "session":
+        current_app.logger.debug(
+            "Purged session DEK for deleted account %s", user["id"]
+        )
     manager.clear_secure_cookie(resp)
     resp.headers["HX-Redirect"] = "/login"
     return resp
