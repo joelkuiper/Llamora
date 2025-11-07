@@ -24,11 +24,32 @@ class ScrollBottomButtonElement extends ReactiveElement {
   }
 
   setVisible(visible) {
+    const button = this.#button;
     if (visible) {
       this.classList.add("visible");
+      if (button) {
+        button.removeAttribute("aria-hidden");
+        button.tabIndex = 0;
+        if ("inert" in button) {
+          button.inert = false;
+          button.toggleAttribute("inert", false);
+        } else {
+          button.disabled = false;
+        }
+      }
     } else {
       this.classList.remove("visible");
-      this.#button?.classList.remove("clicked");
+      if (button) {
+        button.setAttribute("aria-hidden", "true");
+        button.tabIndex = -1;
+        if ("inert" in button) {
+          button.inert = true;
+          button.toggleAttribute("inert", true);
+        } else {
+          button.disabled = true;
+        }
+        button.classList.remove("clicked");
+      }
     }
   }
 
