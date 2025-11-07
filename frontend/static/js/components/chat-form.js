@@ -1,3 +1,4 @@
+import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 
 class ChatFormElement extends ReactiveElement {
@@ -20,6 +21,7 @@ class ChatFormElement extends ReactiveElement {
   #pendingStreamingState = null;
   #isSubmitting = false;
   #isStreaming = false;
+  #streamingMsgId = null;
 
   connectedCallback() {
     super.connectedCallback();
@@ -73,6 +75,20 @@ class ChatFormElement extends ReactiveElement {
     this.#maybeInit();
   }
 
+  set streamingMsgId(value) {
+    const normalized = value ? String(value) : null;
+    this.#streamingMsgId = normalized;
+    if (normalized) {
+      this.dataset.streamingMsgId = normalized;
+    } else {
+      delete this.dataset.streamingMsgId;
+    }
+  }
+
+  get streamingMsgId() {
+    return this.#streamingMsgId;
+  }
+
   get isToday() {
     return this.#isToday;
   }
@@ -99,6 +115,8 @@ class ChatFormElement extends ReactiveElement {
     this.#isToday = this.#date === today;
     this.#draftKey = `chat-draft-${this.#date}`;
 
+    this.streamingMsgId = this.#state?.currentStreamMsgId || null;
+
     this.#restoreDraft();
     this.#configureForm();
     this.#bindEvents();
@@ -123,6 +141,7 @@ class ChatFormElement extends ReactiveElement {
     this.#initialized = false;
     this.#isStreaming = false;
     this.#isSubmitting = false;
+    this.streamingMsgId = null;
   }
 
   #restoreDraft() {
@@ -343,7 +362,7 @@ class ChatFormElement extends ReactiveElement {
 
   #handleStopClick() {
     if (!this.#chat) return;
-    const indicator = this.#chat.querySelector("#typing-indicator");
+    const indicator = this.#getTypingIndicator();
     const stopEndpoint = indicator?.dataset.stopUrl;
     const stream = indicator?.closest("llm-stream");
     if (stream && typeof stream.abort === "function") {
@@ -358,7 +377,34 @@ class ChatFormElement extends ReactiveElement {
     if (this.#state) {
       this.#state.currentStreamMsgId = null;
     }
+    if (this.#chat?.dataset) {
+      delete this.#chat.dataset.currentStream;
+    }
+    this.streamingMsgId = null;
     this.setStreaming(false);
+  }
+
+  #getTypingIndicator() {
+    if (!this.#chat) return null;
+    const targetId = this.#streamingMsgId || this.#state?.currentStreamMsgId || null;
+    if (targetId) {
+      const normalized = String(targetId);
+      const message = document.getElementById(`msg-${normalized}`);
+      if (message) {
+        const scoped = message.querySelector(TYPING_INDICATOR_SELECTOR);
+        if (scoped) {
+          return scoped;
+        }
+      }
+
+      const typed = Array.from(
+        this.#chat.querySelectorAll(TYPING_INDICATOR_SELECTOR)
+      ).find((node) => node?.dataset?.userMsgId === normalized);
+      if (typed) {
+        return typed;
+      }
+    }
+    return this.#chat.querySelector(TYPING_INDICATOR_SELECTOR);
   }
 
   #setSubmitting(value) {

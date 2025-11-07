@@ -3,6 +3,9 @@
 <div id="chat"
      data-date="{{ day }}"
      data-long-date="{{ day|long_date }}"
+     {% if pending_msg_id -%}
+     data-current-stream="{{ pending_msg_id }}"
+     {% endif -%}
      role="log"
      aria-live="polite"
      aria-relevant="additions">

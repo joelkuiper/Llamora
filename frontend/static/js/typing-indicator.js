@@ -1,3 +1,5 @@
+export const TYPING_INDICATOR_SELECTOR = "#typing-indicator";
+
 const VOID_TAGS = new Set([
   'AREA','BASE','BR','COL','EMBED','HR','IMG','INPUT','LINK','META','PARAM','SOURCE','TRACK','WBR'
 ]);

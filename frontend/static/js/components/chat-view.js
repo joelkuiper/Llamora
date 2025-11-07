@@ -5,11 +5,10 @@ import { initDayNav } from "../day.js";
 import { scrollToHighlight } from "../ui.js";
 import { setTimezoneCookie } from "../timezone.js";
 import { createListenerBag } from "../utils/events.js";
+import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 import "./chat-form.js";
 import "./llm-stream.js";
-
-const TYPING_INDICATOR_SELECTOR = "#typing-indicator";
 
 function formatDate(date) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
@@ -27,13 +26,6 @@ function activateAnimations(node) {
   node.querySelectorAll?.(".no-anim").forEach((el) => {
     el.classList.remove("no-anim");
   });
-}
-
-function findCurrentMsgId(chat) {
-  if (!chat) return null;
-  const indicator = chat.querySelector(TYPING_INDICATOR_SELECTOR);
-  if (!indicator) return null;
-  return indicator.dataset.userMsgId || "opening";
 }
 
 function scheduleMidnightRefresh(chat) {
@@ -228,7 +220,8 @@ export class ChatView extends ReactiveElement {
 
     const container = document.getElementById("content-wrapper");
 
-    this.#state = { currentStreamMsgId: null };
+    const initialStreamMsgId = chat?.dataset?.currentStream || null;
+    this.#state = { currentStreamMsgId: initialStreamMsgId || null };
     this.#chat = chat;
 
     if (this.#pendingScrollTarget) {
@@ -263,12 +256,13 @@ export class ChatView extends ReactiveElement {
         return;
       }
 
-      if (!el?.querySelector?.("#typing-indicator")) {
+      if (!el?.querySelector?.(TYPING_INDICATOR_SELECTOR)) {
         renderMarkdownInElement(el);
       }
     });
 
     this.#chatForm = this.querySelector("chat-form");
+    this.#syncStreamingMsgId(initialStreamMsgId);
     let chatFormReady = Promise.resolve();
     if (this.#chatForm) {
       const currentForm = this.#chatForm;
@@ -281,6 +275,9 @@ export class ChatView extends ReactiveElement {
       this.#chatFormReady = chatFormReady.then(() => {
         if (this.#chatForm !== currentForm) return;
         const currentMsgId = this.#state?.currentStreamMsgId ?? null;
+        if (this.#chatForm) {
+          this.#chatForm.streamingMsgId = currentMsgId;
+        }
         if (typeof this.#chatForm.setStreaming === "function") {
           this.#chatForm.setStreaming(Boolean(currentMsgId));
         }
@@ -460,6 +457,9 @@ export class ChatView extends ReactiveElement {
         this.#chatFormReady = chatFormReady.then(() => {
           if (this.#chatForm !== currentForm) return;
           const currentMsgId = this.#state?.currentStreamMsgId ?? null;
+          if (this.#chatForm) {
+            this.#chatForm.streamingMsgId = currentMsgId;
+          }
           if (typeof this.#chatForm.setStreaming === "function") {
             this.#chatForm.setStreaming(Boolean(currentMsgId));
           }
@@ -497,8 +497,11 @@ export class ChatView extends ReactiveElement {
 
     if (!this.#chat || !this.#chatForm) return;
 
-    const msgId = findCurrentMsgId(this.#chat);
-    this.#state.currentStreamMsgId = msgId;
+    const datasetMsgId = this.#chat.dataset?.currentStream || null;
+    const stateMsgId = this.#state?.currentStreamMsgId || null;
+    const msgId = datasetMsgId || stateMsgId || null;
+
+    this.#syncStreamingMsgId(msgId);
     if (typeof this.#chatForm.setStreaming === "function") {
       this.#chatForm.setStreaming(Boolean(msgId));
     }
@@ -506,6 +509,24 @@ export class ChatView extends ReactiveElement {
     if (forceScroll) {
       this.#scrollManager?.scrollToBottom(true);
     }
+  }
+
+  #syncStreamingMsgId(msgId) {
+    const normalized = msgId || null;
+    if (this.#state) {
+      this.#state.currentStreamMsgId = normalized;
+    }
+    if (this.#chat) {
+      if (normalized) {
+        this.#chat.dataset.currentStream = normalized;
+      } else {
+        delete this.#chat.dataset.currentStream;
+      }
+    }
+    if (this.#chatForm) {
+      this.#chatForm.streamingMsgId = normalized;
+    }
+    return normalized;
   }
 
   #handleMarkdownRendered(el) {
@@ -532,11 +553,10 @@ export class ChatView extends ReactiveElement {
 
   #handleStreamStart(event) {
     const detail = event?.detail || {};
-    if (this.#state) {
-      this.#state.currentStreamMsgId = detail.userMsgId || null;
-    }
+    const msgId = detail.userMsgId || null;
+    this.#syncStreamingMsgId(msgId);
     if (typeof this.#chatForm?.setStreaming === "function") {
-      this.#chatForm.setStreaming(true);
+      this.#chatForm.setStreaming(Boolean(msgId));
     }
     scrollEvents.dispatchEvent(
       new CustomEvent("scroll:force-bottom", {
@@ -547,9 +567,7 @@ export class ChatView extends ReactiveElement {
 
   #handleStreamComplete(event) {
     const detail = event?.detail || {};
-    if (this.#state) {
-      this.#state.currentStreamMsgId = null;
-    }
+    this.#syncStreamingMsgId(null);
     if (typeof this.#chatForm?.setStreaming === "function") {
       this.#chatForm.setStreaming(false);
     }

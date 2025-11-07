@@ -1,7 +1,7 @@
+import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
 import { renderMarkdownInElement } from "../markdown.js";
 
 const MARKDOWN_SELECTOR = ".message .markdown-body";
-const TYPING_INDICATOR_SELECTOR = "#typing-indicator";
 
 function collectTargetsFromNode(node, targets) {
   if (!node) return;
