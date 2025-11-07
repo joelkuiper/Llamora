@@ -181,8 +181,8 @@
   border-radius: var(--radius-sm);
   padding: 10px;
   transition: background var(--motion-fade) ease;
-  max-width: 19rem;
   z-index: 1100;
+  width: 21rem;
 
   .overlay-close {
     top: -1.25rem;
