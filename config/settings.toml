@@ -87,6 +87,11 @@ repeat_penalty = 1.15      # 1.05–1.25 is a good range
 repeat_last_n = 256        # how far back to look
 penalize_nl = true         # also penalize newlines
 
+# Experimental
+mirostat = 2        # 0 = off, 1 = basic, 2 = improved (recommended)
+mirostat_tau = 5.0  # target entropy (lower → more focused)
+mirostat_eta = 0.1  # learning rate for adaptation
+
 [default.LLM.stream]
 pending_ttl = 300
 queue_limit = 4
