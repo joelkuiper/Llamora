@@ -1,5 +1,5 @@
 import { flashHighlight, clearScrollTarget, createInlineSpinner } from "../ui.js";
-import { motionSafeBehavior } from "../utils/motion.js";
+import { motionSafeBehavior, prefersReducedMotion } from "../utils/motion.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 import { InlineAutocompleteController } from "../utils/inline-autocomplete.js";
 import { createShortcutBag } from "../utils/global-shortcuts.js";
@@ -258,16 +258,19 @@ export class SearchOverlay extends ReactiveElement {
       return;
     }
 
+    const completeEnter = () => {
+      panel.classList.remove("pop-enter");
+      wrap.classList.add("is-open");
+      this.#activateOverlayListeners();
+    };
+
     panel.classList.add("pop-enter");
-    panel.addEventListener(
-      "animationend",
-      () => {
-        panel.classList.remove("pop-enter");
-        wrap.classList.add("is-open");
-        this.#activateOverlayListeners();
-      },
-      { once: true }
-    );
+
+    if (prefersReducedMotion()) {
+      completeEnter();
+    } else {
+      panel.addEventListener("animationend", completeEnter, { once: true });
+    }
     this.#addCurrentQueryToAutocomplete();
     this.#loadRecentSearches();
   }
@@ -587,14 +590,18 @@ export class SearchOverlay extends ReactiveElement {
 
     panel.classList.remove("pop-enter");
 
-    if (immediate) {
+    const completeExit = () => {
       panel.classList.remove("pop-exit");
       finish();
+    };
+
+    if (immediate || prefersReducedMotion()) {
+      completeExit();
       return;
     }
 
     panel.classList.add("pop-exit");
-    panel.addEventListener("animationend", finish, { once: true });
+    panel.addEventListener("animationend", completeExit, { once: true });
   }
 }
 
