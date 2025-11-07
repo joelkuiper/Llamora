@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""SQLite persistence helpers with hardened connection pragmas."""
+
 import asyncio
 import logging
 import threading
@@ -30,6 +32,8 @@ from llamora.app.db.search_history import SearchHistoryRepository
 
 
 RepositoryT = TypeVar("RepositoryT")
+
+logger = logging.getLogger(__name__)
 
 
 SCHEMA_PATH = resolve_data_path(
@@ -136,23 +140,30 @@ class LocalDB:
         conn = await aiosqlite.connect(
             self.db_path, timeout=float(settings.DATABASE.timeout)
         )
-        await conn.execute(
-            f"PRAGMA busy_timeout = {int(settings.DATABASE.busy_timeout)}"
+        pragmas = (
+            f"PRAGMA busy_timeout = {int(settings.DATABASE.busy_timeout)}",
+            f"PRAGMA mmap_size = {int(settings.DATABASE.mmap_size)}",
+            "PRAGMA foreign_keys = ON",
+            "PRAGMA journal_mode = WAL",
+            "PRAGMA synchronous = NORMAL",
+            "PRAGMA cache_size = 10000",
+            "PRAGMA temp_store = MEMORY",
+            "PRAGMA trusted_schema = OFF",
         )
-        await conn.execute(f"PRAGMA mmap_size = {int(settings.DATABASE.mmap_size)}")
-        await conn.execute("PRAGMA foreign_keys = ON")
-        await conn.execute("PRAGMA journal_mode = WAL")
-        await conn.execute("PRAGMA synchronous = NORMAL")
-        await conn.execute("PRAGMA cache_size = 10000")
-        await conn.execute("PRAGMA temp_store = MEMORY")
+        for pragma in pragmas:
+            await self._apply_pragma(conn, pragma)
         conn.row_factory = aiosqlite.Row
         return conn
 
+    async def _apply_pragma(self, conn: aiosqlite.Connection, pragma: str) -> None:
+        try:
+            await conn.execute(pragma)
+        except Exception:
+            logger.warning("Failed to apply %s", pragma, exc_info=True)
+
     async def _ensure_schema(self, is_new: bool) -> None:
         if is_new:
-            logging.getLogger(__name__).info(
-                "Creating new database at %s", self.db_path
-            )
+            logger.info("Creating new database at %s", self.db_path)
         if not self.pool:
             raise RuntimeError("Connection pool not initialized")
         schema_sql = SCHEMA_PATH.read_text().format(
