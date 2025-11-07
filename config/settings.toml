@@ -77,11 +77,15 @@ n_predict = 1024
 stream = true
 stop = ["<|im_start|>", "<|im_end|>", "<|endoftext|>", "<|end|>"]
 n_keep = -1
-temperature = 0.7
+temperature = 0.8
 top_p = 0.8
 top_k = 20
 min_p = 0
 cache_prompt = true
+
+repeat_penalty = 1.15      # 1.05–1.25 is a good range
+repeat_last_n = 256        # how far back to look
+penalize_nl = true         # also penalize newlines
 
 [default.LLM.stream]
 pending_ttl = 300
