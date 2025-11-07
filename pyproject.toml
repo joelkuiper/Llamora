@@ -21,6 +21,7 @@ dependencies = [
     "cachetools>=5.3.3",
     "orjson>=3.10.0",
     "dynaconf>=3.2.6",
+    "blinker>=1.9.0",
     "markdown-it-py>=3.0.0",
     "mdit-py-plugins>=0.4.0",
     "bleach>=6.1.0",

@@ -10,6 +10,7 @@ from llamora.llm.client import LLMClient
 from llamora.llm.process_manager import LlamafileProcessManager
 
 from .chat_stream import ChatStreamManager
+from .service_pulse import ServicePulse
 
 
 logger = logging.getLogger(__name__)
@@ -18,13 +19,22 @@ logger = logging.getLogger(__name__)
 class LLMService:
     """Own the llamafile process, client, and chat streaming manager."""
 
-    def __init__(self, db: Any, *, pending_ttl: int = 300) -> None:
+    def __init__(
+        self,
+        db: Any,
+        *,
+        pending_ttl: int = 300,
+        queue_limit: int = 4,
+        service_pulse: ServicePulse | None = None,
+    ) -> None:
         self._db = db
         self._process_manager: LlamafileProcessManager | None = None
         self._llm: LLMClient | None = None
         self._chat_stream_manager: ChatStreamManager | None = None
         self._lock = asyncio.Lock()
         self._pending_ttl = pending_ttl
+        self._queue_limit = queue_limit
+        self._service_pulse = service_pulse
 
     async def start(self) -> None:
         """Initialise the llamafile stack if it is not already running."""
@@ -58,7 +68,10 @@ class LLMService:
                 llm_client = LLMClient(process_manager)
 
                 chat_stream_manager = ChatStreamManager(
-                    llm_client, pending_ttl=self._pending_ttl
+                    llm_client,
+                    pending_ttl=self._pending_ttl,
+                    queue_limit=self._queue_limit,
+                    service_pulse=self._service_pulse,
                 )
                 chat_stream_manager.set_db(self._db)
             except Exception:

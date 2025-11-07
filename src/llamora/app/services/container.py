@@ -15,6 +15,7 @@ from llamora.app.api.search import SearchAPI
 from llamora.app.services.lexical_reranker import LexicalReranker
 from llamora.app.services.vector_search import VectorSearchService
 from llamora.app.services.llm_service import LLMService
+from llamora.app.services.service_pulse import ServicePulse
 from llamora.settings import settings
 
 
@@ -30,6 +31,7 @@ class AppServices:
     lexical_reranker: LexicalReranker
     search_api: SearchAPI
     llm_service: LLMService
+    service_pulse: ServicePulse
 
     @classmethod
     def create(cls) -> "AppServices":
@@ -48,7 +50,22 @@ class AppServices:
                 pending_ttl_raw,
             )
             pending_ttl = 300
-        llm_service = LLMService(db, pending_ttl=pending_ttl)
+        queue_limit_raw = settings.get("LLM.stream.queue_limit", 4)
+        try:
+            queue_limit = max(0, int(queue_limit_raw))
+        except (TypeError, ValueError):
+            logger.warning(
+                "Invalid LLM.stream.queue_limit value %r; falling back to 4",
+                queue_limit_raw,
+            )
+            queue_limit = 4
+        service_pulse = ServicePulse()
+        llm_service = LLMService(
+            db,
+            pending_ttl=pending_ttl,
+            queue_limit=queue_limit,
+            service_pulse=service_pulse,
+        )
         db.set_search_api(search_api)
         return cls(
             db=db,
@@ -56,6 +73,7 @@ class AppServices:
             lexical_reranker=lexical_reranker,
             search_api=search_api,
             llm_service=llm_service,
+            service_pulse=service_pulse,
         )
 
 
