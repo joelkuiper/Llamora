@@ -7,10 +7,13 @@
             class="message assistant-stream"
             data-user-msg-id="{{ user_msg_id }}"
             data-assistant-msg-id=""
-            data-sse-url="{{ sse_url }}">
+            data-sse-url="{{ sse_url }}"
+            role="article"
+            aria-labelledby="msg-{{ user_msg_id }}-speaker msg-{{ user_msg_id }}-body">
   <span class="raw-response" hidden></span>
 
-  <div class="markdown-body">
+  <span class="visually-hidden" id="msg-{{ user_msg_id }}-speaker">{{ config.APP_NAME }} response</span>
+  <div class="markdown-body" id="msg-{{ user_msg_id }}-body">
     <span id="typing-indicator"
           data-user-msg-id="{{ user_msg_id }}"
           {%- if stop_url %}

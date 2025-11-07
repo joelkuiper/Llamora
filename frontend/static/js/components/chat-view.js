@@ -102,8 +102,10 @@ export class ChatView extends ReactiveElement {
   #setRenderingState(isRendering) {
     if (isRendering) {
       this.setAttribute("data-rendering", "true");
+      this.setAttribute("aria-busy", "true");
     } else {
       this.removeAttribute("data-rendering");
+      this.setAttribute("aria-busy", "false");
     }
   }
 
@@ -164,6 +166,8 @@ export class ChatView extends ReactiveElement {
     if (!this.style.display) {
       this.style.display = "block";
     }
+
+    this.setAttribute("aria-busy", this.hasAttribute("data-rendering") ? "true" : "false");
 
     this.#connectionListeners = this.resetListenerBag(this.#connectionListeners);
     this.#connectionListeners.add(window, "pageshow", this.#pageShowHandler);

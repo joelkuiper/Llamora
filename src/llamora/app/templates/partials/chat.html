@@ -1,7 +1,8 @@
 <main
   id="content-wrapper"
   {% if oob %} hx-swap-oob="true" {% endif %}>
-  <chat-view{% if request.headers.get('HX-Request') == 'true' %} data-rendering="true"{% endif %}{% if scroll_target %} data-scroll-target="{{ scroll_target }}"{% endif %}>
+  <chat-view{% if request.headers.get('HX-Request') == 'true' %} data-rendering="true"{% endif %}{% if scroll_target %} data-scroll-target="{{ scroll_target }}"{% endif %}
+             aria-busy="{{ 'true' if request.headers.get('HX-Request') == 'true' else 'false' }}">
     {% include 'partials/history.html' %}
     {% if is_today %}
     <chat-form data-date="{{ day }}">
@@ -11,7 +12,9 @@
             hx-on::after-request="this.reset()"
             hx-swap="beforeend">
         <div class="input-wrapper">
+          <label class="visually-hidden" for="chat-message">Message for {{ day|long_date }}</label>
           <textarea class="input"
+                    id="chat-message"
                     name="message"
                     rows="3"
                     placeholder="{{ 'Write your thoughts here…' if is_today else 'This day has passed.' }}"

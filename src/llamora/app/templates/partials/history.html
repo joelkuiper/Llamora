@@ -8,15 +8,23 @@
      {% endif -%}
      role="log"
      aria-live="polite"
-     aria-relevant="additions">
+     aria-relevant="additions"
+     aria-labelledby="chat-log-label-{{ day }}">
+  <h2 class="visually-hidden" id="chat-log-label-{{ day }}">Conversation for {{ day|long_date }}</h2>
   {% if not history|length and not is_today %}
   <div class="no-content">Nothing was written this day.</div>
   {% endif %}
   {% for msg in history %}
   {% set is_error = msg.get('meta', {}).get('error') %}
-  <div id="msg-{{ msg['id'] }}" class="message {{ 'assistant' if msg['role'] != 'user' else 'user'}}{% if is_error %} message--error{% endif %}">
+  {% set speaker = 'Your' if msg['role'] == 'user' else 'Assistant' %}
+  <div id="msg-{{ msg['id'] }}"
+       class="message {{ 'assistant' if msg['role'] != 'user' else 'user'}}{% if is_error %} message--error{% endif %}"
+       role="article"
+       aria-labelledby="msg-{{ msg['id'] }}-speaker msg-{{ msg['id'] }}-body">
+    <span class="visually-hidden" id="msg-{{ msg['id'] }}-speaker">{{ speaker }} message</span>
     {% set rendered = msg.get('message_html') %}
-    <div class="markdown-body"{% if rendered is not none %} data-rendered="true"{% endif %}>
+    <div class="markdown-body"
+         id="msg-{{ msg['id'] }}-body"{% if rendered is not none %} data-rendered="true"{% endif %}>
       {% if rendered is not none %}
       {{ rendered | safe }}
       {% else %}
