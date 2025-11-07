@@ -16,7 +16,7 @@ max_tag_length = 64
 max_username_length = 30
 max_password_length = 128
 min_password_length = 8
-max_message_length = 5000
+max_message_length = 12000
 max_search_query_length = 512
 
 [default.SEARCH]
@@ -61,7 +61,7 @@ concurrency = 0
 llamafile_path = ""
 # When set, connect to an existing llama.cpp/llamafile server (e.g., http://127.0.0.1:8081 from
 # `llama-server --hf Qwen/Qwen3-4B-Instruct-2507`).
-host = null
+host = ""
 parallel = 1
 
 [default.LLM.server.args]

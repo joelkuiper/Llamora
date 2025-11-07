@@ -13,7 +13,35 @@ from dynaconf import Dynaconf
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = PACKAGE_DIR.parent
-CONFIG_DIR = PROJECT_ROOT / "config"
+
+
+def _resolve_config_dir() -> Path:
+    env_override = os.environ.get("LLAMORA_CONFIG_DIR")
+    candidates: list[Path] = []
+
+    if env_override:
+        candidates.append(Path(env_override).expanduser())
+
+    candidates.append(PROJECT_ROOT / "config")
+    candidates.append(PROJECT_ROOT.parent / "config")
+
+    for candidate in candidates:
+        expanded = candidate.expanduser()
+        if expanded.is_dir():
+            return expanded.resolve()
+
+    searched = ", ".join(str(path) for path in candidates)
+    message = (
+        "Unable to locate configuration directory. "
+        "Searched: "
+        f"{searched}."
+    )
+    if env_override:
+        message += " Set LLAMORA_CONFIG_DIR to a valid directory."
+    raise RuntimeError(message)
+
+
+CONFIG_DIR = _resolve_config_dir()
 
 
 def _cpu_count(default: int = 4) -> int:
