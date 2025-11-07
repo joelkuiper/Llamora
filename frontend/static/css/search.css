@@ -19,7 +19,7 @@
   padding: 0.5rem 2.25rem 0.5rem 0.9rem;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: var(--color-bg);
+  background: var(--glass-bg-alt);
   box-shadow: var(--raised-shadow);
   outline: none;
   font-family: var(--font-base);
