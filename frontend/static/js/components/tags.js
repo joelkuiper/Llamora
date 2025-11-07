@@ -172,7 +172,13 @@ export class Tags extends BaseHTMLElement {
         if (this.#suggestions && !this.#suggestions.dataset.loaded) {
           htmx.trigger(this.#suggestions, "tag-popover:show");
         }
-        this.#input?.focus();
+        if (this.#input && typeof this.#input.focus === "function") {
+          try {
+            this.#input.focus({ preventScroll: true });
+          } catch (error) {
+            this.#input.focus();
+          }
+        }
         this.#scheduleAutocompleteFetch({ immediate: true });
         this.#updateAutocompleteCandidates();
       },
