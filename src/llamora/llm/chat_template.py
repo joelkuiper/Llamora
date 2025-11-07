@@ -29,7 +29,7 @@ ANSWER_REQUIREMENTS = dedent("""
 """).strip()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ChatPromptRender:
     """Container for a rendered prompt and its tokenisation."""
 
@@ -41,7 +41,7 @@ class ChatPromptRender:
         return len(self.tokens)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ChatPromptSeries:
     """Collection of rendered prompts for the base and history suffixes."""
 
