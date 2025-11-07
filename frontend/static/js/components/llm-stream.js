@@ -357,7 +357,9 @@ class LlmStreamElement extends HTMLElement {
     const html = renderMarkdown(this.#text || "");
     const changed = this.#renderer.update(html);
 
-    this.#markdown.dataset.markdownSource = this.#text || "";
+    if ("markdownSource" in this.#markdown.dataset) {
+      delete this.#markdown.dataset.markdownSource;
+    }
     this.#markdown.dataset.rendered = "true";
 
     if (reposition) {
