@@ -223,6 +223,8 @@ export class ScrollManager {
       return;
     }
 
+    const shouldResetCenter = !chat || chat === this.chat;
+
     this.#cancelInitRelease();
     this.#cancelAlign();
 
@@ -233,6 +235,10 @@ export class ScrollManager {
     this.#resizeObserver = null;
 
     this.chat = null;
+
+    if (shouldResetCenter) {
+      document.documentElement?.style?.removeProperty?.("--chat-center");
+    }
   }
 
   scrollToBottom(force = false) {
