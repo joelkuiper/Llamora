@@ -134,8 +134,6 @@ DEFAULTS: dict[str, Any] = {
         "request": DEFAULT_LLM_REQUEST,
         "stream": {
             "pending_ttl": 300,
-            "repeat_guard_size": 6,
-            "repeat_guard_min_length": 12,
         },
         "allowed_config_keys": ["temperature"],
         "tokenizer": {

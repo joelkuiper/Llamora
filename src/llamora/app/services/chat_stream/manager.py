@@ -9,7 +9,6 @@ from contextlib import suppress
 from typing import Callable
 
 from llamora.llm.client import LLMClient
-from llamora.settings import settings
 
 from llamora.app.services.chat_meta import ChatMetaParser
 from llamora.app.services.service_pulse import ServicePulse
@@ -120,12 +119,6 @@ class PendingResponse(ResponsePipelineCallbacks):
         )
         self._parser = ChatMetaParser()
         self._visible_total = ""
-        repeat_guard_size = _coerce_int(
-            settings.get("LLM.stream.repeat_guard_size", None)
-        )
-        repeat_guard_min_length = _coerce_int(
-            settings.get("LLM.stream.repeat_guard_min_length", None)
-        )
         self._pipeline = ResponsePipeline(
             session=self._session,
             parser=self._parser,
@@ -136,8 +129,6 @@ class PendingResponse(ResponsePipelineCallbacks):
             dek=self.dek,
             meta_extra=self.meta_extra,
             timeout=pending_ttl,
-            repeat_guard_size=repeat_guard_size,
-            repeat_guard_min_length=repeat_guard_min_length,
         )
         logger.debug("Starting generation for user message %s", user_msg_id)
         self._task = asyncio.create_task(
@@ -279,18 +270,6 @@ class PendingResponse(ResponsePipelineCallbacks):
         self.text = total
         self._total_len = len(total)
         self._visible_total = total
-
-
-def _coerce_int(value: object) -> int | None:
-    """Best-effort conversion of numeric configuration values."""
-
-    if value is None:
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):  # pragma: no cover - defensive
-        logger.warning("Invalid integer configuration for repeat guard: %r", value)
-        return None
 
 
 class StreamCapacityError(RuntimeError):

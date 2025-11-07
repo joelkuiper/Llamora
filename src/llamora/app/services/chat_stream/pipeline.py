@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections import deque
 from dataclasses import dataclass
 from typing import Awaitable, Callable, Protocol
 
@@ -89,44 +88,6 @@ class AssistantMessageWriter:
             ) from exc
 
 
-@dataclass(slots=True)
-class ChunkRingGuard:
-    """Detects repeated visible chunks within a moving window."""
-
-    size: int
-    min_length: int = 0
-
-    def __post_init__(self) -> None:
-        self.size = max(int(self.size), 0)
-        self.min_length = max(int(self.min_length), 0)
-        self._ring: deque[str] | None = (
-            deque(maxlen=self.size) if self.size > 0 else None
-        )
-
-    def record(self, chunk: str) -> bool:
-        """Track a chunk and report if the ring contains identical entries."""
-
-        if self._ring is None:
-            return False
-
-        normalised = self._normalise(chunk)
-        if len(normalised) < self.min_length:
-            self._ring.clear()
-            return False
-
-        self._ring.append(normalised)
-        maxlen = self._ring.maxlen
-        if maxlen is None or len(self._ring) < maxlen:
-            return False
-
-        first = self._ring[0]
-        return bool(first) and all(entry == first for entry in self._ring)
-
-    @staticmethod
-    def _normalise(chunk: str) -> str:
-        return chunk.strip()
-
-
 class ResponsePipeline:
     """Coordinates the LLM streaming lifecycle."""
 
@@ -142,8 +103,6 @@ class ResponsePipeline:
         dek: bytes,
         meta_extra: dict | None = None,
         timeout: int | None = None,
-        repeat_guard_size: int | None = None,
-        repeat_guard_min_length: int | None = None,
     ) -> None:
         self._session = session
         self._parser = parser
@@ -159,13 +118,6 @@ class ResponsePipeline:
         self._cancelled = False
         self._error = False
         self._error_message: str | None = None
-        guard_size = repeat_guard_size or 0
-        guard_min_length = repeat_guard_min_length or 0
-        self._chunk_guard = (
-            ChunkRingGuard(guard_size, guard_min_length)
-            if guard_size > 0
-            else None
-        )
 
     async def run(self, callbacks: ResponsePipelineCallbacks) -> PipelineResult:
         """Execute the pipeline and notify callbacks."""
@@ -235,15 +187,6 @@ class ResponsePipeline:
             async for chunk in self._fetch_chunks():
                 visible = self._parse_chunk(chunk)
                 if visible:
-                    if self._chunk_guard and self._chunk_guard.record(visible):
-                        self._error = True
-                        self._error_message = (
-                            "The response was stopped because it repeated output."
-                        )
-                        if not self._cancel_requested:
-                            self._cancel_requested = True
-                        await self._abort_session()
-                        break
                     full_response += visible
                     self._visible_total = full_response
                     await callbacks.on_visible(visible, full_response)
@@ -375,7 +318,6 @@ class ResponsePipeline:
 __all__ = [
     "AssistantMessagePersistenceError",
     "AssistantMessageWriter",
-    "ChunkRingGuard",
     "LLMStreamError",
     "PipelineResult",
     "ResponsePipeline",
