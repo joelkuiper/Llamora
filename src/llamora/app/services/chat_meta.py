@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 try:
@@ -16,7 +16,7 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(slots=True)
 class ChatMetaParser:
     """Extracts assistant-visible text and metadata fragments from chunks."""
 
@@ -24,13 +24,12 @@ class ChatMetaParser:
     sentinel_end: str = "</meta>"
     tail_limit: int = 256
 
-    def __post_init__(self) -> None:
-        self._found_start = False
-        self._meta_complete = False
-        self._meta_buffer: str = ""
-        self._tail: str = ""
-        self._raw_buffer: str = ""
-        self._orphan_meta = False
+    _found_start: bool = field(init=False, default=False)
+    _meta_complete: bool = field(init=False, default=False)
+    _meta_buffer: str = field(init=False, default="")
+    _tail: str = field(init=False, default="")
+    _raw_buffer: str = field(init=False, default="")
+    _orphan_meta: bool = field(init=False, default=False)
 
     def feed(self, chunk: str) -> str:
         """Process a chunk and return the user-visible portion."""
