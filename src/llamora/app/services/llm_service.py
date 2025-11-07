@@ -48,14 +48,47 @@ class LLMService:
 
             logger.debug("Initialising LLM service stack")
 
-            process_manager = LlamafileProcessManager()
-            await asyncio.to_thread(process_manager.ensure_server_running)
-            llm_client = LLMClient(process_manager)
+            process_manager: LlamafileProcessManager | None = None
+            llm_client: LLMClient | None = None
+            chat_stream_manager: ChatStreamManager | None = None
 
-            chat_stream_manager = ChatStreamManager(
-                llm_client, pending_ttl=self._pending_ttl
-            )
-            chat_stream_manager.set_db(self._db)
+            try:
+                process_manager = LlamafileProcessManager()
+                await asyncio.to_thread(process_manager.ensure_server_running)
+                llm_client = LLMClient(process_manager)
+
+                chat_stream_manager = ChatStreamManager(
+                    llm_client, pending_ttl=self._pending_ttl
+                )
+                chat_stream_manager.set_db(self._db)
+            except Exception:
+                logger.exception("Failed to initialise LLM service stack")
+
+                if chat_stream_manager is not None:
+                    try:
+                        await chat_stream_manager.shutdown()
+                    except Exception:
+                        logger.exception(
+                            "Error shutting down chat stream manager after failed start"
+                        )
+
+                if llm_client is not None:
+                    try:
+                        await llm_client.aclose()
+                    except Exception:
+                        logger.exception(
+                            "Error closing LLM client after failed start"
+                        )
+
+                if process_manager is not None:
+                    try:
+                        await asyncio.to_thread(process_manager.shutdown)
+                    except Exception:
+                        logger.exception(
+                            "Error shutting down process manager after failed start"
+                        )
+
+                raise
 
             self._process_manager = process_manager
             self._llm = llm_client
@@ -80,14 +113,33 @@ class LLMService:
             self._llm = None
             self._process_manager = None
 
+        errors: list[Exception] = []
+
         if chat_stream_manager is not None:
-            await chat_stream_manager.shutdown()
+            try:
+                await chat_stream_manager.shutdown()
+            except Exception as exc:
+                errors.append(exc)
+                logger.exception("Error shutting down chat stream manager")
 
         if llm_client is not None:
-            await llm_client.aclose()
+            try:
+                await llm_client.aclose()
+            except Exception as exc:
+                errors.append(exc)
+                logger.exception("Error closing LLM client")
 
         if process_manager is not None:
-            await asyncio.to_thread(process_manager.shutdown)
+            try:
+                await asyncio.to_thread(process_manager.shutdown)
+            except Exception as exc:
+                errors.append(exc)
+                logger.exception("Error shutting down process manager")
+
+        if errors:
+            if len(errors) == 1:
+                raise errors[0]
+            raise ExceptionGroup("Errors while stopping LLM service", errors)
 
         logger.info("LLM service stack stopped")
 
