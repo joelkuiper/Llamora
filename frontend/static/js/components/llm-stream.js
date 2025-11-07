@@ -6,6 +6,7 @@ import { prefersReducedMotion } from "../utils/motion.js";
 
 const NEWLINE_REGEX = /\[newline\]/g;
 const RENDER_COOLDOWN_MS = 16;
+const FALLBACK_ERROR_MESSAGE = "The assistant ran into an error. Please try again.";
 
 function decodeChunk(data) {
   return typeof data === "string" ? data.replace(NEWLINE_REGEX, "\n") : "";
@@ -93,6 +94,7 @@ class LlmStreamElement extends HTMLElement {
   #markdown = null;
   #typingIndicator = null;
   #meta = null;
+  #repeatGuardIndicator = null;
   #boundHandleMessage;
   #boundHandleDone;
   #boundHandleError;
@@ -274,8 +276,16 @@ class LlmStreamElement extends HTMLElement {
     if (this.#completed) return;
 
     const data = decodeChunk(event?.data || "");
-    if (data) {
-      this.#text = data;
+    const trimmed = data.trim();
+    const hasExistingText = Boolean(this.#text && this.#text.trim());
+    const message = trimmed
+      ? trimmed
+      : hasExistingText
+        ? this.#text
+        : FALLBACK_ERROR_MESSAGE;
+
+    if (!hasExistingText || message !== this.#text) {
+      this.#text = message;
       if (this.#sink) {
         this.#sink.textContent = this.#text;
       }
@@ -283,7 +293,7 @@ class LlmStreamElement extends HTMLElement {
 
     this.#renderNow({ repositionTyping: false, shouldScroll: true });
     this.#markAsError();
-    this.#finalize({ status: "error", message: data || "" });
+    this.#finalize({ status: "error", message });
   }
 
   #handleMeta(event) {
@@ -294,6 +304,12 @@ class LlmStreamElement extends HTMLElement {
     if (!meta) return;
 
     this.#meta = meta;
+    if (meta.repeat_guard) {
+      this.#showRepeatGuardIndicator();
+    } else {
+      this.#clearRepeatGuardIndicator();
+    }
+
     this.dispatchEvent(
       new CustomEvent("llm-stream:meta", {
         bubbles: true,
@@ -305,6 +321,46 @@ class LlmStreamElement extends HTMLElement {
         },
       })
     );
+  }
+
+  #showRepeatGuardIndicator() {
+    this.dataset.repeatGuard = "true";
+
+    if (this.#repeatGuardIndicator?.isConnected) {
+      return;
+    }
+
+    const indicator = document.createElement("div");
+    indicator.className = "repeat-guard-indicator";
+    indicator.setAttribute("role", "status");
+    indicator.setAttribute("aria-live", "polite");
+    indicator.title = "Response paused after repeating itself.";
+    indicator.innerHTML = `
+      <span class="repeat-guard-indicator__waves" aria-hidden="true">
+        <span class="repeat-guard-indicator__dot"></span>
+        <span class="repeat-guard-indicator__dot repeat-guard-indicator__dot--delay"></span>
+        <span class="repeat-guard-indicator__dot repeat-guard-indicator__dot--late"></span>
+      </span>
+      <span class="visually-hidden">Response paused after repeating itself.</span>
+    `;
+
+    const placeholder = this.querySelector(".meta-chips-placeholder");
+    if (placeholder?.parentNode) {
+      placeholder.parentNode.insertBefore(indicator, placeholder);
+    } else {
+      this.append(indicator);
+    }
+
+    this.#repeatGuardIndicator = indicator;
+  }
+
+  #clearRepeatGuardIndicator() {
+    delete this.dataset.repeatGuard;
+
+    if (this.#repeatGuardIndicator?.isConnected) {
+      this.#repeatGuardIndicator.remove();
+    }
+    this.#repeatGuardIndicator = null;
   }
 
   #scheduleRender({ repositionTyping = false, shouldScroll = false } = {}) {

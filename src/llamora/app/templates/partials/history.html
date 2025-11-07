@@ -15,10 +15,13 @@
   <div class="no-content">Nothing was written this day.</div>
   {% endif %}
   {% for msg in history %}
-  {% set is_error = msg.get('meta', {}).get('error') %}
+  {% set msg_meta = msg.get('meta', {}) %}
+  {% set is_error = msg_meta.get('error') %}
+  {% set repeat_guard = msg_meta.get('repeat_guard') %}
   {% set speaker = 'Your' if msg['role'] == 'user' else 'Assistant' %}
   <div id="msg-{{ msg['id'] }}"
        class="message {{ 'assistant' if msg['role'] != 'user' else 'user'}}{% if is_error %} message--error{% endif %}"
+       {% if repeat_guard %}data-repeat-guard="true"{% endif %}
        role="article"
        aria-labelledby="msg-{{ msg['id'] }}-speaker msg-{{ msg['id'] }}-body">
     <span class="visually-hidden" id="msg-{{ msg['id'] }}-speaker">{{ speaker }} message</span>
@@ -31,7 +34,20 @@
       {{ msg.message }}
       {% endif %}
     </div>
-    {% if msg['role'] != 'user' and not msg.get('meta', {}).get('error') %}
+    {% if repeat_guard %}
+    <div class="repeat-guard-indicator"
+         role="status"
+         aria-live="polite"
+         title="Response paused after repeating itself.">
+      <span class="repeat-guard-indicator__waves" aria-hidden="true">
+        <span class="repeat-guard-indicator__dot"></span>
+        <span class="repeat-guard-indicator__dot repeat-guard-indicator__dot--delay"></span>
+        <span class="repeat-guard-indicator__dot repeat-guard-indicator__dot--late"></span>
+      </span>
+      <span class="visually-hidden">Response paused after repeating itself.</span>
+    </div>
+    {% endif %}
+    {% if msg['role'] != 'user' and not msg_meta.get('error') %}
     {{ render_meta_chips(msg['id'], msg.get('tags', [])) }}
     {% endif %}
   </div>

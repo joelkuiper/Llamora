@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass
+from collections import deque
+from dataclasses import dataclass, field
 from typing import Awaitable, Callable, Protocol
 
 from llamora.app.services.chat_meta import ChatMetaParser, build_meta
@@ -88,6 +89,57 @@ class AssistantMessageWriter:
             ) from exc
 
 
+@dataclass(slots=True)
+class ChunkRingGuard:
+    """Detects repeated visible chunks within a moving window."""
+
+    size: int
+    min_length: int = 0
+    _ring: deque[str] | None = field(init=False, repr=False)
+    _buffer: str = field(init=False, repr=False, default="")
+
+    def __post_init__(self) -> None:
+        self.size = max(int(self.size), 0)
+        self.min_length = max(int(self.min_length), 0)
+        self._ring = deque(maxlen=self.size) if self.size > 0 else None
+        self._buffer = ""
+
+    def record(self, chunk: str) -> bool:
+        """Track a chunk and report if the ring contains identical entries."""
+
+        if self._ring is None:
+            return False
+
+        normalised = self._normalise(chunk)
+        if not normalised:
+            self._reset()
+            return False
+
+        candidate = normalised
+        if self.min_length > 0:
+            candidate = self._buffer + candidate
+            if len(candidate) < self.min_length:
+                self._buffer = candidate
+                return False
+            self._buffer = ""
+
+        self._ring.append(candidate)
+        maxlen = self._ring.maxlen
+        if maxlen is None or len(self._ring) < maxlen:
+            return False
+
+        first = self._ring[0]
+        return bool(first) and all(entry == first for entry in self._ring)
+
+    def _reset(self) -> None:
+        self._buffer = ""
+        self._ring.clear()
+
+    @staticmethod
+    def _normalise(chunk: str) -> str:
+        return " ".join(chunk.split())
+
+
 class ResponsePipeline:
     """Coordinates the LLM streaming lifecycle."""
 
@@ -103,6 +155,8 @@ class ResponsePipeline:
         dek: bytes,
         meta_extra: dict | None = None,
         timeout: int | None = None,
+        repeat_guard_size: int | None = None,
+        repeat_guard_min_length: int | None = None,
     ) -> None:
         self._session = session
         self._parser = parser
@@ -118,6 +172,15 @@ class ResponsePipeline:
         self._cancelled = False
         self._error = False
         self._error_message: str | None = None
+        self._status_prefix = "⚠️ "
+        self._repeat_guard_triggered = False
+        guard_size = repeat_guard_size or 0
+        guard_min_length = repeat_guard_min_length or 0
+        self._chunk_guard = (
+            ChunkRingGuard(guard_size, guard_min_length)
+            if guard_size > 0
+            else None
+        )
 
     async def run(self, callbacks: ResponsePipelineCallbacks) -> PipelineResult:
         """Execute the pipeline and notify callbacks."""
@@ -141,7 +204,9 @@ class ResponsePipeline:
             self._error = True
             self._error_message = str(exc) or "Unknown error"
             result = await self._finalize_with_text(
-                self._append_status_line("", self._error_message),
+                self._append_status_line(
+                    "", self._error_message, prefix=self._status_prefix
+                ),
                 error_meta=True,
             )
         except Exception as exc:  # pragma: no cover - defensive
@@ -149,7 +214,11 @@ class ResponsePipeline:
             self._error = True
             self._error_message = str(exc) or "An unexpected error occurred."
             result = await self._finalize_with_text(
-                self._append_status_line(self._visible_total, self._error_message),
+                self._append_status_line(
+                    self._visible_total,
+                    self._error_message,
+                    prefix=self._status_prefix,
+                ),
                 error_meta=True,
             )
         else:
@@ -187,6 +256,12 @@ class ResponsePipeline:
             async for chunk in self._fetch_chunks():
                 visible = self._parse_chunk(chunk)
                 if visible:
+                    if self._chunk_guard and self._chunk_guard.record(visible):
+                        self._repeat_guard_triggered = True
+                        if not self._cancel_requested:
+                            self._cancel_requested = True
+                        await self._abort_session()
+                        break
                     full_response += visible
                     self._visible_total = full_response
                     await callbacks.on_visible(visible, full_response)
@@ -258,17 +333,22 @@ class ResponsePipeline:
     async def _finalize_cancelled(self, *, partial: bool) -> PipelineResult:
         final_text = self._visible_total + self._parser.flush_visible_tail()
         if self._error_message:
-            final_text = self._append_status_line(final_text, self._error_message)
+            final_text = self._append_status_line(
+                final_text, self._error_message, prefix=self._status_prefix
+            )
         meta: dict = {"error": True} if self._error else {}
+        if self._repeat_guard_triggered:
+            meta.update({"repeat_guard": True, "partial": True})
         if self._meta_extra:
             meta.update(self._meta_extra)
         assistant_msg_id, failed = await self._persist(final_text, meta, partial=True)
         if failed:
             final_text = self._append_persistence_warning(final_text)
             self._error = True
+        meta_payload = meta if meta else None
         return PipelineResult(
             final_text=final_text,
-            meta=None,
+            meta=meta_payload,
             assistant_message_id=assistant_msg_id,
             error=self._error,
             error_message=self._error_message,
@@ -304,20 +384,24 @@ class ResponsePipeline:
         return ResponsePipeline._append_status_line(text, "Failed to save response.")
 
     @staticmethod
-    def _append_status_line(text: str, message: str) -> str:
+    def _append_status_line(
+        text: str, message: str, *, prefix: str | None = None
+    ) -> str:
         if not message:
             return text
+        prefix = "⚠️ " if prefix is None else prefix
         status_message = message
         if text:
             separator = "\n\n" if not text.endswith("\n") else "\n"
         else:
             separator = ""
-        return f"{text}{separator}⚠️ {status_message}"
+        return f"{text}{separator}{prefix}{status_message}"
 
 
 __all__ = [
     "AssistantMessagePersistenceError",
     "AssistantMessageWriter",
+    "ChunkRingGuard",
     "LLMStreamError",
     "PipelineResult",
     "ResponsePipeline",

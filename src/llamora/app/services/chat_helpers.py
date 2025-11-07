@@ -158,7 +158,12 @@ def build_conversation_context(
 def _error_events(pending_response, chunk: str | None = None):
     """Yield SSE events for an errored streaming response."""
 
-    message = chunk or pending_response.text or pending_response.error_message or ""
+    message = (
+        pending_response.text
+        or chunk
+        or pending_response.error_message
+        or ""
+    )
     yield format_sse_event("error", message)
     yield format_sse_event("done", {})
 

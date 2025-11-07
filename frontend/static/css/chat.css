@@ -101,6 +101,16 @@ body {
       background: var(--color-assistant-bg);
     }
 
+    &[data-repeat-guard="true"] {
+      border-color: color-mix(in srgb, var(--accent-20), transparent 55%);
+      background: linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--accent-10), transparent 78%) 0%,
+        transparent 72%
+      );
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-15), transparent 70%);
+    }
+
     &.message--error {
       border-color: var(--color-error-text);
       background: var(--color-error-bg);
@@ -130,6 +140,73 @@ body {
     display: none;
   }
 
+}
+
+.repeat-guard-indicator {
+  margin-top: var(--spacing-md);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.04em;
+  font-size: 0.85em;
+}
+
+.repeat-guard-indicator__waves {
+  display: inline-flex;
+  gap: 0.3rem;
+}
+
+.repeat-guard-indicator__dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-30), transparent 20%);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-10), transparent 15%);
+  opacity: 0.55;
+  animation: repeat-guard-breathe var(--motion-breathe) ease-in-out infinite;
+}
+
+.repeat-guard-indicator__dot--delay {
+  animation-delay: calc(var(--motion-breathe) / 6);
+}
+
+.repeat-guard-indicator__dot--late {
+  animation-delay: calc(var(--motion-breathe) / 3);
+}
+
+@keyframes repeat-guard-breathe {
+  0% {
+    transform: scale(0.75);
+    opacity: 0.35;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(0.75);
+    opacity: 0.35;
+  }
+}
+
+body[data-theme="dark"] #chat .message[data-repeat-guard="true"] {
+  border-color: color-mix(in srgb, var(--accent-20-dark), transparent 55%);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent-10-dark), transparent 78%) 0%,
+    transparent 68%
+  );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-15-dark), transparent 70%);
+}
+
+body[data-theme="dark"] .repeat-guard-indicator {
+  color: var(--color-text-muted-dark);
+}
+
+body[data-theme="dark"] .repeat-guard-indicator__dot {
+  background: color-mix(in srgb, var(--accent-30-dark), transparent 30%);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-15-dark), transparent 40%);
 }
 
 chat-view[data-rendering="true"] #chat {
