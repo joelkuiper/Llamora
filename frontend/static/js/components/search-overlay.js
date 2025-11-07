@@ -1,4 +1,5 @@
 import { flashHighlight, clearScrollTarget, createInlineSpinner } from "../ui.js";
+import { motionSafeBehavior } from "../utils/motion.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 import { InlineAutocompleteController } from "../utils/inline-autocomplete.js";
 import { createShortcutBag } from "../utils/global-shortcuts.js";
@@ -543,7 +544,10 @@ export class SearchOverlay extends ReactiveElement {
       const el = document.getElementById(targetId);
       if (el) {
         history.pushState(null, "", `${window.location.pathname}?target=${targetId}`);
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.scrollIntoView({
+          behavior: motionSafeBehavior("smooth"),
+          block: "center",
+        });
         flashHighlight(el);
         clearScrollTarget(targetId, { emitEvent: false });
       }

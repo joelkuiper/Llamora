@@ -1,4 +1,5 @@
 import { createListenerBag } from "../utils/events.js";
+import { motionSafeBehavior, prefersReducedMotion } from "../utils/motion.js";
 
 export const scrollEvents = new EventTarget();
 
@@ -245,7 +246,7 @@ export class ScrollManager {
     if (this.autoScrollEnabled || force) {
       this.container.scrollTo({
         top: this.container.scrollHeight,
-        behavior: "smooth",
+        behavior: motionSafeBehavior("smooth"),
       });
     }
 
@@ -270,7 +271,10 @@ export class ScrollManager {
 
     const { behavior = "smooth", block = "center" } = options || {};
     this.#skipNextRestore = true;
-    element.scrollIntoView({ behavior, block });
+    element.scrollIntoView({
+      behavior: motionSafeBehavior(behavior),
+      block,
+    });
     return true;
   }
 
@@ -380,10 +384,15 @@ export class ScrollManager {
 
   onScrollBtnClick() {
     if (!this.scrollBtn && !this.scrollBtnContainer) return;
-    this.scrollBtnContainer?.pulse?.();
-    if (this.scrollBtn && !this.scrollBtnContainer?.pulse) {
-      this.scrollBtn.classList.add("clicked");
-      window.setTimeout(() => this.scrollBtn?.classList.remove("clicked"), 300);
+    if (!prefersReducedMotion()) {
+      this.scrollBtnContainer?.pulse?.();
+      if (this.scrollBtn && !this.scrollBtnContainer?.pulse) {
+        this.scrollBtn.classList.add("clicked");
+        window.setTimeout(
+          () => this.scrollBtn?.classList.remove("clicked"),
+          300
+        );
+      }
     }
     this.scrollToBottom(true);
   }

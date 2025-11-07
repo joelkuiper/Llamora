@@ -5,6 +5,7 @@ import {
   navigateToDate,
 } from "./day.js";
 import { scrollEvents } from "./chat/scroll-manager.js";
+import { motionSafeBehavior } from "./utils/motion.js";
 
 let registered = false;
 
@@ -25,7 +26,10 @@ const focusChatComposer = () => {
 
   if (typeof textarea.scrollIntoView === "function") {
     requestAnimationFrame(() => {
-      textarea.scrollIntoView({ block: "center", behavior: "smooth" });
+      textarea.scrollIntoView({
+        block: "center",
+        behavior: motionSafeBehavior("smooth"),
+      });
     });
   }
 

@@ -2,6 +2,7 @@ import { renderMarkdown } from "../markdown.js";
 import { positionTypingIndicator } from "../typing-indicator.js";
 import { IncrementalMarkdownRenderer } from "../chat/incremental-markdown-renderer.js";
 import { scrollEvents } from "../chat/scroll-manager.js";
+import { prefersReducedMotion } from "../utils/motion.js";
 
 const NEWLINE_REGEX = /\[newline\]/g;
 const RENDER_COOLDOWN_MS = 16;
@@ -42,8 +43,15 @@ function revealMetaChips(container) {
   if (!container || !container.hidden) return;
 
   const parent = container.closest(".message");
-  const start = parent?.offsetHeight;
+  const reduceMotion = prefersReducedMotion();
+  const start = reduceMotion ? undefined : parent?.offsetHeight;
   container.hidden = false;
+
+  if (reduceMotion) {
+    requestScrollToBottom({ reason: "meta" });
+    return;
+  }
+
   const end = parent?.offsetHeight;
 
   if (parent && start !== undefined && end !== undefined) {

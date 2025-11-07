@@ -1,4 +1,5 @@
 import { ReactiveElement } from "../utils/reactive-element.js";
+import { prefersReducedMotion } from "../utils/motion.js";
 
 class ScrollBottomButtonElement extends ReactiveElement {
   #button = null;
@@ -32,7 +33,7 @@ class ScrollBottomButtonElement extends ReactiveElement {
   }
 
   pulse() {
-    if (!this.#button) return;
+    if (!this.#button || prefersReducedMotion()) return;
     this.#button.classList.add("clicked");
     if (this.#clickReset != null) {
       window.clearTimeout(this.#clickReset);

@@ -1,4 +1,5 @@
 import { scrollEvents } from "./chat/scroll-manager.js";
+import { motionSafeBehavior, prefersReducedMotion } from "./utils/motion.js";
 
 export const SPINNER = {
   interval: 80,
@@ -89,9 +90,27 @@ export function stopButtonSpinner(btn) {
 }
 
 export function flashHighlight(el) {
-  if (!el) return;
+  if (!(el instanceof HTMLElement)) return;
+  const existing = el.dataset.flashTimerId;
+  if (existing) {
+    window.clearTimeout(Number(existing));
+    delete el.dataset.flashTimerId;
+  }
   el.classList.remove("no-anim");
   el.classList.add("highlight");
+
+  if (prefersReducedMotion()) {
+    el.style.backgroundColor = "var(--highlight-color)";
+    const timeoutId = window.setTimeout(() => {
+      el.classList.remove("highlight");
+      el.style.backgroundColor = "";
+      el.classList.add("no-anim");
+      delete el.dataset.flashTimerId;
+    }, 600);
+    el.dataset.flashTimerId = String(timeoutId);
+    return;
+  }
+
   el.style.animation = "flash 1s ease-in-out";
   el.addEventListener(
     "animationend",
@@ -99,6 +118,7 @@ export function flashHighlight(el) {
       el.classList.remove("highlight");
       el.style.animation = "";
       el.classList.add("no-anim");
+      delete el.dataset.flashTimerId;
     },
     { once: true }
   );
@@ -171,7 +191,10 @@ export function scrollToHighlight(fallbackTarget) {
         new CustomEvent("scroll:target", {
           detail: {
             id: target,
-            options: { behavior: "smooth", block: "center" },
+            options: {
+              behavior: motionSafeBehavior("smooth"),
+              block: "center",
+            },
           },
         })
       );
