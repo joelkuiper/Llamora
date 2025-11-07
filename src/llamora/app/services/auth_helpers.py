@@ -195,12 +195,34 @@ class SecureCookieManager:
                 self.dek_store[sid] = dek
             return dek
 
-        data = self.get_secure_cookie("dek")
+        state = self._cookie_state()
+        data = state.get("dek")
         if not data:
             return None
         try:
             return base64.b64decode(data)
         except Exception:
+            current_app.logger.info(
+                "Invalid DEK cookie encountered; clearing cached credentials",
+                exc_info=True,
+            )
+            state.pop("dek", None)
+            if self.dek_storage == "session":
+                sid = state.get("sid") or ""
+            else:
+                sid = None
+            if sid is not None:
+                state.pop("sid", None)
+            self.clear_session_dek()
+
+            uid = state.get("uid")
+            if uid:
+                if self.dek_storage == "session":
+                    cache_key = (uid, sid or "")
+                else:
+                    cache_key = (uid, data)
+                self._user_snapshot_cache.pop(cache_key, None)
+
             return None
 
     async def load_user(self) -> None:
