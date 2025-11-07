@@ -146,6 +146,8 @@ export class Tags extends BaseHTMLElement {
     this.#suggestions = this.#popoverEl?.querySelector(".tag-suggestions") ?? null;
     this.#closeButton = this.#popoverEl?.querySelector(".overlay-close") ?? null;
     this.#tagContainer = this.querySelector(".meta-tags");
+
+    this.#button?.setAttribute("aria-expanded", "false");
   }
 
   #teardownListeners() {
@@ -165,6 +167,7 @@ export class Tags extends BaseHTMLElement {
       getPanel: () => this.#panel,
       onShow: () => {
         this.#button.classList.add("active");
+        this.#button?.setAttribute("aria-expanded", "true");
         this.classList.add("popover-open");
         if (this.#suggestions && !this.#suggestions.dataset.loaded) {
           htmx.trigger(this.#suggestions, "tag-popover:show");
@@ -175,8 +178,10 @@ export class Tags extends BaseHTMLElement {
       },
       onHide: () => {
         this.#button.classList.remove("active");
+        this.#button?.setAttribute("aria-expanded", "false");
       },
       onHidden: () => {
+        this.#button?.setAttribute("aria-expanded", "false");
         this.classList.remove("popover-open");
         if (this.#suggestions) {
           this.#suggestions.innerHTML = "";

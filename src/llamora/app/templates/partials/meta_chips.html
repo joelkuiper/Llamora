@@ -39,7 +39,7 @@
       {% endfor %}
     </div>
 
-    <div class="tag-popover" role="tooltip" hidden>
+    <div class="tag-popover" role="dialog" aria-modal="true" hidden>
       <div class="tp-content">
         <button type="button" class="overlay-close" aria-label="Close">×</button>
         <form hx-post="{{ url_for('tags.add_tag', msg_id=msg_id) }}"
