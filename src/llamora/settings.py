@@ -301,9 +301,16 @@ embedding_concurrency = int(settings.get("EMBEDDING.concurrency", 0))
 if embedding_concurrency <= 0:
     embedding_concurrency = _cpu_count()
     settings.set("EMBEDDING.concurrency", embedding_concurrency)
-    settings.set(
-        "WORKERS.index_worker.max_queue_size",
-        int(settings.get("WORKERS.index_worker.max_queue_size", 0)),
-    )
+
+queue_size_default = DEFAULTS["WORKERS"]["index_worker"]["max_queue_size"]
+queue_size_raw = settings.get(
+    "WORKERS.index_worker.max_queue_size", queue_size_default
+)
+try:
+    queue_size = int(queue_size_raw)
+except (TypeError, ValueError):
+    queue_size = queue_size_default
+
+settings.set("WORKERS.index_worker.max_queue_size", queue_size)
 
 __all__ = ["settings"]
