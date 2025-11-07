@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import asyncio
 import logging
+import threading
+from collections.abc import Coroutine
 from pathlib import Path
 from typing import Any, TypeVar, cast
-from collections.abc import Coroutine
 
 import aiosqlite
 from aiosqlitepool import SQLiteConnectionPool
@@ -50,6 +53,8 @@ class LocalDB:
         self._vectors: VectorsRepository | None = None
         self._search_history: SearchHistoryRepository | None = None
         self._events: RepositoryEventBus | None = None
+        self._init_lock = asyncio.Lock()
+        self._sync_lock = threading.Lock()
 
     async def __aenter__(self) -> "LocalDB":
         await self.init()
@@ -66,15 +71,16 @@ class LocalDB:
         self._run_sync(self.close())
 
     def _run_sync(self, operation: Coroutine[Any, Any, Any]) -> Any:
-        if hasattr(asyncio, "Runner"):
-            with asyncio.Runner() as runner:  # type: ignore[attr-defined]
-                return runner.run(operation)
+        with self._sync_lock:
+            if hasattr(asyncio, "Runner"):
+                with asyncio.Runner() as runner:  # type: ignore[attr-defined]
+                    return runner.run(operation)
 
-        loop = asyncio.new_event_loop()
-        try:
-            return loop.run_until_complete(operation)
-        finally:
-            loop.close()
+            loop = asyncio.new_event_loop()
+            try:
+                return loop.run_until_complete(operation)
+            finally:
+                loop.close()
 
     def set_search_api(self, api) -> None:
         self.search_api = api
@@ -82,47 +88,49 @@ class LocalDB:
             self._messages.set_on_message_appended(self._on_message_appended)
 
     async def init(self) -> None:
-        if self.pool is not None:
-            return
+        async with self._init_lock:
+            if self.pool is not None:
+                return
 
-        is_new = not self.db_path.exists()
-        acquisition_timeout = int(settings.DATABASE.pool_acquire_timeout)
+            is_new = not self.db_path.exists()
+            acquisition_timeout = int(settings.DATABASE.pool_acquire_timeout)
 
-        async def _connection_factory() -> SQLitePoolConnection:
-            return cast(SQLitePoolConnection, await self._create_connection())
+            async def _connection_factory() -> SQLitePoolConnection:
+                return cast(SQLitePoolConnection, await self._create_connection())
 
-        pool = SQLiteConnectionPool(
-            _connection_factory,
-            pool_size=int(settings.DATABASE.pool_size),
-            acquisition_timeout=acquisition_timeout,
-        )
-        self.pool = pool
-        try:
-            await self._ensure_schema(is_new)
-            self._configure_repositories()
-        except Exception:
-            await pool.close()
-            self.pool = None
+            pool = SQLiteConnectionPool(
+                _connection_factory,
+                pool_size=int(settings.DATABASE.pool_size),
+                acquisition_timeout=acquisition_timeout,
+            )
+            self.pool = pool
+            try:
+                await self._ensure_schema(is_new)
+                self._configure_repositories()
+            except Exception:
+                await pool.close()
+                self.pool = None
+                self._users = None
+                self._messages = None
+                self._tags = None
+                self._vectors = None
+                self._search_history = None
+                self._events = None
+                raise
+
+    async def close(self) -> None:
+        async with self._init_lock:
+            if self.pool is not None:
+                try:
+                    await self.pool.close()
+                finally:
+                    self.pool = None
             self._users = None
             self._messages = None
             self._tags = None
             self._vectors = None
             self._search_history = None
             self._events = None
-            raise
-
-    async def close(self) -> None:
-        if self.pool is not None:
-            try:
-                await self.pool.close()
-            finally:
-                self.pool = None
-        self._users = None
-        self._messages = None
-        self._tags = None
-        self._vectors = None
-        self._search_history = None
-        self._events = None
 
     async def _create_connection(self) -> aiosqlite.Connection:
         conn = await aiosqlite.connect(
