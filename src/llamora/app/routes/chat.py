@@ -11,7 +11,6 @@ import logging
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from typing import Any, Mapping
-from werkzeug.exceptions import HTTPException
 
 from llamora.llm.chat_template import build_opening_messages, render_chat_prompt
 
@@ -317,32 +316,22 @@ async def sse_reply(user_msg_id: str, date: str):
     ctx = dict(ctx_mapping)
 
     manager = _chat_stream_manager()
+    pending_response = manager.get(user_msg_id, uid)
+    if not pending_response:
+        try:
+            pending_response = manager.start_stream(
+                user_msg_id,
+                uid,
+                actual_date or normalized_date,
+                history,
+                dek,
+                params,
+                ctx,
+            )
+        except StreamCapacityError as exc:
+            return StreamSession.backpressure(
+                "The assistant is busy. Please try again in a moment.",
+                exc.retry_after,
+            )
 
-    try:
-        pending_response = manager.get(user_msg_id, uid)
-        if not pending_response:
-            try:
-                pending_response = manager.start_stream(
-                    user_msg_id,
-                    uid,
-                    actual_date or normalized_date,
-                    history,
-                    dek,
-                    params,
-                    ctx,
-                )
-            except StreamCapacityError as exc:
-                return StreamSession.backpressure(
-                    "The assistant is busy. Please try again in a moment.",
-                    exc.retry_after,
-                )
-        return StreamSession.pending(pending_response)
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception(
-            "Failed to start streaming reply for %s", user_msg_id
-        )
-        return StreamSession.error(
-            "The assistant ran into an unexpected error. Please try again."
-        )
+    return StreamSession.pending(pending_response)
