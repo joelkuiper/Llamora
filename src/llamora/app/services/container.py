@@ -92,13 +92,39 @@ class AppLifecycle:
             logger.debug(
                 "Starting application lifecycle: db.init -> search_api.start -> llm_service.ensure_started"
             )
+            db_initialised = False
+            search_started = False
+            llm_started = False
+
             try:
                 await self._services.db.init()
+                db_initialised = True
                 await self._services.search_api.start()
+                search_started = True
                 await self._services.llm_service.ensure_started()
+                llm_started = True
             except Exception:
+                logger.debug(
+                    "Startup failed; rolling back initialised services", exc_info=True
+                )
                 with suppress(Exception):
-                    await self._services.db.close()
+                    if search_started:
+                        logger.debug(
+                            "Rollback: stopping search API after startup failure"
+                        )
+                        await self._services.search_api.stop()
+                with suppress(Exception):
+                    if llm_started:
+                        logger.debug(
+                            "Rollback: stopping LLM service after startup failure"
+                        )
+                        await self._services.llm_service.ensure_stopped()
+                with suppress(Exception):
+                    if db_initialised:
+                        logger.debug(
+                            "Rollback: closing database after startup failure"
+                        )
+                        await self._services.db.close()
                 raise
 
             asyncio.create_task(
