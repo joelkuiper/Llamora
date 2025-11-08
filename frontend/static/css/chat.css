@@ -387,7 +387,7 @@ chat-view[data-rendering="true"] #chat {
 
 /* Progressive enhancement fallbacks */
 @supports not (backdrop-filter: blur(1px)) {
-  #search-container .search-results-overlay {
+  #app-header .search-results-overlay {
     background: var(--glass-fallback-bg);
   }
 }
