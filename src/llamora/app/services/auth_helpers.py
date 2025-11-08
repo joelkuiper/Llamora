@@ -1,5 +1,6 @@
 import base64
 import secrets
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from typing import Any, Mapping
 
@@ -35,7 +36,8 @@ class SecureCookieManager:
         self.cookie_name = cookie_name
         self.cookie_box = secret.SecretBox(key)
         self.dek_storage = dek_storage.lower()
-        self.dek_store: TTLCache[str, bytes] = TTLCache(maxsize=1024, ttl=session_ttl)
+        self._session_ttl = max(0, int(session_ttl))
+        self.dek_store: TTLCache[str, bytes] = TTLCache(maxsize=1024, ttl=self._session_ttl)
         self._user_snapshot_cache: TTLCache[tuple[str, str], Any] = TTLCache(
             maxsize=user_cache_maxsize,
             ttl=user_cache_ttl,
@@ -105,6 +107,12 @@ class SecureCookieManager:
             request.is_secure,
             list(data.keys()),
         )
+        max_age: int | None = None
+        expires: datetime | None = None
+        if self._session_ttl > 0:
+            max_age = self._session_ttl
+            expires = datetime.now(timezone.utc) + timedelta(seconds=self._session_ttl)
+
         response.set_cookie(
             self.cookie_name,
             b64,
@@ -112,6 +120,8 @@ class SecureCookieManager:
             secure=request.is_secure,
             samesite="Lax",
             path="/",
+            max_age=max_age,
+            expires=expires,
         )
         setattr(g, self._cookie_state_attr, data)
         return response
