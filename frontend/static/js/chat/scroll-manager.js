@@ -64,7 +64,9 @@ export class ScrollManager {
     this.#listeners = createListenerBag();
     const bag = this.#listeners;
 
-    bag.add(scrollEvents, FORCE_BOTTOM_EVENT, () => this.scrollToBottom(true));
+    bag.add(scrollEvents, FORCE_BOTTOM_EVENT, (event) => {
+      this.#handleForceBottom(event?.detail);
+    });
     bag.add(scrollEvents, TARGET_EVENT, (event) => {
       const detail = event?.detail || {};
       if (!detail || (!detail.id && !detail.element)) return;
@@ -263,6 +265,19 @@ export class ScrollManager {
     } else {
       this.alignScrollButton();
     }
+  }
+
+  #handleForceBottom(detail) {
+    const meta = detail || {};
+    const force = meta.force === true;
+
+    if (!force && !this.autoScrollEnabled) {
+      this.toggleScrollBtn();
+      this.alignScrollButton();
+      return;
+    }
+
+    this.scrollToBottom(force);
   }
 
   scrollToTarget(target, options = {}) {

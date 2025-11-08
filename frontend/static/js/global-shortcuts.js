@@ -114,7 +114,9 @@ const toggleCalendar = () => clickIfEnabled("#calendar-btn");
 
 const scrollChatToBottom = () => {
   scrollEvents.dispatchEvent(
-    new CustomEvent("scroll:force-bottom", { detail: { source: "shortcut" } })
+    new CustomEvent("scroll:force-bottom", {
+      detail: { source: "shortcut", force: true },
+    })
   );
   return true;
 };
