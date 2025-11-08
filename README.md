@@ -80,18 +80,23 @@ You can write freely, think aloud, or stay in silence.
 
 ### Run Llamora
 
-   ```bash
-   export LLAMORA_LLM__SERVER__HOST=http://127.0.0.1:8081
-   uv run llamora-server
-   ```
+Development (Quart with live reload):
 
-   Open [http://localhost:5000](http://localhost:5000) in your browser.
+```bash
+export LLAMORA_LLM__SERVER__HOST=http://127.0.0.1:8081
+uv run llamora-server dev
+```
 
-   Optional:
+Production (Hypercorn with worker management):
 
-   * `QUART_DEBUG=1` for live code reloads
-   * `LOG_LEVEL=DEBUG` for detailed logs
-   * `LLAMORA_APP__PORT=8000` to change the port
+```bash
+export LLAMORA_LLM__SERVER__HOST=http://127.0.0.1:8081
+uv run llamora-server --workers 4 --graceful-timeout 30 --keep-alive 5
+```
+
+Both commands honor configuration overrides such as `LLAMORA_APP__HOST` and `LLAMORA_APP__PORT`, or you can pass `--host`/`--port` flags directly. Development keeps Quart’s code reloader enabled by default; append `--no-reload` to disable it. In production, tune `--workers` to match your CPU cores and use `--graceful-timeout`/`--keep-alive` to align with load balancers or process managers.
+
+Open [http://localhost:5000](http://localhost:5000) (or your configured port) in your browser once the server starts.
 
 ---
 
