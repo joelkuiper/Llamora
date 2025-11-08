@@ -1,5 +1,23 @@
+const escapeHtml = (value) =>
+  String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+const renderer = new marked.Renderer();
+renderer.html = (html) => {
+  const raw = typeof html === "string" ? html : html?.text ?? "";
+  return `<pre class="code-block"><code>${escapeHtml(raw)}</code></pre>`;
+};
+
 export function renderMarkdown(text) {
-  const rawHtml = marked.parse(text, { gfm: true, breaks: true });
+  const rawHtml = marked.parse(text, {
+    gfm: true,
+    breaks: true,
+    renderer,
+  });
   return DOMPurify.sanitize(rawHtml);
 }
 
