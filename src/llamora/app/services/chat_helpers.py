@@ -5,7 +5,6 @@ from __future__ import annotations
 import math
 from contextlib import suppress
 from datetime import datetime, timezone
-from html import escape
 from types import MappingProxyType
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -52,11 +51,11 @@ def _serialize_payload(payload: Any) -> tuple[str, bool]:
 
 
 def format_sse_event(event_type: str, payload: Any) -> str:
-    """Format a Server-Sent Event payload with consistent escaping."""
+    """Format a Server-Sent Event payload with newline normalization."""
 
-    serialized, escape_quotes = _serialize_payload(payload)
+    serialized, _ = _serialize_payload(payload)
     if serialized:
-        serialized = replace_newline(escape(serialized, quote=escape_quotes))
+        serialized = replace_newline(serialized)
     return f"event: {event_type}\ndata: {serialized}\n\n"
 
 
