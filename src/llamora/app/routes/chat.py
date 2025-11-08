@@ -202,8 +202,19 @@ async def sse_opening(date: str):
     yesterday_msgs = await _db().messages.get_recent_history(
         uid, yesterday_iso, dek, limit=20
     )
+    had_yesterday_activity = bool(yesterday_msgs)
 
-    has_no_activity = not is_new and not yesterday_msgs
+    trim_context = {"date": date_str, "part_of_day": pod}
+    try:
+        llm_client = get_services().llm_service.llm
+        yesterday_msgs = await llm_client.trim_history(
+            yesterday_msgs,
+            context=trim_context,
+        )
+    except Exception:  # pragma: no cover - defensive
+        logger.exception("Failed to trim opening history")
+
+    has_no_activity = not is_new and not had_yesterday_activity
     try:
         opening_messages = build_opening_messages(
             yesterday_messages=yesterday_msgs,

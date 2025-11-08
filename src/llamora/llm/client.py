@@ -3,7 +3,7 @@ import hashlib
 import logging
 from pathlib import Path
 from contextlib import asynccontextmanager, suppress
-from typing import Any, AsyncGenerator, NamedTuple
+from typing import Any, AsyncGenerator, Mapping, NamedTuple, Sequence
 
 import httpx
 import orjson
@@ -363,6 +363,37 @@ class LLMClient:
             if tokens <= max_input:
                 return history[start_idx:]
         return []
+
+    async def trim_history(
+        self,
+        history: Sequence[Mapping[str, Any] | dict[str, Any]],
+        *,
+        params: Mapping[str, Any] | None = None,
+        context: Mapping[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return ``history`` trimmed to fit within the model context window."""
+
+        history_list = [
+            dict(entry) if not isinstance(entry, dict) else entry
+            for entry in history
+        ]
+        if not history_list:
+            return history_list
+
+        if self.ctx_size is None:
+            return history_list
+
+        cfg = {**self.default_request, **(dict(params) if params is not None else {})}
+        n_predict = cfg.get("n_predict")
+        if n_predict is None:
+            return history_list
+
+        max_input = self.ctx_size - int(n_predict)
+        if max_input <= 0:
+            return history_list
+
+        ctx = dict(context or {})
+        return await self._trim_history(history_list, max_input, ctx)
 
     async def stream_response(
         self,
