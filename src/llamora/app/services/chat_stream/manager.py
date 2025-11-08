@@ -286,11 +286,53 @@ def _coerce_int(value: object) -> int | None:
 
     if value is None:
         return None
-    try:
+    if isinstance(value, bool):
         return int(value)
-    except (TypeError, ValueError):  # pragma: no cover - defensive
-        logger.warning("Invalid integer configuration for repeat guard: %r", value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, (bytes, bytearray)):
+        try:
+            text = value.decode()
+        except Exception:  # pragma: no cover - defensive
+            logger.warning("Invalid byte sequence for integer configuration")
+            return None
+        try:
+            return int(text.strip())
+        except (TypeError, ValueError):  # pragma: no cover - defensive
+            logger.warning("Invalid integer configuration for repeat guard: %r", value)
+            return None
+    if isinstance(value, str):
+        value = value.strip()
+        if not value:
+            return None
+        try:
+            return int(value)
+        except ValueError:
+            logger.warning("Invalid integer configuration for repeat guard: %r", value)
+            return None
+
+    int_method = getattr(value, "__int__", None)
+    if callable(int_method):
+        try:
+            result = int_method()
+        except Exception:  # pragma: no cover - defensive
+            logger.warning("Invalid integer configuration for repeat guard: %r", value)
+            return None
+        if isinstance(result, int):
+            return result
+        if isinstance(result, bool):
+            return int(result)
+        if isinstance(result, float):
+            return int(result)
+        if isinstance(result, (str, bytes, bytearray)):
+            return _coerce_int(result)
+        logger.warning("Unsupported __int__ return type for configuration: %r", result)
         return None
+
+    logger.warning("Unsupported type for integer configuration: %r", value)
+    return None
 
 
 class StreamCapacityError(RuntimeError):
