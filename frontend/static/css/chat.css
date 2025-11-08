@@ -123,7 +123,7 @@ body {
       cursor: help;
       pointer-events: auto;
       opacity: 0;
-      transform: translateY(-0.3rem);
+      transform: translateY(0.2rem);
       transition: opacity 0.28s ease, transform 0.28s ease;
     }
 
