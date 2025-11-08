@@ -4,8 +4,9 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass
+from contextlib import suppress
 from types import MappingProxyType
-from typing import Any, Awaitable, Callable, Iterable, Mapping, Protocol
+from typing import Any, Awaitable, Callable, Iterable, Mapping, Protocol, cast
 
 from blinker import Namespace, Signal
 
@@ -73,13 +74,30 @@ class ServicePulse:
     def _handle_result(self, result: Any) -> None:
         if result is None:
             return
-        if asyncio.isfuture(result) or asyncio.iscoroutine(result):
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                asyncio.run(result)
-            else:  # pragma: no branch - simple scheduling
-                loop.create_task(result)
+
+        awaitable: Awaitable[Any] | None = None
+        if asyncio.iscoroutine(result):
+            awaitable = result
+        elif asyncio.isfuture(result):
+            future = cast(asyncio.Future[Any], result)
+            if not future.done():
+
+                def _log_future(fut: asyncio.Future[Any]) -> None:
+                    with suppress(Exception):
+                        fut.result()
+
+                future.add_done_callback(_log_future)
+            return
+
+        if awaitable is None:
+            return
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            asyncio.run(awaitable)
+        else:  # pragma: no branch - simple scheduling
+            loop.create_task(awaitable)
 
     def subscribe(
         self,

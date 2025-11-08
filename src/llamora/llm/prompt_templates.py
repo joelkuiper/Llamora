@@ -70,8 +70,14 @@ def get_prompt_template(name: str):
     try:
         return environment.get_template(name)
     except TemplateNotFound as exc:  # pragma: no cover - defensive
+        loader = environment.loader
+        search_path = getattr(loader, "searchpath", None)
+        if search_path is None:
+            location = "<unknown>"
+        else:
+            location = ", ".join(str(path) for path in search_path)
         raise FileNotFoundError(
-            f"Prompt template '{name}' could not be located in {environment.loader.searchpath}"
+            f"Prompt template '{name}' could not be located in {location}"
         ) from exc
 
 

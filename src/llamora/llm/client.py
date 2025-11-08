@@ -596,7 +596,7 @@ class LLMClient:
                 yield {"type": "error", "data": f"Prompt error: {e}"}
                 return
         try:
-            prompt_text = render_chat_prompt(messages)
+            prompt_text = render_chat_prompt(messages).prompt
         except Exception as e:
             self.logger.exception("Failed to render chat prompt")
             yield {"type": "error", "data": f"Prompt error: {e}"}

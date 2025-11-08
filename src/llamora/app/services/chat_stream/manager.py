@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import time
@@ -6,7 +8,7 @@ from itertools import count
 from collections import deque
 from collections.abc import AsyncIterator
 from contextlib import suppress
-from typing import Callable
+from typing import Callable, cast
 
 from llamora.llm.client import LLMClient
 from llamora.settings import settings
@@ -120,11 +122,11 @@ class PendingResponse(ResponsePipelineCallbacks):
         )
         self._parser = ChatMetaParser()
         self._visible_total = ""
-        repeat_guard_size = _coerce_int(
-            settings.get("LLM.stream.repeat_guard_size", None)
+        repeat_guard_size = cast(
+            int | None, settings.get("LLM.stream.repeat_guard_size", None)
         )
-        repeat_guard_min_length = _coerce_int(
-            settings.get("LLM.stream.repeat_guard_min_length", None)
+        repeat_guard_min_length = cast(
+            int | None, settings.get("LLM.stream.repeat_guard_min_length", None)
         )
         self._pipeline = ResponsePipeline(
             session=self._session,
@@ -279,20 +281,6 @@ class PendingResponse(ResponsePipelineCallbacks):
         self.text = total
         self._total_len = len(total)
         self._visible_total = total
-
-
-def _coerce_int(value: object) -> int | None:
-    """Best-effort conversion of numeric configuration values."""
-
-    if value is None:
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):  # pragma: no cover - defensive
-        logger.warning("Invalid integer configuration for repeat guard: %r", value)
-        return None
-
-
 class StreamCapacityError(RuntimeError):
     """Raised when no parallel slots are available for a new stream."""
 
