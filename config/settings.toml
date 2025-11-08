@@ -80,19 +80,23 @@ gpu = "auto"
 ctx_size = 8192
 
 [default.LLM.request]
-n_predict = 1024
-stream = true
-stop = ["<|im_start|>", "<|im_end|>", "<|endoftext|>", "<|end|>"]
-n_keep = -1
-cache_prompt = true
+n_predict       = 1024
+stream          = true
+stop            = ["<|im_start|>", "<|im_end|>", "<|endoftext|>", "<|end|>"]
+n_keep          = -1
+cache_prompt    = true
 
-mirostat = 2
-mirostat_tau = 5.0
-mirostat_eta = 0.1
+mirostat        = 2
+mirostat_tau    = 4.5
+mirostat_eta    = 0.12
 
-repeat_penalty = 1.15
-repeat_last_n = 128
-penalize_nl = true
+repeat_penalty  = 1.25
+repeat_last_n   = 320
+penalize_nl     = true
+
+temperature = 0.7
+top_p = 0.8
+top_k = 20
 
 [default.LLM.stream]
 pending_ttl = 300
