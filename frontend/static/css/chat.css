@@ -123,7 +123,6 @@ body {
       cursor: help;
       pointer-events: auto;
       opacity: 0;
-      transform: translateY(0.2rem);
       transition: opacity 0.28s ease, transform 0.28s ease;
     }
 
@@ -164,7 +163,6 @@ body {
       align-items: center;
       gap: 0.15rem;
       max-width: 1.2rem;
-      overflow: hidden;
       transition: opacity 0.4s ease, max-width 0.4s ease;
     }
 
