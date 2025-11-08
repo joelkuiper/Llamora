@@ -376,8 +376,8 @@ class MessagesRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT m.id, m.role, m.nonce, m.ciphertext, m.alg, m.created_at,
-                       m.prompt_tokens
+                SELECT m.id, m.role, m.reply_to, m.nonce, m.ciphertext, m.alg,
+                       m.created_at, m.prompt_tokens
                 FROM messages m
                 WHERE m.user_id = ?
                 ORDER BY m.id DESC
@@ -395,8 +395,8 @@ class MessagesRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT m.id, m.role, m.nonce, m.ciphertext, m.alg, m.created_at,
-                       m.prompt_tokens
+                SELECT m.id, m.role, m.reply_to, m.nonce, m.ciphertext, m.alg,
+                       m.created_at, m.prompt_tokens
                 FROM messages m
                 WHERE m.user_id = ? AND m.id < ?
                 ORDER BY m.id DESC
