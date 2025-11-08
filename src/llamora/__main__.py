@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import sys
 from logging import getLogger
 from typing import Sequence
 
@@ -130,11 +131,11 @@ def main() -> None:
 
 
 def prod() -> None:
-    cli(["prod"])
+    cli(["prod", *sys.argv[1:]])
 
 
 def dev() -> None:
-    cli(["dev"])
+    cli(["dev", *sys.argv[1:]])
 
 
 if __name__ == "__main__":
