@@ -8,6 +8,9 @@
             data-user-msg-id="{{ user_msg_id }}"
             data-assistant-msg-id=""
             data-sse-url="{{ sse_url }}"
+            {%- if stop_url %}
+            data-stop-url="{{ stop_url }}"
+            {%- endif %}
             role="article"
             aria-labelledby="msg-{{ user_msg_id }}-speaker msg-{{ user_msg_id }}-body">
   <span class="raw-response" hidden></span>

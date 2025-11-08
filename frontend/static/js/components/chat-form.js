@@ -363,8 +363,36 @@ class ChatFormElement extends ReactiveElement {
   #handleStopClick() {
     if (!this.#chat) return;
     const indicator = this.#getTypingIndicator();
-    const stopEndpoint = indicator?.dataset.stopUrl;
-    const stream = indicator?.closest("llm-stream");
+    const currentId =
+      this.#streamingMsgId ||
+      this.#state?.currentStreamMsgId ||
+      indicator?.dataset.userMsgId ||
+      null;
+    let stream = null;
+    if (currentId) {
+      const normalized = String(currentId);
+      const escapeAttr = (value) => {
+        if (window.CSS?.escape) {
+          return CSS.escape(value);
+        }
+        return value.replace(/["\\]/g, "\\$&");
+      };
+      const byAttr = this.#chat.querySelector(
+        `llm-stream[data-user-msg-id="${escapeAttr(normalized)}"]`
+      );
+      if (byAttr) {
+        stream = byAttr;
+      } else {
+        const byId = document.getElementById(`msg-${normalized}`);
+        if (byId && byId.tagName === "LLM-STREAM") {
+          stream = byId;
+        }
+      }
+    }
+    if (!stream && indicator) {
+      stream = indicator.closest("llm-stream");
+    }
+    const stopEndpoint = stream?.dataset?.stopUrl || indicator?.dataset?.stopUrl;
     if (stream && typeof stream.abort === "function") {
       stream.abort();
     } else if (indicator) {
