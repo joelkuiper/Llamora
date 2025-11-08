@@ -109,6 +109,12 @@ export function renderAllMarkdown(root, nodes = null) {
   const targets = collectMarkdownBodies(root, normalizeNodes(nodes));
 
   targets.forEach((el) => {
+    const isStreaming =
+      el.closest("llm-stream")?.dataset.streaming === "true";
+    if (isStreaming) {
+      // Streaming responses manage their own incremental rendering to avoid deleting the typing indicator mid-update.
+      return;
+    }
     if (el.dataset.rendered !== "true" && !el.querySelector("#typing-indicator")) {
       renderMarkdownInElement(el);
     }

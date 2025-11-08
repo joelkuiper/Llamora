@@ -31,6 +31,12 @@ function collectTargetsFromNode(node, targets) {
 
 function shouldRender(el) {
   if (!el || !(el instanceof Element) || !el.isConnected) return false;
+  const isStreaming =
+    el.closest("llm-stream")?.dataset.streaming === "true";
+  if (isStreaming) {
+    // Streaming responses manage their own incremental rendering to avoid deleting the typing indicator mid-update.
+    return false;
+  }
   if (el.dataset.rendered === "true") return false;
   if (el.querySelector(TYPING_INDICATOR_SELECTOR)) return false;
   return true;
