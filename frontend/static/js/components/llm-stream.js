@@ -304,11 +304,6 @@ class LlmStreamElement extends HTMLElement {
     if (!meta) return;
 
     this.#meta = meta;
-    if (meta.repeat_guard) {
-      this.#showRepeatGuardIndicator();
-    } else {
-      this.#clearRepeatGuardIndicator();
-    }
 
     this.dispatchEvent(
       new CustomEvent("llm-stream:meta", {
@@ -321,46 +316,6 @@ class LlmStreamElement extends HTMLElement {
         },
       })
     );
-  }
-
-  #showRepeatGuardIndicator() {
-    this.dataset.repeatGuard = "true";
-
-    if (this.#repeatGuardIndicator?.isConnected) {
-      return;
-    }
-
-    const indicator = document.createElement("div");
-    indicator.className = "repeat-guard-indicator";
-    indicator.setAttribute("role", "status");
-    indicator.setAttribute("aria-live", "polite");
-    indicator.title = "Response paused after repeating itself.";
-    indicator.innerHTML = `
-      <span class="repeat-guard-indicator__waves" aria-hidden="true">
-        <span class="repeat-guard-indicator__dot"></span>
-        <span class="repeat-guard-indicator__dot repeat-guard-indicator__dot--delay"></span>
-        <span class="repeat-guard-indicator__dot repeat-guard-indicator__dot--late"></span>
-      </span>
-      <span class="visually-hidden">Response paused after repeating itself.</span>
-    `;
-
-    const placeholder = this.querySelector(".meta-chips-placeholder");
-    if (placeholder?.parentNode) {
-      placeholder.parentNode.insertBefore(indicator, placeholder);
-    } else {
-      this.append(indicator);
-    }
-
-    this.#repeatGuardIndicator = indicator;
-  }
-
-  #clearRepeatGuardIndicator() {
-    delete this.dataset.repeatGuard;
-
-    if (this.#repeatGuardIndicator?.isConnected) {
-      this.#repeatGuardIndicator.remove();
-    }
-    this.#repeatGuardIndicator = null;
   }
 
   #scheduleRender({ repositionTyping = false, shouldScroll = false } = {}) {
