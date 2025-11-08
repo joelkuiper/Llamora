@@ -7,6 +7,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
+
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
 from llamora.settings import settings
@@ -152,16 +153,22 @@ def _format_vibes_line(display_emojis: Sequence[str]) -> str:
 def format_vibes_text(history: Sequence[Mapping[str, Any] | dict[str, Any]]) -> str:
     """Render the optional emoji vibes line for ``history``.
 
-    The chat prompt template displays at most the five most recent emojis,
-    ordered from newest to oldest, when any history entries include an
-    ``emoji`` value in their ``meta`` mapping.
+    Shows up to five *distinct* recent emojis from the history, newest first.
     """
+    seen: set[str] = set()
+    ordered: list[str] = []
 
-    emojis: list[str] = []
-    for entry in history:
+    # walk from newest to oldest
+    for entry in reversed(history):
         emoji = _extract_emoji(entry)
-        if emoji:
-            emojis.append(emoji)
+        if not emoji:
+            continue
+        if emoji in seen:
+            continue
+        seen.add(emoji)
+        ordered.append(emoji)
+        if len(ordered) == 5:
+            break
 
-    display = tuple(reversed(emojis[-5:]))
-    return _format_vibes_line(display)
+    # ordered is newest→oldest
+    return _format_vibes_line(ordered)
