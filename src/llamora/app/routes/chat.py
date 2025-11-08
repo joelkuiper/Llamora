@@ -10,7 +10,7 @@ from quart import (
 import logging
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-from typing import Any, Mapping
+from typing import Any, Mapping, MutableMapping
 from werkzeug.exceptions import HTTPException
 
 from llamora.llm.chat_template import build_opening_messages, render_chat_prompt
@@ -28,6 +28,7 @@ from llamora.app.services.chat_helpers import (
     normalize_llm_config,
 )
 from llamora.app.services.chat_stream.manager import StreamCapacityError
+from llamora.app.services.tag_recall import build_tag_recall_context
 from llamora.app.services.time import (
     local_date,
     get_timezone,
@@ -54,6 +55,26 @@ def _chat_stream_manager():
 
 
 logger = logging.getLogger(__name__)
+
+
+def _max_prompt_tokens(llm_client, params: Mapping[str, Any] | None = None) -> int | None:
+    ctx_size = llm_client.ctx_size
+    if ctx_size is None:
+        return None
+
+    cfg: MutableMapping[str, Any] = dict(llm_client.default_request)
+    if params:
+        for key, value in params.items():
+            if value is not None:
+                cfg[key] = value
+
+    n_predict = cfg.get("n_predict")
+    try:
+        predict_tokens = int(n_predict)
+    except (TypeError, ValueError):
+        return ctx_size
+
+    return max(ctx_size - predict_tokens, 0)
 
 
 async def _require_user() -> Mapping[str, Any]:
@@ -223,7 +244,37 @@ async def sse_opening(date: str):
             is_new=is_new,
             has_no_activity=has_no_activity,
         )
-        _ = render_chat_prompt(opening_messages)
+        recall_context = await build_tag_recall_context(
+            _db(),
+            uid,
+            dek,
+            history=yesterday_msgs,
+            current_date=today_iso,
+        )
+        recall_inserted = False
+        if recall_context:
+            opening_messages.insert(
+                1,
+                {
+                    "role": "system",
+                    "content": recall_context.text,
+                },
+            )
+            recall_inserted = True
+
+        prompt_render = render_chat_prompt(opening_messages)
+        max_tokens = _max_prompt_tokens(llm_client)
+        if max_tokens is not None and prompt_render.token_count > max_tokens:
+            if recall_inserted:
+                logger.info(
+                    "Dropping tag recall context from opening prompt due to budget (%s > %s)",
+                    prompt_render.token_count,
+                    max_tokens,
+                )
+                opening_messages.pop(1)
+                prompt_render = render_chat_prompt(opening_messages)
+            if prompt_render.token_count > max_tokens:
+                raise ValueError("Opening prompt exceeds context window")
     except Exception as exc:
         logger.exception("Failed to prepare opening prompt")
 
@@ -332,12 +383,38 @@ async def sse_reply(user_msg_id: str, date: str):
     try:
         pending_response = manager.get(user_msg_id, uid)
         if not pending_response:
+            history_for_stream = list(history)
+            recall_context = await build_tag_recall_context(
+                _db(),
+                uid,
+                dek,
+                history=history,
+                current_date=actual_date or normalized_date,
+            )
+            if recall_context:
+                history_for_stream.append(
+                    {
+                        "id": None,
+                        "role": "system",
+                        "message": recall_context.text,
+                        "meta": {"tag_recall": {"tags": list(recall_context.tags)}},
+                    }
+                )
+            llm_client = get_services().llm_service.llm
+            try:
+                history_for_stream = await llm_client.trim_history(
+                    history_for_stream,
+                    params=params,
+                    context=ctx,
+                )
+            except Exception:
+                logger.exception("Failed to pre-trim history before streaming reply")
             try:
                 pending_response = manager.start_stream(
                     user_msg_id,
                     uid,
                     actual_date or normalized_date,
-                    history,
+                    history_for_stream,
                     dek,
                     params,
                     ctx,

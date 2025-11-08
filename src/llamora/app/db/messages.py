@@ -167,6 +167,7 @@ class MessagesRepository(BaseRepository):
                     "id": row["id"],
                     "created_at": row["created_at"],
                     "role": row["role"],
+                    "reply_to": row["reply_to"],
                     "message": rec.get("message", ""),
                     "meta": rec.get("meta", {}),
                     "prompt_tokens": int(row["prompt_tokens"] or 0),
@@ -431,7 +432,7 @@ class MessagesRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 f"""
-                SELECT m.id, m.created_at, m.role, m.nonce, m.ciphertext, m.alg,
+                SELECT m.id, m.created_at, m.role, m.reply_to, m.nonce, m.ciphertext, m.alg,
                        m.prompt_tokens
                 FROM messages m
                 WHERE m.user_id = ? AND m.id IN ({placeholders})

@@ -19,6 +19,13 @@ min_password_length = 8
 max_message_length = 12000
 max_search_query_length = 512
 
+[default.TAG_RECALL]
+summary_sentences = 4
+summary_max_chars = 640
+history_scope = 20
+max_tags = 5
+max_snippets = 5
+
 [default.SEARCH]
 recent_limit = 50
 recent_suggestion_limit = 8
