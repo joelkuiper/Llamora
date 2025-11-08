@@ -260,6 +260,11 @@ export class ChatView extends ReactiveElement {
         return;
       }
 
+      const activeStream = el?.closest?.("llm-stream[data-streaming='true']");
+      if (activeStream) {
+        return;
+      }
+
       if (!el?.querySelector?.(TYPING_INDICATOR_SELECTOR)) {
         renderMarkdownInElement(el);
       }
