@@ -91,7 +91,7 @@ class AssistantMessageWriter:
 
 @dataclass(slots=True)
 class ChunkRingGuard:
-    """Detects repeated visible chunks within a moving window."""
+    """Detects repeated visible chunks and trailing patterns within a window."""
 
     size: int
     min_length: int = 0
@@ -104,8 +104,12 @@ class ChunkRingGuard:
         self._ring = deque(maxlen=self.size) if self.size > 0 else None
         self._buffer = ""
 
-    def record(self, chunk: str) -> bool:
-        """Track a chunk and report if the ring contains identical entries."""
+    def record(self, chunk: str, *, total: str | None = None) -> bool:
+        """Track a chunk and report if repetition heuristics are triggered."""
+
+        if total is not None and self._detect_total_repeat(total):
+            self._reset()
+            return True
 
         if self._ring is None:
             return False
@@ -139,6 +143,44 @@ class ChunkRingGuard:
     @staticmethod
     def _normalise(chunk: str) -> str:
         return " ".join(chunk.split())
+
+    def _detect_total_repeat(self, total: str) -> bool:
+        if self.size < 2:
+            return False
+
+        normalised_total = self._normalise(total)
+        if not normalised_total:
+            return False
+
+        tokens = normalised_total.split(" ")
+        if len(tokens) < self.size:
+            return False
+
+        max_tail_tokens = min(len(tokens), max(self.size * 64, 256))
+        tail_tokens = tokens[-max_tail_tokens:]
+        max_pattern_tokens = len(tail_tokens) // self.size
+        if max_pattern_tokens == 0:
+            return False
+
+        for length in range(1, max_pattern_tokens + 1):
+            pattern_tokens = tail_tokens[-length:]
+            if self.min_length:
+                pattern_text = " ".join(pattern_tokens)
+                if len(pattern_text) < self.min_length:
+                    continue
+
+            repeated = True
+            for repeat_index in range(2, self.size + 1):
+                start = -length * repeat_index
+                end = None if start == 0 else -length * (repeat_index - 1)
+                if tail_tokens[start:end] != pattern_tokens:
+                    repeated = False
+                    break
+
+            if repeated:
+                return True
+
+        return False
 
 
 class ResponsePipeline:
@@ -257,13 +299,16 @@ class ResponsePipeline:
             async for chunk in self._fetch_chunks():
                 visible = self._parse_chunk(chunk)
                 if visible:
-                    if self._chunk_guard and self._chunk_guard.record(visible):
+                    candidate_total = full_response + visible
+                    if self._chunk_guard and self._chunk_guard.record(
+                        visible, total=candidate_total
+                    ):
                         self._repeat_guard_triggered = True
                         if not self._cancel_requested:
                             self._cancel_requested = True
                         await self._abort_session()
                         break
-                    full_response += visible
+                    full_response = candidate_total
                     self._visible_total = full_response
                     await callbacks.on_visible(visible, full_response)
                 if self._cancel_requested:
