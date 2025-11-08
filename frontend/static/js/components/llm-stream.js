@@ -7,6 +7,9 @@ import { prefersReducedMotion } from "../utils/motion.js";
 const NEWLINE_REGEX = /\[newline\]/g;
 const RENDER_COOLDOWN_MS = 16;
 const FALLBACK_ERROR_MESSAGE = "The assistant ran into an error. Please try again.";
+const REPEAT_GUARD_BADGE = "response trimmed";
+const REPEAT_GUARD_DESCRIPTION = "Response paused after repeating itself.";
+const REPEAT_GUARD_HIDE_DELAY_MS = 5000;
 
 function decodeChunk(data) {
   return typeof data === "string" ? data.replace(NEWLINE_REGEX, "\n") : "";
@@ -95,6 +98,8 @@ class LlmStreamElement extends HTMLElement {
   #typingIndicator = null;
   #meta = null;
   #repeatGuardIndicator = null;
+  #repeatGuardHideTimer = null;
+  #repeatGuardWavesDismissed = false;
   #boundHandleMessage;
   #boundHandleDone;
   #boundHandleError;
@@ -112,6 +117,11 @@ class LlmStreamElement extends HTMLElement {
     this.#sink = this.querySelector(".raw-response");
     this.#markdown = this.querySelector(".markdown-body");
     this.#typingIndicator = this.querySelector("#typing-indicator") || null;
+    this.#repeatGuardIndicator =
+      this.querySelector(".repeat-guard-indicator") || null;
+    this.#repeatGuardWavesDismissed = Boolean(
+      this.#repeatGuardIndicator?.classList.contains("repeat-guard-indicator--calm")
+    );
 
     if (this.#sink) {
       this.#text = decodeChunk(this.#sink.textContent || "");
@@ -129,6 +139,11 @@ class LlmStreamElement extends HTMLElement {
   disconnectedCallback() {
     this.#cancelRender();
     this.#closeEventSource();
+    if (this.#repeatGuardHideTimer) {
+      clearTimeout(this.#repeatGuardHideTimer);
+      this.#repeatGuardHideTimer = null;
+    }
+    this.#repeatGuardWavesDismissed = false;
   }
 
   get userMsgId() {
@@ -441,19 +456,158 @@ class LlmStreamElement extends HTMLElement {
 
   #showRepeatGuardIndicator() {
     this.dataset.repeatGuard = "true";
-    if (this.#repeatGuardIndicator?.isConnected) {
+
+    const indicator = this.#ensureRepeatGuardIndicator();
+    if (!indicator) {
       return;
     }
-    this.#repeatGuardIndicator = indicator;
+
+    indicator.classList.remove("repeat-guard-indicator--leaving");
+    indicator.classList.add("repeat-guard-indicator--visible");
+
+    const reduceMotion = prefersReducedMotion();
+    if (this.#repeatGuardWavesDismissed) {
+      indicator.classList.add("repeat-guard-indicator--calm");
+      return;
+    }
+
+    indicator.classList.remove("repeat-guard-indicator--calm");
+
+    if (reduceMotion) {
+      this.#calmRepeatGuardIndicator();
+      return;
+    }
+
+    indicator.classList.remove("repeat-guard-indicator--visible");
+    void indicator.offsetWidth;
+    indicator.classList.add("repeat-guard-indicator--visible");
+    this.#scheduleRepeatGuardCalming();
   }
 
-  #clearRepeatGuardIndicator() {
+  #scheduleRepeatGuardCalming() {
+    if (this.#repeatGuardWavesDismissed) {
+      return;
+    }
+
+    if (this.#repeatGuardHideTimer) {
+      clearTimeout(this.#repeatGuardHideTimer);
+    }
+
+    this.#repeatGuardHideTimer = window.setTimeout(() => {
+      this.#repeatGuardHideTimer = null;
+      this.#calmRepeatGuardIndicator();
+    }, REPEAT_GUARD_HIDE_DELAY_MS);
+  }
+
+  #calmRepeatGuardIndicator() {
+    if (this.#repeatGuardWavesDismissed) {
+      return;
+    }
+
+    const indicator = this.#repeatGuardIndicator;
+    if (!indicator) {
+      return;
+    }
+
+    this.#repeatGuardWavesDismissed = true;
+    indicator.classList.add("repeat-guard-indicator--calm");
+  }
+
+  #clearRepeatGuardIndicator({ immediate = false } = {}) {
     delete this.dataset.repeatGuard;
 
-    if (this.#repeatGuardIndicator?.isConnected) {
-      this.#repeatGuardIndicator.remove();
+    if (this.#repeatGuardHideTimer) {
+      clearTimeout(this.#repeatGuardHideTimer);
+      this.#repeatGuardHideTimer = null;
     }
+
+    this.#repeatGuardWavesDismissed = false;
+
+    const indicator = this.#repeatGuardIndicator;
+    if (!indicator) {
+      return;
+    }
+
     this.#repeatGuardIndicator = null;
+
+    if (!indicator.isConnected) {
+      return;
+    }
+
+    const reduceMotion = prefersReducedMotion();
+    if (reduceMotion || immediate) {
+      indicator.remove();
+      return;
+    }
+
+    indicator.classList.remove("repeat-guard-indicator--visible");
+    indicator.classList.add("repeat-guard-indicator--leaving");
+    indicator.addEventListener(
+      "transitionend",
+      () => indicator.remove(),
+      { once: true }
+    );
+  }
+
+  #ensureRepeatGuardIndicator() {
+    if (this.#repeatGuardIndicator?.isConnected) {
+      return this.#repeatGuardIndicator;
+    }
+
+    const indicator =
+      this.#repeatGuardIndicator || this.#createRepeatGuardIndicator();
+
+    if (!indicator) {
+      return null;
+    }
+
+    if (!indicator.isConnected) {
+      const placeholder = this.querySelector(".meta-chips-placeholder");
+      if (placeholder?.parentNode === this) {
+        this.insertBefore(indicator, placeholder);
+      } else {
+        this.appendChild(indicator);
+      }
+    }
+
+    this.#repeatGuardIndicator = indicator;
+    return indicator;
+  }
+
+  #createRepeatGuardIndicator() {
+    const indicator = document.createElement("div");
+    indicator.className = "repeat-guard-indicator";
+    indicator.setAttribute("role", "status");
+    indicator.setAttribute("aria-live", "polite");
+    indicator.title = REPEAT_GUARD_DESCRIPTION;
+
+    const waves = document.createElement("span");
+    waves.className = "repeat-guard-indicator__waves";
+    waves.setAttribute("aria-hidden", "true");
+
+    const primaryDot = document.createElement("span");
+    primaryDot.className = "repeat-guard-indicator__dot";
+
+    const delayedDot = document.createElement("span");
+    delayedDot.className =
+      "repeat-guard-indicator__dot repeat-guard-indicator__dot--delay";
+
+    const lateDot = document.createElement("span");
+    lateDot.className =
+      "repeat-guard-indicator__dot repeat-guard-indicator__dot--late";
+
+    waves.append(primaryDot, delayedDot, lateDot);
+
+    const label = document.createElement("span");
+    label.className = "repeat-guard-indicator__label";
+    label.textContent = REPEAT_GUARD_BADGE;
+
+    const srOnly = document.createElement("span");
+    srOnly.className = "visually-hidden";
+    srOnly.textContent = REPEAT_GUARD_DESCRIPTION;
+
+    indicator.append(waves, label, srOnly);
+    return indicator;
   }
 
   #loadMetaChips(assistantId) {

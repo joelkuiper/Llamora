@@ -105,16 +105,88 @@ body {
       position: relative;
     }
 
-    &[data-repeat-guard="true"]::after {
-      content: "repetition trimmed";
+    .repeat-guard-indicator {
       position: absolute;
       top: 0.35rem;
       right: 0.65rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      background: var(--color-bg);
+      background: color-mix(in srgb, var(--color-bg) 80%, transparent);
+      color: var(--color-text-muted);
       font-size: 0.625rem;
       letter-spacing: 0.02em;
       text-transform: lowercase;
-      color: var(--color-text-muted);
+      cursor: help;
+      pointer-events: auto;
+      opacity: 0;
+      transform: translateY(-0.3rem);
+      transition: opacity 0.28s ease, transform 0.28s ease;
+    }
+
+    .repeat-guard-indicator--visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .repeat-guard-indicator--leaving {
       pointer-events: none;
+    }
+
+    .repeat-guard-indicator--leaving,
+    .repeat-guard-indicator--leaving .repeat-guard-indicator__dot {
+      opacity: 0;
+    }
+
+    .repeat-guard-indicator--leaving .repeat-guard-indicator__dot {
+      animation-play-state: paused;
+    }
+
+    .repeat-guard-indicator--calm {
+      cursor: default;
+      gap: 0;
+    }
+
+    .repeat-guard-indicator--calm .repeat-guard-indicator__waves {
+      opacity: 0;
+      max-width: 0;
+    }
+
+    .repeat-guard-indicator--calm .repeat-guard-indicator__dot {
+      animation-play-state: paused;
+    }
+
+    .repeat-guard-indicator__waves {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.15rem;
+      max-width: 1.2rem;
+      overflow: hidden;
+      transition: opacity 0.4s ease, max-width 0.4s ease;
+    }
+
+    .repeat-guard-indicator__dot {
+      width: 0.3rem;
+      height: 0.3rem;
+      border-radius: 999px;
+      background: currentColor;
+      opacity: 0.35;
+      animation: repeat-guard-wave 1.6s ease-in-out infinite;
+    }
+
+    .repeat-guard-indicator__dot--delay {
+      animation-delay: 0.24s;
+    }
+
+    .repeat-guard-indicator__dot--late {
+      animation-delay: 0.48s;
+    }
+
+    .repeat-guard-indicator__label {
+      white-space: nowrap;
     }
   }
 
@@ -498,5 +570,32 @@ scroll-bottom-button .scroll-btn {
       opacity: 0.9;
       transform: none;
     }
+  }
+}
+
+@keyframes repeat-guard-wave {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+
+  50% {
+    opacity: 0.85;
+    transform: translateY(-0.15rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .repeat-guard-indicator {
+    transition: none;
+  }
+
+  .repeat-guard-indicator__waves {
+    transition: none;
+  }
+
+  .repeat-guard-indicator__dot {
+    animation: none;
   }
 }

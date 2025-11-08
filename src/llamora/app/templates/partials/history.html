@@ -35,17 +35,10 @@
       {% endif %}
     </div>
     {% if repeat_guard %}
-    <div class="repeat-guard-indicator"
-         role="status"
-         aria-live="polite"
-         title="Response paused after repeating itself.">
-      <span class="repeat-guard-indicator__waves" aria-hidden="true">
-        <span class="repeat-guard-indicator__dot"></span>
-        <span class="repeat-guard-indicator__dot repeat-guard-indicator__dot--delay"></span>
-        <span class="repeat-guard-indicator__dot repeat-guard-indicator__dot--late"></span>
-      </span>
+    <span class="repeat-guard-indicator repeat-guard-indicator--visible repeat-guard-indicator--calm">
+      <span class="repeat-guard-indicator__label">response trimmed</span>
       <span class="visually-hidden">Response paused after repeating itself.</span>
-    </div>
+    </span>
     {% endif %}
     {% if msg['role'] != 'user' and not msg_meta.get('error') %}
     {{ render_meta_chips(msg['id'], msg.get('tags', [])) }}
