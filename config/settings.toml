@@ -20,11 +20,11 @@ max_message_length = 12000
 max_search_query_length = 512
 
 [default.TAG_RECALL]
-summary_sentences = 4
-summary_max_chars = 640
+summary_sentences = 6
+summary_max_chars = 1200
 history_scope = 20
-max_tags = 5
-max_snippets = 5
+max_tags = 6
+max_snippets = 6
 
 [default.SEARCH]
 recent_limit = 50
