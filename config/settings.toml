@@ -104,8 +104,8 @@ repeat_guard_min_length = 12
 allowed_config_keys = ["temperature"]
 
 [default.PROMPTS]
-prompt_file = ""
 grammar_file = ""
+template_dir = "../src/llamora/llm/templates"
 
 [default.COOKIES]
 name = "llamora"

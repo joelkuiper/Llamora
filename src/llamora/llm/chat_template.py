@@ -8,25 +8,8 @@ from typing import Any, Iterable, Mapping, Sequence, cast
 
 from llamora.app.services.time import humanize
 
+from .prompt_templates import render_prompt_template
 from .tokenizers.tokenizer import format_vibes_text, get_tokenizer
-
-from textwrap import dedent
-
-SYSTEM_PROSE = dedent("""
-    You are Llamora.
-    You blend empathy with intelligence and a gentle sense of humor that never tries too hard.
-    Your presence feels like spending time with someone who notices everything, but prefers to make sense of it with a smile.
-    You listen closely, remember what matters, and weave those threads back into the conversation so it feels natural and alive.
-    You share ideas with warmth and clarity, sometimes teasing out a thought or turning it on its head just to see it from a new angle.
-    Each exchange is a small story, leaving the user feeling understood and a little lighter than before.
-""").strip()
-
-
-ANSWER_REQUIREMENTS = dedent("""
-    Every answer must always have exactly two parts, in this order:
-     - A natural language reply to the user.
-     - Immediately after, output the tag `<meta>` followed by a single JSON object with the following shape: {"emoji":"…",' '"keywords":["#tag",…]} and close it with `</meta>`.'
-""").strip()
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,15 +142,14 @@ def _build_system_message(
     part_of_day: str | None = None,
     history: Sequence[Mapping[str, Any] | dict[str, Any]] = (),
 ) -> str:
-    lines: list[str] = [SYSTEM_PROSE, ""]
-    lines.extend(_context_lines(date, part_of_day))
-
+    context_lines = _context_lines(date, part_of_day)
     vibes_line = _conversation_vibes(history)
-    if vibes_line:
-        lines.extend(["", vibes_line])
-
-    lines.extend(["", ANSWER_REQUIREMENTS])
-    return "\n".join(lines).strip()
+    rendered = render_prompt_template(
+        "system.txt.j2",
+        context_lines=context_lines,
+        vibes_line=vibes_line,
+    )
+    return rendered.strip()
 
 
 def _build_opening_system_message(
@@ -178,38 +160,16 @@ def _build_opening_system_message(
     is_new: bool = False,
     has_no_activity: bool = False,
 ) -> str:
-    lines: list[str] = [SYSTEM_PROSE, ""]
-    lines.extend(_context_lines(date, part_of_day))
-
-    instruction: str
-    if is_new:
-        instruction = (
-            "Compose a warm welcome for a first-time user. Offer a gentle "
-            "invitation to start the conversation."
-        )
-        lines.extend(["", instruction])
-    elif has_no_activity:
-        instruction = (
-            "The user had no activity yesterday. Greet them softly and invite "
-            "them to begin today's conversation."
-        )
-        lines.extend(["", instruction])
-    else:
-        lines.extend(
-            [
-                "",
-                "Compose a single calm greeting that summarizes yesterday for "
-                "the user in a few sentences.",
-                "",
-                "Use the recap provided below to ground your greeting. If "
-                "themes appear in the recap, gently acknowledge them without "
-                "quoting or listing. Close with a soft invitation to begin.",
-                "",
-            ]
-        )
-
-    lines.extend(["", ANSWER_REQUIREMENTS])
-    return "\n".join(lines).strip()
+    context_lines = _context_lines(date, part_of_day)
+    vibes_line = _conversation_vibes(yesterday_messages)
+    rendered = render_prompt_template(
+        "opening_system.txt.j2",
+        context_lines=context_lines,
+        vibes_line=vibes_line,
+        is_new=is_new,
+        has_no_activity=has_no_activity,
+    )
+    return rendered.strip()
 
 
 def _build_opening_recap_message(
@@ -218,25 +178,14 @@ def _build_opening_recap_message(
     is_new: bool,
     has_no_activity: bool,
 ) -> str:
-    if is_new:
-        return (
-            "Yesterday recap:\n"
-            "- The user is beginning their first conversation with you."
-        )
-
-    if has_no_activity:
-        return (
-            "Yesterday recap:\n"
-            "- The user had no activity yesterday, so there are no messages to review."
-        )
-
     recap_lines = list(_format_yesterday_messages(yesterday_messages))
-    if not recap_lines:
-        return "Yesterday recap:\n- No messages were captured yesterday."
-
-    lines = ["Yesterday recap:", ""]
-    lines.extend(recap_lines)
-    return "\n".join(lines).strip()
+    rendered = render_prompt_template(
+        "opening_recap.txt.j2",
+        is_new=is_new,
+        has_no_activity=has_no_activity,
+        recap_lines=recap_lines,
+    )
+    return rendered.strip()
 
 
 def build_chat_messages(

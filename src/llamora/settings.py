@@ -144,8 +144,8 @@ DEFAULTS: dict[str, Any] = {
         },
     },
     "PROMPTS": {
-        "prompt_file": str(PACKAGE_DIR / "llm" / "prompts" / "llamora_chatml.j2"),
         "grammar_file": str(PACKAGE_DIR / "llm" / "meta_grammar.bnf"),
+        "template_dir": str(PACKAGE_DIR / "llm" / "templates"),
     },
     "COOKIES": {
         "name": "llamora",

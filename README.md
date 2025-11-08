@@ -146,6 +146,21 @@ top_p = 0.8
 
 Restart the app after changing settings.
 
+### Prompt templates
+
+System prompts are rendered from Jinja2 templates stored in `src/llamora/llm/templates`.
+Each template exposes structured placeholders (context lines, vibe summaries, and recap data) so you can adjust copy without
+touching Python code.
+
+To point Llamora at a different set of prompt files, update `LLAMORA_PROMPTS__TEMPLATE_DIR` (or the matching entry in
+`config/settings.toml`) to any directory containing replacements for:
+
+* `system.txt.j2`
+* `opening_system.txt.j2`
+* `opening_recap.txt.j2`
+
+Swap prompt variants by editing or replacing those files—changes take effect on the next server restart.
+
 ---
 
 ## Technical Overview

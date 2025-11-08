@@ -27,6 +27,7 @@ dependencies = [
     "bleach>=6.1.0",
     "transformers>=4.48.0",
     "sumy>=0.11.0",
+    "jinja2>=3.1.4",
 ]
 
 [project.scripts]
@@ -49,6 +50,8 @@ packages = ["src/llamora"]
 include = [
     "frontend/static",
     "frontend/static/**/*",
+    "src/llamora/llm/templates",
+    "src/llamora/llm/templates/**/*",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -56,6 +59,8 @@ packages = ["src/llamora"]
 include = [
     "frontend/static",
     "frontend/static/**/*",
+    "src/llamora/llm/templates",
+    "src/llamora/llm/templates/**/*",
 ]
 
 [tool.hatch.build.targets.sdist]
