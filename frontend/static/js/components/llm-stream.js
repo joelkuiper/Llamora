@@ -305,6 +305,12 @@ class LlmStreamElement extends HTMLElement {
 
     this.#meta = meta;
 
+    if (meta.repeat_guard) {
+      this.#showRepeatGuardIndicator();
+    } else {
+      this.#clearRepeatGuardIndicator();
+    }
+
     this.dispatchEvent(
       new CustomEvent("llm-stream:meta", {
         bubbles: true,
@@ -431,6 +437,23 @@ class LlmStreamElement extends HTMLElement {
         },
       })
     );
+  }
+
+  #showRepeatGuardIndicator() {
+    this.dataset.repeatGuard = "true";
+    if (this.#repeatGuardIndicator?.isConnected) {
+      return;
+    }
+    this.#repeatGuardIndicator = indicator;
+  }
+
+  #clearRepeatGuardIndicator() {
+    delete this.dataset.repeatGuard;
+
+    if (this.#repeatGuardIndicator?.isConnected) {
+      this.#repeatGuardIndicator.remove();
+    }
+    this.#repeatGuardIndicator = null;
   }
 
   #loadMetaChips(assistantId) {
