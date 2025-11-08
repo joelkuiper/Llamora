@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from quart import (
     Blueprint,
     render_template,
@@ -71,9 +69,6 @@ def _max_prompt_tokens(llm_client, params: Mapping[str, Any] | None = None) -> i
                 cfg[key] = value
 
     n_predict = cfg.get("n_predict")
-    if n_predict is None:
-        return ctx_size
-
     try:
         predict_tokens = int(n_predict)
     except (TypeError, ValueError):
@@ -231,10 +226,8 @@ async def sse_opening(date: str):
     had_yesterday_activity = bool(yesterday_msgs)
 
     trim_context = {"date": date_str, "part_of_day": pod}
-    services = get_services()
-    llm_client = services.llm_service.llm
-
     try:
+        llm_client = get_services().llm_service.llm
         yesterday_msgs = await llm_client.trim_history(
             yesterday_msgs,
             context=trim_context,

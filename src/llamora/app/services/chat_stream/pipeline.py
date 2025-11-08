@@ -133,8 +133,7 @@ class ChunkRingGuard:
 
     def _reset(self) -> None:
         self._buffer = ""
-        if self._ring is not None:
-            self._ring.clear()
+        self._ring.clear()
 
     @staticmethod
     def _normalise(chunk: str) -> str:
