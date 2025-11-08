@@ -91,7 +91,7 @@ mirostat_tau = 5.0
 mirostat_eta = 0.1
 
 repeat_penalty = 1.15
-repeat_last_n = 256
+repeat_last_n = 128
 penalize_nl = true
 
 [default.LLM.stream]
