@@ -383,24 +383,47 @@ async def sse_reply(user_msg_id: str, date: str):
     try:
         pending_response = manager.get(user_msg_id, uid)
         if not pending_response:
-            history_for_stream = list(history)
+            db = _db()
+            services = get_services()
+            history_for_stream: list[dict[str, Any]] = []
             recall_context = await build_tag_recall_context(
-                _db(),
+                db,
                 uid,
                 dek,
                 history=history,
                 current_date=actual_date or normalized_date,
             )
+            guidance_entry: dict[str, Any] | None = None
             if recall_context:
-                history_for_stream.append(
-                    {
-                        "id": None,
-                        "role": "system",
-                        "message": recall_context.text,
-                        "meta": {"tag_recall": {"tags": list(recall_context.tags)}},
-                    }
-                )
-            llm_client = get_services().llm_service.llm
+                guidance_entry = {
+                    "id": None,
+                    "role": "system",
+                    "message": recall_context.text,
+                    "meta": {"tag_recall": {"tags": list(recall_context.tags)}},
+                }
+                tag_items = [
+                    {"name": tag}
+                    for tag in recall_context.tags
+                    if str(tag or "").strip()
+                ]
+                if tag_items:
+                    guidance_entry["tags"] = tag_items
+
+            inserted_context = False
+            for entry in history:
+                entry_dict = dict(entry)
+                if (
+                    not inserted_context
+                    and guidance_entry is not None
+                    and str(entry_dict.get("id")) == user_msg_id
+                ):
+                    history_for_stream.append(dict(guidance_entry))
+                    inserted_context = True
+                history_for_stream.append(entry_dict)
+
+            if guidance_entry is not None and not inserted_context:
+                history_for_stream.append(dict(guidance_entry))
+            llm_client = services.llm_service.llm
             try:
                 history_for_stream = await llm_client.trim_history(
                     history_for_stream,

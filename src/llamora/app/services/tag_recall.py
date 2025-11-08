@@ -8,6 +8,7 @@ from sumy.nlp.tokenizers import Tokenizer
 from sumy.parsers.plaintext import PlaintextParser
 from sumy.summarizers.lex_rank import LexRankSummarizer
 
+from llamora.llm.prompt_templates import render_prompt_template
 from llamora.settings import settings
 
 
@@ -295,11 +296,14 @@ async def build_tag_recall_context(
         if tag_names.get(tag, "")
     ]
     header_tags = f" ({', '.join(tag_labels)})" if tag_labels else ""
-    lines = [
-        "Cross-day tag recall" + header_tags + ":",
-        *(f"- {snippet}" for snippet in snippets),
-    ]
-    text = "\n".join(lines)
+    text = render_prompt_template(
+        "tag_recall.txt.j2",
+        heading="Cross-day tag recall",
+        tag_labels=tag_labels,
+        snippets=snippets,
+    ).strip()
+    if not text:
+        return None
 
     return TagRecallContext(text=text, tags=tuple(tag_labels))
 
