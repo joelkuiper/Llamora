@@ -196,17 +196,17 @@ The system supports both llama.cpp servers and llamafile binaries through the sa
 * Config lives in: `config/settings.toml` and `config/settings.local.toml`
 * Debug mode: `QUART_DEBUG=1`
 
-  
+
 ---
 
 ## Deployment (not recommended)
 
 Llamora is a personal experiment and **not production-ready**.
-If you still deploy it, set the required secrets and runtime vars:
+If you still deploy it, set the required secrets and runtime vars.
 
 ```bash
 # Required
-export LLAMORA_SECURITY__SECRET_KEY=$(openssl rand -hex 32)
+export LLAMORA_SECRET_KEY=$(openssl rand -hex 32)
 export LLAMORA_COOKIES__SECRET=$(openssl rand -base64 32)
 
 # Backend and runtime
