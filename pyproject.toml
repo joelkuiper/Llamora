@@ -26,6 +26,7 @@ dependencies = [
     "mdit-py-plugins>=0.4.0",
     "bleach>=6.1.0",
     "transformers>=4.48.0",
+    "sumy>=0.11.0",
 ]
 
 [project.scripts]
@@ -33,6 +34,7 @@ llamora-server = "llamora.__main__:main"
 
 [dependency-groups]
 dev = [
+    "ipython>=9.7.0",
     "mypy>=1.18.2",
     "pyright>=1.1.407",
     "pytest>=8.3.2",
