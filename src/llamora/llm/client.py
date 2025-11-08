@@ -10,6 +10,7 @@ import orjson
 from httpx import HTTPError
 
 from cachetools import LRUCache
+from llamora.app.util import canonicalize
 from llamora.settings import settings
 from llamora.util import resolve_data_path
 from .process_manager import LlamafileProcessManager
@@ -343,6 +344,61 @@ class LLMClient:
         self._history_token_cache[key] = result
         return result
 
+    @staticmethod
+    def _canonicalize_tag_value(value: Any) -> str | None:
+        text = str(value or "").strip()
+        if not text:
+            return None
+        try:
+            return canonicalize(text)
+        except ValueError:
+            return None
+
+    def _collect_tag_priorities(
+        self, history: Sequence[Mapping[str, Any] | dict[str, Any]]
+    ) -> tuple[dict[str, list[int]], dict[int, set[str]], dict[str, str]]:
+        tag_occurrences: dict[str, list[int]] = {}
+        tags_by_index: dict[int, set[str]] = {}
+        tag_display: dict[str, str] = {}
+
+        for idx, raw_entry in enumerate(history):
+            entry = raw_entry if isinstance(raw_entry, Mapping) else dict(raw_entry)
+            canonical_tags: set[str] = set()
+
+            tags = entry.get("tags")
+            if isinstance(tags, Sequence) and not isinstance(tags, (str, bytes)):
+                for raw_tag in tags:
+                    if isinstance(raw_tag, Mapping):
+                        candidate = raw_tag.get("name")
+                    else:  # pragma: no cover - defensive
+                        candidate = raw_tag
+                    canonical_tag = self._canonicalize_tag_value(candidate)
+                    if canonical_tag:
+                        canonical_tags.add(canonical_tag)
+
+            meta = entry.get("meta")
+            if isinstance(meta, Mapping):
+                keywords = meta.get("keywords")
+                if isinstance(keywords, Sequence) and not isinstance(
+                    keywords, (str, bytes)
+                ):
+                    for keyword in keywords:
+                        canonical_keyword = self._canonicalize_tag_value(keyword)
+                        if canonical_keyword:
+                            canonical_tags.add(canonical_keyword)
+
+            if not canonical_tags:
+                continue
+
+            tags_by_index[idx] = canonical_tags
+
+            for tag in canonical_tags:
+                normalized = tag.lower()
+                tag_occurrences.setdefault(normalized, []).append(idx)
+                tag_display.setdefault(normalized, tag)
+
+        return tag_occurrences, tags_by_index, tag_display
+
     async def _trim_history(
         self, history: list[dict[str, Any]], max_input: int, context: dict[str, Any]
     ) -> list[dict[str, Any]]:
@@ -352,17 +408,129 @@ class LLMClient:
         number of tokenisation calls is bounded by the history length for a
         given history/context pair. Any change to the history or rendering
         context yields a different cache key, forcing token counts to be
-        recomputed for the new inputs.
+        recomputed for the new inputs. When trimming drops messages that carry
+        canonicalised tags (either attached by the user or emitted via
+        ``meta.keywords``), the function reintroduces the most recent instance
+        for each tag so long as the combined prompt still fits within
+        ``max_input`` tokens.
         """
         if not history:
             return history
         ctx = dict(context)
         token_counts = await self._get_token_counts(history, ctx)
 
+        tag_occurrences, tags_by_index, tag_display = self._collect_tag_priorities(history)
+        priority_targets = {
+            indices[-1] for indices in tag_occurrences.values() if indices
+        }
+
+        base_start_idx: int | None = None
         for start_idx, tokens in enumerate(token_counts):
             if tokens <= max_input:
-                return history[start_idx:]
-        return []
+                base_start_idx = start_idx
+                break
+
+        if not priority_targets:
+            if base_start_idx is not None:
+                return history[base_start_idx:]
+            return []
+
+        base_indices = (
+            list(range(base_start_idx, len(history))) if base_start_idx is not None else []
+        )
+
+        candidate_indices = sorted(set(base_indices) | priority_targets)
+
+        async def total_tokens_for(indices: Sequence[int]) -> int:
+            if not indices:
+                return 0
+            subset = [history[i] for i in indices]
+            counts = await self._get_token_counts(subset, ctx)
+            return counts[0] if counts else 0
+
+        total_tokens = await total_tokens_for(candidate_indices)
+        mutable_priority = set(priority_targets)
+        removed_non_priority: list[int] = []
+        removed_priority: list[int] = []
+
+        while candidate_indices and total_tokens > max_input:
+            removable_non_priority = [
+                idx for idx in candidate_indices if idx not in mutable_priority
+            ]
+            if removable_non_priority:
+                remove_idx = removable_non_priority[0]
+                candidate_indices.remove(remove_idx)
+                removed_non_priority.append(remove_idx)
+            else:
+                remove_idx = candidate_indices[0]
+                candidate_indices.remove(remove_idx)
+                if remove_idx in mutable_priority:
+                    mutable_priority.remove(remove_idx)
+                    removed_priority.append(remove_idx)
+            total_tokens = await total_tokens_for(candidate_indices)
+
+        if not candidate_indices:
+            if removed_priority:
+                dropped_tags = [
+                    tag_display[norm]
+                    for norm, indices in tag_occurrences.items()
+                    if indices and indices[-1] in removed_priority
+                ]
+                self.logger.warning(
+                    "Unable to retain tagged history entries within context window; "
+                    "dropped=%s",
+                    dropped_tags,
+                )
+            return []
+
+        final_indices = sorted(candidate_indices)
+
+        if base_indices != final_indices or removed_priority or removed_non_priority:
+            added = [idx for idx in final_indices if idx not in base_indices]
+            removed = [idx for idx in base_indices if idx not in final_indices]
+            added_tags = [
+                sorted(tags_by_index.get(idx, set())) for idx in added if idx in tags_by_index
+            ]
+            flattened_added = sorted({tag for sublist in added_tags for tag in sublist})
+            dropped_tags = [
+                sorted(tags_by_index.get(idx, set()))
+                for idx in removed_priority
+                if idx in tags_by_index
+            ]
+            flattened_dropped = sorted({tag for sublist in dropped_tags for tag in sublist})
+            self.logger.info(
+                "Tag-priority trim adjusted slice: base_start=%s final_indices=%s "
+                "added=%s removed=%s removed_non_priority=%s added_tags=%s "
+                "dropped_priority=%s",
+                base_start_idx,
+                final_indices,
+                added,
+                removed,
+                removed_non_priority or None,
+                flattened_added or None,
+                flattened_dropped or None,
+            )
+            if flattened_added:
+                self.logger.debug(
+                    "Retained tags after trim: %s",
+                    flattened_added,
+                )
+
+        if removed_priority:
+            dropped_priority_tags = sorted(
+                {
+                    tag
+                    for idx in removed_priority
+                    for tag in tags_by_index.get(idx, set())
+                }
+            )
+            if dropped_priority_tags:
+                self.logger.warning(
+                    "Dropped tagged history entries to satisfy context window: %s",
+                    dropped_priority_tags,
+                )
+
+        return [history[i] for i in final_indices]
 
     async def trim_history(
         self,
