@@ -1,36 +1,13 @@
-# ── whitespace ─────────────────────────────────────────────
-ws          ::= ([ \t\r\n])*
+root      ::= text "<meta>" obj "</meta>"
+text      ::= (anychar)*
+anychar  ::= [^<] | "<" [^m] | "<m" [^e] | "<me" [^t] | "<met" [^a] | "<meta" [^>]
+quote     ::= "\""
 
+string    ::= quote (char)* quote
+char      ::= [^"\\] | "\\" ["\\/bfnrt]
 
-# ── top-level structure ────────────────────────────────────
-root        ::= text "<meta>" ws obj ws "</meta>"
-text        ::= (anychar)*
+emoji     ::= quote ([😀-🙏] | [🚀-🛀] | [🌀-🗿]) quote
+keyword   ::= quote "#" [a-zA-Z0-9-]+ quote
+kwarray   ::= "[" (keyword ("," keyword){0,2})? "]"
 
-# anything that is not the literal "<meta>"
-anychar     ::= ([^<]
-              | "<" [^m]
-              | "<m" [^e]
-              | "<me" [^t]
-              | "<met" [^a]
-              | "<meta" [^>])
-
-
-# ── JSON-like strings  ─────────────────────────
-string      ::= "\"" stringchar* "\"" ws
-
-stringchar ::= [^"\\\x7F\x00-\x1F] | "\\" escape
-
-escape      ::= ["\\bfnrt] | "u" hex hex hex hex
-
-hex         ::= [0-9a-fA-F]
-
-
-# ── meta object ────────────────────────────────────────────
-obj         ::= ("{" ws
-                 "emoji" ":" ws emoji ws "," ws
-                 "keywords" ":" ws kwarray ws
-               "}")
-
-emoji       ::= "\"" emojichar+ "\"" ws
-emojichar  ::= [😀-🙏] | [🚀-🛀] | [🌀-🗿]
-kwarray     ::= "[" ws (string ("," ws string){0,2})? "]" ws
+obj       ::= "{" quote "emoji" quote ": " emoji "," quote "keywords" quote ": " kwarray "}"
