@@ -24,13 +24,14 @@
   --calendar-label-rest-color: var(--color-text);
   --calendar-label-highlight-color: var(--accent);
   color: var(--calendar-label-rest-color);
-  transition: color var(--motion-gentle) ease;
+  transition: color var(--motion-tap) ease-out;
 }
 
 #calendar-btn:hover #calendar-label,
 #calendar-btn:focus-visible #calendar-label,
 #calendar-btn.active #calendar-label {
   --calendar-label-rest-color: var(--accent);
+  transition-duration: 0s;
 }
 
 #calendar-label {
