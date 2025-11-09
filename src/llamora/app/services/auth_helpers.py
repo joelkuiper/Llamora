@@ -37,7 +37,9 @@ class SecureCookieManager:
         self.cookie_box = secret.SecretBox(key)
         self.dek_storage = dek_storage.lower()
         self._session_ttl = max(0, int(session_ttl))
-        self.dek_store: TTLCache[str, bytes] = TTLCache(maxsize=1024, ttl=self._session_ttl)
+        self.dek_store: TTLCache[str, bytes] = TTLCache(
+            maxsize=1024, ttl=self._session_ttl
+        )
         self._user_snapshot_cache: TTLCache[tuple[str, str], Any] = TTLCache(
             maxsize=user_cache_maxsize,
             ttl=user_cache_ttl,

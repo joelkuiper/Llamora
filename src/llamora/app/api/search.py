@@ -301,9 +301,7 @@ class SearchAPI:
         for res in results:
             msg_id = res.get("id")
             raw_tags = tag_map.get(msg_id, []) if msg_id else []
-            prepared, visible, has_more = self._prepare_tags(
-                raw_tags, token_lookup
-            )
+            prepared, visible, has_more = self._prepare_tags(raw_tags, token_lookup)
             res["tags"] = prepared
             res["visible_tags"] = visible
             res["has_more_tags"] = has_more

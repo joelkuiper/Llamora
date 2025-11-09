@@ -20,17 +20,28 @@ logger = getLogger(__name__)
 app = create_app()
 
 
-def _resolve_host_port(override_host: str | None, override_port: int | None) -> tuple[str, int]:
+def _resolve_host_port(
+    override_host: str | None, override_port: int | None
+) -> tuple[str, int]:
     host_setting = settings.get("APP.host")
     port_setting = settings.get("APP.port")
 
     host = override_host or host_setting or "127.0.0.1"
-    port_value: int | str | None = override_port if override_port is not None else port_setting
+    port_value: int | str | None = (
+        override_port if override_port is not None else port_setting
+    )
     port = int(port_value) if port_value is not None else 5000
     return host, port
 
 
-async def _run_prod(host: str, port: int, *, workers: int | None, keep_alive: float | None, graceful_timeout: float | None) -> None:
+async def _run_prod(
+    host: str,
+    port: int,
+    *,
+    workers: int | None,
+    keep_alive: float | None,
+    graceful_timeout: float | None,
+) -> None:
     config = Config()
     config.bind = [f"{host}:{port}"]
 
@@ -54,13 +65,17 @@ async def _run_prod(host: str, port: int, *, workers: int | None, keep_alive: fl
 
 
 def _run_dev(host: str, port: int, *, reload: bool) -> None:
-    logger.info("Starting Quart development server on %s:%s (reload=%s)", host, port, reload)
+    logger.info(
+        "Starting Quart development server on %s:%s (reload=%s)", host, port, reload
+    )
     app.run(host=host, port=port, use_reloader=reload)
 
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the Llamora application server.")
-    parser.add_argument("--host", help="Override the bind host (defaults to settings.APP.host)")
+    parser.add_argument(
+        "--host", help="Override the bind host (defaults to settings.APP.host)"
+    )
     parser.add_argument(
         "--port",
         type=int,
@@ -69,7 +84,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="mode")
 
-    dev_parser = subparsers.add_parser("dev", help="Run the Quart development server with reload support.")
+    dev_parser = subparsers.add_parser(
+        "dev", help="Run the Quart development server with reload support."
+    )
     dev_parser.set_defaults(mode="dev")
     dev_parser.add_argument(
         "--no-reload",
@@ -77,7 +94,9 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Disable the code reloader (enabled by default).",
     )
 
-    prod_parser = subparsers.add_parser("prod", help="Run the Hypercorn production server.")
+    prod_parser = subparsers.add_parser(
+        "prod", help="Run the Hypercorn production server."
+    )
     prod_parser.set_defaults(mode="prod")
     prod_parser.add_argument(
         "--workers",

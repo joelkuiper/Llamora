@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""SQLite persistence helpers with hardened connection pragmas."""
+# SQLite persistence helpers with hardened connection pragmas.
 
 import asyncio
 import logging

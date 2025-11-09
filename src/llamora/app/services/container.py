@@ -139,9 +139,7 @@ class AppLifecycle:
                         await self._services.llm_service.ensure_stopped()
                 with suppress(Exception):
                     if db_initialised:
-                        logger.debug(
-                            "Rollback: closing database after startup failure"
-                        )
+                        logger.debug("Rollback: closing database after startup failure")
                         await self._services.db.close()
                 raise
 

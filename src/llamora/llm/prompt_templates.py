@@ -46,7 +46,9 @@ def _resolve_template_dir() -> Path:
     for candidate in _candidate_template_dirs(configured_str or None):
         if candidate.is_dir():
             return candidate
-    searched = ", ".join(str(path) for path in _candidate_template_dirs(configured_str or None))
+    searched = ", ".join(
+        str(path) for path in _candidate_template_dirs(configured_str or None)
+    )
     raise FileNotFoundError(f"Unable to locate prompt templates. Searched: {searched}")
 
 

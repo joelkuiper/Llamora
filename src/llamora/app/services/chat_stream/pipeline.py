@@ -220,9 +220,7 @@ class ResponsePipeline:
         guard_size = repeat_guard_size or 0
         guard_min_length = repeat_guard_min_length or 0
         self._chunk_guard = (
-            ChunkRingGuard(guard_size, guard_min_length)
-            if guard_size > 0
-            else None
+            ChunkRingGuard(guard_size, guard_min_length) if guard_size > 0 else None
         )
 
     async def run(self, callbacks: ResponsePipelineCallbacks) -> PipelineResult:

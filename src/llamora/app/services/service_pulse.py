@@ -30,8 +30,7 @@ class PulseEvent:
 class PulseListener(Protocol):
     """Callback protocol for service pulse subscribers."""
 
-    def __call__(self, event: PulseEvent) -> Awaitable[None] | None:
-        ...
+    def __call__(self, event: PulseEvent) -> Awaitable[None] | None: ...
 
 
 class ServicePulse:
@@ -67,7 +66,9 @@ class ServicePulse:
                     payload=event.payload,
                 )
             except Exception:  # pragma: no cover - defensive
-                logger.exception("Service pulse listener failed for topic %s", event.topic)
+                logger.exception(
+                    "Service pulse listener failed for topic %s", event.topic
+                )
                 continue
             self._handle_result(result)
 
@@ -112,13 +113,17 @@ class ServicePulse:
         if topics is not None:
             topic_list = list(dict.fromkeys(topics))
 
-        def _receiver(sender: Any, *, event: PulseEvent | None = None, **_: Any) -> None:
+        def _receiver(
+            sender: Any, *, event: PulseEvent | None = None, **_: Any
+        ) -> None:
             if event is None:
                 return
             try:
                 result = listener(event)
             except Exception:  # pragma: no cover - defensive
-                logger.exception("Service pulse listener failed for topic %s", event.topic)
+                logger.exception(
+                    "Service pulse listener failed for topic %s", event.topic
+                )
                 return
             self._handle_result(result)
 
@@ -136,9 +141,7 @@ class ServicePulse:
                 events = list(self._latest.values())
             else:
                 events = [
-                    event
-                    for name, event in self._latest.items()
-                    if name in topic_list
+                    event for name, event in self._latest.items() if name in topic_list
                 ]
             for event in events:
                 try:

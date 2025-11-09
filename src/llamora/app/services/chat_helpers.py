@@ -157,12 +157,7 @@ def build_conversation_context(
 def _error_events(pending_response, chunk: str | None = None):
     """Yield SSE events for an errored streaming response."""
 
-    message = (
-        pending_response.text
-        or chunk
-        or pending_response.error_message
-        or ""
-    )
+    message = pending_response.text or chunk or pending_response.error_message or ""
     yield format_sse_event("error", message)
     yield format_sse_event("done", {})
 
@@ -231,9 +226,7 @@ class StreamSession(Response):
         return cls(cls._error_stream(message))
 
     @classmethod
-    def backpressure(
-        cls, message: Any, retry_after: float | int
-    ) -> "StreamSession":
+    def backpressure(cls, message: Any, retry_after: float | int) -> "StreamSession":
         """Create an error stream that advertises a retry delay."""
 
         retry_seconds = max(1, int(math.ceil(float(retry_after))))

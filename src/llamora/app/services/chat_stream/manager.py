@@ -281,6 +281,8 @@ class PendingResponse(ResponsePipelineCallbacks):
         self.text = total
         self._total_len = len(total)
         self._visible_total = total
+
+
 class StreamCapacityError(RuntimeError):
     """Raised when no parallel slots are available for a new stream."""
 
@@ -615,8 +617,8 @@ class ChatStreamManager:
             self._avg_stream_duration = sample
         else:
             self._avg_stream_duration = (
-                (1 - alpha) * self._avg_stream_duration + alpha * sample
-            )
+                1 - alpha
+            ) * self._avg_stream_duration + alpha * sample
 
     def _update_wait_estimate(self, sample: float) -> None:
         if sample < 0:
@@ -625,9 +627,7 @@ class ChatStreamManager:
         if self._avg_queue_wait is None:
             self._avg_queue_wait = sample
         else:
-            self._avg_queue_wait = (
-                (1 - alpha) * self._avg_queue_wait + alpha * sample
-            )
+            self._avg_queue_wait = (1 - alpha) * self._avg_queue_wait + alpha * sample
 
     def _estimate_retry_after(self, queue_depth: int, max_slots: int) -> float:
         avg_wait = self._avg_queue_wait if self._avg_queue_wait is not None else 0.75

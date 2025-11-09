@@ -31,11 +31,7 @@ def _resolve_config_dir() -> Path:
             return expanded.resolve()
 
     searched = ", ".join(str(path) for path in candidates)
-    message = (
-        "Unable to locate configuration directory. "
-        "Searched: "
-        f"{searched}."
-    )
+    message = f"Unable to locate configuration directory. Searched: {searched}."
     if env_override:
         message += " Set LLAMORA_CONFIG_DIR to a valid directory."
     raise RuntimeError(message)
@@ -305,9 +301,7 @@ if embedding_concurrency <= 0:
     settings.set("EMBEDDING.concurrency", embedding_concurrency)
 
 queue_size_default = DEFAULTS["WORKERS"]["index_worker"]["max_queue_size"]
-queue_size_raw = settings.get(
-    "WORKERS.index_worker.max_queue_size", queue_size_default
-)
+queue_size_raw = settings.get("WORKERS.index_worker.max_queue_size", queue_size_default)
 try:
     queue_size = int(queue_size_raw)
 except (TypeError, ValueError):

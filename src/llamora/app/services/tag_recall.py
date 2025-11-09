@@ -291,11 +291,8 @@ async def build_tag_recall_context(
         return None
 
     tag_labels = [
-        tag_names.get(tag, "")
-        for tag in focus_tags
-        if tag_names.get(tag, "")
+        tag_names.get(tag, "") for tag in focus_tags if tag_names.get(tag, "")
     ]
-    header_tags = f" ({', '.join(tag_labels)})" if tag_labels else ""
     text = render_prompt_template(
         "tag_recall.txt.j2",
         heading="Cross-day tag recall",
@@ -306,4 +303,3 @@ async def build_tag_recall_context(
         return None
 
     return TagRecallContext(text=text, tags=tuple(tag_labels))
-

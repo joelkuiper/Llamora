@@ -371,9 +371,7 @@ class LlamafileProcessManager:
         default_settings = data.get("default_generation_settings")
         if isinstance(default_settings, Mapping):
             ctx_size = default_settings.get("n_ctx")
-            if ctx_size is None and isinstance(
-                default_settings.get("params"), Mapping
-            ):
+            if ctx_size is None and isinstance(default_settings.get("params"), Mapping):
                 ctx_size = default_settings["params"].get("n_ctx")
         if ctx_size is None:
             ctx_size = data.get("n_ctx")
@@ -384,7 +382,9 @@ class LlamafileProcessManager:
                 if ctx_value > 0:
                     self._ctx_size = ctx_value
         except (TypeError, ValueError):
-            self.logger.debug("Ignoring invalid ctx size from server props", exc_info=True)
+            self.logger.debug(
+                "Ignoring invalid ctx size from server props", exc_info=True
+            )
 
         total_slots = data.get("total_slots")
         try:

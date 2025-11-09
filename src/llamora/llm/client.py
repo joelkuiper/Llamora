@@ -139,13 +139,17 @@ class _CompletionStream:
             status_line = str(e)
             body: bytes | None = None
             if response is not None:
-                status_line = f"{response.status_code} {response.reason_phrase or ''}".strip()
+                status_line = (
+                    f"{response.status_code} {response.reason_phrase or ''}".strip()
+                )
                 try:
                     body = await response.aread()
                 except Exception:
                     body = None
             detail = self._client._normalize_response_detail(body, status_line)
-            self._client.logger.error("Completion request failed (%s): %s", status_line, detail)
+            self._client.logger.error(
+                "Completion request failed (%s): %s", status_line, detail
+            )
             self._client.process_manager.ensure_server_running()
             await self._emit({"type": "error", "data": detail})
         except HTTPError as e:
@@ -419,7 +423,9 @@ class LLMClient:
         ctx = dict(context)
         token_counts = await self._get_token_counts(history, ctx)
 
-        tag_occurrences, tags_by_index, tag_display = self._collect_tag_priorities(history)
+        tag_occurrences, tags_by_index, tag_display = self._collect_tag_priorities(
+            history
+        )
         priority_targets = {
             indices[-1] for indices in tag_occurrences.values() if indices
         }
@@ -436,7 +442,9 @@ class LLMClient:
             return []
 
         base_indices = (
-            list(range(base_start_idx, len(history))) if base_start_idx is not None else []
+            list(range(base_start_idx, len(history)))
+            if base_start_idx is not None
+            else []
         )
 
         candidate_indices = sorted(set(base_indices) | priority_targets)
@@ -489,7 +497,9 @@ class LLMClient:
             added = [idx for idx in final_indices if idx not in base_indices]
             removed = [idx for idx in base_indices if idx not in final_indices]
             added_tags = [
-                sorted(tags_by_index.get(idx, set())) for idx in added if idx in tags_by_index
+                sorted(tags_by_index.get(idx, set()))
+                for idx in added
+                if idx in tags_by_index
             ]
             flattened_added = sorted({tag for sublist in added_tags for tag in sublist})
             dropped_tags = [
@@ -497,7 +507,9 @@ class LLMClient:
                 for idx in removed_priority
                 if idx in tags_by_index
             ]
-            flattened_dropped = sorted({tag for sublist in dropped_tags for tag in sublist})
+            flattened_dropped = sorted(
+                {tag for sublist in dropped_tags for tag in sublist}
+            )
             self.logger.info(
                 "Tag-priority trim adjusted slice: base_start=%s final_indices=%s "
                 "added=%s removed=%s removed_non_priority=%s added_tags=%s "
@@ -542,8 +554,7 @@ class LLMClient:
         """Return ``history`` trimmed to fit within the model context window."""
 
         history_list = [
-            dict(entry) if not isinstance(entry, dict) else entry
-            for entry in history
+            dict(entry) if not isinstance(entry, dict) else entry for entry in history
         ]
         if not history_list:
             return history_list

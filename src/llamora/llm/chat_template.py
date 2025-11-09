@@ -239,7 +239,7 @@ def build_opening_messages(
 
 
 def render_chat_prompt(
-    messages: Sequence[Mapping[str, Any] | dict[str, Any]]
+    messages: Sequence[Mapping[str, Any] | dict[str, Any]],
 ) -> ChatPromptRender:
     """Render ``messages`` to a prompt using the tokenizer's chat template."""
 

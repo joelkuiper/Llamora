@@ -89,9 +89,7 @@ class LLMService:
                     try:
                         await llm_client.aclose()
                     except Exception:
-                        logger.exception(
-                            "Error closing LLM client after failed start"
-                        )
+                        logger.exception("Error closing LLM client after failed start")
 
                 if process_manager is not None:
                     try:

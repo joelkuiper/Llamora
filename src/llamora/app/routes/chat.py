@@ -59,7 +59,9 @@ def _chat_stream_manager():
 logger = logging.getLogger(__name__)
 
 
-def _max_prompt_tokens(llm_client, params: Mapping[str, Any] | None = None) -> int | None:
+def _max_prompt_tokens(
+    llm_client, params: Mapping[str, Any] | None = None
+) -> int | None:
     ctx_size = llm_client.ctx_size
     if ctx_size is None:
         return None
@@ -458,9 +460,7 @@ async def sse_reply(user_msg_id: str, date: str):
     except HTTPException:
         raise
     except Exception:
-        logger.exception(
-            "Failed to start streaming reply for %s", user_msg_id
-        )
+        logger.exception("Failed to start streaming reply for %s", user_msg_id)
         return StreamSession.error(
             "The assistant ran into an unexpected error. Please try again."
         )
