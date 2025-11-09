@@ -225,14 +225,9 @@
 
 .meta-chips--static .meta-chip.is-highlighted {
   background: var(--highlight-color);
-  border-color: rgba(0, 0, 0, 0.12);
+  border-color: var(--border);
   box-shadow: none;
 }
-
-[data-theme="dark"] .meta-chips--static .meta-chip.is-highlighted {
-  border-color: rgba(255, 255, 255, 0.18);
-}
-
 
 @media (max-width: 640px) {
   .search-result-item a {

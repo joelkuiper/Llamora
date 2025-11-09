@@ -59,7 +59,7 @@
   box-shadow:
     var(--raised-shadow),
     0 0 0 2px var(--accent-10);
-  background: linear-gradient(0deg, rgba(59,167,246,0.16), rgba(59,167,246,0.12)) var(--glass-bg-alt);
+  background: linear-gradient(0deg, var(--accent-15), var(--accent-05)) var(--glass-bg-alt);
 }
 
 .meta-chip:focus,
@@ -299,7 +299,7 @@
     &:hover {
       border-color: var(--accent);
       box-shadow: var(--raised-shadow), 0 0 0 2px var(--accent-10);
-      background: linear-gradient(0deg, rgba(59,167,246,0.16), rgba(59,167,246,0.12)) var(--glass-bg-alt);
+      background: linear-gradient(0deg, var(--accent-15), var(--accent-05)) var(--glass-bg-alt);
     }
     &:active { transform: translateY(1px); }
   }
