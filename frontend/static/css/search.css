@@ -62,7 +62,10 @@
   padding: var(--spacing-sm);
   list-style-type: none;
 
-  mark { background-color: var(--highlight-color); }
+  mark {
+    background-color: var(--highlight-color);
+    color: var(--color-text);
+  }
 
   .status-semantic {
     opacity: 0.5;
