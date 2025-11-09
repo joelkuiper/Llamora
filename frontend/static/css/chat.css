@@ -270,7 +270,6 @@ chat-view[data-rendering="true"] #chat {
       border-radius: var(--radius-sm);
     }
   }
-
 }
 
 #message-form {
@@ -389,91 +388,6 @@ chat-view[data-rendering="true"] #chat {
       cursor: default;
     }
   }
-}
-
-.message-divider {
-  --divider-phase-color: color-mix(in srgb, var(--brand-accent), transparent 68%);
-  --divider-phase-soft: color-mix(in srgb, var(--brand-accent-15), transparent 40%);
-
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  color: var(--color-text-muted);
-  font-size: 0.75rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-weight: 600;
-  align-self: stretch;
-  padding: 0;
-  margin: var(--spacing-xs) 0;
-}
-
-.message-divider::before,
-.message-divider::after {
-  content: "";
-  flex: 1 1 auto;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--divider-phase-color));
-  opacity: 0.8;
-}
-
-.message-divider::after {
-  background: linear-gradient(270deg, transparent, var(--divider-phase-color));
-}
-
-.message-divider__content {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.35rem 0.85rem;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--divider-phase-soft), transparent 70%);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--divider-phase-color), transparent 60%);
-  color: inherit;
-}
-
-.message-divider__phase {
-  font-weight: 600;
-}
-
-.message-divider__bullet {
-  opacity: 0.65;
-}
-
-.message-divider__time {
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.08em;
-}
-
-.message-divider[data-phase="night"] {
-  --divider-phase-color: color-mix(in srgb, var(--brand-accent), transparent 55%);
-  --divider-phase-soft: color-mix(in srgb, var(--brand-accent-25), transparent 45%);
-}
-
-.message-divider[data-phase="early-morning"] {
-  --divider-phase-color: color-mix(in srgb, var(--accent), transparent 40%);
-  --divider-phase-soft: color-mix(in srgb, var(--accent-15), transparent 25%);
-}
-
-.message-divider[data-phase="morning"] {
-  --divider-phase-color: color-mix(in srgb, var(--accent-active), transparent 35%);
-  --divider-phase-soft: color-mix(in srgb, var(--accent-10), transparent 15%);
-}
-
-.message-divider[data-phase="afternoon"] {
-  --divider-phase-color: color-mix(in srgb, var(--color-success-text), transparent 45%);
-  --divider-phase-soft: color-mix(in srgb, var(--color-success-bg), transparent 25%);
-}
-
-.message-divider[data-phase="evening"] {
-  --divider-phase-color: color-mix(in srgb, var(--color-danger), transparent 55%);
-  --divider-phase-soft: color-mix(in srgb, var(--color-danger-bg), transparent 30%);
-}
-
-.message-divider[data-phase="late-night"] {
-  --divider-phase-color: color-mix(in srgb, var(--brand-accent), transparent 48%);
-  --divider-phase-soft: color-mix(in srgb, var(--brand-accent-15), transparent 32%);
 }
 
 /* animations */

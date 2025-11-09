@@ -6,9 +6,8 @@ from typing import Any, Mapping
 
 from llamora.app.services.auth_helpers import get_secure_cookie_manager
 from llamora.app.services.container import get_services
-from llamora.app.services.history_serializer import serialize_history_for_view
 from llamora.app.services.markdown import render_markdown_to_html
-from llamora.app.services.time import get_timezone, local_date
+from llamora.app.services.time import local_date
 
 
 async def get_chat_context(
@@ -43,11 +42,8 @@ async def get_chat_context(
 
     opening_stream = not history and is_today
 
-    tz = get_timezone()
-    rendered_history = serialize_history_for_view(history, tz)
-
     return {
-        "history": rendered_history,
+        "history": history,
         "pending_msg_id": pending_msg_id,
         "is_today": is_today,
         "opening_stream": opening_stream,
