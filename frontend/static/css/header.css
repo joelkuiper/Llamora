@@ -20,6 +20,8 @@
     display: flex;
     align-items: center;
     gap: var(--spacing-xs);
+    text-decoration: none;
+    color: inherit;
   }
 
   #calendar-control {
@@ -54,10 +56,6 @@
 
   @media (max-width: 960px) {
     gap: var(--spacing-sm);
-
-    #branding h1 {
-      display: none;
-    }
   }
 
   @media (max-width: 780px) {
