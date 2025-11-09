@@ -30,11 +30,14 @@ async def index():
 
 
 async def _render_day(date: str, target: str | None):
+    today = local_date().isoformat()
     chat_response = await render_chat(date, oob=False, scroll_target=target)
     chat_html = await chat_response.get_data(as_text=True)
     html = await render_template(
         "index.html",
         day=date,
+        is_today=date == today,
+        today=today,
         chat_html=chat_html,
         scroll_target=target,
     )

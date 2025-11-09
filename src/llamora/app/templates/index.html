@@ -38,7 +38,12 @@
       </svg>
       <span id="calendar-label">{{ day|long_date }}</span>
     </button>
-    <button id="next-day" disabled type="button" class="icon-btn" aria-label="Next day" data-tooltip-title="Next day">
+    <button id="next-day"
+            type="button"
+            class="icon-btn"
+            aria-label="Next day"
+            {% if is_today %}disabled aria-disabled="true"{% endif %}
+            {% if not is_today %}data-tooltip-title="Next day"{% endif %}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="9 18 15 12 9 6"></polyline>
       </svg>
