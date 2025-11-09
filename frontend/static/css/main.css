@@ -399,14 +399,14 @@ html, body {
 #branding .branding-link {
   display: inline-flex;
   align-items: center;
-  gap: var(--spacing-sm);
   opacity: 0.75;
+  gap: var(--spacing-sm);
   transition: opacity var(--motion-hover) ease;
 }
 
 #branding .branding-link:hover,
 #branding .branding-link:focus {
-  opacity: 1;
+  /* placeholder */
 }
 
 /* ==========================================================================

@@ -29,7 +29,6 @@
     align-items: center;
     gap: var(--spacing-xs);
     text-decoration: none;
-    color: inherit;
     flex: 0 0 auto;
   }
 
@@ -54,7 +53,7 @@
 
   @media (min-width: 1440px) {
     .header-right > .search-wrap {
-      flex-basis: clamp(13rem, 24vw, 22rem);
+      flex-basis: clamp(13rem, 24vw, 18rem);
       max-width: 24rem;
     }
   }
@@ -86,7 +85,7 @@
     gap: var(--spacing-sm);
 
     .header-right > .search-wrap {
-      flex-basis: clamp(9.5rem, 36vw, 16rem);
+      flex-basis: clamp(9.5rem, 36vw, 14rem);
       max-width: 16rem;
     }
   }
