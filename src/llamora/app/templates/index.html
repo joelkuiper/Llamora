@@ -1,13 +1,24 @@
 {% extends 'layouts/base.html' %}
 
 {% block header %}
-  <div id="branding">
-    <picture>
-      <source srcset="{{ url_for('static', filename='img/logo-dark.svg') }}" media="(prefers-color-scheme: dark)">
-      <img class="logo" src="{{ url_for('static', filename='img/logo.svg') }}" alt="{{ config.APP_NAME }} logo">
-    </picture>
-    <h1>{{ config.APP_NAME }}</h1>
-  </div>
+  <a id="branding"
+     href="{{ url_for('days.day_today') }}"
+     aria-label="Go to today"
+     hx-get="{{ url_for('chat.chat_htmx_today') }}"
+     hx-target="#content-wrapper"
+     hx-swap="outerHTML"
+     hx-push-url="true"
+     data-logo-toggle>
+    <img class="logo"
+         src="{{ url_for('static', filename='img/logo.svg') }}"
+         alt="{{ config.APP_NAME }} logo"
+         data-light-default="{{ url_for('static', filename='img/logo.svg') }}"
+         data-light-hover="{{ url_for('static', filename='img/logo-hover.svg') }}"
+         data-light-active="{{ url_for('static', filename='img/logo-hover.svg') }}"
+         data-dark-default="{{ url_for('static', filename='img/logo-dark.svg') }}"
+         data-dark-hover="{{ url_for('static', filename='img/logo-dark-hover.svg') }}"
+         data-dark-active="{{ url_for('static', filename='img/logo-dark-hover.svg') }}">
+  </a>
 
   <calendar-control id="calendar-control">
     <button id="prev-day" type="button" class="icon-btn" aria-label="Previous day" data-tooltip-title="Previous day">

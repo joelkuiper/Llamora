@@ -1,17 +1,15 @@
 #branding {
   margin: 0 auto;
   width: fit-content;
-  position: relative;
-  left: -10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
   .logo {
-    width: 5em;
+    height: 5rem;
+    width: auto;
     padding: var(--spacing-sm);
-  }
-
-  h1 {
-    margin-top: 1rem;
-    margin-left: -1.25em;
+    display: block;
   }
 }
 
