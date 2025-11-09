@@ -105,12 +105,13 @@ function updateNavButton(button, { disabled, tooltip, onClick }) {
 
 /* Initialize previous/next day navigation buttons */
 export function initDayNav(chat, options = {}) {
+  const { forceFlash = false, activeDay, label } = options;
   const prevBtn = document.getElementById("prev-day");
   const nextBtn = document.getElementById("next-day");
   if (!prevBtn || !nextBtn) return;
 
   const activeDaySource =
-    options.activeDay ||
+    activeDay ||
     chat?.dataset?.date ||
     document.body?.dataset?.activeDay ||
     "";
@@ -121,14 +122,14 @@ export function initDayNav(chat, options = {}) {
   const labelNode = document.getElementById("calendar-label");
   if (labelNode) {
     const labelText =
-      options.label ||
+      label ||
       chat?.dataset?.longDate ||
       document.body?.dataset?.activeDayLabel ||
       (currentDate ? formatLongDate(currentDate) : activeDaySource);
     if (typeof labelText === "string") {
       const previousLabel = labelNode.textContent;
       labelNode.textContent = labelText;
-      if (previousLabel !== labelText) {
+      if (previousLabel !== labelText || forceFlash) {
         triggerLabelFlash(labelNode);
       }
     }

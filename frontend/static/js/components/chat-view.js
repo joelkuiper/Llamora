@@ -90,6 +90,7 @@ export class ChatView extends ReactiveElement {
   #lastRenderedDay = null;
   #chatFormReady = Promise.resolve();
   #pendingScrollTarget = null;
+  #forceNavFlash = false;
 
   constructor() {
     super();
@@ -215,6 +216,7 @@ export class ChatView extends ReactiveElement {
       this.#setRenderingState(false);
       this.#chat = null;
       this.#lastRenderedDay = null;
+      this.#forceNavFlash = false;
       if (document?.body?.dataset) {
         delete document.body.dataset.activeDay;
         delete document.body.dataset.activeDayLabel;
@@ -323,7 +325,15 @@ export class ChatView extends ReactiveElement {
     this.#markdownObserver.start();
     chatFormReady.then(() => this.#updateStreamingState());
 
-    initDayNav(chat, { activeDay, label: activeDayLabel });
+    const shouldForceNavFlash = this.#forceNavFlash;
+    initDayNav(chat, {
+      activeDay,
+      label: activeDayLabel,
+      forceFlash: shouldForceNavFlash,
+    });
+    if (shouldForceNavFlash) {
+      this.#forceNavFlash = false;
+    }
 
     if (activeDayLabel) {
       document.title = activeDayLabel;
@@ -451,6 +461,7 @@ export class ChatView extends ReactiveElement {
 
   #handleHistoryRestore() {
     this.#initialized = false;
+    this.#forceNavFlash = true;
     this.#cancelHistoryRestoreFrame();
     this.#historyRestoreFrame = window.requestAnimationFrame(() => {
       this.#historyRestoreFrame = null;
