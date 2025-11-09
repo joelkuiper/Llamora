@@ -101,6 +101,7 @@ export class SearchOverlay extends ReactiveElement {
   #keydownHandler;
   #documentClickHandler;
   #focusHandler;
+  #pageShowHandler;
   #recentFetchPromise = null;
   #recentLoaded = false;
   #recentFetchedAt = 0;
@@ -115,6 +116,7 @@ export class SearchOverlay extends ReactiveElement {
     this.#keydownHandler = (event) => this.#handleKeydown(event);
     this.#documentClickHandler = (event) => this.#handleDocumentClick(event);
     this.#focusHandler = () => this.#handleInputFocus();
+    this.#pageShowHandler = (event) => this.#handlePageShow(event);
   }
 
   connectedCallback() {
@@ -149,6 +151,9 @@ export class SearchOverlay extends ReactiveElement {
       onEnd: this.#afterRequestHandler,
     });
     listeners.add(this, "htmx:afterSwap", this.#afterSwapHandler);
+
+    const win = eventTarget.defaultView ?? window;
+    win.addEventListener("pageshow", this.#pageShowHandler);
   }
 
   disconnectedCallback() {
@@ -166,6 +171,10 @@ export class SearchOverlay extends ReactiveElement {
     this.#resultsEl = null;
     this.#inputEl = null;
     this.#spinnerEl = null;
+
+    const doc = this.ownerDocument ?? document;
+    const win = doc.defaultView ?? window;
+    win.removeEventListener("pageshow", this.#pageShowHandler);
     super.disconnectedCallback();
   }
 
@@ -602,6 +611,24 @@ export class SearchOverlay extends ReactiveElement {
 
     panel.classList.add("pop-exit");
     panel.addEventListener("animationend", completeExit, { once: true });
+  }
+
+  #handlePageShow(event) {
+    if (!this.isConnected) return;
+    if (!event?.persisted) return;
+
+    const input = this.querySelector("#search-input");
+    this.#inputEl = input instanceof HTMLInputElement ? input : null;
+
+    if (!this.#inputEl) return;
+
+    if (this.#autocomplete) {
+      this.#loadRecentSearches(true);
+      return;
+    }
+
+    this.#initAutocomplete();
+    this.#loadRecentSearches(true);
   }
 }
 
