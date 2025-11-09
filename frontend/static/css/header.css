@@ -5,10 +5,10 @@
   z-index: 40;
   background: var(--color-bg-alt);
   padding: var(--spacing-sm) var(--spacing-xl);
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: var(--spacing-lg);
-  flex-wrap: nowrap;
 
   #branding,
   .header-right {
@@ -18,9 +18,10 @@
   #branding {
     display: flex;
     align-items: center;
-    flex: 1 1 auto;
     min-width: 0;
-    margin-inline-end: auto;
+    justify-self: start;
+    grid-column: 1;
+    grid-row: 1;
   }
 
   #branding .branding-link {
@@ -32,13 +33,10 @@
     flex: 0 0 auto;
   }
 
-  .header-right {
-    flex: 1 1 0;
-  }
-
   #calendar-control {
-    flex: 0 0 auto;
-    margin-inline: auto;
+    grid-column: 1 / -1;
+    grid-row: 1;
+    justify-self: center;
   }
 
   .header-right {
@@ -46,6 +44,11 @@
     align-items: center;
     justify-content: flex-end;
     gap: var(--spacing-md);
+    justify-self: stretch;
+    width: 100%;
+    min-width: 0;
+    grid-column: 2;
+    grid-row: 1;
   }
 
   .header-right > .search-wrap {
