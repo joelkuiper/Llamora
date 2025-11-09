@@ -125,7 +125,7 @@ export function flashHighlight(el) {
 }
 
 export function clearScrollTarget(target, options = {}) {
-  const { emitEvent = true } = options;
+  const { emitEvent = true, historyState = null } = options;
   const params = new URLSearchParams(window.location.search);
   const hadTargetParam = params.has("target");
   if (hadTargetParam) {
@@ -142,7 +142,8 @@ export function clearScrollTarget(target, options = {}) {
       ? `${window.location.pathname}?${query}`
       : window.location.pathname;
     const finalUrl = shouldClearHash ? baseUrl : `${baseUrl}${window.location.hash}`;
-    history.replaceState(null, "", finalUrl);
+    const state = historyState ?? history.state;
+    history.replaceState(state, "", finalUrl);
   }
 
   if (emitEvent) {
@@ -163,6 +164,7 @@ export function scrollToHighlight(fallbackTarget) {
   let target = params.get("target");
   let consumedFallback = false;
   let shouldUpdateHistory = false;
+  const historyState = history.state;
 
   if (!target && window.location.hash.startsWith("#msg-")) {
     target = window.location.hash.substring(1);
@@ -183,7 +185,7 @@ export function scrollToHighlight(fallbackTarget) {
       const newUrl = query
         ? `${window.location.pathname}?${query}`
         : window.location.pathname;
-      history.replaceState(null, "", newUrl);
+      history.replaceState(historyState, "", newUrl);
     }
     const el = document.getElementById(target);
     if (el) {
@@ -199,7 +201,7 @@ export function scrollToHighlight(fallbackTarget) {
         })
       );
       flashHighlight(el);
-      clearScrollTarget(target);
+      clearScrollTarget(target, { historyState });
     }
   }
 
