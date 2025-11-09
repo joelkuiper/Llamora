@@ -397,13 +397,16 @@ export class ChatView extends ReactiveElement {
       }
 
       if (target?.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
-        target.querySelectorAll?.(".message").forEach((node) => {
+        target.querySelectorAll?.(".message, .message-divider").forEach((node) => {
           activateAnimations(node);
         });
         return;
       }
 
-      if (target?.classList?.contains("message")) {
+      if (
+        target?.classList?.contains("message") ||
+        target?.classList?.contains("message-divider")
+      ) {
         activateAnimations(target);
       }
     });
