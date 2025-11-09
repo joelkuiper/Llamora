@@ -94,6 +94,7 @@ export class SearchOverlay extends ReactiveElement {
   #spinnerEl = null;
   #spinnerController = null;
   #autocomplete = null;
+  #autocompleteInput = null;
   #beforeRequestHandler;
   #afterRequestHandler;
   #afterSwapHandler;
@@ -102,6 +103,7 @@ export class SearchOverlay extends ReactiveElement {
   #documentClickHandler;
   #focusHandler;
   #pageShowHandler;
+  #historyRestoreHandler;
   #recentFetchPromise = null;
   #recentLoaded = false;
   #recentFetchedAt = 0;
@@ -117,6 +119,7 @@ export class SearchOverlay extends ReactiveElement {
     this.#documentClickHandler = (event) => this.#handleDocumentClick(event);
     this.#focusHandler = () => this.#handleInputFocus();
     this.#pageShowHandler = (event) => this.#handlePageShow(event);
+    this.#historyRestoreHandler = () => this.#handleHistoryRestore();
   }
 
   connectedCallback() {
@@ -151,6 +154,7 @@ export class SearchOverlay extends ReactiveElement {
       onEnd: this.#afterRequestHandler,
     });
     listeners.add(this, "htmx:afterSwap", this.#afterSwapHandler);
+    listeners.add(this, "htmx:historyRestore", this.#historyRestoreHandler);
 
     const win = eventTarget.defaultView ?? window;
     win.addEventListener("pageshow", this.#pageShowHandler);
@@ -171,6 +175,7 @@ export class SearchOverlay extends ReactiveElement {
     this.#resultsEl = null;
     this.#inputEl = null;
     this.#spinnerEl = null;
+    this.#autocompleteInput = null;
 
     const doc = this.ownerDocument ?? document;
     const win = doc.defaultView ?? window;
@@ -305,6 +310,7 @@ export class SearchOverlay extends ReactiveElement {
         this.#addCurrentQueryToAutocomplete();
       },
     });
+    this.#autocompleteInput = this.#inputEl;
   }
 
   #destroyAutocomplete() {
@@ -312,6 +318,7 @@ export class SearchOverlay extends ReactiveElement {
       this.#autocomplete.destroy();
     }
     this.#autocomplete = null;
+    this.#autocompleteInput = null;
   }
 
   #loadRecentSearches(force = false) {
@@ -622,12 +629,38 @@ export class SearchOverlay extends ReactiveElement {
 
     if (!this.#inputEl) return;
 
-    if (this.#autocomplete) {
-      this.#loadRecentSearches(true);
-      return;
+    const listeners = this.#listeners;
+    if (listeners) {
+      listeners.add(this.#inputEl, "input", this.#inputHandler);
+      listeners.add(this.#inputEl, "focus", this.#focusHandler);
     }
 
-    this.#initAutocomplete();
+    const autocompleteInput = this.#autocompleteInput;
+    if (!this.#autocomplete || autocompleteInput !== this.#inputEl || !autocompleteInput?.isConnected) {
+      this.#initAutocomplete();
+    }
+    this.#loadRecentSearches(true);
+  }
+
+  #handleHistoryRestore() {
+    if (!this.isConnected) return;
+
+    const input = this.querySelector("#search-input");
+    this.#inputEl = input instanceof HTMLInputElement ? input : null;
+
+    if (!this.#inputEl) return;
+
+    const listeners = this.#listeners;
+    if (listeners) {
+      listeners.add(this.#inputEl, "input", this.#inputHandler);
+      listeners.add(this.#inputEl, "focus", this.#focusHandler);
+    }
+
+    const autocompleteInput = this.#autocompleteInput;
+    if (!this.#autocomplete || autocompleteInput !== this.#inputEl || !autocompleteInput?.isConnected) {
+      this.#initAutocomplete();
+    }
+
     this.#loadRecentSearches(true);
   }
 }
