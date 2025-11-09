@@ -190,7 +190,8 @@
 .search-result-item a {
   display: grid;
   grid-template-columns: minmax(6.5rem, auto) minmax(0, 1fr);
-  align-items: flex-start;
+  align-items: start;
+  align-items: baseline;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
   border-radius: 12px;
@@ -210,15 +211,18 @@
 .search-result-body {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  align-items: flex-start;
+  gap: 0.35rem;
   min-width: 0;
+  align-self: baseline;
 }
 
 .search-result-content {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-width: 0;
   margin: 0;
   font-size: 0.95rem;
+  line-height: 1.28;
   opacity: 0.9;
   overflow: hidden;
   text-overflow: ellipsis;
