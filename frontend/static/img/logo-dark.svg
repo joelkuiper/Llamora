@@ -1,37 +1,38 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<svg width="1400" height="512" viewBox="0 0 1400 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="logoDarkTitle">
-  <title id="logoDarkTitle">Llamora mark dark</title>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <filter id="softShadowDark" x="-40%" y="-40%" width="180%" height="180%">
+    <filter id="softShadowDark" x="-50%" y="-50%" width="200%" height="200%">
       <feOffset dx="6" dy="6" in="SourceAlpha" result="off" />
-      <feGaussianBlur in="off" stdDeviation="8" result="blur" />
+      <feGaussianBlur in="off" stdDeviation="10" result="blur" />
       <feColorMatrix in="blur" type="matrix"
-        values="0 0 0 0 0.10  0 0 0 0 0.16  0 0 0 0 0.26  0 0 0 0.36 0" />
+        values="0 0 0 0 0.12  0 0 0 0 0.19  0 0 0 0 0.32  0 0 0 0.45 0" />
       <feMerge>
         <feMergeNode />
         <feMergeNode in="SourceGraphic" />
       </feMerge>
     </filter>
-    <filter id="innerLightDark" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="2.5" in="SourceAlpha" result="shadow" />
+    <filter id="innerLightDark" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" in="SourceAlpha" result="shadow" />
       <feOffset dx="-4" dy="-4" in="shadow" result="offsetShadow" />
       <feComposite in="offsetShadow" in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1" result="inner" />
       <feColorMatrix in="inner" type="matrix"
-        values="0 0 0 0 0.76   0 0 0 0 0.84   0 0 0 0 0.96   0 0 0 0.38 0" />
+        values="0 0 0 0 0.85   0 0 0 0 0.92   0 0 0 0 0.98   0 0 0 0.45 0" />
       <feBlend in="SourceGraphic" in2="inner" mode="normal" />
     </filter>
     <linearGradient id="inkDark" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#9fb4cc" stop-opacity="0.95" />
-      <stop offset="100%" stop-color="#cbd8e6" stop-opacity="0.95" />
+      <stop offset="0%" stop-color="#dbeafe" stop-opacity="0.95" />
+      <stop offset="100%" stop-color="#94a3b8" stop-opacity="0.95" />
     </linearGradient>
   </defs>
 
+  <!-- Neumorphic circle base -->
   <g filter="url(#softShadowDark)">
     <circle cx="256" cy="256" r="180" fill="none" />
     <circle cx="256" cy="256" r="180" fill="none" filter="url(#innerLightDark)" />
   </g>
 
-  <g stroke="url(#inkDark)" stroke-width="10" fill="none" stroke-linecap="round" opacity="0.92">
+  <!-- Circular labyrinth arcs -->
+  <g stroke="url(#inkDark)" stroke-width="10" fill="none" stroke-linecap="round" opacity="0.95">
     <path d="M 276.00 256.00 A 20.00 20.00 0 1 1 271.32 243.14" />
     <path d="M 293.59 269.68 A 40.00 40.00 0 1 1 293.59 242.32" />
     <path d="M 301.96 294.57 A 60.00 60.00 0 1 1 316.00 256.00" />
@@ -41,12 +42,4 @@
     <path d="M 186.00 377.24 A 140.00 140.00 0 1 1 280.31 393.87" />
     <path d="M 133.43 358.85 A 160.00 160.00 0 1 1 228.22 413.57" />
   </g>
-
-  <text x="560" y="280"
-        font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-        font-size="164" font-weight="300" letter-spacing="2"
-        dominant-baseline="middle" alignment-baseline="middle"
-        text-anchor="start" fill="url(#inkDark)">
-    Llamora
-  </text>
 </svg>

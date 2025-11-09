@@ -394,13 +394,19 @@ html, body {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  opacity: 0.75;
-  transition: opacity var(--motion-hover) ease;
-}
+  opacity: 0.6;
 
-#branding:hover,
-#branding:focus {
-  opacity: 1;
+  picture {
+    display: flex;
+    align-items: center;
+  }
+
+  h1 {
+    font-weight: lighter;
+    user-select: none;
+    font-size: 1em;
+    text-shadow: var(--text-shadow-soft);
+  }
 }
 
 /* ==========================================================================
