@@ -342,6 +342,17 @@ chat-view[data-rendering="true"] #chat {
     }
 
     .btn.stopping {
+      background: linear-gradient(
+        135deg,
+        var(--accent-20) 0%,
+        color-mix(in srgb, var(--accent-05), transparent 15%) 55%,
+        var(--glass-bg-alt) 100%
+      );
+      background-size: 200% 200%;
+      animation: stopping-wave calc(var(--motion-wave, 1.6s) * 0.9) ease-in-out infinite;
+      box-shadow:
+        inset 0 0 0 1px var(--accent-20),
+        0 0 8px color-mix(in srgb, var(--accent-drop-shadow), transparent 20%);
     }
 
     .btn.stopping:active {
@@ -376,7 +387,8 @@ chat-view[data-rendering="true"] #chat {
 /* respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
   #message-form.is-submitting::after,
-  .input-wrapper .btn.submitting {
+  .input-wrapper .btn.submitting,
+  .input-wrapper .btn.stopping {
     animation: none;
     background-position: 50% 50%;
   }
