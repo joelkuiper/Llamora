@@ -18,6 +18,15 @@ const DATA_KEYS = {
 
 let schemeListenerRegistered = false;
 
+function isFocusVisible(anchor) {
+  if (typeof document === "undefined") {
+    return false;
+  }
+  return (
+    anchor === document.activeElement && anchor.matches(":focus-visible")
+  );
+}
+
 function currentPalette() {
   if (darkScheme && typeof darkScheme.matches === "boolean") {
     return darkScheme.matches ? "dark" : "light";
@@ -43,8 +52,16 @@ function applyState(img, state) {
 }
 
 function releaseState(anchor, img) {
-  const shouldHover = anchor.matches(":hover") || anchor.matches(":focus");
-  applyState(img, shouldHover ? "hover" : "default");
+  anchor.removeAttribute("data-logo-pressed");
+  const settle = () => {
+    const shouldHover = anchor.matches(":hover") || isFocusVisible(anchor);
+    applyState(img, shouldHover ? "hover" : "default");
+  };
+  if (typeof requestAnimationFrame === "function") {
+    requestAnimationFrame(settle);
+  } else {
+    settle();
+  }
 }
 
 function initLogo(anchor) {
@@ -61,13 +78,36 @@ function initLogo(anchor) {
     return;
   }
 
-  const toDefault = () => applyState(img, "default");
-  const toHover = () => applyState(img, "hover");
-  const toActive = () => applyState(img, "active");
-  const reset = () => releaseState(anchor, img);
+  const setPressed = () => anchor.setAttribute("data-logo-pressed", "true");
+  const clearPressed = () => anchor.removeAttribute("data-logo-pressed");
+
+  const toDefault = () => {
+    clearPressed();
+    applyState(img, "default");
+  };
+  const toHover = () => {
+    clearPressed();
+    applyState(img, "hover");
+  };
+  const toActive = () => {
+    setPressed();
+    applyState(img, "active");
+  };
+  const reset = () => {
+    clearPressed();
+    releaseState(anchor, img);
+  };
+
+  const handleFocus = () => {
+    if (isFocusVisible(anchor)) {
+      toHover();
+      return;
+    }
+    toDefault();
+  };
 
   anchor.addEventListener("pointerenter", toHover);
-  anchor.addEventListener("pointerleave", toDefault);
+  anchor.addEventListener("pointerleave", reset);
   anchor.addEventListener("pointerdown", (event) => {
     if (event.button === 0) {
       toActive();
@@ -75,7 +115,7 @@ function initLogo(anchor) {
   });
   anchor.addEventListener("pointerup", reset);
   anchor.addEventListener("pointercancel", reset);
-  anchor.addEventListener("focus", toHover);
+  anchor.addEventListener("focus", handleFocus);
   anchor.addEventListener("blur", toDefault);
   anchor.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") {
@@ -84,9 +124,23 @@ function initLogo(anchor) {
   });
   anchor.addEventListener("keyup", (event) => {
     if (event.key === "Enter" || event.key === " ") {
-      toHover();
+      handleFocus();
     }
   });
+
+  anchor.addEventListener("htmx:beforeRequest", () => {
+    setPressed();
+    applyState(img, "active");
+  });
+
+  const clearAfterRequest = () => {
+    reset();
+  };
+
+  anchor.addEventListener("htmx:afterRequest", clearAfterRequest);
+  anchor.addEventListener("htmx:requestError", clearAfterRequest);
+  anchor.addEventListener("htmx:responseError", clearAfterRequest);
+  anchor.addEventListener("htmx:sendError", clearAfterRequest);
 
   applyState(img, img.dataset.logoState ?? "default");
 

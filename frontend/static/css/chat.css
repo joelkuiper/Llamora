@@ -31,11 +31,32 @@ body {
 #branding {
   width: auto;
 
-  .logo {
-    height: 3rem;
-    width: auto;
-    padding: 0;
-    display: block;
+  .branding-link {
+    touch-action: manipulation;
+    display: inline-flex;
+
+    &:focus-visible {
+      outline: none;
+    }
+
+    .logo {
+      height: 3rem;
+      width: auto;
+      padding: 0;
+      display: block;
+      transform-origin: center;
+      transition: transform var(--motion-tap) ease;
+    }
+
+    &:focus-visible .logo {
+      outline: 2px solid var(--accent);
+      outline-offset: 4px;
+      border-radius: var(--radius-md);
+    }
+
+    &[data-logo-pressed="true"] .logo {
+      transform: translateY(1px) scale(0.985);
+    }
   }
 }
 

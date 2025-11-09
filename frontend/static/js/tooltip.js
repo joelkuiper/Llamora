@@ -7,6 +7,11 @@ let currentTarget;
 let lastRect;
 let initialized = false;
 
+function parseOffset(value, fallback) {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 function ensureEl() {
   if (tooltipEl && tooltipEl.isConnected) return;
   tooltipEl = document.createElement('div');
@@ -26,14 +31,20 @@ function show(el) {
     left: '',
     position: '',
   });
+  const placement = el.dataset.tooltipPlacement || "bottom";
+  const offsetX = parseOffset(el.dataset.tooltipOffsetX, 0);
+  const offsetY = parseOffset(el.dataset.tooltipOffsetY, 8);
+
   popoverController = createPopover(el, tooltipEl, {
     animation: null,
     closeOnOutside: false,
     closeOnEscape: false,
     popperOptions: {
-      placement: 'bottom',
+      placement,
       strategy: 'fixed',
-      modifiers: [{ name: 'offset', options: { offset: [0, 8] } }],
+      modifiers: [
+        { name: 'offset', options: { offset: [offsetX, offsetY] } },
+      ],
     },
     onShow: () => {
       tooltipEl.classList.add('visible');

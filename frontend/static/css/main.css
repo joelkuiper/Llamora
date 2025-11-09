@@ -394,12 +394,18 @@ html, body {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
+}
+
+#branding .branding-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
   opacity: 0.75;
   transition: opacity var(--motion-hover) ease;
 }
 
-#branding:hover,
-#branding:focus {
+#branding .branding-link:hover,
+#branding .branding-link:focus {
   opacity: 1;
 }
 

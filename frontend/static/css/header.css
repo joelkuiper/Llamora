@@ -12,16 +12,28 @@
 
   #branding,
   .header-right {
-    flex: 1 1 0;
     min-width: 0;
   }
 
   #branding {
     display: flex;
     align-items: center;
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-inline-end: auto;
+  }
+
+  #branding .branding-link {
+    display: inline-flex;
+    align-items: center;
     gap: var(--spacing-xs);
     text-decoration: none;
     color: inherit;
+    flex: 0 0 auto;
+  }
+
+  .header-right {
+    flex: 1 1 0;
   }
 
   #calendar-control {
