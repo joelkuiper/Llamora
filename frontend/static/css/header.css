@@ -33,12 +33,6 @@
     flex: 0 0 auto;
   }
 
-  #calendar-control {
-    grid-column: 1 / -1;
-    grid-row: 1;
-    justify-self: center;
-  }
-
   .header-right {
     display: flex;
     align-items: center;
@@ -53,9 +47,16 @@
 
   .header-right > .search-wrap {
     position: relative;
-    flex: 1 1 clamp(7rem, 28vw, 18rem);
-    min-width: 5.5rem;
-    max-width: 18rem;
+    flex: 0 1 clamp(11rem, 20vw, 18rem);
+    min-width: 8rem;
+    max-width: 20rem;
+  }
+
+  @media (min-width: 1440px) {
+    .header-right > .search-wrap {
+      flex-basis: clamp(13rem, 24vw, 22rem);
+      max-width: 24rem;
+    }
   }
 
   .header-right > .user-actions {
@@ -65,12 +66,67 @@
     flex-shrink: 0;
   }
 
+  #calendar-control {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    justify-self: center;
+    min-width: 0;
+  }
+
   @media (max-width: 1080px) {
     gap: var(--spacing-md);
+
+    .header-right > .search-wrap {
+      flex-basis: clamp(10rem, 30vw, 17rem);
+      max-width: 18rem;
+    }
   }
 
   @media (max-width: 960px) {
     gap: var(--spacing-sm);
+
+    .header-right > .search-wrap {
+      flex-basis: clamp(9.5rem, 36vw, 16rem);
+      max-width: 16rem;
+    }
+  }
+
+  @media (max-width: 860px) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--spacing-md);
+
+    #branding {
+      justify-self: stretch;
+    }
+
+    #calendar-control {
+      grid-column: 1;
+      grid-row: 2;
+      justify-self: center;
+    }
+
+    .header-right {
+      grid-column: 1;
+      grid-row: 3;
+      justify-content: flex-start;
+      flex-wrap: wrap;
+      align-items: stretch;
+      gap: var(--spacing-sm);
+      width: 100%;
+    }
+
+    .header-right > .search-wrap {
+      flex: 1 1 100%;
+      max-width: none;
+      width: 100%;
+    }
+
+    .header-right > .user-actions {
+      flex: 1 1 auto;
+      justify-content: flex-end;
+      gap: var(--spacing-sm);
+      width: 100%;
+    }
   }
 
   @media (max-width: 780px) {
@@ -79,29 +135,17 @@
     #calendar-label {
       display: none;
     }
-
-    .header-right > .search-wrap {
-      flex-basis: clamp(7rem, 40vw, 18rem);
-    }
   }
 
   @media (max-width: 640px) {
     gap: var(--spacing-sm);
 
     .header-right {
-      gap: var(--spacing-sm);
-    }
-
-    .header-right > .search-wrap {
-      flex-basis: clamp(6rem, 48vw, 16rem);
+      gap: var(--spacing-xs);
     }
   }
 
   @media (max-width: 520px) {
     padding: var(--spacing-xs) var(--spacing-md);
-
-    .header-right > .search-wrap {
-      flex-basis: clamp(5.5rem, 52vw, 14rem);
-    }
   }
 }

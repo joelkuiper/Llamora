@@ -93,9 +93,11 @@
 
 .search-results-overlay {
   position: absolute;
-  top: calc(100% - 0.25rem);
+  top: calc(100% - 0.2rem);
   right: 0;
   left: auto;
+  inset-inline-start: auto;
+  inset-inline-end: 0;
   z-index: 50;
   /* Frosted glass effect */
   backdrop-filter: blur(10px) saturate(140%);
@@ -107,10 +109,30 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  max-height: min(60vh, 40rem);
-  width: min(48rem, 92vw);
+  max-height: min(55vh, 40rem);
+  width: min(48rem, calc(100vw - 2 * var(--spacing-xl)));
+  max-width: calc(100vw - 2 * var(--spacing-md));
   pointer-events: auto;
 
+}
+
+@media (max-width: 1100px) {
+  .search-results-overlay {
+    width: min(36rem, calc(100vw - 2 * var(--spacing-lg)));
+  }
+}
+
+@media (max-width: 780px) {
+  .search-results-overlay {
+    width: min(32rem, calc(100vw - 2 * var(--spacing-md)));
+  }
+}
+
+@media (max-width: 560px) {
+  .search-results-overlay {
+    width: calc(100vw - 2 * var(--spacing-md));
+    border-radius: var(--radius-md);
+  }
 }
 
 .search-results-overlay.is-empty {
