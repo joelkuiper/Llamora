@@ -54,7 +54,7 @@ You can write freely, think aloud, or stay in silence.
 ### Requirements
 
 - [uv](https://docs.astral.sh/uv/)
-- A local [llama.cpp](https://github.com/ggerganov/llama.cpp) build (or prebuilt release) so you can run `llama-server --hf Qwen/Qwen3-4B-Instruct-2507`. Qwen3-4B-Instruct has become the baseline for Llamora because it follows instructions reliably while still fitting on consumer hardware.
+- A local [llama.cpp](https://github.com/ggerganov/llama.cpp) build (or prebuilt release) so you can run `llama-server -hf Qwen/Qwen3-4B-Instruct-2507`. Qwen3-4B-Instruct has become the baseline for Llamora because it follows instructions reliably while still fitting on consumer hardware.
 - Optionally, a [llamafile](https://github.com/Mozilla-Ocho/llamafile) binary if you prefer an all-in-one executable instead of running llama.cpp yourself.
 - A relatively fast computer (ideally with a strong GPU).
 - A relatively modern browser.
@@ -66,7 +66,7 @@ You can write freely, think aloud, or stay in silence.
    For example, if you have llama-cpp installed:
 
    ```bash
-   llama-server --hf Qwen/Qwen3-4B-Instruct-2507 --port 8081
+   llama-server -hf Qwen/Qwen3-4B-Instruct-2507 --port 8081
    ```
 
    This downloads the model weights once and starts an HTTP endpoint at `http://127.0.0.1:8081`.
