@@ -1,5 +1,6 @@
 import { ScrollManager } from "./chat/scroll-manager.js";
 import { initGlobalShortcuts } from "./global-shortcuts.js";
+import { setTimezoneCookie } from "./timezone.js";
 import {
   getAlertContainer,
   onAlertDismiss,
@@ -16,6 +17,10 @@ function registerHtmxHeaderHooks(csrfToken) {
   document.body.addEventListener("htmx:configRequest", (event) => {
     const headers = event.detail?.headers;
     if (!headers) return;
+
+    const timezone = setTimezoneCookie();
+    const zone = typeof timezone === "string" && timezone ? timezone : "UTC";
+    headers["X-Timezone"] = zone;
 
     if (csrfToken) {
       headers["X-CSRFToken"] = csrfToken;
