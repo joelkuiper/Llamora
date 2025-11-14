@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 def get_timezone() -> str:
     """Return client timezone as an IANA string.
 
-    Prefers the ``tz`` query parameter, then the ``X-Timezone`` header, followed by
-    a ``tz`` cookie. Defaults to ``UTC`` if unavailable.
+    Prefers the ``tz`` query parameter, then a ``tz`` cookie. Defaults to ``UTC``
+    if unavailable.
     """
     tz = request.args.get("tz")
     if tz:
@@ -24,13 +24,6 @@ def get_timezone() -> str:
             return tz
         except Exception:  # pragma: no cover - ZoneInfo raises various errors
             logger.debug("Invalid timezone '%s' from query parameter", tz)
-    tz_header = request.headers.get("X-Timezone")
-    if tz_header:
-        try:
-            ZoneInfo(tz_header)
-            return tz_header
-        except Exception:  # pragma: no cover - ZoneInfo raises various errors
-            logger.debug("Invalid timezone '%s' from header", tz_header)
     tz_cookie = request.cookies.get("tz")
     if tz_cookie:
         try:

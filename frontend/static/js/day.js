@@ -1,5 +1,3 @@
-import { setTimezoneCookie } from "./timezone.js";
-
 function ordinalSuffix(day) {
   if (!Number.isFinite(day)) return "";
   const mod100 = day % 100;
@@ -73,24 +71,17 @@ export function navigateToDate(dateStr) {
     return false;
   }
 
-  const timezone = setTimezoneCookie();
-  const zone =
-    typeof timezone === "string" && timezone ? timezone : "UTC";
-  const tzQuery = `?tz=${encodeURIComponent(zone)}`;
-  const htmxUrl = `/c/${dateStr}${tzQuery}`;
-  const pushUrl = `/d/${dateStr}${tzQuery}`;
-
   const targetId = "#content-wrapper";
   if (window.htmx) {
-    window.htmx.ajax("GET", htmxUrl, {
+    window.htmx.ajax("GET", `/c/${dateStr}`, {
       target: targetId,
       swap: "outerHTML",
-      pushUrl,
+      pushUrl: `/d/${dateStr}`,
     });
     return true;
   }
 
-  window.location.assign(pushUrl);
+  window.location.assign(`/d/${dateStr}`);
   return true;
 }
 
