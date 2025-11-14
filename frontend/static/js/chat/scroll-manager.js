@@ -1,7 +1,6 @@
 import { createListenerBag } from "../utils/events.js";
 import { motionSafeBehavior, prefersReducedMotion } from "../utils/motion.js";
 import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
-import { isNearBottom } from "./scroll-utils.js";
 
 export const scrollEvents = new EventTarget();
 
@@ -213,7 +212,7 @@ export class ScrollManager {
     this.chat = chat || null;
     this.ensureElements();
     this.#attachContextListeners();
-    this.autoScrollEnabled = this.isUserNearBottom(0);
+    this.autoScrollEnabled = this.isUserNearBottom();
     this.lastScrollTop = this.container?.scrollTop ?? 0;
     this.#initSuppressed = true;
     this.toggleScrollBtn();
@@ -309,7 +308,11 @@ export class ScrollManager {
 
   isUserNearBottom(threshold = 0) {
     if (!this.container) return true;
-    return isNearBottom(this.container, threshold);
+    const distance =
+      this.container.scrollHeight -
+      this.container.clientHeight -
+      this.container.scrollTop;
+    return distance < threshold;
   }
 
   toggleScrollBtn() {

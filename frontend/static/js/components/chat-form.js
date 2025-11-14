@@ -1,5 +1,4 @@
 import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
-import { isNearBottom } from "../chat/scroll-utils.js";
 import { getAlertContainer } from "../utils/alert-center.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 
@@ -286,13 +285,20 @@ class ChatFormElement extends ReactiveElement {
   #resizeTextarea({ forceScroll = false } = {}) {
     if (!this.#textarea) return;
     const wasNearBottom = this.#container
-      ? isNearBottom(this.#container, 16)
+      ? this.#isNearBottom(this.#container)
       : false;
     this.#textarea.style.height = "auto";
     this.#textarea.style.height = this.#textarea.scrollHeight + "px";
     if (this.#container && (forceScroll || wasNearBottom)) {
       this.#container.scrollTop = this.#container.scrollHeight;
     }
+  }
+
+  #isNearBottom(element) {
+    const threshold = 16;
+    const distance =
+      element.scrollHeight - (element.scrollTop + element.clientHeight);
+    return distance <= threshold;
   }
 
   setStreaming(streaming) {
