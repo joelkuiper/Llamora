@@ -98,6 +98,24 @@ def _sanitise_metadata(payload: Mapping[str, Any] | None) -> dict[str, Any]:
     return {"emoji": emoji, "keywords": keywords}
 
 
+def _metadata_json_schema() -> dict[str, Any]:
+    """Return the JSON schema used to constrain metadata completions."""
+
+    return {
+        "type": "object",
+        "properties": {
+            "emoji": {"type": "string", "minLength": 1, "maxLength": 16},
+            "keywords": {
+                "type": "array",
+                "items": {"type": "string", "minLength": 1, "maxLength": 64},
+                "maxItems": 5,
+            },
+        },
+        "required": ["emoji", "keywords"],
+        "additionalProperties": True,
+    }
+
+
 async def generate_metadata(
     llm: LLMClient,
     reply_text: str,
@@ -116,7 +134,12 @@ async def generate_metadata(
         {"role": "user", "content": reply},
     ]
 
-    params = {"n_predict": 64, "temperature": 0.2}
+    schema = _metadata_json_schema()
+    params = {
+        "n_predict": 64,
+        "json_schema": schema,
+        "response_format": {"type": "json_schema", "schema": schema},
+    }
     if request_overrides:
         params.update({k: v for k, v in request_overrides.items() if v is not None})
 
