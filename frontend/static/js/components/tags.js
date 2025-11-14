@@ -1,9 +1,7 @@
 import { createPopover } from "../popover.js";
 import { InlineAutocompleteController } from "../utils/inline-autocomplete.js";
 import { AutocompleteDataStore } from "../utils/autocomplete-data-store.js";
-
-const BaseHTMLElement =
-  typeof HTMLElement !== "undefined" ? HTMLElement : class {};
+import { ReactiveElement } from "../utils/reactive-element.js";
 
 const canonicalizeTag = (value, limit = null) => {
   const text = `${value ?? ""}`.replace(/^#/, "").trim();
@@ -42,7 +40,7 @@ export const mergeTagCandidateValues = (
   return merged;
 };
 
-export class Tags extends BaseHTMLElement {
+export class Tags extends ReactiveElement {
   #popover = null;
   #button = null;
   #popoverEl = null;
@@ -105,40 +103,34 @@ export class Tags extends BaseHTMLElement {
   }
 
   connectedCallback() {
+    super.connectedCallback();
     this.#cacheElements();
-    this.#teardownListeners();
+    this.#listeners = this.resetListenerBag(this.#listeners);
+    const listeners = this.#listeners;
     this.#destroyAutocomplete();
 
     if (!this.#button || !this.#popoverEl || !this.#form || !this.#input || !this.#submit || !this.#tagContainer) {
       return;
     }
 
-
-    this.#listeners = new AbortController();
-    const { signal } = this.#listeners;
-
-    this.#input.addEventListener("input", this.#inputHandler, { signal });
-    this.#input.addEventListener("focus", this.#inputFocusHandler, { signal });
-    this.#form.addEventListener("htmx:configRequest", this.#configRequestHandler, {
-      signal,
-    });
-    this.#form.addEventListener("htmx:afterRequest", this.#afterRequestHandler, {
-      signal,
-    });
-    this.addEventListener("htmx:afterSwap", this.#afterSwapHandler, { signal });
-    this.#button.addEventListener("click", this.#buttonClickHandler, { signal });
-    this.#closeButton?.addEventListener("click", this.#closeClickHandler, {
-      signal,
-    });
-    this.#suggestions?.addEventListener("htmx:afterSwap", this.#suggestionsSwapHandler, {
-      signal,
-    });
-    this.#tagContainer.addEventListener("click", this.#chipActivationHandler, {
-      signal,
-    });
-    this.#tagContainer.addEventListener("keydown", this.#chipKeydownHandler, {
-      signal,
-    });
+    listeners.add(this.#input, "input", this.#inputHandler);
+    listeners.add(this.#input, "focus", this.#inputFocusHandler);
+    listeners.add(
+      this.#form,
+      "htmx:configRequest",
+      this.#configRequestHandler,
+    );
+    listeners.add(this.#form, "htmx:afterRequest", this.#afterRequestHandler);
+    listeners.add(this, "htmx:afterSwap", this.#afterSwapHandler);
+    listeners.add(this.#button, "click", this.#buttonClickHandler);
+    listeners.add(this.#closeButton, "click", this.#closeClickHandler);
+    listeners.add(
+      this.#suggestions,
+      "htmx:afterSwap",
+      this.#suggestionsSwapHandler,
+    );
+    listeners.add(this.#tagContainer, "click", this.#chipActivationHandler);
+    listeners.add(this.#tagContainer, "keydown", this.#chipKeydownHandler);
 
     this.#initPopover();
     this.#updateSubmitState();
@@ -149,6 +141,7 @@ export class Tags extends BaseHTMLElement {
     this.#destroyPopover();
     this.#teardownListeners();
     this.#destroyAutocomplete();
+    super.disconnectedCallback();
   }
 
   #cacheElements() {
@@ -166,10 +159,7 @@ export class Tags extends BaseHTMLElement {
   }
 
   #teardownListeners() {
-    if (this.#listeners) {
-      this.#listeners.abort();
-      this.#listeners = null;
-    }
+    this.#listeners = this.disposeListenerBag(this.#listeners);
   }
 
   #initPopover() {
