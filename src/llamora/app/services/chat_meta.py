@@ -1,309 +1,135 @@
-"""Utilities for parsing streamed chat metadata."""
+"""Metadata generation helpers for assistant replies."""
 
 from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
-from typing import Any
+import re
+from functools import lru_cache
+from typing import Any, Mapping, Sequence
 
-try:
-    import orjson
-except ModuleNotFoundError:  # pragma: no cover - optional dependency
-    orjson = None  # type: ignore[assignment]
+from llamora.llm.client import LLMClient
+from llamora.llm.prompt_templates import render_prompt_template
 
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass(slots=True)
-class ChatMetaParser:
-    """Extracts assistant-visible text and metadata fragments from chunks."""
-
-    sentinel_start: str = "<meta>"
-    sentinel_end: str = "</meta>"
-    tail_limit: int = 256
-
-    _found_start: bool = field(init=False, default=False)
-    _meta_complete: bool = field(init=False, default=False)
-    _meta_buffer: str = field(init=False, default="")
-    _tail: str = field(init=False, default="")
-    _raw_buffer: str = field(init=False, default="")
-    _orphan_meta: bool = field(init=False, default=False)
-
-    def feed(self, chunk: str) -> str:
-        """Process a chunk and return the user-visible portion."""
-
-        self._raw_buffer += chunk
-        data = self._tail + chunk
-        self._tail = ""
-        visible = ""
-
-        if not self._found_start:
-            idx = data.find(self.sentinel_start)
-            end_idx = data.find(self.sentinel_end)
-            if end_idx != -1 and (idx == -1 or end_idx < idx):
-                visible = data[:end_idx]
-                remainder = data[end_idx + len(self.sentinel_end) :]
-                candidate = extract_json_candidate(remainder)
-                trailing = ""
-                if candidate:
-                    candidate_idx = remainder.find(candidate)
-                    meta_fragment = remainder[: candidate_idx + len(candidate)]
-                    trailing = remainder[candidate_idx + len(candidate) :]
-                else:
-                    meta_fragment = remainder
-                self._found_start = True
-                self._meta_buffer += meta_fragment
-                if candidate:
-                    self._meta_complete = True
-                if trailing:
-                    visible += trailing
-                return visible
-            if idx != -1:
-                visible = data[:idx]
-                data = data[idx + len(self.sentinel_start) :]
-                self._found_start = True
-                self._meta_buffer += data
-            else:
-                visible, self._tail = self._split_visible_tail(data)
-                self._maybe_claim_orphan_meta()
-                return visible
-        else:
-            self._meta_buffer += data
-
-        if not self._meta_complete:
-            end_idx = self._meta_buffer.find(self.sentinel_end)
-            if end_idx != -1:
-                trailing = self._meta_buffer[end_idx + len(self.sentinel_end) :]
-                if trailing.strip():
-                    logger.debug(
-                        "Unexpected trailing content after %s: %r",
-                        self.sentinel_end,
-                        trailing,
-                    )
-                self._meta_buffer = self._meta_buffer[:end_idx]
-                self._meta_complete = True
-
-        return visible
-
-    def flush_visible_tail(self) -> str:
-        """Return any buffered visible text when no meta was found."""
-
-        if self._found_start or self._orphan_meta:
-            return ""
-        remainder = self._tail
-        self._tail = ""
-        return remainder
-
-    def _split_visible_tail(self, data: str) -> tuple[str, str]:
-        if not data:
-            return "", ""
-        minimal_keep = max(len(self.sentinel_end), len(self.sentinel_start) - 1, 0)
-        stripped = data.rstrip("\r\n")
-        trailing_newlines = data[len(stripped) :]
-        last_newline = stripped.rfind("\n")
-        if last_newline != -1:
-            tail = stripped[last_newline + 1 :] + trailing_newlines
-        else:
-            tail = stripped + trailing_newlines
-        original_tail = tail
-        candidate = extract_json_candidate(tail)
-        if candidate:
-            candidate_idx = tail.rfind(candidate)
-            if candidate_idx != -1:
-                prefix = tail[:candidate_idx]
-                kept = tail[candidate_idx:]
-                if len(kept) > self.tail_limit:
-                    kept = kept[-self.tail_limit :]
-                base_visible = data[: len(data) - len(original_tail)]
-                return base_visible + prefix, kept
-        if "{" in tail:
-            brace_idx = tail.find("{")
-            prefix = tail[:brace_idx]
-            kept = tail[brace_idx:]
-            if len(kept) > self.tail_limit:
-                kept = kept[-self.tail_limit :]
-            base_visible = data[: len(data) - len(original_tail)]
-            return base_visible + prefix, kept
-        kept_tail = tail[-minimal_keep:]
-        if not kept_tail and minimal_keep:
-            kept_tail = data[-minimal_keep:]
-        if len(data) <= len(kept_tail):
-            return "", data
-        return data[: len(data) - len(kept_tail)], kept_tail
-
-    def _maybe_claim_orphan_meta(self) -> None:
-        if self._found_start or self._orphan_meta:
-            return
-        candidate = extract_json_candidate(self._tail)
-        if not candidate:
-            return
-        meta = parse_meta_json(candidate)
-        if not isinstance(meta, dict):
-            return
-        if not {"emoji", "keywords"}.issubset(meta.keys()):
-            return
-        self._found_start = True
-        self._meta_buffer = candidate
-        self._meta_complete = True
-        self._orphan_meta = True
-        self._tail = ""
-
-    @property
-    def meta_complete(self) -> bool:
-        return self._meta_complete
-
-    @property
-    def meta_payload(self) -> str:
-        return self._meta_buffer.strip()
-
-    @property
-    def raw_buffer(self) -> str:
-        return self._raw_buffer
+_CODE_FENCE_RE = re.compile(r"^```[a-zA-Z0-9_-]*\s*|```$", re.MULTILINE)
 
 
-def recover_meta_payload(parser: ChatMetaParser) -> str | None:
-    """Recover the last plausible meta payload from the raw buffer."""
+@lru_cache(maxsize=1)
+def _metadata_system_prompt() -> str:
+    """Return the cached system prompt used for metadata generation."""
 
-    raw = parser.raw_buffer
-    if not raw:
+    prompt = render_prompt_template("metadata_system.txt.j2")
+    return prompt.strip()
+
+
+def _strip_code_fence(text: str) -> str:
+    """Remove Markdown code fences if present."""
+
+    if "```" not in text:
+        return text
+    return _CODE_FENCE_RE.sub("", text).strip()
+
+
+def _extract_json_object(text: str) -> Mapping[str, Any] | None:
+    """Parse the first JSON object found in ``text`` if any."""
+
+    cleaned = _strip_code_fence(text.strip())
+    if not cleaned:
         return None
-    start_idx = raw.rfind(parser.sentinel_start)
-    if start_idx != -1:
-        raw_segment = raw[start_idx + len(parser.sentinel_start) :]
-    else:
-        raw_segment = raw
-    end_idx = raw_segment.rfind(parser.sentinel_end)
-    if end_idx != -1:
-        raw_segment = raw_segment[:end_idx]
-    raw_segment = raw_segment.strip()
-    if not raw_segment:
-        return None
-    candidate = find_last_json_object(raw_segment)
-    if candidate:
-        return candidate.strip()
-    first_brace = raw_segment.find("{")
-    if first_brace == -1:
-        return None
-    trailing = raw_segment[first_brace:]
-    candidate = find_last_json_object(trailing)
-    if candidate:
-        return candidate.strip()
-    return trailing.strip() or None
 
-
-def parse_meta_json(payload: str | None) -> dict[str, Any] | None:
-    """Parse a JSON dictionary from the provided payload."""
-
-    candidate = extract_json_candidate(payload)
-    if not candidate:
-        return None
     try:
-        obj = json.loads(candidate)
+        payload = json.loads(cleaned)
     except json.JSONDecodeError:
-        if orjson is None:  # pragma: no cover - optional dependency
+        first = cleaned.find("{")
+        last = cleaned.rfind("}")
+        if first == -1 or last == -1 or last <= first:
             return None
+        snippet = cleaned[first : last + 1]
         try:
-            obj = orjson.loads(candidate)
-        except Exception:
+            payload = json.loads(snippet)
+        except json.JSONDecodeError:
             return None
-    if isinstance(obj, dict):
-        return obj
+    if isinstance(payload, Mapping):
+        return payload
     return None
 
 
-def extract_json_candidate(payload: str | None) -> str | None:
-    if not payload:
-        return None
-    text = payload.strip()
-    if not text:
-        return None
-    first_brace = text.find("{")
-    if first_brace == -1:
-        return None
-    snippet = text[first_brace:]
-    candidate = find_last_json_object(snippet)
-    if candidate:
-        return candidate.strip()
-    decoder = json.JSONDecoder()
-    try:
-        _, end = decoder.raw_decode(snippet)
-    except json.JSONDecodeError:
-        last_brace = snippet.rfind("}")
-        if last_brace == -1:
-            return None
-        narrowed = snippet[: last_brace + 1]
-        candidate = find_last_json_object(narrowed)
-        if candidate:
-            return candidate.strip()
-        return None
-    else:
-        return snippet[:end].strip()
-
-
-def find_last_json_object(text: str) -> str | None:
-    in_string = False
-    escape_next = False
-    depth = 0
-    end = None
-    for idx in range(len(text) - 1, -1, -1):
-        ch = text[idx]
-        if in_string:
-            if escape_next:
-                escape_next = False
-                continue
-            if ch == "\\":
-                escape_next = True
-                continue
-            if ch == '"':
-                in_string = False
+def _normalise_keywords(value: Any, *, max_items: int = 3) -> list[str]:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        return []
+    keywords: list[str] = []
+    seen: set[str] = set()
+    for raw in value:
+        if not isinstance(raw, str):
             continue
-        if ch == '"':
-            in_string = True
+        candidate = raw.strip()
+        if not candidate:
             continue
-        if ch == "}":
-            if depth == 0:
-                end = idx + 1
-            depth += 1
-        elif ch == "{":
-            if depth == 0:
-                continue
-            depth -= 1
-            if depth == 0 and end is not None:
-                return text[idx:end]
-    return None
-
-
-def build_meta(
-    parser: ChatMetaParser, *, meta_extra: dict | None = None, error: bool = False
-) -> dict:
-    """Assemble a metadata dictionary from parser output and extras."""
-
-    candidates: list[str | None] = [parser.meta_payload]
-    recovered = recover_meta_payload(parser)
-    if recovered and recovered not in candidates:
-        candidates.append(recovered)
-
-    meta: dict[str, Any] | None = None
-    for attempt in candidates:
-        meta = parse_meta_json(attempt)
-        if meta is not None:
+        candidate = candidate.lstrip("#")
+        if not candidate:
+            continue
+        formatted = f"#{candidate}"[:64]
+        lower = formatted.lower()
+        if lower in seen:
+            continue
+        seen.add(lower)
+        keywords.append(formatted)
+        if len(keywords) >= max_items:
             break
-    if meta is None:
-        meta = {}
-    if error:
-        meta["error"] = True
-    if meta_extra:
-        meta.update(meta_extra)
-    return meta
+    return keywords
 
 
-__all__ = [
-    "ChatMetaParser",
-    "build_meta",
-    "extract_json_candidate",
-    "find_last_json_object",
-    "parse_meta_json",
-    "recover_meta_payload",
-]
+def _sanitise_metadata(payload: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Validate ``payload`` and apply fallback values when necessary."""
+
+    emoji = "💬"
+    keywords: list[str] = []
+
+    if isinstance(payload, Mapping):
+        raw_emoji = payload.get("emoji")
+        if isinstance(raw_emoji, str) and raw_emoji.strip():
+            emoji = raw_emoji.strip()
+        keywords = _normalise_keywords(payload.get("keywords"))
+
+    return {"emoji": emoji, "keywords": keywords}
+
+
+async def generate_metadata(
+    llm: LLMClient,
+    reply_text: str,
+    *,
+    request_overrides: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Generate metadata for ``reply_text`` using a second LLM pass."""
+
+    reply = reply_text.strip()
+    if not reply:
+        return {"emoji": "💬", "keywords": []}
+
+    system_prompt = _metadata_system_prompt()
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": reply},
+    ]
+
+    params = {"n_predict": 64, "temperature": 0.2}
+    if request_overrides:
+        params.update({k: v for k, v in request_overrides.items() if v is not None})
+
+    try:
+        raw = await llm.complete_chat(messages, params=params)
+    except Exception:
+        logger.exception("Metadata generation request failed")
+        return {"emoji": "💬", "keywords": []}
+
+    metadata = _extract_json_object(raw)
+    if metadata is None:
+        logger.debug("Metadata helper returned non-JSON payload: %r", raw)
+    return _sanitise_metadata(metadata)
+
+
+__all__ = ["generate_metadata"]

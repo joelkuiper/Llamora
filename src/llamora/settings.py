@@ -140,7 +140,6 @@ DEFAULTS: dict[str, Any] = {
         },
     },
     "PROMPTS": {
-        "grammar_file": str(PACKAGE_DIR / "llm" / "meta_grammar.bnf"),
         "template_dir": str(PACKAGE_DIR / "llm" / "templates"),
     },
     "COOKIES": {
@@ -275,12 +274,6 @@ settings.set(
         **request_overrides,
     },
 )
-
-if not settings.get("PROMPTS.grammar_file"):
-    settings.set(
-        "PROMPTS.grammar_file",
-        str(PACKAGE_DIR / "llm" / "meta_grammar.bnf"),
-    )
 
 threads = int(settings.get("LLM.server.args.threads", 0))
 if threads <= 0:

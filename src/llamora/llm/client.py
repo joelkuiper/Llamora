@@ -1,7 +1,6 @@
 import asyncio
 import hashlib
 import logging
-from pathlib import Path
 from contextlib import asynccontextmanager, suppress
 from typing import Any, AsyncGenerator, Mapping, NamedTuple, Sequence
 
@@ -12,13 +11,10 @@ from httpx import HTTPError
 from cachetools import LRUCache
 from llamora.app.util import canonicalize
 from llamora.settings import settings
-from llamora.util import resolve_data_path
 from .process_manager import LlamafileProcessManager
 from .chat_template import build_chat_messages, render_chat_prompt
 from .tokenizers.tokenizer import count_tokens, history_suffix_token_totals
 
-LLM_DIR = Path(__file__).resolve().parent
-GRAMMAR_PATH = resolve_data_path(settings.PROMPTS.grammar_file, fallback_dir=LLM_DIR)
 DEFAULT_LLM_REQUEST = dict(settings.LLM.request)
 HISTORY_TOKEN_CACHE_SIZE = 32
 
@@ -215,9 +211,6 @@ class LLMClient:
         self._history_token_cache: LRUCache[tuple[str, str], tuple[int, ...]] = (
             LRUCache(maxsize=HISTORY_TOKEN_CACHE_SIZE)
         )
-
-        with open(GRAMMAR_PATH, "r", encoding="utf-8") as gf:
-            self.grammar = gf.read()
 
     @staticmethod
     def _normalize_response_detail(
@@ -613,7 +606,7 @@ class LLMClient:
             yield {"type": "error", "data": f"Prompt error: {e}"}
             return
 
-        payload = {"prompt": prompt_text, **cfg, "grammar": self.grammar}
+        payload = {"prompt": prompt_text, **cfg}
         if msg_id:
             payload.setdefault("id", str(msg_id))
 
@@ -627,6 +620,106 @@ class LLMClient:
                         yield item
             finally:
                 await stream.aclose()
+
+    async def complete_chat(
+        self,
+        messages: Sequence[Mapping[str, Any]] | list[dict[str, Any]],
+        *,
+        params: Mapping[str, Any] | None = None,
+    ) -> str:
+        """Request a non-streamed completion for ``messages``."""
+
+        self.process_manager.ensure_server_running()
+
+        cfg = {**self.default_request, **(params or {})}
+        cfg["stream"] = False
+
+        message_list = list(messages)
+
+        try:
+            prompt_text = render_chat_prompt(message_list).prompt
+        except Exception as exc:
+            self.logger.exception("Failed to render completion prompt")
+            raise RuntimeError("Prompt rendering failed") from exc
+
+        payload = {"prompt": prompt_text, **cfg}
+        payload.pop("slot_id", None)
+        payload.pop("id", None)
+
+        try:
+            response = await self._client.post(
+                f"{self.server_url}/completion",
+                json=payload,
+            )
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            http_response = exc.response
+            status_line = str(exc)
+            body: bytes | None = None
+            if http_response is not None:
+                status_line = (
+                    f"{http_response.status_code} "
+                    f"{http_response.reason_phrase or ''}"
+                ).strip()
+                try:
+                    body = await http_response.aread()
+                except Exception:
+                    body = None
+            detail = self._normalize_response_detail(body, status_line)
+            self.logger.error(
+                "Completion request failed (%s): %s", status_line, detail
+            )
+            self.process_manager.ensure_server_running()
+            raise RuntimeError(detail) from exc
+        except HTTPError as exc:
+            self.process_manager.ensure_server_running()
+            raise RuntimeError(f"HTTP error: {exc}") from exc
+        except Exception as exc:  # pragma: no cover - defensive
+            raise RuntimeError(f"Unexpected error: {exc}") from exc
+
+        try:
+            payload = response.json()
+        except ValueError:
+            return response.text.strip()
+
+        text = self._extract_completion_text(payload)
+        return text.strip()
+
+    def _extract_completion_text(self, payload: Any) -> str:
+        """Normalise completion responses into a string."""
+
+        if isinstance(payload, Mapping):
+            for key in ("content", "completion", "text", "data"):
+                value = payload.get(key)
+                if isinstance(value, str):
+                    return value
+            choices = payload.get("choices")
+            if choices is not None:
+                text = self._extract_completion_text(choices)
+                if text:
+                    return text
+            message = payload.get("message")
+            if message is not None:
+                text = self._extract_completion_text(message)
+                if text:
+                    return text
+            results = payload.get("results")
+            if results is not None:
+                text = self._extract_completion_text(results)
+                if text:
+                    return text
+            return ""
+
+        if isinstance(payload, Sequence) and not isinstance(
+            payload, (str, bytes, bytearray)
+        ):
+            parts = [self._extract_completion_text(item) for item in payload]
+            return "".join(part for part in parts if part)
+
+        if isinstance(payload, (bytes, bytearray)):
+            return payload.decode("utf-8", "replace")
+
+        return str(payload or "")
 
     async def abort(self, msg_id: str) -> bool:
         slot_id: int | None = None

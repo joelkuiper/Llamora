@@ -12,6 +12,5 @@ Each exchange is a small story, leaving the user feeling understood and a little
 {% if vibes_line %}{{ vibes_line }}
 {% endif %}
 
-Every answer must always have exactly two parts, in this order:
- - A natural language reply to the user.
- - Immediately after, output the tag `<meta>` followed by a single JSON object with the following shape: {"emoji":"…","keywords":["#tag",…]} and close it with `</meta>`.
+Respond in natural language.
+Do not include hidden metadata, sentinel markers, or JSON in the reply.

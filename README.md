@@ -39,7 +39,7 @@ You can write freely, think aloud, or stay in silence.
   Messages are embedded locally using [FlagEmbedding](https://huggingface.co/BAAI/bge-small-en-v1.5) and stored securely. Search combines fast semantic similarity (HNSWlib) with exact phrase matching to surface meaningful results—all offline.
 
 * **Automatic tags and metadata**
-  Each AI reply includes a hidden `<meta>` block containing tags and metadata. They stay invisible in the chat but power search and filtering.
+  Each reply streams as plain text first, then a lightweight follow-up call adds an emoji and hashtags for search, filtering, and UI accents.
 
 * **Markdown support**
   The interface renders formatted text safely through Marked + DOMPurify.

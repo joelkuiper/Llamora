@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from functools import partial
 from heapq import heappop, heappush
 from itertools import count
 from collections import deque
@@ -13,7 +14,7 @@ from typing import Callable, cast
 from llamora.llm.client import LLMClient
 from llamora.settings import settings
 
-from llamora.app.services.chat_meta import ChatMetaParser
+from llamora.app.services.chat_meta import generate_metadata
 from llamora.app.services.service_pulse import ServicePulse
 
 from .pipeline import (
@@ -120,7 +121,6 @@ class PendingResponse(ResponsePipelineCallbacks):
         self._session = LLMStreamSession(
             llm, user_msg_id, history, params, context, messages
         )
-        self._parser = ChatMetaParser()
         self._visible_total = ""
         repeat_guard_size = cast(
             int | None, settings.get("LLM.stream.repeat_guard_size", None)
@@ -128,10 +128,11 @@ class PendingResponse(ResponsePipelineCallbacks):
         repeat_guard_min_length = cast(
             int | None, settings.get("LLM.stream.repeat_guard_min_length", None)
         )
+        metadata_builder = partial(generate_metadata, llm)
         self._pipeline = ResponsePipeline(
             session=self._session,
-            parser=self._parser,
             writer=AssistantMessageWriter(db),
+            metadata_builder=metadata_builder,
             uid=uid,
             reply_to=self.reply_to,
             date=self.date,

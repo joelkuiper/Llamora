@@ -6,9 +6,7 @@ import asyncio
 import logging
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Awaitable, Callable, Protocol
-
-from llamora.app.services.chat_meta import ChatMetaParser, build_meta
+from typing import Any, Awaitable, Callable, Mapping, Protocol
 
 
 logger = logging.getLogger(__name__)
@@ -190,8 +188,8 @@ class ResponsePipeline:
         self,
         *,
         session,
-        parser: ChatMetaParser,
         writer: AssistantMessageWriter,
+        metadata_builder: Callable[[str], Awaitable[Mapping[str, Any]]] | None,
         uid: str,
         reply_to: str,
         date: str,
@@ -202,8 +200,8 @@ class ResponsePipeline:
         repeat_guard_min_length: int | None = None,
     ) -> None:
         self._session = session
-        self._parser = parser
         self._writer = writer
+        self._metadata_builder = metadata_builder
         self._uid = uid
         self._reply_to = reply_to
         self._date = date
@@ -295,20 +293,21 @@ class ResponsePipeline:
         async def consume() -> str:
             full_response = ""
             async for chunk in self._fetch_chunks():
-                visible = self._parse_chunk(chunk)
-                if visible:
-                    candidate_total = full_response + visible
-                    if self._chunk_guard and self._chunk_guard.record(
-                        visible, total=candidate_total
-                    ):
-                        self._repeat_guard_triggered = True
-                        if not self._cancel_requested:
-                            self._cancel_requested = True
-                        await self._abort_session()
-                        break
-                    full_response = candidate_total
-                    self._visible_total = full_response
-                    await callbacks.on_visible(visible, full_response)
+                text = chunk if isinstance(chunk, str) else str(chunk)
+                if not text:
+                    continue
+                candidate_total = full_response + text
+                if self._chunk_guard and self._chunk_guard.record(
+                    text, total=candidate_total
+                ):
+                    self._repeat_guard_triggered = True
+                    if not self._cancel_requested:
+                        self._cancel_requested = True
+                    await self._abort_session()
+                    break
+                full_response = candidate_total
+                self._visible_total = full_response
+                await callbacks.on_visible(text, full_response)
                 if self._cancel_requested:
                     break
             return full_response
@@ -326,10 +325,6 @@ class ResponsePipeline:
             if self._cancel_requested:
                 break
             yield chunk
-
-    def _parse_chunk(self, chunk: str) -> str:
-        text = chunk if isinstance(chunk, str) else str(chunk)
-        return self._parser.feed(text)
 
     async def _persist(
         self,
@@ -356,14 +351,69 @@ class ResponsePipeline:
         logger.debug("Saved %s %s", label, message_id)
         return message_id, False
 
+    async def _build_metadata(
+        self,
+        text: str,
+        *,
+        allow_generation: bool,
+        error: bool,
+        partial: bool,
+        include_repeat_guard: bool,
+    ) -> dict[str, Any]:
+        meta: dict[str, Any] = {}
+
+        if allow_generation and self._metadata_builder and text.strip():
+            try:
+                generated = await self._metadata_builder(text)
+            except Exception:
+                logger.exception("Metadata builder failed")
+            else:
+                if isinstance(generated, Mapping):
+                    meta.update(dict(generated))
+                else:
+                    logger.debug(
+                        "Metadata builder returned unexpected payload: %r", generated
+                    )
+
+        emoji = meta.get("emoji")
+        if not isinstance(emoji, str) or not emoji.strip():
+            meta["emoji"] = "💬"
+        else:
+            meta["emoji"] = emoji.strip()
+
+        keywords = meta.get("keywords")
+        if not isinstance(keywords, list) or any(
+            not isinstance(item, str) for item in keywords
+        ):
+            meta["keywords"] = []
+        else:
+            meta["keywords"] = [item for item in keywords if isinstance(item, str)]
+
+        if include_repeat_guard:
+            meta["repeat_guard"] = True
+        if error:
+            meta["error"] = True
+        if partial:
+            meta["partial"] = True
+        if self._meta_extra:
+            meta.update(self._meta_extra)
+
+        return meta
+
     async def _finalize_success(self, full_response: str) -> PipelineResult:
-        final_text = full_response + self._parser.flush_visible_tail()
-        meta = build_meta(self._parser, meta_extra=self._meta_extra, error=self._error)
+        final_text = full_response
+        meta = await self._build_metadata(
+            final_text,
+            allow_generation=True,
+            error=self._error,
+            partial=False,
+            include_repeat_guard=self._repeat_guard_triggered,
+        )
         assistant_msg_id, failed = await self._persist(final_text, meta, partial=False)
         if failed:
             final_text = self._append_persistence_warning(final_text)
             self._error = True
-            meta = build_meta(self._parser, meta_extra=self._meta_extra, error=True)
+            meta["error"] = True
         return PipelineResult(
             final_text=final_text,
             meta=meta,
@@ -375,24 +425,25 @@ class ResponsePipeline:
         )
 
     async def _finalize_cancelled(self, *, partial: bool) -> PipelineResult:
-        final_text = self._visible_total + self._parser.flush_visible_tail()
+        final_text = self._visible_total
         if self._error_message:
             final_text = self._append_status_line(
                 final_text, self._error_message, prefix=self._status_prefix
             )
-        meta: dict = {"error": True} if self._error else {}
-        if self._repeat_guard_triggered:
-            meta.update({"repeat_guard": True, "partial": True})
-        if self._meta_extra:
-            meta.update(self._meta_extra)
+        meta = await self._build_metadata(
+            final_text,
+            allow_generation=False,
+            error=self._error,
+            partial=True,
+            include_repeat_guard=self._repeat_guard_triggered,
+        )
         assistant_msg_id, failed = await self._persist(final_text, meta, partial=True)
         if failed:
             final_text = self._append_persistence_warning(final_text)
             self._error = True
-        meta_payload = meta if meta else None
         return PipelineResult(
             final_text=final_text,
-            meta=meta_payload,
+            meta=meta,
             assistant_message_id=assistant_msg_id,
             error=self._error,
             error_message=self._error_message,
@@ -403,10 +454,12 @@ class ResponsePipeline:
     async def _finalize_with_text(
         self, final_text: str, *, error_meta: bool
     ) -> PipelineResult:
-        meta = build_meta(
-            self._parser,
-            meta_extra=self._meta_extra,
+        meta = await self._build_metadata(
+            final_text,
+            allow_generation=False,
             error=error_meta or self._error,
+            partial=False,
+            include_repeat_guard=False,
         )
         assistant_msg_id, failed = await self._persist(final_text, meta, partial=False)
         if failed:
