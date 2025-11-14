@@ -1,5 +1,6 @@
 import { createPopover } from "../popover.js";
 import { InlineAutocompleteController } from "../utils/inline-autocomplete.js";
+import { AutocompleteDataStore } from "../utils/autocomplete-data-store.js";
 
 const BaseHTMLElement =
   typeof HTMLElement !== "undefined" ? HTMLElement : class {};
@@ -64,12 +65,7 @@ export class Tags extends BaseHTMLElement {
   #suggestionsSwapHandler;
   #chipActivationHandler;
   #chipKeydownHandler;
-  #remoteCandidates = [];
-  #autocompleteCache = null;
-  #autocompleteFetchTimer = null;
-  #autocompleteFetchController = null;
-  #lastAutocompleteQueryKey = null;
-  #pendingAutocompleteQueryKey = null;
+  #autocompleteStore = null;
   
   constructor() {
     super();
@@ -86,7 +82,26 @@ export class Tags extends BaseHTMLElement {
     this.#suggestionsSwapHandler = () => this.#handleSuggestionsSwap();
     this.#chipActivationHandler = (event) => this.#handleChipActivation(event);
     this.#chipKeydownHandler = (event) => this.#handleChipKeydown(event);
-    this.#autocompleteCache = new Map();
+    this.#autocompleteStore = new AutocompleteDataStore({
+      debounceMs: 200,
+      fetchCandidates: (query, context = {}) =>
+        this.#fetchTagAutocompleteCandidates(query, context),
+      buildCacheKey: (query, context = {}) =>
+        this.#buildAutocompleteCacheKey(query, context),
+      getCandidateKey: (candidate) => this.#normalizeTagCandidate(candidate),
+      mergeCandidates: (remote, localSets) => this.#mergeAutocompleteCandidates(remote, localSets),
+      onError: (error) => {
+        if (typeof console !== "undefined" && typeof console.debug === "function") {
+          console.debug("Failed to fetch tag autocomplete suggestions", error);
+        }
+      },
+    });
+    this.#autocompleteStore.subscribe(
+      (candidates) => {
+        this.#applyAutocompleteCandidates(candidates);
+      },
+      { immediate: false }
+    );
   }
 
   connectedCallback() {
@@ -194,8 +209,7 @@ export class Tags extends BaseHTMLElement {
           delete this.#suggestions.dataset.loaded;
         }
         this.#cancelPendingAutocompleteFetch();
-        this.#remoteCandidates = [];
-        this.#autocomplete?.clearCandidates();
+        this.#autocompleteStore?.reset({ clearLocal: true });
       },
     });
   }
@@ -358,12 +372,10 @@ export class Tags extends BaseHTMLElement {
       this.#autocomplete.destroy();
     }
     this.#autocomplete = null;
-    this.#cancelPendingAutocompleteFetch({ resetQueryKey: true });
-    this.#remoteCandidates = [];
+    this.#cancelPendingAutocompleteFetch();
   }
 
   #updateAutocompleteCandidates() {
-    if (!this.#autocomplete) return;
     const domValues = [];
     if (this.#suggestions) {
       this.#suggestions.querySelectorAll(".tag-suggestion").forEach((btn) => {
@@ -379,31 +391,18 @@ export class Tags extends BaseHTMLElement {
         domValues.push(canonical);
       });
     }
-
-    const limit = this.#getCanonicalMaxLength();
-    const values = mergeTagCandidateValues(
-      this.#remoteCandidates,
-      domValues,
-      limit
-    );
-    const entries = values.map((canonical) => {
-      const value = canonical;
-      const display = displayTag(canonical);
-      return {
-        value,
-        display,
-        tokens: [value],
-      };
-    });
-
-    this.#autocomplete.setCandidates(entries);
+    this.#autocompleteStore?.setLocalEntries("dom", domValues);
+    this.#applyAutocompleteCandidates();
   }
 
   #scheduleAutocompleteFetch({ immediate = false } = {}) {
     if (!this.#input) return;
     const url = this.#getAutocompleteUrl();
     const msgId = this.dataset?.msgId ?? "";
-    if (!url || !msgId) return;
+    if (!url || !msgId) {
+      this.#autocompleteStore?.cancel();
+      return;
+    }
 
     let query = prepareTagAutocompleteValue(this.#input.value ?? "");
     const maxLength = this.#getInputMaxLength();
@@ -411,51 +410,63 @@ export class Tags extends BaseHTMLElement {
       query = query.slice(0, maxLength);
     }
 
-    const cacheKey = this.#buildCacheKey(query);
-
-    if (!immediate && this.#pendingAutocompleteQueryKey === cacheKey && this.#autocompleteFetchTimer) {
-      return;
-    }
-
-    this.#pendingAutocompleteQueryKey = cacheKey;
-
-    if (this.#autocompleteFetchTimer) {
-      globalThis.clearTimeout(this.#autocompleteFetchTimer);
-      this.#autocompleteFetchTimer = null;
-    }
-
-    const delay = immediate ? 0 : 200;
-    this.#autocompleteFetchTimer = globalThis.setTimeout(() => {
-      this.#autocompleteFetchTimer = null;
-      this.#requestAutocomplete(query, cacheKey);
-    }, delay);
+    this.#autocompleteStore?.scheduleFetch(query, { msgId, url }, { immediate });
   }
 
-  #requestAutocomplete(query, cacheKey) {
+  #cancelPendingAutocompleteFetch() {
+    this.#autocompleteStore?.cancel();
+  }
+
+  #clearAutocompleteCache() {
+    this.#autocompleteStore?.clearCache();
+  }
+
+  #invalidateAutocompleteCache({ immediate = false } = {}) {
+    this.#clearAutocompleteCache();
+    this.#scheduleAutocompleteFetch({ immediate });
+  }
+
+  #applyAutocompleteCandidates(candidates = null) {
+    if (!this.#autocomplete) return;
+    const list = Array.isArray(candidates)
+      ? candidates
+      : this.#autocompleteStore?.getCandidates() ?? [];
+    if (!list.length) {
+      this.#autocomplete.clearCandidates();
+      return;
+    }
+    const limit = this.#getCanonicalMaxLength();
+    const entries = list
+      .map((item) => {
+        const raw = typeof item === "string" ? item : item?.value ?? "";
+        const canonical = canonicalizeTag(raw, limit);
+        if (!canonical) {
+          return null;
+        }
+        const value = canonical;
+        const display = displayTag(canonical);
+        return {
+          value,
+          display,
+          tokens: [value],
+        };
+      })
+      .filter(Boolean);
+
+    if (!entries.length) {
+      this.#autocomplete.clearCandidates();
+      return;
+    }
+
+    this.#autocomplete.setCandidates(entries);
+  }
+
+  async #fetchTagAutocompleteCandidates(query, context = {}) {
     const url = this.#getAutocompleteUrl();
-    const msgId = this.dataset?.msgId ?? "";
+    const msgId = this.dataset?.msgId ?? context.msgId ?? "";
     if (!url || !msgId) {
-      this.#remoteCandidates = [];
-      this.#updateAutocompleteCandidates();
-      return;
+      return [];
     }
-
-    const key = cacheKey ?? this.#buildCacheKey(query);
-    this.#lastAutocompleteQueryKey = key;
-
-    if (this.#autocompleteCache?.has(key)) {
-      const cached = this.#autocompleteCache.get(key) ?? [];
-      this.#remoteCandidates = cached.slice();
-      this.#updateAutocompleteCandidates();
-      return;
-    }
-
-    if (this.#autocompleteFetchController) {
-      this.#autocompleteFetchController.abort();
-    }
-
-    const controller = new AbortController();
-    this.#autocompleteFetchController = controller;
 
     const params = new URLSearchParams();
     params.set("msg_id", msgId);
@@ -468,84 +479,72 @@ export class Tags extends BaseHTMLElement {
       params.set("limit", String(clamped));
     }
 
-    fetch(`${url}?${params.toString()}`, {
-      signal: controller.signal,
-      headers: { Accept: "application/json" },
-    })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`Request failed with status ${response.status}`);
-        }
-        return response.json();
-      })
-      .then((body) => {
-        if (controller.signal.aborted) return;
-        const items = Array.isArray(body?.results) ? body.results : [];
-        const values = [];
-        const limit = this.#getCanonicalMaxLength();
-        for (const item of items) {
-          let source = null;
-          if (typeof item === "string") {
-            source = item;
-          } else if (item && typeof item.name === "string") {
-            source = item.name;
-          }
-          if (!source) continue;
-          const canonical = canonicalizeTag(source, limit);
-          if (!canonical) continue;
-          values.push(canonical);
-        }
-        this.#autocompleteCache?.set(key, values);
-        if (this.#lastAutocompleteQueryKey === key) {
-          this.#remoteCandidates = values;
-          this.#updateAutocompleteCandidates();
-        }
-      })
-      .catch((error) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-        if (typeof console !== "undefined" && typeof console.debug === "function") {
-          console.debug("Failed to fetch tag autocomplete suggestions", error);
-        }
-        if (this.#lastAutocompleteQueryKey === key) {
-          this.#remoteCandidates = [];
-          this.#updateAutocompleteCandidates();
-        }
-      })
-      .finally(() => {
-        if (this.#autocompleteFetchController === controller) {
-          this.#autocompleteFetchController = null;
-        }
+    try {
+      const response = await fetch(`${url}?${params.toString()}`, {
+        signal: context.signal,
+        headers: { Accept: "application/json" },
       });
+      if (!response.ok) {
+        return [];
+      }
+      const body = await response.json().catch(() => null);
+      if (!body) {
+        return [];
+      }
+      const items = Array.isArray(body?.results) ? body.results : [];
+      const values = [];
+      const limitLength = this.#getCanonicalMaxLength();
+      for (const item of items) {
+        let source = null;
+        if (typeof item === "string") {
+          source = item;
+        } else if (item && typeof item.name === "string") {
+          source = item.name;
+        }
+        if (!source) continue;
+        const canonical = canonicalizeTag(source, limitLength);
+        if (!canonical) continue;
+        values.push(canonical);
+      }
+      return values;
+    } catch {
+      return [];
+    }
   }
 
-  #cancelPendingAutocompleteFetch({ resetQueryKey = false } = {}) {
-    if (this.#autocompleteFetchTimer !== null) {
-      globalThis.clearTimeout(this.#autocompleteFetchTimer);
-      this.#autocompleteFetchTimer = null;
-    }
-    if (this.#autocompleteFetchController) {
-      this.#autocompleteFetchController.abort();
-      this.#autocompleteFetchController = null;
-    }
-    if (resetQueryKey) {
-      this.#pendingAutocompleteQueryKey = null;
-      this.#lastAutocompleteQueryKey = null;
-    }
+  #buildAutocompleteCacheKey(query, context = {}) {
+    const limit = this.#getCanonicalMaxLength();
+    const canonical = canonicalizeTag(query ?? "", limit);
+    const normalized = canonical
+      ? canonical.toLowerCase()
+      : (query ?? "").trim().toLowerCase();
+    const msgId = context.msgId ?? this.dataset?.msgId ?? "";
+    return `${msgId}::${normalized}`;
   }
 
-  #clearAutocompleteCache() {
-    this.#autocompleteCache?.clear();
-    this.#pendingAutocompleteQueryKey = null;
-    this.#lastAutocompleteQueryKey = null;
+  #normalizeTagCandidate(candidate) {
+    const limit = this.#getCanonicalMaxLength();
+    if (typeof candidate === "string") {
+      const canonical = canonicalizeTag(candidate, limit);
+      return canonical ? canonical.toLowerCase() : "";
+    }
+    if (candidate && typeof candidate.value === "string") {
+      const canonical = canonicalizeTag(candidate.value, limit);
+      return canonical ? canonical.toLowerCase() : "";
+    }
+    return "";
   }
 
-  #invalidateAutocompleteCache({ immediate = false } = {}) {
-    this.#clearAutocompleteCache();
-    this.#remoteCandidates = [];
-    this.#updateAutocompleteCandidates();
-    this.#scheduleAutocompleteFetch({ immediate });
+  #mergeAutocompleteCandidates(remote, localSets) {
+    const locals = [];
+    for (const list of localSets) {
+      if (!Array.isArray(list) || !list.length) {
+        continue;
+      }
+      locals.push(...list);
+    }
+    const limit = this.#getCanonicalMaxLength();
+    return mergeTagCandidateValues(remote ?? [], locals, limit);
   }
 
   #getAutocompleteUrl() {

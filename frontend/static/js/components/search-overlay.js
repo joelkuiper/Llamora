@@ -2,6 +2,7 @@ import { flashHighlight, clearScrollTarget, createInlineSpinner } from "../ui.js
 import { motionSafeBehavior, prefersReducedMotion } from "../utils/motion.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 import { InlineAutocompleteController } from "../utils/inline-autocomplete.js";
+import { AutocompleteDataStore } from "../utils/autocomplete-data-store.js";
 import { createShortcutBag } from "../utils/global-shortcuts.js";
 
 const getEventTarget = (evt) => {
@@ -67,10 +68,8 @@ export class SearchOverlay extends ReactiveElement {
   #historyRestoreHandler;
   #popStateHandler;
   #historyRestoreRemover = null;
-  #recentFetchPromise = null;
-  #recentLoaded = false;
-  #recentFetchedAt = 0;
-  #recentCandidates = null;
+  #recentStore = null;
+  #localRecentEntries = [];
   #shortcutBag = null;
 
   constructor() {
@@ -86,6 +85,29 @@ export class SearchOverlay extends ReactiveElement {
     this.#pageHideHandler = (event) => this.#handlePageHide(event);
     this.#historyRestoreHandler = () => this.#handleHistoryRestore();
     this.#popStateHandler = () => this.#handlePopState();
+
+    this.#recentStore = new AutocompleteDataStore({
+      debounceMs: 0,
+      maxResults: RECENT_CANDIDATE_MAX,
+      cacheTimeMs: RECENT_REFRESH_MIN_MS,
+      fetchCandidates: (_, context = {}) =>
+        this.#fetchRecentAutocompleteCandidates(context?.signal),
+      buildCacheKey: () => "recent",
+      getCandidateKey: (candidate) => this.#normalizeCandidateValue(candidate),
+    });
+    this.#recentStore.subscribe(
+      (candidates) => {
+        if (!this.#autocomplete) {
+          return;
+        }
+        if (candidates.length) {
+          this.#autocomplete.setCandidates(candidates);
+        } else {
+          this.#autocomplete.clearCandidates();
+        }
+      },
+      { immediate: false }
+    );
   }
 
   connectedCallback() {
@@ -152,6 +174,7 @@ export class SearchOverlay extends ReactiveElement {
     this.#spinnerController = null;
     this.#shortcutBag?.abort();
     this.#shortcutBag = null;
+    this.#recentStore?.cancel();
     this.#mutationObserver?.disconnect();
     this.#mutationObserver = null;
     this.#resultsEl = null;
@@ -367,84 +390,69 @@ export class SearchOverlay extends ReactiveElement {
   }
 
   #loadRecentSearches(force = false) {
-    if (!this.#inputEl) return;
-    if (this.#recentFetchPromise) {
-      if (this.#recentLoaded) {
-        this.#applyRecentCandidates();
+    if (!this.#recentStore) return null;
+    this.#applyRecentCandidates();
+    return this.#recentStore.scheduleFetch("", {}, { immediate: true, bypassCache: force });
+  }
+
+  async #fetchRecentAutocompleteCandidates(signal) {
+    try {
+      const response = await fetch("/search/recent", {
+        headers: { Accept: "application/json" },
+        credentials: "same-origin",
+        signal,
+      });
+      if (!response.ok) {
+        return [];
       }
-      return this.#recentFetchPromise;
-    }
 
-    const now = Date.now();
-    if (!force && this.#recentLoaded && now - this.#recentFetchedAt < RECENT_REFRESH_MIN_MS) {
-      this.#applyRecentCandidates();
-      return;
-    }
-
-    const task = (async () => {
-      try {
-        const response = await fetch("/search/recent", {
-          headers: { Accept: "application/json" },
-          credentials: "same-origin",
-        });
-        if (!response.ok) {
-          return;
-        }
-
-        const payload = await response.json().catch(() => null);
-        if (!payload) {
-          return;
-        }
-
-        const recent = Array.isArray(payload.recent) ? payload.recent : [];
-        const frecentTags = Array.isArray(payload.frecent_tags) ? payload.frecent_tags : [];
-        const entries = [];
-        const seen = new Set();
-
-        for (const candidate of [...recent, ...frecentTags]) {
-          if (typeof candidate !== "string") continue;
-          const entry = buildSearchEntry(candidate);
-          if (!entry) continue;
-          const key = normalizeSearchValue(entry.value).toLowerCase();
-          if (!key || seen.has(key)) continue;
-          seen.add(key);
-          entries.push(entry);
-          if (entries.length >= RECENT_CANDIDATE_MAX) break;
-        }
-
-        this.#recentCandidates = entries;
-        this.#recentLoaded = true;
-        this.#recentFetchedAt = Date.now();
-        this.#applyRecentCandidates();
-      } catch {
-        // Ignore fetch failures; results simply stay empty.
-      } finally {
-        this.#recentFetchPromise = null;
+      const payload = await response.json().catch(() => null);
+      if (!payload) {
+        return [];
       }
-    })();
 
-    this.#recentFetchPromise = task;
-    return task;
+      const recent = Array.isArray(payload.recent) ? payload.recent : [];
+      const frecentTags = Array.isArray(payload.frecent_tags) ? payload.frecent_tags : [];
+      const entries = [];
+      const seen = new Set();
+
+      for (const candidate of [...recent, ...frecentTags]) {
+        if (typeof candidate !== "string") continue;
+        const entry = buildSearchEntry(candidate);
+        if (!entry) continue;
+        const key = this.#normalizeCandidateValue(entry);
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        entries.push(entry);
+        if (entries.length >= RECENT_CANDIDATE_MAX) break;
+      }
+
+      return entries;
+    } catch {
+      return [];
+    }
   }
 
   #addCurrentQueryToAutocomplete() {
-    if (!this.#autocomplete || !this.#inputEl) return;
+    if (!this.#inputEl) return;
     const value = this.#inputEl.value?.trim();
     if (!value) return;
     const entry = buildSearchEntry(value);
     if (!entry) {
       return;
     }
-    this.#autocomplete.addCandidate(entry);
     const normalized = this.#normalizeCandidateValue(entry);
     if (!normalized) {
       return;
     }
-    const existing = Array.isArray(this.#recentCandidates)
-      ? this.#recentCandidates.filter((item) => this.#normalizeCandidateValue(item) !== normalized)
+    const existing = Array.isArray(this.#localRecentEntries)
+      ? this.#localRecentEntries.filter(
+          (item) => this.#normalizeCandidateValue(item) !== normalized
+        )
       : [];
     existing.unshift(entry);
-    this.#recentCandidates = existing.slice(0, RECENT_CANDIDATE_MAX);
+    this.#localRecentEntries = existing.slice(0, RECENT_CANDIDATE_MAX);
+    this.#recentStore?.setLocalEntries("local", this.#localRecentEntries);
   }
 
   #handleKeydown(evt) {
@@ -769,11 +777,9 @@ export class SearchOverlay extends ReactiveElement {
     if (!this.#autocomplete) {
       return;
     }
-    if (!Array.isArray(this.#recentCandidates)) {
-      return;
-    }
-    if (this.#recentCandidates.length) {
-      this.#autocomplete.setCandidates(this.#recentCandidates);
+    const candidates = this.#recentStore?.getCandidates() ?? [];
+    if (candidates.length) {
+      this.#autocomplete.setCandidates(candidates);
     } else {
       this.#autocomplete.clearCandidates();
     }
