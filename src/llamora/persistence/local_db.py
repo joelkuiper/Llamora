@@ -24,6 +24,7 @@ from llamora.app.services.crypto import (
 )
 from llamora.app.db.base import run_in_transaction
 from llamora.app.db.events import RepositoryEventBus
+from llamora.app.services.history_cache import HistoryCache
 from llamora.app.db.users import UsersRepository
 from llamora.app.db.messages import MessagesRepository
 from llamora.app.db.tags import TagsRepository
@@ -57,6 +58,7 @@ class LocalDB:
         self._vectors: VectorsRepository | None = None
         self._search_history: SearchHistoryRepository | None = None
         self._events: RepositoryEventBus | None = None
+        self._history_cache: HistoryCache | None = None
         self._init_lock = asyncio.Lock()
         self._sync_lock = threading.Lock()
 
@@ -120,6 +122,7 @@ class LocalDB:
                 self._vectors = None
                 self._search_history = None
                 self._events = None
+                self._history_cache = None
                 raise
 
     async def close(self) -> None:
@@ -135,6 +138,7 @@ class LocalDB:
             self._vectors = None
             self._search_history = None
             self._events = None
+            self._history_cache = None
 
     async def _create_connection(self) -> aiosqlite.Connection:
         conn = await aiosqlite.connect(
@@ -180,9 +184,18 @@ class LocalDB:
         if not self.pool:
             raise RuntimeError("Connection pool not initialized")
         self._events = RepositoryEventBus()
+        history_cache_cfg = settings.MESSAGES.history_cache
+        self._history_cache = HistoryCache(
+            maxsize=int(history_cache_cfg.maxsize),
+            ttl=int(history_cache_cfg.ttl),
+        )
         self._users = UsersRepository(self.pool)
         self._messages = MessagesRepository(
-            self.pool, encrypt_message, decrypt_message, self._events
+            self.pool,
+            encrypt_message,
+            decrypt_message,
+            self._events,
+            self._history_cache,
         )
         self._tags = TagsRepository(
             self.pool,
@@ -220,6 +233,12 @@ class LocalDB:
         """Return the messages repository."""
 
         return self._require_repository(self._messages, "Messages")
+
+    @property
+    def history_cache(self) -> HistoryCache:
+        """Expose the shared message history cache."""
+
+        return self._require_repository(self._history_cache, "History cache")
 
     @property
     def tags(self) -> TagsRepository:
