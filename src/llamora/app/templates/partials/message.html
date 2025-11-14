@@ -1,0 +1,48 @@
+{% from 'partials/meta_chips.html' import render_meta_chips %}
+{% macro render_message(msg_id,
+                       role,
+                       body_html=None,
+                       body_text=None,
+                       meta=None,
+                       tags=None,
+                       extra_classes='',
+                       speaker_label=None) -%}
+  {% set meta = meta or {} %}
+  {% set tags = tags or [] %}
+  {% set is_error = meta.get('error') %}
+  {% set repeat_guard = meta.get('repeat_guard') %}
+  {% set classes = 'message ' + ('assistant' if role != 'user' else 'user') %}
+  {% if extra_classes %}
+    {% set classes = classes + ' ' + extra_classes %}
+  {% endif %}
+  {% if is_error %}
+    {% set classes = classes + ' message--error' %}
+  {% endif %}
+  {% if speaker_label is none %}
+    {% set speaker_label = 'Your message' if role == 'user' else 'Assistant message' %}
+  {% endif %}
+  <div id="msg-{{ msg_id }}"
+       class="{{ classes }}"
+       {% if repeat_guard %}data-repeat-guard="true"{% endif %}
+       role="article"
+       aria-labelledby="msg-{{ msg_id }}-speaker msg-{{ msg_id }}-body">
+    <span class="visually-hidden" id="msg-{{ msg_id }}-speaker">{{ speaker_label }}</span>
+    <div class="markdown-body"
+         id="msg-{{ msg_id }}-body"{% if body_html is not none %} data-rendered="true"{% endif %}>
+      {% if body_html is not none %}
+      {{ body_html | safe }}
+      {% elif body_text is not none %}
+      {{ body_text }}
+      {% endif %}
+    </div>
+    {% if repeat_guard %}
+    <span class="repeat-guard-indicator repeat-guard-indicator--visible repeat-guard-indicator--calm">
+      <span class="repeat-guard-indicator__label">response trimmed</span>
+      <span class="visually-hidden">Response paused after repeating itself.</span>
+    </span>
+    {% endif %}
+    {% if role != 'user' and not is_error %}
+    {{ render_meta_chips(msg_id, tags) }}
+    {% endif %}
+  </div>
+{%- endmacro %}
