@@ -53,9 +53,9 @@ class PromptBudget:
 
     def __init__(
         self,
-        client: "LLMClient",
+        client: LLMClient,
         *,
-        service_pulse: "ServicePulse" | None = None,
+        service_pulse: ServicePulse | None = None,
     ) -> None:
         self._client = client
         self._service_pulse = service_pulse
@@ -333,10 +333,10 @@ class LLMClient:
 
     def __init__(
         self,
-        process_manager: "LlamafileProcessManager",
+        process_manager: LlamafileProcessManager,
         default_request: dict | None = None,
         *,
-        service_pulse: "ServicePulse" | None = None,
+        service_pulse: ServicePulse | None = None,
     ) -> None:
         self.logger = logging.getLogger(__name__)
         self.process_manager = process_manager

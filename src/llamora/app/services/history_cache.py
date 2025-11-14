@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from logging import getLogger
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from cachetools import TTLCache
 
@@ -23,10 +23,7 @@ if TYPE_CHECKING:
     from llamora.app.db.messages import MessagesRepository
 
 
-class HistoryCacheBackend(Protocol):
-    def get(self, key: CacheKey, default: object | None = None) -> object | None: ...
-
-    def __setitem__(self, key: CacheKey, value: object) -> None: ...
+HistoryCacheBackend = MutableMapping[CacheKey, object]
 
 
 @dataclass(slots=True)
@@ -63,7 +60,7 @@ def _thaw_history(history: FrozenHistory) -> list[dict[str, Any]]:
     return thawed
 
 
-def default_backend_factory(maxsize: int, ttl: int) -> TTLCache[CacheKey, object]:
+def default_backend_factory(maxsize: int, ttl: int) -> HistoryCacheBackend:
     return TTLCache(maxsize=maxsize, ttl=ttl)
 
 
@@ -85,6 +82,7 @@ class HistoryCache:
         if backend is None:
             factory = backend_factory or default_backend_factory
             backend = factory(maxsize, ttl)
+        assert backend is not None
         self._backend: HistoryCacheBackend = backend
         self._lock = asyncio.Lock()
         self._listeners: list[HistoryCacheListener] = []
@@ -183,7 +181,7 @@ class HistoryCacheSynchronizer:
         *,
         event_bus: RepositoryEventBus | None,
         history_cache: HistoryCache | None,
-        messages_repository: "MessagesRepository" | None,
+        messages_repository: MessagesRepository | None,
     ) -> None:
         self._cache = history_cache
         self._events = event_bus

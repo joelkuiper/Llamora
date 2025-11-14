@@ -29,6 +29,8 @@ class BaseSearchCandidateGenerator(Protocol):
     ) -> CandidateMap:
         """Return candidate messages ordered by recency and vector distance."""
 
+        ...
+
 
 class DefaultSearchCandidateGenerator:
     """Use the configured :class:`VectorSearchService` to produce candidates."""

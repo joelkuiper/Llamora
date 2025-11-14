@@ -19,6 +19,8 @@ class BaseSearchReranker(Protocol):
     ) -> list[dict]:
         """Return the reranked result list."""
 
+        ...
+
 
 class DefaultSearchReranker:
     """Use the lexical reranker to score and order candidates."""
@@ -39,7 +41,7 @@ class DefaultSearchReranker:
         limit: int,
         boosts: dict[str, float],
     ) -> list[dict]:
-        return self._lexical_reranker.rerank(query, candidates, limit, boosts)
+        return self._lexical_reranker.rerank(query, list(candidates), limit, boosts)
 
 
 __all__ = ["BaseSearchReranker", "DefaultSearchReranker"]

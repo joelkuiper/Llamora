@@ -27,6 +27,8 @@ class BaseSearchNormalizer(Protocol):
     def normalize(self, user_id: str, query: str) -> NormalizedQuery:
         """Normalize ``query`` for ``user_id`` or raise :class:`InvalidSearchQuery`."""
 
+        ...
+
 
 class DefaultSearchNormalizer:
     """Normalize queries using the application search configuration limits."""

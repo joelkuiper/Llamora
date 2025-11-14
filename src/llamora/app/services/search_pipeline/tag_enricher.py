@@ -40,6 +40,8 @@ class BaseTagEnricher(Protocol):
     ) -> TagEnrichment:
         """Augment ``candidate_map`` and compute tag boost weights."""
 
+        ...
+
 
 class DefaultTagEnricher:
     """Apply canonical tag matching and hydration to the candidate set."""

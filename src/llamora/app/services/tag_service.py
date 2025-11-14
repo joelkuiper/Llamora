@@ -42,7 +42,11 @@ class TagService:
         if not results:
             return
 
-        message_ids = [res.get("id") for res in results if res.get("id")]
+        message_ids: list[str] = []
+        for res in results:
+            msg_id = res.get("id")
+            if isinstance(msg_id, str) and msg_id:
+                message_ids.append(msg_id)
         if not message_ids:
             return
 

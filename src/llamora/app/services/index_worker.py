@@ -26,9 +26,9 @@ class IndexWorker:
 
     def __init__(
         self,
-        search_api: "SearchAPI",
+        search_api: SearchAPI,
         *,
-        search_config: "SearchConfig" | None = None,
+        search_config: SearchConfig | None = None,
         max_queue_size: int = DEFAULT_MAX_QUEUE_SIZE,
         enqueue_timeout: float | None = DEFAULT_ENQUEUE_TIMEOUT,
         batch_size: int = 1,
@@ -165,7 +165,7 @@ class IndexWorker:
         return self._dropped_jobs
 
     @property
-    def search_config(self) -> "SearchConfig" | None:
+    def search_config(self) -> SearchConfig | None:
         """Return the search configuration associated with the worker."""
 
         return self._search_config
