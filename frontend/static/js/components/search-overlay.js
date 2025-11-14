@@ -97,6 +97,7 @@ export class SearchOverlay extends ReactiveElement {
   #autocomplete = null;
   #autocompleteInput = null;
   #inputListenerTarget = null;
+  #mutationObserver = null;
   #beforeRequestHandler;
   #afterRequestHandler;
   #afterSwapHandler;
@@ -147,6 +148,7 @@ export class SearchOverlay extends ReactiveElement {
     }
 
     this.#registerShortcuts();
+    this.#setupMutationObserver();
 
     const eventTarget = this.ownerDocument ?? document;
 
@@ -186,6 +188,8 @@ export class SearchOverlay extends ReactiveElement {
     this.#spinnerController = null;
     this.#shortcutBag?.abort();
     this.#shortcutBag = null;
+    this.#mutationObserver?.disconnect();
+    this.#mutationObserver = null;
     this.#resultsEl = null;
     this.#inputEl = null;
     this.#spinnerEl = null;
@@ -349,6 +353,31 @@ export class SearchOverlay extends ReactiveElement {
     }
     this.#autocomplete = null;
     this.#autocompleteInput = null;
+  }
+
+  #setupMutationObserver() {
+    this.#mutationObserver?.disconnect();
+
+    const observer = new MutationObserver(() => {
+      if (!this.isConnected) return;
+
+      const input = this.querySelector("#search-input");
+      this.#inputEl = input instanceof HTMLInputElement ? input : null;
+
+      const differs = this.#inputEl !== this.#autocompleteInput;
+      const missingInlineClass = this.#inputEl
+        ? !this.#inputEl.classList.contains("inline-autocomplete__input")
+        : false;
+
+      if (differs || missingInlineClass) {
+        this.#ensureInputListeners({ force: true });
+        this.#initAutocomplete();
+        this.#loadRecentSearches(true);
+      }
+    });
+
+    observer.observe(this, { childList: true, subtree: true });
+    this.#mutationObserver = observer;
   }
 
   #ensureInputListeners(options = {}) {
