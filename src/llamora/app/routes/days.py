@@ -7,10 +7,8 @@ from quart import (
     make_response,
     abort,
 )
-from llamora.app.services.auth_helpers import (
-    get_secure_cookie_manager,
-    login_required,
-)
+from llamora.app.services.auth_helpers import login_required
+from llamora.app.services.session_context import get_session_context
 from llamora.app.services.time import local_date
 from llamora.app.services.validators import parse_iso_date
 from llamora.app.services.calendar import get_month_context
@@ -19,8 +17,8 @@ from llamora.app.routes.chat import render_chat
 days_bp = Blueprint("days", __name__)
 
 
-def _cookies():
-    return get_secure_cookie_manager()
+def _session():
+    return get_session_context()
 
 
 @days_bp.route("/")
@@ -68,11 +66,8 @@ async def day(date):
 @days_bp.route("/calendar")
 @login_required
 async def calendar_view():
-    manager = _cookies()
-    user = await manager.get_current_user()
-    if user is None:
-        abort(401)
-        raise AssertionError("unreachable")
+    session = _session()
+    user = await session.require_user()
     today = local_date()
     requested_year = request.args.get("year", type=int)
     requested_month = request.args.get("month", type=int)
@@ -100,11 +95,8 @@ async def calendar_view():
 @days_bp.route("/calendar/<int:year>/<int:month>")
 @login_required
 async def calendar_month(year: int, month: int):
-    manager = _cookies()
-    user = await manager.get_current_user()
-    if user is None:
-        abort(401)
-        raise AssertionError("unreachable")
+    session = _session()
+    user = await session.require_user()
     context = await get_month_context(user["id"], year, month)
     html = await render_template(
         "partials/calendar.html",

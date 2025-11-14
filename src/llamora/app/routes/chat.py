@@ -18,10 +18,7 @@ from werkzeug.exceptions import HTTPException
 from llamora.llm.chat_template import build_opening_messages, render_chat_prompt
 
 from llamora.app.services.container import get_services
-from llamora.app.services.auth_helpers import (
-    get_secure_cookie_manager,
-    login_required,
-)
+from llamora.app.services.auth_helpers import login_required
 from llamora.app.services.chat_context import get_chat_context
 from llamora.app.services.chat_helpers import (
     StreamSession,
@@ -31,6 +28,7 @@ from llamora.app.services.chat_helpers import (
 )
 from llamora.app.services.chat_stream.manager import StreamCapacityError
 from llamora.app.services.tag_recall import build_tag_recall_context
+from llamora.app.services.session_context import get_session_context
 from llamora.app.services.time import (
     local_date,
     get_timezone,
@@ -48,8 +46,8 @@ def _db():
     return get_services().db
 
 
-def _cookies():
-    return get_secure_cookie_manager()
+def _session():
+    return get_session_context()
 
 
 def _chat_stream_manager():
@@ -84,31 +82,14 @@ def _max_prompt_tokens(
     return max(ctx_size - predict_tokens, 0)
 
 
-async def _require_user() -> Mapping[str, Any]:
-    manager = _cookies()
-    user = await manager.get_current_user()
-    if user is None:
-        abort(401)
-        raise AssertionError("unreachable")
-    return user
-
-
-def _require_dek() -> bytes:
-    manager = _cookies()
-    dek = manager.get_dek()
-    if dek is None:
-        abort(401, description="Missing encryption key")
-        raise AssertionError("unreachable")
-    return dek
-
-
 async def render_chat(
     date: str,
     oob: bool = False,
     scroll_target: str | None = None,
     hx_push_url: str | None = None,
 ) -> Response:
-    user = await _require_user()
+    session = _session()
+    user = await session.require_user()
     context = await get_chat_context(user, date)
     html = await render_template(
         "partials/chat.html",
@@ -167,15 +148,9 @@ async def chat_htmx_today():
 @login_required
 async def stop_generation(user_msg_id: str):
     logger.info("Stop requested for user message %s", user_msg_id)
-    manager = _cookies()
-    user = await manager.get_current_user()
-    dek = manager.get_dek()
-    if user is None or dek is None:
-        logger.debug("Stop request without authenticated user")
-        abort(401)
-        raise AssertionError("unreachable")
-    assert user is not None
-    assert dek is not None
+    session = _session()
+    user = await session.require_user()
+    await session.require_dek()
 
     if not await _db().messages.message_exists(user["id"], user_msg_id):
         logger.warning("Stop request for unauthorized message %s", user_msg_id)
@@ -199,8 +174,9 @@ async def stop_generation(user_msg_id: str):
 @chat_bp.get("/c/meta-chips/<msg_id>")
 @login_required
 async def meta_chips(msg_id: str):
-    user = await _require_user()
-    dek = _require_dek()
+    session = _session()
+    user = await session.require_user()
+    dek = await session.require_dek()
     if not await _db().messages.message_exists(user["id"], msg_id):
         abort(404, description="message not found")
     tags = await _db().tags.get_tags_for_message(user["id"], msg_id, dek)
@@ -216,8 +192,9 @@ async def meta_chips(msg_id: str):
 @chat_bp.get("/c/opening/<date>")
 @login_required
 async def sse_opening(date: str):
-    user = await _require_user()
-    dek = _require_dek()
+    session = _session()
+    user = await session.require_user()
+    dek = await session.require_dek()
     uid = user["id"]
     tz = get_timezone()
     now = datetime.now(ZoneInfo(tz))
@@ -319,8 +296,9 @@ async def send_message(date):
     form = await request.form
     user_text = form.get("message", "").strip()
     user_time = form.get("user_time")
-    user = await _require_user()
-    dek = _require_dek()
+    session = _session()
+    user = await session.require_user()
+    dek = await session.require_dek()
     uid = user["id"]
 
     max_len = int(settings.LIMITS.max_message_length)
@@ -362,8 +340,9 @@ async def sse_reply(user_msg_id: str, date: str):
         abort(400, description="Invalid date")
         raise AssertionError("unreachable") from exc
 
-    user = await _require_user()
-    dek = _require_dek()
+    session = _session()
+    user = await session.require_user()
+    dek = await session.require_dek()
     uid = user["id"]
     history, existing_assistant_msg, actual_date = await locate_message_and_reply(
         _db(), uid, dek, normalized_date, user_msg_id

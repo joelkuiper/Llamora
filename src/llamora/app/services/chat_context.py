@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from llamora.app.services.auth_helpers import get_secure_cookie_manager
 from llamora.app.services.container import get_services
 from llamora.app.services.markdown import render_markdown_to_html
+from llamora.app.services.session_context import get_session_context
 from llamora.app.services.time import local_date
 
 
@@ -24,10 +24,7 @@ async def get_chat_context(
     """
 
     services = get_services()
-    manager = get_secure_cookie_manager()
-    dek = manager.get_dek()
-    if dek is None:
-        raise RuntimeError("Missing encryption key for chat context")
+    dek = await get_session_context().require_dek()
     history = await services.db.messages.get_history(user["id"], date, dek)
 
     for entry in history:

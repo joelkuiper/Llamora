@@ -1,9 +1,7 @@
 from quart import Blueprint, request, abort, render_template, jsonify
 from llamora.app.services.container import get_services
-from llamora.app.services.auth_helpers import (
-    get_secure_cookie_manager,
-    login_required,
-)
+from llamora.app.services.auth_helpers import login_required
+from llamora.app.services.session_context import get_session_context
 from llamora.app.util.tags import canonicalize, display
 from llamora.settings import settings
 from llamora.app.util.frecency import (
@@ -18,18 +16,15 @@ def _db():
     return get_services().db
 
 
-def _cookies():
-    return get_secure_cookie_manager()
+def _session():
+    return get_session_context()
 
 
 @tags_bp.delete("/t/<msg_id>/<tag_hash>")
 @login_required
 async def remove_tag(msg_id: str, tag_hash: str):
-    manager = _cookies()
-    user = await manager.get_current_user()
-    if user is None:
-        abort(401)
-        raise AssertionError("unreachable")
+    session = _session()
+    user = await session.require_user()
     try:
         tag_hash_bytes = bytes.fromhex(tag_hash)
     except ValueError as exc:
@@ -42,11 +37,8 @@ async def remove_tag(msg_id: str, tag_hash: str):
 @tags_bp.post("/t/<msg_id>")
 @login_required
 async def add_tag(msg_id: str):
-    manager = _cookies()
-    user = await manager.get_current_user()
-    if user is None:
-        abort(401)
-        raise AssertionError("unreachable")
+    session = _session()
+    user = await session.require_user()
     form = await request.form
     raw_tag = (form.get("tag") or "").strip()
     max_tag_length = int(settings.LIMITS.max_tag_length)
@@ -57,10 +49,7 @@ async def add_tag(msg_id: str):
     except ValueError:
         abort(400, description="empty tag")
         raise AssertionError("unreachable")
-    dek = manager.get_dek()
-    if dek is None:
-        abort(401, description="Missing encryption key")
-        raise AssertionError("unreachable")
+    dek = await session.require_dek()
     if not await _db().messages.message_exists(user["id"], msg_id):
         abort(404, description="message not found")
     tag_hash = await _db().tags.resolve_or_create_tag(user["id"], canonical, dek)
@@ -77,15 +66,9 @@ async def add_tag(msg_id: str):
 @tags_bp.get("/t/suggestions/<msg_id>")
 @login_required
 async def get_tag_suggestions(msg_id: str):
-    manager = _cookies()
-    user = await manager.get_current_user()
-    if user is None:
-        abort(401)
-        raise AssertionError("unreachable")
-    dek = manager.get_dek()
-    if dek is None:
-        abort(401, description="Missing encryption key")
-        raise AssertionError("unreachable")
+    session = _session()
+    user = await session.require_user()
+    dek = await session.require_dek()
     messages = await _db().messages.get_messages_by_ids(user["id"], [msg_id], dek)
     if not messages:
         abort(404, description="message not found")
@@ -128,16 +111,10 @@ async def get_tag_suggestions(msg_id: str):
 @tags_bp.get("/tags/autocomplete")
 @login_required
 async def autocomplete_tags():
-    manager = _cookies()
-    user = await manager.get_current_user()
-    if user is None:
-        abort(401)
-        raise AssertionError("unreachable")
+    session = _session()
+    user = await session.require_user()
 
-    dek = manager.get_dek()
-    if dek is None:
-        abort(401, description="Missing encryption key")
-        raise AssertionError("unreachable")
+    dek = await session.require_dek()
 
     msg_id = (request.args.get("msg_id") or "").strip()
     if not msg_id:
