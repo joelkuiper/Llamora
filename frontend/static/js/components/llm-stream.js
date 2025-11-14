@@ -116,6 +116,14 @@ class LlmStreamElement extends HTMLElement {
     this.#boundHandleMeta = (event) => this.#handleMeta(event);
   }
 
+  #getStreamingSession() {
+    const host = this.closest?.("chat-view");
+    if (host && "streamingSession" in host) {
+      return host.streamingSession || null;
+    }
+    return null;
+  }
+
   connectedCallback() {
     this.#sink = this.querySelector(".raw-response");
     this.#markdown = this.querySelector(".markdown-body");
@@ -159,6 +167,8 @@ class LlmStreamElement extends HTMLElement {
 
   abort() {
     if (this.#completed) return;
+    const session = this.#getStreamingSession();
+    session?.abort();
     this.#finalize({ status: "aborted" });
   }
 
@@ -201,6 +211,10 @@ class LlmStreamElement extends HTMLElement {
     this.dataset.streaming = "true";
     this.setAttribute("aria-busy", "true");
     this.#meta = null;
+    const session = this.#getStreamingSession();
+    if (session && this.userMsgId) {
+      session.begin(this.userMsgId);
+    }
     this.dispatchEvent(
       new CustomEvent("llm-stream:start", {
         bubbles: true,
@@ -439,6 +453,11 @@ class LlmStreamElement extends HTMLElement {
     } else {
       const placeholder = this.querySelector(".meta-chips-placeholder");
       placeholder?.remove();
+    }
+
+    const session = this.#getStreamingSession();
+    if (session) {
+      session.complete(status);
     }
 
     this.dispatchEvent(

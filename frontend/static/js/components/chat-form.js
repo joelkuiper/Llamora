@@ -5,10 +5,11 @@ import { ReactiveElement } from "../utils/reactive-element.js";
 class ChatFormElement extends ReactiveElement {
   #chat = null;
   #container = null;
-  #state = null;
   #date = null;
   #form = null;
   #textarea = null;
+  #session = null;
+  #sessionListeners = null;
   #button = null;
   #errors = null;
   #isToday = false;
@@ -61,11 +62,6 @@ class ChatFormElement extends ReactiveElement {
     this.#container = value || null;
   }
 
-  set state(value) {
-    this.#state = value || null;
-    this.#maybeInit();
-  }
-
   set date(value) {
     this.#date = value || null;
     if (value) {
@@ -86,6 +82,37 @@ class ChatFormElement extends ReactiveElement {
     }
   }
 
+
+  set session(value) {
+    if (this.#session === value) {
+      return;
+    }
+
+    this.#sessionListeners = this.disposeListenerBag(this.#sessionListeners);
+    this.#session = value || null;
+
+    if (this.#session) {
+      const bag = this.resetListenerBag(this.#sessionListeners);
+      this.#sessionListeners = bag;
+      bag.add(this.#session, "streaming:begin", (event) =>
+        this.#handleSessionBegin(event)
+      );
+      bag.add(this.#session, "streaming:abort", (event) =>
+        this.#handleSessionAbort(event)
+      );
+      bag.add(this.#session, "streaming:complete", (event) =>
+        this.#handleSessionComplete(event)
+      );
+    }
+
+    if (this.#initialized) {
+      const currentId = this.#session?.currentMsgId || null;
+      this.streamingMsgId = currentId;
+      this.setStreaming(Boolean(currentId));
+    }
+  }
+
+
   get streamingMsgId() {
     return this.#streamingMsgId;
   }
@@ -104,7 +131,7 @@ class ChatFormElement extends ReactiveElement {
     if (!this.#form || !this.#textarea || !this.#button) {
       return;
     }
-    if (!this.#state || !this.#chat || !this.#date) {
+    if (!this.#chat || !this.#date) {
       return;
     }
 
@@ -116,7 +143,7 @@ class ChatFormElement extends ReactiveElement {
     this.#isToday = this.#date === today;
     this.#draftKey = `chat-draft-${this.#date}`;
 
-    this.streamingMsgId = this.#state?.currentStreamMsgId || null;
+    this.streamingMsgId = this.#session?.currentMsgId || null;
 
     this.#restoreDraft();
     this.#configureForm();
@@ -138,6 +165,7 @@ class ChatFormElement extends ReactiveElement {
     this.#streamFocusListeners = this.disposeListenerBag(
       this.#streamFocusListeners
     );
+    this.#sessionListeners = this.disposeListenerBag(this.#sessionListeners);
     this.#shouldRestoreFocus = false;
     this.#initialized = false;
     this.#isStreaming = false;
@@ -217,7 +245,7 @@ class ChatFormElement extends ReactiveElement {
       if (this.#draftKey) {
         sessionStorage.setItem(this.#draftKey, this.#textarea.value);
       }
-      if (!this.#state?.currentStreamMsgId && !this.#isSubmitting) {
+      if (!this.#session?.currentMsgId && !this.#isSubmitting) {
         this.#button.disabled = !this.#textarea.value.trim();
       }
     };
@@ -366,7 +394,7 @@ class ChatFormElement extends ReactiveElement {
     const indicator = this.#getTypingIndicator();
     const currentId =
       this.#streamingMsgId ||
-      this.#state?.currentStreamMsgId ||
+      this.#session?.currentMsgId ||
       indicator?.dataset.userMsgId ||
       null;
     let stream = null;
@@ -403,19 +431,15 @@ class ChatFormElement extends ReactiveElement {
     if (stopEndpoint) {
       htmx.ajax("POST", stopEndpoint, { swap: "none" });
     }
-    if (this.#state) {
-      this.#state.currentStreamMsgId = null;
+    if (!this.#session || !this.#session.abort()) {
+      this.streamingMsgId = null;
+      this.setStreaming(false);
     }
-    if (this.#chat?.dataset) {
-      delete this.#chat.dataset.currentStream;
-    }
-    this.streamingMsgId = null;
-    this.setStreaming(false);
   }
 
   #getTypingIndicator() {
     if (!this.#chat) return null;
-    const targetId = this.#streamingMsgId || this.#state?.currentStreamMsgId || null;
+    const targetId = this.#streamingMsgId || this.#session?.currentMsgId || null;
     if (targetId) {
       const normalized = String(targetId);
       const message = document.getElementById(`msg-${normalized}`);
@@ -465,6 +489,31 @@ class ChatFormElement extends ReactiveElement {
       }
       this.#textarea.disabled = false;
       this.#button.disabled = !this.#textarea.value.trim();
+    }
+  }
+
+  #handleSessionBegin(event) {
+    const detail = event?.detail || {};
+    const msgId = detail.userMsgId || null;
+    this.streamingMsgId = msgId;
+    this.setStreaming(true);
+  }
+
+  #handleSessionAbort(event) {
+    const detail = event?.detail || {};
+    const msgId = detail.userMsgId || null;
+    if (!msgId || msgId === this.streamingMsgId) {
+      this.streamingMsgId = null;
+      this.setStreaming(false);
+    }
+  }
+
+  #handleSessionComplete(event) {
+    const detail = event?.detail || {};
+    const msgId = detail.userMsgId || null;
+    if (!msgId || msgId === this.streamingMsgId) {
+      this.streamingMsgId = null;
+      this.setStreaming(false);
     }
   }
 }

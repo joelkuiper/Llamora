@@ -1,5 +1,6 @@
 import { scrollEvents } from "../chat/scroll-manager.js";
 import { MarkdownObserver } from "../chat/markdown-observer.js";
+import { StreamingSession } from "../chat/streaming-session.js";
 import { renderMarkdownInElement } from "../markdown.js";
 import { initDayNav } from "../day.js";
 import { scrollToHighlight } from "../ui.js";
@@ -75,7 +76,6 @@ export class ChatView extends ReactiveElement {
   #chatForm = null;
   #scrollManager = null;
   #scrollEventListeners = null;
-  #state = null;
   #chat = null;
   #midnightCleanup = null;
   #afterSwapHandler;
@@ -85,6 +85,8 @@ export class ChatView extends ReactiveElement {
   #historyRestoreFrame = null;
   #connectionListeners = null;
   #chatListeners = null;
+  #session = null;
+  #sessionListeners = null;
   #markdownObserver = null;
   #initialized = false;
   #lastRenderedDay = null;
@@ -98,6 +100,10 @@ export class ChatView extends ReactiveElement {
     this.#beforeSwapHandler = (event) => this.#handleChatBeforeSwap(event);
     this.#pageShowHandler = (event) => this.#handlePageShow(event);
     this.#historyRestoreHandler = (event) => this.#handleHistoryRestore(event);
+  }
+
+  get streamingSession() {
+    return this.#session;
   }
 
   #setRenderingState(isRendering) {
@@ -227,8 +233,25 @@ export class ChatView extends ReactiveElement {
     const container = document.getElementById("content-wrapper");
 
     const initialStreamMsgId = chat?.dataset?.currentStream || null;
-    this.#state = { currentStreamMsgId: initialStreamMsgId || null };
+    this.#sessionListeners = this.disposeListenerBag(this.#sessionListeners);
+    this.#session = new StreamingSession({
+      currentMsgId: initialStreamMsgId || null,
+    });
+    this.#sessionListeners = this.resetListenerBag(this.#sessionListeners);
+    this.#sessionListeners.add(this.#session, "streaming:begin", (event) =>
+      this.#onSessionBegin(event)
+    );
+    this.#sessionListeners.add(this.#session, "streaming:abort", (event) =>
+      this.#onSessionAbort(event)
+    );
+    this.#sessionListeners.add(
+      this.#session,
+      "streaming:complete",
+      (event) => this.#onSessionComplete(event)
+    );
+
     this.#chat = chat;
+    this.#syncChatDataset(initialStreamMsgId);
 
     if (this.#pendingScrollTarget) {
       this.#queuePendingScrollTarget();
@@ -273,19 +296,18 @@ export class ChatView extends ReactiveElement {
     });
 
     this.#chatForm = this.querySelector("chat-form");
-    this.#syncStreamingMsgId(initialStreamMsgId);
     let chatFormReady = Promise.resolve();
     if (this.#chatForm) {
       const currentForm = this.#chatForm;
       chatFormReady = this.#wireChatForm(currentForm, {
         chat,
         container,
-        state: this.#state,
+        session: this.#session,
         date: activeDay,
       });
       this.#chatFormReady = chatFormReady.then(() => {
         if (this.#chatForm !== currentForm) return;
-        const currentMsgId = this.#state?.currentStreamMsgId ?? null;
+        const currentMsgId = this.#session?.currentMsgId ?? null;
         if (this.#chatForm) {
           this.#chatForm.streamingMsgId = currentMsgId;
         }
@@ -309,12 +331,6 @@ export class ChatView extends ReactiveElement {
     this.#chatListeners = this.resetListenerBag(this.#chatListeners);
     this.#chatListeners.add(chat, "htmx:afterSwap", this.#afterSwapHandler);
     this.#chatListeners.add(chat, "htmx:beforeSwap", this.#beforeSwapHandler);
-    this.#chatListeners.add(chat, "llm-stream:start", (event) =>
-      this.#handleStreamStart(event)
-    );
-    this.#chatListeners.add(chat, "llm-stream:complete", (event) =>
-      this.#handleStreamComplete(event)
-    );
 
     activateAnimations(chat);
 
@@ -323,7 +339,7 @@ export class ChatView extends ReactiveElement {
       onRender: (el) => this.#handleMarkdownRendered(el),
     });
     this.#markdownObserver.start();
-    chatFormReady.then(() => this.#updateStreamingState());
+    chatFormReady.then(() => this.#applySessionState());
 
     const shouldForceNavFlash = this.#forceNavFlash;
     initDayNav(chat, {
@@ -377,10 +393,11 @@ export class ChatView extends ReactiveElement {
     this.#markdownObserver = null;
 
     this.#chatListeners = this.disposeListenerBag(this.#chatListeners);
+    this.#sessionListeners = this.disposeListenerBag(this.#sessionListeners);
 
     this.#chat = null;
     this.#chatForm = null;
-    this.#state = null;
+    this.#session = null;
     this.#chatFormReady = Promise.resolve();
     this.#pendingScrollTarget = null;
   }
@@ -421,7 +438,7 @@ export class ChatView extends ReactiveElement {
     this.#markdownObserver?.resume(swapTargets);
 
     if (swapTargets.includes(this.#chat)) {
-      this.#updateStreamingState(true);
+      this.#applySessionState({ forceScroll: true });
       this.#scheduleRenderingComplete(this.#chat);
     }
 
@@ -471,12 +488,12 @@ export class ChatView extends ReactiveElement {
         const chatFormReady = this.#wireChatForm(currentForm, {
           chat: this.#chat,
           container: document.getElementById("content-wrapper"),
-          state: this.#state,
+          session: this.#session,
           date: this.#lastRenderedDay,
         });
         this.#chatFormReady = chatFormReady.then(() => {
           if (this.#chatForm !== currentForm) return;
-          const currentMsgId = this.#state?.currentStreamMsgId ?? null;
+          const currentMsgId = this.#session?.currentMsgId ?? null;
           if (this.#chatForm) {
             this.#chatForm.streamingMsgId = currentMsgId;
           }
@@ -484,7 +501,7 @@ export class ChatView extends ReactiveElement {
             this.#chatForm.setStreaming(Boolean(currentMsgId));
           }
         });
-        this.#chatFormReady.then(() => this.#updateStreamingState());
+        this.#chatFormReady.then(() => this.#applySessionState());
       } else {
         this.#chatFormReady = Promise.resolve();
       }
@@ -492,14 +509,14 @@ export class ChatView extends ReactiveElement {
     });
   }
 
-  async #wireChatForm(chatForm, { chat, container, state, date }) {
+  async #wireChatForm(chatForm, { chat, container, session, date }) {
     if (!chatForm) return;
     await customElements.whenDefined("chat-form");
     if (!chatForm.isConnected) return;
     customElements.upgrade(chatForm);
     chatForm.container = container;
     chatForm.chat = chat;
-    chatForm.state = state;
+    chatForm.session = session;
     chatForm.date = date;
   }
 
@@ -510,20 +527,21 @@ export class ChatView extends ReactiveElement {
     }
   }
 
-  async #updateStreamingState(forceScroll = false) {
-    if (!this.#chat || !this.#chatForm) return;
+  async #applySessionState({ msgId, streaming, forceScroll = false } = {}) {
+    if (!this.#chatForm) return;
 
     await this.#chatFormReady;
 
-    if (!this.#chat || !this.#chatForm) return;
+    if (!this.#chatForm) return;
 
-    const datasetMsgId = this.#chat.dataset?.currentStream || null;
-    const stateMsgId = this.#state?.currentStreamMsgId || null;
-    const msgId = datasetMsgId || stateMsgId || null;
+    const nextMsgId =
+      msgId !== undefined ? msgId : this.#session?.currentMsgId || null;
+    const nextStreaming =
+      streaming !== undefined ? streaming : Boolean(nextMsgId);
 
-    this.#syncStreamingMsgId(msgId);
+    this.#chatForm.streamingMsgId = nextMsgId;
     if (typeof this.#chatForm.setStreaming === "function") {
-      this.#chatForm.setStreaming(Boolean(msgId));
+      this.#chatForm.setStreaming(nextStreaming);
     }
 
     if (forceScroll) {
@@ -531,22 +549,16 @@ export class ChatView extends ReactiveElement {
     }
   }
 
-  #syncStreamingMsgId(msgId) {
-    const normalized = msgId || null;
-    if (this.#state) {
-      this.#state.currentStreamMsgId = normalized;
+  #syncChatDataset(msgId) {
+    if (!this.#chat) {
+      return;
     }
-    if (this.#chat) {
-      if (normalized) {
-        this.#chat.dataset.currentStream = normalized;
-      } else {
-        delete this.#chat.dataset.currentStream;
-      }
+
+    if (msgId) {
+      this.#chat.dataset.currentStream = msgId;
+    } else {
+      delete this.#chat.dataset.currentStream;
     }
-    if (this.#chatForm) {
-      this.#chatForm.streamingMsgId = normalized;
-    }
-    return normalized;
   }
 
   #handleMarkdownRendered(el) {
@@ -571,13 +583,11 @@ export class ChatView extends ReactiveElement {
     this.#chat.querySelectorAll?.("llm-stream").forEach((stream) => resume(stream));
   }
 
-  #handleStreamStart(event) {
+  #onSessionBegin(event) {
     const detail = event?.detail || {};
     const msgId = detail.userMsgId || null;
-    this.#syncStreamingMsgId(msgId);
-    if (typeof this.#chatForm?.setStreaming === "function") {
-      this.#chatForm.setStreaming(Boolean(msgId));
-    }
+    this.#syncChatDataset(msgId);
+    this.#applySessionState({ msgId, streaming: Boolean(msgId) });
     scrollEvents.dispatchEvent(
       new CustomEvent("scroll:force-bottom", {
         detail: { source: "stream:start" },
@@ -585,13 +595,18 @@ export class ChatView extends ReactiveElement {
     );
   }
 
-  #handleStreamComplete(event) {
+  #onSessionAbort(event) {
+    void event;
+    this.#syncChatDataset(null);
+    this.#applySessionState({ msgId: null, streaming: false });
+  }
+
+  #onSessionComplete(event) {
     const detail = event?.detail || {};
-    this.#syncStreamingMsgId(null);
-    if (typeof this.#chatForm?.setStreaming === "function") {
-      this.#chatForm.setStreaming(false);
-    }
-    if (detail.status !== "aborted") {
+    const status = detail.status || "done";
+    this.#syncChatDataset(null);
+    this.#applySessionState({ msgId: null, streaming: false });
+    if (status !== "aborted") {
       scrollEvents.dispatchEvent(
         new CustomEvent("scroll:force-bottom", {
           detail: { source: "stream:complete" },
