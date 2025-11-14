@@ -734,14 +734,26 @@ export class SearchOverlay extends ReactiveElement {
     const state = this.#resolveInputState();
     if (!state.input) return;
 
-    if (!persisted && !state.needsAutocomplete) {
+    const needsInlineRefresh = this.#inputNeedsInlineAutocompleteRefresh(state.input);
+    const needsAutocomplete = state.needsAutocomplete || needsInlineRefresh;
+
+    if (!persisted && !needsAutocomplete) {
       return;
     }
 
-    this.#applyResolvedInputState(state, {
+    const nextState =
+      needsAutocomplete && !state.needsAutocomplete
+        ? { ...state, needsAutocomplete: true }
+        : state;
+
+    this.#applyResolvedInputState(nextState, {
       forceListeners: persisted,
       forceRecent: true,
     });
+
+    if (needsAutocomplete) {
+      this.#applyRecentCandidates();
+    }
   }
 
   #handlePageHide(event) {
@@ -774,10 +786,22 @@ export class SearchOverlay extends ReactiveElement {
     const state = this.#resolveInputState();
     if (!state.input) return;
 
-    this.#applyResolvedInputState(state, {
+    const needsInlineRefresh = this.#inputNeedsInlineAutocompleteRefresh(state.input);
+    const needsAutocomplete = state.needsAutocomplete || needsInlineRefresh;
+
+    const nextState =
+      needsAutocomplete && !state.needsAutocomplete
+        ? { ...state, needsAutocomplete: true }
+        : state;
+
+    this.#applyResolvedInputState(nextState, {
       forceListeners: true,
       forceRecent: true,
     });
+
+    if (needsAutocomplete) {
+      this.#applyRecentCandidates();
+    }
   }
 
   #handlePopState() {
@@ -860,6 +884,17 @@ export class SearchOverlay extends ReactiveElement {
     } else {
       this.#autocomplete.clearCandidates();
     }
+  }
+
+  #inputNeedsInlineAutocompleteRefresh(input) {
+    if (!input) {
+      return false;
+    }
+
+    const missingInlineClass = !input.classList.contains("inline-autocomplete__input");
+    const missingWrapper = !input.closest(".inline-autocomplete");
+
+    return missingInlineClass || missingWrapper;
   }
 }
 
