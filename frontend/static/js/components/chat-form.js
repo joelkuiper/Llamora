@@ -1,4 +1,5 @@
 import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
+import { getAlertContainer } from "../utils/alert-center.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 
 class ChatFormElement extends ReactiveElement {
@@ -29,7 +30,7 @@ class ChatFormElement extends ReactiveElement {
     this.#form = this.querySelector("form");
     this.#textarea = this.#form?.querySelector("textarea");
     this.#button = this.#form?.querySelector("button");
-    this.#errors = document.getElementById("errors");
+    this.#errors = getAlertContainer();
     if (!this.#date && this.dataset.date) {
       this.#date = this.dataset.date;
     }
