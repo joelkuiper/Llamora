@@ -104,6 +104,7 @@ export class SearchOverlay extends ReactiveElement {
   #focusHandler;
   #pageShowHandler;
   #historyRestoreHandler;
+  #historyRestoreRemover = null;
   #recentFetchPromise = null;
   #recentLoaded = false;
   #recentFetchedAt = 0;
@@ -154,7 +155,18 @@ export class SearchOverlay extends ReactiveElement {
       onEnd: this.#afterRequestHandler,
     });
     listeners.add(this, "htmx:afterSwap", this.#afterSwapHandler);
-    listeners.add(this, "htmx:historyRestore", this.#historyRestoreHandler);
+
+    if (this.#historyRestoreRemover) {
+      this.#historyRestoreRemover();
+      this.#historyRestoreRemover = null;
+    }
+    eventTarget.addEventListener("htmx:historyRestore", this.#historyRestoreHandler);
+    this.#historyRestoreRemover = () => {
+      eventTarget.removeEventListener(
+        "htmx:historyRestore",
+        this.#historyRestoreHandler,
+      );
+    };
 
     const win = eventTarget.defaultView ?? window;
     win.addEventListener("pageshow", this.#pageShowHandler);
@@ -180,6 +192,11 @@ export class SearchOverlay extends ReactiveElement {
     const doc = this.ownerDocument ?? document;
     const win = doc.defaultView ?? window;
     win.removeEventListener("pageshow", this.#pageShowHandler);
+
+    if (this.#historyRestoreRemover) {
+      this.#historyRestoreRemover();
+      this.#historyRestoreRemover = null;
+    }
     super.disconnectedCallback();
   }
 
