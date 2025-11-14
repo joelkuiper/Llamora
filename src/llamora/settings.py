@@ -130,6 +130,7 @@ DEFAULTS: dict[str, Any] = {
         "request": DEFAULT_LLM_REQUEST,
         "stream": {
             "pending_ttl": 300,
+            "queue_limit": 4,
             "repeat_guard_size": 6,
             "repeat_guard_min_length": 12,
         },

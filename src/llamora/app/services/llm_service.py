@@ -10,6 +10,7 @@ from llamora.llm.client import LLMClient
 from llamora.llm.process_manager import LlamafileProcessManager
 
 from .chat_stream import ChatStreamManager
+from .llm_stream_config import LLMStreamConfig
 from .service_pulse import ServicePulse
 
 
@@ -23,8 +24,7 @@ class LLMService:
         self,
         db: Any,
         *,
-        pending_ttl: int = 300,
-        queue_limit: int = 4,
+        stream_config: LLMStreamConfig,
         service_pulse: ServicePulse | None = None,
     ) -> None:
         self._db = db
@@ -32,8 +32,7 @@ class LLMService:
         self._llm: LLMClient | None = None
         self._chat_stream_manager: ChatStreamManager | None = None
         self._lock = asyncio.Lock()
-        self._pending_ttl = pending_ttl
-        self._queue_limit = queue_limit
+        self._stream_config = stream_config
         self._service_pulse = service_pulse
 
     async def start(self) -> None:
@@ -71,8 +70,7 @@ class LLMService:
 
                 chat_stream_manager = ChatStreamManager(
                     llm_client,
-                    pending_ttl=self._pending_ttl,
-                    queue_limit=self._queue_limit,
+                    stream_config=self._stream_config,
                     service_pulse=self._service_pulse,
                 )
                 chat_stream_manager.set_db(self._db)

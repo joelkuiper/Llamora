@@ -10,6 +10,8 @@ from typing import Any, Awaitable, Callable, Mapping, Protocol
 
 from llamora.app.services.chat_meta import normalise_metadata_emoji
 
+from ..llm_stream_config import LLMStreamConfig
+
 
 logger = logging.getLogger(__name__)
 
@@ -197,9 +199,7 @@ class ResponsePipeline:
         date: str,
         dek: bytes,
         meta_extra: dict | None = None,
-        timeout: int | None = None,
-        repeat_guard_size: int | None = None,
-        repeat_guard_min_length: int | None = None,
+        config: LLMStreamConfig,
     ) -> None:
         self._session = session
         self._writer = writer
@@ -209,7 +209,8 @@ class ResponsePipeline:
         self._date = date
         self._dek = dek
         self._meta_extra = meta_extra or {}
-        self._timeout = timeout
+        self._config = config
+        self._timeout = config.pending_ttl
         self._visible_total = ""
         self._cancel_requested = False
         self._cancelled = False
@@ -217,8 +218,8 @@ class ResponsePipeline:
         self._error_message: str | None = None
         self._status_prefix = "⚠️ "
         self._repeat_guard_triggered = False
-        guard_size = repeat_guard_size or 0
-        guard_min_length = repeat_guard_min_length or 0
+        guard_size = config.repeat_guard_size or 0
+        guard_min_length = config.repeat_guard_min_length or 0
         self._chunk_guard = (
             ChunkRingGuard(guard_size, guard_min_length) if guard_size > 0 else None
         )

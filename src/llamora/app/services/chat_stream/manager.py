@@ -9,14 +9,13 @@ from itertools import count
 from collections import deque
 from collections.abc import AsyncIterator, Callable
 from contextlib import suppress
-from typing import cast
 
 from llamora.llm.client import LLMClient
-from llamora.settings import settings
-
 from llamora.app.services.chat_meta import generate_metadata
 from llamora.app.services.service_pulse import ServicePulse
 from llamora.app.services.queues import FairAsyncQueue
+
+from ..llm_stream_config import LLMStreamConfig
 
 from .pipeline import (
     AssistantMessageWriter,
@@ -86,7 +85,7 @@ class PendingResponse(ResponsePipelineCallbacks):
         llm: LLMClient,
         db,
         on_cleanup: Callable[[str], None],
-        pending_ttl: int,
+        config: LLMStreamConfig,
         params: dict | None = None,
         context: dict | None = None,
         messages: list[dict[str, str]] | None = None,
@@ -123,12 +122,8 @@ class PendingResponse(ResponsePipelineCallbacks):
             llm, user_msg_id, history, params, context, messages
         )
         self._visible_total = ""
-        repeat_guard_size = cast(
-            int | None, settings.get("LLM.stream.repeat_guard_size", None)
-        )
-        repeat_guard_min_length = cast(
-            int | None, settings.get("LLM.stream.repeat_guard_min_length", None)
-        )
+        repeat_guard_size = config.repeat_guard_size
+        repeat_guard_min_length = config.repeat_guard_min_length
         metadata_builder = partial(generate_metadata, llm)
         self._pipeline = ResponsePipeline(
             session=self._session,
@@ -139,9 +134,7 @@ class PendingResponse(ResponsePipelineCallbacks):
             date=self.date,
             dek=self.dek,
             meta_extra=self.meta_extra,
-            timeout=pending_ttl,
-            repeat_guard_size=repeat_guard_size,
-            repeat_guard_min_length=repeat_guard_min_length,
+            config=config,
         )
         logger.debug("Starting generation for user message %s", user_msg_id)
         self._task = asyncio.create_task(
@@ -301,22 +294,18 @@ class ChatStreamManager:
         self,
         llm: LLMClient,
         db=None,
-        pending_ttl: int = 300,
         *,
-        queue_limit: int = 4,
+        stream_config: LLMStreamConfig,
         service_pulse: ServicePulse | None = None,
     ) -> None:
         self._llm = llm
         self._db = db
-        self._pending_ttl = pending_ttl
+        self._config = stream_config
+        self._pending_ttl = stream_config.pending_ttl
         self._pending: dict[str, PendingResponse] = {}
         self._pending_heap: list[tuple[float, int, str, PendingResponse]] = []
         self._heap_counter = count()
-        try:
-            limit = int(queue_limit)
-        except (TypeError, ValueError):
-            limit = 0
-        self._queue_limit = max(0, limit)
+        self._queue_limit = max(0, stream_config.queue_limit)
         self._queue = FairAsyncQueue[str, PendingResponse](
             id_getter=lambda pending: pending.user_msg_id
         )
@@ -456,7 +445,7 @@ class ChatStreamManager:
                 self._llm,
                 self._db,
                 self._on_pending_cleanup,
-                self._pending_ttl,
+                self._config,
                 params,
                 context,
                 messages,
@@ -477,7 +466,7 @@ class ChatStreamManager:
             self._llm,
             self._db,
             self._on_pending_cleanup,
-            self._pending_ttl,
+            self._config,
             params,
             context,
             messages,

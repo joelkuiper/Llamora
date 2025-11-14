@@ -14,6 +14,7 @@ from llamora.persistence.local_db import LocalDB
 from llamora.app.api.search import SearchAPI
 from llamora.app.services.lexical_reranker import LexicalReranker
 from llamora.app.services.llm_service import LLMService
+from llamora.app.services.llm_stream_config import LLMStreamConfig
 from llamora.app.services.tag_service import TagService
 from llamora.app.services.service_pulse import ServicePulse
 from llamora.app.services.search_config import SearchConfig
@@ -52,28 +53,10 @@ class AppServices:
             service_pulse=service_pulse,
             tag_service=tag_service,
         )
-        pending_ttl_raw = settings.get("LLM.stream.pending_ttl", 300)
-        try:
-            pending_ttl = int(pending_ttl_raw)
-        except (TypeError, ValueError):
-            logger.warning(
-                "Invalid LLM.stream.pending_ttl value %r; using default of 300 seconds",
-                pending_ttl_raw,
-            )
-            pending_ttl = 300
-        queue_limit_raw = settings.get("LLM.stream.queue_limit", 4)
-        try:
-            queue_limit = max(0, int(queue_limit_raw))
-        except (TypeError, ValueError):
-            logger.warning(
-                "Invalid LLM.stream.queue_limit value %r; falling back to 4",
-                queue_limit_raw,
-            )
-            queue_limit = 4
+        stream_config = LLMStreamConfig.from_settings(settings)
         llm_service = LLMService(
             db,
-            pending_ttl=pending_ttl,
-            queue_limit=queue_limit,
+            stream_config=stream_config,
             service_pulse=service_pulse,
         )
         db.set_search_api(search_api)
