@@ -95,6 +95,7 @@ export class SearchOverlay extends ReactiveElement {
   #spinnerController = null;
   #autocomplete = null;
   #autocompleteInput = null;
+  #inputListenerTarget = null;
   #beforeRequestHandler;
   #afterRequestHandler;
   #afterSwapHandler;
@@ -139,8 +140,7 @@ export class SearchOverlay extends ReactiveElement {
     const listeners = this.#listeners;
 
     if (this.#inputEl) {
-      listeners.add(this.#inputEl, "input", this.#inputHandler);
-      listeners.add(this.#inputEl, "focus", this.#focusHandler);
+      this.#ensureInputListeners({ force: true });
       this.#initAutocomplete();
     }
 
@@ -188,6 +188,7 @@ export class SearchOverlay extends ReactiveElement {
     this.#inputEl = null;
     this.#spinnerEl = null;
     this.#autocompleteInput = null;
+    this.#inputListenerTarget = null;
 
     const doc = this.ownerDocument ?? document;
     const win = doc.defaultView ?? window;
@@ -336,6 +337,36 @@ export class SearchOverlay extends ReactiveElement {
     }
     this.#autocomplete = null;
     this.#autocompleteInput = null;
+  }
+
+  #ensureInputListeners(options = {}) {
+    if (!this.#inputEl) return;
+
+    const { force = false } = options;
+    const listeners = this.#listeners;
+    if (!listeners) return;
+
+    const currentTarget = this.#inputListenerTarget;
+
+    if (currentTarget && currentTarget !== this.#inputEl) {
+      currentTarget.removeEventListener("input", this.#inputHandler);
+      currentTarget.removeEventListener("focus", this.#focusHandler);
+      this.#inputListenerTarget = null;
+    }
+
+    if (
+      !force &&
+      this.#inputListenerTarget === this.#inputEl &&
+      this.#inputEl.isConnected
+    ) {
+      return;
+    }
+
+    this.#inputEl.removeEventListener("input", this.#inputHandler);
+    this.#inputEl.removeEventListener("focus", this.#focusHandler);
+    listeners.add(this.#inputEl, "input", this.#inputHandler);
+    listeners.add(this.#inputEl, "focus", this.#focusHandler);
+    this.#inputListenerTarget = this.#inputEl;
   }
 
   #loadRecentSearches(force = false) {
@@ -639,23 +670,30 @@ export class SearchOverlay extends ReactiveElement {
 
   #handlePageShow(event) {
     if (!this.isConnected) return;
-    if (!event?.persisted) return;
+
+    const persisted = !!event?.persisted;
 
     const input = this.querySelector("#search-input");
     this.#inputEl = input instanceof HTMLInputElement ? input : null;
 
     if (!this.#inputEl) return;
 
-    const listeners = this.#listeners;
-    if (listeners) {
-      listeners.add(this.#inputEl, "input", this.#inputHandler);
-      listeners.add(this.#inputEl, "focus", this.#focusHandler);
+    const autocompleteInput = this.#autocompleteInput;
+    const needsAutocomplete =
+      !this.#autocomplete ||
+      autocompleteInput !== this.#inputEl ||
+      !autocompleteInput?.isConnected;
+
+    if (!persisted && !needsAutocomplete) {
+      return;
     }
 
-    const autocompleteInput = this.#autocompleteInput;
-    if (!this.#autocomplete || autocompleteInput !== this.#inputEl || !autocompleteInput?.isConnected) {
+    this.#ensureInputListeners({ force: persisted });
+
+    if (needsAutocomplete) {
       this.#initAutocomplete();
     }
+
     this.#loadRecentSearches(true);
   }
 
@@ -667,11 +705,7 @@ export class SearchOverlay extends ReactiveElement {
 
     if (!this.#inputEl) return;
 
-    const listeners = this.#listeners;
-    if (listeners) {
-      listeners.add(this.#inputEl, "input", this.#inputHandler);
-      listeners.add(this.#inputEl, "focus", this.#focusHandler);
-    }
+    this.#ensureInputListeners({ force: true });
 
     const autocompleteInput = this.#autocompleteInput;
     if (!this.#autocomplete || autocompleteInput !== this.#inputEl || !autocompleteInput?.isConnected) {
