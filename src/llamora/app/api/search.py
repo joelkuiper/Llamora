@@ -312,9 +312,7 @@ class SearchAPI:
 
         module_name, _, attr = path.rpartition(".")
         if not module_name or not attr:
-            logger.error(
-                "Invalid search pipeline override path '%s' for %s", path, key
-            )
+            logger.error("Invalid search pipeline override path '%s' for %s", path, key)
             return None
 
         try:

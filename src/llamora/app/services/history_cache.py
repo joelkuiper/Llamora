@@ -39,7 +39,9 @@ FrozenHistory = tuple[Mapping[str, Any], ...]
 _INVALID_HISTORY_SENTINEL = object()
 
 
-def _freeze_history(history: Sequence[Mapping[str, Any] | dict[str, Any]]) -> FrozenHistory:
+def _freeze_history(
+    history: Sequence[Mapping[str, Any] | dict[str, Any]],
+) -> FrozenHistory:
     frozen_messages: list[Mapping[str, Any]] = []
     for message in history:
         raw_message = dict(message)
@@ -109,7 +111,10 @@ class HistoryCache:
         return history
 
     async def store(
-        self, user_id: str, created_date: str, history: Sequence[Mapping[str, Any] | dict[str, Any]]
+        self,
+        user_id: str,
+        created_date: str,
+        history: Sequence[Mapping[str, Any] | dict[str, Any]],
     ) -> None:
         key = (user_id, created_date)
         frozen = _freeze_history(history)
@@ -117,7 +122,9 @@ class HistoryCache:
             self._backend[key] = frozen
         self._notify("store", key, payload=_thaw_history(frozen))
 
-    async def append(self, user_id: str, created_date: str, message: Mapping[str, Any]) -> None:
+    async def append(
+        self, user_id: str, created_date: str, message: Mapping[str, Any]
+    ) -> None:
         key = (user_id, created_date)
         while True:
             async with self._lock:
@@ -191,9 +198,7 @@ class HistoryCacheSynchronizer:
         self._events.subscribe(
             MESSAGE_HISTORY_CHANGED_EVENT, self._handle_history_changed
         )
-        self._events.subscribe(
-            MESSAGE_TAGS_CHANGED_EVENT, self._handle_tags_changed
-        )
+        self._events.subscribe(MESSAGE_TAGS_CHANGED_EVENT, self._handle_tags_changed)
 
     async def _handle_history_changed(
         self,
@@ -211,9 +216,7 @@ class HistoryCacheSynchronizer:
             return
         await self._cache.invalidate(user_id, created_date)
 
-    async def _handle_tags_changed(
-        self, *, user_id: str, message_id: str
-    ) -> None:
+    async def _handle_tags_changed(self, *, user_id: str, message_id: str) -> None:
         if not self._events or not self._messages:
             return
         created_date = await self._messages.get_message_date(user_id, message_id)

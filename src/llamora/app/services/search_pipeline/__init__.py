@@ -1,4 +1,5 @@
 """Search pipeline component interfaces and defaults."""
+
 from __future__ import annotations
 
 from .exceptions import InvalidSearchQuery

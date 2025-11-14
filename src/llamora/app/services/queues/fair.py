@@ -44,7 +44,8 @@ class FairAsyncQueue(Generic[_Owner, _T]):
         self,
         *,
         id_getter: Callable[[_T], Hashable],
-        listeners: Iterable[Callable[["FairAsyncQueue[_Owner, _T]"], None]] | None = None,
+        listeners: Iterable[Callable[["FairAsyncQueue[_Owner, _T]"], None]]
+        | None = None,
         owner_limits: Mapping[_Owner, int] | None = None,
         default_owner_limit: int | None = None,
     ) -> None:
@@ -75,7 +76,9 @@ class FairAsyncQueue(Generic[_Owner, _T]):
     def enqueue(self, owner: _Owner, item: _T) -> None:
         item_id = self._id_getter(item)
         if item_id in self._index:
-            logger.warning("Duplicate item %s scheduled; dropping existing entry", item_id)
+            logger.warning(
+                "Duplicate item %s scheduled; dropping existing entry", item_id
+            )
             self.remove(item_id)
         limit = self._resolve_owner_limit(owner)
         if limit is not None:
@@ -198,5 +201,3 @@ class FairAsyncQueue(Generic[_Owner, _T]):
             asyncio.create_task(_notify())
 
         loop.call_soon_threadsafe(_schedule)
-
-

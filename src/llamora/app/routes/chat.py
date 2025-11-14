@@ -55,6 +55,8 @@ def _chat_stream_manager():
 
 
 logger = logging.getLogger(__name__)
+
+
 async def render_chat(
     date: str,
     oob: bool = False,

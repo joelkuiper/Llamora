@@ -66,7 +66,9 @@ class LLMStreamConfig:
         try:
             value = int(raw_value)
         except (TypeError, ValueError):
-            logger.warning("Invalid %s value %r; using default %s", key, raw_value, default)
+            logger.warning(
+                "Invalid %s value %r; using default %s", key, raw_value, default
+            )
             return default
         if minimum is not None and value < minimum:
             logger.warning(

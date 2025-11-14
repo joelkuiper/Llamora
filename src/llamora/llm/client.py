@@ -61,9 +61,7 @@ class PromptBudget:
         self._service_pulse = service_pulse
         self._logger = client.logger
 
-    def max_prompt_tokens(
-        self, params: Mapping[str, Any] | None = None
-    ) -> int | None:
+    def max_prompt_tokens(self, params: Mapping[str, Any] | None = None) -> int | None:
         """Return the maximum tokens available for the prompt portion."""
 
         ctx_size = self._client.ctx_size
@@ -127,9 +125,7 @@ class PromptBudget:
             overflow = max(0, prompt_tokens - max_tokens)
             saturation = prompt_tokens / max_tokens
 
-        params_copy = (
-            MappingProxyType(dict(params)) if params is not None else None
-        )
+        params_copy = MappingProxyType(dict(params)) if params is not None else None
         extra_copy = MappingProxyType(dict(extra)) if extra is not None else None
 
         snapshot = PromptBudgetSnapshot(
@@ -817,17 +813,14 @@ class LLMClient:
             body: bytes | None = None
             if http_response is not None:
                 status_line = (
-                    f"{http_response.status_code} "
-                    f"{http_response.reason_phrase or ''}"
+                    f"{http_response.status_code} {http_response.reason_phrase or ''}"
                 ).strip()
                 try:
                     body = await http_response.aread()
                 except Exception:
                     body = None
             detail = self._normalize_response_detail(body, status_line)
-            self.logger.error(
-                "Completion request failed (%s): %s", status_line, detail
-            )
+            self.logger.error("Completion request failed (%s): %s", status_line, detail)
             self.process_manager.ensure_server_running()
             raise RuntimeError(detail) from exc
         except HTTPError as exc:

@@ -435,4 +435,3 @@ class MessagesRepository(BaseRepository):
             )
             row = await cursor.fetchone()
         return bool(row)
-

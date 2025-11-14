@@ -551,7 +551,9 @@ class ChatStreamManager:
     def remove_queue_hook(self, callback: Callable[[dict[str, int]], None]) -> None:
         self._queue_hooks.discard(callback)
 
-    def _handle_queue_change(self, _queue: FairAsyncQueue[str, PendingResponse]) -> None:
+    def _handle_queue_change(
+        self, _queue: FairAsyncQueue[str, PendingResponse]
+    ) -> None:
         self._publish_queue_state()
         self._ensure_queue_worker()
 

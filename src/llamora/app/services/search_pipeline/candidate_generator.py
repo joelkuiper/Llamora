@@ -35,7 +35,9 @@ class BaseSearchCandidateGenerator(Protocol):
 class DefaultSearchCandidateGenerator:
     """Use the configured :class:`VectorSearchService` to produce candidates."""
 
-    def __init__(self, vector_search: VectorSearchService, config: SearchConfig) -> None:
+    def __init__(
+        self, vector_search: VectorSearchService, config: SearchConfig
+    ) -> None:
         self._vector_search = vector_search
         self._config = config
 
