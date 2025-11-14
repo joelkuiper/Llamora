@@ -7,15 +7,16 @@ from functools import partial
 from heapq import heappop, heappush
 from itertools import count
 from collections import deque
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import suppress
-from typing import Callable, cast
+from typing import cast
 
 from llamora.llm.client import LLMClient
 from llamora.settings import settings
 
 from llamora.app.services.chat_meta import generate_metadata
 from llamora.app.services.service_pulse import ServicePulse
+from llamora.app.services.queues import FairAsyncQueue
 
 from .pipeline import (
     AssistantMessageWriter,
@@ -316,8 +317,11 @@ class ChatStreamManager:
         except (TypeError, ValueError):
             limit = 0
         self._queue_limit = max(0, limit)
-        self._queue_buckets: dict[str, deque[PendingResponse]] = {}
-        self._queue_order: deque[str] = deque()
+        self._queue = FairAsyncQueue[str, PendingResponse](
+            id_getter=lambda pending: pending.user_msg_id
+        )
+        self._queue.add_listener(self._handle_queue_change)
+        self._queue_hooks: set[Callable[[dict[str, int]], None]] = set()
         self._active_ids: set[str] = set()
         self._service_pulse = service_pulse
         self._avg_stream_duration: float | None = None
@@ -436,7 +440,7 @@ class ChatStreamManager:
             raise RuntimeError("ChatStreamManager database is not configured")
 
         max_slots = self._max_slots()
-        queue_depth = self._queue_length()
+        queue_depth = len(self._queue)
 
         if len(self._active_ids) >= max_slots:
             if self._queue_limit and queue_depth >= self._queue_limit:
@@ -461,7 +465,7 @@ class ChatStreamManager:
                 auto_start=False,
             )
             self._register_pending(pending)
-            self._enqueue_pending(uid, pending)
+            self._queue.enqueue(uid, pending)
             return pending
 
         pending = PendingResponse(
@@ -501,8 +505,7 @@ class ChatStreamManager:
 
         if pending:
             if not pending.activated:
-                if self._remove_from_queue(user_msg_id):
-                    self._emit_queue_update()
+                self._queue.remove(user_msg_id)
             logger.debug("Cancelling pending response %s", user_msg_id)
             await pending.cancel()
             return True, True
@@ -514,9 +517,9 @@ class ChatStreamManager:
         if pending and pending.started_at is not None:
             duration = max(0.0, time.monotonic() - pending.started_at)
             self._update_stream_duration(duration)
-        self._remove_from_queue(user_msg_id)
+        self._queue.remove(user_msg_id)
         self._active_ids.discard(user_msg_id)
-        self._emit_queue_update()
+        self._publish_queue_state()
         self._promote_waiting()
 
     def _register_pending(self, pending: PendingResponse) -> None:
@@ -532,19 +535,10 @@ class ChatStreamManager:
             ),
         )
 
-    def _enqueue_pending(self, uid: str, pending: PendingResponse) -> None:
-        bucket = self._queue_buckets.get(uid)
-        if bucket is None:
-            bucket = deque()
-            self._queue_buckets[uid] = bucket
-            self._queue_order.append(uid)
-        bucket.append(pending)
-        self._emit_queue_update()
-
     def _promote_waiting(self) -> None:
         max_slots = self._max_slots()
         while len(self._active_ids) < max_slots:
-            pending = self._pop_next_queued()
+            pending = self._queue.pop_next()
             if pending is None:
                 break
             self._activate_pending(pending)
@@ -555,60 +549,44 @@ class ChatStreamManager:
             if pending.started_at is not None:
                 wait_time = max(0.0, pending.started_at - pending.created_at)
                 self._update_wait_estimate(wait_time)
-        self._emit_queue_update()
-
-    def _pop_next_queued(self) -> PendingResponse | None:
-        while self._queue_order:
-            uid = self._queue_order.popleft()
-            bucket = self._queue_buckets.get(uid)
-            if not bucket:
-                continue
-            pending = bucket.popleft()
-            if bucket:
-                self._queue_order.append(uid)
-            else:
-                self._queue_buckets.pop(uid, None)
-            self._emit_queue_update()
-            return pending
-        return None
-
-    def _remove_from_queue(self, user_msg_id: str) -> bool:
-        removed = False
-        for uid, bucket in list(self._queue_buckets.items()):
-            for idx, pending in enumerate(bucket):
-                if pending.user_msg_id == user_msg_id:
-                    del bucket[idx]
-                    removed = True
-                    break
-            if removed:
-                if not bucket:
-                    self._queue_buckets.pop(uid, None)
-                    if self._queue_order:
-                        self._queue_order = deque(
-                            user for user in self._queue_order if user != uid
-                        )
-                break
-        return removed
-
-    def _queue_length(self) -> int:
-        return sum(len(bucket) for bucket in self._queue_buckets.values())
+        self._publish_queue_state()
 
     def _max_slots(self) -> int:
         return max(1, int(getattr(self._llm, "parallel_slots", 1)))
 
-    def _emit_queue_update(self) -> None:
-        if self._service_pulse is None:
-            return
-        payload = {
-            "depth": self._queue_length(),
+    def add_queue_hook(self, callback: Callable[[dict[str, int]], None]) -> None:
+        self._queue_hooks.add(callback)
+        try:
+            callback(self._build_queue_snapshot())
+        except Exception:  # pragma: no cover - defensive
+            logger.exception("Chat stream queue hook failed")
+
+    def remove_queue_hook(self, callback: Callable[[dict[str, int]], None]) -> None:
+        self._queue_hooks.discard(callback)
+
+    def _handle_queue_change(self, _queue: FairAsyncQueue[str, PendingResponse]) -> None:
+        self._publish_queue_state()
+
+    def _build_queue_snapshot(self) -> dict[str, int]:
+        return {
+            "depth": len(self._queue),
             "active": len(self._active_ids),
             "limit": self._queue_limit,
             "slots": self._max_slots(),
         }
-        try:
-            self._service_pulse.emit("chat_stream.queue", payload)
-        except Exception:  # pragma: no cover - defensive
-            logger.exception("Failed to emit chat stream queue pulse")
+
+    def _publish_queue_state(self) -> None:
+        snapshot = self._build_queue_snapshot()
+        if self._service_pulse is not None:
+            try:
+                self._service_pulse.emit("chat_stream.queue", snapshot)
+            except Exception:  # pragma: no cover - defensive
+                logger.exception("Failed to emit chat stream queue pulse")
+        for hook in list(self._queue_hooks):
+            try:
+                hook(snapshot)
+            except Exception:  # pragma: no cover - defensive
+                logger.exception("Chat stream queue hook failed")
 
     def _update_stream_duration(self, sample: float) -> None:
         if sample <= 0:
@@ -648,10 +626,9 @@ class ChatStreamManager:
                 await pending.cancel()
         self._pending.clear()
         self._pending_heap.clear()
-        self._queue_buckets.clear()
-        self._queue_order.clear()
+        self._queue.clear()
         self._active_ids.clear()
-        self._emit_queue_update()
+        self._publish_queue_state()
 
 
 __all__ = [
