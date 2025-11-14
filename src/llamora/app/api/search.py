@@ -1,29 +1,35 @@
+from __future__ import annotations
+
+import importlib
 import logging
-import re
 import time
-from collections import OrderedDict
-from typing import Sequence, Tuple
+from typing import Any, Callable, Sequence, Tuple, Type
 
 import orjson
 
 from llamora.app.services.index_worker import IndexWorker
-from llamora.app.services.vector_search import VectorSearchService
 from llamora.app.services.lexical_reranker import LexicalReranker
-from llamora.app.services.tag_service import TagService
-from llamora.app.util.tags import tag_hash
 from llamora.app.services.search_config import SearchConfig
+from llamora.app.services.search_pipeline import (
+    BaseSearchCandidateGenerator,
+    BaseSearchNormalizer,
+    BaseSearchReranker,
+    BaseTagEnricher,
+    DefaultSearchCandidateGenerator,
+    DefaultSearchNormalizer,
+    DefaultSearchReranker,
+    DefaultTagEnricher,
+    InvalidSearchQuery,
+    SearchPipeline,
+    SearchPipelineComponents,
+    SearchPipelineResult,
+)
 from llamora.app.services.service_pulse import ServicePulse
+from llamora.app.services.tag_service import TagService
+from llamora.app.services.vector_search import VectorSearchService
 from llamora.settings import settings
 
-
-TOKEN_PATTERN = re.compile(r"\S+")
-
 logger = logging.getLogger(__name__)
-
-
-class InvalidSearchQuery(ValueError):
-    """Exception raised when a provided search query is invalid."""
-
 
 IndexJob = Tuple[str, str, str, bytes]
 
@@ -36,17 +42,39 @@ class SearchAPI:
         db,
         vector_search: VectorSearchService | None = None,
         lexical_reranker: LexicalReranker | None = None,
+        normalizer: BaseSearchNormalizer | None = None,
+        candidate_generator: BaseSearchCandidateGenerator | None = None,
+        tag_enricher: BaseTagEnricher | None = None,
+        reranker: BaseSearchReranker | None = None,
         *,
         config: SearchConfig | None = None,
         service_pulse: ServicePulse | None = None,
         tag_service: TagService | None = None,
-    ):
+    ) -> None:
         self.db = db
         self.config = config or SearchConfig.from_settings(settings)
         self.vector_search = vector_search or VectorSearchService(db, self.config)
-        self.lexical_reranker = lexical_reranker or LexicalReranker()
         self._tag_service = tag_service or TagService(db)
         self._service_pulse = service_pulse
+        self._pipeline_overrides = self._read_pipeline_overrides(settings)
+
+        lexical_reranker = lexical_reranker or LexicalReranker()
+        components = self._build_pipeline_components(
+            lexical_reranker,
+            normalizer,
+            candidate_generator,
+            tag_enricher,
+            reranker,
+        )
+        self._pipeline = SearchPipeline(components)
+
+        reranker_component = components.reranker
+        self.lexical_reranker = getattr(
+            reranker_component,
+            "lexical_reranker",
+            lexical_reranker,
+        )
+
         self._emit_config_diagnostics()
         self._index_worker = IndexWorker(
             self,
@@ -76,14 +104,20 @@ class SearchAPI:
 
     async def start(self) -> None:
         """Start background services for the search API."""
+
         await self._index_worker.start()
 
     async def stop(self) -> None:
         """Stop background services for the search API."""
+
         await self._index_worker.stop()
 
     async def enqueue_index_job(
-        self, user_id: str, message_id: str, plaintext: str, dek: bytes
+        self,
+        user_id: str,
+        message_id: str,
+        plaintext: str,
+        dek: bytes,
     ) -> None:
         await self._index_worker.enqueue(user_id, message_id, plaintext, dek)
 
@@ -121,114 +155,6 @@ class SearchAPI:
             self._index_worker.dropped_jobs,
         )
 
-    def _normalize_query(self, user_id: str, query: str) -> tuple[str, bool]:
-        """Return the normalized query text and whether truncation occurred."""
-
-        normalized = (query or "").strip()
-        if not normalized:
-            logger.info("Rejecting empty search query for user %s", user_id)
-            raise InvalidSearchQuery("Search query must not be empty")
-
-        truncated = False
-        max_query_length = self.config.limits.max_search_query_length
-        if len(normalized) > max_query_length:
-            logger.info(
-                "Truncating overlong search query (len=%d, limit=%d) for user %s",
-                len(normalized),
-                max_query_length,
-                user_id,
-            )
-            normalized = normalized[:max_query_length]
-            truncated = True
-
-        return normalized, truncated
-
-    def _tokenize_query(self, normalized: str) -> list[str]:
-        """Return unique canonical tokens extracted from ``normalized``."""
-
-        seen_tokens: set[str] = set()
-        tokens: list[str] = []
-        for raw in TOKEN_PATTERN.findall(normalized):
-            token = raw.strip()
-            if not token:
-                continue
-            try:
-                canonical = self._tag_service.canonicalize(token)
-            except ValueError:
-                continue
-            canonical_lower = canonical.lower()
-            if canonical_lower in seen_tokens:
-                continue
-            seen_tokens.add(canonical_lower)
-            tokens.append(canonical)
-        return tokens
-
-    async def _hydrate_candidates(
-        self,
-        user_id: str,
-        dek: bytes,
-        candidate_map: OrderedDict[str, dict],
-        tag_hashes: list[bytes],
-        limit: int,
-    ) -> None:
-        """Ensure candidates referenced by ``tag_hashes`` are present."""
-
-        if not tag_hashes:
-            return
-
-        tag_message_ids = await self.db.tags.get_recent_messages_for_tag_hashes(
-            user_id, tag_hashes, limit=limit
-        )
-        if not tag_message_ids:
-            return
-
-        missing_ids = [mid for mid in tag_message_ids if mid not in candidate_map]
-        if not missing_ids:
-            return
-
-        rows = await self.vector_search.index_store.hydrate_messages(
-            user_id, missing_ids, dek
-        )
-        row_map = {row["id"]: row for row in rows}
-
-        for mid in tag_message_ids:
-            if mid in candidate_map:
-                continue
-            row = row_map.get(mid)
-            if not row:
-                continue
-            candidate_map[mid] = {
-                "id": row["id"],
-                "created_at": row["created_at"],
-                "role": row["role"],
-                "content": row.get("message", ""),
-                "cosine": 0.0,
-            }
-
-    async def _compute_tag_boosts(
-        self,
-        user_id: str,
-        candidate_map: OrderedDict[str, dict],
-        tag_hashes: list[bytes],
-    ) -> dict[str, float]:
-        """Compute tag-based boost multipliers for ``candidate_map``."""
-
-        if not candidate_map or not tag_hashes:
-            return {}
-
-        message_ids = list(candidate_map.keys())
-        if not message_ids:
-            return {}
-
-        match_counts = await self.db.tags.get_tag_match_counts(
-            user_id, tag_hashes, message_ids
-        )
-        boosts: dict[str, float] = {}
-        for mid, count in match_counts.items():
-            if count > 0:
-                boosts[mid] = 1.0 + 0.1 * (count - 1)
-        return boosts
-
     async def search(
         self,
         user_id: str,
@@ -237,8 +163,6 @@ class SearchAPI:
         k1: int | None = None,
         k2: int | None = None,
     ) -> tuple[str, list[dict], bool]:
-        normalized, truncated = self._normalize_query(user_id, query)
-
         cfg = self.config.progressive
         resolved_k1 = int(k1) if k1 is not None else cfg.k1
         resolved_k2 = int(k2) if k2 is not None else cfg.k2
@@ -248,45 +172,30 @@ class SearchAPI:
             resolved_k1,
             resolved_k2,
         )
-        candidates = await self.vector_search.search_candidates(
-            user_id, dek, normalized, resolved_k1, resolved_k2
+
+        result: SearchPipelineResult = await self._pipeline.execute(
+            user_id,
+            dek,
+            query,
+            resolved_k1,
+            resolved_k2,
         )
 
-        candidate_map: OrderedDict[str, dict] = OrderedDict()
-        for cand in candidates:
-            mid = cand.get("id")
-            if not mid:
-                continue
-            existing = candidate_map.get(mid)
-            if existing is None or cand.get("cosine", 0.0) > existing.get(
-                "cosine", 0.0
-            ):
-                candidate_map[mid] = cand
-
-        tokens = self._tokenize_query(normalized)
-        boosts: dict[str, float] = {}
-        if tokens:
-            tag_hashes = [tag_hash(user_id, t) for t in tokens]
-            limit = max(resolved_k2, len(candidate_map), 1)
-            await self._hydrate_candidates(
-                user_id, dek, candidate_map, tag_hashes, limit
-            )
-            boosts = await self._compute_tag_boosts(user_id, candidate_map, tag_hashes)
-
-        if not candidate_map:
+        if not result.candidates:
             logger.debug(
-                "No candidates found for user %s; returning empty result set", user_id
+                "No candidates found for user %s; returning empty result set",
+                user_id,
             )
-            return normalized, [], truncated
+            return result.normalized.text, [], result.truncated
 
-        ordered_candidates = list(candidate_map.values())
-
-        results = self.lexical_reranker.rerank(
-            normalized, ordered_candidates, resolved_k2, boosts
+        await self._tag_service.hydrate_search_results(
+            user_id,
+            dek,
+            result.results,
+            result.enrichment.tokens,
         )
-        await self._tag_service.hydrate_search_results(user_id, dek, results, tokens)
-        logger.debug("Returning %d results for user %s", len(results), user_id)
-        return normalized, results, truncated
+        logger.debug("Returning %d results for user %s", len(result.results), user_id)
+        return result.normalized.text, result.results, result.truncated
 
     @property
     def search_config(self) -> SearchConfig:
@@ -307,9 +216,139 @@ class SearchAPI:
         )
 
     async def on_message_appended(
-        self, user_id: str, msg_id: str, plaintext: str, dek: bytes
+        self,
+        user_id: str,
+        msg_id: str,
+        plaintext: str,
+        dek: bytes,
     ) -> None:
         await self.bulk_index([(user_id, msg_id, plaintext, dek)])
 
     async def maintenance_tick(self) -> None:
         await self.vector_search.maintenance_tick()
+
+    def _build_pipeline_components(
+        self,
+        lexical_reranker: LexicalReranker,
+        normalizer: BaseSearchNormalizer | None,
+        candidate_generator: BaseSearchCandidateGenerator | None,
+        tag_enricher: BaseTagEnricher | None,
+        reranker: BaseSearchReranker | None,
+    ) -> SearchPipelineComponents:
+        component_builders: dict[
+            str,
+            tuple[
+                Any | None,
+                Type[Any],
+                Callable[[], dict[str, Any]],
+            ],
+        ] = {
+            "normalizer": (
+                normalizer,
+                DefaultSearchNormalizer,
+                lambda: {"config": self.config},
+            ),
+            "candidate_generator": (
+                candidate_generator,
+                DefaultSearchCandidateGenerator,
+                lambda: {
+                    "vector_search": self.vector_search,
+                    "config": self.config,
+                },
+            ),
+            "tag_enricher": (
+                tag_enricher,
+                DefaultTagEnricher,
+                lambda: {
+                    "db": self.db,
+                    "tag_service": self._tag_service,
+                    "vector_search": self.vector_search,
+                },
+            ),
+            "reranker": (
+                reranker,
+                DefaultSearchReranker,
+                lambda: {"lexical_reranker": lexical_reranker},
+            ),
+        }
+
+        components: dict[str, Any] = {}
+        for key, (provided, default_cls, kwargs_factory) in component_builders.items():
+            components[key] = self._resolve_component(
+                provided,
+                key,
+                default_cls,
+                kwargs_factory,
+            )
+
+        return SearchPipelineComponents(**components)
+
+    def _resolve_component(
+        self,
+        provided: Any | None,
+        key: str,
+        default_cls: Type[Any],
+        kwargs_factory: Callable[[], dict[str, Any]],
+    ) -> Any:
+        if provided is not None:
+            return provided
+
+        kwargs = kwargs_factory()
+        override_cls = self._load_component_class(key)
+        if override_cls is not None:
+            try:
+                return override_cls(**kwargs)
+            except Exception:  # pragma: no cover - defensive logging
+                logger.exception(
+                    "Failed to initialise search pipeline override for %s", key
+                )
+
+        return default_cls(**kwargs)
+
+    def _load_component_class(self, key: str) -> Type[Any] | None:
+        path = self._pipeline_overrides.get(key)
+        if not path:
+            return None
+
+        module_name, _, attr = path.rpartition(".")
+        if not module_name or not attr:
+            logger.error(
+                "Invalid search pipeline override path '%s' for %s", path, key
+            )
+            return None
+
+        try:
+            module = importlib.import_module(module_name)
+            return getattr(module, attr)
+        except Exception:  # pragma: no cover - defensive logging
+            logger.exception(
+                "Failed to load search pipeline override for %s from %s", key, path
+            )
+            return None
+
+    @staticmethod
+    def _read_pipeline_overrides(settings_obj: Any) -> dict[str, str]:
+        overrides: dict[str, str] = {}
+        search_cfg = getattr(settings_obj, "SEARCH", None)
+        if search_cfg is None:
+            return overrides
+
+        pipeline_cfg = getattr(search_cfg, "pipeline", None)
+        if pipeline_cfg is None:
+            return overrides
+
+        keys = ("normalizer", "candidate_generator", "tag_enricher", "reranker")
+        for key in keys:
+            value: Any | None
+            if isinstance(pipeline_cfg, dict):
+                value = pipeline_cfg.get(key)
+            else:
+                value = getattr(pipeline_cfg, key, None)
+                if value is None and hasattr(pipeline_cfg, "get"):
+                    value = pipeline_cfg.get(key)
+            if isinstance(value, str) and value:
+                overrides[key] = value
+        return overrides
+
+
+__all__ = ["SearchAPI", "InvalidSearchQuery"]
