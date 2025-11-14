@@ -107,6 +107,7 @@ export class SearchOverlay extends ReactiveElement {
   #focusHandler;
   #pageShowHandler;
   #historyRestoreHandler;
+  #popStateHandler;
   #historyRestoreRemover = null;
   #recentFetchPromise = null;
   #recentLoaded = false;
@@ -125,6 +126,7 @@ export class SearchOverlay extends ReactiveElement {
     this.#focusHandler = () => this.#handleInputFocus();
     this.#pageShowHandler = (event) => this.#handlePageShow(event);
     this.#historyRestoreHandler = () => this.#handleHistoryRestore();
+    this.#popStateHandler = () => this.#handlePopState();
   }
 
   connectedCallback() {
@@ -174,6 +176,7 @@ export class SearchOverlay extends ReactiveElement {
 
     const win = eventTarget.defaultView ?? window;
     win.addEventListener("pageshow", this.#pageShowHandler);
+    win.addEventListener("popstate", this.#popStateHandler);
   }
 
   disconnectedCallback() {
@@ -199,6 +202,7 @@ export class SearchOverlay extends ReactiveElement {
     const doc = this.ownerDocument ?? document;
     const win = doc.defaultView ?? window;
     win.removeEventListener("pageshow", this.#pageShowHandler);
+    win.removeEventListener("popstate", this.#popStateHandler);
 
     if (this.#historyRestoreRemover) {
       this.#historyRestoreRemover();
@@ -723,47 +727,84 @@ export class SearchOverlay extends ReactiveElement {
     if (!this.isConnected) return;
 
     const persisted = !!event?.persisted;
+    const state = this.#resolveInputState();
+    if (!state.input) return;
 
-    const input = this.querySelector("#search-input");
-    this.#inputEl = input instanceof HTMLInputElement ? input : null;
-
-    if (!this.#inputEl) return;
-
-    const autocompleteInput = this.#autocompleteInput;
-    const needsAutocomplete =
-      !this.#autocomplete ||
-      autocompleteInput !== this.#inputEl ||
-      !autocompleteInput?.isConnected;
-
-    if (!persisted && !needsAutocomplete) {
+    if (!persisted && !state.needsAutocomplete) {
       return;
     }
 
-    this.#ensureInputListeners({ force: persisted });
-
-    if (needsAutocomplete) {
-      this.#initAutocomplete();
-    }
-
-    this.#loadRecentSearches(true);
+    this.#applyResolvedInputState(state, {
+      forceListeners: persisted,
+      forceRecent: true,
+    });
   }
 
   #handleHistoryRestore() {
     if (!this.isConnected) return;
 
+    const state = this.#resolveInputState();
+    if (!state.input) return;
+
+    this.#applyResolvedInputState(state, {
+      forceListeners: true,
+      forceRecent: true,
+    });
+  }
+
+  #handlePopState() {
+    if (!this.isConnected) return;
+
+    const state = this.#resolveInputState();
+    if (!state.input) return;
+
+    this.#applyResolvedInputState(state, {
+      forceListeners: true,
+      forceRecent: true,
+    });
+  }
+
+  #resolveInputState() {
+    if (!this.isConnected) {
+      return { input: null, needsAutocomplete: false };
+    }
+
     const input = this.querySelector("#search-input");
-    this.#inputEl = input instanceof HTMLInputElement ? input : null;
+    const resolvedInput = input instanceof HTMLInputElement ? input : null;
+    this.#inputEl = resolvedInput;
 
-    if (!this.#inputEl) return;
-
-    this.#ensureInputListeners({ force: true });
+    if (!resolvedInput) {
+      return { input: null, needsAutocomplete: false };
+    }
 
     const autocompleteInput = this.#autocompleteInput;
-    if (!this.#autocomplete || autocompleteInput !== this.#inputEl || !autocompleteInput?.isConnected) {
+    const needsAutocomplete =
+      !this.#autocomplete ||
+      autocompleteInput !== resolvedInput ||
+      !autocompleteInput?.isConnected;
+
+    return { input: resolvedInput, needsAutocomplete };
+  }
+
+  #applyResolvedInputState(state, options = {}) {
+    const { forceListeners = false, forceRecent = false } = options;
+    const { input, needsAutocomplete } = state;
+
+    if (!input) {
+      return state;
+    }
+
+    this.#ensureInputListeners({ force: forceListeners });
+
+    if (needsAutocomplete) {
       this.#initAutocomplete();
     }
 
-    this.#loadRecentSearches(true);
+    if (forceRecent || needsAutocomplete) {
+      this.#loadRecentSearches(true);
+    }
+
+    return state;
   }
 
   #normalizeCandidateValue(entry) {
