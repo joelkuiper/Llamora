@@ -1,7 +1,6 @@
 import { createPopover } from "../popover.js";
-import { InlineAutocompleteController } from "../utils/inline-autocomplete.js";
-import { AutocompleteDataStore } from "../utils/autocomplete-data-store.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
+import { AutocompleteOverlayMixin } from "./base/autocomplete-overlay.js";
 
 const canonicalizeTag = (value, limit = null) => {
   const text = `${value ?? ""}`.replace(/^#/, "").trim();
@@ -40,7 +39,7 @@ export const mergeTagCandidateValues = (
   return merged;
 };
 
-export class Tags extends ReactiveElement {
+export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
   #popover = null;
   #button = null;
   #popoverEl = null;
@@ -52,7 +51,6 @@ export class Tags extends ReactiveElement {
   #closeButton = null;
   #tagContainer = null;
   #listeners = null;
-  #autocomplete = null;
   #buttonClickHandler;
   #closeClickHandler;
   #inputHandler;
@@ -63,7 +61,6 @@ export class Tags extends ReactiveElement {
   #suggestionsSwapHandler;
   #chipActivationHandler;
   #chipKeydownHandler;
-  #autocompleteStore = null;
   
   constructor() {
     super();
@@ -71,7 +68,7 @@ export class Tags extends ReactiveElement {
     this.#closeClickHandler = (event) => this.#handleCloseClick(event);
     this.#inputHandler = () => {
       this.#updateSubmitState();
-      this.#scheduleAutocompleteFetch();
+      this.scheduleAutocompleteFetch();
     };
     this.#inputFocusHandler = () => this.#handleInputFocus();
     this.#configRequestHandler = (event) => this.#handleConfigRequest(event);
@@ -80,26 +77,6 @@ export class Tags extends ReactiveElement {
     this.#suggestionsSwapHandler = () => this.#handleSuggestionsSwap();
     this.#chipActivationHandler = (event) => this.#handleChipActivation(event);
     this.#chipKeydownHandler = (event) => this.#handleChipKeydown(event);
-    this.#autocompleteStore = new AutocompleteDataStore({
-      debounceMs: 200,
-      fetchCandidates: (query, context = {}) =>
-        this.#fetchTagAutocompleteCandidates(query, context),
-      buildCacheKey: (query, context = {}) =>
-        this.#buildAutocompleteCacheKey(query, context),
-      getCandidateKey: (candidate) => this.#normalizeTagCandidate(candidate),
-      mergeCandidates: (remote, localSets) => this.#mergeAutocompleteCandidates(remote, localSets),
-      onError: (error) => {
-        if (typeof console !== "undefined" && typeof console.debug === "function") {
-          console.debug("Failed to fetch tag autocomplete suggestions", error);
-        }
-      },
-    });
-    this.#autocompleteStore.subscribe(
-      (candidates) => {
-        this.#applyAutocompleteCandidates(candidates);
-      },
-      { immediate: false }
-    );
   }
 
   connectedCallback() {
@@ -107,7 +84,6 @@ export class Tags extends ReactiveElement {
     this.#cacheElements();
     this.#listeners = this.resetListenerBag(this.#listeners);
     const listeners = this.#listeners;
-    this.#destroyAutocomplete();
 
     if (!this.#button || !this.#popoverEl || !this.#form || !this.#input || !this.#submit || !this.#tagContainer) {
       return;
@@ -140,7 +116,6 @@ export class Tags extends ReactiveElement {
   disconnectedCallback() {
     this.#destroyPopover();
     this.#teardownListeners();
-    this.#destroyAutocomplete();
     super.disconnectedCallback();
   }
 
@@ -184,7 +159,7 @@ export class Tags extends ReactiveElement {
             this.#input.focus();
           }
         }
-        this.#scheduleAutocompleteFetch({ immediate: true });
+        this.scheduleAutocompleteFetch({ immediate: true });
         this.#updateAutocompleteCandidates();
       },
       onHide: () => {
@@ -198,8 +173,8 @@ export class Tags extends ReactiveElement {
           this.#suggestions.innerHTML = "";
           delete this.#suggestions.dataset.loaded;
         }
-        this.#cancelPendingAutocompleteFetch();
-        this.#autocompleteStore?.reset({ clearLocal: true });
+        this.cancelAutocompleteFetch();
+        this.resetAutocompleteStore({ clearLocal: true });
       },
     });
   }
@@ -240,7 +215,8 @@ export class Tags extends ReactiveElement {
   }
 
   #handleInputFocus() {
-    this.#scheduleAutocompleteFetch({ immediate: true });
+    this.scheduleAutocompleteFetch({ immediate: true });
+    this.#updateAutocompleteCandidates();
   }
 
   #updateSubmitState() {
@@ -339,6 +315,81 @@ export class Tags extends ReactiveElement {
     this.#updateAutocompleteCandidates();
   }
 
+  resolveAutocompleteInput() {
+    if (this.#input instanceof HTMLInputElement) {
+      return this.#input;
+    }
+    const form = this.querySelector(".tag-popover form");
+    const input = form?.querySelector('input[name="tag"]');
+    return input instanceof HTMLInputElement ? input : null;
+  }
+
+  getAutocompleteControllerOptions() {
+    return {
+      prepareQuery: prepareTagAutocompleteValue,
+      prepareCandidate: prepareTagAutocompleteValue,
+    };
+  }
+
+  getAutocompleteStoreOptions() {
+    return {
+      debounceMs: 200,
+      fetchCandidates: (query, context = {}) =>
+        this.#fetchTagAutocompleteCandidates(query, context),
+      buildCacheKey: (query, context = {}) =>
+        this.#buildAutocompleteCacheKey(query, context),
+      getCandidateKey: (candidate) => this.#normalizeTagCandidate(candidate),
+      mergeCandidates: (remote, localSets, helpers) =>
+        this.#mergeAutocompleteCandidates(remote, localSets, helpers),
+      onError: (error) => {
+        if (typeof console !== "undefined" && typeof console.debug === "function") {
+          console.debug("Failed to fetch tag autocomplete suggestions", error);
+        }
+      },
+    };
+  }
+
+  transformAutocompleteCandidates(candidates) {
+    const list = Array.isArray(candidates) ? candidates : [];
+    const limit = this.#getCanonicalMaxLength();
+    const entries = list
+      .map((item) => {
+        const raw = typeof item === "string" ? item : item?.value ?? "";
+        const canonical = canonicalizeTag(raw, limit);
+        if (!canonical) {
+          return null;
+        }
+        const value = canonical;
+        const display = displayTag(canonical);
+        return { value, display, tokens: [value] };
+      })
+      .filter(Boolean);
+    return entries;
+  }
+
+  buildAutocompleteFetchParams() {
+    const input = this.resolveAutocompleteInput();
+    const url = this.#getAutocompleteUrl();
+    const msgId = this.dataset?.msgId ?? "";
+    if (!input || !url || !msgId) {
+      return null;
+    }
+    let query = prepareTagAutocompleteValue(input.value ?? "");
+    const maxLength = this.#getInputMaxLength();
+    if (maxLength) {
+      query = query.slice(0, maxLength);
+    }
+    return { query, context: { msgId, url } };
+  }
+
+  onAutocompleteCommit() {
+    this.#updateSubmitState();
+  }
+
+  normalizeAutocompleteCandidate(candidate) {
+    return this.#normalizeTagCandidate(candidate);
+  }
+
   #initAutocomplete() {
     if (!this.#input) return;
     this.#input.setAttribute("autocomplete", "off");
@@ -347,22 +398,8 @@ export class Tags extends ReactiveElement {
     this.#input.setAttribute("spellcheck", "false");
     this.#input.setAttribute("data-lpignore", "true");
     this.#input.setAttribute("data-1p-ignore", "true");
-    this.#autocomplete = new InlineAutocompleteController(this.#input, {
-      prepareQuery: prepareTagAutocompleteValue,
-      prepareCandidate: prepareTagAutocompleteValue,
-      onCommit: () => {
-        this.#updateSubmitState();
-      },
-    });
+    this.refreshAutocompleteController({ force: true });
     this.#updateAutocompleteCandidates();
-  }
-
-  #destroyAutocomplete() {
-    if (this.#autocomplete) {
-      this.#autocomplete.destroy();
-    }
-    this.#autocomplete = null;
-    this.#cancelPendingAutocompleteFetch();
   }
 
   #updateAutocompleteCandidates() {
@@ -381,79 +418,18 @@ export class Tags extends ReactiveElement {
         domValues.push(canonical);
       });
     }
-    this.#autocompleteStore?.setLocalEntries("dom", domValues);
-    this.#applyAutocompleteCandidates();
-  }
-
-  #scheduleAutocompleteFetch({ immediate = false } = {}) {
-    if (!this.#input) return;
-    const url = this.#getAutocompleteUrl();
-    const msgId = this.dataset?.msgId ?? "";
-    if (!url || !msgId) {
-      this.#autocompleteStore?.cancel();
-      return;
-    }
-
-    let query = prepareTagAutocompleteValue(this.#input.value ?? "");
-    const maxLength = this.#getInputMaxLength();
-    if (maxLength) {
-      query = query.slice(0, maxLength);
-    }
-
-    this.#autocompleteStore?.scheduleFetch(query, { msgId, url }, { immediate });
-  }
-
-  #cancelPendingAutocompleteFetch() {
-    this.#autocompleteStore?.cancel();
-  }
-
-  #clearAutocompleteCache() {
-    this.#autocompleteStore?.clearCache();
+    this.setAutocompleteLocalEntries("dom", domValues);
+    this.applyAutocompleteCandidates();
   }
 
   #invalidateAutocompleteCache({ immediate = false } = {}) {
-    this.#clearAutocompleteCache();
-    this.#scheduleAutocompleteFetch({ immediate });
-  }
-
-  #applyAutocompleteCandidates(candidates = null) {
-    if (!this.#autocomplete) return;
-    const list = Array.isArray(candidates)
-      ? candidates
-      : this.#autocompleteStore?.getCandidates() ?? [];
-    if (!list.length) {
-      this.#autocomplete.clearCandidates();
-      return;
-    }
-    const limit = this.#getCanonicalMaxLength();
-    const entries = list
-      .map((item) => {
-        const raw = typeof item === "string" ? item : item?.value ?? "";
-        const canonical = canonicalizeTag(raw, limit);
-        if (!canonical) {
-          return null;
-        }
-        const value = canonical;
-        const display = displayTag(canonical);
-        return {
-          value,
-          display,
-          tokens: [value],
-        };
-      })
-      .filter(Boolean);
-
-    if (!entries.length) {
-      this.#autocomplete.clearCandidates();
-      return;
-    }
-
-    this.#autocomplete.setCandidates(entries);
+    this.clearAutocompleteCache();
+    this.scheduleAutocompleteFetch({ immediate });
   }
 
   async #fetchTagAutocompleteCandidates(query, context = {}) {
-    const url = this.#getAutocompleteUrl();
-    const msgId = this.dataset?.msgId ?? context.msgId ?? "";
+    const url = context.url ?? this.#getAutocompleteUrl();
+    const msgId = context.msgId ?? this.dataset?.msgId ?? "";
     if (!url || !msgId) {
       return [];
     }
@@ -525,7 +501,7 @@ export class Tags extends ReactiveElement {
     return "";
   }
 
-  #mergeAutocompleteCandidates(remote, localSets) {
+  #mergeAutocompleteCandidates(remote, localSets, _helpers = {}) {
     const locals = [];
     for (const list of localSets) {
       if (!Array.isArray(list) || !list.length) {
@@ -565,16 +541,6 @@ export class Tags extends ReactiveElement {
       return null;
     }
     return inputLimit;
-  }
-
-  #buildCacheKey(query) {
-    const msgId = this.dataset?.msgId ?? "";
-    const limit = this.#getCanonicalMaxLength();
-    const canonical = canonicalizeTag(query ?? "", limit);
-    const normalized = canonical
-      ? canonical.toLowerCase()
-      : (query ?? "").trim().toLowerCase();
-    return `${msgId}::${normalized}`;
   }
 
   #handleChipActivation(event) {
