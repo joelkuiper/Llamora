@@ -106,6 +106,7 @@ export class SearchOverlay extends ReactiveElement {
   #documentClickHandler;
   #focusHandler;
   #pageShowHandler;
+  #pageHideHandler;
   #historyRestoreHandler;
   #popStateHandler;
   #historyRestoreRemover = null;
@@ -125,6 +126,7 @@ export class SearchOverlay extends ReactiveElement {
     this.#documentClickHandler = (event) => this.#handleDocumentClick(event);
     this.#focusHandler = () => this.#handleInputFocus();
     this.#pageShowHandler = (event) => this.#handlePageShow(event);
+    this.#pageHideHandler = (event) => this.#handlePageHide(event);
     this.#historyRestoreHandler = () => this.#handleHistoryRestore();
     this.#popStateHandler = () => this.#handlePopState();
   }
@@ -176,6 +178,7 @@ export class SearchOverlay extends ReactiveElement {
 
     const win = eventTarget.defaultView ?? window;
     win.addEventListener("pageshow", this.#pageShowHandler);
+    win.addEventListener("pagehide", this.#pageHideHandler);
     win.addEventListener("popstate", this.#popStateHandler);
   }
 
@@ -202,6 +205,7 @@ export class SearchOverlay extends ReactiveElement {
     const doc = this.ownerDocument ?? document;
     const win = doc.defaultView ?? window;
     win.removeEventListener("pageshow", this.#pageShowHandler);
+    win.removeEventListener("pagehide", this.#pageHideHandler);
     win.removeEventListener("popstate", this.#popStateHandler);
 
     if (this.#historyRestoreRemover) {
@@ -738,6 +742,30 @@ export class SearchOverlay extends ReactiveElement {
       forceListeners: persisted,
       forceRecent: true,
     });
+  }
+
+  #handlePageHide(event) {
+    if (!this.isConnected) return;
+    if (!event?.persisted) {
+      return;
+    }
+
+    const listenerTarget = this.#inputListenerTarget;
+    const hasAutocomplete = !!this.#autocomplete;
+
+    if (!hasAutocomplete && !listenerTarget) {
+      return;
+    }
+
+    this.#destroyAutocomplete();
+
+    if (listenerTarget) {
+      listenerTarget.removeEventListener("input", this.#inputHandler);
+      listenerTarget.removeEventListener("focus", this.#focusHandler);
+    }
+
+    this.#autocompleteInput = null;
+    this.#inputListenerTarget = null;
   }
 
   #handleHistoryRestore() {
