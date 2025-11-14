@@ -1,5 +1,5 @@
 from __future__ import annotations
 
-from .fair import FairAsyncQueue
+from .fair import FairAsyncQueue, OwnerCapacityError
 
-__all__ = ["FairAsyncQueue"]
+__all__ = ["FairAsyncQueue", "OwnerCapacityError"]

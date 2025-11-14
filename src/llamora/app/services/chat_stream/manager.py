@@ -312,6 +312,9 @@ class ChatStreamManager:
         self._queue.add_listener(self._handle_queue_change)
         self._queue_hooks: set[Callable[[dict[str, int]], None]] = set()
         self._active_ids: set[str] = set()
+        self._queue_consumer: asyncio.Task[None] | None = None
+        self._queue_loop: asyncio.AbstractEventLoop | None = None
+        self._slot_event: asyncio.Event | None = None
         self._service_pulse = service_pulse
         self._avg_stream_duration: float | None = None
         self._avg_queue_wait: float | None = None
@@ -410,7 +413,7 @@ class ChatStreamManager:
         meta_extra: dict | None = None,
     ) -> PendingResponse:
         self._prune_stale_pending()
-        self._promote_waiting()
+        self._ensure_queue_worker()
         pending = self._pending.get(user_msg_id)
         if pending:
             if pending.uid == uid:
@@ -455,6 +458,7 @@ class ChatStreamManager:
             )
             self._register_pending(pending)
             self._queue.enqueue(uid, pending)
+            self._ensure_queue_worker()
             return pending
 
         pending = PendingResponse(
@@ -509,7 +513,8 @@ class ChatStreamManager:
         self._queue.remove(user_msg_id)
         self._active_ids.discard(user_msg_id)
         self._publish_queue_state()
-        self._promote_waiting()
+        self._update_slot_event()
+        self._ensure_queue_worker()
 
     def _register_pending(self, pending: PendingResponse) -> None:
         user_msg_id = pending.user_msg_id
@@ -524,20 +529,13 @@ class ChatStreamManager:
             ),
         )
 
-    def _promote_waiting(self) -> None:
-        max_slots = self._max_slots()
-        while len(self._active_ids) < max_slots:
-            pending = self._queue.pop_next()
-            if pending is None:
-                break
-            self._activate_pending(pending)
-
     def _activate_pending(self, pending: PendingResponse) -> None:
         if pending.start():
             self._active_ids.add(pending.user_msg_id)
             if pending.started_at is not None:
                 wait_time = max(0.0, pending.started_at - pending.created_at)
                 self._update_wait_estimate(wait_time)
+        self._update_slot_event()
         self._publish_queue_state()
 
     def _max_slots(self) -> int:
@@ -555,6 +553,7 @@ class ChatStreamManager:
 
     def _handle_queue_change(self, _queue: FairAsyncQueue[str, PendingResponse]) -> None:
         self._publish_queue_state()
+        self._ensure_queue_worker()
 
     def _build_queue_snapshot(self) -> dict[str, int]:
         return {
@@ -576,6 +575,68 @@ class ChatStreamManager:
                 hook(snapshot)
             except Exception:  # pragma: no cover - defensive
                 logger.exception("Chat stream queue hook failed")
+
+    def _ensure_queue_worker(self) -> None:
+        if self._queue_consumer is not None and not self._queue_consumer.done():
+            return
+        loop = self._get_running_loop()
+        if loop is None:
+            return
+        if self._queue_loop is None:
+            self._queue_loop = loop
+        if self._slot_event is None:
+            self._slot_event = asyncio.Event()
+        self._update_slot_event()
+        task = loop.create_task(self._queue_consumer_loop())
+        task.add_done_callback(self._on_queue_worker_done)
+        self._queue_consumer = task
+
+    async def _queue_consumer_loop(self) -> None:
+        try:
+            while True:
+                await self._wait_for_slot()
+                pending = await self._queue.async_pop()
+                self._activate_pending(pending)
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # pragma: no cover - defensive
+            logger.exception("Chat stream queue worker failed")
+            raise
+
+    async def _wait_for_slot(self) -> None:
+        while len(self._active_ids) >= self._max_slots():
+            self._update_slot_event()
+            event = self._slot_event
+            if event is None:
+                event = asyncio.Event()
+                self._slot_event = event
+                self._update_slot_event()
+            await event.wait()
+
+    def _update_slot_event(self) -> None:
+        event = self._slot_event
+        if event is None:
+            return
+        if len(self._active_ids) < self._max_slots():
+            event.set()
+        else:
+            event.clear()
+
+    def _on_queue_worker_done(self, task: asyncio.Task[None]) -> None:
+        self._queue_consumer = None
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc is not None:
+            logger.exception("Chat stream queue worker exited", exc_info=exc)
+            if self._queue:
+                self._ensure_queue_worker()
+
+    def _get_running_loop(self) -> asyncio.AbstractEventLoop | None:
+        try:
+            return asyncio.get_running_loop()
+        except RuntimeError:
+            return None
 
     def _update_stream_duration(self, sample: float) -> None:
         if sample <= 0:
@@ -618,6 +679,11 @@ class ChatStreamManager:
         self._queue.clear()
         self._active_ids.clear()
         self._publish_queue_state()
+        if self._queue_consumer is not None:
+            self._queue_consumer.cancel()
+            with suppress(Exception):
+                await self._queue_consumer
+            self._queue_consumer = None
 
 
 __all__ = [
