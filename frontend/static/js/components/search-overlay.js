@@ -15,76 +15,33 @@ const getEventTarget = (evt) => {
 const RECENT_REFRESH_MIN_MS = 5000;
 const RECENT_CANDIDATE_MAX = 50;
 
-const trimSearchValue = (value) => (typeof value === "string" ? value.trim() : "");
-
-const collapseSearchWhitespace = (value) =>
-  trimSearchValue(value).replace(/\s+/g, " ");
-
-const prepareSearchAutocompleteValue = (value) => {
-  const collapsed = collapseSearchWhitespace(value);
-  return collapsed;
+const normalizeSearchValue = (value) => {
+  if (typeof value !== "string") return "";
+  return value.trim().replace(/\s+/g, " ");
 };
 
-const buildSearchAutocompleteEntry = (value) => {
-  const trimmed = trimSearchValue(value);
+const buildSearchEntry = (value) => {
+  const trimmed = typeof value === "string" ? value.trim() : "";
   if (!trimmed) return null;
 
-  const tokens = new Set();
-  const addToken = (token) => {
-    const base = trimSearchValue(token);
-    if (!base) return;
-    tokens.add(base);
-    const collapsed = collapseSearchWhitespace(base);
-    if (collapsed) {
-      tokens.add(collapsed);
-    }
-  };
-
-  addToken(trimmed);
-  const collapsed = collapseSearchWhitespace(trimmed);
-  if (collapsed && collapsed !== trimmed) {
-    addToken(collapsed);
+  const collapsed = normalizeSearchValue(trimmed);
+  const tokens = new Set([trimmed]);
+  if (collapsed) {
+    tokens.add(collapsed);
+    collapsed
+      .split(/\s+/)
+      .filter(Boolean)
+      .forEach((part) => tokens.add(part));
   }
 
-  (collapsed || trimmed)
-    .split(/\s+/)
-    .filter(Boolean)
-    .forEach((part) => addToken(part));
-
-  const tokenList = Array.from(tokens)
-    .filter(Boolean)
-    .sort((a, b) => a.length - b.length || a.localeCompare(b));
-  if (!tokenList.length) {
-    tokenList.push(trimmed);
-  }
+  const tokenList = Array.from(tokens).filter(Boolean);
+  tokenList.sort((a, b) => a.length - b.length || a.localeCompare(b));
 
   return {
     value: trimmed,
     display: trimmed,
-    tokens: tokenList,
+    tokens: tokenList.length ? tokenList : [trimmed],
   };
-};
-
-const buildSearchTagAutocompleteEntry = (tag) => {
-  const canonical = trimSearchValue(tag);
-  if (!canonical) return null;
-
-  const entry = buildSearchAutocompleteEntry(`${canonical}`);
-  if (!entry) return null;
-
-  const tokenSet = new Set(entry.tokens ?? []);
-  tokenSet.add(canonical);
-  const collapsedCanonical = collapseSearchWhitespace(canonical);
-  if (collapsedCanonical) {
-    tokenSet.add(collapsedCanonical);
-    collapsedCanonical
-      .split(/\s+/)
-      .filter(Boolean)
-      .forEach((part) => tokenSet.add(part));
-  }
-
-  entry.tokens = Array.from(tokenSet);
-  return entry;
 };
 
 export class SearchOverlay extends ReactiveElement {
@@ -146,10 +103,11 @@ export class SearchOverlay extends ReactiveElement {
     this.#listeners = this.resetListenerBag(this.#listeners);
     const listeners = this.#listeners;
 
-    if (this.#inputEl) {
-      this.#ensureInputListeners({ force: true });
-      this.#initAutocomplete();
-    }
+    this.#refreshInputState({
+      forceListeners: true,
+      forceAutocomplete: true,
+      forceRecent: true,
+    });
 
     this.#registerShortcuts();
     this.#setupMutationObserver();
@@ -327,16 +285,7 @@ export class SearchOverlay extends ReactiveElement {
   }
 
   #handleInputFocus() {
-    const input = this.#inputEl;
-    if (input) {
-      const missingAutocomplete = !this.#autocomplete;
-      const missingInlineClass = !input.classList.contains("inline-autocomplete__input");
-      const staleInput = this.#autocompleteInput && this.#autocompleteInput !== input;
-      if (missingAutocomplete || missingInlineClass || staleInput) {
-        this.#initAutocomplete();
-      }
-    }
-    this.#loadRecentSearches();
+    this.#refreshInputState();
   }
 
   #initAutocomplete() {
@@ -345,8 +294,8 @@ export class SearchOverlay extends ReactiveElement {
     this.#autocomplete = new InlineAutocompleteController(this.#inputEl, {
       minLength: 1,
       emitInputEvent: false,
-      prepareQuery: prepareSearchAutocompleteValue,
-      prepareCandidate: prepareSearchAutocompleteValue,
+      prepareQuery: normalizeSearchValue,
+      prepareCandidate: normalizeSearchValue,
       onCommit: () => {
         this.#addCurrentQueryToAutocomplete();
       },
@@ -368,19 +317,18 @@ export class SearchOverlay extends ReactiveElement {
 
     const observer = new MutationObserver(() => {
       if (!this.isConnected) return;
-
       const input = this.querySelector("#search-input");
       this.#inputEl = input instanceof HTMLInputElement ? input : null;
-
-      const differs = this.#inputEl !== this.#autocompleteInput;
-      const missingInlineClass = this.#inputEl
-        ? !this.#inputEl.classList.contains("inline-autocomplete__input")
-        : false;
-
-      if (differs || missingInlineClass) {
-        this.#ensureInputListeners({ force: true });
-        this.#initAutocomplete();
-        this.#loadRecentSearches(true);
+      const needsRefresh =
+        this.#inputEl &&
+        (this.#inputEl !== this.#autocompleteInput ||
+          this.#needsInlineAutocompleteRefresh(this.#inputEl));
+      if (needsRefresh) {
+        this.#refreshInputState({
+          forceListeners: true,
+          forceAutocomplete: true,
+          forceRecent: true,
+        });
       }
     });
 
@@ -433,79 +381,57 @@ export class SearchOverlay extends ReactiveElement {
       return;
     }
 
-    const promise = fetch("/search/recent", {
-      headers: { Accept: "application/json" },
-      credentials: "same-origin",
-    })
-      .then((response) => {
+    const task = (async () => {
+      try {
+        const response = await fetch("/search/recent", {
+          headers: { Accept: "application/json" },
+          credentials: "same-origin",
+        });
         if (!response.ok) {
-          return null;
+          return;
         }
-        return response.json().catch(() => null);
-      })
-      .then((payload) => {
+
+        const payload = await response.json().catch(() => null);
         if (!payload) {
           return;
         }
 
         const recent = Array.isArray(payload.recent) ? payload.recent : [];
-        const frecentTags = Array.isArray(payload.frecent_tags)
-          ? payload.frecent_tags
-          : [];
-
+        const frecentTags = Array.isArray(payload.frecent_tags) ? payload.frecent_tags : [];
         const entries = [];
-        const seenKeys = new Set();
-        const pushEntry = (entry) => {
-          if (!entry || typeof entry.value !== "string") {
-            return;
-          }
-          const normalized = prepareSearchAutocompleteValue(entry.value)?.toLowerCase();
-          if (!normalized) {
-            return;
-          }
-          if (seenKeys.has(normalized)) {
-            return;
-          }
-          seenKeys.add(normalized);
+        const seen = new Set();
+
+        for (const candidate of [...recent, ...frecentTags]) {
+          if (typeof candidate !== "string") continue;
+          const entry = buildSearchEntry(candidate);
+          if (!entry) continue;
+          const key = normalizeSearchValue(entry.value).toLowerCase();
+          if (!key || seen.has(key)) continue;
+          seen.add(key);
           entries.push(entry);
-        };
-
-        for (const value of recent) {
-          if (typeof value !== "string") continue;
-          const entry = buildSearchAutocompleteEntry(value);
-          if (entry) {
-            pushEntry(entry);
-          }
+          if (entries.length >= RECENT_CANDIDATE_MAX) break;
         }
 
-        for (const tag of frecentTags) {
-          if (typeof tag !== "string") continue;
-          const entry = buildSearchTagAutocompleteEntry(tag);
-          if (entry) {
-            pushEntry(entry);
-          }
-        }
-
-        this.#recentCandidates = entries.slice(0, RECENT_CANDIDATE_MAX);
-        this.#applyRecentCandidates();
+        this.#recentCandidates = entries;
         this.#recentLoaded = true;
         this.#recentFetchedAt = Date.now();
-      })
-      .catch((error) => {
-      })
-      .finally(() => {
+        this.#applyRecentCandidates();
+      } catch {
+        // Ignore fetch failures; results simply stay empty.
+      } finally {
         this.#recentFetchPromise = null;
-      });
+      }
+    })();
 
-    this.#recentFetchPromise = promise;
-    return promise;
+    this.#recentFetchPromise = task;
+    return task;
   }
 
   #addCurrentQueryToAutocomplete() {
     if (!this.#autocomplete || !this.#inputEl) return;
     const value = this.#inputEl.value?.trim();
     if (!value) return;
-    const entry = buildSearchAutocompleteEntry(value);
+    const entry = buildSearchEntry(value);
     if (!entry) {
       return;
     }
@@ -731,27 +657,14 @@ export class SearchOverlay extends ReactiveElement {
     if (!this.isConnected) return;
 
     const persisted = !!event?.persisted;
-    const state = this.#resolveInputState();
-    if (!state.input) return;
 
-    const needsInlineRefresh = this.#inputNeedsInlineAutocompleteRefresh(state.input);
-    const needsAutocomplete = state.needsAutocomplete || needsInlineRefresh;
-
-    if (!persisted && !needsAutocomplete) {
-      return;
-    }
-
-    const nextState =
-      needsAutocomplete && !state.needsAutocomplete
-        ? { ...state, needsAutocomplete: true }
-        : state;
-
-    this.#applyResolvedInputState(nextState, {
+    this.#refreshInputState({
       forceListeners: persisted,
-      forceRecent: true,
+      forceAutocomplete: persisted,
+      forceRecent: persisted,
     });
 
-    if (needsAutocomplete) {
+    if (persisted) {
       this.#applyRecentCandidates();
     }
   }
@@ -783,80 +696,61 @@ export class SearchOverlay extends ReactiveElement {
   #handleHistoryRestore() {
     if (!this.isConnected) return;
 
-    const state = this.#resolveInputState();
-    if (!state.input) return;
-
-    const needsInlineRefresh = this.#inputNeedsInlineAutocompleteRefresh(state.input);
-    const needsAutocomplete = state.needsAutocomplete || needsInlineRefresh;
-
-    const nextState =
-      needsAutocomplete && !state.needsAutocomplete
-        ? { ...state, needsAutocomplete: true }
-        : state;
-
-    this.#applyResolvedInputState(nextState, {
+    this.#refreshInputState({
       forceListeners: true,
+      forceAutocomplete: true,
       forceRecent: true,
     });
 
-    if (needsAutocomplete) {
-      this.#applyRecentCandidates();
-    }
+    this.#applyRecentCandidates();
   }
 
   #handlePopState() {
     if (!this.isConnected) return;
 
-    const state = this.#resolveInputState();
-    if (!state.input) return;
-
-    this.#applyResolvedInputState(state, {
+    this.#refreshInputState({
       forceListeners: true,
       forceRecent: true,
     });
   }
 
-  #resolveInputState() {
-    if (!this.isConnected) {
-      return { input: null, needsAutocomplete: false };
-    }
+  #refreshInputState(options = {}) {
+    if (!this.isConnected) return;
+
+    const {
+      forceListeners = false,
+      forceAutocomplete = false,
+      forceRecent = false,
+    } = options;
 
     const input = this.querySelector("#search-input");
-    const resolvedInput = input instanceof HTMLInputElement ? input : null;
-    this.#inputEl = resolvedInput;
+    const resolved = input instanceof HTMLInputElement ? input : null;
+    this.#inputEl = resolved;
 
-    if (!resolvedInput) {
-      return { input: null, needsAutocomplete: false };
+    if (!resolved) {
+      return;
     }
 
-    const autocompleteInput = this.#autocompleteInput;
-    const needsAutocomplete =
+    const needsInline = this.#needsInlineAutocompleteRefresh(resolved);
+    const shouldInit =
+      forceAutocomplete ||
       !this.#autocomplete ||
-      autocompleteInput !== resolvedInput ||
-      !autocompleteInput?.isConnected;
+      this.#autocompleteInput !== resolved ||
+      !this.#autocompleteInput?.isConnected ||
+      needsInline;
 
-    return { input: resolvedInput, needsAutocomplete };
-  }
+    this.#ensureInputListeners({
+      force:
+        forceListeners ||
+        this.#inputListenerTarget !== resolved ||
+        needsInline,
+    });
 
-  #applyResolvedInputState(state, options = {}) {
-    const { forceListeners = false, forceRecent = false } = options;
-    const { input, needsAutocomplete } = state;
-
-    if (!input) {
-      return state;
-    }
-
-    this.#ensureInputListeners({ force: forceListeners });
-
-    if (needsAutocomplete) {
+    if (shouldInit) {
       this.#initAutocomplete();
     }
 
-    if (forceRecent || needsAutocomplete) {
-      this.#loadRecentSearches(true);
-    }
-
-    return state;
+    this.#loadRecentSearches(forceRecent || shouldInit);
   }
 
   #normalizeCandidateValue(entry) {
@@ -868,8 +762,7 @@ export class SearchOverlay extends ReactiveElement {
           ? entry.value
           : "";
     if (!value) return "";
-    const prepared = prepareSearchAutocompleteValue(value);
-    return typeof prepared === "string" ? prepared.toLowerCase() : "";
+    return normalizeSearchValue(value).toLowerCase();
   }
 
   #applyRecentCandidates() {
@@ -886,7 +779,7 @@ export class SearchOverlay extends ReactiveElement {
     }
   }
 
-  #inputNeedsInlineAutocompleteRefresh(input) {
+  #needsInlineAutocompleteRefresh(input) {
     if (!input) {
       return false;
     }
