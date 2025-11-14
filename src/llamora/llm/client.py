@@ -1,14 +1,21 @@
+from __future__ import annotations
+
 import asyncio
 import hashlib
 import logging
+from dataclasses import dataclass
 from contextlib import asynccontextmanager, suppress
-from typing import Any, AsyncGenerator, Mapping, NamedTuple, Sequence
+from types import MappingProxyType
+from typing import Any, AsyncGenerator, Mapping, NamedTuple, Sequence, TYPE_CHECKING
 
 import httpx
 import orjson
 from httpx import HTTPError
 
 from cachetools import LRUCache
+
+if TYPE_CHECKING:
+    from llamora.app.services.service_pulse import ServicePulse
 from llamora.app.util import canonicalize
 from llamora.settings import settings
 from .process_manager import LlamafileProcessManager
@@ -17,6 +24,153 @@ from .tokenizers.tokenizer import count_tokens, history_suffix_token_totals
 
 DEFAULT_LLM_REQUEST = dict(settings.LLM.request)
 HISTORY_TOKEN_CACHE_SIZE = 32
+
+
+@dataclass(slots=True, frozen=True)
+class PromptBudgetSnapshot:
+    """Summary of a prompt's token usage against the available context."""
+
+    prompt_tokens: int
+    max_tokens: int | None
+    overflow: int
+    saturation: float | None
+    context_size: int | None
+    label: str | None = None
+    params: Mapping[str, Any] | None = None
+    extra: Mapping[str, Any] | None = None
+
+    @property
+    def at_ceiling(self) -> bool:
+        return self.max_tokens is not None and self.prompt_tokens >= self.max_tokens
+
+    @property
+    def exceeded(self) -> bool:
+        return self.max_tokens is not None and self.prompt_tokens > self.max_tokens
+
+
+class PromptBudget:
+    """Helper for computing prompt budgets and reporting usage diagnostics."""
+
+    def __init__(
+        self,
+        client: "LLMClient",
+        *,
+        service_pulse: "ServicePulse" | None = None,
+    ) -> None:
+        self._client = client
+        self._service_pulse = service_pulse
+        self._logger = client.logger
+
+    def max_prompt_tokens(
+        self, params: Mapping[str, Any] | None = None
+    ) -> int | None:
+        """Return the maximum tokens available for the prompt portion."""
+
+        ctx_size = self._client.ctx_size
+        if ctx_size is None:
+            return None
+
+        cfg: dict[str, Any] = dict(self._client.default_request)
+        if params:
+            for key, value in params.items():
+                if value is not None:
+                    cfg[key] = value
+
+        n_predict = cfg.get("n_predict")
+        if n_predict is None:
+            return ctx_size
+
+        try:
+            predict_tokens = int(n_predict)
+        except (TypeError, ValueError):
+            return ctx_size
+
+        return max(ctx_size - predict_tokens, 0)
+
+    async def trim_history(
+        self,
+        history: Sequence[Mapping[str, Any] | dict[str, Any]],
+        *,
+        params: Mapping[str, Any] | None = None,
+        context: Mapping[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return ``history`` trimmed to fit the available prompt budget."""
+
+        history_list = [
+            dict(entry) if not isinstance(entry, dict) else entry for entry in history
+        ]
+        if not history_list:
+            return history_list
+
+        max_input = self.max_prompt_tokens(params)
+        if max_input is None or max_input <= 0:
+            return history_list
+
+        ctx = dict(context or {})
+        return await self._client._trim_history(history_list, max_input, ctx)
+
+    def diagnostics(
+        self,
+        *,
+        prompt_tokens: int,
+        params: Mapping[str, Any] | None = None,
+        label: str | None = None,
+        extra: Mapping[str, Any] | None = None,
+    ) -> PromptBudgetSnapshot:
+        """Analyse prompt usage and emit diagnostics if limits are reached."""
+
+        max_tokens = self.max_prompt_tokens(params)
+        overflow = 0
+        saturation: float | None = None
+
+        if max_tokens is not None and max_tokens > 0:
+            overflow = max(0, prompt_tokens - max_tokens)
+            saturation = prompt_tokens / max_tokens
+
+        params_copy = (
+            MappingProxyType(dict(params)) if params is not None else None
+        )
+        extra_copy = MappingProxyType(dict(extra)) if extra is not None else None
+
+        snapshot = PromptBudgetSnapshot(
+            prompt_tokens=prompt_tokens,
+            max_tokens=max_tokens,
+            overflow=overflow,
+            saturation=saturation,
+            context_size=self._client.ctx_size,
+            label=label,
+            params=params_copy,
+            extra=extra_copy,
+        )
+
+        if snapshot.at_ceiling:
+            label_suffix = f" ({snapshot.label})" if snapshot.label else ""
+            self._logger.warning(
+                "Prompt budget ceiling reached%s: tokens=%s max=%s overflow=%s",
+                label_suffix,
+                snapshot.prompt_tokens,
+                snapshot.max_tokens,
+                snapshot.overflow,
+            )
+            if self._service_pulse is not None:
+                payload: dict[str, Any] = {
+                    "label": snapshot.label,
+                    "prompt_tokens": snapshot.prompt_tokens,
+                    "max_tokens": snapshot.max_tokens,
+                    "overflow": snapshot.overflow,
+                    "saturation": snapshot.saturation,
+                    "context_size": snapshot.context_size,
+                }
+                if snapshot.extra is not None:
+                    payload["extra"] = dict(snapshot.extra)
+                if snapshot.params is not None:
+                    payload["params"] = dict(snapshot.params)
+                try:
+                    self._service_pulse.emit("llm.prompt_budget", payload)
+                except Exception:  # pragma: no cover - defensive
+                    self._logger.exception("Failed to emit prompt budget pulse")
+
+        return snapshot
 
 
 class SSEEvent(NamedTuple):
@@ -181,6 +335,8 @@ class LLMClient:
         self,
         process_manager: "LlamafileProcessManager",
         default_request: dict | None = None,
+        *,
+        service_pulse: "ServicePulse" | None = None,
     ) -> None:
         self.logger = logging.getLogger(__name__)
         self.process_manager = process_manager
@@ -205,6 +361,7 @@ class LLMClient:
             "Accept-Encoding": "identity",
             "Cache-Control": "no-cache",
         }
+        self.prompt_budget = PromptBudget(self, service_pulse=service_pulse)
         # Cached cumulative token counts keyed by (history_hash, context_hash).
         # The cache lets adjacent requests within the same stream reuse
         # tokenisation results instead of repeatedly calling the HTTP endpoint.
@@ -545,27 +702,9 @@ class LLMClient:
         context: Mapping[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         """Return ``history`` trimmed to fit within the model context window."""
-
-        history_list = [
-            dict(entry) if not isinstance(entry, dict) else entry for entry in history
-        ]
-        if not history_list:
-            return history_list
-
-        if self.ctx_size is None:
-            return history_list
-
-        cfg = {**self.default_request, **(dict(params) if params is not None else {})}
-        n_predict = cfg.get("n_predict")
-        if n_predict is None:
-            return history_list
-
-        max_input = self.ctx_size - int(n_predict)
-        if max_input <= 0:
-            return history_list
-
-        ctx = dict(context or {})
-        return await self._trim_history(history_list, max_input, ctx)
+        return await self.prompt_budget.trim_history(
+            history, params=params, context=context
+        )
 
     async def stream_response(
         self,
@@ -584,15 +723,14 @@ class LLMClient:
         if messages is None:
             history = history or []
             ctx = context or {}
-            n_predict = cfg.get("n_predict")
-            if self.ctx_size is not None and n_predict is not None:
-                max_input = self.ctx_size - n_predict
-                try:
-                    history = await self._trim_history(history, max_input, ctx)
-                except Exception as e:
-                    self.logger.exception("Failed to trim history")
-                    yield {"type": "error", "data": f"Prompt error: {e}"}
-                    return
+            try:
+                history = await self.prompt_budget.trim_history(
+                    history, params=cfg, context=ctx
+                )
+            except Exception as e:
+                self.logger.exception("Failed to trim history")
+                yield {"type": "error", "data": f"Prompt error: {e}"}
+                return
             try:
                 messages = build_chat_messages(history, **ctx)
             except Exception as e:
@@ -600,11 +738,23 @@ class LLMClient:
                 yield {"type": "error", "data": f"Prompt error: {e}"}
                 return
         try:
-            prompt_text = render_chat_prompt(messages).prompt
+            prompt_render = render_chat_prompt(messages)
         except Exception as e:
             self.logger.exception("Failed to render chat prompt")
             yield {"type": "error", "data": f"Prompt error: {e}"}
             return
+
+        self.prompt_budget.diagnostics(
+            prompt_tokens=prompt_render.token_count,
+            params=cfg,
+            label="chat:stream",
+            extra={
+                "history_messages": len(history or []) if history is not None else 0,
+                "prompt_messages": len(messages or []),
+            },
+        )
+
+        prompt_text = prompt_render.prompt
 
         payload = {"prompt": prompt_text, **cfg}
         if msg_id:
@@ -637,10 +787,19 @@ class LLMClient:
         message_list = list(messages)
 
         try:
-            prompt_text = render_chat_prompt(message_list).prompt
+            prompt_render = render_chat_prompt(message_list)
         except Exception as exc:
             self.logger.exception("Failed to render completion prompt")
             raise RuntimeError("Prompt rendering failed") from exc
+
+        self.prompt_budget.diagnostics(
+            prompt_tokens=prompt_render.token_count,
+            params=cfg,
+            label="chat:complete",
+            extra={"prompt_messages": len(message_list)},
+        )
+
+        prompt_text = prompt_render.prompt
 
         payload = {"prompt": prompt_text, **cfg}
         payload.pop("slot_id", None)

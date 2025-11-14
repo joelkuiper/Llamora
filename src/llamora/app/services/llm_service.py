@@ -65,7 +65,9 @@ class LLMService:
             try:
                 process_manager = LlamafileProcessManager()
                 await asyncio.to_thread(process_manager.ensure_server_running)
-                llm_client = LLMClient(process_manager)
+                llm_client = LLMClient(
+                    process_manager, service_pulse=self._service_pulse
+                )
 
                 chat_stream_manager = ChatStreamManager(
                     llm_client,

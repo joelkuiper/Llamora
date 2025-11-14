@@ -12,7 +12,7 @@ from quart import (
 import logging
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-from typing import Any, Mapping, MutableMapping
+from typing import Any
 from werkzeug.exceptions import HTTPException
 
 from llamora.llm.chat_template import build_opening_messages, render_chat_prompt
@@ -55,33 +55,6 @@ def _chat_stream_manager():
 
 
 logger = logging.getLogger(__name__)
-
-
-def _max_prompt_tokens(
-    llm_client, params: Mapping[str, Any] | None = None
-) -> int | None:
-    ctx_size = llm_client.ctx_size
-    if ctx_size is None:
-        return None
-
-    cfg: MutableMapping[str, Any] = dict(llm_client.default_request)
-    if params:
-        for key, value in params.items():
-            if value is not None:
-                cfg[key] = value
-
-    n_predict = cfg.get("n_predict")
-    if n_predict is None:
-        return ctx_size
-
-    try:
-        predict_tokens = int(n_predict)
-    except (TypeError, ValueError):
-        return ctx_size
-
-    return max(ctx_size - predict_tokens, 0)
-
-
 async def render_chat(
     date: str,
     oob: bool = False,
@@ -248,8 +221,18 @@ async def sse_opening(date: str):
             )
             recall_inserted = True
 
+        budget = llm_client.prompt_budget
         prompt_render = render_chat_prompt(opening_messages)
-        max_tokens = _max_prompt_tokens(llm_client)
+        snapshot = budget.diagnostics(
+            prompt_tokens=prompt_render.token_count,
+            label="chat:opening",
+            extra={
+                "phase": "initial",
+                "messages": len(opening_messages),
+                "recall_inserted": recall_inserted,
+            },
+        )
+        max_tokens = snapshot.max_tokens
         if max_tokens is not None and prompt_render.token_count > max_tokens:
             if recall_inserted:
                 logger.info(
@@ -259,7 +242,25 @@ async def sse_opening(date: str):
                 )
                 opening_messages.pop(1)
                 prompt_render = render_chat_prompt(opening_messages)
+                budget.diagnostics(
+                    prompt_tokens=prompt_render.token_count,
+                    label="chat:opening",
+                    extra={
+                        "phase": "after-recall-drop",
+                        "messages": len(opening_messages),
+                        "recall_inserted": False,
+                    },
+                )
             if prompt_render.token_count > max_tokens:
+                budget.diagnostics(
+                    prompt_tokens=prompt_render.token_count,
+                    label="chat:opening",
+                    extra={
+                        "phase": "overflow-after-trim",
+                        "messages": len(opening_messages),
+                        "recall_inserted": False,
+                    },
+                )
                 raise ValueError("Opening prompt exceeds context window")
     except Exception as exc:
         logger.exception("Failed to prepare opening prompt")
