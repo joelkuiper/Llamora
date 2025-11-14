@@ -27,9 +27,14 @@ async def index():
     return redirect(url_for("days.day_today"), code=302)
 
 
-async def _render_day(date: str, target: str | None):
+async def _render_day(date: str, target: str | None, view_kind: str):
     today = local_date().isoformat()
-    chat_response = await render_chat(date, oob=False, scroll_target=target)
+    chat_response = await render_chat(
+        date,
+        oob=False,
+        scroll_target=target,
+        view_kind=view_kind,
+    )
     chat_html = await chat_response.get_data(as_text=True)
     html = await render_template(
         "index.html",
@@ -38,6 +43,7 @@ async def _render_day(date: str, target: str | None):
         today=today,
         chat_html=chat_html,
         scroll_target=target,
+        view_kind=view_kind,
     )
     resp = await make_response(html, 200)
     return resp
@@ -48,7 +54,7 @@ async def _render_day(date: str, target: str | None):
 async def day_today():
     today = local_date().isoformat()
     target = request.args.get("target")
-    return await _render_day(today, target)
+    return await _render_day(today, target, "today")
 
 
 @days_bp.route("/d/<date>")
@@ -60,7 +66,7 @@ async def day(date):
         abort(400, description="Invalid date")
         raise AssertionError("unreachable") from exc
     target = request.args.get("target")
-    return await _render_day(normalized_date, target)
+    return await _render_day(normalized_date, target, "day")
 
 
 @days_bp.route("/calendar")

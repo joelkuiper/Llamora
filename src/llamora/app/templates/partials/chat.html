@@ -2,6 +2,7 @@
   id="content-wrapper"
   {% if oob %} hx-swap-oob="true" {% endif %}>
   <chat-view{% if request.headers.get('HX-Request') == 'true' %} data-rendering="true"{% endif %}{% if scroll_target %} data-scroll-target="{{ scroll_target }}"{% endif %}
+             data-view-kind="{{ view_kind }}"
              aria-busy="{{ 'true' if request.headers.get('HX-Request') == 'true' else 'false' }}">
     {% include 'partials/history.html' %}
     {% if is_today %}

@@ -2,7 +2,7 @@ import { scrollEvents } from "../chat/scroll-manager.js";
 import { MarkdownObserver } from "../chat/markdown-observer.js";
 import { StreamingSession } from "../chat/streaming-session.js";
 import { renderMarkdownInElement } from "../markdown.js";
-import { initDayNav } from "../day.js";
+import { initDayNav, navigateToDate } from "../day.js";
 import { scrollToHighlight } from "../ui.js";
 import { setTimezoneCookie } from "../timezone.js";
 import { createListenerBag } from "../utils/events.js";
@@ -42,7 +42,14 @@ function scheduleMidnightRefresh(chat) {
     }
 
     const now = new Date();
-    const today = formatDate(now);
+    const updateClientToday = window?.appInit?.updateClientToday;
+    const today =
+      typeof updateClientToday === "function"
+        ? updateClientToday()
+        : formatDate(now);
+    if (typeof updateClientToday !== "function" && document?.body?.dataset) {
+      document.body.dataset.clientToday = today;
+    }
 
     if (chat.dataset.date !== today) {
       const timezone = setTimezoneCookie();
@@ -268,6 +275,25 @@ export class ChatView extends ReactiveElement {
 
     const activeDay = chatDate || null;
     const activeDayLabel = chat?.dataset?.longDate ?? null;
+    const viewKind = this.dataset?.viewKind || null;
+    const updateClientToday = window?.appInit?.updateClientToday;
+    const clientToday =
+      typeof updateClientToday === "function"
+        ? updateClientToday()
+        : formatDate(new Date());
+
+    if (typeof updateClientToday !== "function" && document?.body?.dataset) {
+      document.body.dataset.clientToday = clientToday;
+    }
+
+    const isClientToday = activeDay === clientToday;
+
+    if (viewKind === "today" && activeDay && !isClientToday) {
+      this.#forceNavFlash = true;
+      navigateToDate(clientToday);
+      return;
+    }
+
     this.#lastRenderedDay = activeDay;
 
     if (document?.body?.dataset) {

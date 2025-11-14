@@ -59,9 +59,11 @@ logger = logging.getLogger(__name__)
 
 async def render_chat(
     date: str,
+    *,
     oob: bool = False,
     scroll_target: str | None = None,
     hx_push_url: str | None = None,
+    view_kind: str = "day",
 ) -> Response:
     session = _session()
     user = await session.require_user()
@@ -72,6 +74,7 @@ async def render_chat(
         oob=oob,
         user=user,
         scroll_target=scroll_target,
+        view_kind=view_kind,
         **context,
     )
 
@@ -102,6 +105,7 @@ async def chat_htmx(date):
         oob=False,
         scroll_target=target,
         hx_push_url=push_url,
+        view_kind="day",
     )
 
 
@@ -116,6 +120,7 @@ async def chat_htmx_today():
         oob=False,
         scroll_target=target,
         hx_push_url=push_url,
+        view_kind="today",
     )
 
 
