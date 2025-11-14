@@ -1,8 +1,7 @@
 from quart import Blueprint, request, abort, render_template, jsonify
-from llamora.app.services.container import get_services
+from llamora.app.services.container import get_services, get_tag_service
 from llamora.app.services.auth_helpers import login_required
 from llamora.app.services.session_context import get_session_context
-from llamora.app.util.tags import canonicalize, display
 from llamora.settings import settings
 from llamora.app.util.frecency import (
     DEFAULT_FRECENCY_DECAY,
@@ -18,6 +17,10 @@ def _db():
 
 def _session():
     return get_session_context()
+
+
+def _tags():
+    return get_tag_service()
 
 
 @tags_bp.delete("/t/<msg_id>/<tag_hash>")
@@ -45,7 +48,7 @@ async def add_tag(msg_id: str):
     if len(raw_tag) > max_tag_length:
         raw_tag = raw_tag[:max_tag_length]
     try:
-        canonical = canonicalize(raw_tag)
+        canonical = _tags().canonicalize(raw_tag)
     except ValueError:
         abort(400, description="empty tag")
         raise AssertionError("unreachable")
@@ -69,40 +72,24 @@ async def get_tag_suggestions(msg_id: str):
     session = _session()
     user = await session.require_user()
     dek = await session.require_dek()
-    messages = await _db().messages.get_messages_by_ids(user["id"], [msg_id], dek)
-    if not messages:
-        abort(404, description="message not found")
-    meta = messages[0].get("meta", {})
-    keywords = meta.get("keywords") or []
-    existing = await _db().tags.get_tags_for_message(user["id"], msg_id, dek)
-    existing_names = {
-        (t.get("name") or "").strip().lower()
-        for t in existing
-        if (t.get("name") or "").strip()
-    }
-
-    meta_suggestions: set[str] = set()
-    for kw in keywords:
-        try:
-            canonical_kw = canonicalize(kw)
-        except ValueError:
-            continue
-        meta_suggestions.add(canonical_kw)
-
     decay_constant = resolve_frecency_lambda(
         request.args.get("lambda"), default=DEFAULT_FRECENCY_DECAY
     )
-    frecent_tags = await _db().tags.get_tag_frecency(user["id"], 3, decay_constant, dek)
-    frecent_suggestions = {t["name"] for t in frecent_tags if (t.get("name"))}
 
-    combined = meta_suggestions | frecent_suggestions
-    combined = [
-        name for name in combined if name and name.strip().lower() not in existing_names
-    ]
+    suggestions = await _tags().suggest_for_message(
+        user["id"],
+        msg_id,
+        dek,
+        frecency_limit=3,
+        decay_constant=decay_constant,
+    )
+    if suggestions is None:
+        abort(404, description="message not found")
+        raise AssertionError("unreachable")
 
     html = await render_template(
         "partials/tag_suggestions.html",
-        suggestions=combined,
+        suggestions=suggestions,
         msg_id=msg_id,
     )
     return html
@@ -180,7 +167,7 @@ async def autocomplete_tags():
         payload.append(
             {
                 "name": canonical_name,
-                "display": display(canonical_name),
+                "display": _tags().display(canonical_name),
                 "hash": entry.get("hash"),
             }
         )

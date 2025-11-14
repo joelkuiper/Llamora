@@ -14,6 +14,7 @@ from llamora.persistence.local_db import LocalDB
 from llamora.app.api.search import SearchAPI
 from llamora.app.services.lexical_reranker import LexicalReranker
 from llamora.app.services.llm_service import LLMService
+from llamora.app.services.tag_service import TagService
 from llamora.app.services.service_pulse import ServicePulse
 from llamora.app.services.search_config import SearchConfig
 from llamora.app.services.vector_search import VectorSearchService
@@ -30,6 +31,7 @@ class AppServices:
     db: LocalDB
     vector_search: VectorSearchService
     lexical_reranker: LexicalReranker
+    tag_service: TagService
     search_api: SearchAPI
     llm_service: LLMService
     service_pulse: ServicePulse
@@ -41,12 +43,14 @@ class AppServices:
         search_config = SearchConfig.from_settings(settings)
         vector_search = VectorSearchService(db, search_config)
         lexical_reranker = LexicalReranker()
+        tag_service = TagService(db)
         search_api = SearchAPI(
             db,
             vector_search,
             lexical_reranker,
             config=search_config,
             service_pulse=service_pulse,
+            tag_service=tag_service,
         )
         pending_ttl_raw = settings.get("LLM.stream.pending_ttl", 300)
         try:
@@ -77,6 +81,7 @@ class AppServices:
             db=db,
             vector_search=vector_search,
             lexical_reranker=lexical_reranker,
+            tag_service=tag_service,
             search_api=search_api,
             llm_service=llm_service,
             service_pulse=service_pulse,
@@ -251,6 +256,12 @@ def get_llm_service() -> LLMService:
     """Convenience accessor for the LLM service wrapper."""
 
     return get_services().llm_service
+
+
+def get_tag_service() -> TagService:
+    """Convenience accessor for the tag service."""
+
+    return get_services().tag_service
 
 
 async def _warmup_embeddings() -> None:
