@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Tuple
 
 if TYPE_CHECKING:  # pragma: no cover - type checking only
     from llamora.app.api.search import SearchAPI
+    from llamora.app.services.search_config import SearchConfig
 
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ class IndexWorker:
         self,
         search_api: "SearchAPI",
         *,
+        search_config: "SearchConfig" | None = None,
         max_queue_size: int = DEFAULT_MAX_QUEUE_SIZE,
         enqueue_timeout: float | None = DEFAULT_ENQUEUE_TIMEOUT,
         batch_size: int = 1,
@@ -40,6 +42,7 @@ class IndexWorker:
         self._dropped_jobs = 0
         self._batch_size = max(batch_size, 1)
         self._flush_interval = max(flush_interval, 0.0)
+        self._search_config = search_config
 
     async def start(self) -> None:
         """Start processing indexing jobs."""
@@ -160,3 +163,9 @@ class IndexWorker:
         """Number of jobs dropped because the queue remained full."""
 
         return self._dropped_jobs
+
+    @property
+    def search_config(self) -> "SearchConfig" | None:
+        """Return the search configuration associated with the worker."""
+
+        return self._search_config

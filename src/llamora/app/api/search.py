@@ -6,11 +6,13 @@ from typing import Any, Sequence, Tuple
 
 import orjson
 
-from llamora.settings import settings
 from llamora.app.services.index_worker import IndexWorker
 from llamora.app.services.vector_search import VectorSearchService
 from llamora.app.services.lexical_reranker import LexicalReranker
 from llamora.app.util.tags import canonicalize, display, tag_hash
+from llamora.app.services.search_config import SearchConfig
+from llamora.app.services.service_pulse import ServicePulse
+from llamora.settings import settings
 
 
 TOKEN_PATTERN = re.compile(r"\S+")
@@ -33,12 +35,19 @@ class SearchAPI:
         db,
         vector_search: VectorSearchService | None = None,
         lexical_reranker: LexicalReranker | None = None,
+        *,
+        config: SearchConfig | None = None,
+        service_pulse: ServicePulse | None = None,
     ):
         self.db = db
-        self.vector_search = vector_search or VectorSearchService(db)
+        self.config = config or SearchConfig.from_settings(settings)
+        self.vector_search = vector_search or VectorSearchService(db, self.config)
         self.lexical_reranker = lexical_reranker or LexicalReranker()
+        self._service_pulse = service_pulse
+        self._emit_config_diagnostics()
         self._index_worker = IndexWorker(
             self,
+            search_config=self.config,
             max_queue_size=int(settings.WORKERS.index_worker.max_queue_size),
             batch_size=int(settings.WORKERS.index_worker.batch_size),
             flush_interval=float(settings.WORKERS.index_worker.flush_interval),
@@ -118,7 +127,7 @@ class SearchAPI:
             raise InvalidSearchQuery("Search query must not be empty")
 
         truncated = False
-        max_query_length = int(settings.LIMITS.max_search_query_length)
+        max_query_length = self.config.limits.max_search_query_length
         if len(normalized) > max_query_length:
             logger.info(
                 "Truncating overlong search query (len=%d, limit=%d) for user %s",
@@ -311,14 +320,22 @@ class SearchAPI:
         user_id: str,
         dek: bytes,
         query: str,
-        k1: int = int(settings.SEARCH.progressive.k1),
-        k2: int = int(settings.SEARCH.progressive.k2),
+        k1: int | None = None,
+        k2: int | None = None,
     ) -> tuple[str, list[dict], bool]:
         normalized, truncated = self._normalize_query(user_id, query)
 
-        logger.debug("Search requested by user %s with k1=%d k2=%d", user_id, k1, k2)
+        cfg = self.config.progressive
+        resolved_k1 = int(k1) if k1 is not None else cfg.k1
+        resolved_k2 = int(k2) if k2 is not None else cfg.k2
+        logger.debug(
+            "Search requested by user %s with k1=%d k2=%d",
+            user_id,
+            resolved_k1,
+            resolved_k2,
+        )
         candidates = await self.vector_search.search_candidates(
-            user_id, dek, normalized, k1, k2
+            user_id, dek, normalized, resolved_k1, resolved_k2
         )
 
         candidate_map: OrderedDict[str, dict] = OrderedDict()
@@ -336,7 +353,7 @@ class SearchAPI:
         boosts: dict[str, float] = {}
         if tokens:
             tag_hashes = [tag_hash(user_id, t) for t in tokens]
-            limit = max(k2, len(candidate_map), 1)
+            limit = max(resolved_k2, len(candidate_map), 1)
             await self._hydrate_candidates(
                 user_id, dek, candidate_map, tag_hashes, limit
             )
@@ -351,11 +368,29 @@ class SearchAPI:
         ordered_candidates = list(candidate_map.values())
 
         results = self.lexical_reranker.rerank(
-            normalized, ordered_candidates, k2, boosts
+            normalized, ordered_candidates, resolved_k2, boosts
         )
         await self._attach_tags(user_id, dek, results, tokens)
         logger.debug("Returning %d results for user %s", len(results), user_id)
         return normalized, results, truncated
+
+    @property
+    def search_config(self) -> SearchConfig:
+        """Expose the active search configuration."""
+
+        return self.config
+
+    def _emit_config_diagnostics(self) -> None:
+        payload = self.config.as_dict()
+        if self._service_pulse is not None:
+            self._service_pulse.emit("search.config", payload)
+        logger.info(
+            "Search configuration loaded: k1=%d k2=%d rounds=%d batch_size=%d",
+            self.config.progressive.k1,
+            self.config.progressive.k2,
+            self.config.progressive.rounds,
+            self.config.progressive.batch_size,
+        )
 
     async def on_message_appended(
         self, user_id: str, msg_id: str, plaintext: str, dek: bytes

@@ -2,9 +2,9 @@ import logging
 import time
 from typing import List
 
-from llamora.settings import settings
 from llamora.app.embed.model import async_embed_texts
 from llamora.app.index.message_ann import MessageIndexStore
+from llamora.app.services.search_config import SearchConfig
 
 
 logger = logging.getLogger(__name__)
@@ -13,10 +13,9 @@ logger = logging.getLogger(__name__)
 class VectorSearchService:
     """Handles ANN index access and progressive warm-up for message search."""
 
-    def __init__(self, db, index_max_elements: int | None = None):
-        max_elements = index_max_elements or int(
-            settings.SEARCH.message_index_max_elements
-        )
+    def __init__(self, db, config: SearchConfig, index_max_elements: int | None = None):
+        self._config = config
+        max_elements = index_max_elements or config.limits.message_index_max_elements
         self.index_store = MessageIndexStore(db, max_elements=max_elements)
 
     def _quality_satisfied(self, ids: List[str], cosines: List[float], k2: int) -> bool:
@@ -24,7 +23,7 @@ class VectorSearchService:
             return False
         if not cosines:
             return False
-        cfg = settings.SEARCH.progressive
+        cfg = self._config.progressive
         max_cos = max(cosines)
         hits = sum(c >= float(cfg.poor_match_max_cos) for c in cosines)
         return max_cos >= float(cfg.poor_match_max_cos) and hits >= int(
@@ -41,7 +40,7 @@ class VectorSearchService:
     ) -> bool:
         if self._quality_satisfied(ids, cosines, k2):
             return False
-        cfg = settings.SEARCH.progressive
+        cfg = self._config.progressive
         if rounds >= int(cfg.rounds):
             return False
         elapsed_ms = (time.monotonic() - start) * 1000
@@ -59,9 +58,12 @@ class VectorSearchService:
         user_id: str,
         dek: bytes,
         query: str,
-        k1: int = int(settings.SEARCH.progressive.k1),
-        k2: int = int(settings.SEARCH.progressive.k2),
+        k1: int | None = None,
+        k2: int | None = None,
     ) -> List[dict]:
+        cfg = self._config.progressive
+        k1 = int(k1) if k1 is not None else cfg.k1
+        k2 = int(k2) if k2 is not None else cfg.k2
         logger.debug(
             "Vector search requested by user %s with k1=%d k2=%d", user_id, k1, k2
         )
@@ -77,7 +79,7 @@ class VectorSearchService:
         rounds = 0
         while self._should_continue(start, rounds, ids, cosines, k2):
             added = await self.index_store.expand_older(
-                user_id, dek, int(settings.SEARCH.progressive.batch_size)
+                user_id, dek, int(cfg.batch_size)
             )
             logger.debug("Backfill round %d added %d vectors", rounds + 1, added)
             if added <= 0:

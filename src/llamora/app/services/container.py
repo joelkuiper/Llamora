@@ -13,9 +13,10 @@ from llamora.app.embed.model import async_embed_texts, _get_model
 from llamora.persistence.local_db import LocalDB
 from llamora.app.api.search import SearchAPI
 from llamora.app.services.lexical_reranker import LexicalReranker
-from llamora.app.services.vector_search import VectorSearchService
 from llamora.app.services.llm_service import LLMService
 from llamora.app.services.service_pulse import ServicePulse
+from llamora.app.services.search_config import SearchConfig
+from llamora.app.services.vector_search import VectorSearchService
 from llamora.settings import settings
 
 
@@ -36,11 +37,17 @@ class AppServices:
     @classmethod
     def create(cls) -> "AppServices":
         db = LocalDB()
-        vector_search = VectorSearchService(
-            db, index_max_elements=int(settings.SEARCH.message_index_max_elements)
-        )
+        service_pulse = ServicePulse()
+        search_config = SearchConfig.from_settings(settings)
+        vector_search = VectorSearchService(db, search_config)
         lexical_reranker = LexicalReranker()
-        search_api = SearchAPI(db, vector_search, lexical_reranker)
+        search_api = SearchAPI(
+            db,
+            vector_search,
+            lexical_reranker,
+            config=search_config,
+            service_pulse=service_pulse,
+        )
         pending_ttl_raw = settings.get("LLM.stream.pending_ttl", 300)
         try:
             pending_ttl = int(pending_ttl_raw)
@@ -59,7 +66,6 @@ class AppServices:
                 queue_limit_raw,
             )
             queue_limit = 4
-        service_pulse = ServicePulse()
         llm_service = LLMService(
             db,
             pending_ttl=pending_ttl,
