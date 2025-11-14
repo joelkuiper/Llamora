@@ -45,8 +45,17 @@ function scheduleMidnightRefresh(chat) {
     const today = formatDate(now);
 
     if (chat.dataset.date !== today) {
-      setTimezoneCookie();
-      window.location.href = "/d/today";
+      const timezone = setTimezoneCookie();
+      const zone =
+        typeof timezone === "string" && timezone ? timezone : "UTC";
+      try {
+        const url = new URL("/d/today", window.location.origin);
+        url.searchParams.set("tz", zone);
+        window.location.href = `${url.pathname}${url.search}`;
+      } catch (err) {
+        const encoded = encodeURIComponent(zone);
+        window.location.href = `/d/today?tz=${encoded}`;
+      }
       return;
     }
 

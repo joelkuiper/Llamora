@@ -1,4 +1,5 @@
 import { renderMarkdown } from "../markdown.js";
+import { setTimezoneCookie } from "../timezone.js";
 import {
   positionTypingIndicator,
   TYPING_INDICATOR_SELECTOR,
@@ -208,6 +209,27 @@ class LlmStreamElement extends HTMLElement {
   #startStream() {
     if (this.#eventSource || !this.sseUrl) return;
 
+    const timezone = setTimezoneCookie();
+    const zone =
+      typeof timezone === "string" && timezone ? timezone : "UTC";
+
+    let url = this.sseUrl;
+    try {
+      const base = window.location?.origin || undefined;
+      const parsed = new URL(url, base);
+      if (!parsed.searchParams.has("tz")) {
+        parsed.searchParams.set("tz", zone);
+      }
+      url = `${parsed.pathname}${parsed.search}`;
+    } catch (err) {
+      if (!/[?&]tz=/.test(url)) {
+        const separator = url.includes("?") ? "&" : "?";
+        url = `${url}${separator}tz=${encodeURIComponent(zone)}`;
+      }
+    }
+
+    this.dataset.sseUrl = url;
+
     this.dataset.streaming = "true";
     this.setAttribute("aria-busy", "true");
     this.#meta = null;
@@ -224,7 +246,7 @@ class LlmStreamElement extends HTMLElement {
     );
 
     try {
-      this.#eventSource = new EventSource(this.sseUrl, { withCredentials: true });
+      this.#eventSource = new EventSource(url, { withCredentials: true });
     } catch (err) {
       console.error("Unable to open stream", err);
       this.#text = "Connection failed";
