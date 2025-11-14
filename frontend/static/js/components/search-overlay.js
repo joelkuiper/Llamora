@@ -13,6 +13,7 @@ const getEventTarget = (evt) => {
 };
 
 const RECENT_REFRESH_MIN_MS = 5000;
+const RECENT_CANDIDATE_MAX = 50;
 
 const trimSearchValue = (value) => (typeof value === "string" ? value.trim() : "");
 
@@ -109,6 +110,7 @@ export class SearchOverlay extends ReactiveElement {
   #recentFetchPromise = null;
   #recentLoaded = false;
   #recentFetchedAt = 0;
+  #recentCandidates = null;
   #shortcutBag = null;
 
   constructor() {
@@ -313,6 +315,15 @@ export class SearchOverlay extends ReactiveElement {
   }
 
   #handleInputFocus() {
+    const input = this.#inputEl;
+    if (input) {
+      const missingAutocomplete = !this.#autocomplete;
+      const missingInlineClass = !input.classList.contains("inline-autocomplete__input");
+      const staleInput = this.#autocompleteInput && this.#autocompleteInput !== input;
+      if (missingAutocomplete || missingInlineClass || staleInput) {
+        this.#initAutocomplete();
+      }
+    }
     this.#loadRecentSearches();
   }
 
@@ -329,6 +340,7 @@ export class SearchOverlay extends ReactiveElement {
       },
     });
     this.#autocompleteInput = this.#inputEl;
+    this.#applyRecentCandidates();
   }
 
   #destroyAutocomplete() {
@@ -372,11 +384,15 @@ export class SearchOverlay extends ReactiveElement {
   #loadRecentSearches(force = false) {
     if (!this.#inputEl) return;
     if (this.#recentFetchPromise) {
+      if (this.#recentLoaded) {
+        this.#applyRecentCandidates();
+      }
       return this.#recentFetchPromise;
     }
 
     const now = Date.now();
     if (!force && this.#recentLoaded && now - this.#recentFetchedAt < RECENT_REFRESH_MIN_MS) {
+      this.#applyRecentCandidates();
       return;
     }
 
@@ -433,11 +449,8 @@ export class SearchOverlay extends ReactiveElement {
           }
         }
 
-        if (entries.length) {
-          this.#autocomplete?.setCandidates(entries);
-        } else {
-          this.#autocomplete?.clearCandidates();
-        }
+        this.#recentCandidates = entries.slice(0, RECENT_CANDIDATE_MAX);
+        this.#applyRecentCandidates();
         this.#recentLoaded = true;
         this.#recentFetchedAt = Date.now();
       })
@@ -460,6 +473,15 @@ export class SearchOverlay extends ReactiveElement {
       return;
     }
     this.#autocomplete.addCandidate(entry);
+    const normalized = this.#normalizeCandidateValue(entry);
+    if (!normalized) {
+      return;
+    }
+    const existing = Array.isArray(this.#recentCandidates)
+      ? this.#recentCandidates.filter((item) => this.#normalizeCandidateValue(item) !== normalized)
+      : [];
+    existing.unshift(entry);
+    this.#recentCandidates = existing.slice(0, RECENT_CANDIDATE_MAX);
   }
 
   #handleKeydown(evt) {
@@ -713,6 +735,33 @@ export class SearchOverlay extends ReactiveElement {
     }
 
     this.#loadRecentSearches(true);
+  }
+
+  #normalizeCandidateValue(entry) {
+    if (!entry) return "";
+    const value =
+      typeof entry === "string"
+        ? entry
+        : typeof entry.value === "string"
+          ? entry.value
+          : "";
+    if (!value) return "";
+    const prepared = prepareSearchAutocompleteValue(value);
+    return typeof prepared === "string" ? prepared.toLowerCase() : "";
+  }
+
+  #applyRecentCandidates() {
+    if (!this.#autocomplete) {
+      return;
+    }
+    if (!Array.isArray(this.#recentCandidates)) {
+      return;
+    }
+    if (this.#recentCandidates.length) {
+      this.#autocomplete.setCandidates(this.#recentCandidates);
+    } else {
+      this.#autocomplete.clearCandidates();
+    }
   }
 }
 
