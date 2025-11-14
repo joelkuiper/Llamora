@@ -8,6 +8,8 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Mapping, Protocol
 
+from llamora.app.services.chat_meta import normalise_metadata_emoji
+
 
 logger = logging.getLogger(__name__)
 
@@ -375,11 +377,7 @@ class ResponsePipeline:
                         "Metadata builder returned unexpected payload: %r", generated
                     )
 
-        emoji = meta.get("emoji")
-        if not isinstance(emoji, str) or not emoji.strip():
-            meta["emoji"] = "💬"
-        else:
-            meta["emoji"] = emoji.strip()
+        meta["emoji"] = normalise_metadata_emoji(meta.get("emoji"))
 
         keywords = meta.get("keywords")
         if not isinstance(keywords, list) or any(

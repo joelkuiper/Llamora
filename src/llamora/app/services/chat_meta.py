@@ -8,11 +8,16 @@ import re
 from functools import lru_cache
 from typing import Any, Mapping, Sequence
 
+from emoji import emoji_count, is_emoji
+
 from llamora.llm.client import LLMClient
 from llamora.llm.prompt_templates import render_prompt_template
 
 
 logger = logging.getLogger(__name__)
+
+
+DEFAULT_METADATA_EMOJI = "🌳"
 
 
 _CODE_FENCE_RE = re.compile(r"^```[a-zA-Z0-9_-]*\s*|```$", re.MULTILINE)
@@ -83,16 +88,42 @@ def _normalise_keywords(value: Any, *, max_items: int = 3) -> list[str]:
     return keywords
 
 
+def _clean_metadata_emoji(value: Any) -> str | None:
+    """Return ``value`` if it is a single emoji, otherwise ``None``."""
+
+    if not isinstance(value, str):
+        return None
+
+    candidate = value.strip()
+    if not candidate:
+        return None
+
+    if emoji_count(candidate) != 1:
+        return None
+
+    if not is_emoji(candidate):
+        return None
+
+    return candidate
+
+
+def normalise_metadata_emoji(value: Any) -> str:
+    """Validate ``value`` and return a usable emoji for metadata."""
+
+    cleaned = _clean_metadata_emoji(value)
+    if cleaned is not None:
+        return cleaned
+    return DEFAULT_METADATA_EMOJI
+
+
 def _sanitise_metadata(payload: Mapping[str, Any] | None) -> dict[str, Any]:
     """Validate ``payload`` and apply fallback values when necessary."""
 
-    emoji = "💬"
+    emoji = DEFAULT_METADATA_EMOJI
     keywords: list[str] = []
 
     if isinstance(payload, Mapping):
-        raw_emoji = payload.get("emoji")
-        if isinstance(raw_emoji, str) and raw_emoji.strip():
-            emoji = raw_emoji.strip()
+        emoji = normalise_metadata_emoji(payload.get("emoji"))
         keywords = _normalise_keywords(payload.get("keywords"))
 
     return {"emoji": emoji, "keywords": keywords}
@@ -126,7 +157,7 @@ async def generate_metadata(
 
     reply = reply_text.strip()
     if not reply:
-        return {"emoji": "💬", "keywords": []}
+        return {"emoji": DEFAULT_METADATA_EMOJI, "keywords": []}
 
     system_prompt = _metadata_system_prompt()
     messages = [
@@ -147,7 +178,7 @@ async def generate_metadata(
         raw = await llm.complete_chat(messages, params=params)
     except Exception:
         logger.exception("Metadata generation request failed")
-        return {"emoji": "💬", "keywords": []}
+        return {"emoji": DEFAULT_METADATA_EMOJI, "keywords": []}
 
     metadata = _extract_json_object(raw)
     if metadata is None:
@@ -155,4 +186,4 @@ async def generate_metadata(
     return _sanitise_metadata(metadata)
 
 
-__all__ = ["generate_metadata"]
+__all__ = ["generate_metadata", "normalise_metadata_emoji", "DEFAULT_METADATA_EMOJI"]
