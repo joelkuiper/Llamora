@@ -17,7 +17,9 @@
 
   <span class="visually-hidden" id="msg-{{ user_msg_id }}-speaker">{{ config.APP_NAME }} response</span>
   <div class="markdown-body" id="msg-{{ user_msg_id }}-body">
-    <span id="typing-indicator"
+    <span id="typing-indicator-{{ user_msg_id }}"
+          class="typing-indicator"
+          data-typing-indicator
           data-user-msg-id="{{ user_msg_id }}"
           {%- if stop_url %}
           data-stop-url="{{ stop_url }}"

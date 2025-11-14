@@ -1,3 +1,5 @@
+import { TYPING_INDICATOR_SELECTOR } from "./typing-indicator.js";
+
 const escapeHtml = (value) =>
   String(value)
     .replace(/&/g, "&amp;")
@@ -115,7 +117,10 @@ export function renderAllMarkdown(root, nodes = null) {
       // Streaming responses manage their own incremental rendering to avoid deleting the typing indicator mid-update.
       return;
     }
-    if (el.dataset.rendered !== "true" && !el.querySelector("#typing-indicator")) {
+    if (
+      el.dataset.rendered !== "true" &&
+      !el.querySelector(TYPING_INDICATOR_SELECTOR)
+    ) {
       renderMarkdownInElement(el);
     }
   });

@@ -212,7 +212,7 @@ body {
   }
 
 
-  #typing-indicator {
+  .typing-indicator {
     display: inline-block;
     font-weight: bold;
     padding-left: 4px;
@@ -221,15 +221,15 @@ body {
     white-space: normal; /* don't inherit pre spacing */
   }
 
-  #typing-indicator.stopped {
+  .typing-indicator.stopped {
     color: var(--color-text-muted);
   }
 
-  #typing-indicator.stopped::before {
+  .typing-indicator.stopped::before {
     content: "\23F9"; /* ⏹ */
   }
 
-  #typing-indicator.stopped .cursor {
+  .typing-indicator.stopped .cursor {
     display: none;
   }
 
@@ -536,11 +536,11 @@ scroll-bottom-button .scroll-btn {
 
 @media (prefers-reduced-motion: no-preference) {
   #chat {
-    #typing-indicator {
+    .typing-indicator {
       animation: blink var(--motion-blink) step-start infinite;
     }
 
-    #typing-indicator.stopped {
+    .typing-indicator.stopped {
       animation: pop-fade var(--motion-exhale) ease forwards;
     }
   }
@@ -587,11 +587,11 @@ scroll-bottom-button .scroll-btn {
 
 @media (prefers-reduced-motion: reduce) {
   #chat {
-    #typing-indicator {
+    .typing-indicator {
       animation: none;
     }
 
-    #typing-indicator.stopped {
+    .typing-indicator.stopped {
       animation: none;
       opacity: 0;
     }

@@ -1,5 +1,6 @@
 import { createListenerBag } from "../utils/events.js";
 import { motionSafeBehavior, prefersReducedMotion } from "../utils/motion.js";
+import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
 
 export const scrollEvents = new EventTarget();
 
@@ -595,7 +596,7 @@ export class ScrollManager {
     return Array.from(nodes).some((node) => {
       if (!(node instanceof Element)) return false;
       if (node.dataset.rendered === "true") return false;
-      return !node.querySelector?.("#typing-indicator");
+      return !node.querySelector?.(TYPING_INDICATOR_SELECTOR);
     });
   }
 

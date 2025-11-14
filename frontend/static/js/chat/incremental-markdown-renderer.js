@@ -1,3 +1,4 @@
+import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
 import { computeSharedPrefixLength } from "./incremental-markdown-utils.js";
 
 const HASH_LIMIT = 512;
@@ -120,7 +121,7 @@ export class IncrementalMarkdownRenderer {
 
   #typingAnchor() {
     if (!this.container) return null;
-    const typing = this.container.querySelector?.("#typing-indicator");
+    const typing = this.container.querySelector?.(TYPING_INDICATOR_SELECTOR);
     if (typing && typing.parentNode === this.container) {
       return typing;
     }

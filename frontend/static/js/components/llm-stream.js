@@ -1,5 +1,8 @@
 import { renderMarkdown } from "../markdown.js";
-import { positionTypingIndicator } from "../typing-indicator.js";
+import {
+  positionTypingIndicator,
+  TYPING_INDICATOR_SELECTOR,
+} from "../typing-indicator.js";
 import { IncrementalMarkdownRenderer } from "../chat/incremental-markdown-renderer.js";
 import { scrollEvents } from "../chat/scroll-manager.js";
 import { prefersReducedMotion } from "../utils/motion.js";
@@ -116,7 +119,7 @@ class LlmStreamElement extends HTMLElement {
   connectedCallback() {
     this.#sink = this.querySelector(".raw-response");
     this.#markdown = this.querySelector(".markdown-body");
-    this.#typingIndicator = this.querySelector("#typing-indicator") || null;
+    this.#typingIndicator = this.querySelector(TYPING_INDICATOR_SELECTOR) || null;
     this.#repeatGuardIndicator =
       this.querySelector(".repeat-guard-indicator") || null;
     this.#repeatGuardWavesDismissed = Boolean(
