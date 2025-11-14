@@ -23,7 +23,6 @@
 
 ### 🧠 Backend Patterns
 
-* Start files with `from __future__ import annotations`.
 * Use type hints, `slots=True`, and per-module loggers.
 * Routes are `async`. Use `await render_template()`.
 * Access shared services via `AppServices`, never direct inits.
