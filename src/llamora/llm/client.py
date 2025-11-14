@@ -660,7 +660,7 @@ class LLMClient:
             flattened_dropped = sorted(
                 {tag for sublist in dropped_tags for tag in sublist}
             )
-            self.logger.info(
+            self.logger.debug(
                 "Tag-priority trim adjusted slice: base_start=%s final_indices=%s "
                 "added=%s removed=%s removed_non_priority=%s added_tags=%s "
                 "dropped_priority=%s",
