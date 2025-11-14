@@ -21,11 +21,15 @@
        hx-push-url="true"
        data-date="{{ today }}">Today</button>
   </div>
-  <table class="calendar-table">
+  <table class="calendar-table"
+         role="grid"
+         aria-label="Calendar for {{ month_name }} {{ year }}"
+         data-columns="7"
+         data-calendar-grid>
     <thead>
       <tr>
         {% for d in ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"] %}
-        <th>{{ d }}</th>
+        <th scope="col" role="columnheader">{{ d }}</th>
         {% endfor %}
       </tr>
     </thead>
@@ -34,7 +38,7 @@
       <tr>
         {% for day in week %}
           {% if day == 0 %}
-          <td class="empty"></td>
+          <td class="empty" role="gridcell" tabindex="-1" aria-hidden="true" data-calendar-empty></td>
           {% else %}
           {% set date_str = "%04d-%02d-%02d"|format(year, month, day) %}
           {% set classes = [] %}
@@ -42,7 +46,13 @@
           {% if date_str == today %}{% set classes = classes + ['is-today'] %}{% endif %}
           {% if day in active_days %}{% set classes = classes + ['has-entry'] %}{% endif %}
           {% set is_today = (date_str == today) %}
-          <td data-date="{{ date_str }}"{% if classes %} class="{{ classes|join(' ') }}"{% endif %}>
+          <td data-date="{{ date_str }}"
+              data-calendar-cell
+              role="gridcell"
+              tabindex="{{ 0 if date_str == active_day else -1 }}"
+              aria-selected="{{ 'true' if date_str == active_day else 'false' }}"
+              {% if date_str == active_day %}data-calendar-active="true"{% endif %}
+              {% if classes %} class="{{ classes|join(' ') }}"{% endif %}>
             {% if is_today or day in active_days %}
             <a{% if not is_today %} class="not-today"{% endif %}
                href="{{ url_for('days.day', date=date_str) }}"
@@ -50,6 +60,7 @@
                hx-target="#content-wrapper"
                hx-swap="outerHTML"
                hx-push-url="true"
+               tabindex="-1"
                {% if date_str == active_day %}aria-current="date"{% endif %}>{{ day }}</a>
             {% else %}
             <span class="no-messages">{{ day }}</span>
