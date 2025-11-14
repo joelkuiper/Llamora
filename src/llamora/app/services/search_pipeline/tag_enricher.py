@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Tag-based enrichment for search candidates."""
+
+from __future__ import annotations
 
 import logging
 import re

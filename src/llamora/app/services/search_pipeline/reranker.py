@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Result reranking component for the search pipeline."""
+
+from __future__ import annotations
 
 from typing import Protocol, Sequence
 

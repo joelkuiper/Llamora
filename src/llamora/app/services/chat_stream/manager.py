@@ -122,8 +122,8 @@ class PendingResponse(ResponsePipelineCallbacks):
             llm, user_msg_id, history, params, context, messages
         )
         self._visible_total = ""
-        repeat_guard_size = config.repeat_guard_size
-        repeat_guard_min_length = config.repeat_guard_min_length
+        _repeat_guard_size = config.repeat_guard_size
+        _repeat_guard_min_length = config.repeat_guard_min_length
         metadata_builder = partial(generate_metadata, llm)
         self._pipeline = ResponsePipeline(
             session=self._session,

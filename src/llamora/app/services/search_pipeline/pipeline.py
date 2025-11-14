@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Composable pipeline orchestration for search queries."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any

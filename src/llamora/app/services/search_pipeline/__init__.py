@@ -1,6 +1,5 @@
-from __future__ import annotations
-
 """Search pipeline component interfaces and defaults."""
+from __future__ import annotations
 
 from .exceptions import InvalidSearchQuery
 from .normalizer import BaseSearchNormalizer, DefaultSearchNormalizer, NormalizedQuery

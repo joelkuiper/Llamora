@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Candidate generation for the search pipeline."""
+
+from __future__ import annotations
 
 import logging
 from collections import OrderedDict

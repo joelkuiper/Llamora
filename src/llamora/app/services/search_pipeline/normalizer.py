@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Query normalization component for the search pipeline."""
+
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
