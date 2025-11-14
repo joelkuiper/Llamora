@@ -1,5 +1,5 @@
-import { flashHighlight, clearScrollTarget, createInlineSpinner } from "../ui.js";
-import { motionSafeBehavior, prefersReducedMotion } from "../utils/motion.js";
+import { scrollToHighlight, createInlineSpinner } from "../ui.js";
+import { prefersReducedMotion } from "../utils/motion.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 import { InlineAutocompleteController } from "../utils/inline-autocomplete.js";
 import { AutocompleteDataStore } from "../utils/autocomplete-data-store.js";
@@ -601,15 +601,12 @@ export class SearchOverlay extends ReactiveElement {
     if (link.dataset.date === currentId) {
       evt.preventDefault();
       this.#closeResults(true);
-      const el = document.getElementById(targetId);
-      if (el) {
-        history.pushState(null, "", `${window.location.pathname}?target=${targetId}`);
-        el.scrollIntoView({
-          behavior: motionSafeBehavior("smooth"),
-          block: "center",
+      if (targetId) {
+        scrollToHighlight(null, {
+          targetId,
+          pushHistory: true,
+          clearOptions: { emitEvent: false },
         });
-        flashHighlight(el);
-        clearScrollTarget(targetId, { emitEvent: false });
       }
     } else {
       this.#closeResults(true, { immediate: true });

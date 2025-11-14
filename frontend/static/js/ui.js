@@ -159,12 +159,26 @@ export function clearScrollTarget(target, options = {}) {
   }
 }
 
-export function scrollToHighlight(fallbackTarget) {
+export function scrollToHighlight(fallbackTarget, options = {}) {
+  const {
+    targetId = null,
+    pushHistory = false,
+    scrollOptions = {
+      behavior: motionSafeBehavior("smooth"),
+      block: "center",
+    },
+    clearOptions = {},
+  } = options;
+
   const params = new URLSearchParams(window.location.search);
-  let target = params.get("target");
+  let target = targetId ?? params.get("target");
   let consumedFallback = false;
-  let shouldUpdateHistory = false;
+  let shouldUpdateHistory = Boolean(targetId);
   const historyState = history.state;
+
+  if (targetId) {
+    params.set("target", targetId);
+  }
 
   if (!target && window.location.hash.startsWith("#msg-")) {
     target = window.location.hash.substring(1);
@@ -185,23 +199,26 @@ export function scrollToHighlight(fallbackTarget) {
       const newUrl = query
         ? `${window.location.pathname}?${query}`
         : window.location.pathname;
-      history.replaceState(historyState, "", newUrl);
+
+      if (pushHistory && targetId) {
+        history.pushState(historyState, "", newUrl);
+      } else {
+        history.replaceState(historyState, "", newUrl);
+      }
     }
+
     const el = document.getElementById(target);
     if (el) {
       scrollEvents.dispatchEvent(
         new CustomEvent("scroll:target", {
           detail: {
             id: target,
-            options: {
-              behavior: motionSafeBehavior("smooth"),
-              block: "center",
-            },
+            options: scrollOptions,
           },
         })
       );
       flashHighlight(el);
-      clearScrollTarget(target, { historyState });
+      clearScrollTarget(target, { historyState, ...clearOptions });
     }
   }
 
