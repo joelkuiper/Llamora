@@ -2,7 +2,7 @@ import asyncio
 import logging
 from typing import Any
 
-from quart import Blueprint, render_template, request, abort, jsonify
+from quart import Blueprint, render_template, request, jsonify
 from llamora.app.api.search import InvalidSearchQuery
 from llamora.app.services.container import get_search_api, get_services
 from llamora.app.services.auth_helpers import login_required

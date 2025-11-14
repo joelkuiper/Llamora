@@ -5,13 +5,22 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from logging import getLogger
 from types import MappingProxyType
-from typing import Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from cachetools import TTLCache
+
+from llamora.app.db.events import (
+    MESSAGE_HISTORY_CHANGED_EVENT,
+    MESSAGE_TAGS_CHANGED_EVENT,
+)
 
 logger = getLogger(__name__)
 
 CacheKey = tuple[str, str]
+
+if TYPE_CHECKING:
+    from llamora.app.db.events import RepositoryEventBus
+    from llamora.app.db.messages import MessagesRepository
 
 
 class HistoryCacheBackend(Protocol):
@@ -164,10 +173,68 @@ class HistoryCache:
                 logger.exception("History cache listener %r failed", listener)
 
 
+class HistoryCacheSynchronizer:
+    """Bridge repository events with the history cache."""
+
+    __slots__ = ("_cache", "_events", "_messages")
+
+    def __init__(
+        self,
+        *,
+        event_bus: RepositoryEventBus | None,
+        history_cache: HistoryCache | None,
+        messages_repository: "MessagesRepository" | None,
+    ) -> None:
+        self._cache = history_cache
+        self._events = event_bus
+        self._messages = messages_repository
+        if not self._events:
+            return
+        self._events.subscribe(
+            MESSAGE_HISTORY_CHANGED_EVENT, self._handle_history_changed
+        )
+        self._events.subscribe(
+            MESSAGE_TAGS_CHANGED_EVENT, self._handle_tags_changed
+        )
+
+    async def _handle_history_changed(
+        self,
+        *,
+        user_id: str,
+        created_date: str,
+        reason: str,
+        message_id: str | None = None,
+        message: Mapping[str, Any] | None = None,
+    ) -> None:
+        if not self._cache:
+            return
+        if reason == "insert" and message is not None:
+            await self._cache.append(user_id, created_date, message)
+            return
+        await self._cache.invalidate(user_id, created_date)
+
+    async def _handle_tags_changed(
+        self, *, user_id: str, message_id: str
+    ) -> None:
+        if not self._events or not self._messages:
+            return
+        created_date = await self._messages.get_message_date(user_id, message_id)
+        if not created_date:
+            return
+        await self._events.emit_for_message_date(
+            MESSAGE_HISTORY_CHANGED_EVENT,
+            user_id=user_id,
+            created_date=created_date,
+            message_id=message_id,
+            reason="tags-changed",
+        )
+
+
 __all__ = [
     "HistoryCache",
     "HistoryCacheEvent",
     "HistoryCacheListener",
     "FrozenHistory",
+    "HistoryCacheSynchronizer",
     "default_backend_factory",
 ]

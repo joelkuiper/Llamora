@@ -24,7 +24,7 @@ from llamora.app.services.crypto import (
 )
 from llamora.app.db.base import run_in_transaction
 from llamora.app.db.events import RepositoryEventBus
-from llamora.app.services.history_cache import HistoryCache
+from llamora.app.services.history_cache import HistoryCache, HistoryCacheSynchronizer
 from llamora.app.db.users import UsersRepository
 from llamora.app.db.messages import MessagesRepository
 from llamora.app.db.tags import TagsRepository
@@ -59,6 +59,7 @@ class LocalDB:
         self._search_history: SearchHistoryRepository | None = None
         self._events: RepositoryEventBus | None = None
         self._history_cache: HistoryCache | None = None
+        self._history_synchronizer: HistoryCacheSynchronizer | None = None
         self._init_lock = asyncio.Lock()
         self._sync_lock = threading.Lock()
 
@@ -196,6 +197,11 @@ class LocalDB:
             decrypt_message,
             self._events,
             self._history_cache,
+        )
+        self._history_synchronizer = HistoryCacheSynchronizer(
+            event_bus=self._events,
+            history_cache=self._history_cache,
+            messages_repository=self._messages,
         )
         self._tags = TagsRepository(
             self.pool,

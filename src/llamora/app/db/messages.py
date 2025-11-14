@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Awaitable, Callable
+from typing import Awaitable, Callable
 
 import orjson
 from aiosqlitepool import SQLiteConnectionPool
@@ -12,11 +12,7 @@ from llamora.llm.tokenizers.tokenizer import count_message_tokens
 from llamora.app.services.history_cache import HistoryCache
 
 from .base import BaseRepository
-from .events import (
-    RepositoryEventBus,
-    MESSAGE_HISTORY_CHANGED_EVENT,
-    MESSAGE_TAGS_CHANGED_EVENT,
-)
+from .events import RepositoryEventBus, MESSAGE_HISTORY_CHANGED_EVENT
 from .utils import cached_tag_name
 
 MessageAppendedCallback = Callable[[str, str, str, bytes], Awaitable[None]]
@@ -41,10 +37,6 @@ class MessagesRepository(BaseRepository):
         if history_cache is None:
             raise ValueError("history_cache must be provided")
         self._history_cache = history_cache
-        if self._event_bus:
-            self._event_bus.subscribe(
-                MESSAGE_TAGS_CHANGED_EVENT, self._handle_message_tags_changed
-            )
 
     def set_on_message_appended(self, callback: MessageAppendedCallback | None) -> None:
         self._on_message_appended = callback
@@ -58,14 +50,6 @@ class MessagesRepository(BaseRepository):
         self, user_id: str, created_date: str, history: list[dict]
     ) -> None:
         await self._history_cache.store(user_id, created_date, history)
-
-    async def _append_message_to_cache(
-        self, user_id: str, created_date: str, message: dict
-    ) -> None:
-        await self._history_cache.append(user_id, created_date, message)
-
-    async def _invalidate_history_cache(self, user_id: str, created_date: str) -> None:
-        await self._history_cache.invalidate(user_id, created_date)
 
     def _rows_to_messages(
         self, rows, user_id: str, dek: bytes
@@ -208,16 +192,15 @@ class MessagesRepository(BaseRepository):
             "tags": [],
         }
 
-        if created_date:
-            await self._append_message_to_cache(user_id, created_date, message_entry)
-            if self._event_bus:
-                await self._event_bus.emit_for_message_date(
-                    MESSAGE_HISTORY_CHANGED_EVENT,
-                    user_id=user_id,
-                    created_date=created_date,
-                    message_id=msg_id,
-                    reason="insert",
-                )
+        if created_date and self._event_bus:
+            await self._event_bus.emit_for_message_date(
+                MESSAGE_HISTORY_CHANGED_EVENT,
+                user_id=user_id,
+                created_date=created_date,
+                message_id=msg_id,
+                reason="insert",
+                message=message_entry,
+            )
 
         if self._on_message_appended:
             await self._on_message_appended(user_id, msg_id, plaintext, dek)
@@ -248,8 +231,6 @@ class MessagesRepository(BaseRepository):
         created_date = await self.get_message_date(user_id, message_id)
         if not created_date:
             return
-
-        await self._invalidate_history_cache(user_id, created_date)
 
         if self._event_bus:
             await self._event_bus.emit_for_message_date(
@@ -455,11 +436,3 @@ class MessagesRepository(BaseRepository):
             row = await cursor.fetchone()
         return bool(row)
 
-    async def _handle_message_tags_changed(
-        self, *, user_id: str, message_id: str
-    ) -> None:
-        await self.invalidate_history_for_message(
-            user_id,
-            message_id,
-            reason="tags-changed",
-        )
