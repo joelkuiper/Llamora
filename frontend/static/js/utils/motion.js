@@ -15,8 +15,8 @@ export function prefersReducedMotion() {
   return Boolean(query?.matches);
 }
 
-export function motionSafeBehavior(behavior = "smooth", reduceMotion = prefersReducedMotion()) {
-  if (!reduceMotion) {
+export function motionSafeBehavior(behavior = "smooth") {
+  if (!prefersReducedMotion()) {
     return behavior;
   }
   return behavior === "smooth" ? "auto" : behavior;

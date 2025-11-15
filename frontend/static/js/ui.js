@@ -2,10 +2,7 @@ import {
   requestScrollTarget,
   requestScrollTargetConsumed,
 } from "./chat/scroll-manager.js";
-import {
-  animateMotion,
-  motionSafeBehavior,
-} from "./services/motion.js";
+import { motionSafeBehavior, prefersReducedMotion } from "./utils/motion.js";
 
 export const SPINNER = {
   interval: 80,
@@ -95,46 +92,39 @@ export function stopButtonSpinner(btn) {
   }
 }
 
-const highlightAnimations = new WeakMap();
-
 export function flashHighlight(el) {
   if (!(el instanceof HTMLElement)) return;
-
-  const cancelExisting = highlightAnimations.get(el);
-  if (typeof cancelExisting === "function") {
-    cancelExisting();
+  const existing = el.dataset.flashTimerId;
+  if (existing) {
+    window.clearTimeout(Number(existing));
+    delete el.dataset.flashTimerId;
   }
-
-  highlightAnimations.delete(el);
-
-  el.style.backgroundColor = "";
   el.classList.remove("no-anim");
   el.classList.add("highlight");
 
-  const finish = () => {
-    el.classList.remove("highlight");
-    el.style.backgroundColor = "";
-    el.classList.add("no-anim");
-    highlightAnimations.delete(el);
-  };
+  if (prefersReducedMotion()) {
+    el.style.backgroundColor = "var(--highlight-color)";
+    const timeoutId = window.setTimeout(() => {
+      el.classList.remove("highlight");
+      el.style.backgroundColor = "";
+      el.classList.add("no-anim");
+      delete el.dataset.flashTimerId;
+    }, 600);
+    el.dataset.flashTimerId = String(timeoutId);
+    return;
+  }
 
-  const cancel = animateMotion(el, "motion-animate-highlight", {
-    onFinish: finish,
-    onCancel: finish,
-    reducedMotion: (node, done) => {
-      node.style.backgroundColor = "var(--highlight-color)";
-      const timeoutId = window.setTimeout(() => {
-        node.style.backgroundColor = "";
-        done();
-      }, 600);
-      return () => {
-        window.clearTimeout(timeoutId);
-        node.style.backgroundColor = "";
-      };
+  el.style.animation = "flash 1s ease-in-out";
+  el.addEventListener(
+    "animationend",
+    () => {
+      el.classList.remove("highlight");
+      el.style.animation = "";
+      el.classList.add("no-anim");
+      delete el.dataset.flashTimerId;
     },
-  });
-
-  highlightAnimations.set(el, cancel);
+    { once: true }
+  );
 }
 
 export function clearScrollTarget(target, options = {}) {

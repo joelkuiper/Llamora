@@ -1,9 +1,8 @@
 /* Token layers */
-@layer tokens.core, tokens.dark, tokens.motion;
+@layer tokens.core, tokens.dark;
 
 @import url("./tokens/core.css") layer(tokens.core);
 @import url("./tokens/dark.css") layer(tokens.dark);
-@import url("./motion.css");
 
 .meta-chips {
   --meta-chip-max-width: 32ch;
@@ -83,6 +82,32 @@
   transform: translateY(1px);
   box-shadow: var(--inset-shadow-disabled);
 }
+
+.meta-chip.chip-enter,
+.meta-chips.chip-enter,
+.meta-chip.htmx-added {
+  animation: chip-pop var(--motion-gentle) ease both;
+}
+
+.meta-chip.htmx-swapping {
+  animation: chip-pop-out var(--motion-hover) ease forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meta-chip.chip-enter,
+  .meta-chips.chip-enter,
+  .meta-chip.htmx-added {
+    animation: none;
+    opacity: 1;
+  }
+
+  .meta-chip.htmx-swapping {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+
 
 .chip-label {
   text-decoration: none;
@@ -290,3 +315,24 @@
 }
 
 
+@keyframes chip-pop {
+  from {
+    opacity: 0;
+    /* transform: scale(0.9); */
+  }
+  to {
+    opacity: 1;
+    /* transform: scale(1); */
+  }
+}
+
+@keyframes chip-pop-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
