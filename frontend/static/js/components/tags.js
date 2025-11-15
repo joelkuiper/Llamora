@@ -2,6 +2,7 @@ import { createPopover } from "../popover.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 import { AutocompleteOverlayMixin } from "./base/autocomplete-overlay.js";
 import { AutocompleteHistory } from "../utils/autocomplete-history.js";
+import { parsePositiveInteger } from "../utils/number.js";
 
 const canonicalizeTag = (value, limit = null) => {
   const text = `${value ?? ""}`.replace(/^#/, "").trim();
@@ -598,20 +599,12 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
 
   #getAutocompleteLimit() {
     const raw = this.dataset?.autocompleteLimit ?? "";
-    const value = Number.parseInt(raw, 10);
-    if (Number.isFinite(value) && value > 0) {
-      return value;
-    }
-    return null;
+    return parsePositiveInteger(raw, null);
   }
 
   #getInputMaxLength() {
     const attr = this.#input?.getAttribute("maxlength") ?? "";
-    const value = Number.parseInt(attr, 10);
-    if (Number.isFinite(value) && value > 0) {
-      return value;
-    }
-    return null;
+    return parsePositiveInteger(attr, null);
   }
 
   #getCanonicalMaxLength() {

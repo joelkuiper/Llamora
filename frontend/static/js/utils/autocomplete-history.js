@@ -1,16 +1,9 @@
 import { normalizeAutocompleteValue } from "./autocomplete-normalize.js";
+import { parsePositiveInteger } from "./number.js";
 
 const defaultPrepare = (value) => value;
 
 const defaultNormalize = (value) => normalizeAutocompleteValue(value);
-
-const toPositiveInteger = (value, fallback = null) => {
-  const parsed = Number.parseInt(value, 10);
-  if (Number.isFinite(parsed) && parsed > 0) {
-    return parsed;
-  }
-  return fallback;
-};
 
 export class AutocompleteHistory {
   #entries;
@@ -29,7 +22,7 @@ export class AutocompleteHistory {
     this.#normalize = typeof normalize === "function" ? normalize : defaultNormalize;
     this.#prepare = typeof prepare === "function" ? prepare : defaultPrepare;
 
-    const limit = toPositiveInteger(maxEntries, null);
+    const limit = parsePositiveInteger(maxEntries, null);
     this.#maxEntries = limit ?? null;
     this.#entries = [];
 

@@ -1,4 +1,5 @@
 import { normalizeAutocompleteValue } from "./autocomplete-normalize.js";
+import { parsePositiveInteger } from "./number.js";
 
 const DEFAULT_DEBOUNCE_MS = 200;
 
@@ -40,14 +41,6 @@ const defaultMergeCandidates = (remoteCandidates, localCollections, helpers) => 
   }
 
   return merged;
-};
-
-const toPositiveInteger = (value, fallback = null) => {
-  const parsed = Number.parseInt(value, 10);
-  if (Number.isFinite(parsed) && parsed > 0) {
-    return parsed;
-  }
-  return fallback;
 };
 
 const sanitizeList = (entries) => {
@@ -101,8 +94,8 @@ export class AutocompleteDataStore {
     this.#buildCacheKey = typeof buildCacheKey === "function" ? buildCacheKey : defaultBuildCacheKey;
     this.#getCandidateKey = typeof getCandidateKey === "function" ? getCandidateKey : defaultGetCandidateKey;
     this.#mergeCandidates = typeof mergeCandidates === "function" ? mergeCandidates : defaultMergeCandidates;
-    this.#maxResults = toPositiveInteger(maxResults, null);
-    this.#cacheTimeMs = toPositiveInteger(cacheTimeMs, null);
+    this.#maxResults = parsePositiveInteger(maxResults, null);
+    this.#cacheTimeMs = parsePositiveInteger(cacheTimeMs, null);
     this.#cache = new Map();
     this.#timer = null;
     this.#pendingKey = null;
