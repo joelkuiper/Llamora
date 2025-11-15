@@ -64,20 +64,25 @@ const stampDetail = (detail, base) => {
   return payload;
 };
 
-export function requestScrollForceBottom(detail = {}) {
-  const normalized = stampDetail(
-    {
-      ...detail,
-      force: detail?.force === true,
-    },
-    FORCE_BOTTOM_DETAIL_BASE
-  );
+const emitScrollEvent = (eventName, baseDetail, detail = {}) => {
+  const normalized = stampDetail(detail, baseDetail);
   scrollEvents.dispatchEvent(
-    new CustomEvent(FORCE_BOTTOM_EVENT, {
+    new CustomEvent(eventName, {
       detail: normalized,
     })
   );
   return normalized;
+};
+
+export function requestScrollForceBottom(detail = {}) {
+  return emitScrollEvent(
+    FORCE_BOTTOM_EVENT,
+    FORCE_BOTTOM_DETAIL_BASE,
+    {
+      ...detail,
+      force: detail?.force === true,
+    }
+  );
 }
 
 export function requestScrollTarget(target, options = null, detail = {}) {
@@ -93,29 +98,18 @@ export function requestScrollTarget(target, options = null, detail = {}) {
     baseDetail.element = target;
   }
 
-  const normalized = stampDetail(baseDetail, TARGET_DETAIL_BASE);
-  scrollEvents.dispatchEvent(
-    new CustomEvent(TARGET_EVENT, {
-      detail: normalized,
-    })
-  );
-  return normalized;
+  return emitScrollEvent(TARGET_EVENT, TARGET_DETAIL_BASE, baseDetail);
 }
 
 export function requestScrollTargetConsumed(target, detail = {}) {
-  const normalized = stampDetail(
+  return emitScrollEvent(
+    TARGET_CONSUMED_EVENT,
+    TARGET_CONSUMED_DETAIL_BASE,
     {
       ...detail,
       target: target ?? null,
-    },
-    TARGET_CONSUMED_DETAIL_BASE
+    }
   );
-  scrollEvents.dispatchEvent(
-    new CustomEvent(TARGET_CONSUMED_EVENT, {
-      detail: normalized,
-    })
-  );
-  return normalized;
 }
 
 const DEFAULT_CONTAINER_SELECTOR = "#content-wrapper";
