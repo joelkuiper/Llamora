@@ -54,7 +54,6 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
   #closeButton = null;
   #tagContainer = null;
   #listeners = null;
-  #inputListeners = null;
   #buttonClickHandler;
   #closeClickHandler;
   #inputHandler;
@@ -118,6 +117,8 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
       return;
     }
 
+    listeners.add(this.#input, "input", this.#inputHandler);
+    listeners.add(this.#input, "focus", this.#inputFocusHandler);
     listeners.add(
       this.#form,
       "htmx:configRequest",
@@ -137,12 +138,12 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
 
     this.#initPopover();
     this.#updateSubmitState();
+    this.#initAutocomplete();
   }
 
   disconnectedCallback() {
     this.#destroyPopover();
     this.#teardownListeners();
-    this.#inputListeners = this.disposeListenerBag(this.#inputListeners);
     super.disconnectedCallback();
   }
 
@@ -351,18 +352,19 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#updateAutocompleteCandidates();
   }
 
+  resolveAutocompleteInput() {
+    if (this.#input instanceof HTMLInputElement) {
+      return this.#input;
+    }
+    const form = this.querySelector(".tag-popover form");
+    const input = form?.querySelector('input[name="tag"]');
+    return input instanceof HTMLInputElement ? input : null;
+  }
+
   getAutocompleteControllerOptions() {
     return {
       prepareQuery: prepareTagAutocompleteValue,
       prepareCandidate: prepareTagAutocompleteValue,
-    };
-  }
-
-  getAutocompleteInputConfig() {
-    return {
-      selector: 'form input[name="tag"]',
-      observe: true,
-      root: () => this.querySelector(".tag-popover") ?? this,
     };
   }
 
@@ -403,7 +405,7 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   buildAutocompleteFetchParams() {
-    const input = this.autocompleteInput;
+    const input = this.resolveAutocompleteInput();
     const url = this.#getAutocompleteUrl();
     const msgId = this.dataset?.msgId ?? "";
     if (!input || !url || !msgId) {
@@ -425,40 +427,15 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
     return this.#normalizeTagCandidate(candidate);
   }
 
-  onAutocompleteInputChanged(input, previous, meta = {}) {
-    const next = input instanceof HTMLInputElement ? input : null;
-    this.#input = next;
-
-    this.#inputListeners = this.disposeListenerBag(this.#inputListeners);
-
-    if (next) {
-      const bag = this.createListenerBag();
-      bag.add(next, "input", this.#inputHandler);
-      bag.add(next, "focus", this.#inputFocusHandler);
-      this.#inputListeners = bag;
-    }
-
-    this.#initAutocomplete();
-    this.#updateSubmitState();
-
-    if (meta?.initialized) {
-      this.scheduleAutocompleteFetch({ immediate: true });
-    }
-  }
-
   #initAutocomplete() {
-    const input = this.#input ?? this.autocompleteInput;
-    if (!(input instanceof HTMLInputElement)) {
-      return;
-    }
-
-    this.#input = input;
-    input.setAttribute("autocomplete", "off");
-    input.setAttribute("autocapitalize", "off");
-    input.setAttribute("autocorrect", "off");
-    input.setAttribute("spellcheck", "false");
-    input.setAttribute("data-lpignore", "true");
-    input.setAttribute("data-1p-ignore", "true");
+    if (!this.#input) return;
+    this.#input.setAttribute("autocomplete", "off");
+    this.#input.setAttribute("autocapitalize", "off");
+    this.#input.setAttribute("autocorrect", "off");
+    this.#input.setAttribute("spellcheck", "false");
+    this.#input.setAttribute("data-lpignore", "true");
+    this.#input.setAttribute("data-1p-ignore", "true");
+    this.refreshAutocompleteController({ force: true });
     this.#updateAutocompleteCandidates();
   }
 
