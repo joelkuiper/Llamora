@@ -13,6 +13,7 @@ import {
   buildTimezoneQueryParam,
   getTimezone,
 } from "../utils/timezone-service.js";
+import { afterNextFrame, scheduleFrame } from "../utils/scheduler.js";
 import "./chat-form.js";
 import "./llm-stream.js";
 
@@ -142,9 +143,7 @@ export class ChatView extends ReactiveElement {
       }
     };
 
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(finalize);
-    });
+    afterNextFrame(finalize);
   }
 
   #queuePendingScrollTarget() {
@@ -152,7 +151,7 @@ export class ChatView extends ReactiveElement {
       return;
     }
 
-    window.requestAnimationFrame(() => {
+    scheduleFrame(() => {
       if (!this.#pendingScrollTarget) {
         return;
       }
@@ -178,7 +177,7 @@ export class ChatView extends ReactiveElement {
 
     const isVisible = this.offsetParent !== null && chat.offsetParent !== null;
     if (!isVisible) {
-      window.requestAnimationFrame(() => this.#applyPendingScrollTarget());
+      scheduleFrame(() => this.#applyPendingScrollTarget());
       return;
     }
 
@@ -499,7 +498,10 @@ export class ChatView extends ReactiveElement {
     this.#initialized = false;
     this.#forceNavFlash = true;
     this.#cancelHistoryRestoreFrame();
-    this.#historyRestoreFrame = window.requestAnimationFrame(() => {
+    const frame = scheduleFrame(() => {
+      if (this.#historyRestoreFrame !== frame) {
+        return;
+      }
       this.#historyRestoreFrame = null;
       this.#syncToChatDate();
       if (this.#chatForm) {
@@ -526,6 +528,7 @@ export class ChatView extends ReactiveElement {
       }
       this.#resumeDormantStreams();
     });
+    this.#historyRestoreFrame = frame;
   }
 
   async #wireChatForm(chatForm, { chat, container, session, date }) {
@@ -540,8 +543,8 @@ export class ChatView extends ReactiveElement {
   }
 
   #cancelHistoryRestoreFrame() {
-    if (this.#historyRestoreFrame != null) {
-      window.cancelAnimationFrame(this.#historyRestoreFrame);
+    if (this.#historyRestoreFrame) {
+      this.#historyRestoreFrame.cancel?.();
       this.#historyRestoreFrame = null;
     }
   }

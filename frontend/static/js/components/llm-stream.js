@@ -12,6 +12,7 @@ import {
   getTimezone,
   TIMEZONE_QUERY_PARAM,
 } from "../utils/timezone-service.js";
+import { scheduleFrame } from "../utils/scheduler.js";
 
 const NEWLINE_REGEX = /\[newline\]/g;
 const RENDER_COOLDOWN_MS = 16;
@@ -285,7 +286,7 @@ class LlmStreamElement extends HTMLElement {
     }
 
     if (this.#renderFrame) {
-      cancelAnimationFrame(this.#renderFrame);
+      this.#renderFrame.cancel?.();
       this.#renderFrame = null;
     }
 
@@ -401,7 +402,10 @@ class LlmStreamElement extends HTMLElement {
       this.#renderCooldownTimer = null;
       this.#cancelRender({ clearPending: false });
 
-      this.#renderFrame = requestAnimationFrame(() => {
+      const frame = scheduleFrame(() => {
+        if (this.#renderFrame !== frame) {
+          return;
+        }
         this.#renderFrame = null;
         const options = this.#pendingRenderOptions || {
           repositionTyping: false,
@@ -410,6 +414,7 @@ class LlmStreamElement extends HTMLElement {
         this.#pendingRenderOptions = null;
         this.#renderNow(options);
       });
+      this.#renderFrame = frame;
     }, RENDER_COOLDOWN_MS);
   }
 

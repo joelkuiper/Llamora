@@ -6,6 +6,7 @@ import {
   ACTIVE_DAY_CHANGED_EVENT,
   getActiveDay,
 } from "./active-day-store.js";
+import { scheduleFrame, scheduleRafLoop } from "../utils/scheduler.js";
 
 export const scrollEvents = new EventTarget();
 
@@ -122,11 +123,6 @@ const DEFAULT_BUTTON_SELECTOR = "scroll-bottom-button, #scroll-bottom";
 const STORAGE_PREFIX = "scroll-pos";
 const MARKDOWN_EVENT = "markdown:rendered";
 
-const raf = (fn) =>
-  typeof requestAnimationFrame === "function"
-    ? requestAnimationFrame(fn)
-    : setTimeout(fn, 16);
-
 export class ScrollManager {
   #initSuppressed = false;
   #initReleaseFrame = null;
@@ -181,7 +177,7 @@ export class ScrollManager {
     });
     bag.add(scrollEvents, REFRESH_EVENT, () => {
       this.ensureElements();
-      this.toggleScrollBtn();
+      scheduleFrame(() => this.toggleScrollBtn());
     });
     bag.add(scrollEvents, TARGET_CONSUMED_EVENT, (event) => {
       const detail = event?.detail || {};
@@ -324,7 +320,7 @@ export class ScrollManager {
     this.lastScrollTop = this.container?.scrollTop ?? 0;
     this.#initSuppressed = true;
     this.toggleScrollBtn();
-    raf(() => this.toggleScrollBtn());
+    scheduleFrame(() => this.toggleScrollBtn());
     this.#scheduleInitRelease();
     this.alignScrollButton();
   }
@@ -457,24 +453,20 @@ export class ScrollManager {
       return;
     }
 
-    if (typeof requestAnimationFrame !== "function") {
-      this.alignScrollButtonNow();
-      return;
-    }
-
-    this.#alignFrame = requestAnimationFrame(() => {
+    const frame = scheduleFrame(() => {
+      if (this.#alignFrame !== frame) {
+        return;
+      }
       this.#alignFrame = null;
       this.alignScrollButtonNow();
     });
+    this.#alignFrame = frame;
   }
 
   alignScrollButtonNow() {
     if (!this.chat) return;
 
-    if (this.#alignFrame != null && typeof cancelAnimationFrame === "function") {
-      cancelAnimationFrame(this.#alignFrame);
-      this.#alignFrame = null;
-    }
+    this.#cancelAlign();
 
     const rect = this.chat.getBoundingClientRect();
     if (rect.width === 0) {
@@ -548,48 +540,45 @@ export class ScrollManager {
 
     this.#cancelInitRelease();
 
-    const now =
-      typeof performance !== "undefined" && typeof performance.now === "function"
-        ? () => performance.now()
-        : () => Date.now();
+    const controller = scheduleRafLoop({
+      timeoutMs: 500,
+      callback: ({ timedOut, stop }) => {
+        if (this.#initReleaseFrame !== controller) {
+          stop();
+          return false;
+        }
 
-    const start = now();
-    const frame = { raf: null };
-    this.#initReleaseFrame = frame;
+        const nearBottom = this.isUserNearBottom(10);
 
-    const releaseWhenReady = () => {
-      if (this.#initReleaseFrame !== frame) return;
+        if (nearBottom || timedOut) {
+          stop();
+          if (this.#initReleaseFrame === controller) {
+            this.#initReleaseFrame = null;
+          }
+          this.#initSuppressed = false;
+          this.toggleScrollBtn();
+          return false;
+        }
 
-      const nearBottom = this.isUserNearBottom(10);
-      const timedOut = now() - start >= 500;
+        return true;
+      },
+    });
 
-      if (nearBottom || timedOut) {
-        this.#initReleaseFrame = null;
-        this.#initSuppressed = false;
-        this.toggleScrollBtn();
-        return;
-      }
-
-      frame.raf = requestAnimationFrame(releaseWhenReady);
-    };
-
-    frame.raf = requestAnimationFrame(releaseWhenReady);
+    this.#initReleaseFrame = controller;
   }
 
   #cancelInitRelease() {
-    const frame = this.#initReleaseFrame;
-    if (!frame) return;
-    if (frame.raf != null) {
-      cancelAnimationFrame(frame.raf);
+    if (this.#initReleaseFrame) {
+      this.#initReleaseFrame.cancel?.();
+      this.#initReleaseFrame = null;
     }
-    this.#initReleaseFrame = null;
   }
 
   #cancelAlign() {
-    if (this.#alignFrame != null && typeof cancelAnimationFrame === "function") {
-      cancelAnimationFrame(this.#alignFrame);
+    if (this.#alignFrame) {
+      this.#alignFrame.cancel?.();
+      this.#alignFrame = null;
     }
-    this.#alignFrame = null;
   }
 
   #handleBeforeSwap(event) {
@@ -758,7 +747,7 @@ export class ScrollManager {
   #applySavedScroll(saved) {
     const value = Number.parseInt(saved, 10);
     if (!Number.isFinite(value)) return;
-    raf(() => {
+    scheduleFrame(() => {
       this.ensureContainer();
       if (!this.container) return;
       this.container.scrollTop = value;
