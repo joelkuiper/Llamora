@@ -10,7 +10,6 @@ class ChatFormElement extends ReactiveElement {
   #form = null;
   #textarea = null;
   #session = null;
-  #sessionListeners = null;
   #button = null;
   #errors = null;
   #isToday = false;
@@ -25,6 +24,8 @@ class ChatFormElement extends ReactiveElement {
   #isSubmitting = false;
   #isStreaming = false;
   #streamingMsgId = null;
+  #streamController = null;
+  #controllerDisconnect = null;
 
   connectedCallback() {
     super.connectedCallback();
@@ -43,10 +44,15 @@ class ChatFormElement extends ReactiveElement {
       }
     }
     this.#maybeInit();
+    this.#ensureControllerRegistration();
   }
 
   disconnectedCallback() {
     this.#connected = false;
+    if (this.#controllerDisconnect) {
+      this.#controllerDisconnect();
+      this.#controllerDisconnect = null;
+    }
     this.#teardown();
     this.#form = null;
     this.#textarea = null;
@@ -89,28 +95,25 @@ class ChatFormElement extends ReactiveElement {
       return;
     }
 
-    this.#sessionListeners = this.disposeListenerBag(this.#sessionListeners);
     this.#session = value || null;
-
-    if (this.#session) {
-      const bag = this.resetListenerBag(this.#sessionListeners);
-      this.#sessionListeners = bag;
-      bag.add(this.#session, "streaming:begin", (event) =>
-        this.#handleSessionBegin(event)
-      );
-      bag.add(this.#session, "streaming:abort", (event) =>
-        this.#handleSessionAbort(event)
-      );
-      bag.add(this.#session, "streaming:complete", (event) =>
-        this.#handleSessionComplete(event)
-      );
-    }
 
     if (this.#initialized) {
       const currentId = this.#session?.currentMsgId || null;
       this.streamingMsgId = currentId;
       this.setStreaming(Boolean(currentId));
     }
+  }
+
+  set streamController(value) {
+    if (this.#streamController === value) {
+      return;
+    }
+    if (this.#controllerDisconnect) {
+      this.#controllerDisconnect();
+      this.#controllerDisconnect = null;
+    }
+    this.#streamController = value || null;
+    this.#ensureControllerRegistration();
   }
 
 
@@ -159,6 +162,23 @@ class ChatFormElement extends ReactiveElement {
     }
   }
 
+  #ensureControllerRegistration() {
+    if (!this.#streamController || !this.#connected) {
+      return;
+    }
+
+    if (this.#controllerDisconnect) {
+      return;
+    }
+
+    if (typeof this.#streamController.registerForm === "function") {
+      const cleanup = this.#streamController.registerForm(this);
+      if (typeof cleanup === "function") {
+        this.#controllerDisconnect = cleanup;
+      }
+    }
+  }
+
   #teardown() {
     this.#setSubmitting(false);
     this.#listeners = this.disposeListenerBag(this.#listeners);
@@ -166,7 +186,6 @@ class ChatFormElement extends ReactiveElement {
     this.#streamFocusListeners = this.disposeListenerBag(
       this.#streamFocusListeners
     );
-    this.#sessionListeners = this.disposeListenerBag(this.#sessionListeners);
     this.#shouldRestoreFocus = false;
     this.#initialized = false;
     this.#isStreaming = false;
@@ -416,18 +435,27 @@ class ChatFormElement extends ReactiveElement {
       stream = indicator.closest("llm-stream");
     }
     const stopEndpoint = stream?.dataset?.stopUrl || indicator?.dataset?.stopUrl;
-    if (stream && typeof stream.abort === "function") {
-      stream.abort();
-    } else if (indicator) {
-      indicator.classList.add("stopped");
-      setTimeout(() => indicator.remove(), 1000);
+    const abortedViaController = this.#streamController?.abortActiveStream({
+      reason: "chat-form:stop",
+    });
+
+    let abortedLocally = false;
+    if (!abortedViaController) {
+      if (stream && typeof stream.abort === "function") {
+        stream.abort();
+        abortedLocally = true;
+      } else if (indicator) {
+        indicator.classList.add("stopped");
+        setTimeout(() => indicator.remove(), 1000);
+      }
     }
+
     if (stopEndpoint) {
       htmx.ajax("POST", stopEndpoint, { swap: "none" });
     }
-    if (!this.#session || !this.#session.abort()) {
-      this.streamingMsgId = null;
-      this.setStreaming(false);
+
+    if (!abortedViaController && !abortedLocally && this.#session) {
+      this.#session.abort({ reason: "chat-form:stop" });
     }
   }
 
@@ -486,27 +514,38 @@ class ChatFormElement extends ReactiveElement {
     }
   }
 
-  #handleSessionBegin(event) {
-    const detail = event?.detail || {};
-    const msgId = detail.userMsgId || null;
-    this.streamingMsgId = msgId;
-    this.setStreaming(true);
-  }
+  handleStreamStatus(detail) {
+    const info = detail || {};
+    const type = info.type || "statuschange";
+    const currentId = info.currentMsgId ?? null;
 
-  #handleSessionAbort(event) {
-    const detail = event?.detail || {};
-    const msgId = detail.userMsgId || null;
-    if (!msgId || msgId === this.streamingMsgId) {
-      this.streamingMsgId = null;
-      this.setStreaming(false);
+    if (type === "begin") {
+      const activeId = currentId || info.userMsgId || null;
+      this.streamingMsgId = activeId;
+      this.setStreaming(true);
+      return;
     }
-  }
 
-  #handleSessionComplete(event) {
-    const detail = event?.detail || {};
-    const msgId = detail.userMsgId || null;
-    if (!msgId || msgId === this.streamingMsgId) {
-      this.streamingMsgId = null;
+    if (type === "abort" || type === "complete") {
+      const targetId = info.userMsgId || null;
+      if (!targetId || targetId === this.streamingMsgId) {
+        this.streamingMsgId = currentId || null;
+        this.setStreaming(false);
+      }
+      return;
+    }
+
+    if (info.streaming) {
+      const activeId = currentId || info.userMsgId || null;
+      this.streamingMsgId = activeId;
+      this.setStreaming(true);
+      return;
+    }
+
+    const targetId =
+      info.userMsgId ?? info.previousMsgId ?? this.streamingMsgId;
+    if (!targetId || targetId === this.streamingMsgId) {
+      this.streamingMsgId = currentId || null;
       this.setStreaming(false);
     }
   }

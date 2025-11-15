@@ -117,6 +117,8 @@ class LlmStreamElement extends HTMLElement {
   #boundHandleDone;
   #boundHandleError;
   #boundHandleMeta;
+  #controller = null;
+  #controllerDisconnect = null;
 
   constructor() {
     super();
@@ -132,6 +134,35 @@ class LlmStreamElement extends HTMLElement {
       return host.streamingSession || null;
     }
     return null;
+  }
+
+  #getStreamController() {
+    const host = this.closest?.("chat-view");
+    if (host && "streamController" in host) {
+      return host.streamController || null;
+    }
+    return null;
+  }
+
+  #syncController() {
+    const controller = this.#getStreamController();
+    if (controller === this.#controller) {
+      return;
+    }
+
+    if (this.#controllerDisconnect) {
+      this.#controllerDisconnect();
+      this.#controllerDisconnect = null;
+    }
+
+    this.#controller = controller || null;
+
+    if (this.#controller && typeof this.#controller.registerStream === "function") {
+      const cleanup = this.#controller.registerStream(this);
+      if (typeof cleanup === "function") {
+        this.#controllerDisconnect = cleanup;
+      }
+    }
   }
 
   connectedCallback() {
@@ -152,6 +183,8 @@ class LlmStreamElement extends HTMLElement {
       this.#renderer = new IncrementalMarkdownRenderer(this.#markdown);
     }
 
+    this.#syncController();
+
     if (!this.#completed) {
       this.#startStream();
     }
@@ -165,6 +198,11 @@ class LlmStreamElement extends HTMLElement {
       this.#repeatGuardHideTimer = null;
     }
     this.#repeatGuardWavesDismissed = false;
+    if (this.#controllerDisconnect) {
+      this.#controllerDisconnect();
+      this.#controllerDisconnect = null;
+    }
+    this.#controller = null;
   }
 
   get userMsgId() {
@@ -175,11 +213,19 @@ class LlmStreamElement extends HTMLElement {
     return this.dataset.sseUrl || this.getAttribute("sse-url") || "";
   }
 
-  abort() {
+  abort({ reason = "user:abort" } = {}) {
     if (this.#completed) return;
-    const session = this.#getStreamingSession();
-    session?.abort();
-    this.#finalize({ status: "aborted" });
+    const userMsgId = this.userMsgId;
+    const controller = this.#controller || this.#getStreamController();
+    let aborted = false;
+    if (controller && typeof controller.notifyStreamAbort === "function") {
+      aborted = controller.notifyStreamAbort(this, { reason });
+    } else {
+      const session = this.#getStreamingSession();
+      aborted = session?.abort({ reason, userMsgId }) ?? false;
+    }
+
+    this.#finalize({ status: "aborted", reason });
   }
 
   get isStreaming() {
@@ -238,9 +284,15 @@ class LlmStreamElement extends HTMLElement {
     this.dataset.streaming = "true";
     this.setAttribute("aria-busy", "true");
     this.#meta = null;
-    const session = this.#getStreamingSession();
-    if (session && this.userMsgId) {
-      session.begin(this.userMsgId);
+    const controller = this.#controller || this.#getStreamController();
+    if (controller && typeof controller.notifyStreamStart === "function") {
+      controller.notifyStreamStart(this, { reason: "stream:start" });
+    } else {
+      const session = this.#getStreamingSession();
+      if (session && this.userMsgId) {
+        session.begin(this.userMsgId);
+      }
+      requestScrollForceBottom({ source: "stream:start" });
     }
     this.dispatchEvent(
       new CustomEvent("llm-stream:start", {
@@ -259,7 +311,7 @@ class LlmStreamElement extends HTMLElement {
         this.#sink.textContent = this.#text;
       }
       this.#renderNow({ repositionTyping: false, shouldScroll: true });
-      this.#finalize({ status: "error", message: "Connection failed" });
+      this.#finalize({ status: "error", message: "Connection failed", reason: "stream:error" });
       return;
     }
 
@@ -328,7 +380,7 @@ class LlmStreamElement extends HTMLElement {
     }
 
     this.#renderNow({ repositionTyping: false, shouldScroll: true });
-    this.#finalize({ status: "done", assistantMsgId });
+    this.#finalize({ status: "done", assistantMsgId, reason: "stream:complete" });
   }
 
   #handleError(event) {
@@ -352,7 +404,7 @@ class LlmStreamElement extends HTMLElement {
 
     this.#renderNow({ repositionTyping: false, shouldScroll: true });
     this.#markAsError();
-    this.#finalize({ status: "error", message });
+    this.#finalize({ status: "error", message, reason: "stream:error" });
   }
 
   #handleMeta(event) {
@@ -452,7 +504,7 @@ class LlmStreamElement extends HTMLElement {
     return changed;
   }
 
-  #finalize({ status, assistantMsgId = null, message = "" }) {
+  #finalize({ status, assistantMsgId = null, message = "", reason = null }) {
     if (this.#completed) return;
     this.#completed = true;
 
@@ -486,9 +538,21 @@ class LlmStreamElement extends HTMLElement {
       placeholder?.remove();
     }
 
-    const session = this.#getStreamingSession();
-    if (session) {
-      session.complete(status);
+    const controller = this.#controller || this.#getStreamController();
+    if (controller && typeof controller.notifyStreamComplete === "function") {
+      controller.notifyStreamComplete(this, {
+        status,
+        reason,
+        userMsgId: this.userMsgId,
+      });
+    } else {
+      const session = this.#getStreamingSession();
+      if (session) {
+        session.complete({ result: status, reason, userMsgId: this.userMsgId });
+      }
+      if (status !== "aborted") {
+        requestScrollForceBottom({ source: "stream:complete" });
+      }
     }
 
     this.dispatchEvent(

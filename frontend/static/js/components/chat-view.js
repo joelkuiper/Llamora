@@ -1,6 +1,7 @@
-import { scrollEvents, requestScrollForceBottom } from "../chat/scroll-manager.js";
+import { scrollEvents } from "../chat/scroll-manager.js";
 import { MarkdownObserver } from "../chat/markdown-observer.js";
 import { StreamingSession } from "../chat/streaming-session.js";
+import { StreamController } from "../chat/stream-controller.js";
 import { renderMarkdownInElement } from "../markdown.js";
 import { initDayNav, navigateToDate } from "../day.js";
 import { scrollToHighlight } from "../ui.js";
@@ -106,6 +107,7 @@ export class ChatView extends ReactiveElement {
   #chatListeners = null;
   #session = null;
   #sessionListeners = null;
+  #streamController = null;
   #markdownObserver = null;
   #initialized = false;
   #lastRenderedDay = null;
@@ -123,6 +125,10 @@ export class ChatView extends ReactiveElement {
 
   get streamingSession() {
     return this.#session;
+  }
+
+  get streamController() {
+    return this.#streamController;
   }
 
   #setRenderingState(isRendering) {
@@ -251,21 +257,12 @@ export class ChatView extends ReactiveElement {
     this.#session = new StreamingSession({
       currentMsgId: initialStreamMsgId || null,
     });
-    this.#sessionListeners = this.resetListenerBag(this.#sessionListeners);
-    this.#sessionListeners.add(this.#session, "streaming:begin", (event) =>
-      this.#onSessionBegin(event)
-    );
-    this.#sessionListeners.add(this.#session, "streaming:abort", (event) =>
-      this.#onSessionAbort(event)
-    );
-    this.#sessionListeners.add(
-      this.#session,
-      "streaming:complete",
-      (event) => this.#onSessionComplete(event)
-    );
+
+    this.#streamController?.dispose();
+    this.#streamController = new StreamController(this.#session);
+    this.#streamController.setChat(chat);
 
     this.#chat = chat;
-    this.#syncChatDataset(initialStreamMsgId);
 
     if (this.#pendingScrollTarget) {
       this.#queuePendingScrollTarget();
@@ -325,13 +322,7 @@ export class ChatView extends ReactiveElement {
       });
       this.#chatFormReady = chatFormReady.then(() => {
         if (this.#chatForm !== currentForm) return;
-        const currentMsgId = this.#session?.currentMsgId ?? null;
-        if (this.#chatForm) {
-          this.#chatForm.streamingMsgId = currentMsgId;
-        }
-        if (typeof this.#chatForm.setStreaming === "function") {
-          this.#chatForm.setStreaming(Boolean(currentMsgId));
-        }
+        this.#streamController?.refresh();
       });
     } else {
       this.#chatFormReady = Promise.resolve();
@@ -357,7 +348,7 @@ export class ChatView extends ReactiveElement {
       onRender: (el) => this.#handleMarkdownRendered(el),
     });
     this.#markdownObserver.start();
-    chatFormReady.then(() => this.#applySessionState());
+    chatFormReady.then(() => this.#streamController?.refresh());
 
     const shouldForceNavFlash = this.#forceNavFlash;
     initDayNav(chat, {
@@ -413,6 +404,9 @@ export class ChatView extends ReactiveElement {
     this.#chatListeners = this.disposeListenerBag(this.#chatListeners);
     this.#sessionListeners = this.disposeListenerBag(this.#sessionListeners);
 
+    this.#streamController?.dispose();
+    this.#streamController = null;
+
     this.#chat = null;
     this.#chatForm = null;
     this.#session = null;
@@ -456,7 +450,8 @@ export class ChatView extends ReactiveElement {
     this.#markdownObserver?.resume(swapTargets);
 
     if (swapTargets.includes(this.#chat)) {
-      this.#applySessionState({ forceScroll: true });
+      this.#streamController?.refresh();
+      this.#scrollManager?.scrollToBottom(true);
       this.#scheduleRenderingComplete(this.#chat);
     }
 
@@ -514,15 +509,8 @@ export class ChatView extends ReactiveElement {
         });
         this.#chatFormReady = chatFormReady.then(() => {
           if (this.#chatForm !== currentForm) return;
-          const currentMsgId = this.#session?.currentMsgId ?? null;
-          if (this.#chatForm) {
-            this.#chatForm.streamingMsgId = currentMsgId;
-          }
-          if (typeof this.#chatForm.setStreaming === "function") {
-            this.#chatForm.setStreaming(Boolean(currentMsgId));
-          }
+          this.#streamController?.refresh();
         });
-        this.#chatFormReady.then(() => this.#applySessionState());
       } else {
         this.#chatFormReady = Promise.resolve();
       }
@@ -540,46 +528,15 @@ export class ChatView extends ReactiveElement {
     chatForm.chat = chat;
     chatForm.session = session;
     chatForm.date = date;
+    if ("streamController" in chatForm) {
+      chatForm.streamController = this.#streamController;
+    }
   }
 
   #cancelHistoryRestoreFrame() {
     if (this.#historyRestoreFrame) {
       this.#historyRestoreFrame.cancel?.();
       this.#historyRestoreFrame = null;
-    }
-  }
-
-  async #applySessionState({ msgId, streaming, forceScroll = false } = {}) {
-    if (!this.#chatForm) return;
-
-    await this.#chatFormReady;
-
-    if (!this.#chatForm) return;
-
-    const nextMsgId =
-      msgId !== undefined ? msgId : this.#session?.currentMsgId || null;
-    const nextStreaming =
-      streaming !== undefined ? streaming : Boolean(nextMsgId);
-
-    this.#chatForm.streamingMsgId = nextMsgId;
-    if (typeof this.#chatForm.setStreaming === "function") {
-      this.#chatForm.setStreaming(nextStreaming);
-    }
-
-    if (forceScroll) {
-      this.#scrollManager?.scrollToBottom(true);
-    }
-  }
-
-  #syncChatDataset(msgId) {
-    if (!this.#chat) {
-      return;
-    }
-
-    if (msgId) {
-      this.#chat.dataset.currentStream = msgId;
-    } else {
-      delete this.#chat.dataset.currentStream;
     }
   }
 
@@ -605,27 +562,4 @@ export class ChatView extends ReactiveElement {
     this.#chat.querySelectorAll?.("llm-stream").forEach((stream) => resume(stream));
   }
 
-  #onSessionBegin(event) {
-    const detail = event?.detail || {};
-    const msgId = detail.userMsgId || null;
-    this.#syncChatDataset(msgId);
-    this.#applySessionState({ msgId, streaming: Boolean(msgId) });
-    requestScrollForceBottom({ source: "stream:start" });
-  }
-
-  #onSessionAbort(event) {
-    void event;
-    this.#syncChatDataset(null);
-    this.#applySessionState({ msgId: null, streaming: false });
-  }
-
-  #onSessionComplete(event) {
-    const detail = event?.detail || {};
-    const status = detail.status || "done";
-    this.#syncChatDataset(null);
-    this.#applySessionState({ msgId: null, streaming: false });
-    if (status !== "aborted") {
-      requestScrollForceBottom({ source: "stream:complete" });
-    }
-  }
 }
