@@ -3,9 +3,8 @@
      hx-get="{{ url_for('chat.chat_htmx', date=item.created_at[:10]) }}?target=msg-{{ item.id }}"
      hx-target="#content-wrapper"
      hx-swap="outerHTML"
-     data-date="{{ item.created_at[:10] }}"
-     data-target="msg-{{ item.id }}"
-     hx-trigger="click[!document.getElementById('chat') || document.getElementById('chat').dataset.date !== this.dataset.date]">
+     data-day="{{ item.created_at[:10] }}"
+     data-target="msg-{{ item.id }}">
     <div class="search-result-time">
       {{ item.created_at|humanize }}
     </div>

@@ -74,20 +74,27 @@ export function parseDateFromSource(value) {
   return { date, year: y, month: m, day: d };
 }
 
-export function navigateToDate(dateStr) {
+export function navigateToDate(dateStr, options = {}) {
   if (typeof dateStr !== "string" || !dateStr) {
     return false;
   }
 
-  const zone = getTimezone();
-  const tzQuery = `?${buildTimezoneQueryParam(zone)}`;
-  const htmxUrl = `/c/${dateStr}${tzQuery}`;
-  const pushUrl = `/d/${dateStr}${tzQuery}`;
+  const params = new URLSearchParams(buildTimezoneQueryParam(getTimezone()));
+  const scrollTarget =
+    typeof options?.targetId === "string" ? options.targetId.trim() : "";
 
-  const targetId = "#content-wrapper";
+  if (scrollTarget) {
+    params.set("target", scrollTarget);
+  }
+
+  const query = params.toString();
+  const htmxUrl = `/c/${dateStr}?${query}`;
+  const pushUrl = `/d/${dateStr}?${query}`;
+
+  const contentTarget = "#content-wrapper";
   if (window.htmx) {
     window.htmx.ajax("GET", htmxUrl, {
-      target: targetId,
+      target: contentTarget,
       swap: "outerHTML",
       pushUrl,
     });
