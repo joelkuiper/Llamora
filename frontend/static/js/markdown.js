@@ -55,6 +55,32 @@ export function renderMarkdownInElement(el, text) {
 
 const MARKDOWN_SELECTOR = ".message .markdown-body";
 
+const markdownRenderListeners = new Set();
+
+export function addMarkdownRenderListener(listener) {
+  if (typeof listener !== "function") return () => {};
+  markdownRenderListeners.add(listener);
+  return () => removeMarkdownRenderListener(listener);
+}
+
+export function removeMarkdownRenderListener(listener) {
+  if (typeof listener !== "function") return;
+  markdownRenderListeners.delete(listener);
+}
+
+function notifyMarkdownRendered(element) {
+  markdownRenderListeners.forEach((listener) => {
+    try {
+      listener(element);
+    } catch (error) {
+      // Swallow listener errors to avoid breaking markdown rendering flows.
+      if (typeof console !== "undefined" && typeof console.error === "function") {
+        console.error(error);
+      }
+    }
+  });
+}
+
 function normalizeNodes(nodes) {
   if (!nodes) return [];
 
@@ -105,7 +131,7 @@ function collectMarkdownBodies(root, nodes) {
   return markdownNodes;
 }
 
-export function renderAllMarkdown(root, nodes = null) {
+export function renderAllMarkdown(root, nodes = null, options = {}) {
   if (!root) return;
 
   const targets = collectMarkdownBodies(root, normalizeNodes(nodes));
@@ -122,6 +148,10 @@ export function renderAllMarkdown(root, nodes = null) {
       !el.querySelector(TYPING_INDICATOR_SELECTOR)
     ) {
       renderMarkdownInElement(el);
+      if (typeof options.onRender === "function") {
+        options.onRender(el);
+      }
+      notifyMarkdownRendered(el);
     }
   });
 }

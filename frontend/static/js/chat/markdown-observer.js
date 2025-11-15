@@ -1,53 +1,19 @@
-import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
-import { renderMarkdownInElement } from "../markdown.js";
-
-const MARKDOWN_SELECTOR = ".message .markdown-body";
-
-function collectTargetsFromNode(node, targets) {
-  if (!node) return;
-
-  if (node.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
-    node.querySelectorAll?.(MARKDOWN_SELECTOR).forEach((el) => {
-      targets.add(el);
-    });
-    return;
-  }
-
-  if (node.nodeType !== Node.ELEMENT_NODE) return;
-
-  const element = /** @type {Element} */ (node);
-
-  if (
-    element.matches?.(MARKDOWN_SELECTOR) ||
-    (element.matches?.(".markdown-body") && element.closest?.(".message"))
-  ) {
-    targets.add(element);
-  }
-
-  element.querySelectorAll?.(MARKDOWN_SELECTOR).forEach((el) => {
-    targets.add(el);
-  });
-}
-
-function shouldRender(el) {
-  if (!el || !(el instanceof Element) || !el.isConnected) return false;
-  const isStreaming =
-    el.closest("llm-stream")?.dataset.streaming === "true";
-  if (isStreaming) {
-    // Streaming responses manage their own incremental rendering to avoid deleting the typing indicator mid-update.
-    return false;
-  }
-  if (el.dataset.rendered === "true") return false;
-  if (el.querySelector(TYPING_INDICATOR_SELECTOR)) return false;
-  return true;
-}
+import {
+  addMarkdownRenderListener,
+  removeMarkdownRenderListener,
+  renderAllMarkdown,
+} from "../markdown.js";
 
 export class MarkdownObserver {
+  #listener = null;
+  #listening = false;
+
   constructor({ root, onRender } = {}) {
     this.root = root || null;
     this.onRender = typeof onRender === "function" ? onRender : null;
     this.observer = null;
     this.isObserving = false;
+    this.#listener = (element) => this.#handleRendered(element);
   }
 
   start() {
@@ -73,6 +39,8 @@ export class MarkdownObserver {
       this.isObserving = true;
     }
 
+    this.#ensureListener();
+
     if (nodes) {
       this.renderAll(nodes);
     }
@@ -87,6 +55,7 @@ export class MarkdownObserver {
       this.observer.disconnect();
       this.isObserving = false;
     }
+    this.#removeListener();
   }
 
   stop() {
@@ -97,41 +66,21 @@ export class MarkdownObserver {
   renderAll(nodes = null) {
     if (!this.root) return;
 
-    const targets = new Set();
-
-    if (!nodes) {
-      collectTargetsFromNode(this.root, targets);
-    } else if (nodes instanceof NodeList || Array.isArray(nodes)) {
-      nodes.forEach((node) => collectTargetsFromNode(node, targets));
-    } else if (nodes instanceof Node) {
-      collectTargetsFromNode(nodes, targets);
-    }
-
-    targets.forEach((el) => {
-      if (!shouldRender(el)) return;
-      renderMarkdownInElement(el);
-      if (this.onRender) {
-        this.onRender(el);
-      }
-      if (typeof document !== "undefined") {
-        document.dispatchEvent(
-          new CustomEvent("markdown:rendered", { detail: { element: el } })
-        );
-      }
-    });
+    this.#ensureListener();
+    renderAllMarkdown(this.root, nodes);
   }
 
   #handleMutations(mutations) {
     if (!mutations || mutations.length === 0) return;
 
-    const targets = new Set();
+    const targets = [];
 
     mutations.forEach((mutation) => {
       if (mutation.type === "characterData") {
         const parent = mutation.target?.parentElement;
         const container = parent?.closest?.(".markdown-body");
         if (container) {
-          targets.add(container);
+          targets.push(container);
         }
         return;
       }
@@ -140,16 +89,62 @@ export class MarkdownObserver {
 
       const targetNode = mutation.target;
       if (targetNode instanceof Node) {
-        collectTargetsFromNode(targetNode, targets);
+        targets.push(targetNode);
       }
 
       mutation.addedNodes.forEach((node) => {
-        collectTargetsFromNode(node, targets);
+        targets.push(node);
       });
     });
 
-    if (targets.size > 0) {
-      this.renderAll(Array.from(targets));
+    if (targets.length > 0) {
+      this.renderAll(targets);
     }
+  }
+
+  #handleRendered(element) {
+    if (!element || !this.root) return;
+    if (element instanceof Node) {
+      const rootNode = /** @type {Node} */ (this.root);
+      if (rootNode !== element) {
+        let contains = false;
+        if (typeof rootNode.contains === "function") {
+          contains = rootNode.contains(element);
+        } else if (
+          typeof rootNode.compareDocumentPosition === "function" &&
+          element instanceof Node
+        ) {
+          contains = Boolean(
+            rootNode.compareDocumentPosition(element) &
+              Node.DOCUMENT_POSITION_CONTAINED_BY
+          );
+        }
+        if (!contains) {
+          return;
+        }
+      }
+    }
+
+    if (this.onRender) {
+      this.onRender(element);
+    }
+
+    if (typeof document !== "undefined") {
+      document.dispatchEvent(
+        new CustomEvent("markdown:rendered", { detail: { element } })
+      );
+    }
+  }
+
+  #ensureListener() {
+    if (this.#listening) return;
+    addMarkdownRenderListener(this.#listener);
+    this.#listening = true;
+  }
+
+  #removeListener() {
+    if (!this.#listening) return;
+    removeMarkdownRenderListener(this.#listener);
+    this.#listening = false;
   }
 }
