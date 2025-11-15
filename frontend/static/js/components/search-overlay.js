@@ -71,8 +71,8 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
 
   constructor() {
     super();
-    this.#beforeRequestHandler = (event) => this.#handleBeforeRequest(event);
-    this.#afterRequestHandler = (event) => this.#handleAfterRequest(event);
+    this.#beforeRequestHandler = () => this.#handleBeforeRequest();
+    this.#afterRequestHandler = () => this.#handleAfterRequest();
     this.#afterSwapHandler = (event) => this.#handleAfterSwap(event);
     this.#inputHandler = () => this.#handleInput();
     this.#keydownHandler = (event) => this.#handleKeydown(event);
@@ -116,8 +116,8 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     const eventTarget = this.ownerDocument ?? document;
 
     this.watchHtmxRequests(eventTarget, {
-      within: (event) => this.#isRelevantRequest(event),
       bag: listeners,
+      withinSelector: "#search-results",
       onStart: this.#beforeRequestHandler,
       onEnd: this.#afterRequestHandler,
     });
@@ -207,8 +207,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#overlayListeners = this.disposeListenerBag(this.#overlayListeners);
   }
 
-  #handleBeforeRequest(event) {
-    if (!this.#isRelevantRequest(event)) return;
+  #handleBeforeRequest() {
     const wrap = this.#resultsEl;
     if (wrap) {
       wrap.setAttribute("aria-busy", "true");
@@ -216,29 +215,12 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#spinnerController?.start();
   }
 
-  #handleAfterRequest(event) {
-    if (!this.#isRelevantRequest(event)) return;
+  #handleAfterRequest() {
     const wrap = this.#resultsEl;
     if (wrap) {
       wrap.removeAttribute("aria-busy");
     }
     this.#spinnerController?.stop();
-  }
-
-  #isRelevantRequest(event) {
-    const source = event?.target;
-    if (source instanceof Element && this.contains(source)) {
-      return true;
-    }
-
-    const detailTarget = event?.detail?.target;
-    const results = this.#resultsEl;
-
-    if (results && detailTarget instanceof Element) {
-      return detailTarget === results;
-    }
-
-    return false;
   }
 
   #handleAfterSwap(evt) {

@@ -4,6 +4,38 @@ function isFunction(value) {
   return typeof value === "function";
 }
 
+export function isEventWithin(event, scope) {
+  if (!scope) {
+    return false;
+  }
+
+  if (scope === event?.target || scope === event?.detail?.target) {
+    return true;
+  }
+
+  const contains = typeof scope.contains === "function" ? scope.contains : null;
+  if (!contains) {
+    return false;
+  }
+
+  const target = event?.target;
+  if (target instanceof Element && contains.call(scope, target)) {
+    return true;
+  }
+
+  const detailTarget = event?.detail?.target;
+  if (detailTarget instanceof Element && contains.call(scope, detailTarget)) {
+    return true;
+  }
+
+  const detailElement = event?.detail?.elt;
+  if (detailElement instanceof Element && contains.call(scope, detailElement)) {
+    return true;
+  }
+
+  return false;
+}
+
 export class ReactiveElement extends HTMLElement {
   #defaultBag = null;
   #bags = new Set();
@@ -68,26 +100,117 @@ export class ReactiveElement extends HTMLElement {
   watchHtmxRequests(target = this, options = {}) {
     const {
       within = this,
+      withinSelector = null,
+      withinSelectors = null,
       onStart = null,
       onEnd = null,
       bag = null,
     } = options;
     const listeners = bag || this.createListenerBag();
 
-    const isRelevant = (event) => {
-      if (!within) return true;
-      if (isFunction(within)) {
-        return !!within.call(this, event);
+    const selectors = [];
+    if (Array.isArray(withinSelector)) {
+      selectors.push(...withinSelector);
+    } else if (withinSelector) {
+      selectors.push(withinSelector);
+    }
+    if (Array.isArray(withinSelectors)) {
+      selectors.push(...withinSelectors);
+    } else if (withinSelectors) {
+      selectors.push(withinSelectors);
+    }
+
+    const findBySelector = (selector) => {
+      if (!selector || typeof selector !== "string") {
+        return null;
       }
-      const scope = within === "self" ? this : within;
-      if (scope instanceof Document) {
+      const local = isFunction(this.querySelector)
+        ? this.querySelector(selector)
+        : null;
+      if (local) {
+        return local;
+      }
+      const root = this.getRootNode?.();
+      if (root && typeof root.querySelector === "function") {
+        const fromRoot = root.querySelector(selector);
+        if (fromRoot) {
+          return fromRoot;
+        }
+      }
+      const doc = this.ownerDocument ?? document;
+      return typeof doc.querySelector === "function"
+        ? doc.querySelector(selector)
+        : null;
+    };
+
+    const createScopeResolver = (value) => {
+      if (!value) {
+        return null;
+      }
+      if (value === "self") {
+        return () => this;
+      }
+      if (value === "document") {
+        return () => this.ownerDocument ?? document;
+      }
+      if (typeof value === "string") {
+        return () => findBySelector(value);
+      }
+      if (typeof value.contains === "function") {
+        return () => value;
+      }
+      return null;
+    };
+
+    const predicates = [];
+
+    const registerScope = (value) => {
+      if (!value) {
+        return;
+      }
+      if (Array.isArray(value)) {
+        for (const entry of value) {
+          registerScope(entry);
+        }
+        return;
+      }
+      if (isFunction(value)) {
+        predicates.push((event) => !!value.call(this, event));
+        return;
+      }
+      const resolver = createScopeResolver(value);
+      if (!resolver) {
+        return;
+      }
+      predicates.push((event) => {
+        const scope = resolver();
+        return scope ? isEventWithin(event, scope) : false;
+      });
+    };
+
+    registerScope(within);
+
+    for (const selector of selectors) {
+      predicates.push((event) => {
+        const scope = findBySelector(selector);
+        return scope ? isEventWithin(event, scope) : false;
+      });
+    }
+
+    const isRelevant = (event) => {
+      if (!predicates.length) {
         return true;
       }
-      if (scope instanceof Element) {
-        const origin = event?.target;
-        return origin instanceof Element && scope.contains(origin);
+      for (const predicate of predicates) {
+        try {
+          if (predicate(event)) {
+            return true;
+          }
+        } catch (err) {
+          /* no-op */
+        }
       }
-      return true;
+      return false;
     };
 
     const wrap = (callback) => {
