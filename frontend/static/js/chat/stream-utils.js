@@ -1,12 +1,5 @@
 import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
-
-function normalizeMsgId(msgId) {
-  if (msgId === undefined || msgId === null) {
-    return null;
-  }
-  const value = String(msgId).trim();
-  return value ? value : null;
-}
+import { normalizeStreamId } from "./stream-id.js";
 
 function escapeAttributeValue(value) {
   if (window.CSS?.escape) {
@@ -23,7 +16,7 @@ function getSearchRoot(root) {
 }
 
 export function findStreamByUserMsgId(root, msgId) {
-  const normalized = normalizeMsgId(msgId);
+  const normalized = normalizeStreamId(msgId);
   if (!normalized) {
     return null;
   }
@@ -46,7 +39,7 @@ export function findStreamByUserMsgId(root, msgId) {
 
 export function findTypingIndicator(root, msgId) {
   const searchRoot = getSearchRoot(root);
-  const normalized = normalizeMsgId(msgId);
+  const normalized = normalizeStreamId(msgId);
 
   if (normalized) {
     const message = document.getElementById(`msg-${normalized}`);

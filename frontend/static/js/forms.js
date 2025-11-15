@@ -4,19 +4,29 @@ import { runWhenDocumentReady } from "./utils/dom-ready.js";
 
 const FORM_SELECTOR = ".form-container form, #profile-page form";
 
+function collectForms(root = document) {
+  const forms = [];
+  const scope = root instanceof Document ? root : root ?? document;
+
+  if (!scope) {
+    return forms;
+  }
+
+  if (scope instanceof Element && scope.matches(FORM_SELECTOR)) {
+    forms.push(scope);
+  }
+
+  if (typeof scope.querySelectorAll === "function") {
+    forms.push(...scope.querySelectorAll(FORM_SELECTOR));
+  }
+
+  return forms;
+}
+
 export function initForms(root = document) {
   getTimezone();
 
-  const elements = [];
-  const scope = root instanceof Document ? root : root ?? document;
-
-  if (scope instanceof Element && scope.matches(FORM_SELECTOR)) {
-    elements.push(scope);
-  }
-
-  if (scope && typeof scope.querySelectorAll === "function") {
-    elements.push(...scope.querySelectorAll(FORM_SELECTOR));
-  }
+  const elements = collectForms(root);
 
   elements.forEach((form) => {
     if (form.dataset.initFormsBound === "1") return;
@@ -85,16 +95,7 @@ const onReady = () => {
 function resetSpinningButtons(scope = document) {
   if (!scope) return;
 
-  const forms = [];
-  const searchRoot = scope instanceof Document ? scope : scope ?? document;
-
-  if (searchRoot instanceof HTMLFormElement && searchRoot.matches(FORM_SELECTOR)) {
-    forms.push(searchRoot);
-  }
-
-  if (searchRoot && typeof searchRoot.querySelectorAll === "function") {
-    forms.push(...searchRoot.querySelectorAll(FORM_SELECTOR));
-  }
+  const forms = collectForms(scope);
 
   forms.forEach((form) => {
     form.querySelectorAll('button[data-spinning="1"]').forEach((btn) => {

@@ -1,8 +1,5 @@
 import { requestScrollForceBottom } from "./scroll-manager.js";
-
-function normalizeId(value) {
-  return value ? String(value) : null;
-}
+import { normalizeStreamId } from "./stream-id.js";
 
 function buildSnapshotDetail(session) {
   if (!session) {
@@ -110,7 +107,7 @@ export class StreamController {
     }
     this.#updateStreamIndex(stream);
     return () => {
-      const id = normalizeId(stream?.userMsgId);
+      const id = normalizeStreamId(stream?.userMsgId);
       if (id && this.#streams.get(id) === stream) {
         this.#streams.delete(id);
       }
@@ -118,7 +115,7 @@ export class StreamController {
   }
 
   notifyStreamStart(stream, { reason = "stream:start" } = {}) {
-    const id = normalizeId(stream?.userMsgId);
+    const id = normalizeStreamId(stream?.userMsgId);
     if (id) {
       this.#streams.set(id, stream);
     }
@@ -127,12 +124,12 @@ export class StreamController {
   }
 
   notifyStreamAbort(stream, { reason = "user:abort" } = {}) {
-    const id = normalizeId(stream?.userMsgId);
+    const id = normalizeStreamId(stream?.userMsgId);
     return this.#session?.abort({ reason, userMsgId: id }) ?? false;
   }
 
   notifyStreamComplete(stream, { status, reason, userMsgId } = {}) {
-    const id = normalizeId(userMsgId ?? stream?.userMsgId);
+    const id = normalizeStreamId(userMsgId ?? stream?.userMsgId);
     if (id && this.#streams.get(id) === stream) {
       this.#streams.delete(id);
     }
@@ -144,7 +141,7 @@ export class StreamController {
   }
 
   abortActiveStream({ reason = "user:stop" } = {}) {
-    const id = normalizeId(this.#session?.currentMsgId);
+    const id = normalizeStreamId(this.#session?.currentMsgId);
     if (!id) {
       return false;
     }
@@ -162,7 +159,7 @@ export class StreamController {
   }
 
   #handleStatusChange(detail = {}) {
-    const msgId = normalizeId(detail.currentMsgId);
+    const msgId = normalizeStreamId(detail.currentMsgId);
     this.#syncChatDataset(msgId);
     this.#forms.forEach((form) => {
       if (typeof form.handleStreamStatus === "function") {
@@ -184,7 +181,7 @@ export class StreamController {
   }
 
   #updateStreamIndex(stream) {
-    const id = normalizeId(stream?.userMsgId);
+    const id = normalizeStreamId(stream?.userMsgId);
     if (!id) {
       return;
     }
