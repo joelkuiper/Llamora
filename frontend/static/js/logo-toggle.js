@@ -1,3 +1,5 @@
+import { runWhenDocumentReady } from "./utils/dom-ready.js";
+
 const SCHEME_QUERY = "(prefers-color-scheme: dark)";
 const darkScheme = typeof window !== "undefined" && window.matchMedia
   ? window.matchMedia(SCHEME_QUERY)
@@ -192,19 +194,10 @@ function setupHtmxHooks() {
   });
 }
 
-function initWhenReady() {
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => {
-      initLogoToggles();
-      setupHtmxHooks();
-    }, { once: true });
-    return;
-  }
+runWhenDocumentReady(() => {
   initLogoToggles();
   setupHtmxHooks();
-}
-
-initWhenReady();
+});
 
 if (typeof window !== "undefined") {
   window.addEventListener("pageshow", () => {

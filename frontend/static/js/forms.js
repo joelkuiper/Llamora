@@ -1,5 +1,6 @@
 import { startButtonSpinner, stopButtonSpinner } from "./ui.js";
 import { getTimezone } from "./utils/timezone-service.js";
+import { runWhenDocumentReady } from "./utils/dom-ready.js";
 
 const FORM_SELECTOR = ".form-container form, #profile-page form";
 
@@ -102,11 +103,7 @@ function resetSpinningButtons(scope = document) {
   });
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", onReady);
-} else {
-  onReady();
-}
+runWhenDocumentReady(onReady);
 
 if (typeof window !== "undefined") {
   window.appInit = window.appInit || {};

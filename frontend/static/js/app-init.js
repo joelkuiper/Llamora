@@ -8,6 +8,7 @@ import {
   pushAlert,
   registerAlertContainer,
 } from "./utils/alert-center.js";
+import { runWhenDocumentReady } from "./utils/dom-ready.js";
 import { applyTimezoneHeader } from "./utils/timezone-service.js";
 
 let headersRegistered = false;
@@ -121,8 +122,4 @@ function init() {
   };
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", init, { once: true });
-} else {
-  init();
-}
+runWhenDocumentReady(init);
