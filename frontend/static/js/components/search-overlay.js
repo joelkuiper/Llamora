@@ -3,6 +3,7 @@ import { prefersReducedMotion } from "../utils/motion.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 import { createShortcutBag } from "../utils/global-shortcuts.js";
 import { AutocompleteOverlayMixin } from "./base/autocomplete-overlay.js";
+import { AutocompleteHistory } from "../utils/autocomplete-history.js";
 
 const getEventTarget = (evt) => {
   const target = evt.target;
@@ -65,7 +66,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
   #historyRestoreHandler;
   #popStateHandler;
   #historyRestoreRemover = null;
-  #localRecentEntries = [];
+  #recentHistory;
   #shortcutBag = null;
 
   constructor() {
@@ -81,7 +82,11 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#pageHideHandler = (event) => this.#handlePageHide(event);
     this.#historyRestoreHandler = () => this.#handleHistoryRestore();
     this.#popStateHandler = () => this.#handlePopState();
-
+    this.#recentHistory = new AutocompleteHistory({
+      maxEntries: RECENT_CANDIDATE_MAX,
+      normalize: (entry) => this.#normalizeCandidateValue(entry),
+      prepare: (entry) => entry,
+    });
   }
 
   connectedCallback() {
@@ -396,14 +401,8 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     if (!normalized) {
       return;
     }
-    const existing = Array.isArray(this.#localRecentEntries)
-      ? this.#localRecentEntries.filter(
-          (item) => this.#normalizeCandidateValue(item) !== normalized
-        )
-      : [];
-    existing.unshift(entry);
-    this.#localRecentEntries = existing.slice(0, RECENT_CANDIDATE_MAX);
-    this.setAutocompleteLocalEntries("local", this.#localRecentEntries);
+    this.#recentHistory.add(entry);
+    this.setAutocompleteLocalEntries("local", this.#recentHistory.values());
   }
 
   #handleKeydown(evt) {

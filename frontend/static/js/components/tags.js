@@ -1,6 +1,7 @@
 import { createPopover } from "../popover.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 import { AutocompleteOverlayMixin } from "./base/autocomplete-overlay.js";
+import { AutocompleteHistory } from "../utils/autocomplete-history.js";
 
 const canonicalizeTag = (value, limit = null) => {
   const text = `${value ?? ""}`.replace(/^#/, "").trim();
@@ -15,6 +16,8 @@ const displayTag = (canonical) => `${canonical ?? ""}`.trim();
 
 const prepareTagAutocompleteValue = (value) =>
   `${value ?? ""}`.replace(/^#/, "").trim();
+
+const TAG_HISTORY_MAX = 50;
 
 export const mergeTagCandidateValues = (
   remoteCandidates = [],
@@ -61,6 +64,7 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
   #suggestionsSwapHandler;
   #chipActivationHandler;
   #chipKeydownHandler;
+  #tagHistory;
   
   constructor() {
     super();
@@ -77,6 +81,30 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#suggestionsSwapHandler = () => this.#handleSuggestionsSwap();
     this.#chipActivationHandler = (event) => this.#handleChipActivation(event);
     this.#chipKeydownHandler = (event) => this.#handleChipKeydown(event);
+    this.#tagHistory = new AutocompleteHistory({
+      maxEntries: TAG_HISTORY_MAX,
+      prepare: (value) => {
+        const limit = this.#getCanonicalMaxLength();
+        if (typeof value === "string") {
+          return canonicalizeTag(value, limit) || null;
+        }
+        if (value && typeof value.value === "string") {
+          return canonicalizeTag(value.value, limit) || null;
+        }
+        return null;
+      },
+      normalize: (value) => {
+        if (typeof value === "string") {
+          return value.trim().toLowerCase();
+        }
+        if (value && typeof value.value === "string") {
+          const limit = this.#getCanonicalMaxLength();
+          const canonical = canonicalizeTag(value.value, limit);
+          return canonical ? canonical.toLowerCase() : "";
+        }
+        return "";
+      },
+    });
   }
 
   connectedCallback() {
@@ -282,17 +310,26 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
         const label = chip
           .querySelector(".chip-label")
           ?.textContent?.trim();
-        const canonical = canonicalizeTag(label ?? "", limit)?.toLowerCase();
-        if (canonical && this.#suggestions) {
+        const canonicalValue = canonicalizeTag(label ?? "", limit);
+        const canonicalKey = canonicalValue?.toLowerCase();
+        if (canonicalKey && this.#suggestions) {
           this.#suggestions.querySelectorAll(".tag-suggestion").forEach((btn) => {
             const btnCanonical = canonicalizeTag(
               btn.dataset.tag ?? btn.textContent ?? "",
               limit
             )?.toLowerCase();
-            if (btnCanonical === canonical) {
+            if (btnCanonical === canonicalKey) {
               btn.remove();
             }
           });
+        }
+        if (canonicalValue) {
+          this.#tagHistory.add(canonicalValue);
+          this.setAutocompleteLocalEntries(
+            "history",
+            this.#tagHistory.values()
+          );
+          this.applyAutocompleteCandidates();
         }
       }
       this.#updateSubmitState();
@@ -419,6 +456,7 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
       });
     }
     this.setAutocompleteLocalEntries("dom", domValues);
+    this.setAutocompleteLocalEntries("history", this.#tagHistory.values());
     this.applyAutocompleteCandidates();
   }
 
