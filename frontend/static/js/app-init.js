@@ -1,6 +1,5 @@
 import { ScrollManager } from "./chat/scroll-manager.js";
 import { initGlobalShortcuts } from "./global-shortcuts.js";
-import { setTimezoneCookie } from "./timezone.js";
 import { formatIsoDate } from "./day.js";
 import { getActiveDay } from "./chat/active-day-store.js";
 import {
@@ -9,6 +8,7 @@ import {
   pushAlert,
   registerAlertContainer,
 } from "./utils/alert-center.js";
+import { applyTimezoneHeader } from "./utils/timezone-service.js";
 
 let headersRegistered = false;
 let offlineHandlerRegistered = false;
@@ -28,9 +28,7 @@ function registerHtmxHeaderHooks(csrfToken) {
     const headers = event.detail?.headers;
     if (!headers) return;
 
-    const timezone = setTimezoneCookie();
-    const zone = typeof timezone === "string" && timezone ? timezone : "UTC";
-    headers["X-Timezone"] = zone;
+    applyTimezoneHeader(headers);
 
     const clientToday = updateClientToday();
     if (clientToday) {

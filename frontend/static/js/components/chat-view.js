@@ -4,11 +4,15 @@ import { StreamingSession } from "../chat/streaming-session.js";
 import { renderMarkdownInElement } from "../markdown.js";
 import { initDayNav, navigateToDate } from "../day.js";
 import { scrollToHighlight } from "../ui.js";
-import { setTimezoneCookie } from "../timezone.js";
 import { createListenerBag } from "../utils/events.js";
 import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 import { setActiveDay, clearActiveDay } from "../chat/active-day-store.js";
+import {
+  applyTimezoneSearchParam,
+  buildTimezoneQueryParam,
+  getTimezone,
+} from "../utils/timezone-service.js";
 import "./chat-form.js";
 import "./llm-stream.js";
 
@@ -53,16 +57,13 @@ function scheduleMidnightRefresh(chat) {
     }
 
     if (chat.dataset.date !== today) {
-      const timezone = setTimezoneCookie();
-      const zone =
-        typeof timezone === "string" && timezone ? timezone : "UTC";
+      const zone = getTimezone();
       try {
         const url = new URL("/d/today", window.location.origin);
-        url.searchParams.set("tz", zone);
+        applyTimezoneSearchParam(url.searchParams, zone);
         window.location.href = `${url.pathname}${url.search}`;
       } catch (err) {
-        const encoded = encodeURIComponent(zone);
-        window.location.href = `/d/today?tz=${encoded}`;
+        window.location.href = `/d/today?${buildTimezoneQueryParam(zone)}`;
       }
       return;
     }
@@ -233,7 +234,7 @@ export class ChatView extends ReactiveElement {
 
     this.#pendingScrollTarget = this.dataset?.scrollTarget || null;
 
-    setTimezoneCookie();
+    getTimezone();
 
     if (!chat) {
       this.#setRenderingState(false);

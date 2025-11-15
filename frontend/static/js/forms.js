@@ -1,10 +1,10 @@
 import { startButtonSpinner, stopButtonSpinner } from "./ui.js";
-import { setTimezoneCookie } from "./timezone.js";
+import { getTimezone } from "./utils/timezone-service.js";
 
 const FORM_SELECTOR = ".form-container form, #profile-page form";
 
 export function initForms(root = document) {
-  setTimezoneCookie();
+  getTimezone();
 
   const elements = [];
   const scope = root instanceof Document ? root : root ?? document;

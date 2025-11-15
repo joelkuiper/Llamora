@@ -1,4 +1,4 @@
-import { setTimezoneCookie } from "./timezone.js";
+import { buildTimezoneQueryParam, getTimezone } from "./utils/timezone-service.js";
 import {
   ACTIVE_DAY_CHANGED_EVENT,
   getActiveDay,
@@ -79,10 +79,8 @@ export function navigateToDate(dateStr) {
     return false;
   }
 
-  const timezone = setTimezoneCookie();
-  const zone =
-    typeof timezone === "string" && timezone ? timezone : "UTC";
-  const tzQuery = `?tz=${encodeURIComponent(zone)}`;
+  const zone = getTimezone();
+  const tzQuery = `?${buildTimezoneQueryParam(zone)}`;
   const htmxUrl = `/c/${dateStr}${tzQuery}`;
   const pushUrl = `/d/${dateStr}${tzQuery}`;
 

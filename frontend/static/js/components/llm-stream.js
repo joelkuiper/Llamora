@@ -1,5 +1,4 @@
 import { renderMarkdown } from "../markdown.js";
-import { setTimezoneCookie } from "../timezone.js";
 import {
   positionTypingIndicator,
   TYPING_INDICATOR_SELECTOR,
@@ -7,6 +6,12 @@ import {
 import { IncrementalMarkdownRenderer } from "../chat/incremental-markdown-renderer.js";
 import { scrollEvents } from "../chat/scroll-manager.js";
 import { prefersReducedMotion } from "../utils/motion.js";
+import {
+  applyTimezoneSearchParam,
+  buildTimezoneQueryParam,
+  getTimezone,
+  TIMEZONE_QUERY_PARAM,
+} from "../utils/timezone-service.js";
 
 const NEWLINE_REGEX = /\[newline\]/g;
 const RENDER_COOLDOWN_MS = 16;
@@ -14,6 +19,13 @@ const FALLBACK_ERROR_MESSAGE = "The assistant ran into an error. Please try agai
 const REPEAT_GUARD_BADGE = "response trimmed";
 const REPEAT_GUARD_DESCRIPTION = "Response paused after repeating itself.";
 const REPEAT_GUARD_HIDE_DELAY_MS = 5000;
+const ESCAPED_TIMEZONE_PARAM = TIMEZONE_QUERY_PARAM.replace(
+  /[.*+?^${}()|[\]\\]/g,
+  "\\$&"
+);
+const TIMEZONE_QUERY_PARAM_PATTERN = new RegExp(
+  `[?&]${ESCAPED_TIMEZONE_PARAM}=`
+);
 
 function decodeChunk(data) {
   return typeof data === "string" ? data.replace(NEWLINE_REGEX, "\n") : "";
@@ -209,22 +221,18 @@ class LlmStreamElement extends HTMLElement {
   #startStream() {
     if (this.#eventSource || !this.sseUrl) return;
 
-    const timezone = setTimezoneCookie();
-    const zone =
-      typeof timezone === "string" && timezone ? timezone : "UTC";
+    const zone = getTimezone();
 
     let url = this.sseUrl;
     try {
       const base = window.location?.origin || undefined;
       const parsed = new URL(url, base);
-      if (!parsed.searchParams.has("tz")) {
-        parsed.searchParams.set("tz", zone);
-      }
+      applyTimezoneSearchParam(parsed.searchParams, zone);
       url = `${parsed.pathname}${parsed.search}`;
     } catch (err) {
-      if (!/[?&]tz=/.test(url)) {
+      if (!TIMEZONE_QUERY_PARAM_PATTERN.test(url)) {
         const separator = url.includes("?") ? "&" : "?";
-        url = `${url}${separator}tz=${encodeURIComponent(zone)}`;
+        url = `${url}${separator}${buildTimezoneQueryParam(zone)}`;
       }
     }
 
