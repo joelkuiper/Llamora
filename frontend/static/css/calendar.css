@@ -129,14 +129,9 @@
   transform-origin: top center;
 
   color: var(--color-text);
-  backdrop-filter: blur(10px) saturate(140%);
-  -webkit-backdrop-filter: blur(10px) saturate(140%);
   background: var(--glass-bg-strong);
 
-
-  border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  box-shadow: var(--raised-shadow);
   padding: 12px;
 
   .calendar-nav {

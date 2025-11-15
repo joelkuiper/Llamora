@@ -17,7 +17,7 @@
   <p class="search-results-notice" role="status" aria-live="polite">{{ truncation_notice }}</p>
   {% endif %}
   {% if items %}
-  <div class="sr-panel search-results-overlay">
+  <div class="sr-panel glass-panel search-results-overlay">
     <ul class="search-results-list" role="listbox">
       {% for item in items %}
       {% include 'partials/search_result_item.html' %}
@@ -26,7 +26,7 @@
     {{ overlay_close_button() }}
   </div>
   {% elif query_present %}
-  <div class="sr-panel search-results-overlay is-empty">
+  <div class="sr-panel glass-panel search-results-overlay is-empty">
     <div class="search-results-empty" role="group">
       <p class="search-results-empty-title">No matches found</p>
       <p class="search-results-empty-description">Try a different search or adjust your filters.</p>

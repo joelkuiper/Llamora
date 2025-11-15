@@ -172,11 +172,7 @@
 .tag-popover {
   --tp-h: 2rem;
 
-  backdrop-filter: blur(10px) saturate(140%);
-  -webkit-backdrop-filter: blur(10px) saturate(140%);
   background: var(--glass-bg-strong);
-  border: 1px solid var(--border);
-  box-shadow: var(--raised-shadow);
   color: var(--glass-text-muted);
   border-radius: var(--radius-sm);
   padding: 10px;
