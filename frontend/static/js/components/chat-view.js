@@ -1,4 +1,4 @@
-import { requestScrollForceBottom } from "../chat/scroll-manager.js";
+import { scrollEvents } from "../chat/scroll-manager.js";
 import { MarkdownObserver } from "../chat/markdown-observer.js";
 import { StreamingSession } from "../chat/streaming-session.js";
 import { renderMarkdownInElement } from "../markdown.js";
@@ -607,7 +607,11 @@ export class ChatView extends ReactiveElement {
     const msgId = detail.userMsgId || null;
     this.#syncChatDataset(msgId);
     this.#applySessionState({ msgId, streaming: Boolean(msgId) });
-    requestScrollForceBottom({ source: "stream:start" });
+    scrollEvents.dispatchEvent(
+      new CustomEvent("scroll:force-bottom", {
+        detail: { source: "stream:start" },
+      })
+    );
   }
 
   #onSessionAbort(event) {
@@ -622,7 +626,11 @@ export class ChatView extends ReactiveElement {
     this.#syncChatDataset(null);
     this.#applySessionState({ msgId: null, streaming: false });
     if (status !== "aborted") {
-      requestScrollForceBottom({ source: "stream:complete" });
+      scrollEvents.dispatchEvent(
+        new CustomEvent("scroll:force-bottom", {
+          detail: { source: "stream:complete" },
+        })
+      );
     }
   }
 }

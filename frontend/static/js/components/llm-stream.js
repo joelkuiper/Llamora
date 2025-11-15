@@ -4,7 +4,7 @@ import {
   TYPING_INDICATOR_SELECTOR,
 } from "../typing-indicator.js";
 import { IncrementalMarkdownRenderer } from "../chat/incremental-markdown-renderer.js";
-import { requestScrollForceBottom } from "../chat/scroll-manager.js";
+import { scrollEvents } from "../chat/scroll-manager.js";
 import { prefersReducedMotion } from "../utils/motion.js";
 import {
   applyTimezoneSearchParam,
@@ -52,7 +52,11 @@ function parseMetaPayload(data) {
 }
 
 function requestScrollToBottom(detail = {}) {
-  requestScrollForceBottom({ source: "llm-stream", ...detail });
+  scrollEvents.dispatchEvent(
+    new CustomEvent("scroll:force-bottom", {
+      detail: { source: "llm-stream", ...detail },
+    })
+  );
 }
 
 function revealMetaChips(container) {

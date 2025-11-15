@@ -4,7 +4,7 @@ import {
   parseDateFromSource,
   navigateToDate,
 } from "./day.js";
-import { requestScrollForceBottom } from "./chat/scroll-manager.js";
+import { scrollEvents } from "./chat/scroll-manager.js";
 import { motionSafeBehavior } from "./utils/motion.js";
 import { getActiveDay } from "./chat/active-day-store.js";
 
@@ -114,7 +114,11 @@ const goToToday = () => {
 const toggleCalendar = () => clickIfEnabled("#calendar-btn");
 
 const scrollChatToBottom = () => {
-  requestScrollForceBottom({ source: "shortcut", force: true });
+  scrollEvents.dispatchEvent(
+    new CustomEvent("scroll:force-bottom", {
+      detail: { source: "shortcut", force: true },
+    })
+  );
   return true;
 };
 

@@ -9,113 +9,12 @@ import {
 
 export const scrollEvents = new EventTarget();
 
-/**
- * All scroll helper events share a common detail contract so listeners can rely on
- * the same metadata regardless of the caller.
- *
- * Standard fields:
- * - `source`: string identifier for the originator. Defaults to "unspecified".
- * - `reason`: optional free-form string describing the trigger. Defaults to null.
- * - `emittedAt`: timestamp (ms) noting when the helper dispatched the event.
- *
- * Additional fields are provided per-event:
- * - `force`: `boolean` present on `scroll:force-bottom` to request a hard scroll.
- * - `id` / `element`: target identifier or element for `scroll:target` requests.
- * - `options`: scrollIntoView options supplied for target navigation.
- * - `target`: identifier consumed by listeners acknowledging a target request.
- */
-
 const FORCE_BOTTOM_EVENT = "scroll:force-bottom";
 const TARGET_EVENT = "scroll:target";
 const TARGET_CONSUMED_EVENT = "scroll:target-consumed";
 const REFRESH_EVENT = "scroll:refresh";
 const HISTORY_RESTORE_EVENT = "scroll:history-restore";
 const MARKDOWN_COMPLETE_EVENT = "scroll:markdown-complete";
-
-const SCROLL_DETAIL_BASE = Object.freeze({
-  source: "unspecified",
-  reason: null,
-  emittedAt: 0,
-});
-
-const FORCE_BOTTOM_DETAIL_BASE = Object.freeze({
-  ...SCROLL_DETAIL_BASE,
-  force: false,
-});
-
-const TARGET_DETAIL_BASE = Object.freeze({
-  ...SCROLL_DETAIL_BASE,
-  id: null,
-  element: null,
-  options: null,
-});
-
-const TARGET_CONSUMED_DETAIL_BASE = Object.freeze({
-  ...SCROLL_DETAIL_BASE,
-  target: null,
-});
-
-const stampDetail = (detail, base) => {
-  const payload = { ...base, ...detail };
-  if (typeof payload.emittedAt !== "number" || Number.isNaN(payload.emittedAt)) {
-    payload.emittedAt = Date.now();
-  }
-  return payload;
-};
-
-export function requestScrollForceBottom(detail = {}) {
-  const normalized = stampDetail(
-    {
-      ...detail,
-      force: detail?.force === true,
-    },
-    FORCE_BOTTOM_DETAIL_BASE
-  );
-  scrollEvents.dispatchEvent(
-    new CustomEvent(FORCE_BOTTOM_EVENT, {
-      detail: normalized,
-    })
-  );
-  return normalized;
-}
-
-export function requestScrollTarget(target, options = null, detail = {}) {
-  const baseDetail = {
-    ...detail,
-    id: null,
-    element: null,
-    options: options ?? null,
-  };
-  if (typeof target === "string") {
-    baseDetail.id = target;
-  } else if (target instanceof HTMLElement) {
-    baseDetail.element = target;
-  }
-
-  const normalized = stampDetail(baseDetail, TARGET_DETAIL_BASE);
-  scrollEvents.dispatchEvent(
-    new CustomEvent(TARGET_EVENT, {
-      detail: normalized,
-    })
-  );
-  return normalized;
-}
-
-export function requestScrollTargetConsumed(target, detail = {}) {
-  const normalized = stampDetail(
-    {
-      ...detail,
-      target: target ?? null,
-    },
-    TARGET_CONSUMED_DETAIL_BASE
-  );
-  scrollEvents.dispatchEvent(
-    new CustomEvent(TARGET_CONSUMED_EVENT, {
-      detail: normalized,
-    })
-  );
-  return normalized;
-}
 
 const DEFAULT_CONTAINER_SELECTOR = "#content-wrapper";
 const DEFAULT_BUTTON_SELECTOR = "scroll-bottom-button, #scroll-bottom";
@@ -408,8 +307,10 @@ export class ScrollManager {
     return true;
   }
 
-  notifyTargetConsumed(target, detail = {}) {
-    requestScrollTargetConsumed(target, detail);
+  notifyTargetConsumed(target) {
+    const detail = { target: target ?? null };
+    const event = new CustomEvent(TARGET_CONSUMED_EVENT, { detail });
+    scrollEvents.dispatchEvent(event);
   }
 
   isUserNearBottom(threshold = 0) {
