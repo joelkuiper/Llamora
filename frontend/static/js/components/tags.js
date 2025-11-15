@@ -241,6 +241,22 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
     return seen;
   }
 
+  #shouldFetchAutocomplete() {
+    if (!this.#input) {
+      return false;
+    }
+    if (this.#popover?.isOpen) {
+      return true;
+    }
+    if (
+      typeof document !== "undefined" &&
+      document.activeElement === this.#input
+    ) {
+      return true;
+    }
+    return false;
+  }
+
   #handleInputFocus() {
     this.scheduleAutocompleteFetch({ immediate: true });
     this.#updateAutocompleteCandidates();
@@ -441,7 +457,7 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#initAutocomplete();
     this.#updateSubmitState();
 
-    if (meta?.initialized) {
+    if (meta?.initialized && this.#shouldFetchAutocomplete()) {
       this.scheduleAutocompleteFetch({ immediate: true });
     }
   }
@@ -485,7 +501,9 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
 
   #invalidateAutocompleteCache({ immediate = false } = {}) {
     this.clearAutocompleteCache();
-    this.scheduleAutocompleteFetch({ immediate });
+    if (this.#shouldFetchAutocomplete()) {
+      this.scheduleAutocompleteFetch({ immediate });
+    }
   }
 
   async #fetchTagAutocompleteCandidates(query, context = {}) {
