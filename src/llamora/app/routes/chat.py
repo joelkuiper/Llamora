@@ -35,7 +35,11 @@ from llamora.app.services.time import (
     format_date,
     part_of_day,
 )
-from llamora.app.routes.helpers import require_iso_date
+from llamora.app.routes.helpers import (
+    ensure_message_exists,
+    require_iso_date,
+    require_user_and_dek,
+)
 from llamora.settings import settings
 
 
@@ -124,13 +128,14 @@ async def chat_htmx_today():
 @login_required
 async def stop_generation(user_msg_id: str):
     logger.info("Stop requested for user message %s", user_msg_id)
-    session = _session()
-    user = await session.require_user()
-    await session.require_dek()
+    _, user, _ = await require_user_and_dek(_session())
 
-    if not await _db().messages.message_exists(user["id"], user_msg_id):
-        logger.warning("Stop request for unauthorized message %s", user_msg_id)
-        abort(404, description="message not found")
+    try:
+        await ensure_message_exists(_db(), user["id"], user_msg_id)
+    except HTTPException as exc:
+        if exc.code == 404:
+            logger.warning("Stop request for unauthorized message %s", user_msg_id)
+        raise
 
     manager = _chat_stream_manager()
     handled, was_pending = await manager.stop(user_msg_id, user["id"])
@@ -150,11 +155,8 @@ async def stop_generation(user_msg_id: str):
 @chat_bp.get("/c/meta-chips/<msg_id>")
 @login_required
 async def meta_chips(msg_id: str):
-    session = _session()
-    user = await session.require_user()
-    dek = await session.require_dek()
-    if not await _db().messages.message_exists(user["id"], msg_id):
-        abort(404, description="message not found")
+    _, user, dek = await require_user_and_dek(_session())
+    await ensure_message_exists(_db(), user["id"], msg_id)
     tags = await _db().tags.get_tags_for_message(user["id"], msg_id, dek)
     html = await render_template(
         "partials/meta_chips_wrapper.html",
@@ -168,9 +170,7 @@ async def meta_chips(msg_id: str):
 @chat_bp.get("/c/opening/<date>")
 @login_required
 async def sse_opening(date: str):
-    session = _session()
-    user = await session.require_user()
-    dek = await session.require_dek()
+    _, user, dek = await require_user_and_dek(_session())
     uid = user["id"]
     tz = get_timezone()
     now = datetime.now(ZoneInfo(tz))
@@ -300,9 +300,7 @@ async def send_message(date):
     form = await request.form
     user_text = form.get("message", "").strip()
     user_time = form.get("user_time")
-    session = _session()
-    user = await session.require_user()
-    dek = await session.require_dek()
+    _, user, dek = await require_user_and_dek(_session())
     uid = user["id"]
 
     max_len = int(settings.LIMITS.max_message_length)
@@ -340,9 +338,7 @@ async def sse_reply(user_msg_id: str, date: str):
 
     normalized_date = require_iso_date(date)
 
-    session = _session()
-    user = await session.require_user()
-    dek = await session.require_dek()
+    _, user, dek = await require_user_and_dek(_session())
     uid = user["id"]
     history, existing_assistant_msg, actual_date = await locate_message_and_reply(
         _db(), uid, dek, normalized_date, user_msg_id

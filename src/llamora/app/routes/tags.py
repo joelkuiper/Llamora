@@ -7,6 +7,7 @@ from llamora.app.util.frecency import (
     DEFAULT_FRECENCY_DECAY,
     resolve_frecency_lambda,
 )
+from llamora.app.routes.helpers import ensure_message_exists, require_user_and_dek
 
 tags_bp = Blueprint("tags", __name__)
 
@@ -40,8 +41,7 @@ async def remove_tag(msg_id: str, tag_hash: str):
 @tags_bp.post("/t/<msg_id>")
 @login_required
 async def add_tag(msg_id: str):
-    session = _session()
-    user = await session.require_user()
+    _, user, dek = await require_user_and_dek(_session())
     form = await request.form
     raw_tag = (form.get("tag") or "").strip()
     max_tag_length = int(settings.LIMITS.max_tag_length)
@@ -52,9 +52,7 @@ async def add_tag(msg_id: str):
     except ValueError:
         abort(400, description="empty tag")
         raise AssertionError("unreachable")
-    dek = await session.require_dek()
-    if not await _db().messages.message_exists(user["id"], msg_id):
-        abort(404, description="message not found")
+    await ensure_message_exists(_db(), user["id"], msg_id)
     tag_hash = await _db().tags.resolve_or_create_tag(user["id"], canonical, dek)
     await _db().tags.xref_tag_message(user["id"], tag_hash, msg_id)
     html = await render_template(
@@ -69,9 +67,7 @@ async def add_tag(msg_id: str):
 @tags_bp.get("/t/suggestions/<msg_id>")
 @login_required
 async def get_tag_suggestions(msg_id: str):
-    session = _session()
-    user = await session.require_user()
-    dek = await session.require_dek()
+    _, user, dek = await require_user_and_dek(_session())
     decay_constant = resolve_frecency_lambda(
         request.args.get("lambda"), default=DEFAULT_FRECENCY_DECAY
     )
@@ -98,10 +94,7 @@ async def get_tag_suggestions(msg_id: str):
 @tags_bp.get("/tags/autocomplete")
 @login_required
 async def autocomplete_tags():
-    session = _session()
-    user = await session.require_user()
-
-    dek = await session.require_dek()
+    _, user, dek = await require_user_and_dek(_session())
 
     msg_id = (request.args.get("msg_id") or "").strip()
     if not msg_id:
@@ -116,9 +109,7 @@ async def autocomplete_tags():
 
     limit = max(1, min(limit, 50))
 
-    if not await _db().messages.message_exists(user["id"], msg_id):
-        abort(404, description="message not found")
-        raise AssertionError("unreachable")
+    await ensure_message_exists(_db(), user["id"], msg_id)
 
     max_tag_length = int(settings.LIMITS.max_tag_length)
     raw_query = (request.args.get("q") or "").strip()[:max_tag_length]

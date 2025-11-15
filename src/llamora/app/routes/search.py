@@ -12,6 +12,7 @@ from llamora.app.util.frecency import (
     resolve_frecency_lambda,
     DEFAULT_FRECENCY_DECAY,
 )
+from llamora.app.routes.helpers import require_user_and_dek
 
 
 logger = logging.getLogger(__name__)
@@ -33,9 +34,7 @@ async def search():
     sanitized_query = ""
 
     if raw_query:
-        session = _session()
-        user = await session.require_user()
-        dek = await session.require_dek()
+        _, user, dek = await require_user_and_dek(_session())
 
         try:
             sanitized_query, results, truncated = await get_search_api().search(
@@ -73,10 +72,7 @@ FRECENT_TAG_LAMBDA = DEFAULT_FRECENCY_DECAY
 @search_bp.get("/search/recent")
 @login_required
 async def recent_searches():
-    session = _session()
-    user = await session.require_user()
-
-    dek = await session.require_dek()
+    _, user, dek = await require_user_and_dek(_session())
 
     limit = int(settings.SEARCH.recent_suggestion_limit)
     lambda_param: Any = request.args.get("lambda")
