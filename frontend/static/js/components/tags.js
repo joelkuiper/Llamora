@@ -3,6 +3,7 @@ import { ReactiveElement } from "../utils/reactive-element.js";
 import { AutocompleteOverlayMixin } from "./base/autocomplete-overlay.js";
 import { AutocompleteHistory } from "../utils/autocomplete-history.js";
 import { parsePositiveInteger } from "../utils/number.js";
+import { animateMotion } from "../services/motion.js";
 
 const canonicalizeTag = (value, limit = null) => {
   const text = `${value ?? ""}`.replace(/^#/, "").trim();
@@ -316,12 +317,7 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
     if (target === this.#tagContainer) {
       const chip = this.#tagContainer?.lastElementChild;
       if (chip?.classList?.contains("meta-chip")) {
-        chip.classList.add("chip-enter");
-        chip.addEventListener(
-          "animationend",
-          () => chip.classList.remove("chip-enter"),
-          { once: true }
-        );
+        animateMotion(chip, "motion-animate-chip-enter");
         const limit = this.#getCanonicalMaxLength();
         const label = chip
           .querySelector(".chip-label")

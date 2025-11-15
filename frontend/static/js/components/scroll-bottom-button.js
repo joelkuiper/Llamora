@@ -1,9 +1,9 @@
 import { ReactiveElement } from "../utils/reactive-element.js";
-import { prefersReducedMotion } from "../utils/motion.js";
+import { animateMotion } from "../services/motion.js";
 
 class ScrollBottomButtonElement extends ReactiveElement {
   #button = null;
-  #clickReset = null;
+  #pulseCleanup = null;
 
   connectedCallback() {
     super.connectedCallback();
@@ -12,9 +12,9 @@ class ScrollBottomButtonElement extends ReactiveElement {
   }
 
   disconnectedCallback() {
-    if (this.#clickReset != null) {
-      window.clearTimeout(this.#clickReset);
-      this.#clickReset = null;
+    if (typeof this.#pulseCleanup === "function") {
+      this.#pulseCleanup();
+      this.#pulseCleanup = null;
     }
     super.disconnectedCallback();
   }
@@ -48,21 +48,31 @@ class ScrollBottomButtonElement extends ReactiveElement {
         } else {
           button.disabled = true;
         }
-        button.classList.remove("clicked");
+        if (typeof this.#pulseCleanup === "function") {
+          this.#pulseCleanup();
+          this.#pulseCleanup = null;
+        }
       }
     }
   }
 
   pulse() {
-    if (!this.#button || prefersReducedMotion()) return;
-    this.#button.classList.add("clicked");
-    if (this.#clickReset != null) {
-      window.clearTimeout(this.#clickReset);
+    const button = this.#button;
+    if (!button) return;
+
+    if (typeof this.#pulseCleanup === "function") {
+      this.#pulseCleanup();
+      this.#pulseCleanup = null;
     }
-    this.#clickReset = window.setTimeout(() => {
-      this.#button?.classList.remove("clicked");
-      this.#clickReset = null;
-    }, 300);
+
+    this.#pulseCleanup = animateMotion(button, "motion-animate-tactile", {
+      onFinish: () => {
+        this.#pulseCleanup = null;
+      },
+      onCancel: () => {
+        this.#pulseCleanup = null;
+      },
+    });
   }
 
   #ensureButton() {

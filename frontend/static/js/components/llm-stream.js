@@ -5,7 +5,7 @@ import {
 } from "../typing-indicator.js";
 import { IncrementalMarkdownRenderer } from "../chat/incremental-markdown-renderer.js";
 import { requestScrollForceBottom } from "../chat/scroll-manager.js";
-import { prefersReducedMotion } from "../utils/motion.js";
+import { animateMotion, isMotionReduced } from "../services/motion.js";
 import {
   applyTimezoneSearchParam,
   buildTimezoneQueryParam,
@@ -60,41 +60,40 @@ function revealMetaChips(container) {
   if (!container || !container.hidden) return;
 
   const parent = container.closest(".message");
-  const reduceMotion = prefersReducedMotion();
+  const reduceMotion = isMotionReduced();
   const start = reduceMotion ? undefined : parent?.offsetHeight;
   container.hidden = false;
 
-  if (reduceMotion) {
+  if (!reduceMotion) {
+    const end = parent?.offsetHeight;
+
+    if (parent && start !== undefined && end !== undefined) {
+      parent.style.height = start + "px";
+      parent.offsetHeight;
+      parent.style.transition = "height var(--motion-gentle, 0.2s) ease";
+      parent.style.height = end + "px";
+      parent.addEventListener(
+        "transitionend",
+        () => {
+          parent.style.height = "";
+          parent.style.transition = "";
+        },
+        { once: true }
+      );
+    }
+  }
+
+  const notifyScroll = () => {
     requestScrollToBottom({ reason: "meta" });
-    return;
-  }
+  };
 
-  const end = parent?.offsetHeight;
-
-  if (parent && start !== undefined && end !== undefined) {
-    parent.style.height = start + "px";
-    parent.offsetHeight;
-    parent.style.transition = "height 0.2s ease";
-    parent.style.height = end + "px";
-    parent.addEventListener(
-      "transitionend",
-      () => {
-        parent.style.height = "";
-        parent.style.transition = "";
-      },
-      { once: true }
-    );
-  }
-
-  container.classList.add("chip-enter");
-  container.addEventListener(
-    "animationend",
-    () => {
-      container.classList.remove("chip-enter");
-      requestScrollToBottom({ reason: "meta" });
+  animateMotion(container, "motion-animate-chip-enter", {
+    onFinish: notifyScroll,
+    onCancel: notifyScroll,
+    reducedMotion: (_, done) => {
+      done();
     },
-    { once: true }
-  );
+  });
 }
 
 class LlmStreamElement extends HTMLElement {
@@ -582,7 +581,7 @@ class LlmStreamElement extends HTMLElement {
     indicator.classList.remove("repeat-guard-indicator--leaving");
     indicator.classList.add("repeat-guard-indicator--visible");
 
-    const reduceMotion = prefersReducedMotion();
+    const reduceMotion = isMotionReduced();
     if (this.#repeatGuardWavesDismissed) {
       indicator.classList.add("repeat-guard-indicator--calm");
       return;
@@ -651,7 +650,7 @@ class LlmStreamElement extends HTMLElement {
       return;
     }
 
-    const reduceMotion = prefersReducedMotion();
+    const reduceMotion = isMotionReduced();
     if (reduceMotion || immediate) {
       indicator.remove();
       return;
