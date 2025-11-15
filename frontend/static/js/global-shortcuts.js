@@ -6,6 +6,7 @@ import {
 } from "./day.js";
 import { scrollEvents } from "./chat/scroll-manager.js";
 import { motionSafeBehavior } from "./utils/motion.js";
+import { getActiveDay } from "./chat/active-day-store.js";
 
 let registered = false;
 
@@ -53,7 +54,7 @@ const clickIfEnabled = (selector) => {
 };
 
 const getActiveDate = () => {
-  const source = document.body?.dataset?.activeDay || "";
+  const source = getActiveDay() || "";
   const parsed = parseDateFromSource(source);
   return parsed?.date ?? null;
 };

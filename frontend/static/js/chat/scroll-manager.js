@@ -2,6 +2,10 @@ import { createListenerBag } from "../utils/events.js";
 import { motionSafeBehavior, prefersReducedMotion } from "../utils/motion.js";
 import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
 import { isNearBottom } from "./scroll-utils.js";
+import {
+  ACTIVE_DAY_CHANGED_EVENT,
+  getActiveDay,
+} from "./active-day-store.js";
 
 export const scrollEvents = new EventTarget();
 
@@ -105,7 +109,7 @@ export class ScrollManager {
 
     this.ensureElements();
 
-    const hasActiveDay = Boolean(document.body?.dataset?.activeDay);
+    const hasActiveDay = Boolean(getActiveDay());
     if (hasActiveDay) {
       this.restore();
       return;
@@ -115,7 +119,9 @@ export class ScrollManager {
       this.restore();
     };
 
-    bag.add(document, "chat:active-day-ready", resumeRestore, { once: true });
+    bag.add(document, ACTIVE_DAY_CHANGED_EVENT, resumeRestore, {
+      once: true,
+    });
   }
 
   stop() {
@@ -662,7 +668,7 @@ export class ScrollManager {
   }
 
   #getKey() {
-    const activeDay = document.body?.dataset?.activeDay;
+    const activeDay = getActiveDay();
     if (activeDay) {
       return `${STORAGE_PREFIX}-day-${activeDay}`;
     }

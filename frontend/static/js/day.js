@@ -1,4 +1,9 @@
 import { setTimezoneCookie } from "./timezone.js";
+import {
+  ACTIVE_DAY_CHANGED_EVENT,
+  getActiveDay,
+  getActiveDayLabel,
+} from "./chat/active-day-store.js";
 
 function ordinalSuffix(day) {
   if (!Number.isFinite(day)) return "";
@@ -19,6 +24,7 @@ function ordinalSuffix(day) {
 }
 
 const LABEL_FLASH_CLASS = "text-glow-flash";
+let navListenerRegistered = false;
 
 function triggerLabelFlash(node) {
   if (!node) return;
@@ -113,28 +119,33 @@ function updateNavButton(button, { disabled, tooltip, onClick }) {
 }
 
 /* Initialize previous/next day navigation buttons */
-export function initDayNav(chat, options = {}) {
-  const { forceFlash = false, activeDay, label } = options;
+const resolveNavElements = () => {
   const prevBtn = document.getElementById("prev-day");
   const nextBtn = document.getElementById("next-day");
-  if (!prevBtn || !nextBtn) return;
+  const labelNode = document.getElementById("calendar-label");
+  if (!prevBtn || !nextBtn) {
+    return null;
+  }
+  return { prevBtn, nextBtn, labelNode };
+};
 
-  const activeDaySource =
-    activeDay ||
-    chat?.dataset?.date ||
-    document.body?.dataset?.activeDay ||
-    "";
+const applyDayStateToNav = ({ activeDay, label, forceFlash = false }) => {
+  const elements = resolveNavElements();
+  if (!elements) return;
 
+  const { prevBtn, nextBtn, labelNode } = elements;
+
+  const activeDaySource = typeof activeDay === "string" ? activeDay : "";
   const parsed = parseDateFromSource(activeDaySource);
   const currentDate = parsed?.date ?? null;
 
-  const labelNode = document.getElementById("calendar-label");
   if (labelNode) {
     const labelText =
-      label ||
-      chat?.dataset?.longDate ||
-      document.body?.dataset?.activeDayLabel ||
-      (currentDate ? formatLongDate(currentDate) : activeDaySource);
+      typeof label === "string" && label
+        ? label
+        : currentDate
+          ? formatLongDate(currentDate)
+          : activeDaySource;
     if (typeof labelText === "string") {
       const previousLabel = labelNode.textContent;
       labelNode.textContent = labelText;
@@ -175,4 +186,38 @@ export function initDayNav(chat, options = {}) {
     tooltip: nextDate > today ? null : "Next day",
     onClick: nextDate > today ? null : () => navigateToDate(nextIso),
   });
+};
+
+const handleActiveDayChange = (event) => {
+  const detail = event?.detail || {};
+  const activeDay =
+    typeof detail.activeDay === "string" ? detail.activeDay : getActiveDay();
+  const label =
+    typeof detail.activeDayLabel === "string"
+      ? detail.activeDayLabel
+      : getActiveDayLabel();
+  const forceFlash = Boolean(detail.forceFlash);
+  applyDayStateToNav({ activeDay, label, forceFlash });
+};
+
+export function initDayNav(chat, options = {}) {
+  const { forceFlash = false, activeDay, label } = options;
+  const currentDay =
+    activeDay || getActiveDay() || chat?.dataset?.date || "";
+  const currentLabel =
+    label || getActiveDayLabel() || chat?.dataset?.longDate || null;
+
+  applyDayStateToNav({
+    activeDay: currentDay,
+    label: currentLabel,
+    forceFlash,
+  });
+
+  if (!navListenerRegistered) {
+    document.addEventListener(
+      ACTIVE_DAY_CHANGED_EVENT,
+      handleActiveDayChange
+    );
+    navListenerRegistered = true;
+  }
 }

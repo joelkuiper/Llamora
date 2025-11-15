@@ -8,6 +8,7 @@ import { setTimezoneCookie } from "../timezone.js";
 import { createListenerBag } from "../utils/events.js";
 import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
+import { setActiveDay, clearActiveDay } from "../chat/active-day-store.js";
 import "./chat-form.js";
 import "./llm-stream.js";
 
@@ -239,10 +240,7 @@ export class ChatView extends ReactiveElement {
       this.#chat = null;
       this.#lastRenderedDay = null;
       this.#forceNavFlash = false;
-      if (document?.body?.dataset) {
-        delete document.body.dataset.activeDay;
-        delete document.body.dataset.activeDayLabel;
-      }
+      clearActiveDay();
       return;
     }
 
@@ -296,24 +294,9 @@ export class ChatView extends ReactiveElement {
 
     this.#lastRenderedDay = activeDay;
 
-    if (document?.body?.dataset) {
-      if (activeDay) {
-        document.body.dataset.activeDay = activeDay;
-      } else {
-        delete document.body.dataset.activeDay;
-      }
-      if (activeDayLabel) {
-        document.body.dataset.activeDayLabel = activeDayLabel;
-      } else {
-        delete document.body.dataset.activeDayLabel;
-      }
-
-      document.dispatchEvent(
-        new CustomEvent("chat:active-day-ready", {
-          detail: { activeDay, activeDayLabel },
-        })
-      );
-    }
+    setActiveDay(activeDay, activeDayLabel, {
+      detail: { source: "chat-view" },
+    });
 
     chat.querySelectorAll?.(".markdown-body").forEach((el) => {
       if (el?.dataset?.rendered === "true") {

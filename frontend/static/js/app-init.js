@@ -2,6 +2,7 @@ import { ScrollManager } from "./chat/scroll-manager.js";
 import { initGlobalShortcuts } from "./global-shortcuts.js";
 import { setTimezoneCookie } from "./timezone.js";
 import { formatIsoDate } from "./day.js";
+import { getActiveDay } from "./chat/active-day-store.js";
 import {
   getAlertContainer,
   onAlertDismiss,
@@ -40,7 +41,7 @@ function registerHtmxHeaderHooks(csrfToken) {
       headers["X-CSRFToken"] = csrfToken;
     }
 
-    const activeDate = document.body?.dataset?.activeDay;
+    const activeDate = getActiveDay();
     if (activeDate) {
       headers["X-Active-Day"] = activeDate;
     }
