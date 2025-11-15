@@ -1,0 +1,113 @@
+@layer tokens.motion, motion.keyframes, motion.utilities;
+
+@layer tokens.motion {
+  :root {
+    --motion-highlight-duration: var(--motion-blink, 1s);
+    --motion-highlight-animation:
+      motion-highlight-flash var(--motion-highlight-duration) ease-in-out;
+
+    --motion-chip-enter-duration: var(--motion-gentle);
+    --motion-chip-exit-duration: var(--motion-hover);
+    --motion-chip-enter-animation:
+      motion-chip-enter var(--motion-chip-enter-duration) ease both;
+    --motion-chip-exit-animation:
+      motion-chip-exit var(--motion-chip-exit-duration) ease forwards;
+
+    --motion-tactile-animation: motion-tactile-pulse var(--motion-pulse) ease;
+  }
+}
+
+@layer motion.keyframes {
+  @keyframes motion-highlight-flash {
+    from {
+      background-color: var(--highlight-color);
+    }
+    to {
+      background-color: transparent;
+    }
+  }
+
+  @keyframes motion-chip-enter {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes motion-chip-exit {
+    from {
+      opacity: 1;
+      transform: scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: scale(0.8);
+    }
+  }
+
+  @keyframes motion-tactile-pulse {
+    0% {
+      transform: scale(1);
+      background: var(--pulse-bg-start);
+    }
+    40% {
+      transform: scale(0.88);
+      background: var(--pulse-bg-mid);
+    }
+    100% {
+      transform: scale(1);
+      background: var(--pulse-bg-end);
+    }
+  }
+}
+
+@layer motion.utilities {
+  :where(.motion-animate-highlight) {
+    animation: var(--motion-highlight-animation);
+  }
+
+  :where(.meta-chips).motion-animate-chip-enter,
+  :where(.meta-chips).htmx-added,
+  :where(.meta-chip).motion-animate-chip-enter,
+  :where(.meta-chip).htmx-added {
+    animation: var(--motion-chip-enter-animation);
+  }
+
+  :where(.meta-chip).motion-animate-chip-exit,
+  :where(.meta-chip).htmx-swapping {
+    animation: var(--motion-chip-exit-animation);
+  }
+
+  :where(.scroll-btn).motion-animate-tactile {
+    animation: var(--motion-tactile-animation);
+  }
+}
+
+@layer motion.utilities {
+  @media (prefers-reduced-motion: reduce) {
+    :where(.motion-animate-highlight),
+    :where(.meta-chips).motion-animate-chip-enter,
+    :where(.meta-chips).htmx-added,
+    :where(.meta-chip).motion-animate-chip-enter,
+    :where(.meta-chip).htmx-added,
+    :where(.meta-chip).motion-animate-chip-exit,
+    :where(.meta-chip).htmx-swapping,
+    :where(.scroll-btn).motion-animate-tactile {
+      animation: none !important;
+    }
+
+    :where(.meta-chip).motion-animate-chip-exit,
+    :where(.meta-chip).htmx-swapping {
+      opacity: 0;
+    }
+
+    :where(.meta-chip).motion-animate-chip-enter,
+    :where(.meta-chip).htmx-added,
+    :where(.meta-chips).motion-animate-chip-enter,
+    :where(.meta-chips).htmx-added {
+      opacity: 1;
+    }
+  }
+}
