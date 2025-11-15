@@ -1,3 +1,9 @@
+/* Token layers */
+@layer tokens.core, tokens.dark;
+
+@import url("./tokens/core.css") layer(tokens.core);
+@import url("./tokens/dark.css") layer(tokens.dark);
+
 .meta-chips {
   --meta-chip-max-width: 32ch;
   margin-top: var(--spacing-sm);

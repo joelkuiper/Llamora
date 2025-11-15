@@ -1,3 +1,9 @@
+/* Token layers */
+@layer tokens.core, tokens.dark;
+
+@import url("./tokens/core.css") layer(tokens.core);
+@import url("./tokens/dark.css") layer(tokens.dark);
+
 .markdown-body {
   display: contents;
 
@@ -27,12 +33,12 @@
   }
 
   table thead th {
-    background: var(--brand-accent-08, rgba(0,0,0,0.015));
+    background: var(--brand-accent-08);
     color: var(--color-heading);
     font-weight: 600;
     letter-spacing: 0.01em;
     text-transform: uppercase;
-    border-bottom: 1px solid color-mix(in srgb, var(--brand-accent, #6f6e6c), transparent 65%);
+    border-bottom: 1px solid color-mix(in srgb, var(--brand-accent), transparent 65%);
   }
 
   table th,
@@ -45,7 +51,7 @@
 
   tbody tr:nth-child(even) {
     /* gentle zebra using brand tone, not accent */
-    background: var(--brand-accent-08, rgba(0,0,0,0.01));
+    background: var(--brand-accent-08);
   }
 
   tbody tr:last-child td {
