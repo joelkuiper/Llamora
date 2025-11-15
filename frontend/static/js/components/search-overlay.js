@@ -1,4 +1,3 @@
-import { navigateToDate } from "../day.js";
 import { scrollToHighlight, createInlineSpinner } from "../ui.js";
 import { prefersReducedMotion } from "../utils/motion.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
@@ -469,18 +468,11 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   #navigateToResult(link, evt) {
-    const currentDay = document.getElementById("chat")?.dataset?.date || null;
-    const targetDay = link?.dataset?.day || link?.dataset?.date || null;
-    const targetId = link?.dataset?.target || null;
+    const currentId = document.getElementById("chat")?.dataset.date;
+    const targetId = link.dataset.target;
 
-    if (!targetDay) {
-      this.#closeResults(true, { immediate: true });
-      return;
-    }
-
-    evt?.preventDefault();
-
-    if (targetDay === currentDay) {
+    if (link.dataset.date === currentId) {
+      evt.preventDefault();
       this.#closeResults(true);
       if (targetId) {
         scrollToHighlight(null, {
@@ -489,11 +481,9 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
           clearOptions: { emitEvent: false },
         });
       }
-      return;
+    } else {
+      this.#closeResults(true, { immediate: true });
     }
-
-    this.#closeResults(true, { immediate: true });
-    navigateToDate(targetDay, { targetId });
   }
 
   #closeResults(clearInput = false, options = {}) {
