@@ -28,6 +28,8 @@ export const AutocompleteOverlayMixin = (BaseClass) => {
       this._autocompleteInput = null;
       this._autocompleteStore = null;
       this._unsubscribeAutocomplete = null;
+      this._autocompleteInputObserver = null;
+      this._autocompleteInputObserverRoot = null;
       this._initializeAutocompleteStore();
     }
 
@@ -35,12 +37,13 @@ export const AutocompleteOverlayMixin = (BaseClass) => {
       if (typeof super.connectedCallback === "function") {
         super.connectedCallback();
       }
-      this.refreshAutocompleteController({ force: true });
+      this.refreshAutocompleteController({ force: true, reason: "connected" });
     }
 
     disconnectedCallback() {
       this.cancelAutocompleteFetch();
       this.destroyAutocompleteController();
+      this._teardownAutocompleteInputObserver();
       if (typeof super.disconnectedCallback === "function") {
         super.disconnectedCallback();
       }
@@ -104,11 +107,10 @@ export const AutocompleteOverlayMixin = (BaseClass) => {
     }
 
     refreshAutocompleteController(options = {}) {
-      const { force = false } = options ?? {};
-      const input =
-        typeof this.resolveAutocompleteInput === "function"
-          ? this.resolveAutocompleteInput()
-          : null;
+      const { force = false, reason = null } = options ?? {};
+      const config = this._resolveAutocompleteInputConfig();
+      this._ensureAutocompleteInputObserver(config);
+      const input = this._resolveAutocompleteInput(config);
       const current = this._autocompleteInput;
       const controller = this._autocompleteController;
       const needsReinit =
@@ -117,6 +119,8 @@ export const AutocompleteOverlayMixin = (BaseClass) => {
         !current ||
         !current.isConnected ||
         current !== input;
+      const hasForce = force === true;
+      let reinitialized = false;
 
       if (!input) {
         if (controller) {
@@ -124,11 +128,26 @@ export const AutocompleteOverlayMixin = (BaseClass) => {
         }
         this._autocompleteController = null;
         this._autocompleteInput = null;
-        return;
+        if (typeof this.onAutocompleteInputChanged === "function") {
+          this.onAutocompleteInputChanged(null, current, {
+            reason,
+            initialized: false,
+            force: hasForce,
+          });
+        }
+        return reinitialized;
       }
 
       if (!needsReinit) {
-        return;
+        if (input !== current && typeof this.onAutocompleteInputChanged === "function") {
+          this._autocompleteInput = input;
+          this.onAutocompleteInputChanged(input, current, {
+            reason,
+            initialized: false,
+            force: hasForce,
+          });
+        }
+        return reinitialized;
       }
 
       if (controller) {
@@ -158,6 +177,17 @@ export const AutocompleteOverlayMixin = (BaseClass) => {
       );
       this._autocompleteInput = input;
       this.applyAutocompleteCandidates();
+      reinitialized = true;
+
+      if (typeof this.onAutocompleteInputChanged === "function") {
+        this.onAutocompleteInputChanged(input, current, {
+          reason,
+          initialized: true,
+          force: hasForce,
+        });
+      }
+
+      return reinitialized;
     }
 
     destroyAutocompleteController() {
@@ -250,6 +280,213 @@ export const AutocompleteOverlayMixin = (BaseClass) => {
 
     resolveAutocompleteInput() {
       return null;
+    }
+
+    getAutocompleteInputConfig() {
+      return null;
+    }
+
+    onAutocompleteInputChanged() {}
+
+    _resolveAutocompleteInputConfig() {
+      if (typeof this.getAutocompleteInputConfig !== "function") {
+        return null;
+      }
+      const raw = this.getAutocompleteInputConfig() ?? null;
+      if (!raw || typeof raw !== "object") {
+        return null;
+      }
+
+      const config = { ...raw };
+      config.selector =
+        typeof config.selector === "string" && config.selector.trim()
+          ? config.selector.trim()
+          : null;
+      config.resolve =
+        typeof config.resolve === "function" ? config.resolve : null;
+      config.observe = config.observe ?? !!config.selector;
+      config.mutationOptions =
+        typeof config.mutationOptions === "object" && config.mutationOptions
+          ? { ...config.mutationOptions }
+          : null;
+      config.rootResolver = this._createAutocompleteRootResolver(config.root);
+      return config;
+    }
+
+    _createAutocompleteRootResolver(rootOption) {
+      if (typeof rootOption === "function") {
+        return () => {
+          try {
+            return rootOption.call(this) ?? null;
+          } catch {
+            return null;
+          }
+        };
+      }
+
+      if (typeof rootOption === "string") {
+        const selector = rootOption.trim();
+        if (!selector) {
+          return () => this;
+        }
+        return () => this._findInScopes(selector) ?? null;
+      }
+
+      if (
+        rootOption &&
+        (typeof rootOption.querySelector === "function" ||
+          rootOption instanceof Document ||
+          rootOption instanceof DocumentFragment)
+      ) {
+        return () => rootOption;
+      }
+
+      return () => this;
+    }
+
+    _findInScopes(selector) {
+      if (!selector) {
+        return null;
+      }
+      if (selector === "self") {
+        return this;
+      }
+      if (selector === "document") {
+        return this.ownerDocument ?? document;
+      }
+      const local =
+        typeof this.querySelector === "function"
+          ? this.querySelector(selector)
+          : null;
+      if (local) {
+        return local;
+      }
+      const root = this.getRootNode?.();
+      if (root && typeof root.querySelector === "function") {
+        const fromRoot = root.querySelector(selector);
+        if (fromRoot) {
+          return fromRoot;
+        }
+      }
+      const doc = this.ownerDocument ?? document;
+      if (typeof doc.querySelector === "function") {
+        const fromDoc = doc.querySelector(selector);
+        if (fromDoc) {
+          return fromDoc;
+        }
+      }
+      return null;
+    }
+
+    _resolveAutocompleteInput(config) {
+      let input = null;
+      if (config?.resolve) {
+        try {
+          input = config.resolve.call(this, config);
+        } catch {
+          input = null;
+        }
+      }
+
+      if (!(input instanceof HTMLInputElement) && config?.selector) {
+        const root = config?.rootResolver ? config.rootResolver() : this;
+        input = this._querySelectorInRoot(root, config.selector);
+      }
+
+      if (
+        !(input instanceof HTMLInputElement) &&
+        typeof this.resolveAutocompleteInput === "function"
+      ) {
+        input = this.resolveAutocompleteInput();
+      }
+
+      return input instanceof HTMLInputElement ? input : null;
+    }
+
+    _querySelectorInRoot(root, selector) {
+      if (!selector) {
+        return null;
+      }
+
+      const scopes = [];
+      if (root) {
+        scopes.push(root);
+      }
+      const hostRoot = this.getRootNode?.();
+      if (hostRoot && hostRoot !== root) {
+        scopes.push(hostRoot);
+      }
+      const doc = this.ownerDocument ?? document;
+      if (doc && doc !== root && doc !== hostRoot) {
+        scopes.push(doc);
+      }
+
+      for (const scope of scopes) {
+        try {
+          if (typeof scope?.querySelector === "function") {
+            const found = scope.querySelector(selector);
+            if (found) {
+              return found;
+            }
+          }
+        } catch {
+          /* no-op */
+        }
+      }
+
+      return null;
+    }
+
+    _ensureAutocompleteInputObserver(config) {
+      if (!config || !config.observe) {
+        this._teardownAutocompleteInputObserver();
+        return;
+      }
+
+      const root = config?.rootResolver ? config.rootResolver() : this;
+      if (!(root instanceof Node)) {
+        this._teardownAutocompleteInputObserver();
+        return;
+      }
+
+      if (
+        this._autocompleteInputObserver &&
+        this._autocompleteInputObserverRoot === root
+      ) {
+        return;
+      }
+
+      this._teardownAutocompleteInputObserver();
+
+      const observer = new MutationObserver(() => {
+        if (!this.isConnected) {
+          return;
+        }
+        this.refreshAutocompleteController({ reason: "mutation" });
+      });
+
+      const options = config.mutationOptions ?? { childList: true, subtree: true };
+      try {
+        observer.observe(root, options);
+        this._autocompleteInputObserver = observer;
+        this._autocompleteInputObserverRoot = root;
+      } catch {
+        observer.disconnect();
+        this._autocompleteInputObserver = null;
+        this._autocompleteInputObserverRoot = null;
+      }
+    }
+
+    _teardownAutocompleteInputObserver() {
+      if (this._autocompleteInputObserver) {
+        try {
+          this._autocompleteInputObserver.disconnect();
+        } catch {
+          /* no-op */
+        }
+      }
+      this._autocompleteInputObserver = null;
+      this._autocompleteInputObserverRoot = null;
     }
 
     onAutocompleteCommit() {}

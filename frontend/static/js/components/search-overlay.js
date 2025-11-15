@@ -52,8 +52,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
   #inputEl = null;
   #spinnerEl = null;
   #spinnerController = null;
-  #inputListenerTarget = null;
-  #mutationObserver = null;
+  #inputListeners = null;
   #beforeRequestHandler;
   #afterRequestHandler;
   #afterSwapHandler;
@@ -92,7 +91,6 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
   connectedCallback() {
     super.connectedCallback();
     this.#resultsEl = this.querySelector("#search-results");
-    this.#inputEl = this.querySelector("#search-input");
     this.#spinnerEl = this.querySelector("#search-spinner");
     if (!this.#spinnerController) {
       this.#spinnerController = createInlineSpinner(this.#spinnerEl);
@@ -105,13 +103,12 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     const listeners = this.#listeners;
 
     this.#refreshInputState({
-      forceListeners: true,
       forceAutocomplete: true,
       forceRecent: true,
+      reason: "connected",
     });
 
     this.#registerShortcuts();
-    this.#setupMutationObserver();
 
     const eventTarget = this.ownerDocument ?? document;
 
@@ -153,12 +150,10 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#shortcutBag?.abort();
     this.#shortcutBag = null;
     this.cancelAutocompleteFetch();
-    this.#mutationObserver?.disconnect();
-    this.#mutationObserver = null;
     this.#resultsEl = null;
     this.#inputEl = null;
     this.#spinnerEl = null;
-    this.#inputListenerTarget = null;
+    this.#inputListeners = this.disposeListenerBag(this.#inputListeners);
 
     const doc = this.ownerDocument ?? document;
     const win = doc.defaultView ?? window;
@@ -268,60 +263,6 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
 
   #handleInputFocus() {
     this.#refreshInputState();
-  }
-
-  #setupMutationObserver() {
-    this.#mutationObserver?.disconnect();
-
-    const observer = new MutationObserver(() => {
-      if (!this.isConnected) return;
-      const input = this.querySelector("#search-input");
-      this.#inputEl = input instanceof HTMLInputElement ? input : null;
-      const needsRefresh =
-        this.#inputEl &&
-        (this.#inputEl !== this.autocompleteInput ||
-          this.#needsInlineAutocompleteRefresh(this.#inputEl));
-      if (needsRefresh) {
-        this.#refreshInputState({
-          forceListeners: true,
-          forceAutocomplete: true,
-          forceRecent: true,
-        });
-      }
-    });
-
-    observer.observe(this, { childList: true, subtree: true });
-    this.#mutationObserver = observer;
-  }
-
-  #ensureInputListeners(options = {}) {
-    if (!this.#inputEl) return;
-
-    const { force = false } = options;
-    const listeners = this.#listeners;
-    if (!listeners) return;
-
-    const currentTarget = this.#inputListenerTarget;
-
-    if (currentTarget && currentTarget !== this.#inputEl) {
-      currentTarget.removeEventListener("input", this.#inputHandler);
-      currentTarget.removeEventListener("focus", this.#focusHandler);
-      this.#inputListenerTarget = null;
-    }
-
-    if (
-      !force &&
-      this.#inputListenerTarget === this.#inputEl &&
-      this.#inputEl.isConnected
-    ) {
-      return;
-    }
-
-    this.#inputEl.removeEventListener("input", this.#inputHandler);
-    this.#inputEl.removeEventListener("focus", this.#focusHandler);
-    listeners.add(this.#inputEl, "input", this.#inputHandler);
-    listeners.add(this.#inputEl, "focus", this.#focusHandler);
-    this.#inputListenerTarget = this.#inputEl;
   }
 
   #loadRecentSearches(force = false) {
@@ -596,9 +537,9 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     const persisted = !!event?.persisted;
 
     this.#refreshInputState({
-      forceListeners: persisted,
       forceAutocomplete: persisted,
       forceRecent: persisted,
+      reason: "pageshow",
     });
 
     if (persisted) {
@@ -612,30 +553,25 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       return;
     }
 
-    const listenerTarget = this.#inputListenerTarget;
     const hasAutocomplete = !!this.autocompleteController;
+    const hasListeners = !!this.#inputListeners;
 
-    if (!hasAutocomplete && !listenerTarget) {
+    if (!hasAutocomplete && !hasListeners) {
       return;
     }
 
     this.destroyAutocompleteController();
-
-    if (listenerTarget) {
-      listenerTarget.removeEventListener("input", this.#inputHandler);
-      listenerTarget.removeEventListener("focus", this.#focusHandler);
-    }
-
-    this.#inputListenerTarget = null;
+    this.#inputListeners = this.disposeListenerBag(this.#inputListeners);
+    this.#inputEl = null;
   }
 
   #handleHistoryRestore() {
     if (!this.isConnected) return;
 
     this.#refreshInputState({
-      forceListeners: true,
       forceAutocomplete: true,
       forceRecent: true,
+      reason: "history-restore",
     });
 
     this.applyAutocompleteCandidates();
@@ -645,14 +581,9 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     if (!this.isConnected) return;
 
     this.#refreshInputState({
-      forceListeners: true,
       forceRecent: true,
+      reason: "popstate",
     });
-  }
-
-  resolveAutocompleteInput() {
-    const input = this.querySelector("#search-input");
-    return input instanceof HTMLInputElement ? input : null;
   }
 
   getAutocompleteControllerOptions() {
@@ -661,6 +592,13 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       emitInputEvent: false,
       prepareQuery: normalizeSearchValue,
       prepareCandidate: normalizeSearchValue,
+    };
+  }
+
+  getAutocompleteInputConfig() {
+    return {
+      selector: "#search-input",
+      observe: true,
     };
   }
 
@@ -695,42 +633,49 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     return this.#normalizeCandidateValue(candidate);
   }
 
+  onAutocompleteInputChanged(input, previous, meta = {}) {
+    const next = input instanceof HTMLInputElement ? input : null;
+    this.#inputEl = next;
+
+    this.#inputListeners = this.disposeListenerBag(this.#inputListeners);
+
+    if (next) {
+      const bag = this.createListenerBag();
+      bag.add(next, "input", this.#inputHandler);
+      bag.add(next, "focus", this.#focusHandler);
+      this.#inputListeners = bag;
+    }
+
+    this.#registerShortcuts();
+
+    if (meta?.reason === "mutation" && meta.initialized) {
+      this.#loadRecentSearches(true);
+    }
+  }
+
   #refreshInputState(options = {}) {
     if (!this.isConnected) return;
 
-    const {
-      forceListeners = false,
-      forceAutocomplete = false,
-      forceRecent = false,
-    } = options;
+    const { forceAutocomplete = false, forceRecent = false, reason = null } =
+      options ?? {};
 
-    const resolved = this.resolveAutocompleteInput();
-    this.#inputEl = resolved;
+    const reinitialized = this.refreshAutocompleteController({
+      force: forceAutocomplete,
+      reason,
+    });
 
-    if (!resolved) {
+    const input = this.autocompleteInput;
+    this.#inputEl = input instanceof HTMLInputElement ? input : null;
+
+    if (!this.#inputEl) {
       return;
     }
 
-    const needsInline = this.#needsInlineAutocompleteRefresh(resolved);
-    const shouldInit =
-      forceAutocomplete ||
-      !this.autocompleteController ||
-      this.autocompleteInput !== resolved ||
-      !this.autocompleteInput?.isConnected ||
-      needsInline;
-
-    this.#ensureInputListeners({
-      force:
-        forceListeners ||
-        this.#inputListenerTarget !== resolved ||
-        needsInline,
-    });
-
-    if (shouldInit) {
-      this.refreshAutocompleteController({ force: true });
+    if (forceRecent || reinitialized) {
+      this.#loadRecentSearches(true);
+    } else {
+      this.#loadRecentSearches();
     }
-
-    this.#loadRecentSearches(forceRecent || shouldInit);
   }
 
   #normalizeCandidateValue(entry) {
@@ -743,17 +688,6 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
           : "";
     if (!value) return "";
     return normalizeSearchValue(value).toLowerCase();
-  }
-
-  #needsInlineAutocompleteRefresh(input) {
-    if (!input) {
-      return false;
-    }
-
-    const missingInlineClass = !input.classList.contains("inline-autocomplete__input");
-    const missingWrapper = !input.closest(".inline-autocomplete");
-
-    return missingInlineClass || missingWrapper;
   }
 }
 
