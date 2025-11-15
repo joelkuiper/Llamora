@@ -1,5 +1,8 @@
-import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
 import { isNearBottom } from "../chat/scroll-utils.js";
+import {
+  findStreamByUserMsgId,
+  findTypingIndicator,
+} from "../chat/stream-utils.js";
 import { getAlertContainer } from "../utils/alert-center.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 
@@ -410,27 +413,9 @@ class ChatFormElement extends ReactiveElement {
       this.#session?.currentMsgId ||
       indicator?.dataset.userMsgId ||
       null;
-    let stream = null;
-    if (currentId) {
-      const normalized = String(currentId);
-      const escapeAttr = (value) => {
-        if (window.CSS?.escape) {
-          return CSS.escape(value);
-        }
-        return value.replace(/["\\]/g, "\\$&");
-      };
-      const byAttr = this.#chat.querySelector(
-        `llm-stream[data-user-msg-id="${escapeAttr(normalized)}"]`
-      );
-      if (byAttr) {
-        stream = byAttr;
-      } else {
-        const byId = document.getElementById(`msg-${normalized}`);
-        if (byId && byId.tagName === "LLM-STREAM") {
-          stream = byId;
-        }
-      }
-    }
+    let stream = currentId
+      ? findStreamByUserMsgId(this.#chat, currentId)
+      : null;
     if (!stream && indicator) {
       stream = indicator.closest("llm-stream");
     }
@@ -462,24 +447,7 @@ class ChatFormElement extends ReactiveElement {
   #getTypingIndicator() {
     if (!this.#chat) return null;
     const targetId = this.#streamingMsgId || this.#session?.currentMsgId || null;
-    if (targetId) {
-      const normalized = String(targetId);
-      const message = document.getElementById(`msg-${normalized}`);
-      if (message) {
-        const scoped = message.querySelector(TYPING_INDICATOR_SELECTOR);
-        if (scoped) {
-          return scoped;
-        }
-      }
-
-      const typed = Array.from(
-        this.#chat.querySelectorAll(TYPING_INDICATOR_SELECTOR)
-      ).find((node) => node?.dataset?.userMsgId === normalized);
-      if (typed) {
-        return typed;
-      }
-    }
-    return this.#chat.querySelector(TYPING_INDICATOR_SELECTOR);
+    return findTypingIndicator(this.#chat, targetId);
   }
 
   #setSubmitting(value) {
