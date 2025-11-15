@@ -1,32 +1,8 @@
+import { normalizeAutocompleteValue } from "./autocomplete-normalize.js";
+
 const defaultPrepare = (value) => value;
 
-const defaultNormalize = (value) => {
-  if (value == null) {
-    return "";
-  }
-  if (typeof value === "string") {
-    return value.trim().toLowerCase();
-  }
-  if (typeof value === "object") {
-    if (typeof value.value === "string") {
-      return value.value.trim().toLowerCase();
-    }
-    if (typeof value.key === "string") {
-      return value.key.trim().toLowerCase();
-    }
-    if (typeof value.id === "string") {
-      return value.id.trim().toLowerCase();
-    }
-    if (typeof value.label === "string") {
-      return value.label.trim().toLowerCase();
-    }
-  }
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return "";
-  }
-};
+const defaultNormalize = (value) => normalizeAutocompleteValue(value);
 
 const toPositiveInteger = (value, fallback = null) => {
   const parsed = Number.parseInt(value, 10);

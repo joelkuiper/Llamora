@@ -1,3 +1,5 @@
+import { normalizeAutocompleteValue } from "./autocomplete-normalize.js";
+
 const DEFAULT_DEBOUNCE_MS = 200;
 
 const defaultBuildCacheKey = (query, context = {}) => {
@@ -12,31 +14,7 @@ const defaultBuildCacheKey = (query, context = {}) => {
   }
 };
 
-const defaultGetCandidateKey = (candidate) => {
-  if (candidate == null) return "";
-  if (typeof candidate === "string") {
-    return candidate.trim().toLowerCase();
-  }
-  if (typeof candidate === "object") {
-    if (typeof candidate.value === "string") {
-      return candidate.value.trim().toLowerCase();
-    }
-    if (typeof candidate.id === "string") {
-      return candidate.id.trim().toLowerCase();
-    }
-    if (typeof candidate.key === "string") {
-      return candidate.key.trim().toLowerCase();
-    }
-    if (typeof candidate.label === "string") {
-      return candidate.label.trim().toLowerCase();
-    }
-  }
-  try {
-    return JSON.stringify(candidate);
-  } catch {
-    return "";
-  }
-};
+const defaultGetCandidateKey = (candidate) => normalizeAutocompleteValue(candidate);
 
 const defaultMergeCandidates = (remoteCandidates, localCollections, helpers) => {
   const merged = [];
