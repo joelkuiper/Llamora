@@ -160,6 +160,19 @@ export class ScrollManager {
     this.onScrollBtnClick = this.onScrollBtnClick.bind(this);
   }
 
+  #hasActiveHighlight() {
+    if (!this.container) return false;
+
+    // flashHighlight() decorates the target element with either the
+    // `highlight` class or a temporary `data-flash-timer-id` attribute while
+    // the animation is in progress. When either marker is present we should
+    // treat the highlight as active and avoid clobbering the scroll position.
+    const highlight = this.container.querySelector?.(
+      "[data-flash-timer-id], .message.highlight"
+    );
+    return highlight instanceof HTMLElement;
+  }
+
   start() {
     if (this.#started) return;
     this.#started = true;
@@ -700,6 +713,10 @@ export class ScrollManager {
     this.ensureContainer();
     if (!this.container) return;
 
+    if (this.#hasActiveHighlight()) {
+      return;
+    }
+
     const key = this.#getKey();
     const params = new URLSearchParams(window.location.search);
     const hasTarget =
@@ -735,6 +752,9 @@ export class ScrollManager {
   maybeRestore() {
     if (this.#skipNextRestore) {
       this.#skipNextRestore = false;
+      return;
+    }
+    if (this.#hasActiveHighlight()) {
       return;
     }
     this.restore();
