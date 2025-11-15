@@ -183,9 +183,23 @@ export function scrollToHighlight(fallbackTarget, options = {}) {
   }
 
   if (!target && window.location.hash.startsWith("#msg-")) {
-    target = window.location.hash.substring(1);
-    params.set("target", target);
-    shouldUpdateHistory = true;
+    const hashedTarget = window.location.hash.substring(1);
+    const hashedElement =
+      typeof document?.getElementById === "function"
+        ? document.getElementById(hashedTarget)
+        : null;
+
+    if (hashedElement) {
+      target = hashedTarget;
+      params.set("target", target);
+      shouldUpdateHistory = true;
+    } else if (window.location.hash) {
+      const query = params.toString();
+      const newUrl = query
+        ? `${window.location.pathname}?${query}`
+        : window.location.pathname;
+      history.replaceState(historyState, "", newUrl);
+    }
   }
 
   if (!target && fallbackTarget) {
