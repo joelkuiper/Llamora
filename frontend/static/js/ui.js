@@ -1,4 +1,7 @@
-import { scrollEvents } from "./chat/scroll-manager.js";
+import {
+  requestScrollTarget,
+  requestScrollTargetConsumed,
+} from "./chat/scroll-manager.js";
 import { motionSafeBehavior, prefersReducedMotion } from "./utils/motion.js";
 
 export const SPINNER = {
@@ -147,14 +150,13 @@ export function clearScrollTarget(target, options = {}) {
   }
 
   if (emitEvent) {
-    const detail = { target: target ?? null };
+    const consumedTarget = target ?? null;
+    const meta = { source: "ui" };
     const manager = window.appInit?.scroll ?? null;
     if (manager && typeof manager.notifyTargetConsumed === "function") {
-      manager.notifyTargetConsumed(detail.target);
+      manager.notifyTargetConsumed(consumedTarget, meta);
     } else {
-      scrollEvents.dispatchEvent(
-        new CustomEvent("scroll:target-consumed", { detail })
-      );
+      requestScrollTargetConsumed(consumedTarget, meta);
     }
   }
 }
@@ -209,14 +211,7 @@ export function scrollToHighlight(fallbackTarget, options = {}) {
 
     const el = document.getElementById(target);
     if (el) {
-      scrollEvents.dispatchEvent(
-        new CustomEvent("scroll:target", {
-          detail: {
-            id: target,
-            options: scrollOptions,
-          },
-        })
-      );
+      requestScrollTarget(target, scrollOptions, { source: "ui" });
       flashHighlight(el);
       clearScrollTarget(target, { historyState, ...clearOptions });
     }
