@@ -10,7 +10,7 @@ from quart import (
 from llamora.app.services.auth_helpers import login_required
 from llamora.app.services.session_context import get_session_context
 from llamora.app.services.time import local_date
-from llamora.app.services.validators import parse_iso_date
+from llamora.app.routes.helpers import require_iso_date
 from llamora.app.services.calendar import get_month_context
 from llamora.app.routes.chat import render_chat
 
@@ -60,11 +60,7 @@ async def day_today():
 @days_bp.route("/d/<date>")
 @login_required
 async def day(date):
-    try:
-        normalized_date = parse_iso_date(date)
-    except ValueError as exc:
-        abort(400, description="Invalid date")
-        raise AssertionError("unreachable") from exc
+    normalized_date = require_iso_date(date)
     target = request.args.get("target")
     return await _render_day(normalized_date, target, "day")
 

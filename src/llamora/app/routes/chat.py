@@ -35,7 +35,7 @@ from llamora.app.services.time import (
     format_date,
     part_of_day,
 )
-from llamora.app.services.validators import parse_iso_date
+from llamora.app.routes.helpers import require_iso_date
 from llamora.settings import settings
 
 
@@ -93,11 +93,7 @@ async def render_chat(
 @chat_bp.route("/c/<date>")
 @login_required
 async def chat_htmx(date):
-    try:
-        normalized_date = parse_iso_date(date)
-    except ValueError as exc:
-        abort(400, description="Invalid date")
-        raise AssertionError("unreachable") from exc
+    normalized_date = require_iso_date(date)
     target = request.args.get("target")
     push_url = url_for("days.day", date=normalized_date)
     return await render_chat(
@@ -342,11 +338,7 @@ async def sse_reply(user_msg_id: str, date: str):
     is sent in a final ``done`` event.
     """
 
-    try:
-        normalized_date = parse_iso_date(date)
-    except ValueError as exc:
-        abort(400, description="Invalid date")
-        raise AssertionError("unreachable") from exc
+    normalized_date = require_iso_date(date)
 
     session = _session()
     user = await session.require_user()
