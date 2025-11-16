@@ -22,6 +22,7 @@ from llamora.app.services.auth_helpers import login_required
 from llamora.app.services.chat_context import get_chat_context
 from llamora.app.services.chat_helpers import (
     augment_history_with_recall,
+    history_has_tag_recall,
     StreamSession,
     build_conversation_context,
     locate_message_and_reply,
@@ -374,17 +375,36 @@ async def sse_reply(user_msg_id: str, date: str):
                 current_date=actual_date or normalized_date,
             )
             llm_client = services.llm_service.llm
+            recall_date = actual_date or normalized_date
+            recall_tags = tuple(recall_context.tags) if recall_context else ()
+            has_existing_guidance = False
+            if recall_context and recall_tags:
+                has_existing_guidance = history_has_tag_recall(
+                    history,
+                    tags=recall_tags,
+                    date=recall_date,
+                )
             augmentation = await augment_history_with_recall(
                 history,
-                recall_context,
+                None if has_existing_guidance else recall_context,
                 llm_client=llm_client,
                 params=params,
                 context=ctx,
                 message_key="message",
                 target_message_id=user_msg_id,
                 include_tag_metadata=True,
+                tag_recall_date=recall_date,
             )
             history_for_stream = augmentation.messages
+            recall_applied = False
+            if recall_context and recall_tags:
+                recall_applied = history_has_tag_recall(
+                    history_for_stream,
+                    tags=recall_tags,
+                    date=recall_date,
+                )
+            else:
+                recall_applied = False
             try:
                 pending_response = manager.start_stream(
                     user_msg_id,
@@ -394,6 +414,7 @@ async def sse_reply(user_msg_id: str, date: str):
                     dek,
                     params,
                     ctx,
+                    meta_extra={"tag_recall_applied": recall_applied},
                 )
             except StreamCapacityError as exc:
                 return StreamSession.backpressure(

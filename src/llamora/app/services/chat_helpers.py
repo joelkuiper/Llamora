@@ -183,6 +183,55 @@ def _locate_recall_entry(
     return None
 
 
+def _normalize_recall_tags(tags: Iterable[str]) -> tuple[str, ...]:
+    normalized: list[str] = []
+    for tag in tags:
+        clean = str(tag or "").strip()
+        if clean:
+            normalized.append(clean)
+    return tuple(normalized)
+
+
+def history_has_tag_recall(
+    history: Sequence[Mapping[str, Any] | dict[str, Any]],
+    *,
+    tags: Sequence[str],
+    date: str | None,
+) -> bool:
+    """Return ``True`` when ``history`` already contains matching tag recall."""
+
+    normalized_tags = _normalize_recall_tags(tags)
+    if not normalized_tags:
+        return False
+
+    date_key = str(date or "").strip()
+
+    for entry in history:
+        if not isinstance(entry, Mapping):
+            continue
+        if entry.get("role") != "system":
+            continue
+        meta = entry.get("meta")
+        if not isinstance(meta, Mapping):
+            continue
+        tag_meta = meta.get("tag_recall")
+        if not isinstance(tag_meta, Mapping):
+            continue
+        entry_tags = tag_meta.get("tags")
+        if not isinstance(entry_tags, Sequence):
+            continue
+        normalized_entry_tags = _normalize_recall_tags(entry_tags)
+        if normalized_entry_tags != normalized_tags:
+            continue
+        if date_key:
+            entry_date = str(tag_meta.get("date") or "").strip()
+            if entry_date != date_key:
+                continue
+        return True
+
+    return False
+
+
 async def augment_history_with_recall(
     history: Sequence[Mapping[str, Any] | dict[str, Any]],
     recall_context: TagRecallContext | None,
@@ -194,6 +243,7 @@ async def augment_history_with_recall(
     target_message_id: str | None = None,
     insert_index: int | None = None,
     include_tag_metadata: bool = False,
+    tag_recall_date: str | None = None,
 ) -> RecallAugmentation:
     """Insert ``recall_context`` into ``history`` and optionally trim it."""
 
@@ -209,7 +259,10 @@ async def augment_history_with_recall(
             message_key: recall_context.text,
         }
         if include_tag_metadata:
-            recall_entry["meta"] = {"tag_recall": {"tags": list(recall_context.tags)}}
+            tag_meta: dict[str, Any] = {"tags": list(recall_context.tags)}
+            if tag_recall_date:
+                tag_meta["date"] = str(tag_recall_date)
+            recall_entry["meta"] = {"tag_recall": tag_meta}
             tag_items = [
                 {"name": tag}
                 for tag in recall_context.tags
