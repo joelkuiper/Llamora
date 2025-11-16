@@ -11,18 +11,11 @@
       {% set runtime_js = config.STATIC_MANIFEST['js'].get('app-runtime') %}
     {% endif %}
 
-    {% if app_css %}
-      <link rel="stylesheet" href="{{ url_for('static', filename=app_css) }}">
-    {% else %}
-      <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
-      <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
-      <link rel="stylesheet" href="{{ url_for('static', filename='css/header.css') }}">
-      <link rel="stylesheet" href="{{ url_for('static', filename='css/search.css') }}">
-      <link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css') }}">
-      <link rel="stylesheet" href="{{ url_for('static', filename='css/markdown.css') }}">
-      <link rel="stylesheet" href="{{ url_for('static', filename='css/meta-chips.css') }}">
-      <link rel="stylesheet" href="{{ url_for('static', filename='css/calendar.css') }}">
+    {% if not app_css %}
+      {% set app_css = 'css/app.css' %}
     {% endif %}
+
+    <link rel="stylesheet" href="{{ url_for('static', filename=app_css) }}">
 
     {% if runtime_js %}
       <script type="module" defer src="{{ url_for('static', filename=runtime_js) }}"></script>
