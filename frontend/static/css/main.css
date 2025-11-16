@@ -2,10 +2,7 @@
    Theme Tokens
    ========================================================================= */
 
-@layer tokens.core, tokens.dark, tokens.motion;
-
-@import url("./tokens/core.css") layer(tokens.core);
-@import url("./tokens/dark.css") layer(tokens.dark);
+@import url("./tokens/base.css");
 @import url("./motion.css");
 
 /* ==========================================================================

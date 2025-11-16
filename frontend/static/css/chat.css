@@ -1,8 +1,4 @@
-/* Token layers */
-@layer tokens.core, tokens.dark;
-
-@import url("./tokens/core.css") layer(tokens.core);
-@import url("./tokens/dark.css") layer(tokens.dark);
+@import url("./tokens/base.css");
 
 body {
   background: var(--color-bg);

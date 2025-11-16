@@ -1,0 +1,5 @@
+/* Shared theme token imports */
+@layer tokens.core, tokens.dark;
+
+@import url("./core.css") layer(tokens.core);
+@import url("./dark.css") layer(tokens.dark);
