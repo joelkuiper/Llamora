@@ -1,11 +1,13 @@
 import {
   requestScrollTarget,
   requestScrollTargetConsumed,
+  scrollEvents,
 } from "./chat/scroll-manager.js";
 import {
   animateMotion,
   motionSafeBehavior,
 } from "./services/motion.js";
+import { scheduleFrame } from "./utils/scheduler.js";
 
 export const SPINNER = {
   interval: 80,
@@ -180,6 +182,7 @@ export function scrollToHighlight(fallbackTarget, options = {}) {
       block: "center",
     },
     clearOptions = {},
+    fallbackCleanupDelay = 1500,
   } = options;
 
   const params = new URLSearchParams(window.location.search);
@@ -219,6 +222,33 @@ export function scrollToHighlight(fallbackTarget, options = {}) {
     consumedFallback = true;
   }
 
+  let cleanupTimeoutId = null;
+
+  const cleanupFallbackTarget = () => {
+    if (!consumedFallback) return;
+    if (cleanupTimeoutId !== null) {
+      window.clearTimeout(cleanupTimeoutId);
+      cleanupTimeoutId = null;
+    }
+
+    const chatView = document.querySelector("chat-view");
+    if (chatView?.dataset.scrollTarget === fallbackTarget) {
+      delete chatView.dataset.scrollTarget;
+    }
+  };
+
+  const scheduleFallbackCleanup = () => {
+    if (!consumedFallback) return;
+    if (cleanupTimeoutId !== null) return;
+
+    const delay = Number.isFinite(fallbackCleanupDelay)
+      ? fallbackCleanupDelay
+      : 0;
+    if (delay < 0) return;
+
+    cleanupTimeoutId = window.setTimeout(() => cleanupFallbackTarget(), delay);
+  };
+
   if (target) {
     if (shouldUpdateHistory || window.location.hash) {
       const query = params.toString();
@@ -233,18 +263,46 @@ export function scrollToHighlight(fallbackTarget, options = {}) {
       }
     }
 
-    const el = document.getElementById(target);
-    if (el) {
+    let resolvedHighlight = false;
+    let markdownListener = null;
+
+    const teardownMarkdownListener = () => {
+      if (markdownListener) {
+        scrollEvents.removeEventListener("scroll:markdown-complete", markdownListener);
+        markdownListener = null;
+      }
+    };
+
+    const highlightTarget = () => {
+      const el = document.getElementById(target);
+      if (!el) return false;
+
+      resolvedHighlight = true;
+      teardownMarkdownListener();
       requestScrollTarget(target, scrollOptions, { source: "ui" });
       flashHighlight(el);
       clearScrollTarget(target, { historyState, ...clearOptions });
-    }
-  }
+      cleanupFallbackTarget();
+      return true;
+    };
 
-  if (consumedFallback) {
-    const chatView = document.querySelector("chat-view");
-    if (chatView?.dataset.scrollTarget === fallbackTarget) {
-      delete chatView.dataset.scrollTarget;
+    const retryAcrossFrames = (remainingFrames = 3) => {
+      if (resolvedHighlight || remainingFrames <= 0) return;
+      if (highlightTarget()) return;
+      if (remainingFrames - 1 > 0) {
+        scheduleFrame(() => retryAcrossFrames(remainingFrames - 1));
+      }
+    };
+
+    if (!highlightTarget()) {
+      markdownListener = () => {
+        if (resolvedHighlight) return;
+        highlightTarget();
+        teardownMarkdownListener();
+      };
+      scrollEvents.addEventListener("scroll:markdown-complete", markdownListener);
+      retryAcrossFrames();
+      scheduleFallbackCleanup();
     }
   }
 }
