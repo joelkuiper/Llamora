@@ -32,16 +32,23 @@ function hasAnyGlobal(names) {
   return names.some((name) => globalScope[name] !== undefined && globalScope[name] !== null);
 }
 
+const vendorBase = (() => {
+  if (typeof location !== "undefined") {
+    return new URL("/static/js/vendor/", location.origin);
+  }
+  return new URL("./", import.meta.url);
+})();
+
 const vendorSpecs = [
-  { path: "./vendor/htmx.min.js", globals: ["htmx"] },
-  { path: "./vendor/marked.umd.js", globals: ["marked"] },
-  { path: "./vendor/purify.min.js", globals: ["DOMPurify"] },
-  { path: "./vendor/popper.min.jsm.js", globals: ["createPopper", "Popper"] },
+  { path: "htmx.min.js", globals: ["htmx"] },
+  { path: "marked.umd.js", globals: ["marked"] },
+  { path: "purify.min.js", globals: ["DOMPurify"] },
+  { path: "popper.min.jsm.js", globals: ["createPopper", "Popper"] },
 ];
 
 for (const spec of vendorSpecs) {
   if (!hasAnyGlobal(spec.globals)) {
-    const url = new URL(spec.path, import.meta.url);
+    const url = new URL(spec.path, vendorBase);
     await loadScript(url);
   }
 }

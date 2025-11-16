@@ -690,6 +690,11 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 }
 
-if (!customElements.get("search-overlay")) {
-  customElements.define("search-overlay", SearchOverlay);
+function registerSearchOverlay() {
+  if (!customElements.get("search-overlay")) {
+    customElements.define("search-overlay", SearchOverlay);
+  }
 }
+
+registerSearchOverlay();
+document.addEventListener("app:rehydrate", registerSearchOverlay);

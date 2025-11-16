@@ -41,13 +41,4 @@
 
     <scroll-bottom-button></scroll-bottom-button>
   </chat-view>
-
-  {% if config.STATIC_BUNDLES %}
-    {% set chat_js = config.STATIC_MANIFEST['js'].get('chat') %}
-    {% if chat_js %}
-      <script type="module" defer src="{{ url_for('static', filename=chat_js) }}"></script>
-    {% endif %}
-  {% else %}
-    <script type="module" src="{{ url_for('static', filename='js/chat-entry.js') }}"></script>
-  {% endif %}
 </main>

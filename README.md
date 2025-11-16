@@ -98,25 +98,18 @@ Both commands honor configuration overrides such as `LLAMORA_APP__HOST` and `LLA
 
 Open [http://localhost:5000](http://localhost:5000) (or your configured port) in your browser once the server starts.
 
-### Bundling front-end assets
+### Front-end assets
 
-Llamora keeps the front-end build lightweight by vendoring the [esbuild](https://esbuild.github.io) binary under `scripts/bin/`. The helper script downloads the right executable for your platform the first time you call it.
-
-Use the Python wrapper to manage bundles:
+Assets live under `frontend/static/` and can run directly as native ES modules or be bundled for production.
+Use the vendored esbuild wrapper to produce minified bundles and a manifest in `frontend/dist/`:
 
 ```bash
-uv run python scripts/build_assets.py build
+uv run python scripts/build_assets.py build --mode prod
 ```
 
-* `build` (default mode: production) emits minified JS and CSS bundles into `frontend/dist/` alongside a `manifest.json`.
-* Pass `--mode dev` to `build` when you want sourcemaps without minification.
-* `watch` keeps esbuild running in development and automatically copies passthrough assets:
-  ```bash
-  uv run python scripts/build_assets.py watch
-  ```
-* `clean` removes the generated `frontend/dist/` directory.
-
-When `frontend/dist/manifest.json` exists, the Quart app serves those bundles automatically. Otherwise it falls back to the files in `frontend/static/`, so you can keep developing without running the build step.
+When `frontend/dist/manifest.json` exists, the server prefers the bundled outputs (exposed to templates as
+`config.STATIC_MANIFEST`). Remove `frontend/dist/` or run with `--mode dev`/`watch` to fall back to the
+unbundled files while keeping load order intact.
 
 ---
 

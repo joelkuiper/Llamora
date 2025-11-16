@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 def create_app():
     from quart import Quart, render_template, make_response, request, g
+    from quart import abort, send_from_directory
     from quart_wtf import CSRFProtect
     from .services.container import AppLifecycle, AppServices
 
@@ -75,7 +76,6 @@ def create_app():
     dist_dir = project_root / "frontend" / "dist"
     manifest_path = dist_dir / "manifest.json"
     asset_manifest: dict[str, dict[str, str]] = {"js": {}, "css": {}}
-    static_dir = static_fallback_dir
     static_bundles = False
 
     if manifest_path.exists():
@@ -84,14 +84,9 @@ def create_app():
         except json.JSONDecodeError:
             logger.warning("Failed to parse asset manifest at %s", manifest_path)
         else:
-            static_dir = dist_dir
             static_bundles = True
 
-    app = Quart(
-        __name__,
-        static_folder=str(static_dir),
-        static_url_path="/static",
-    )
+    app = Quart(__name__, static_folder=None, static_url_path="/static")
     app.secret_key = settings.SECRET_KEY
     app.config.update(
         APP_NAME=settings.APP_NAME,
@@ -115,6 +110,18 @@ def create_app():
 
     app.extensions["llamora"] = services
     app.extensions[SECURE_COOKIE_MANAGER_KEY] = cookie_manager
+
+    @app.route("/static/<path:filename>", endpoint="static")
+    async def static_file(filename: str):
+        dist_candidate = dist_dir / filename
+        if dist_candidate.exists():
+            return await send_from_directory(str(dist_dir), filename)
+
+        fallback_candidate = static_fallback_dir / filename
+        if fallback_candidate.exists():
+            return await send_from_directory(str(static_fallback_dir), filename)
+
+        abort(404)
 
     logging.basicConfig(
         level=settings.LOG_LEVEL,

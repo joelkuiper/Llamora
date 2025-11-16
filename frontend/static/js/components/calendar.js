@@ -546,6 +546,11 @@ export class CalendarControl extends HTMLElement {
   }
 }
 
-if (!customElements.get("calendar-control")) {
-  customElements.define("calendar-control", CalendarControl);
+function registerCalendarControl() {
+  if (!customElements.get("calendar-control")) {
+    customElements.define("calendar-control", CalendarControl);
+  }
 }
+
+registerCalendarControl();
+document.addEventListener("app:rehydrate", registerCalendarControl);
