@@ -4,17 +4,18 @@ import { MarkdownObserver } from "../chat/markdown-observer.js";
 import { StreamingSession } from "../chat/streaming-session.js";
 import { StreamController } from "../chat/stream-controller.js";
 import { renderMarkdownInElement } from "../markdown.js";
-import { formatIsoDate, initDayNav, navigateToDate } from "../day.js";
+import { initDayNav, navigateToDate } from "../day.js";
 import { scrollToHighlight } from "../ui.js";
 import { createListenerBag } from "../utils/events.js";
 import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 import { setActiveDay, clearActiveDay } from "../chat/active-day-store.js";
 import {
-  applyTimezoneSearchParam,
-  buildTimezoneQueryParam,
+  getClientToday,
   getTimezone,
-} from "../services/datetime.js";
+  scheduleMidnightRollover,
+  updateClientToday,
+} from "../services/time.js";
 import { afterNextFrame, scheduleFrame } from "../utils/scheduler.js";
 import "./chat-form.js";
 import "./llm-stream.js";
@@ -26,62 +27,6 @@ function activateAnimations(node) {
   node.querySelectorAll?.(".no-anim").forEach((el) => {
     el.classList.remove("no-anim");
   });
-}
-
-function scheduleMidnightRefresh(chat) {
-  if (!chat) return () => {};
-
-  let timeoutId = null;
-  const listeners = createListenerBag();
-
-  const runCheck = () => {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-      timeoutId = null;
-    }
-
-    const now = new Date();
-    const updateClientToday = window?.appInit?.updateClientToday;
-    const today =
-      typeof updateClientToday === "function"
-        ? updateClientToday()
-        : formatIsoDate(now);
-    if (typeof updateClientToday !== "function" && document?.body?.dataset) {
-      document.body.dataset.clientToday = today;
-    }
-
-    if (chat.dataset.date !== today) {
-      const zone = getTimezone();
-      try {
-        const url = new URL("/d/today", window.location.origin);
-        applyTimezoneSearchParam(url.searchParams, zone);
-        window.location.href = `${url.pathname}${url.search}`;
-      } catch (err) {
-        window.location.href = `/d/today?${buildTimezoneQueryParam(zone)}`;
-      }
-      return;
-    }
-
-    const nextMidnight = new Date(now);
-    nextMidnight.setHours(24, 0, 0, 0);
-    timeoutId = window.setTimeout(runCheck, nextMidnight.getTime() - now.getTime());
-  };
-
-  const handleVisibility = () => {
-    if (document.visibilityState === "visible") {
-      runCheck();
-    }
-  };
-
-  listeners.add(document, "visibilitychange", handleVisibility);
-  runCheck();
-
-  return () => {
-    listeners.abort();
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-  };
 }
 
 export class ChatView extends ReactiveElement {
@@ -292,15 +237,7 @@ export class ChatView extends ReactiveElement {
     const activeDay = chatDate || null;
     const activeDayLabel = chat?.dataset?.longDate ?? null;
     const viewKind = this.dataset?.viewKind || null;
-    const updateClientToday = window?.appInit?.updateClientToday;
-    const clientToday =
-      typeof updateClientToday === "function"
-        ? updateClientToday()
-        : formatIsoDate(new Date());
-
-    if (typeof updateClientToday !== "function" && document?.body?.dataset) {
-      document.body.dataset.clientToday = clientToday;
-    }
+    const clientToday = updateClientToday() || getClientToday();
 
     const isClientToday = activeDay === clientToday;
 
@@ -349,8 +286,8 @@ export class ChatView extends ReactiveElement {
       this.#chatFormReady = Promise.resolve();
     }
 
-    if (activeDay && activeDay === formatIsoDate(new Date())) {
-      this.#midnightCleanup = scheduleMidnightRefresh(chat);
+    if (isClientToday) {
+      this.#midnightCleanup = scheduleMidnightRollover(chat);
     }
 
     if (!this.#scrollManager) {

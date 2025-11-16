@@ -1,6 +1,5 @@
 import { ScrollManager } from "./chat/scroll-manager.js";
 import { initGlobalShortcuts } from "./global-shortcuts.js";
-import { formatIsoDate } from "./day.js";
 import { getActiveDay } from "./chat/active-day-store.js";
 import {
   getAlertContainer,
@@ -9,7 +8,10 @@ import {
   registerAlertContainer,
 } from "./utils/alert-center.js";
 import { runWhenDocumentReady } from "./utils/dom-ready.js";
-import { applyTimezoneHeader } from "./services/datetime.js";
+import {
+  applyRequestTimeHeaders,
+  updateClientToday as syncClientToday,
+} from "./services/time.js";
 
 let headersRegistered = false;
 let offlineHandlerRegistered = false;
@@ -21,11 +23,7 @@ export const appReady = new Promise((resolve) => {
 });
 
 function updateClientToday() {
-  const today = formatIsoDate(new Date());
-  if (document?.body?.dataset) {
-    document.body.dataset.clientToday = today;
-  }
-  return today;
+  return syncClientToday();
 }
 
 function registerHtmxHeaderHooks(csrfToken) {
@@ -34,12 +32,7 @@ function registerHtmxHeaderHooks(csrfToken) {
     const headers = event.detail?.headers;
     if (!headers) return;
 
-    applyTimezoneHeader(headers);
-
-    const clientToday = updateClientToday();
-    if (clientToday) {
-      headers["X-Client-Today"] = clientToday;
-    }
+    applyRequestTimeHeaders(headers);
 
     if (csrfToken) {
       headers["X-CSRFToken"] = csrfToken;
