@@ -108,9 +108,7 @@ uv run python scripts/build_assets.py build --mode prod
 ```
 
 When `frontend/dist/manifest.json` exists, the server prefers the bundled outputs (exposed to templates as
-`config.STATIC_MANIFEST`). Remove `frontend/dist/` or run with `--mode dev`/`watch` to fall back to the
-unbundled files while keeping load order intact.
-
+`config.STATIC_MANIFEST`). Remove `frontend/dist/` to fallback to unbundled files, or run with `--mode dev`/`watch` during development.
 ---
 
 ## Privacy and Security
