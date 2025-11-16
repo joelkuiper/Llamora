@@ -60,10 +60,6 @@ def _db():
     return get_services().db
 
 
-def _session():
-    return get_session_context()
-
-
 async def _hash_password(password: bytes) -> bytes:
     return await asyncio.to_thread(pwhash.argon2id.str, password)
 
@@ -226,7 +222,7 @@ async def register():
         )
         resp = await make_response(html)
         assert isinstance(resp, Response)
-        session = _session()
+        session = get_session_context()
         manager = session.manager
         manager.set_secure_cookie(resp, "uid", str(user_id))
         manager.set_dek(resp, dek)
@@ -294,7 +290,7 @@ async def login():
                 redirect_value = redirect(redirect_url)
                 resp = await make_response(redirect_value)
                 assert isinstance(resp, Response)
-                session = _session()
+                session = get_session_context()
                 manager = session.manager
                 manager.set_secure_cookie(resp, "uid", str(user["id"]))
                 manager.set_dek(resp, dek)
@@ -330,7 +326,7 @@ async def login():
 
 @auth_bp.route("/logout", methods=["POST"])
 async def logout():
-    session = _session()
+    session = get_session_context()
     manager = session.manager
     user = await session.current_user()
     current_app.logger.debug("Logout for user %s", user["id"] if user else None)
@@ -408,7 +404,7 @@ async def reset_password():
 @auth_bp.route("/profile")
 @login_required
 async def profile():
-    session = _session()
+    session = get_session_context()
     user = await session.require_user()
     await _db().users.update_state(user["id"], active_date=None)
     return await _render_profile_page(user)
@@ -417,7 +413,7 @@ async def profile():
 @auth_bp.route("/profile/data")
 @login_required
 async def download_user_data():
-    session = _session()
+    session = get_session_context()
     user = await session.require_user()
     dek = await session.dek()
     if dek is None:
@@ -448,7 +444,7 @@ async def download_user_data():
 @auth_bp.route("/profile/password", methods=["POST"])
 @login_required
 async def change_password():
-    session = _session()
+    session = get_session_context()
     user = await session.require_user()
     form = await request.form
     current = form.get("current_password", "")
@@ -498,7 +494,7 @@ async def change_password():
 @auth_bp.route("/profile/recovery", methods=["POST"])
 @login_required
 async def regen_recovery():
-    session = _session()
+    session = get_session_context()
     user = await session.require_user()
     dek = await session.dek()
     if dek is None:
@@ -518,7 +514,7 @@ async def regen_recovery():
 @auth_bp.route("/profile", methods=["DELETE"])
 @login_required
 async def delete_profile():
-    session = _session()
+    session = get_session_context()
     manager = session.manager
     user = await session.require_user()
     await _db().users.delete_user(user["id"])

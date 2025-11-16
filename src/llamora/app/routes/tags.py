@@ -16,10 +16,6 @@ def _db():
     return get_services().db
 
 
-def _session():
-    return get_session_context()
-
-
 def _tags():
     return get_tag_service()
 
@@ -27,7 +23,7 @@ def _tags():
 @tags_bp.delete("/t/<msg_id>/<tag_hash>")
 @login_required
 async def remove_tag(msg_id: str, tag_hash: str):
-    session = _session()
+    session = get_session_context()
     user = await session.require_user()
     try:
         tag_hash_bytes = bytes.fromhex(tag_hash)
@@ -41,7 +37,7 @@ async def remove_tag(msg_id: str, tag_hash: str):
 @tags_bp.post("/t/<msg_id>")
 @login_required
 async def add_tag(msg_id: str):
-    _, user, dek = await require_user_and_dek(_session())
+    _, user, dek = await require_user_and_dek()
     form = await request.form
     raw_tag = (form.get("tag") or "").strip()
     max_tag_length = int(settings.LIMITS.max_tag_length)
@@ -67,7 +63,7 @@ async def add_tag(msg_id: str):
 @tags_bp.get("/t/suggestions/<msg_id>")
 @login_required
 async def get_tag_suggestions(msg_id: str):
-    _, user, dek = await require_user_and_dek(_session())
+    _, user, dek = await require_user_and_dek()
     decay_constant = resolve_frecency_lambda(
         request.args.get("lambda"), default=DEFAULT_FRECENCY_DECAY
     )
@@ -94,7 +90,7 @@ async def get_tag_suggestions(msg_id: str):
 @tags_bp.get("/tags/autocomplete")
 @login_required
 async def autocomplete_tags():
-    _, user, dek = await require_user_and_dek(_session())
+    _, user, dek = await require_user_and_dek()
 
     msg_id = (request.args.get("msg_id") or "").strip()
     if not msg_id:

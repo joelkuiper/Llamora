@@ -17,10 +17,6 @@ from llamora.app.routes.chat import render_chat
 days_bp = Blueprint("days", __name__)
 
 
-def _session():
-    return get_session_context()
-
-
 @days_bp.route("/")
 @login_required
 async def index():
@@ -50,7 +46,7 @@ async def _render_day(date: str, target: str | None, view_kind: str):
 
 
 async def _render_calendar(year: int, month: int, *, today=None):
-    session = _session()
+    session = get_session_context()
     user = await session.require_user()
     context = await get_month_context(user["id"], year, month, today=today)
     template = (
@@ -83,7 +79,7 @@ async def day(date):
 @days_bp.route("/calendar")
 @login_required
 async def calendar_view():
-    session = _session()
+    session = get_session_context()
     today = local_date()
     requested_year = request.args.get("year", type=int)
     requested_month = request.args.get("month", type=int)

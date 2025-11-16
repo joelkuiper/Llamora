@@ -50,10 +50,6 @@ def _db():
     return get_services().db
 
 
-def _session():
-    return get_session_context()
-
-
 def _chat_stream_manager():
     return get_services().llm_service.chat_stream_manager
 
@@ -69,7 +65,7 @@ async def render_chat(
     hx_push_url: str | None = None,
     view_kind: str = "day",
 ) -> Response:
-    session = _session()
+    session = get_session_context()
     user = await session.require_user()
     context = await get_chat_context(user, date)
     html = await render_template(
@@ -128,7 +124,7 @@ async def chat_htmx_today():
 @login_required
 async def stop_generation(user_msg_id: str):
     logger.info("Stop requested for user message %s", user_msg_id)
-    _, user, _ = await require_user_and_dek(_session())
+    _, user, _ = await require_user_and_dek()
 
     try:
         await ensure_message_exists(_db(), user["id"], user_msg_id)
@@ -155,7 +151,7 @@ async def stop_generation(user_msg_id: str):
 @chat_bp.get("/c/meta-chips/<msg_id>")
 @login_required
 async def meta_chips(msg_id: str):
-    _, user, dek = await require_user_and_dek(_session())
+    _, user, dek = await require_user_and_dek()
     await ensure_message_exists(_db(), user["id"], msg_id)
     tags = await _db().tags.get_tags_for_message(user["id"], msg_id, dek)
     html = await render_template(
@@ -170,7 +166,7 @@ async def meta_chips(msg_id: str):
 @chat_bp.get("/c/opening/<date>")
 @login_required
 async def sse_opening(date: str):
-    _, user, dek = await require_user_and_dek(_session())
+    _, user, dek = await require_user_and_dek()
     uid = user["id"]
     tz = get_timezone()
     now = datetime.now(ZoneInfo(tz))
@@ -300,7 +296,7 @@ async def send_message(date):
     form = await request.form
     user_text = form.get("message", "").strip()
     user_time = form.get("user_time")
-    _, user, dek = await require_user_and_dek(_session())
+    _, user, dek = await require_user_and_dek()
     uid = user["id"]
 
     max_len = int(settings.LIMITS.max_message_length)
@@ -338,7 +334,7 @@ async def sse_reply(user_msg_id: str, date: str):
 
     normalized_date = require_iso_date(date)
 
-    _, user, dek = await require_user_and_dek(_session())
+    _, user, dek = await require_user_and_dek()
     uid = user["id"]
     history, existing_assistant_msg, actual_date = await locate_message_and_reply(
         _db(), uid, dek, normalized_date, user_msg_id
