@@ -46,10 +46,6 @@ from llamora.settings import settings
 chat_bp = Blueprint("chat", __name__)
 
 
-def _db():
-    return get_services().db
-
-
 def _chat_stream_manager():
     return get_services().llm_service.chat_stream_manager
 
@@ -86,7 +82,7 @@ async def render_chat(
             separator = "&" if "?" in push_url else "?"
             push_url = f"{push_url}{separator}target={scroll_target}"
         resp.headers["HX-Push-Url"] = push_url
-    await _db().users.update_state(user["id"], active_date=date)
+    await get_services().db.users.update_state(user["id"], active_date=date)
     return resp
 
 
@@ -127,7 +123,7 @@ async def stop_generation(user_msg_id: str):
     _, user, _ = await require_user_and_dek()
 
     try:
-        await ensure_message_exists(_db(), user["id"], user_msg_id)
+        await ensure_message_exists(get_services().db, user["id"], user_msg_id)
     except HTTPException as exc:
         if exc.code == 404:
             logger.warning("Stop request for unauthorized message %s", user_msg_id)
@@ -152,8 +148,9 @@ async def stop_generation(user_msg_id: str):
 @login_required
 async def meta_chips(msg_id: str):
     _, user, dek = await require_user_and_dek()
-    await ensure_message_exists(_db(), user["id"], msg_id)
-    tags = await _db().tags.get_tags_for_message(user["id"], msg_id, dek)
+    db = get_services().db
+    await ensure_message_exists(db, user["id"], msg_id)
+    tags = await db.tags.get_tags_for_message(user["id"], msg_id, dek)
     html = await render_template(
         "partials/meta_chips_wrapper.html",
         msg_id=msg_id,
@@ -174,15 +171,16 @@ async def sse_opening(date: str):
     date_str = format_date(now)
     pod = part_of_day(now)
     yesterday_iso = (now - timedelta(days=1)).date().isoformat()
-    is_new = not await _db().messages.user_has_messages(uid)
+    services = get_services()
+    db = services.db
+    is_new = not await db.messages.user_has_messages(uid)
 
-    yesterday_msgs = await _db().messages.get_recent_history(
+    yesterday_msgs = await db.messages.get_recent_history(
         uid, yesterday_iso, dek, limit=20
     )
     had_yesterday_activity = bool(yesterday_msgs)
 
     trim_context = {"date": date_str, "part_of_day": pod}
-    services = get_services()
     llm_client = services.llm_service.llm
 
     try:
@@ -203,7 +201,7 @@ async def sse_opening(date: str):
             has_no_activity=has_no_activity,
         )
         recall_context = await build_tag_recall_context(
-            _db(),
+            db,
             uid,
             dek,
             history=yesterday_msgs,
@@ -305,7 +303,7 @@ async def send_message(date):
         abort(400, description="Message is empty or too long.")
 
     try:
-        user_msg_id = await _db().messages.append_message(
+        user_msg_id = await get_services().db.messages.append_message(
             uid, "user", user_text, dek, created_date=date
         )
         logger.debug("Saved user message %s", user_msg_id)
@@ -337,7 +335,7 @@ async def sse_reply(user_msg_id: str, date: str):
     _, user, dek = await require_user_and_dek()
     uid = user["id"]
     history, existing_assistant_msg, actual_date = await locate_message_and_reply(
-        _db(), uid, dek, normalized_date, user_msg_id
+        get_services().db, uid, dek, normalized_date, user_msg_id
     )
 
     if not history:
@@ -358,13 +356,13 @@ async def sse_reply(user_msg_id: str, date: str):
     )
     ctx = dict(ctx_mapping)
 
-    manager = _chat_stream_manager()
+    services = get_services()
+    db = services.db
+    manager = services.llm_service.chat_stream_manager
 
     try:
         pending_response = manager.get(user_msg_id, uid)
         if not pending_response:
-            db = _db()
-            services = get_services()
             history_for_stream: list[dict[str, Any]] = []
             recall_context = await build_tag_recall_context(
                 db,

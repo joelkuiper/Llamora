@@ -55,11 +55,6 @@ def _password_error_message(error: PasswordValidationError | None) -> str:
         return "Invalid input"
     return PASSWORD_ERROR_MESSAGES.get(error, "Invalid input")
 
-
-def _db():
-    return get_services().db
-
-
 async def _hash_password(password: bytes) -> bytes:
     return await asyncio.to_thread(pwhash.argon2id.str, password)
 
@@ -77,7 +72,7 @@ def _get_client_ip() -> str:
 
 async def _render_profile_page(user: Mapping[str, Any], **context):
     context["user"] = user
-    state = await _db().users.get_state(user["id"])
+    state = await get_services().db.users.get_state(user["id"])
     context["day"] = state.get("active_date", local_date().isoformat())
     if request.headers.get("HX-Request"):
         return await render_template("partials/profile.html", **context)
@@ -187,7 +182,8 @@ async def register():
                 username=username,
             )
 
-        if await _db().users.get_user_by_username(username):
+        db = get_services().db
+        if await db.users.get_user_by_username(username):
             return await render_template(
                 "register.html", error="Username already exists", username=username
             )
@@ -201,7 +197,7 @@ async def register():
         pw_salt, pw_nonce, pw_cipher = wrap_key(dek, password)
         rc_salt, rc_nonce, rc_cipher = wrap_key(dek, recovery_code)
 
-        user_id = await _db().users.create_user(
+        user_id = await db.users.create_user(
             username,
             password_hash,
             pw_salt,
@@ -266,7 +262,9 @@ async def login():
                 username=username,
             )
 
-        user = await _db().users.get_user_by_username(username)
+        services = get_services()
+        db = services.db
+        user = await db.users.get_user_by_username(username)
         if user:
             try:
                 await _verify_password(
@@ -281,7 +279,7 @@ async def login():
                 )
                 redirect_url = return_url
                 if not redirect_url:
-                    state = await _db().users.get_state(user["id"])
+                    state = await db.users.get_state(user["id"])
                     active_date = state.get("active_date")
                     if active_date:
                         redirect_url = url_for("days.day", date=active_date)
@@ -294,7 +292,6 @@ async def login():
                 manager = session.manager
                 manager.set_secure_cookie(resp, "uid", str(user["id"]))
                 manager.set_dek(resp, dek)
-                services = get_services()
                 current_app.add_background_task(
                     services.search_api.warm_index,
                     str(user["id"]),
@@ -371,7 +368,8 @@ async def reset_password():
         if password_error:
             return await render_template("reset_password.html", error="Invalid input")
 
-        user = await _db().users.get_user_by_username(username)
+        db = get_services().db
+        user = await db.users.get_user_by_username(username)
         if not user:
             return await render_template(
                 "reset_password.html", error="Invalid credentials"
@@ -393,7 +391,7 @@ async def reset_password():
         hash_bytes = await _hash_password(password_bytes)
         password_hash = hash_bytes.decode("utf-8")
         pw_salt, pw_nonce, pw_cipher = wrap_key(dek, password)
-        await _db().users.update_password_wrap(
+        await db.users.update_password_wrap(
             user["id"], password_hash, pw_salt, pw_nonce, pw_cipher
         )
         return redirect("/login")
@@ -406,7 +404,7 @@ async def reset_password():
 async def profile():
     session = get_session_context()
     user = await session.require_user()
-    await _db().users.update_state(user["id"], active_date=None)
+    await get_services().db.users.update_state(user["id"], active_date=None)
     return await _render_profile_page(user)
 
 
@@ -422,7 +420,9 @@ async def download_user_data():
         response.status_code = 400
         return response
 
-    messages = await _db().messages.get_latest_messages(user["id"], 1000000, dek)
+    messages = await get_services().db.messages.get_latest_messages(
+        user["id"], 1000000, dek
+    )
     user_data = {
         "user": {
             "id": user["id"],
@@ -484,7 +484,7 @@ async def change_password():
     hash_bytes = await _hash_password(password_bytes)
     password_hash = hash_bytes.decode("utf-8")
     pw_salt, pw_nonce, pw_cipher = wrap_key(dek, new)
-    await _db().users.update_password_wrap(
+    await get_services().db.users.update_password_wrap(
         user["id"], password_hash, pw_salt, pw_nonce, pw_cipher
     )
 
@@ -502,7 +502,9 @@ async def regen_recovery():
 
     recovery_code = generate_recovery_code()
     rc_salt, rc_nonce, rc_cipher = wrap_key(dek, recovery_code)
-    await _db().users.update_recovery_wrap(user["id"], rc_salt, rc_nonce, rc_cipher)
+    await get_services().db.users.update_recovery_wrap(
+        user["id"], rc_salt, rc_nonce, rc_cipher
+    )
 
     return await render_template(
         "recovery.html",
@@ -517,7 +519,7 @@ async def delete_profile():
     session = get_session_context()
     manager = session.manager
     user = await session.require_user()
-    await _db().users.delete_user(user["id"])
+    await get_services().db.users.delete_user(user["id"])
     resp = await make_response("", 204)
     assert isinstance(resp, Response)
     manager.clear_session_dek()

@@ -12,10 +12,6 @@ from llamora.app.routes.helpers import ensure_message_exists, require_user_and_d
 tags_bp = Blueprint("tags", __name__)
 
 
-def _db():
-    return get_services().db
-
-
 def _tags():
     return get_tag_service()
 
@@ -30,7 +26,7 @@ async def remove_tag(msg_id: str, tag_hash: str):
     except ValueError as exc:
         abort(400, description="invalid tag hash")
         raise AssertionError("unreachable") from exc
-    await _db().tags.unlink_tag_message(user["id"], tag_hash_bytes, msg_id)
+    await get_services().db.tags.unlink_tag_message(user["id"], tag_hash_bytes, msg_id)
     return "<span class='chip-tombstone'></span>"
 
 
@@ -48,9 +44,10 @@ async def add_tag(msg_id: str):
     except ValueError:
         abort(400, description="empty tag")
         raise AssertionError("unreachable")
-    await ensure_message_exists(_db(), user["id"], msg_id)
-    tag_hash = await _db().tags.resolve_or_create_tag(user["id"], canonical, dek)
-    await _db().tags.xref_tag_message(user["id"], tag_hash, msg_id)
+    db = get_services().db
+    await ensure_message_exists(db, user["id"], msg_id)
+    tag_hash = await db.tags.resolve_or_create_tag(user["id"], canonical, dek)
+    await db.tags.xref_tag_message(user["id"], tag_hash, msg_id)
     html = await render_template(
         "partials/tag_chip.html",
         keyword=canonical,
@@ -105,14 +102,15 @@ async def autocomplete_tags():
 
     limit = max(1, min(limit, 50))
 
-    await ensure_message_exists(_db(), user["id"], msg_id)
+    db = get_services().db
+    await ensure_message_exists(db, user["id"], msg_id)
 
     max_tag_length = int(settings.LIMITS.max_tag_length)
     raw_query = (request.args.get("q") or "").strip()[:max_tag_length]
     query_canonical = raw_query.lstrip("#").strip()
     query_canonical = query_canonical[:max_tag_length].strip()
 
-    existing = await _db().tags.get_tags_for_message(user["id"], msg_id, dek)
+    existing = await db.tags.get_tags_for_message(user["id"], msg_id, dek)
     excluded: set[str] = set()
     for tag in existing:
         name = (tag.get("name") or "").strip().lower()
@@ -125,7 +123,7 @@ async def autocomplete_tags():
         lambda_param, default=DEFAULT_FRECENCY_DECAY
     )
 
-    results = await _db().tags.search_tags(
+    results = await db.tags.search_tags(
         user["id"],
         dek,
         limit=limit,
