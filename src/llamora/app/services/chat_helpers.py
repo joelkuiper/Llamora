@@ -3,16 +3,22 @@
 from __future__ import annotations
 
 import math
+import logging
 from contextlib import suppress
 from datetime import datetime, timezone
 from types import MappingProxyType
 from typing import Any, Iterable, Mapping, Sequence
+from dataclasses import dataclass
 
 import orjson
 from quart import Response
 from werkzeug.datastructures import Headers
 
 from llamora.app.services.time import date_and_part
+from llamora.app.services.tag_recall import TagRecallContext
+
+
+logger = logging.getLogger(__name__)
 
 
 def replace_newline(value: str) -> str:
@@ -152,6 +158,113 @@ def build_conversation_context(
     tz = tz_cookie or "UTC"
     date_str, part = date_and_part(timestamp, tz)
     return {"date": date_str, "part_of_day": part}
+
+
+@dataclass(slots=True)
+class RecallAugmentation:
+    """Result of applying recall context to a chat history."""
+
+    messages: list[dict[str, Any]]
+    recall_inserted: bool
+    recall_index: int | None
+
+
+def _locate_recall_entry(
+    messages: Sequence[Mapping[str, Any]],
+    *,
+    message_key: str,
+    recall_text: str,
+) -> int | None:
+    for idx, entry in enumerate(messages):
+        if entry.get("role") != "system":
+            continue
+        if str(entry.get(message_key) or "") == recall_text:
+            return idx
+    return None
+
+
+async def augment_history_with_recall(
+    history: Sequence[Mapping[str, Any] | dict[str, Any]],
+    recall_context: TagRecallContext | None,
+    *,
+    llm_client,
+    params: Mapping[str, Any] | None = None,
+    context: Mapping[str, Any] | None = None,
+    message_key: str = "message",
+    target_message_id: str | None = None,
+    insert_index: int | None = None,
+    include_tag_metadata: bool = False,
+) -> RecallAugmentation:
+    """Insert ``recall_context`` into ``history`` and optionally trim it."""
+
+    augmented: list[dict[str, Any]] = [dict(entry) for entry in history]
+    recall_inserted = False
+    recall_index: int | None = None
+    recall_entry: dict[str, Any] | None = None
+
+    if recall_context:
+        recall_entry = {
+            "id": None,
+            "role": "system",
+            message_key: recall_context.text,
+        }
+        if include_tag_metadata:
+            recall_entry["meta"] = {"tag_recall": {"tags": list(recall_context.tags)}}
+            tag_items = [
+                {"name": tag}
+                for tag in recall_context.tags
+                if str(tag or "").strip()
+            ]
+            if tag_items:
+                recall_entry["tags"] = tag_items
+
+    if recall_entry is not None:
+        augmented = []
+        for entry in history:
+            entry_dict = dict(entry)
+            if (
+                not recall_inserted
+                and target_message_id is not None
+                and str(entry_dict.get("id")) == str(target_message_id)
+            ):
+                recall_index = len(augmented)
+                augmented.append(dict(recall_entry))
+                recall_inserted = True
+            augmented.append(entry_dict)
+
+        if not recall_inserted:
+            if insert_index is not None:
+                bounded_index = max(0, min(insert_index, len(augmented)))
+                augmented.insert(bounded_index, dict(recall_entry))
+                recall_index = bounded_index
+            else:
+                recall_index = len(augmented)
+                augmented.append(dict(recall_entry))
+            recall_inserted = True
+
+    trimmed_history = augmented
+    if llm_client is not None:
+        try:
+            trimmed_history = await llm_client.trim_history(
+                augmented, params=params, context=context
+            )
+        except Exception:
+            logger.exception("Failed to trim history with recall context")
+
+    if recall_context and recall_entry is not None:
+        recall_index = _locate_recall_entry(
+            trimmed_history, message_key=message_key, recall_text=recall_context.text
+        )
+        recall_inserted = recall_index is not None
+    else:
+        recall_index = None
+        recall_inserted = False
+
+    return RecallAugmentation(
+        messages=list(trimmed_history),
+        recall_inserted=recall_inserted,
+        recall_index=recall_index,
+    )
 
 
 def _error_events(pending_response, chunk: str | None = None):

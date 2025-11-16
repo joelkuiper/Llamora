@@ -21,6 +21,7 @@ from llamora.app.services.container import get_services
 from llamora.app.services.auth_helpers import login_required
 from llamora.app.services.chat_context import get_chat_context
 from llamora.app.services.chat_helpers import (
+    augment_history_with_recall,
     StreamSession,
     build_conversation_context,
     locate_message_and_reply,
@@ -207,16 +208,16 @@ async def sse_opening(date: str):
             history=yesterday_msgs,
             current_date=today_iso,
         )
-        recall_inserted = False
-        if recall_context:
-            opening_messages.insert(
-                1,
-                {
-                    "role": "system",
-                    "content": recall_context.text,
-                },
-            )
-            recall_inserted = True
+        augmentation = await augment_history_with_recall(
+            opening_messages,
+            recall_context,
+            llm_client=None,
+            message_key="content",
+            insert_index=1,
+        )
+        opening_messages = augmentation.messages
+        recall_inserted = augmentation.recall_inserted
+        recall_index = augmentation.recall_index
 
         budget = llm_client.prompt_budget
         prompt_render = render_chat_prompt(opening_messages)
@@ -237,7 +238,9 @@ async def sse_opening(date: str):
                     prompt_render.token_count,
                     max_tokens,
                 )
-                opening_messages.pop(1)
+                drop_index = recall_index if recall_index is not None else 1
+                if 0 <= drop_index < len(opening_messages):
+                    opening_messages.pop(drop_index)
                 prompt_render = render_chat_prompt(opening_messages)
                 budget.diagnostics(
                     prompt_tokens=prompt_render.token_count,
@@ -363,7 +366,6 @@ async def sse_reply(user_msg_id: str, date: str):
     try:
         pending_response = manager.get(user_msg_id, uid)
         if not pending_response:
-            history_for_stream: list[dict[str, Any]] = []
             recall_context = await build_tag_recall_context(
                 db,
                 uid,
@@ -371,45 +373,18 @@ async def sse_reply(user_msg_id: str, date: str):
                 history=history,
                 current_date=actual_date or normalized_date,
             )
-            guidance_entry: dict[str, Any] | None = None
-            if recall_context:
-                guidance_entry = {
-                    "id": None,
-                    "role": "system",
-                    "message": recall_context.text,
-                    "meta": {"tag_recall": {"tags": list(recall_context.tags)}},
-                }
-                tag_items = [
-                    {"name": tag}
-                    for tag in recall_context.tags
-                    if str(tag or "").strip()
-                ]
-                if tag_items:
-                    guidance_entry["tags"] = tag_items
-
-            inserted_context = False
-            for entry in history:
-                entry_dict = dict(entry)
-                if (
-                    not inserted_context
-                    and guidance_entry is not None
-                    and str(entry_dict.get("id")) == user_msg_id
-                ):
-                    history_for_stream.append(dict(guidance_entry))
-                    inserted_context = True
-                history_for_stream.append(entry_dict)
-
-            if guidance_entry is not None and not inserted_context:
-                history_for_stream.append(dict(guidance_entry))
             llm_client = services.llm_service.llm
-            try:
-                history_for_stream = await llm_client.trim_history(
-                    history_for_stream,
-                    params=params,
-                    context=ctx,
-                )
-            except Exception:
-                logger.exception("Failed to pre-trim history before streaming reply")
+            augmentation = await augment_history_with_recall(
+                history,
+                recall_context,
+                llm_client=llm_client,
+                params=params,
+                context=ctx,
+                message_key="message",
+                target_message_id=user_msg_id,
+                include_tag_metadata=True,
+            )
+            history_for_stream = augmentation.messages
             try:
                 pending_response = manager.start_stream(
                     user_msg_id,
