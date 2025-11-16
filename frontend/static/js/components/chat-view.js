@@ -4,7 +4,7 @@ import { MarkdownObserver } from "../chat/markdown-observer.js";
 import { StreamingSession } from "../chat/streaming-session.js";
 import { StreamController } from "../chat/stream-controller.js";
 import { renderMarkdownInElement } from "../markdown.js";
-import { initDayNav, navigateToDate } from "../day.js";
+import { formatIsoDate, initDayNav, navigateToDate } from "../day.js";
 import { scrollToHighlight } from "../ui.js";
 import { createListenerBag } from "../utils/events.js";
 import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
@@ -14,19 +14,10 @@ import {
   applyTimezoneSearchParam,
   buildTimezoneQueryParam,
   getTimezone,
-} from "../utils/timezone-service.js";
+} from "../services/datetime.js";
 import { afterNextFrame, scheduleFrame } from "../utils/scheduler.js";
 import "./chat-form.js";
 import "./llm-stream.js";
-
-function formatDate(date) {
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  const pad = (value) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
 
 function activateAnimations(node) {
   if (!node || node.nodeType !== Node.ELEMENT_NODE) return;
@@ -54,7 +45,7 @@ function scheduleMidnightRefresh(chat) {
     const today =
       typeof updateClientToday === "function"
         ? updateClientToday()
-        : formatDate(now);
+        : formatIsoDate(now);
     if (typeof updateClientToday !== "function" && document?.body?.dataset) {
       document.body.dataset.clientToday = today;
     }
@@ -305,7 +296,7 @@ export class ChatView extends ReactiveElement {
     const clientToday =
       typeof updateClientToday === "function"
         ? updateClientToday()
-        : formatDate(new Date());
+        : formatIsoDate(new Date());
 
     if (typeof updateClientToday !== "function" && document?.body?.dataset) {
       document.body.dataset.clientToday = clientToday;
@@ -358,7 +349,7 @@ export class ChatView extends ReactiveElement {
       this.#chatFormReady = Promise.resolve();
     }
 
-    if (activeDay && activeDay === formatDate(new Date())) {
+    if (activeDay && activeDay === formatIsoDate(new Date())) {
       this.#midnightCleanup = scheduleMidnightRefresh(chat);
     }
 

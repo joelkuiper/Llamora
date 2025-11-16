@@ -9,7 +9,7 @@ import {
   registerAlertContainer,
 } from "./utils/alert-center.js";
 import { runWhenDocumentReady } from "./utils/dom-ready.js";
-import { applyTimezoneHeader } from "./utils/timezone-service.js";
+import { applyTimezoneHeader } from "./services/datetime.js";
 
 let headersRegistered = false;
 let offlineHandlerRegistered = false;

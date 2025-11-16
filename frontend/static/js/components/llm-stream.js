@@ -11,7 +11,7 @@ import {
   buildTimezoneQueryParam,
   getTimezone,
   TIMEZONE_QUERY_PARAM,
-} from "../utils/timezone-service.js";
+} from "../services/datetime.js";
 import { scheduleFrame } from "../utils/scheduler.js";
 
 const NEWLINE_REGEX = /\[newline\]/g;

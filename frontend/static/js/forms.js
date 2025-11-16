@@ -1,5 +1,5 @@
 import { startButtonSpinner, stopButtonSpinner } from "./ui.js";
-import { getTimezone } from "./utils/timezone-service.js";
+import { getTimezone } from "./services/datetime.js";
 import { runWhenDocumentReady } from "./utils/dom-ready.js";
 
 const FORM_SELECTOR = ".form-container form, #profile-page form";
