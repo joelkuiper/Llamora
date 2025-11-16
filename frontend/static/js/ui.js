@@ -7,7 +7,7 @@ import {
   animateMotion,
   motionSafeBehavior,
 } from "./services/motion.js";
-import { scheduleFrame } from "./utils/scheduler.js";
+import { scheduleRafLoop } from "./utils/scheduler.js";
 
 export const SPINNER = {
   interval: 80,
@@ -183,9 +183,11 @@ export function scrollToHighlight(fallbackTarget, options = {}) {
     },
     clearOptions = {},
     fallbackCleanupDelay = 1500,
+    targetPollTimeout = 3000,
   } = options;
 
   const params = new URLSearchParams(window.location.search);
+  const initialHash = window.location.hash || "";
   let target = targetId ?? params.get("target");
   let consumedFallback = false;
   let shouldUpdateHistory = Boolean(targetId);
@@ -195,24 +197,10 @@ export function scrollToHighlight(fallbackTarget, options = {}) {
     params.set("target", targetId);
   }
 
-  if (!target && window.location.hash.startsWith("#msg-")) {
-    const hashedTarget = window.location.hash.substring(1);
-    const hashedElement =
-      typeof document?.getElementById === "function"
-        ? document.getElementById(hashedTarget)
-        : null;
-
-    if (hashedElement) {
-      target = hashedTarget;
-      params.set("target", target);
-      shouldUpdateHistory = true;
-    } else if (window.location.hash) {
-      const query = params.toString();
-      const newUrl = query
-        ? `${window.location.pathname}?${query}`
-        : window.location.pathname;
-      history.replaceState(historyState, "", newUrl);
-    }
+  if (!target && initialHash.startsWith("#msg-")) {
+    target = initialHash.substring(1);
+    params.set("target", target);
+    shouldUpdateHistory = true;
   }
 
   if (!target && fallbackTarget) {
@@ -252,9 +240,11 @@ export function scrollToHighlight(fallbackTarget, options = {}) {
   if (target) {
     if (shouldUpdateHistory || window.location.hash) {
       const query = params.toString();
-      const newUrl = query
+      const baseUrl = query
         ? `${window.location.pathname}?${query}`
         : window.location.pathname;
+      const hash = initialHash || "";
+      const newUrl = hash ? `${baseUrl}${hash}` : baseUrl;
 
       if (pushHistory && targetId) {
         history.pushState(historyState, "", newUrl);
@@ -265,6 +255,8 @@ export function scrollToHighlight(fallbackTarget, options = {}) {
 
     let resolvedHighlight = false;
     let markdownListener = null;
+    let htmxListeners = [];
+    let poller = null;
 
     const teardownMarkdownListener = () => {
       if (markdownListener) {
@@ -273,12 +265,33 @@ export function scrollToHighlight(fallbackTarget, options = {}) {
       }
     };
 
+    const teardownHtmxListeners = () => {
+      if (!htmxListeners.length) return;
+      for (const { target: evtTarget, type, handler } of htmxListeners) {
+        evtTarget?.removeEventListener(type, handler);
+      }
+      htmxListeners = [];
+    };
+
+    const stopPolling = () => {
+      if (poller?.active) {
+        poller.cancel();
+      }
+      poller = null;
+    };
+
+    const teardownRetries = () => {
+      teardownMarkdownListener();
+      teardownHtmxListeners();
+      stopPolling();
+    };
+
     const highlightTarget = () => {
       const el = document.getElementById(target);
       if (!el) return false;
 
       resolvedHighlight = true;
-      teardownMarkdownListener();
+      teardownRetries();
       requestScrollTarget(target, scrollOptions, { source: "ui" });
       flashHighlight(el);
       clearScrollTarget(target, { historyState, ...clearOptions });
@@ -286,12 +299,40 @@ export function scrollToHighlight(fallbackTarget, options = {}) {
       return true;
     };
 
-    const retryAcrossFrames = (remainingFrames = 3) => {
-      if (resolvedHighlight || remainingFrames <= 0) return;
-      if (highlightTarget()) return;
-      if (remainingFrames - 1 > 0) {
-        scheduleFrame(() => retryAcrossFrames(remainingFrames - 1));
+    const attachHtmxListeners = () => {
+      const htmxRetryEvents = ["htmx:afterSwap", "htmx:afterSettle"];
+      const body = document.body;
+      if (!body) return;
+
+      for (const eventName of htmxRetryEvents) {
+        const handler = () => {
+          if (resolvedHighlight) return;
+          highlightTarget();
+        };
+        body.addEventListener(eventName, handler);
+        htmxListeners.push({ target: body, type: eventName, handler });
       }
+    };
+
+    const pollForTarget = () => {
+      const timeout = Number.isFinite(targetPollTimeout) && targetPollTimeout > 0
+        ? targetPollTimeout
+        : 0;
+      if (timeout <= 0) return;
+
+      poller = scheduleRafLoop({
+        timeoutMs: timeout,
+        callback: ({ timedOut }) => {
+          if (resolvedHighlight) {
+            return false;
+          }
+          if (timedOut) {
+            teardownRetries();
+            return false;
+          }
+          return !highlightTarget();
+        },
+      });
     };
 
     if (!highlightTarget()) {
@@ -301,7 +342,8 @@ export function scrollToHighlight(fallbackTarget, options = {}) {
         teardownMarkdownListener();
       };
       scrollEvents.addEventListener("scroll:markdown-complete", markdownListener);
-      retryAcrossFrames();
+      attachHtmxListeners();
+      pollForTarget();
       scheduleFallbackCleanup();
     }
   }
