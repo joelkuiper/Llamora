@@ -55,6 +55,31 @@ def _password_error_message(error: PasswordValidationError | None) -> str:
         return "Invalid input"
     return PASSWORD_ERROR_MESSAGES.get(error, "Invalid input")
 
+
+def _length_error(
+    username: str, password: str | None, *, max_user: int, max_pass: int | None
+) -> str | None:
+    if len(username) > max_user:
+        return "Input exceeds max length"
+    if password is not None and max_pass is not None and len(password) > max_pass:
+        return "Input exceeds max length"
+    return None
+
+
+async def _render_auth_error(template: str, error: str, **context: Any):
+    return await render_template(template, error=error, **context)
+
+
+async def _issue_auth_response(user_id: str | int, dek: bytes, redirect_url: str) -> Response:
+    redirect_value = redirect(redirect_url)
+    resp = await make_response(redirect_value)
+    assert isinstance(resp, Response)
+    session = get_session_context()
+    manager = session.manager
+    manager.set_secure_cookie(resp, "uid", str(user_id))
+    manager.set_dek(resp, dek)
+    return resp
+
 async def _hash_password(password: bytes) -> bytes:
     return await asyncio.to_thread(pwhash.argon2id.str, password)
 
@@ -151,7 +176,7 @@ async def register():
 
         # Basic validations
         if not username:
-            return await render_template(
+            return await _render_auth_error(
                 "register.html", error="All fields are required", username=username
             )
 
@@ -164,19 +189,20 @@ async def register():
         )
         if password_error:
             message = _password_error_message(password_error)
-            return await render_template(
+            return await _render_auth_error(
                 "register.html", error=message, username=username
             )
 
-        if len(username) > max_user:
-            return await render_template(
-                "register.html",
-                error="Input exceeds max length",
-                username=username,
+        length_error = _length_error(
+            username, password, max_user=max_user, max_pass=max_pass
+        )
+        if length_error:
+            return await _render_auth_error(
+                "register.html", error=length_error, username=username
             )
 
         if not re.fullmatch(r"^[A-Za-z0-9_]+$", username):
-            return await render_template(
+            return await _render_auth_error(
                 "register.html",
                 error="Username may only contain letters, digits, and underscores",
                 username=username,
@@ -184,7 +210,7 @@ async def register():
 
         db = get_services().db
         if await db.users.get_user_by_username(username):
-            return await render_template(
+            return await _render_auth_error(
                 "register.html", error="Username already exists", username=username
             )
 
@@ -216,13 +242,7 @@ async def register():
             code=format_recovery_code(recovery_code),
             next_url=url_for("days.index"),
         )
-        resp = await make_response(html)
-        assert isinstance(resp, Response)
-        session = get_session_context()
-        manager = session.manager
-        manager.set_secure_cookie(resp, "uid", str(user_id))
-        manager.set_dek(resp, dek)
-        return resp
+        return await _issue_auth_response(user_id, dek, url_for("days.index"))
 
     return await render_template("register.html")
 
@@ -253,9 +273,12 @@ async def login():
         max_user = int(settings.LIMITS.max_username_length)
         max_pass = int(settings.LIMITS.max_password_length)
 
-        if len(username) > max_user or len(password) > max_pass:
+        length_error = _length_error(
+            username, password, max_user=max_user, max_pass=max_pass
+        )
+        if length_error:
             _login_failures[cache_key] = attempts + 1
-            return await render_template(
+            return await _render_auth_error(
                 "login.html",
                 error="Invalid credentials",
                 return_url=return_url,
@@ -285,13 +308,7 @@ async def login():
                         redirect_url = url_for("days.day", date=active_date)
                     else:
                         redirect_url = "/"
-                redirect_value = redirect(redirect_url)
-                resp = await make_response(redirect_value)
-                assert isinstance(resp, Response)
-                session = get_session_context()
-                manager = session.manager
-                manager.set_secure_cookie(resp, "uid", str(user["id"]))
-                manager.set_dek(resp, dek)
+                resp = await _issue_auth_response(user["id"], dek, redirect_url)
                 current_app.add_background_task(
                     services.search_api.warm_index,
                     str(user["id"]),
@@ -351,10 +368,11 @@ async def reset_password():
         min_pass = int(settings.LIMITS.min_password_length)
 
         if not username or not recovery:
-            return await render_template("reset_password.html", error="Invalid input")
+            return await _render_auth_error("reset_password.html", error="Invalid input")
 
-        if len(username) > max_user:
-            return await render_template("reset_password.html", error="Invalid input")
+        length_error = _length_error(username, None, max_user=max_user, max_pass=None)
+        if length_error:
+            return await _render_auth_error("reset_password.html", error="Invalid input")
 
         password_error = await validate_password(
             password,
@@ -366,12 +384,12 @@ async def reset_password():
             require_digit=True,
         )
         if password_error:
-            return await render_template("reset_password.html", error="Invalid input")
+            return await _render_auth_error("reset_password.html", error="Invalid input")
 
         db = get_services().db
         user = await db.users.get_user_by_username(username)
         if not user:
-            return await render_template(
+            return await _render_auth_error(
                 "reset_password.html", error="Invalid credentials"
             )
 
@@ -383,7 +401,7 @@ async def reset_password():
                 recovery,
             )
         except Exception:
-            return await render_template(
+            return await _render_auth_error(
                 "reset_password.html", error="Invalid recovery code"
             )
 
