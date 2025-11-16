@@ -105,6 +105,9 @@ class LlmStreamElement extends HTMLElement {
   #boundHandleMeta;
   #controller = null;
   #controllerDisconnect = null;
+  #metaChipsRequest = null;
+  #metaChipsAssistantId = null;
+  #metaChipsListenerController = null;
 
   constructor() {
     super();
@@ -189,6 +192,8 @@ class LlmStreamElement extends HTMLElement {
       this.#controllerDisconnect = null;
     }
     this.#controller = null;
+    this.#cancelMetaChipsRequest();
+    this.#teardownMetaChipsListener();
   }
 
   get userMsgId() {
@@ -706,24 +711,76 @@ class LlmStreamElement extends HTMLElement {
     const placeholder = this.querySelector(".meta-chips-placeholder");
     if (!placeholder) return;
 
-    try {
-      this.addEventListener(
-        "htmx:afterSwap",
-        (event) => {
-          if (event.target?.classList?.contains("meta-chips")) {
-            revealMetaChips(event.target);
-          }
-        },
-        { once: true }
-      );
+    if (this.#metaChipsAssistantId === assistantId) {
+      return;
+    }
 
-      htmx.ajax("GET", `/c/meta-chips/${assistantId}`, {
+    this.#metaChipsAssistantId = assistantId;
+    this.#ensureMetaChipsListener();
+    this.#cancelMetaChipsRequest();
+
+    try {
+      const request = htmx.ajax("GET", `/c/meta-chips/${assistantId}`, {
         target: placeholder,
         swap: "outerHTML",
       });
+
+      if (request) {
+        this.#metaChipsRequest = request;
+        const cleanup = () => {
+          if (this.#metaChipsRequest === request) {
+            this.#metaChipsRequest = null;
+          }
+        };
+        request.addEventListener("abort", cleanup, { once: true });
+        request.addEventListener("loadend", cleanup, { once: true });
+      }
     } catch (err) {
       console.error("failed to load meta chips", err);
     }
+  }
+
+  #cancelMetaChipsRequest() {
+    if (!this.#metaChipsRequest) {
+      return;
+    }
+
+    try {
+      this.#metaChipsRequest.abort();
+    } catch (_) {
+      // ignored
+    }
+
+    this.#metaChipsRequest = null;
+  }
+
+  #ensureMetaChipsListener() {
+    if (this.#metaChipsListenerController) {
+      return;
+    }
+
+    const controller = new AbortController();
+    this.addEventListener(
+      "htmx:afterSwap",
+      (event) => {
+        if (event.target?.classList?.contains("meta-chips")) {
+          revealMetaChips(event.target);
+          this.#teardownMetaChipsListener();
+        }
+      },
+      { signal: controller.signal }
+    );
+
+    this.#metaChipsListenerController = controller;
+  }
+
+  #teardownMetaChipsListener() {
+    if (!this.#metaChipsListenerController) {
+      return;
+    }
+
+    this.#metaChipsListenerController.abort();
+    this.#metaChipsListenerController = null;
   }
 
   #markAsError() {
