@@ -49,6 +49,21 @@ async def _render_day(date: str, target: str | None, view_kind: str):
     return resp
 
 
+async def _render_calendar(year: int, month: int, *, today=None):
+    session = _session()
+    user = await session.require_user()
+    context = await get_month_context(user["id"], year, month, today=today)
+    template = (
+        "partials/calendar_popover.html"
+        if request.endpoint == "days.calendar_view"
+        else "partials/calendar.html"
+    )
+    return await render_template(
+        template,
+        **context,
+    )
+
+
 @days_bp.route("/d/today")
 @login_required
 async def day_today():
@@ -69,7 +84,6 @@ async def day(date):
 @login_required
 async def calendar_view():
     session = _session()
-    user = await session.require_user()
     today = local_date()
     requested_year = request.args.get("year", type=int)
     requested_month = request.args.get("month", type=int)
@@ -84,24 +98,12 @@ async def calendar_view():
     else:
         target_year = today.year
         target_month = today.month
-    context = await get_month_context(
-        user["id"], target_year, target_month, today=today
-    )
-    html = await render_template(
-        "partials/calendar_popover.html",
-        **context,
-    )
+    html = await _render_calendar(target_year, target_month, today=today)
     return await make_response(html)
 
 
 @days_bp.route("/calendar/<int:year>/<int:month>")
 @login_required
 async def calendar_month(year: int, month: int):
-    session = _session()
-    user = await session.require_user()
-    context = await get_month_context(user["id"], year, month)
-    html = await render_template(
-        "partials/calendar.html",
-        **context,
-    )
+    html = await _render_calendar(year, month)
     return await make_response(html)
