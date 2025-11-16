@@ -1,4 +1,5 @@
 import { scrollEvents } from "../chat/scroll-manager.js";
+import { appReady } from "../app-init.js";
 import { MarkdownObserver } from "../chat/markdown-observer.js";
 import { StreamingSession } from "../chat/streaming-session.js";
 import { StreamController } from "../chat/stream-controller.js";
@@ -114,6 +115,7 @@ export class ChatView extends ReactiveElement {
   #chatFormReady = Promise.resolve();
   #pendingScrollTarget = null;
   #forceNavFlash = false;
+  #appReadyPromise = null;
 
   constructor() {
     super();
@@ -191,6 +193,31 @@ export class ChatView extends ReactiveElement {
     this.#pendingScrollTarget = null;
   }
 
+  #observeAppReady() {
+    if (this.#appReadyPromise) {
+      return;
+    }
+
+    this.#appReadyPromise = appReady
+      .catch(() => null)
+      .then((app) => {
+        if (!this.isConnected) {
+          return;
+        }
+
+        const manager = app?.scroll ?? window.appInit?.scroll ?? null;
+        if (manager && manager !== this.#scrollManager) {
+          if (this.#scrollManager && this.#chat) {
+            this.#scrollManager.detachChat(this.#chat);
+          }
+          this.#scrollManager = manager;
+          if (this.#chat) {
+            this.#scrollManager.attachChat(this.#chat);
+          }
+        }
+      });
+  }
+
   connectedCallback() {
     super.connectedCallback();
     if (!this.style.display) {
@@ -206,6 +233,8 @@ export class ChatView extends ReactiveElement {
       "htmx:historyRestore",
       this.#historyRestoreHandler
     );
+
+    this.#observeAppReady();
 
     if (!this.#scrollManager) {
       this.#scrollManager = window.appInit?.scroll ?? null;
@@ -226,6 +255,7 @@ export class ChatView extends ReactiveElement {
     this.#teardown();
     this.#connectionListeners = this.disposeListenerBag(this.#connectionListeners);
     this.#scrollEventListeners = this.disposeListenerBag(this.#scrollEventListeners);
+    this.#appReadyPromise = null;
     this.#initialized = false;
     super.disconnectedCallback();
   }

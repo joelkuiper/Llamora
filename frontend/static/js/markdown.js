@@ -1,3 +1,7 @@
+import {
+  DOMPurify as DOMPurifyGlobal,
+  marked as markedGlobal,
+} from "./vendor/setup-globals.js";
 import { TYPING_INDICATOR_SELECTOR } from "./typing-indicator.js";
 
 const escapeHtml = (value) =>
@@ -7,6 +11,16 @@ const escapeHtml = (value) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+
+const globalScope =
+  typeof globalThis !== "undefined"
+    ? globalThis
+    : typeof window !== "undefined"
+      ? window
+      : {};
+
+const marked = markedGlobal ?? globalScope.marked;
+const DOMPurify = DOMPurifyGlobal ?? globalScope.DOMPurify;
 
 const renderer = new marked.Renderer();
 renderer.html = (html) => {

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import json
 import secrets
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -66,10 +67,25 @@ def create_app():
 
     module_path = Path(__file__).resolve()
     project_root = module_path.parents[2]
-    static_dir = project_root / "frontend" / "static"
-    if not static_dir.exists():
+    static_fallback_dir = project_root / "frontend" / "static"
+    if not static_fallback_dir.exists():
         project_root = module_path.parents[3]
-        static_dir = project_root / "frontend" / "static"
+        static_fallback_dir = project_root / "frontend" / "static"
+
+    dist_dir = project_root / "frontend" / "dist"
+    manifest_path = dist_dir / "manifest.json"
+    asset_manifest: dict[str, dict[str, str]] = {"js": {}, "css": {}}
+    static_dir = static_fallback_dir
+    static_bundles = False
+
+    if manifest_path.exists():
+        try:
+            asset_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            logger.warning("Failed to parse asset manifest at %s", manifest_path)
+        else:
+            static_dir = dist_dir
+            static_bundles = True
 
     app = Quart(
         __name__,
@@ -91,6 +107,10 @@ def create_app():
         PERMANENT_SESSION_LIFETIME=settings.SESSION.permanent_lifetime,
         WTF_CSRF_TIME_LIMIT=settings.SESSION.csrf_time_limit,
         EMBED_MODEL=settings.EMBEDDING.model,
+        STATIC_BUNDLES=static_bundles,
+        STATIC_MANIFEST=asset_manifest,
+        STATIC_DIST_PATH=str(dist_dir),
+        STATIC_FALLBACK_PATH=str(static_fallback_dir),
     )
 
     app.extensions["llamora"] = services

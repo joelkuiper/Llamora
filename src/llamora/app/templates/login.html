@@ -27,5 +27,12 @@
 {% endblock %}
 
 {% block body_scripts %}
-<script type="module" src="{{ url_for('static', filename='js/forms.js') }}"></script>
+  {% if config.STATIC_BUNDLES %}
+    {% set auth_js = config.STATIC_MANIFEST['js'].get('auth-forms') %}
+    {% if auth_js %}
+      <script type="module" defer src="{{ url_for('static', filename=auth_js) }}"></script>
+    {% endif %}
+  {% else %}
+    <script type="module" src="{{ url_for('static', filename='js/forms.js') }}"></script>
+  {% endif %}
 {% endblock %}

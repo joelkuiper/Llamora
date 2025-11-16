@@ -4,8 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{ config.APP_NAME }}{% block title %}{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}" />
+    {% if config.STATIC_BUNDLES %}
+      {% set auth_css = config.STATIC_MANIFEST['css'].get('auth-forms') %}
+      {% if auth_css %}
+        <link rel="stylesheet" href="{{ url_for('static', filename=auth_css) }}" />
+      {% endif %}
+    {% else %}
+      <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+      <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}" />
+    {% endif %}
     <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}" type="image/x-icon" />
     {% block head_extra %}{% endblock %}
   </head>

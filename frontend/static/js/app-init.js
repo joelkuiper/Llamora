@@ -14,6 +14,11 @@ import { applyTimezoneHeader } from "./utils/timezone-service.js";
 let headersRegistered = false;
 let offlineHandlerRegistered = false;
 let scrollManager = null;
+let resolveAppReady = null;
+
+export const appReady = new Promise((resolve) => {
+  resolveAppReady = resolve;
+});
 
 function updateClientToday() {
   const today = formatIsoDate(new Date());
@@ -120,6 +125,8 @@ function init() {
       register: registerAlertContainer,
     },
   };
+
+  resolveAppReady?.(window.appInit);
 }
 
 runWhenDocumentReady(init);

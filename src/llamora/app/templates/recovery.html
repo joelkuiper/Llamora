@@ -37,5 +37,12 @@
 {% endblock %}
 
 {% block body_scripts %}
-<script type="module" src="{{ url_for('static', filename='js/recovery.js') }}"></script>
+  {% if config.STATIC_BUNDLES %}
+    {% set recovery_js = config.STATIC_MANIFEST['js'].get('recovery') %}
+    {% if recovery_js %}
+      <script type="module" defer src="{{ url_for('static', filename=recovery_js) }}"></script>
+    {% endif %}
+  {% else %}
+    <script type="module" src="{{ url_for('static', filename='js/recovery.js') }}"></script>
+  {% endif %}
 {% endblock %}

@@ -6,27 +6,38 @@
     <title>{{ config.APP_NAME }}{% block title %}{% endblock %}</title>
     <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}" type="image/x-icon">
 
-    <script defer src="{{ url_for('static', filename='js/vendor/htmx.min.js') }}"></script>
-    <script defer src="{{ url_for('static', filename='js/vendor/htmx-ext-sse.js') }}"></script>
-    <script defer src="{{ url_for('static', filename='js/vendor/htmx-ext-response-targets.js') }}"></script>
+    {% if config.STATIC_BUNDLES %}
+      {% set app_css = config.STATIC_MANIFEST['css'].get('app-shell') %}
+      {% if app_css %}
+        <link rel="stylesheet" href="{{ url_for('static', filename=app_css) }}">
+      {% endif %}
+      {% set app_js = config.STATIC_MANIFEST['js'].get('app-shell') %}
+      {% if app_js %}
+        <script type="module" defer src="{{ url_for('static', filename=app_js) }}"></script>
+      {% endif %}
+    {% else %}
+      <script defer src="{{ url_for('static', filename='js/vendor/htmx.min.js') }}"></script>
+      <script defer src="{{ url_for('static', filename='js/vendor/htmx-ext-sse.js') }}"></script>
+      <script defer src="{{ url_for('static', filename='js/vendor/htmx-ext-response-targets.js') }}"></script>
 
-    <script defer src="{{ url_for('static', filename='js/vendor/marked.umd.js') }}"></script>
-    <script defer src="{{ url_for('static', filename='js/vendor/purify.min.js') }}"></script>
-    <script defer src="{{ url_for('static', filename='js/vendor/popper.min.jsm.js') }}"></script>
+      <script defer src="{{ url_for('static', filename='js/vendor/marked.umd.js') }}"></script>
+      <script defer src="{{ url_for('static', filename='js/vendor/purify.min.js') }}"></script>
+      <script defer src="{{ url_for('static', filename='js/vendor/popper.min.jsm.js') }}"></script>
 
-    <script defer type="module" src="{{ url_for('static', filename='js/logo-toggle.js') }}"></script>
-    <script defer type="module" src="{{ url_for('static', filename='js/tooltip.js') }}"></script>
-    <script defer type="module" src="{{ url_for('static', filename='js/components/calendar.js') }}"></script>
-    <script defer type="module" src="{{ url_for('static', filename='js/app-init.js') }}"></script>
+      <script defer type="module" src="{{ url_for('static', filename='js/logo-toggle.js') }}"></script>
+      <script defer type="module" src="{{ url_for('static', filename='js/tooltip.js') }}"></script>
+      <script defer type="module" src="{{ url_for('static', filename='js/components/calendar.js') }}"></script>
+      <script defer type="module" src="{{ url_for('static', filename='js/app-init.js') }}"></script>
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/header.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/search.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/markdown.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/meta-chips.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/calendar.css') }}">
+      <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+      <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+      <link rel="stylesheet" href="{{ url_for('static', filename='css/header.css') }}">
+      <link rel="stylesheet" href="{{ url_for('static', filename='css/search.css') }}">
+      <link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css') }}">
+      <link rel="stylesheet" href="{{ url_for('static', filename='css/markdown.css') }}">
+      <link rel="stylesheet" href="{{ url_for('static', filename='css/meta-chips.css') }}">
+      <link rel="stylesheet" href="{{ url_for('static', filename='css/calendar.css') }}">
+    {% endif %}
 
     {% block head_extra %}{% endblock %}
   </head>
