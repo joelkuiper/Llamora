@@ -1,8 +1,8 @@
-import { createPopover } from "./popover.js";
+import { createTooltipPopover } from "./utils/tooltip-popover.js";
 
 let tooltipEl;
 let innerEl;
-let popoverController;
+let tooltipPopover;
 let currentTarget;
 let lastRect;
 let initialized = false;
@@ -35,17 +35,9 @@ function show(el) {
   const offsetX = parseOffset(el.dataset.tooltipOffsetX, 0);
   const offsetY = parseOffset(el.dataset.tooltipOffsetY, 8);
 
-  popoverController = createPopover(el, tooltipEl, {
-    animation: null,
-    closeOnOutside: false,
-    closeOnEscape: false,
-    popperOptions: {
-      placement,
-      strategy: 'fixed',
-      modifiers: [
-        { name: 'offset', options: { offset: [offsetX, offsetY] } },
-      ],
-    },
+  tooltipPopover = createTooltipPopover(el, tooltipEl, {
+    placement,
+    offset: [offsetX, offsetY],
     onShow: () => {
       tooltipEl.classList.add('visible');
     },
@@ -66,12 +58,12 @@ function show(el) {
       }
     },
   });
-  popoverController.show();
+  tooltipPopover.controller.show();
   currentTarget = el;
 }
 
 function hide() {
-  if (!popoverController) {
+  if (!tooltipPopover) {
     if (tooltipEl) {
       tooltipEl.classList.remove('visible');
       tooltipEl.hidden = true;
@@ -80,29 +72,10 @@ function hide() {
     lastRect = null;
     return Promise.resolve();
   }
-  const controller = popoverController;
-  popoverController = null;
+  const currentPopover = tooltipPopover;
+  tooltipPopover = null;
   currentTarget = null;
-  return controller.hide().finally(() => {
-    controller.destroy();
-  });
-}
-
-function cleanup() {
-  const pending = hide();
-  const removeEl = () => {
-    if (tooltipEl) {
-      tooltipEl.remove();
-      tooltipEl = null;
-      innerEl = null;
-      lastRect = null;
-    }
-  };
-  if (pending && typeof pending.then === 'function') {
-    pending.finally(removeEl);
-  } else {
-    removeEl();
-  }
+  return currentPopover.cleanup();
 }
 
 export function initTooltips() {
@@ -137,15 +110,6 @@ export function initTooltips() {
   });
 
   document.addEventListener('click', hide);
-
-  if (window.htmx) {
-    document.body.addEventListener('htmx:beforeHistorySave', cleanup);
-  }
-
-  window.addEventListener('pagehide', cleanup);
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) cleanup();
-  });
 }
 
 initTooltips();
