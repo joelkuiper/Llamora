@@ -130,6 +130,7 @@ class DefaultTagEnricher:
             candidate_map[message_id] = {
                 "id": row["id"],
                 "created_at": row["created_at"],
+                "created_date": row.get("created_date"),
                 "role": row["role"],
                 "content": row.get("message", ""),
                 "cosine": 0.0,

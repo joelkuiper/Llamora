@@ -56,6 +56,9 @@ class MessagesRepository(BaseRepository):
     ) -> list[dict]:  # pragma: no cover - trivial helper
         messages: list[dict] = []
         for row in rows:
+            created_date = None
+            if "created_date" in row.keys():
+                created_date = row["created_date"]
             record_json = self._decrypt_message(
                 dek,
                 user_id,
@@ -69,6 +72,7 @@ class MessagesRepository(BaseRepository):
                 {
                     "id": row["id"],
                     "created_at": row["created_at"],
+                    "created_date": created_date,
                     "role": row["role"],
                     "reply_to": row["reply_to"],
                     "message": rec.get("message", ""),
@@ -277,7 +281,7 @@ class MessagesRepository(BaseRepository):
             cursor = await conn.execute(
                 """
                 SELECT m.id, m.role, m.reply_to, m.nonce, m.ciphertext, m.alg,
-                       m.created_at, m.prompt_tokens
+                       m.created_at, m.created_date, m.prompt_tokens
                 FROM messages m
                 WHERE m.user_id = ?
                 ORDER BY m.id DESC
@@ -296,7 +300,7 @@ class MessagesRepository(BaseRepository):
             cursor = await conn.execute(
                 """
                 SELECT m.id, m.role, m.reply_to, m.nonce, m.ciphertext, m.alg,
-                       m.created_at, m.prompt_tokens
+                       m.created_at, m.created_date, m.prompt_tokens
                 FROM messages m
                 WHERE m.user_id = ? AND m.id < ?
                 ORDER BY m.id DESC
@@ -332,8 +336,8 @@ class MessagesRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 f"""
-                SELECT m.id, m.created_at, m.role, m.reply_to, m.nonce, m.ciphertext, m.alg,
-                       m.prompt_tokens
+                SELECT m.id, m.created_at, m.created_date, m.role, m.reply_to,
+                       m.nonce, m.ciphertext, m.alg, m.prompt_tokens
                 FROM messages m
                 WHERE m.user_id = ? AND m.id IN ({placeholders})
                 """,

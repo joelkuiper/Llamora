@@ -89,6 +89,7 @@ class LexicalReranker:
                 {
                     "id": cand["id"],
                     "created_at": cand["created_at"],
+                    "created_date": cand.get("created_date"),
                     "role": cand["role"],
                     "snippet": snippet,
                     "status": status,
