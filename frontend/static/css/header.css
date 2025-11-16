@@ -48,16 +48,8 @@
 
   .header-right > .search-wrap {
     position: relative;
-    flex: 0 1 clamp(11rem, 20vw, 18rem);
-    min-width: 8rem;
-    max-width: 20rem;
-  }
-
-  @media (min-width: 1440px) {
-    .header-right > .search-wrap {
-      flex-basis: clamp(13rem, 24vw, 18rem);
-      max-width: 24rem;
-    }
+    flex: 0 1 clamp(14rem, calc(8rem + 11vw), 18rem);
+    max-width: clamp(16rem, calc(8rem + 16vw), 24rem);
   }
 
   .header-right > .user-actions {
@@ -76,20 +68,10 @@
 
   @media (max-width: 1080px) {
     gap: var(--spacing-md);
-
-    .header-right > .search-wrap {
-      flex-basis: clamp(10rem, 30vw, 17rem);
-      max-width: 18rem;
-    }
   }
 
   @media (max-width: 960px) {
     gap: var(--spacing-sm);
-
-    .header-right > .search-wrap {
-      flex-basis: clamp(9.5rem, 36vw, 14rem);
-      max-width: 16rem;
-    }
   }
 
   @media (max-width: 860px) {
