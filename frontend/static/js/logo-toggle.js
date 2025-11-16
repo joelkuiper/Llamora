@@ -190,7 +190,7 @@ function setupHtmxHooks() {
     initLogoToggles();
   });
   document.body.addEventListener("htmx:historyRestore", () => {
-    initLogoToggles();
+    refreshAll();
   });
 }
 
