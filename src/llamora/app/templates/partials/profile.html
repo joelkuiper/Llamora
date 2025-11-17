@@ -55,4 +55,14 @@
       </button>
     </section>
   </section>
+  {% if config.STATIC_BUNDLES %}
+    {% set profile_js = config.STATIC_MANIFEST['js'].get('profile') %}
+    {% if profile_js %}
+      <script type="module" defer src="{{ url_for('static', filename=profile_js) }}"></script>
+    {% endif %}
+  {% else %}
+    <script type="module" src="{{ url_for('static', filename='js/profile-page.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/password-strength.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/forms.js') }}"></script>
+  {% endif %}
 </main>

@@ -3,6 +3,11 @@
 
 {% block title %} | Register{% endblock %}
 
+{% block head_extra %}
+  {% if not config.STATIC_BUNDLES %}
+    <script src="{{ url_for('static', filename='js/vendor/htmx.min.js') }}"></script>
+  {% endif %}
+{% endblock %}
 
 {% block form %}
   {% if error %}{{ alert(error) }}{% endif %}
@@ -23,3 +28,14 @@
   <p>Already have an account? <a href="{{ url_for('auth.login') }}">Login</a></p>
 {% endblock %}
 
+{% block body_scripts %}
+  {% if config.STATIC_BUNDLES %}
+    {% set auth_js = config.STATIC_MANIFEST['js'].get('auth-forms') %}
+    {% if auth_js %}
+      <script type="module" defer src="{{ url_for('static', filename=auth_js) }}"></script>
+    {% endif %}
+  {% else %}
+    <script type="module" src="{{ url_for('static', filename='js/password-strength.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/forms.js') }}"></script>
+  {% endif %}
+{% endblock %}

@@ -6,7 +6,6 @@
     <title>{{ config.APP_NAME }}{% block title %}{% endblock %}</title>
     {% if config.STATIC_BUNDLES %}
       {% set auth_css = config.STATIC_MANIFEST['css'].get('auth-forms') %}
-      {% set entry_js = config.STATIC_MANIFEST['js'].get('app') %}
       {% if auth_css %}
         <link rel="stylesheet" href="{{ url_for('static', filename=auth_css) }}" />
       {% endif %}
@@ -17,7 +16,7 @@
     <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}" type="image/x-icon" />
     {% block head_extra %}{% endblock %}
   </head>
-  <body data-entry="{% block body_entry %}auth-forms{% endblock %}">
+  <body>
     <div class="form-container">
       <div id="branding">
         <picture>
@@ -27,11 +26,6 @@
       </div>
       {% block form %}{% endblock %}
     </div>
-    {% if entry_js %}
-      <script type="module" defer src="{{ url_for('static', filename=entry_js) }}"></script>
-    {% else %}
-      <script type="module" defer src="{{ url_for('static', filename='js/entries/app.js') }}"></script>
-    {% endif %}
     {% block body_scripts %}{% endblock %}
   </body>
 </html>

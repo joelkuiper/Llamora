@@ -70,15 +70,6 @@ const FEATURE_IMPORTS = {
     selector: "search-overlay",
     loader: () => import("../components/search-overlay.js"),
   },
-  profile: {
-    selector: "#profile-page",
-    loader: () =>
-      Promise.all([
-        import("../forms.js"),
-        import("../password-strength.js"),
-        import("../profile-page.js"),
-      ]),
-  },
 };
 
 async function ensureFeatureModules(scope) {
