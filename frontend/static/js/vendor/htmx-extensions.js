@@ -32,8 +32,8 @@ function loadScript(url) {
 await vendorReady;
 
 for (const extensionPath of [
-  "./vendor/htmx-ext-sse.js",
-  "./vendor/htmx-ext-response-targets.js",
+  "./htmx-ext-sse.js",
+  "./htmx-ext-response-targets.js",
 ]) {
   const url = new URL(extensionPath, import.meta.url);
   await loadScript(url);
