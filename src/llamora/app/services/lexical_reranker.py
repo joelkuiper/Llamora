@@ -113,6 +113,15 @@ class LexicalReranker:
         else:
             snippet_start = 0
         snippet_end = min(snippet_start + max_len, len(content))
+        leading = snippet_start > 0
+        trailing = snippet_end < len(content)
+        snippet_start, snippet_end = self._adjust_snippet_boundaries(
+            content,
+            snippet_start,
+            snippet_end,
+            leading,
+            trailing,
+        )
         leading_ellipsis = snippet_start > 0
         trailing_ellipsis = snippet_end < len(content)
 
@@ -166,3 +175,65 @@ class LexicalReranker:
             "leading_ellipsis": leading_ellipsis,
             "trailing_ellipsis": trailing_ellipsis,
         }
+
+    def _adjust_snippet_boundaries(
+        self,
+        content: str,
+        snippet_start: int,
+        snippet_end: int,
+        leading: bool,
+        trailing: bool,
+    ) -> tuple[int, int]:
+        length = len(content)
+        start = snippet_start
+        end = snippet_end
+
+        if (
+            leading
+            and start > 0
+            and start < length
+            and self._is_word_char(content[start])
+            and self._is_word_char(content[start - 1])
+        ):
+            adjusted = self._seek_forward_boundary(content, start)
+            if adjusted > start:
+                start = min(adjusted, length)
+
+        if (
+            trailing
+            and end > 0
+            and end < length
+            and self._is_word_char(content[end - 1])
+            and self._is_word_char(content[end])
+        ):
+            adjusted = self._seek_backward_boundary(content, end)
+            if adjusted > start:
+                end = adjusted
+
+        if end <= start:
+            end = min(start + (snippet_end - snippet_start), length)
+        return start, end
+
+    def _seek_forward_boundary(self, text: str, index: int) -> int:
+        length = len(text)
+        idx = index
+        while idx < length and self._is_word_char(text[idx]):
+            idx += 1
+        while idx < length and not self._is_word_char(text[idx]):
+            idx += 1
+        return idx if idx < length else index
+
+    def _seek_backward_boundary(self, text: str, index: int) -> int:
+        idx = min(index, len(text))
+        original = idx
+        while idx > 0 and self._is_word_char(text[idx - 1]):
+            idx -= 1
+        if idx <= 0:
+            return original
+        while idx > 0 and text[idx - 1].isspace():
+            idx -= 1
+        return idx
+
+    @staticmethod
+    def _is_word_char(ch: str) -> bool:
+        return ch.isalnum() or ch in {"_", "'"}
