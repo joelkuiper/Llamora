@@ -3,6 +3,20 @@ import { ready as vendorReady } from "./setup-globals.js";
 const globalScope = typeof globalThis !== "undefined" ? globalThis : window;
 const pendingLoads = new Map();
 
+function resolveExtensionUrl(relativePath) {
+  const moduleUrl = import.meta.url || (globalScope.location && globalScope.location.href);
+  if (!moduleUrl) {
+    return relativePath;
+  }
+
+  const sanitizedPath = relativePath.replace(/^\.\//, "");
+  if (moduleUrl.includes("/js/vendor/")) {
+    return new URL(relativePath, moduleUrl);
+  }
+
+  return new URL(`/static/js/vendor/${sanitizedPath}`, moduleUrl);
+}
+
 function loadScript(url) {
   const href = url instanceof URL ? url.href : String(url);
   if (pendingLoads.has(href)) {
@@ -35,7 +49,7 @@ for (const extensionPath of [
   "./htmx-ext-sse.js",
   "./htmx-ext-response-targets.js",
 ]) {
-  const url = new URL(extensionPath, import.meta.url);
+  const url = resolveExtensionUrl(extensionPath);
   await loadScript(url);
 }
 
