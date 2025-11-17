@@ -732,8 +732,17 @@ class LlmStreamElement extends HTMLElement {
             this.#metaChipsRequest = null;
           }
         };
-        request.addEventListener("abort", cleanup, { once: true });
-        request.addEventListener("loadend", cleanup, { once: true });
+
+        if (typeof request.addEventListener === "function") {
+          request.addEventListener("abort", cleanup, { once: true });
+          request.addEventListener("loadend", cleanup, { once: true });
+        } else if (typeof request.finally === "function") {
+          request.finally(cleanup);
+        } else if (typeof request.then === "function") {
+          request.then(cleanup, cleanup);
+        } else {
+          cleanup();
+        }
       }
     } catch (err) {
       console.error("failed to load meta chips", err);
@@ -745,10 +754,14 @@ class LlmStreamElement extends HTMLElement {
       return;
     }
 
-    try {
-      this.#metaChipsRequest.abort();
-    } catch (_) {
-      // ignored
+    const request = this.#metaChipsRequest;
+    const abortFn = typeof request.abort === "function" ? request.abort : null;
+    if (abortFn) {
+      try {
+        abortFn.call(request);
+      } catch (_) {
+        // ignored
+      }
     }
 
     this.#metaChipsRequest = null;
