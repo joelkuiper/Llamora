@@ -109,7 +109,6 @@ body {
 
     &.user {
       align-self: flex-end;
-      text-align: right;
       border: 1px solid var(--border-user);  /* subtle blue border */
       color: var(--color-user-text);
       background: var(--color-user-bg);
