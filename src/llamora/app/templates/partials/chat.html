@@ -28,14 +28,22 @@
     </chat-form>
 
     {% else %}
-    <div class="return-today">This day has passed.
+    <div class="return-today" role="group" aria-label="Archived day divider">
+      <div class="return-today__divider" aria-hidden="true">
+        <span class="return-today__line return-today__line--left"></span>
+        <span class="return-today__date">{{ day|long_date }}</span>
+        <span class="return-today__line return-today__line--right"></span>
+      </div>
+      <p class="return-today__copy">This moment has settled into memory.</p>
       <a
+        class="return-today__action"
         href="{{ url_for('days.day_today') }}"
         hx-get="{{ url_for('chat.chat_htmx_today') }}"
         hx-target="#content-wrapper"
         hx-swap="outerHTML"
         hx-push-url="true">
-        Return to present. </a>
+        Return to the present
+      </a>
     </div>
     {% endif %}
 
