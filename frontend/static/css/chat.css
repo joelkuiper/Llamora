@@ -317,9 +317,18 @@ chat-view[data-rendering="true"] #chat {
 }
 
 .return-today__action:focus-visible {
-  outline: 2px solid var(--accent-40);
-  outline-offset: 2px;
-  border-radius: 999px;
+  outline: none;
+  border-color: var(--accent);
+  box-shadow:
+    var(--raised-shadow),
+    0 0 0 2px var(--accent-20),
+    0 8px 20px var(--accent-10);
+}
+
+.return-today__action:active,
+.return-today__action:focus-visible:active {
+  transform: translateY(1px);
+  box-shadow: var(--inset-shadow-disabled);
 }
 
 #message-form {
