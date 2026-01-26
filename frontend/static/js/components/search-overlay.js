@@ -189,9 +189,10 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   #activateOverlayListeners() {
-    if (this.#overlayListeners || !this.isConnected) return;
+    if (!this.isConnected) return;
 
-    const bag = this.resetListenerBag(this.#overlayListeners);
+    this.#overlayListeners = this.disposeListenerBag(this.#overlayListeners);
+    const bag = this.createListenerBag();
     const doc = this.ownerDocument ?? document;
     bag.add(doc, "keydown", this.#keydownHandler);
     bag.add(doc, "click", this.#documentClickHandler);
@@ -544,6 +545,8 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     if (persisted) {
       this.applyAutocompleteCandidates();
     }
+
+    this.#refreshOverlayListeners();
   }
 
   #handlePageHide(event) {
@@ -551,6 +554,8 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     if (!event?.persisted) {
       return;
     }
+
+    this.#deactivateOverlayListeners();
 
     const hasAutocomplete = !!this.autocompleteController;
     const hasListeners = !!this.#inputListeners;
@@ -574,6 +579,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     });
 
     this.applyAutocompleteCandidates();
+    this.#refreshOverlayListeners();
   }
 
   #handlePopState() {
@@ -675,6 +681,19 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     } else {
       this.#loadRecentSearches();
     }
+  }
+
+  #refreshOverlayListeners() {
+    const wrap = this.#resultsEl;
+    if (!wrap) return;
+    if (!wrap.classList.contains("is-open")) {
+      return;
+    }
+    const panel = wrap.querySelector(".sr-panel");
+    if (!panel) {
+      return;
+    }
+    this.#activateOverlayListeners();
   }
 
   #normalizeCandidateValue(entry) {
