@@ -2,8 +2,11 @@
   {% set canonical_value = display(keyword) %}
   <span class="meta-chip keyword">
     <a class="chip-label"
-       href="#"
-       data-search-value="{{ canonical_value }}">{{ canonical_value }}</a>
+       href="{{ url_for('search.search') }}?q={{ canonical_value | urlencode }}"
+       hx-get="{{ url_for('search.search') }}?q={{ canonical_value | urlencode }}"
+       hx-target="#search-results"
+       hx-indicator="#search-spinner"
+       hx-swap="innerHTML">{{ canonical_value }}</a>
     {% if msg_id %}
     <button class="chip-remove"
             aria-label="Remove tag {{ canonical_value }}"

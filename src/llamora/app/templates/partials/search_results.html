@@ -4,6 +4,13 @@
 {% set total_known = total_known|default(true) %}
 {% set showing_count = showing_count|default(items|length) %}
 {% set truncation_notice = truncation_notice|default('') %}
+{% if session_id is defined %}
+<input type="hidden"
+       id="search-session-id"
+       name="sid"
+       value="{{ session_id|default('') }}"
+       hx-swap-oob="true">
+{% endif %}
 <div class="search-results-status">
   {% if query_present %}
   <p class="visually-hidden" aria-live="polite" role="status" aria-atomic="true">
@@ -20,11 +27,8 @@
   {% if items %}
   <div class="sr-panel glass-panel search-results-overlay">
     <ul class="search-results-list" role="listbox">
-      {% include 'partials/search_results_stream_chunk.html' %}
+      {% include 'partials/search_results_chunk.html' %}
     </ul>
-    <div class="search-stream-loading" aria-hidden="true">
-      <span class="search-load-indicator"></span>
-    </div>
     {{ overlay_close_button() }}
   </div>
   {% elif query_present %}

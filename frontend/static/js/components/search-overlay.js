@@ -50,12 +50,13 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
   #overlayListeners = null;
   #resultsEl = null;
   #inputEl = null;
-  #formEl = null;
   #spinnerEl = null;
   #spinnerController = null;
   #inputListeners = null;
+  #beforeRequestHandler;
+  #afterRequestHandler;
+  #afterSwapHandler;
   #inputHandler;
-  #submitHandler;
   #keydownHandler;
   #documentClickHandler;
   #focusHandler;
@@ -66,14 +67,16 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
   #historyRestoreRemover = null;
   #recentHistory;
   #shortcutBag = null;
-  #streamSource = null;
-  #streamTimer = null;
-  #streamQuery = "";
+  #scrollObserver = null;
+  #scrollListEl = null;
+  #scrollFallbackHandler = null;
 
   constructor() {
     super();
+    this.#beforeRequestHandler = () => this.#handleBeforeRequest();
+    this.#afterRequestHandler = () => this.#handleAfterRequest();
+    this.#afterSwapHandler = (event) => this.#handleAfterSwap(event);
     this.#inputHandler = () => this.#handleInput();
-    this.#submitHandler = (event) => this.#handleSubmit(event);
     this.#keydownHandler = (event) => this.#handleKeydown(event);
     this.#documentClickHandler = (event) => this.#handleDocumentClick(event);
     this.#focusHandler = () => this.#handleInputFocus();
@@ -92,7 +95,6 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     super.connectedCallback();
     this.#resultsEl = this.querySelector("#search-results");
     this.#spinnerEl = this.querySelector("#search-spinner");
-    this.#formEl = this.querySelector("#search-form");
     if (!this.#spinnerController) {
       this.#spinnerController = createInlineSpinner(this.#spinnerEl);
     } else {
@@ -109,13 +111,17 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       reason: "connected",
     });
 
-    if (this.#formEl) {
-      this.#listeners.add(this.#formEl, "submit", this.#submitHandler);
-    }
-
     this.#registerShortcuts();
 
     const eventTarget = this.ownerDocument ?? document;
+
+    this.watchHtmxRequests(eventTarget, {
+      bag: listeners,
+      withinSelector: "#search-results",
+      onStart: this.#beforeRequestHandler,
+      onEnd: this.#afterRequestHandler,
+    });
+    listeners.add(this, "htmx:afterSwap", this.#afterSwapHandler);
 
     if (this.#historyRestoreRemover) {
       this.#historyRestoreRemover();
@@ -139,6 +145,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#closeResults(false, { immediate: true });
 
     this.#deactivateOverlayListeners();
+    this.#disconnectInfiniteScroll();
     this.#listeners = this.disposeListenerBag(this.#listeners);
 
     this.#spinnerController?.stop();
@@ -149,14 +156,8 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     this.cancelAutocompleteFetch();
     this.#resultsEl = null;
     this.#inputEl = null;
-    this.#formEl = null;
     this.#spinnerEl = null;
     this.#inputListeners = this.disposeListenerBag(this.#inputListeners);
-    this.#closeSearchStream();
-    if (this.#streamTimer) {
-      window.clearTimeout(this.#streamTimer);
-      this.#streamTimer = null;
-    }
 
     const doc = this.ownerDocument ?? document;
     const win = doc.defaultView ?? window;
@@ -206,22 +207,32 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#overlayListeners = this.disposeListenerBag(this.#overlayListeners);
   }
 
+  #handleBeforeRequest() {
+    const wrap = this.#resultsEl;
+    if (wrap) {
+      wrap.setAttribute("aria-busy", "true");
+    }
+    this.#spinnerController?.start();
+  }
+
+  #handleAfterRequest() {
+    const wrap = this.#resultsEl;
+    if (wrap) {
+      wrap.removeAttribute("aria-busy");
+    }
+    this.#spinnerController?.stop();
+  }
+
   #handleAfterSwap(evt) {
     const wrap = this.#resultsEl;
-    const target = evt.detail?.target;
-    if (!wrap || !(target instanceof Element)) return;
-
-    if (target !== wrap) {
-      if (wrap.contains(target) && wrap.classList.contains("is-open")) {
-      }
-      return;
-    }
+    if (!wrap || evt.detail?.target !== wrap) return;
 
 
     const panel = wrap.querySelector(".sr-panel");
     if (!panel) {
       wrap.classList.remove("is-open");
       this.#deactivateOverlayListeners();
+      this.#disconnectInfiniteScroll();
       this.#addCurrentQueryToAutocomplete();
       this.#loadRecentSearches();
       return;
@@ -229,6 +240,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
 
     if (wrap.classList.contains("is-open")) {
       panel.classList.remove("htmx-added");
+      this.#setupInfiniteScroll();
       this.#addCurrentQueryToAutocomplete();
       this.#loadRecentSearches();
       return;
@@ -238,6 +250,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       panel.classList.remove("pop-enter");
       wrap.classList.add("is-open");
       this.#activateOverlayListeners();
+      this.#setupInfiniteScroll();
     };
 
     panel.classList.add("pop-enter");
@@ -252,133 +265,12 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   #handleInput() {
-    if (!this.#inputEl) return;
-    const value = this.#inputEl.value.trim();
-    if (!value) {
-      this.#closeResults();
-      return;
-    }
-    this.#scheduleSearchStream();
+    if (!this.#inputEl || this.#inputEl.value.trim()) return;
+    this.#closeResults();
   }
 
   #handleInputFocus() {
     this.#refreshInputState();
-  }
-
-  #handleSubmit(event) {
-    if (event?.preventDefault) {
-      event.preventDefault();
-    }
-    this.#startSearchStream();
-  }
-
-  #scheduleSearchStream() {
-    if (this.#streamTimer) {
-      window.clearTimeout(this.#streamTimer);
-    }
-    this.#streamTimer = window.setTimeout(() => {
-      this.#streamTimer = null;
-      this.#startSearchStream();
-    }, 300);
-  }
-
-  #startSearchStream() {
-    if (!this.#inputEl) return;
-    const query = normalizeSearchValue(this.#inputEl.value);
-    if (!query) {
-      this.#closeResults();
-      return;
-    }
-
-    if (this.#streamSource && this.#streamQuery === query) {
-      return;
-    }
-
-    this.#closeSearchStream();
-    this.#streamQuery = query;
-
-    const url = `/search/stream?q=${encodeURIComponent(query)}`;
-    const source = new EventSource(url, { withCredentials: true });
-    this.#streamSource = source;
-    this.#spinnerController?.start();
-    if (this.#resultsEl) {
-      this.#resultsEl.setAttribute("aria-busy", "true");
-      this.#resultsEl.classList.add("is-streaming");
-    }
-
-    source.addEventListener("open", () => {
-      console.debug("[search] stream open", { url });
-    });
-
-    source.addEventListener("initial", (event) => {
-      if (!this.#resultsEl) return;
-      const html = event.data || "";
-      this.#applyStreamInitial(html);
-    });
-
-    source.addEventListener("chunk", (event) => {
-      if (!this.#resultsEl) return;
-      const list = this.#resultsEl.querySelector(".search-results-list");
-      if (!list) return;
-      const html = event.data || "";
-      if (html) {
-        list.insertAdjacentHTML("beforeend", html);
-      }
-    });
-
-    source.addEventListener("done", (event) => {
-      this.#finishSearchStream();
-      this.#updateStreamStatus(event?.data);
-    });
-
-    source.addEventListener("error", () => {
-      console.debug("[search] stream error", {
-        readyState: source.readyState,
-      });
-      this.#finishSearchStream();
-    });
-  }
-
-  #applyStreamInitial(html) {
-    const wrap = this.#resultsEl;
-    if (!wrap) return;
-    wrap.innerHTML = html || "";
-    this.#handleAfterSwap({ detail: { target: wrap } });
-  }
-
-  #finishSearchStream() {
-    this.#spinnerController?.stop();
-    if (this.#resultsEl) {
-      this.#resultsEl.removeAttribute("aria-busy");
-      this.#resultsEl.classList.remove("is-streaming");
-    }
-    this.#closeSearchStream();
-  }
-
-  #updateStreamStatus(payload) {
-    if (!this.#resultsEl || !payload) return;
-    let data = null;
-    try {
-      data = JSON.parse(payload);
-    } catch {
-      return;
-    }
-    if (!data || typeof data.showing !== "number") return;
-    const showing = data.showing;
-    const totalKnown = Boolean(data.total_known);
-    const sr = this.#resultsEl.querySelector(
-      ".search-results-status .visually-hidden",
-    );
-    if (!sr) return;
-    const suffix = totalKnown ? "." : "+.";
-    sr.textContent = `Showing ${showing} search result${showing === 1 ? "" : "s"}${suffix}`;
-  }
-
-  #closeSearchStream() {
-    if (this.#streamSource) {
-      this.#streamSource.close();
-      this.#streamSource = null;
-    }
   }
 
   #loadRecentSearches(force = false) {
@@ -605,19 +497,14 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     const wrap = this.#resultsEl;
     const finish = () => {
       this.#spinnerController?.stop();
-      this.#closeSearchStream();
-      if (this.#streamTimer) {
-        window.clearTimeout(this.#streamTimer);
-        this.#streamTimer = null;
-      }
       if (!wrap) {
         return;
       }
       wrap.classList.remove("is-open");
-      wrap.classList.remove("is-streaming");
       wrap.removeAttribute("aria-busy");
       wrap.innerHTML = "";
       this.#deactivateOverlayListeners();
+      this.#disconnectInfiniteScroll();
     };
 
     if (!wrap) {
@@ -815,8 +702,97 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       return;
     }
     this.#activateOverlayListeners();
+    this.#setupInfiniteScroll();
   }
 
+  #disconnectInfiniteScroll() {
+    if (this.#scrollObserver) {
+      this.#scrollObserver.disconnect();
+      this.#scrollObserver = null;
+    }
+    if (this.#scrollListEl && this.#scrollFallbackHandler) {
+      this.#scrollListEl.removeEventListener(
+        "scroll",
+        this.#scrollFallbackHandler,
+      );
+    }
+    this.#scrollFallbackHandler = null;
+    this.#scrollListEl = null;
+  }
+
+  #setupInfiniteScroll() {
+    const wrap = this.#resultsEl;
+    if (!wrap || !wrap.classList.contains("is-open")) {
+      return;
+    }
+
+    const list = wrap.querySelector(".search-results-list");
+    if (!(list instanceof HTMLElement)) {
+      this.#disconnectInfiniteScroll();
+      return;
+    }
+
+    if (this.#scrollListEl !== list) {
+      this.#disconnectInfiniteScroll();
+      this.#scrollListEl = list;
+    }
+
+    const sentinel = list.querySelector(".search-result-load");
+    if (!(sentinel instanceof HTMLElement)) {
+      if (this.#scrollObserver) {
+        this.#scrollObserver.disconnect();
+        this.#scrollObserver = null;
+      }
+      return;
+    }
+
+    const triggerLoad = () => {
+      if (window.htmx) {
+        window.htmx.trigger(sentinel, "revealed");
+      }
+    };
+
+    if ("IntersectionObserver" in window) {
+      if (!this.#scrollObserver) {
+        this.#scrollObserver = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (entry.isIntersecting) {
+                triggerLoad();
+              }
+            }
+          },
+          {
+            root: list,
+            rootMargin: "160px 0px",
+            threshold: 0,
+          },
+        );
+      } else {
+        this.#scrollObserver.disconnect();
+      }
+      this.#scrollObserver.observe(sentinel);
+      if (list.scrollHeight <= list.clientHeight + 2) {
+        triggerLoad();
+      }
+      return;
+    }
+
+    if (!this.#scrollFallbackHandler) {
+      this.#scrollFallbackHandler = () => {
+        const remaining = list.scrollHeight - list.scrollTop - list.clientHeight;
+        if (remaining <= 120) {
+          triggerLoad();
+        }
+      };
+      list.addEventListener("scroll", this.#scrollFallbackHandler, {
+        passive: true,
+      });
+      if (list.scrollHeight <= list.clientHeight + 2) {
+        triggerLoad();
+      }
+    }
+  }
 
   #normalizeCandidateValue(entry) {
     if (!entry) return "";

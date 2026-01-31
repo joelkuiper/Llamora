@@ -1,0 +1,23 @@
+{% set items = results|default([]) %}
+{% if session_id is defined %}
+<input type="hidden"
+       id="search-session-id"
+       name="sid"
+       value="{{ session_id|default('') }}"
+       hx-swap-oob="true">
+{% endif %}
+{% for item in items %}
+{% include 'partials/search_result_item.html' %}
+{% endfor %}
+{% if has_more %}
+<li class="search-result-load"
+    hx-get="{{ url_for('search.search') }}?offset={{ next_offset }}"
+    hx-trigger="revealed"
+    hx-swap="outerHTML"
+    hx-include="#search-form"
+    hx-sync="this:replace"
+    aria-hidden="true">
+  <span class="search-load-indicator" aria-hidden="true"></span>
+  <span class="visually-hidden">Loading more results...</span>
+</li>
+{% endif %}

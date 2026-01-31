@@ -614,20 +614,14 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
   #handleChipActivation(event) {
     const label = event.target.closest?.(".chip-label");
     if (!label || !(label instanceof HTMLElement)) return;
-    if (typeof event.preventDefault === "function") {
-      event.preventDefault();
-    }
 
     const searchInput = document.getElementById("search-input");
     if (!searchInput) return;
 
-    const value =
-      label.getAttribute("data-search-value")?.trim() ??
-      label.textContent?.trim();
+    const value = label.textContent?.trim();
     if (!value) return;
 
     searchInput.value = value;
-    searchInput.dispatchEvent(new Event("input", { bubbles: true }));
     if (typeof searchInput.focus === "function") {
       try {
         searchInput.focus({ preventScroll: true });
