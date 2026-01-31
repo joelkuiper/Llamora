@@ -67,9 +67,6 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
   #historyRestoreRemover = null;
   #recentHistory;
   #shortcutBag = null;
-  #scrollObserver = null;
-  #scrollListEl = null;
-  #scrollFallbackHandler = null;
 
   constructor() {
     super();
@@ -145,7 +142,6 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#closeResults(false, { immediate: true });
 
     this.#deactivateOverlayListeners();
-    this.#disconnectInfiniteScroll();
     this.#listeners = this.disposeListenerBag(this.#listeners);
 
     this.#spinnerController?.stop();
@@ -225,14 +221,16 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
 
   #handleAfterSwap(evt) {
     const wrap = this.#resultsEl;
-    if (!wrap || evt.detail?.target !== wrap) return;
+    if (!wrap) return;
+
+    const swapTarget = evt.detail?.target;
+    if (swapTarget !== wrap) return;
 
 
     const panel = wrap.querySelector(".sr-panel");
     if (!panel) {
       wrap.classList.remove("is-open");
       this.#deactivateOverlayListeners();
-      this.#disconnectInfiniteScroll();
       this.#addCurrentQueryToAutocomplete();
       this.#loadRecentSearches();
       return;
@@ -240,7 +238,6 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
 
     if (wrap.classList.contains("is-open")) {
       panel.classList.remove("htmx-added");
-      this.#setupInfiniteScroll();
       this.#addCurrentQueryToAutocomplete();
       this.#loadRecentSearches();
       return;
@@ -250,7 +247,6 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       panel.classList.remove("pop-enter");
       wrap.classList.add("is-open");
       this.#activateOverlayListeners();
-      this.#setupInfiniteScroll();
     };
 
     panel.classList.add("pop-enter");
@@ -504,7 +500,6 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       wrap.removeAttribute("aria-busy");
       wrap.innerHTML = "";
       this.#deactivateOverlayListeners();
-      this.#disconnectInfiniteScroll();
     };
 
     if (!wrap) {
@@ -702,96 +697,6 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       return;
     }
     this.#activateOverlayListeners();
-    this.#setupInfiniteScroll();
-  }
-
-  #disconnectInfiniteScroll() {
-    if (this.#scrollObserver) {
-      this.#scrollObserver.disconnect();
-      this.#scrollObserver = null;
-    }
-    if (this.#scrollListEl && this.#scrollFallbackHandler) {
-      this.#scrollListEl.removeEventListener(
-        "scroll",
-        this.#scrollFallbackHandler,
-      );
-    }
-    this.#scrollFallbackHandler = null;
-    this.#scrollListEl = null;
-  }
-
-  #setupInfiniteScroll() {
-    const wrap = this.#resultsEl;
-    if (!wrap || !wrap.classList.contains("is-open")) {
-      return;
-    }
-
-    const list = wrap.querySelector(".search-results-list");
-    if (!(list instanceof HTMLElement)) {
-      this.#disconnectInfiniteScroll();
-      return;
-    }
-
-    if (this.#scrollListEl !== list) {
-      this.#disconnectInfiniteScroll();
-      this.#scrollListEl = list;
-    }
-
-    const sentinel = list.querySelector(".search-result-load");
-    if (!(sentinel instanceof HTMLElement)) {
-      if (this.#scrollObserver) {
-        this.#scrollObserver.disconnect();
-        this.#scrollObserver = null;
-      }
-      return;
-    }
-
-    const triggerLoad = () => {
-      if (window.htmx) {
-        window.htmx.trigger(sentinel, "revealed");
-      }
-    };
-
-    if ("IntersectionObserver" in window) {
-      if (!this.#scrollObserver) {
-        this.#scrollObserver = new IntersectionObserver(
-          (entries) => {
-            for (const entry of entries) {
-              if (entry.isIntersecting) {
-                triggerLoad();
-              }
-            }
-          },
-          {
-            root: list,
-            rootMargin: "160px 0px",
-            threshold: 0,
-          },
-        );
-      } else {
-        this.#scrollObserver.disconnect();
-      }
-      this.#scrollObserver.observe(sentinel);
-      if (list.scrollHeight <= list.clientHeight + 2) {
-        triggerLoad();
-      }
-      return;
-    }
-
-    if (!this.#scrollFallbackHandler) {
-      this.#scrollFallbackHandler = () => {
-        const remaining = list.scrollHeight - list.scrollTop - list.clientHeight;
-        if (remaining <= 120) {
-          triggerLoad();
-        }
-      };
-      list.addEventListener("scroll", this.#scrollFallbackHandler, {
-        passive: true,
-      });
-      if (list.scrollHeight <= list.clientHeight + 2) {
-        triggerLoad();
-      }
-    }
   }
 
   #normalizeCandidateValue(entry) {

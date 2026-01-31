@@ -12,7 +12,7 @@
 {% if has_more %}
 <li class="search-result-load"
     hx-get="{{ url_for('search.search') }}?offset={{ next_offset }}"
-    hx-trigger="revealed"
+    hx-trigger="intersect once"
     hx-swap="outerHTML"
     hx-include="#search-form"
     hx-sync="this:replace"
