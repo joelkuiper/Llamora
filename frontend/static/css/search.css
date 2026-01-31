@@ -135,7 +135,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  max-height: min(55vh, 40rem);
+  max-height: min(48vh, 40rem);
   width: min(48rem, calc(100vw - 2 * var(--spacing-xl)));
   max-width: calc(100vw - 2 * var(--spacing-md));
   pointer-events: auto;
