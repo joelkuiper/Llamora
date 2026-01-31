@@ -772,6 +772,9 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
         this.#scrollObserver.disconnect();
       }
       this.#scrollObserver.observe(sentinel);
+      if (list.scrollHeight <= list.clientHeight + 2) {
+        triggerLoad();
+      }
       return;
     }
 
@@ -785,6 +788,9 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       list.addEventListener("scroll", this.#scrollFallbackHandler, {
         passive: true,
       });
+      if (list.scrollHeight <= list.clientHeight + 2) {
+        triggerLoad();
+      }
     }
   }
 

@@ -26,6 +26,7 @@ class SearchStreamSession:
     candidate_map: OrderedDict[str, dict] = field(default_factory=OrderedDict)
     delivered_ids: set[str] = field(default_factory=set)
     current_k2: int = 0
+    exhausted: bool = False
     last_access: float = field(default_factory=time.monotonic)
 
 
@@ -127,14 +128,17 @@ class SearchStreamManager:
         desired_k1 = max(int(cfg.k1), int(k1) if k1 is not None else 0, desired_k2)
 
         if desired_k2 > session.current_k2:
-            candidates = await self._vector_search.search_candidates(
+            candidates, total_count = await self._vector_search.search_candidates(
                 user_id,
                 dek,
                 normalized_query,
                 desired_k1,
                 desired_k2,
                 query_vec=session.query_vec,
+                include_count=True,
             )
+            if desired_k2 >= total_count:
+                session.exhausted = True
             for candidate in candidates:
                 message_id = candidate.get("id")
                 if not message_id:
@@ -180,9 +184,11 @@ class SearchStreamManager:
 
         showing_count = len(session.delivered_ids)
         has_more = (
-            len(session.candidate_map) >= desired_limit
+            not session.exhausted
+            and len(session.candidate_map) >= desired_limit
             and desired_limit < result_window
             and len(page_results) > 0
+            and len(page_results) >= page_limit
         )
         total_known = not has_more
 

@@ -61,7 +61,9 @@ class VectorSearchService:
         k1: int | None = None,
         k2: int | None = None,
         query_vec: "np.ndarray | None" = None,
-    ) -> List[dict]:
+        *,
+        include_count: bool = False,
+    ) -> List[dict] | tuple[List[dict], int]:
         cfg = self._config.progressive
         k1 = int(k1) if k1 is not None else cfg.k1
         k2 = int(k2) if k2 is not None else cfg.k2
@@ -69,6 +71,7 @@ class VectorSearchService:
             "Vector search requested by user %s with k1=%d k2=%d", user_id, k1, k2
         )
         index = await self.index_store.ensure_index(user_id, dek)
+        total_count = index.index.get_current_count()
         if query_vec is None:
             q_vec = (await async_embed_texts([query])).reshape(1, -1)
         else:
@@ -129,6 +132,8 @@ class VectorSearchService:
 
         results.sort(key=lambda r: r["cosine"], reverse=True)
         logger.debug("Vector search returning %d hydrated candidates", len(results))
+        if include_count:
+            return results, total_count
         return results
 
     async def append_message(
