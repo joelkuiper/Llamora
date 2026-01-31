@@ -560,6 +560,18 @@ function initCalendarPicker(calendar) {
     footerLabel.textContent = `Set to ${monthLabel} ${selectedYear}`.trim();
   };
 
+  const scrollOptionIntoView = (button) => {
+    if (!button || typeof button.scrollIntoView !== "function") return;
+    const prefersReduced =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    button.scrollIntoView({
+      block: "center",
+      inline: "nearest",
+      behavior: prefersReduced ? "auto" : "smooth",
+    });
+  };
+
   const updateHeaderAfterConfirm = () => {
     if (headerLabel) {
       const monthLabel = monthNameMap.get(selectedMonth) ?? "";
@@ -632,6 +644,13 @@ function initCalendarPicker(calendar) {
     refreshYears();
     refreshMonths();
     updateFooterText();
+    scrollOptionIntoView(target);
+    const activeMonth = monthButtons.find(
+      (button) => button.getAttribute("aria-pressed") === "true"
+    );
+    if (activeMonth) {
+      scrollOptionIntoView(activeMonth);
+    }
   };
 
   const handleMonthClick = (event) => {
@@ -643,6 +662,7 @@ function initCalendarPicker(calendar) {
     selectedMonth = clampValue(month, minAllowed, maxAllowed);
     refreshMonths();
     updateFooterText();
+    scrollOptionIntoView(target);
   };
 
   const confirmSelection = () => {
@@ -680,6 +700,18 @@ function initCalendarPicker(calendar) {
   refreshYears();
   refreshMonths();
   updateFooterText();
+  const activeYear = yearButtons.find(
+    (button) => button.getAttribute("aria-pressed") === "true"
+  );
+  const activeMonth = monthButtons.find(
+    (button) => button.getAttribute("aria-pressed") === "true"
+  );
+  if (activeYear) {
+    scrollOptionIntoView(activeYear);
+  }
+  if (activeMonth) {
+    scrollOptionIntoView(activeMonth);
+  }
 }
 
 function registerCalendarControl() {
