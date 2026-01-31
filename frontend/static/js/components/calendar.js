@@ -490,6 +490,15 @@ function clampValue(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
+const LABEL_FLASH_CLASS = "text-glow-flash";
+
+function triggerLabelFlash(node) {
+  if (!node) return;
+  node.classList.remove(LABEL_FLASH_CLASS);
+  void node.offsetWidth; // eslint-disable-line no-void
+  node.classList.add(LABEL_FLASH_CLASS);
+}
+
 function syncCalendarHeader(calendar) {
   const toggle = calendar.querySelector("[data-calendar-toggle]");
   if (!toggle) return;
@@ -532,6 +541,9 @@ function initCalendarPicker(calendar) {
   let selectedMonth = clampValue(toNumber(calendar.dataset.month, maxMonth), 1, 12);
 
   const footerLabel = footer.querySelector("[data-calendar-footer-text]");
+  const headerLabel = calendar.querySelector(".calendar-month-year span");
+  const prevBtn = calendar.querySelector(".cal-nav-btn.prev");
+  const nextBtn = calendar.querySelector(".cal-nav-btn.next");
   const monthNameMap = new Map();
   monthButtons.forEach((button) => {
     const month = Number(button.dataset.pickerMonth);
@@ -546,6 +558,38 @@ function initCalendarPicker(calendar) {
     if (!footerLabel) return;
     const monthLabel = monthNameMap.get(selectedMonth) ?? "";
     footerLabel.textContent = `Set to ${monthLabel} ${selectedYear}`.trim();
+  };
+
+  const updateHeaderAfterConfirm = () => {
+    if (headerLabel) {
+      const monthLabel = monthNameMap.get(selectedMonth) ?? "";
+      const nextText = `${monthLabel} ${selectedYear}`.trim();
+      if (headerLabel.textContent !== nextText) {
+        headerLabel.textContent = nextText;
+        triggerLabelFlash(calendar.querySelector(".calendar-month-year"));
+      }
+    }
+    calendar.dataset.year = String(selectedYear);
+    calendar.dataset.month = String(selectedMonth).padStart(2, "0");
+    calendar.dataset.calendarUrl = `/calendar/${selectedYear}/${selectedMonth}`;
+
+    const atMin = selectedYear === minYear && selectedMonth === minMonth;
+    const atMax = selectedYear === maxYear && selectedMonth === maxMonth;
+    const prevMonth = selectedMonth === 1 ? 12 : selectedMonth - 1;
+    const prevYear = selectedMonth === 1 ? selectedYear - 1 : selectedYear;
+    const nextMonth = selectedMonth === 12 ? 1 : selectedMonth + 1;
+    const nextYear = selectedMonth === 12 ? selectedYear + 1 : selectedYear;
+
+    if (prevBtn) {
+      prevBtn.disabled = atMin;
+      prevBtn.setAttribute("aria-disabled", atMin ? "true" : "false");
+      prevBtn.setAttribute("hx-get", `/calendar/${prevYear}/${prevMonth}`);
+    }
+    if (nextBtn) {
+      nextBtn.disabled = atMax;
+      nextBtn.setAttribute("aria-disabled", atMax ? "true" : "false");
+      nextBtn.setAttribute("hx-get", `/calendar/${nextYear}/${nextMonth}`);
+    }
   };
 
 
@@ -613,6 +657,7 @@ function initCalendarPicker(calendar) {
       select: ".calendar-swap",
       swap: "outerHTML swap:120ms settle:120ms",
     });
+    updateHeaderAfterConfirm();
   };
 
   yearButtons.forEach((button) => {

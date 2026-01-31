@@ -166,6 +166,8 @@
     }
 
     .calendar-month-year {
+      --calendar-label-rest-color: var(--color-text);
+      --calendar-label-highlight-color: var(--accent-hover);
       border: 1px solid transparent;
       background: transparent;
       color: inherit;
@@ -210,6 +212,10 @@
       &:active {
         transform: translateY(1px);
       }
+    }
+
+    .calendar-month-year.text-glow-flash {
+      animation: calTextGlow var(--cal-glow-dur) var(--cal-glow-ease);
     }
   }
 
