@@ -1,10 +1,16 @@
 {% from 'partials/overlay_close_button.html' import overlay_close_button %}
 {% set items = results|default([]) %}
 {% set query_present = has_query|default(false) %}
-{% set result_count = total_count|default(items|length) %}
 {% set total_known = total_known|default(true) %}
-{% set showing_count = showing_count|default(result_count) %}
+{% set showing_count = showing_count|default(items|length) %}
 {% set truncation_notice = truncation_notice|default('') %}
+{% if session_id is defined %}
+<input type="hidden"
+       id="search-session-id"
+       name="sid"
+       value="{{ session_id|default('') }}"
+       hx-swap-oob="true">
+{% endif %}
 <div class="search-results-status">
   {% if query_present %}
   <p class="visually-hidden" aria-live="polite" role="status" aria-atomic="true">

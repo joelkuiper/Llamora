@@ -26,6 +26,10 @@ from llamora.app.services.search_pipeline import (
 )
 from llamora.app.services.service_pulse import ServicePulse
 from llamora.app.services.tag_service import TagService
+from llamora.app.services.search_stream import (
+    SearchStreamManager,
+    SearchStreamResult,
+)
 from llamora.app.services.vector_search import VectorSearchService
 from llamora.settings import settings
 
@@ -73,6 +77,14 @@ class SearchAPI:
             reranker_component,
             "lexical_reranker",
             lexical_reranker,
+        )
+
+        self._stream_manager = SearchStreamManager(
+            vector_search=self.vector_search,
+            pipeline_components=components,
+            config=self.config,
+            stream_ttl=float(getattr(settings.SEARCH, "stream_ttl", 900)),
+            stream_max_sessions=int(getattr(settings.SEARCH, "stream_max_sessions", 200)),
         )
 
         self._emit_config_diagnostics()
@@ -227,6 +239,32 @@ class SearchAPI:
     async def maintenance_tick(self) -> None:
         await self.vector_search.maintenance_tick()
 
+    async def search_stream(
+        self,
+        user_id: str,
+        dek: bytes,
+        query: str,
+        *,
+        session_id: str | None,
+        offset: int,
+        page_limit: int,
+        result_window: int,
+        k1: int | None = None,
+        k2: int | None = None,
+    ) -> SearchStreamResult:
+        """Incrementally fetch search results without computing the full window."""
+
+        return await self._stream_manager.fetch_page(
+            user_id=user_id,
+            dek=dek,
+            query=query,
+            session_id=session_id,
+            offset=offset,
+            page_limit=page_limit,
+            result_window=result_window,
+            k1=k1,
+            k2=k2,
+        )
     def _build_pipeline_components(
         self,
         lexical_reranker: LexicalReranker,

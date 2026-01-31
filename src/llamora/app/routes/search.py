@@ -73,30 +73,37 @@ async def search():
     logger.debug("Route search raw query='%s'", context.query)
     offset = _parse_offset(request.args.get("offset", 0))
     page_limit = context.page_size if offset > 0 else context.initial_page_size
-    desired_limit = min(context.result_window, offset + page_limit)
+    session_id = request.args.get("sid") or ""
     results: list = []
     truncation_notice: str | None = None
     sanitized_query = ""
     has_more = False
     next_offset = 0
-    total_count = 0
     total_known = False
+    showing_count = 0
+    returned_session_id: str | None = None
 
     if context.query:
         _, user, dek = await require_user_and_dek()
 
         try:
             search_api = get_search_api()
-            cfg = search_api.search_config.progressive
-            desired_k2 = max(int(cfg.k2), desired_limit)
-            desired_k1 = max(int(cfg.k1), desired_k2)
-            sanitized_query, results, truncated = await search_api.search(
+            stream_result = await search_api.search_stream(
                 user["id"],
                 dek,
                 context.query,
-                k1=desired_k1,
-                k2=desired_k2,
+                session_id=session_id or None,
+                offset=offset,
+                page_limit=page_limit,
+                result_window=context.result_window,
             )
+            returned_session_id = stream_result.session_id
+            sanitized_query = stream_result.normalized_query
+            results = stream_result.results
+            truncated = stream_result.truncated
+            has_more = stream_result.has_more
+            showing_count = stream_result.showing_count
+            total_known = stream_result.total_known
         except InvalidSearchQuery:
             logger.info("Discarding invalid search query for user %s", user["id"])
             sanitized_query = ""
@@ -114,17 +121,13 @@ async def search():
                 f"{context.max_query_length} characters."
             )
 
-    total_count = len(results)
-    page_results = results[offset : offset + page_limit]
+    page_results = results
     next_offset = offset + len(page_results)
-    has_more = total_count >= desired_limit and desired_limit < context.result_window
-    total_known = not has_more
 
     logger.debug(
-        "Route returning %d results (offset=%d, total=%d, has_more=%s)",
+        "Route returning %d results (offset=%d, has_more=%s)",
         len(page_results),
         offset,
-        total_count,
         has_more,
     )
 
@@ -136,6 +139,7 @@ async def search():
             results=page_results,
             has_more=has_more,
             next_offset=next_offset,
+            session_id=returned_session_id,
         )
 
     return await render_template(
@@ -143,11 +147,11 @@ async def search():
         results=page_results,
         has_query=bool(sanitized_query),
         truncation_notice=truncation_notice,
-        total_count=total_count,
         total_known=total_known,
-        showing_count=next_offset,
+        showing_count=showing_count or next_offset,
         has_more=has_more,
         next_offset=next_offset,
+        session_id=returned_session_id,
     )
 
 

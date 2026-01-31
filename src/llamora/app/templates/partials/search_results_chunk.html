@@ -1,4 +1,11 @@
 {% set items = results|default([]) %}
+{% if session_id is defined %}
+<input type="hidden"
+       id="search-session-id"
+       name="sid"
+       value="{{ session_id|default('') }}"
+       hx-swap-oob="true">
+{% endif %}
 {% for item in items %}
 {% include 'partials/search_result_item.html' %}
 {% endfor %}

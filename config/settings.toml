@@ -33,6 +33,8 @@ message_index_max_elements = 100000
 page_size = 5
 initial_page_size = 15
 result_window = 100
+stream_ttl = 900
+stream_max_sessions = 200
 
 [default.SEARCH.progressive]
 k1 = 128
