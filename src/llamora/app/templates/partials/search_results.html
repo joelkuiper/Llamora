@@ -1,7 +1,7 @@
 {% from 'partials/overlay_close_button.html' import overlay_close_button %}
 {% set items = results|default([]) %}
 {% set query_present = has_query|default(false) %}
-{% set result_count = items|length %}
+{% set result_count = total_count|default(items|length) %}
 {% set truncation_notice = truncation_notice|default('') %}
 <div class="search-results-status">
   {% if query_present %}
@@ -19,9 +19,7 @@
   {% if items %}
   <div class="sr-panel glass-panel search-results-overlay">
     <ul class="search-results-list" role="listbox">
-      {% for item in items %}
-      {% include 'partials/search_result_item.html' %}
-      {% endfor %}
+      {% include 'partials/search_results_chunk.html' %}
     </ul>
     {{ overlay_close_button() }}
   </div>
