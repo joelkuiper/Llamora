@@ -73,12 +73,14 @@ async def search():
     logger.debug("Route search raw query='%s'", context.query)
     offset = _parse_offset(request.args.get("offset", 0))
     page_limit = context.page_size if offset > 0 else context.initial_page_size
+    desired_limit = min(context.result_window, offset + page_limit)
     results: list = []
     truncation_notice: str | None = None
     sanitized_query = ""
     has_more = False
     next_offset = 0
     total_count = 0
+    total_known = False
 
     if context.query:
         _, user, dek = await require_user_and_dek()
@@ -86,11 +88,7 @@ async def search():
         try:
             search_api = get_search_api()
             cfg = search_api.search_config.progressive
-            desired_k2 = max(
-                int(cfg.k2),
-                context.result_window,
-                page_limit + offset,
-            )
+            desired_k2 = max(int(cfg.k2), desired_limit)
             desired_k1 = max(int(cfg.k1), desired_k2)
             sanitized_query, results, truncated = await search_api.search(
                 user["id"],
@@ -119,7 +117,8 @@ async def search():
     total_count = len(results)
     page_results = results[offset : offset + page_limit]
     next_offset = offset + len(page_results)
-    has_more = next_offset < total_count
+    has_more = total_count >= desired_limit and desired_limit < context.result_window
+    total_known = not has_more
 
     logger.debug(
         "Route returning %d results (offset=%d, total=%d, has_more=%s)",
@@ -145,6 +144,8 @@ async def search():
         has_query=bool(sanitized_query),
         truncation_notice=truncation_notice,
         total_count=total_count,
+        total_known=total_known,
+        showing_count=next_offset,
         has_more=has_more,
         next_offset=next_offset,
     )

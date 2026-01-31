@@ -2,12 +2,14 @@
 {% set items = results|default([]) %}
 {% set query_present = has_query|default(false) %}
 {% set result_count = total_count|default(items|length) %}
+{% set total_known = total_known|default(true) %}
+{% set showing_count = showing_count|default(result_count) %}
 {% set truncation_notice = truncation_notice|default('') %}
 <div class="search-results-status">
   {% if query_present %}
   <p class="visually-hidden" aria-live="polite" role="status" aria-atomic="true">
     {%- if items -%}
-    {{ result_count }} search result{%- if result_count != 1 %}s{% endif %} available.
+    Showing {{ showing_count }} search result{%- if showing_count != 1 %}s{% endif %}{% if not total_known %}+{% endif %}.
     {%- else -%}
     No matches found.
     {%- endif -%}
