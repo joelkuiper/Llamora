@@ -11,6 +11,7 @@ from ulid import ULID
 from llamora.app.embed.model import async_embed_texts
 from llamora.app.services.search_config import SearchConfig
 from llamora.app.services.search_pipeline import SearchPipelineComponents
+from llamora.app.services.tag_service import TagService
 from llamora.app.services.vector_search import VectorSearchService
 
 logger = logging.getLogger(__name__)
@@ -52,12 +53,14 @@ class SearchStreamManager:
         config: SearchConfig,
         stream_ttl: float,
         stream_max_sessions: int,
+        tag_service: TagService,
     ) -> None:
         self._vector_search = vector_search
         self._components = pipeline_components
         self._config = config
         self._stream_ttl = stream_ttl
         self._stream_max_sessions = stream_max_sessions
+        self._tag_service = tag_service
         self._sessions: dict[str, SearchStreamSession] = {}
 
     def _prune(self) -> None:
@@ -181,6 +184,14 @@ class SearchStreamManager:
             session.delivered_ids.add(item["id"])
             if len(page_results) >= page_limit:
                 break
+
+        if page_results:
+            await self._tag_service.hydrate_search_results(
+                user_id,
+                dek,
+                page_results,
+                enrichment.tokens,
+            )
 
         showing_count = len(session.delivered_ids)
         has_more = (

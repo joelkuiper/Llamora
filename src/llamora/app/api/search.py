@@ -85,6 +85,7 @@ class SearchAPI:
             config=self.config,
             stream_ttl=float(getattr(settings.SEARCH, "stream_ttl", 900)),
             stream_max_sessions=int(getattr(settings.SEARCH, "stream_max_sessions", 200)),
+            tag_service=self._tag_service,
         )
 
         self._emit_config_diagnostics()
