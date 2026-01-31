@@ -3,10 +3,11 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from quart import Blueprint, Request, jsonify, render_template, request
+from quart import Blueprint, Request, jsonify, render_template, request, stream_with_context
 from llamora.app.api.search import InvalidSearchQuery
 from llamora.app.services.container import get_search_api, get_services
 from llamora.app.services.auth_helpers import login_required
+from llamora.app.services.chat_helpers import StreamSession, format_sse_event
 from llamora.settings import settings
 from llamora.app.util.frecency import (
     resolve_frecency_lambda,
@@ -139,7 +140,7 @@ async def search():
         if not page_results:
             return ""
         return await render_template(
-            "partials/search_results_chunk.html",
+            "partials/search_results_stream_chunk.html",
             results=page_results,
             has_more=has_more,
             next_offset=next_offset,
@@ -157,6 +158,118 @@ async def search():
         next_offset=next_offset,
         session_id=returned_session_id,
     )
+
+
+def _format_sse_html(event_type: str, payload: str) -> str:
+    text = (payload or "").replace("\r\n", "\n").replace("\r", "\n")
+    lines = text.split("\n")
+    data = "\n".join(f"data: {line}" for line in lines)
+    return f"event: {event_type}\n{data}\n\n"
+
+
+@search_bp.get("/search/stream")
+@login_required
+async def search_stream():
+    context = resolve_search_context(request)
+    query = context.query
+    if not query:
+        async def _empty():
+            yield _format_sse_html("initial", "")
+            yield format_sse_event("done", {"showing": 0, "total_known": True})
+        return StreamSession(stream_with_context(_empty)())
+
+    _, user, dek = await require_user_and_dek()
+    search_api = get_search_api()
+    logger.debug("Search stream start user=%s query=%r", user["id"], query)
+
+    async def _body():
+        offset = 0
+        page_limit = context.initial_page_size
+        session_id: str | None = None
+        truncation_notice: str | None = None
+
+        try:
+            while True:
+                result = await search_api.search_stream(
+                    user["id"],
+                    dek,
+                    query,
+                    session_id=session_id,
+                    offset=offset,
+                    page_limit=page_limit,
+                    result_window=context.result_window,
+                )
+                session_id = result.session_id
+                if result.truncated and not truncation_notice:
+                    truncation_notice = (
+                        "Your search was truncated to the first "
+                        f"{context.max_query_length} characters."
+                    )
+
+                if offset == 0 and result.normalized_query:
+                    await get_services().db.search_history.record_search(
+                        user["id"], result.normalized_query, dek
+                    )
+
+                if offset == 0:
+                    html = await render_template(
+                        "partials/search_results.html",
+                        results=result.results,
+                        has_query=bool(result.normalized_query),
+                        truncation_notice=truncation_notice,
+                        total_known=result.total_known,
+                        showing_count=result.showing_count,
+                    )
+                    logger.debug(
+                        "Search stream initial chunk user=%s items=%d has_more=%s",
+                        user["id"],
+                        len(result.results),
+                        result.has_more,
+                    )
+                    yield _format_sse_html("initial", html)
+                else:
+                    if result.results:
+                        html = await render_template(
+                            "partials/search_results_stream_chunk.html",
+                            results=result.results,
+                        )
+                        logger.debug(
+                            "Search stream chunk user=%s offset=%d items=%d has_more=%s",
+                            user["id"],
+                            offset,
+                            len(result.results),
+                            result.has_more,
+                        )
+                        yield _format_sse_html("chunk", html)
+
+                if not result.has_more or not result.results:
+                    break
+
+                offset += len(result.results)
+                page_limit = context.page_size
+
+        except InvalidSearchQuery:
+            yield format_sse_event("error", "Invalid search query.")
+            yield format_sse_event("done", {"showing": 0, "total_known": True})
+            return
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.exception("Search stream failed")
+            yield format_sse_event("error", str(exc))
+            yield format_sse_event("done", {"showing": 0, "total_known": True})
+            return
+
+        logger.debug(
+            "Search stream done user=%s showing=%d total_known=%s",
+            user["id"],
+            result.showing_count,
+            result.total_known,
+        )
+        yield format_sse_event(
+            "done",
+            {"showing": result.showing_count, "total_known": result.total_known},
+        )
+
+    return StreamSession(stream_with_context(_body)())
 
 
 @search_bp.get("/search/recent")

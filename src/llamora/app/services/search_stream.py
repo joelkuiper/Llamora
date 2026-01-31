@@ -192,6 +192,19 @@ class SearchStreamManager:
         )
         total_known = not has_more
 
+        logger.debug(
+            "Search stream page: sid=%s offset=%d page_limit=%d desired_limit=%d "
+            "candidates=%d page_results=%d exhausted=%s has_more=%s",
+            session.session_id,
+            offset,
+            page_limit,
+            desired_limit,
+            len(session.candidate_map),
+            len(page_results),
+            session.exhausted,
+            has_more,
+        )
+
         return SearchStreamResult(
             session_id=session.session_id,
             normalized_query=normalized_query,
