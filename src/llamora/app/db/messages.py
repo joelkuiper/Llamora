@@ -431,6 +431,21 @@ class MessagesRepository(BaseRepository):
             rows = await cursor.fetchall()
         return [row["day"] for row in rows]
 
+    async def get_first_message_date(self, user_id: str) -> str | None:
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                """
+                SELECT MIN(created_date) AS first_date
+                FROM messages
+                WHERE user_id = ? AND created_date IS NOT NULL
+                """,
+                (user_id,),
+            )
+            row = await cursor.fetchone()
+        if not row:
+            return None
+        return row["first_date"] or None
+
     async def user_has_messages(self, user_id: str) -> bool:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(

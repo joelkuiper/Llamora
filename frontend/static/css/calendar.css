@@ -123,6 +123,11 @@
   font-size: 0.7rem;
 }
 
+.cal-nav-btn:disabled {
+  opacity: .35;
+  pointer-events: none;
+}
+
 #calendar {
   position: relative;
   z-index: 6100;
@@ -143,14 +148,74 @@
     gap: .5rem;
     margin-bottom: .5rem;
 
-    h2 {
+    h2, .calendar-header {
       margin: 0;
       font-weight: 700;
       letter-spacing: .2px;
       font-size: 1rem;
       text-align: center;
       flex: 1;
+      display: flex;
+      justify-content: center;
     }
+
+    .calendar-header {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+    }
+
+    .calendar-month-year {
+      border: 1px solid transparent;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      padding: .2rem .5rem;
+      border-radius: var(--radius-sm);
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      cursor: pointer;
+      transition:
+        background var(--motion-gentle),
+        color var(--motion-tight),
+        border-color var(--motion-tight),
+        box-shadow var(--motion-tight),
+        transform var(--motion-snap);
+
+      &::after {
+        content: "";
+        width: .4rem;
+        height: .4rem;
+        border-right: 1.5px solid currentColor;
+        border-bottom: 1.5px solid currentColor;
+        transform: rotate(45deg);
+        margin-left: .25rem;
+        opacity: .5;
+      }
+
+      &:hover {
+        background: var(--accent-05);
+        border-color: var(--accent-15);
+        color: var(--accent);
+        box-shadow: 0 0 0 2px var(--accent-10);
+      }
+
+      &:focus-visible {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-20);
+      }
+
+      &:active {
+        transform: translateY(1px);
+      }
+    }
+  }
+
+  .calendar-grid-view {
+    opacity: 1;
+    transform: translateY(0);
   }
 
   .calendar-today {
@@ -294,6 +359,187 @@
       &:hover { opacity: 1 !important; }
     }
   }
+
+  .calendar-picker {
+    margin-top: 0.75rem;
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .calendar-picker-columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .calendar-picker-column {
+    border-radius: var(--radius-md);
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0.2rem 0;
+    min-height: 11.5rem;
+    height: 11.5rem;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .calendar-picker-scroll {
+    flex: 1;
+    overflow-y: auto;
+    scroll-snap-type: y proximity;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding-inline: 0.1rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .calendar-picker-option {
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--color-text);
+    font: inherit;
+    font-size: 0.88rem;
+    padding: 0.3rem 0.5rem;
+    text-align: center;
+    transition:
+      border-color var(--motion-tight),
+      color var(--motion-tight),
+      background var(--motion-tight);
+    scroll-snap-align: center;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .calendar-picker-option:not(.is-selected):not(.is-disabled):hover {
+    background: var(--accent-05);
+    border-color: transparent;
+  }
+
+  .calendar-picker-option:focus-visible {
+    outline: none;
+    border-color: transparent;
+    box-shadow: 0 0 0 2px var(--accent-15);
+  }
+
+  .calendar-picker-option.is-selected {
+    color: var(--accent-hover);
+    border-color: transparent;
+    font-weight: 600;
+    background: var(--accent-05);
+  }
+
+  .calendar-picker-option.is-disabled {
+    color: var(--color-text-muted);
+    opacity: .45;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  .calendar-picker-option.calendar-picker-month {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .calendar-picker-confirm {
+    width: 100%;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    font-size: .9rem;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid var(--border);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.35);
+    transition:
+      background var(--motion-gentle),
+      border-color var(--motion-gentle),
+      box-shadow var(--motion-gentle),
+      transform var(--motion-press);
+
+    &:hover {
+      border-color: var(--accent-15);
+      background: var(--accent-05);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px var(--accent-20);
+    }
+  }
+
+  .calendar-picker-footer {
+    margin-top: 0.35rem;
+    border-radius: calc(var(--radius-lg));
+    background: var(--glass-bg);
+    border: 1px solid transparent;
+    padding: 0.6rem 0.8rem;
+    text-align: center;
+    font-size: 0.82rem;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition:
+      opacity var(--motion-tight),
+      background var(--motion-tight),
+      border-color var(--motion-tight),
+      color var(--motion-tight),
+      transform var(--motion-tight);
+    user-select: none;
+  }
+
+  .calendar-picker-footer:hover {
+    background: var(--accent-05);
+    border-color: var(--accent-20);
+    color: var(--color-text);
+    box-shadow: 0 0 0 2px var(--accent-10);
+    opacity: 0.98;
+  }
+
+  .calendar-picker-footer:focus-visible {
+    outline: none;
+    background: var(--accent-05);
+    border-color: var(--accent-30);
+    box-shadow: 0 0 0 3px var(--accent-20);
+    color: var(--color-text);
+  }
+
+  .calendar-picker-footer:active {
+    background: var(--accent-10);
+    border-color: var(--accent-30);
+    box-shadow: 0 0 0 2px var(--accent-10);
+    transform: translateY(1px);
+  }
+}
+
+#calendar[data-calendar-mode="picker"] .calendar-month-year,
+.calendar-month-year[aria-expanded="true"] {
+  color: var(--accent-hover);
+  background: var(--accent-15);
+  border-color: var(--accent-30);
+  box-shadow: 0 0 0 2px var(--accent-10);
+  font-weight: 600;
+}
+
+#calendar[data-calendar-mode="picker"] .calendar-month-year::after,
+.calendar-month-year[aria-expanded="true"]::after {
+  transform: rotate(-135deg);
+  opacity: 1;
+}
+
+#calendar[data-calendar-mode="picker"] .cal-nav-btn {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+#calendar[data-calendar-mode="picker"] .cal-nav-btn {
+  opacity: .35;
+  pointer-events: none;
 }
 
 #calendar.pop-enter,

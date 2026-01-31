@@ -48,10 +48,11 @@
         <polyline points="9 18 15 12 9 6"></polyline>
       </svg>
     </button>
-    <div id="calendar-popover" class="calendar-popover" role="tooltip" hidden
-         hx-get="{{ url_for('days.calendar_view') }}"
-         hx-trigger="calendar-popover:show"
-         hx-swap="innerHTML"></div>
+    <div id="calendar-popover"
+         class="calendar-popover"
+         role="tooltip"
+         hidden
+         data-calendar-url="{{ url_for('days.calendar_view') }}"></div>
   </calendar-control>
 
   <div class="header-right">

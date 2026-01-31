@@ -9,14 +9,36 @@ from llamora.app.services.container import get_services
 from llamora.app.services.time import local_date
 
 
-def _nav_months(year: int, month: int) -> tuple[int, int, int, int]:
-    """Return previous and next month navigation metadata."""
+def _offset_month(year: int, month: int, delta: int) -> tuple[int, int]:
+    total = (year * 12 + month - 1) + delta
+    new_year = total // 12
+    new_month = total % 12 + 1
+    return new_year, new_month
 
-    prev_month = month - 1 or 12
-    prev_year = year - 1 if month == 1 else year
-    next_month = month + 1 if month < 12 else 1
-    next_year = year + 1 if month == 12 else year
+
+def _nav_months(
+    year: int,
+    month: int,
+    min_month: date,
+    max_month: date,
+) -> tuple[int, int, int, int]:
+    """Return previous/next months clamped to the allowed range."""
+
+    prev_year, prev_month = _offset_month(year, month, -1)
+    next_year, next_month = _offset_month(year, month, 1)
+    prev_date = date(prev_year, prev_month, 1)
+    next_date = date(next_year, next_month, 1)
+
+    if prev_date < min_month:
+        prev_year, prev_month = min_month.year, min_month.month
+    if next_date > max_month:
+        next_year, next_month = max_month.year, max_month.month
+
     return prev_year, prev_month, next_year, next_month
+
+
+def _clamp(value: int, minimum: int, maximum: int) -> int:
+    return max(minimum, min(value, maximum))
 
 
 async def get_month_context(
@@ -41,18 +63,76 @@ async def get_month_context(
 
     services = get_services()
     state = await services.db.users.get_state(user_id)
-    active_days = await services.db.messages.get_days_with_messages(
-        user_id, year, month
-    )
-    prev_year, prev_month, next_year, next_month = _nav_months(year, month)
+    min_date_iso = await services.db.messages.get_first_message_date(user_id)
+    if min_date_iso:
+        min_date_obj = date.fromisoformat(min_date_iso)
+    else:
+        min_date_obj = today_date
 
+    min_month_start = date(min_date_obj.year, min_date_obj.month, 1)
+    max_month_start = date(today_date.year, today_date.month, 1)
+
+    try:
+        requested_month = date(year, month, 1)
+    except ValueError:
+        requested_month = max_month_start
+
+    if requested_month < min_month_start:
+        requested_month = min_month_start
+    if requested_month > max_month_start:
+        requested_month = max_month_start
+
+    selected_year = requested_month.year
+    selected_month = requested_month.month
+
+    stored_active_iso = state.get("active_date")
+    active_candidate = today_date
+    if stored_active_iso:
+        try:
+            active_candidate = date.fromisoformat(stored_active_iso)
+        except ValueError:
+            active_candidate = today_date
+
+    if active_candidate < min_date_obj:
+        active_candidate = min_date_obj
+    if active_candidate > today_date:
+        active_candidate = today_date
+
+    month_days = _calendar.monthrange(selected_year, selected_month)[1]
+    month_min_day = (
+        min_date_obj.day if selected_year == min_date_obj.year and selected_month == min_date_obj.month else 1
+    )
+    month_max_day = month_days
+    if selected_year == today_date.year and selected_month == today_date.month:
+        month_max_day = min(month_max_day, today_date.day)
+    desired_day = active_candidate.day
+    clamped_day = _clamp(desired_day, month_min_day, month_max_day)
+    active_day_iso = date(selected_year, selected_month, clamped_day).isoformat()
+    active_days = await services.db.messages.get_days_with_messages(
+        user_id, selected_year, selected_month
+    )
+    prev_year, prev_month, next_year, next_month = _nav_months(
+        selected_year, selected_month, min_month_start, max_month_start
+    )
+
+    month_names = [name for name in _calendar.month_name[1:]]
     return {
-        "year": year,
-        "month": month,
-        "month_name": _calendar.month_name[month],
-        "weeks": _calendar.Calendar().monthdayscalendar(year, month),
-        "active_day": state.get("active_date", today_iso),
+        "year": selected_year,
+        "month": selected_month,
+        "month_name": _calendar.month_name[selected_month],
+        "weeks": _calendar.Calendar().monthdayscalendar(
+            selected_year, selected_month
+        ),
+        "active_day": active_day_iso,
         "today": today_iso,
+        "today_year": today_date.year,
+        "today_month": today_date.month,
+        "today_day": today_date.day,
+        "min_date": min_date_obj.isoformat(),
+        "min_year": min_date_obj.year,
+        "min_month": min_date_obj.month,
+        "min_day": min_date_obj.day,
+        "month_names": month_names,
         "active_days": active_days,
         "prev_year": prev_year,
         "prev_month": prev_month,

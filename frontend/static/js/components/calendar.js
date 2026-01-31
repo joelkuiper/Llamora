@@ -1,57 +1,5 @@
 import { createPopover } from "../popover.js";
 
-const CALENDAR_STORAGE_KEY = "calendar:last-view";
-
-const calendarStorage = (() => {
-  try {
-    if (typeof window === "undefined" || !window.sessionStorage) {
-      return null;
-    }
-    const probe = "__calendar__";
-    window.sessionStorage.setItem(probe, probe);
-    window.sessionStorage.removeItem(probe);
-    return window.sessionStorage;
-  } catch (err) {
-    return null;
-  }
-})();
-
-function readStoredCalendar() {
-  if (!calendarStorage) return null;
-  try {
-    const raw = calendarStorage.getItem(CALENDAR_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return null;
-    const year = Number(parsed.year);
-    const month = Number(parsed.month);
-    if (!Number.isInteger(year)) return null;
-    if (!Number.isInteger(month)) return null;
-    if (month < 1 || month > 12) return null;
-    return { year, month };
-  } catch (err) {
-    return null;
-  }
-}
-
-function writeStoredCalendar(value) {
-  if (!calendarStorage) return;
-  try {
-    calendarStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify(value));
-  } catch (err) {
-    /* no-op */
-  }
-}
-
-function clearStoredCalendar() {
-  if (!calendarStorage) return;
-  try {
-    calendarStorage.removeItem(CALENDAR_STORAGE_KEY);
-  } catch (err) {
-    /* no-op */
-  }
-}
-
 export class CalendarControl extends HTMLElement {
   #state = null;
   #btn = null;
@@ -146,7 +94,22 @@ export class CalendarControl extends HTMLElement {
   #setupCalendar(btn, pop) {
     const controller = new AbortController();
     const { signal } = controller;
-    const defaultUrl = pop.getAttribute("hx-get");
+    const calendarUrl =
+      pop.dataset.calendarUrl || pop.getAttribute("hx-get") || null;
+
+    const loadCalendarContent = (params = {}) => {
+      if (!calendarUrl) return;
+      const target = new URL(calendarUrl, window.location.origin);
+      Object.entries(params).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
+        target.searchParams.set(key, value);
+      });
+      pop.innerHTML = "";
+      htmx.ajax("GET", target.toString(), {
+        target: pop,
+        swap: "innerHTML",
+      });
+    };
 
     const popover = createPopover(btn, pop, {
       getPanel: () => pop.querySelector("#calendar"),
@@ -177,16 +140,8 @@ export class CalendarControl extends HTMLElement {
           popover.hide();
           return;
         }
-        const stored = readStoredCalendar();
-        if (stored) {
-          pop.setAttribute("hx-vals", JSON.stringify(stored));
-        } else {
-          pop.removeAttribute("hx-vals");
-        }
-        if (defaultUrl) {
-          pop.setAttribute("hx-get", defaultUrl);
-        }
         popover.show();
+        loadCalendarContent();
       },
       { signal }
     );
@@ -198,32 +153,6 @@ export class CalendarControl extends HTMLElement {
           event.preventDefault();
           popover.hide();
           return;
-        }
-
-        const todayBtn = event.target.closest(".today-btn");
-        if (todayBtn) {
-          const dateValue = todayBtn.getAttribute("data-date");
-          if (typeof dateValue === "string") {
-            const [yearStr, monthStr] = dateValue.split("-");
-            const yearNum = Number(yearStr);
-            const monthNum = Number(monthStr);
-            if (
-              Number.isInteger(yearNum) &&
-              Number.isInteger(monthNum) &&
-              monthNum >= 1 &&
-              monthNum <= 12
-            ) {
-              const payload = { year: yearNum, month: monthNum };
-              writeStoredCalendar(payload);
-              pop.setAttribute("hx-vals", JSON.stringify(payload));
-            } else {
-              clearStoredCalendar();
-              pop.removeAttribute("hx-vals");
-            }
-          } else {
-            clearStoredCalendar();
-            pop.removeAttribute("hx-vals");
-          }
         }
 
         if (event.target.closest(".calendar-table a, .today-btn")) {
@@ -243,27 +172,18 @@ export class CalendarControl extends HTMLElement {
         }
         const calendar = pop.querySelector("#calendar");
         if (!calendar) return;
-        const { year, month } = calendar.dataset;
-        const monthNum = Number(month);
-        const yearNum = Number(year);
-        if (
-          Number.isInteger(yearNum) &&
-          Number.isInteger(monthNum) &&
-          monthNum >= 1 &&
-          monthNum <= 12
-        ) {
-          const payload = { year: yearNum, month: monthNum };
-          writeStoredCalendar(payload);
-          pop.setAttribute("hx-vals", JSON.stringify(payload));
-        }
+        calendar.dataset.calendarMode = "calendar";
         this.#configureCalendarGrid(calendar, popover, pop, signal);
+        initCalendarPicker(calendar);
       },
       { signal }
     );
 
     const initialCalendar = pop.querySelector("#calendar");
     if (initialCalendar) {
+      initialCalendar.dataset.calendarMode = "calendar";
       this.#configureCalendarGrid(initialCalendar, popover, pop, signal);
+      initCalendarPicker(initialCalendar);
     }
 
     const dispose = () => {
@@ -544,6 +464,141 @@ export class CalendarControl extends HTMLElement {
     }
     return focusables;
   }
+}
+
+function clampValue(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function initCalendarPicker(calendar) {
+  if (!calendar) return;
+  const picker = calendar.querySelector("#calendar-picker");
+  const footer = calendar.querySelector("[data-calendar-footer]");
+  if (!picker || !footer) {
+    return;
+  }
+
+  const yearButtons = Array.from(picker.querySelectorAll("[data-picker-year]"));
+  const monthButtons = Array.from(picker.querySelectorAll("[data-picker-month]"));
+  if (!yearButtons.length || !monthButtons.length) {
+    return;
+  }
+
+  const toNumber = (value, fallback) => {
+    const parsed = Number(value);
+    return Number.isInteger(parsed) ? parsed : fallback;
+  };
+
+  const minYear = toNumber(calendar.dataset.minYear, 1900);
+  const minMonth = clampValue(toNumber(calendar.dataset.minMonth, 1), 1, 12);
+  const maxYear = toNumber(calendar.dataset.todayYear, minYear);
+  const maxMonth = clampValue(toNumber(calendar.dataset.todayMonth, 12), 1, 12);
+
+  let selectedYear = clampValue(toNumber(calendar.dataset.year, maxYear), minYear, maxYear);
+  let selectedMonth = clampValue(toNumber(calendar.dataset.month, maxMonth), 1, 12);
+
+  const footerLabel = footer.querySelector("[data-calendar-footer-text]");
+  const monthNameMap = new Map();
+  monthButtons.forEach((button) => {
+    const month = Number(button.dataset.pickerMonth);
+    if (!Number.isInteger(month)) return;
+    const label = button.textContent?.trim() ?? "";
+    if (label) {
+      monthNameMap.set(month, label);
+    }
+  });
+
+  const updateFooterText = () => {
+    if (!footerLabel) return;
+    const monthLabel = monthNameMap.get(selectedMonth) ?? "";
+    footerLabel.textContent = `Set to ${monthLabel} ${selectedYear}`.trim();
+  };
+
+
+  const getMonthBounds = () => {
+    const minAllowed = selectedYear === minYear ? minMonth : 1;
+    const maxAllowed = selectedYear === maxYear ? maxMonth : 12;
+    return { minAllowed, maxAllowed };
+  };
+
+  const refreshMonths = () => {
+    const { minAllowed, maxAllowed } = getMonthBounds();
+    selectedMonth = clampValue(selectedMonth, minAllowed, maxAllowed);
+    monthButtons.forEach((button) => {
+      const month = Number(button.dataset.pickerMonth);
+      const disabled = month < minAllowed || month > maxAllowed;
+      button.disabled = disabled;
+      button.classList.toggle("is-disabled", disabled);
+      const active = month === selectedMonth;
+      button.classList.toggle("is-selected", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+  };
+
+  const refreshYears = () => {
+    yearButtons.forEach((button) => {
+      const year = Number(button.dataset.pickerYear);
+      const active = year === selectedYear;
+      button.classList.toggle("is-selected", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+  };
+
+  const handleYearClick = (event) => {
+    const target = event.currentTarget;
+    if (!target) return;
+    const year = Number(target.dataset.pickerYear);
+    if (!Number.isInteger(year)) return;
+    selectedYear = clampValue(year, minYear, maxYear);
+    refreshYears();
+    refreshMonths();
+    updateFooterText();
+  };
+
+  const handleMonthClick = (event) => {
+    const target = event.currentTarget;
+    if (!target || target.disabled) return;
+    const month = Number(target.dataset.pickerMonth);
+    if (!Number.isInteger(month)) return;
+    const { minAllowed, maxAllowed } = getMonthBounds();
+    selectedMonth = clampValue(month, minAllowed, maxAllowed);
+    refreshMonths();
+    updateFooterText();
+  };
+
+  const confirmSelection = () => {
+    const baseUrl = calendar.dataset.calendarUrl;
+    if (!baseUrl) return;
+    const url = new URL(baseUrl, window.location.origin);
+    url.searchParams.set("year", String(selectedYear));
+    url.searchParams.set("month", String(selectedMonth));
+    url.searchParams.set("mode", "calendar");
+    htmx.ajax("GET", url.toString(), {
+      target: "#calendar",
+      swap: "outerHTML",
+    });
+  };
+
+  yearButtons.forEach((button) => {
+    button.addEventListener("click", handleYearClick);
+  });
+  monthButtons.forEach((button) => {
+    button.addEventListener("click", handleMonthClick);
+  });
+  const handleFooterAction = (event) => {
+    if (event) event.preventDefault();
+    confirmSelection();
+  };
+  footer.addEventListener("click", handleFooterAction);
+  footer.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") {
+      handleFooterAction(event);
+    }
+  });
+
+  refreshYears();
+  refreshMonths();
+  updateFooterText();
 }
 
 function registerCalendarControl() {

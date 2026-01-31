@@ -45,10 +45,11 @@ async def _render_day(date: str, target: str | None, view_kind: str):
     return resp
 
 
-async def _render_calendar(year: int, month: int, *, today=None):
+async def _render_calendar(year: int, month: int, *, today=None, mode="calendar"):
     session = get_session_context()
     user = await session.require_user()
     context = await get_month_context(user["id"], year, month, today=today)
+    context["mode"] = mode
     template = (
         "partials/calendar_popover.html"
         if request.endpoint == "days.calendar_view"
@@ -83,6 +84,7 @@ async def calendar_view():
     today = local_date()
     requested_year = request.args.get("year", type=int)
     requested_month = request.args.get("month", type=int)
+    mode = request.args.get("mode", "calendar")
     if (
         requested_year is not None
         and requested_month is not None
@@ -94,12 +96,32 @@ async def calendar_view():
     else:
         target_year = today.year
         target_month = today.month
-    html = await _render_calendar(target_year, target_month, today=today)
+    if mode not in {"calendar", "picker"}:
+        mode = "calendar"
+    html = await _render_calendar(
+        target_year, target_month, today=today, mode=mode
+    )
     return await make_response(html)
 
 
 @days_bp.route("/calendar/<int:year>/<int:month>")
 @login_required
 async def calendar_month(year: int, month: int):
-    html = await _render_calendar(year, month)
+    requested_year = request.args.get("year", type=int)
+    requested_month = request.args.get("month", type=int)
+    mode = request.args.get("mode", "calendar")
+    if (
+        requested_year is not None
+        and requested_month is not None
+        and requested_year >= 1
+        and 1 <= requested_month <= 12
+    ):
+        target_year = requested_year
+        target_month = requested_month
+    else:
+        target_year = year
+        target_month = month
+    if mode not in {"calendar", "picker"}:
+        mode = "calendar"
+    html = await _render_calendar(target_year, target_month, mode=mode)
     return await make_response(html)

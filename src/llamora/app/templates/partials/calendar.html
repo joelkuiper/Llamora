@@ -1,75 +1,151 @@
-<section id="calendar" class="glass-panel" data-year="{{ year }}" data-month="{{ '%02d'|format(month) }}">
+<section id="calendar"
+         class="glass-panel"
+         data-year="{{ year }}"
+         data-month="{{ '%02d'|format(month) }}"
+         data-min-year="{{ min_year }}"
+         data-min-month="{{ min_month }}"
+         data-today-year="{{ today_year }}"
+         data-today-month="{{ today_month }}"
+         data-calendar-mode="{{ mode|default('calendar') }}"
+         data-calendar-url="{{ url_for('days.calendar_month', year=year, month=month) }}">
+  {% set at_min_month = year == min_year and month == min_month %}
+  {% set at_max_month = year == today_year and month == today_month %}
+  {% set toggle_mode = 'calendar' if mode == 'picker' else 'picker' %}
   <div class="calendar-nav">
     <button class="btn btn-pill cal-nav-btn prev"
             hx-get="{{ url_for('days.calendar_month', year=prev_year, month=prev_month) }}"
             hx-target="#calendar"
             hx-swap="outerHTML"
-            aria-label="Previous month">&#9664;</button>
-    <h2>{{ month_name }} {{ year }}</h2>
+            aria-label="Previous month"
+            {% if at_min_month %}disabled aria-disabled="true"{% endif %}>&#9664;</button>
+    <h2 class="calendar-header">
+      <button type="button"
+              class="calendar-month-year"
+              aria-haspopup="dialog"
+              aria-controls="calendar-picker"
+              aria-expanded="{{ 'true' if mode == 'picker' else 'false' }}"
+              hx-get="{{ url_for('days.calendar_month', year=year, month=month, mode=toggle_mode) }}"
+              hx-target="#calendar"
+              hx-swap="outerHTML"
+              data-calendar-toggle>
+        <span>{{ month_name }} {{ year }}</span>
+      </button>
+    </h2>
     <button class="btn btn-pill cal-nav-btn next"
             hx-get="{{ url_for('days.calendar_month', year=next_year, month=next_month) }}"
             hx-target="#calendar"
             hx-swap="outerHTML"
-            aria-label="Next month">&#9654;</button>
+            aria-label="Next month"
+            {% if at_max_month %}disabled aria-disabled="true"{% endif %}>&#9654;</button>
   </div>
-  <div class="calendar-today">
-    <button class="today-btn"
-       type="button"
-       hx-get="{{ url_for('chat.chat_htmx_today') }}"
-       hx-target="#content-wrapper"
-       hx-swap="outerHTML"
-       hx-push-url="true"
-       data-date="{{ today }}">Today</button>
-  </div>
-  <table class="calendar-table"
-         role="grid"
-         aria-label="Calendar for {{ month_name }} {{ year }}"
-         data-columns="7"
-         data-calendar-grid>
-    <thead>
-      <tr>
-        {% for d in ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"] %}
-        <th scope="col" role="columnheader">{{ d }}</th>
-        {% endfor %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for week in weeks %}
-      <tr>
-        {% for day in week %}
-          {% if day == 0 %}
-          <td class="empty" role="gridcell" tabindex="-1" aria-hidden="true" data-calendar-empty></td>
-          {% else %}
-          {% set date_str = "%04d-%02d-%02d"|format(year, month, day) %}
-          {% set classes = [] %}
-          {% if date_str == active_day %}{% set classes = classes + ['active'] %}{% endif %}
-          {% if date_str == today %}{% set classes = classes + ['is-today'] %}{% endif %}
-          {% if day in active_days %}{% set classes = classes + ['has-entry'] %}{% endif %}
-          {% set is_today = (date_str == today) %}
-          <td data-date="{{ date_str }}"
-              data-calendar-cell
-              role="gridcell"
-              tabindex="{{ 0 if date_str == active_day else -1 }}"
-              aria-selected="{{ 'true' if date_str == active_day else 'false' }}"
-              {% if date_str == active_day %}data-calendar-active="true"{% endif %}
-              {% if classes %} class="{{ classes|join(' ') }}"{% endif %}>
-            {% if is_today or day in active_days %}
-            <a{% if not is_today %} class="not-today"{% endif %}
-               href="{{ url_for('days.day', date=date_str) }}"
-               hx-get="{{ url_for('chat.chat_htmx', date=date_str) }}"
-               hx-target="#content-wrapper"
-               hx-swap="outerHTML"
-               hx-push-url="true"
-               tabindex="-1"
-               {% if date_str == active_day %}aria-current="date"{% endif %}>{{ day }}</a>
+  {% if mode != 'picker' %}
+  <div class="calendar-grid-view"
+       data-calendar-grid-view>
+    <div class="calendar-today">
+      <button class="today-btn"
+         type="button"
+         hx-get="{{ url_for('chat.chat_htmx_today') }}"
+         hx-target="#content-wrapper"
+         hx-swap="outerHTML"
+         hx-push-url="true"
+         data-date="{{ today }}">Today</button>
+    </div>
+    <table class="calendar-table"
+           role="grid"
+           aria-label="Calendar for {{ month_name }} {{ year }}"
+           data-columns="7"
+           data-calendar-grid>
+      <thead>
+        <tr>
+          {% for d in ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"] %}
+          <th scope="col" role="columnheader">{{ d }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for week in weeks %}
+        <tr>
+          {% for day in week %}
+            {% if day == 0 %}
+            <td class="empty" role="gridcell" tabindex="-1" aria-hidden="true" data-calendar-empty></td>
             {% else %}
-            <span class="no-messages">{{ day }}</span>
+            {% set date_str = "%04d-%02d-%02d"|format(year, month, day) %}
+            {% set classes = [] %}
+            {% if date_str == active_day %}{% set classes = classes + ['active'] %}{% endif %}
+            {% if date_str == today %}{% set classes = classes + ['is-today'] %}{% endif %}
+            {% if day in active_days %}{% set classes = classes + ['has-entry'] %}{% endif %}
+            {% set is_today = (date_str == today) %}
+            <td data-date="{{ date_str }}"
+                data-calendar-cell
+                role="gridcell"
+                tabindex="{{ 0 if date_str == active_day else -1 }}"
+                aria-selected="{{ 'true' if date_str == active_day else 'false' }}"
+                {% if date_str == active_day %}data-calendar-active="true"{% endif %}
+                {% if classes %} class="{{ classes|join(' ') }}"{% endif %}>
+              {% if is_today or day in active_days %}
+              <a{% if not is_today %} class="not-today"{% endif %}
+                 href="{{ url_for('days.day', date=date_str) }}"
+                 hx-get="{{ url_for('chat.chat_htmx', date=date_str) }}"
+                 hx-target="#content-wrapper"
+                 hx-swap="outerHTML"
+                 hx-push-url="true"
+                 tabindex="-1"
+                 {% if date_str == active_day %}aria-current="date"{% endif %}>{{ day }}</a>
+              {% else %}
+              <span class="no-messages">{{ day }}</span>
+              {% endif %}
+            </td>
             {% endif %}
-          </td>
-          {% endif %}
+          {% endfor %}
+        </tr>
         {% endfor %}
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  {% if mode == 'picker' %}
+  <div id="calendar-picker"
+         class="calendar-picker">
+      <div class="calendar-picker-columns">
+        <div class="calendar-picker-column">
+          <div class="calendar-picker-scroll"
+               role="listbox"
+               aria-label="Years">
+            {% for candidate_year in range(min_year, today_year + 1) %}
+            <button type="button"
+                    class="calendar-picker-option{% if candidate_year == year %} is-selected{% endif %}"
+                    aria-pressed="{{ 'true' if candidate_year == year else 'false' }}"
+                    data-picker-year="{{ candidate_year }}">
+              <span>{{ candidate_year }}</span>
+            </button>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="calendar-picker-column">
+          <div class="calendar-picker-scroll"
+               role="listbox"
+               aria-label="Months">
+            {% for name in month_names %}
+            {% set idx = loop.index %}
+            {% set disabled = (year == min_year and idx < min_month) or (year == today_year and idx > today_month) %}
+            <button type="button"
+                    class="calendar-picker-option calendar-picker-month{% if idx == month %} is-selected{% endif %}{% if disabled %} is-disabled{% endif %}"
+                    data-picker-month="{{ idx }}"
+                    aria-pressed="{{ 'true' if idx == month else 'false' }}"
+                    {% if disabled %}disabled{% endif %}>
+              <span>{{ name }}</span>
+            </button>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="calendar-picker-footer"
+           role="button"
+           tabindex="0"
+           aria-live="polite"
+           data-calendar-footer>
+        <span data-calendar-footer-text>Set to {{ month_name }} {{ year }}</span>
+      </div>
+    </div>
+  {% endif %}
 </section>
