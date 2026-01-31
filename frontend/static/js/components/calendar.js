@@ -172,16 +172,36 @@ export class CalendarControl extends HTMLElement {
         }
         const calendar = pop.querySelector("#calendar");
         if (!calendar) return;
-        calendar.dataset.calendarMode = "calendar";
+        syncCalendarHeader(calendar);
         this.#configureCalendarGrid(calendar, popover, pop, signal);
         initCalendarPicker(calendar);
       },
       { signal }
     );
 
+    pop.addEventListener(
+      "htmx:configRequest",
+      (event) => {
+        const target = event.target;
+        if (!target?.closest?.("[data-calendar-toggle]")) {
+          return;
+        }
+        const calendar = pop.querySelector("#calendar");
+        if (!calendar) return;
+        const isPicker = Boolean(calendar.querySelector("#calendar-picker"));
+        const year = calendar.dataset.year;
+        const month = calendar.dataset.month;
+        if (!year || !month) return;
+        event.detail.path = `/calendar/${year}/${parseInt(month, 10)}`;
+        event.detail.parameters = event.detail.parameters || {};
+        event.detail.parameters.mode = isPicker ? "calendar" : "picker";
+      },
+      { signal }
+    );
+
     const initialCalendar = pop.querySelector("#calendar");
     if (initialCalendar) {
-      initialCalendar.dataset.calendarMode = "calendar";
+      syncCalendarHeader(initialCalendar);
       this.#configureCalendarGrid(initialCalendar, popover, pop, signal);
       initCalendarPicker(initialCalendar);
     }
@@ -470,6 +490,20 @@ function clampValue(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
+function syncCalendarHeader(calendar) {
+  const toggle = calendar.querySelector("[data-calendar-toggle]");
+  if (!toggle) return;
+  const isPicker = Boolean(calendar.querySelector("#calendar-picker"));
+  calendar.dataset.calendarMode = isPicker ? "picker" : "calendar";
+  toggle.setAttribute("aria-expanded", isPicker ? "true" : "false");
+  const year = calendar.dataset.year ?? "";
+  const month = calendar.dataset.month ?? "";
+  const base = calendar.dataset.calendarUrl || `/calendar/${year}/${month}`;
+  const url = new URL(base, window.location.origin);
+  url.searchParams.set("mode", isPicker ? "calendar" : "picker");
+  toggle.setAttribute("hx-get", `${url.pathname}${url.search}`);
+}
+
 function initCalendarPicker(calendar) {
   if (!calendar) return;
   const picker = calendar.querySelector("#calendar-picker");
@@ -513,6 +547,7 @@ function initCalendarPicker(calendar) {
     const monthLabel = monthNameMap.get(selectedMonth) ?? "";
     footerLabel.textContent = `Set to ${monthLabel} ${selectedYear}`.trim();
   };
+
 
 
   const getMonthBounds = () => {
@@ -574,8 +609,9 @@ function initCalendarPicker(calendar) {
     url.searchParams.set("month", String(selectedMonth));
     url.searchParams.set("mode", "calendar");
     htmx.ajax("GET", url.toString(), {
-      target: "#calendar",
-      swap: "outerHTML",
+      target: ".calendar-swap",
+      select: ".calendar-swap",
+      swap: "outerHTML swap:120ms settle:120ms",
     });
   };
 

@@ -24,9 +24,10 @@
               aria-haspopup="dialog"
               aria-controls="calendar-picker"
               aria-expanded="{{ 'true' if mode == 'picker' else 'false' }}"
-              hx-get="{{ url_for('days.calendar_month', year=year, month=month, mode=toggle_mode) }}"
-              hx-target="#calendar"
-              hx-swap="outerHTML"
+              hx-get="{{ url_for('days.calendar_month', year=year, month=month) }}"
+              hx-target=".calendar-swap"
+              hx-select=".calendar-swap"
+              hx-swap="outerHTML swap:120ms settle:120ms"
               data-calendar-toggle>
         <span>{{ month_name }} {{ year }}</span>
       </button>
@@ -39,6 +40,7 @@
             {% if at_max_month %}disabled aria-disabled="true"{% endif %}>&#9654;</button>
   </div>
   {% if mode != 'picker' %}
+  <div class="calendar-swap">
   <div class="calendar-grid-view"
        data-calendar-grid-view>
     <div class="calendar-today">
@@ -102,8 +104,10 @@
       </tbody>
     </table>
   </div>
+  </div>
   {% endif %}
   {% if mode == 'picker' %}
+  <div class="calendar-swap">
   <div id="calendar-picker"
          class="calendar-picker">
       <div class="calendar-picker-columns">
@@ -147,5 +151,6 @@
         <span data-calendar-footer-text>Set to {{ month_name }} {{ year }}</span>
       </div>
     </div>
+  </div>
   {% endif %}
 </section>

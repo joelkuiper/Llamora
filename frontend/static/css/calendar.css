@@ -546,3 +546,17 @@
 #calendar.pop-exit {
   will-change: opacity, transform;
 }
+
+.calendar-swap {
+  transition: opacity var(--motion-gentle), transform var(--motion-gentle);
+}
+
+.calendar-swap.htmx-swapping {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.calendar-swap.htmx-settling {
+  opacity: 0;
+  transform: translateY(4px);
+}
