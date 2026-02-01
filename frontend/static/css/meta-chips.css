@@ -19,7 +19,7 @@
 
   &.popover-open {
     position: relative;
-    z-index: 1050;
+    z-index: 5000;
   }
 }
 
@@ -154,7 +154,7 @@
   border-radius: var(--radius-sm);
   padding: 10px;
   transition: background var(--motion-fade) ease;
-  z-index: 1100;
+  z-index: 5100;
   width: 19rem;
 
   .overlay-close {
@@ -284,5 +284,3 @@
   position: relative;
   transform-origin: top right;
 }
-
-

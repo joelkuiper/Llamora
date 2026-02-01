@@ -7,7 +7,7 @@
     --color-heading-dark: #f3f4f6;
     --color-user-text-dark: #e9eaee;
     --color-assistant-text-dark: #cfd2d7;
-    --color-assistant-bg-dark: #12161b;
+    --color-surface-dark: #12161b;
 
     --accent-dark: #6fb7e6;
     --accent-hover-dark: #86c3ea;
@@ -110,7 +110,7 @@
       --color-heading: var(--color-heading-dark);
       --color-user-text: var(--color-user-text-dark);
       --color-assistant-text: var(--color-assistant-text-dark);
-      --color-assistant-bg: var(--color-assistant-bg-dark);
+      --color-surface: var(--color-surface-dark);
       --color-text-muted: var(--color-text-muted-dark);
       --accent: var(--accent-dark);
       --accent-hover: var(--accent-hover-dark);

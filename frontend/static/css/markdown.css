@@ -23,7 +23,7 @@
     border-spacing: 0;
     margin: var(--spacing-md) 0;
     overflow: hidden;
-    background: var(--glass-bg-alt, var(--color-assistant-bg));
+    background: var(--glass-bg-alt, var(--color-surface));
     box-shadow: var(--subtle-raised-shadow);
     backdrop-filter: blur(6px);
   }
