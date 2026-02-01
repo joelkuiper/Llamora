@@ -98,16 +98,24 @@ async def get_month_context(
     if active_candidate > today_date:
         active_candidate = today_date
 
-    month_days = _calendar.monthrange(selected_year, selected_month)[1]
-    month_min_day = (
-        min_date_obj.day if selected_year == min_date_obj.year and selected_month == min_date_obj.month else 1
-    )
-    month_max_day = month_days
-    if selected_year == today_date.year and selected_month == today_date.month:
-        month_max_day = min(month_max_day, today_date.day)
-    desired_day = active_candidate.day
-    clamped_day = _clamp(desired_day, month_min_day, month_max_day)
-    active_day_iso = date(selected_year, selected_month, clamped_day).isoformat()
+    active_day_iso = active_candidate.isoformat()
+    if (
+        active_candidate.year == selected_year
+        and active_candidate.month == selected_month
+    ):
+        month_days = _calendar.monthrange(selected_year, selected_month)[1]
+        month_min_day = (
+            min_date_obj.day
+            if selected_year == min_date_obj.year
+            and selected_month == min_date_obj.month
+            else 1
+        )
+        month_max_day = month_days
+        if selected_year == today_date.year and selected_month == today_date.month:
+            month_max_day = min(month_max_day, today_date.day)
+        desired_day = active_candidate.day
+        clamped_day = _clamp(desired_day, month_min_day, month_max_day)
+        active_day_iso = date(selected_year, selected_month, clamped_day).isoformat()
     active_days = await services.db.messages.get_days_with_messages(
         user_id, selected_year, selected_month
     )

@@ -554,8 +554,6 @@ function initCalendarPicker(calendar) {
 
   const footerLabel = footer.querySelector("[data-calendar-footer-text]");
   const headerLabel = calendar.querySelector(".calendar-month-year span");
-  const prevBtn = calendar.querySelector(".cal-nav-btn.prev");
-  const nextBtn = calendar.querySelector(".cal-nav-btn.next");
   const monthNameMap = new Map();
   monthButtons.forEach((button) => {
     const month = Number(button.dataset.pickerMonth);
@@ -592,27 +590,6 @@ function initCalendarPicker(calendar) {
         headerLabel.textContent = nextText;
         triggerLabelFlash(calendar.querySelector(".calendar-month-year"));
       }
-    }
-    calendar.dataset.year = String(selectedYear);
-    calendar.dataset.month = String(selectedMonth).padStart(2, "0");
-    calendar.dataset.calendarUrl = `/calendar/${selectedYear}/${selectedMonth}`;
-
-    const atMin = selectedYear === minYear && selectedMonth === minMonth;
-    const atMax = selectedYear === maxYear && selectedMonth === maxMonth;
-    const prevMonth = selectedMonth === 1 ? 12 : selectedMonth - 1;
-    const prevYear = selectedMonth === 1 ? selectedYear - 1 : selectedYear;
-    const nextMonth = selectedMonth === 12 ? 1 : selectedMonth + 1;
-    const nextYear = selectedMonth === 12 ? selectedYear + 1 : selectedYear;
-
-    if (prevBtn) {
-      prevBtn.disabled = atMin;
-      prevBtn.setAttribute("aria-disabled", atMin ? "true" : "false");
-      prevBtn.setAttribute("hx-get", `/calendar/${prevYear}/${prevMonth}`);
-    }
-    if (nextBtn) {
-      nextBtn.disabled = atMax;
-      nextBtn.setAttribute("aria-disabled", atMax ? "true" : "false");
-      nextBtn.setAttribute("hx-get", `/calendar/${nextYear}/${nextMonth}`);
     }
   };
 
@@ -685,11 +662,9 @@ function initCalendarPicker(calendar) {
     url.searchParams.set("month", String(selectedMonth));
     url.searchParams.set("mode", "calendar");
     htmx.ajax("GET", url.toString(), {
-      target: ".calendar-swap",
-      select: ".calendar-swap",
-      swap: "outerHTML swap:120ms settle:120ms",
+      target: "#calendar",
+      swap: "outerHTML",
     });
-    updateHeaderAfterConfirm();
   };
 
   yearButtons.forEach((button) => {
