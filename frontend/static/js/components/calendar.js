@@ -511,6 +511,16 @@ function clampValue(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
+function shiftYearMonth(year, month, delta) {
+  const baseYear = Number.isFinite(year) ? year : 0;
+  const baseMonth = Number.isFinite(month) ? month : 1;
+  const base = baseYear * 12 + (baseMonth - 1);
+  const shifted = base + delta;
+  const nextYear = Math.floor(shifted / 12);
+  const nextMonth = (shifted % 12 + 12) % 12 + 1;
+  return { year: nextYear, month: nextMonth };
+}
+
 const LABEL_FLASH_CLASS = "text-glow-flash";
 
 function triggerLabelFlash(node) {
@@ -668,17 +678,67 @@ function initCalendarPicker(calendar) {
     if (!baseUrl) return;
     const monthLabel = monthNameMap.get(selectedMonth) ?? "";
     const nextLabel = `${monthLabel} ${selectedYear}`.trim();
+    const updateNavButtons = () => {
+      const prevBtn = calendar.querySelector(".cal-nav-btn.prev");
+      const nextBtn = calendar.querySelector(".cal-nav-btn.next");
+      const minYearNum = toNumber(calendar.dataset.minYear, minYear);
+      const minMonthNum = clampValue(toNumber(calendar.dataset.minMonth, minMonth), 1, 12);
+      const maxYearNum = toNumber(calendar.dataset.todayYear, maxYear);
+      const maxMonthNum = clampValue(toNumber(calendar.dataset.todayMonth, maxMonth), 1, 12);
+
+      const atMin = selectedYear === minYearNum && selectedMonth === minMonthNum;
+      const atMax = selectedYear === maxYearNum && selectedMonth === maxMonthNum;
+
+      const updateButton = (button, target, disabled) => {
+        if (!button) return;
+        if (disabled) {
+          button.setAttribute("disabled", "");
+          button.setAttribute("aria-disabled", "true");
+        } else {
+          button.removeAttribute("disabled");
+          button.removeAttribute("aria-disabled");
+        }
+        const href = `/calendar/${target.year}/${target.month}`;
+        button.setAttribute("hx-get", href);
+      };
+
+      const prevTarget = shiftYearMonth(selectedYear, selectedMonth, -1);
+      const nextTarget = shiftYearMonth(selectedYear, selectedMonth, 1);
+      updateButton(prevBtn, prevTarget, atMin);
+      updateButton(nextBtn, nextTarget, atMax);
+    };
+
+    const updateHeader = () => {
+      if (headerLabel) {
+        headerLabel.textContent = nextLabel;
+        triggerLabelFlash(calendar.querySelector(".calendar-month-year"));
+      }
+      calendar.dataset.year = String(selectedYear);
+      calendar.dataset.month = String(selectedMonth).padStart(2, "0");
+      calendar.dataset.calendarMode = "calendar";
+      updateNavButtons();
+      syncCalendarHeader(calendar);
+    };
     const pop = calendar.closest("#calendar-popover");
-    if (pop && nextLabel) {
-      pop.dataset.calendarFlashLabel = nextLabel;
+    if (pop) {
+      const handleSwap = (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        if (!target.classList.contains("calendar-swap")) return;
+        updateHeader();
+      };
+      pop.addEventListener("htmx:afterSwap", handleSwap, { once: true });
+    } else {
+      updateHeader();
     }
     const url = new URL(baseUrl, window.location.origin);
     url.searchParams.set("year", String(selectedYear));
     url.searchParams.set("month", String(selectedMonth));
     url.searchParams.set("mode", "calendar");
     htmx.ajax("GET", url.toString(), {
-      target: "#calendar",
-      swap: "outerHTML",
+      target: ".calendar-swap",
+      select: ".calendar-swap",
+      swap: "outerHTML swap:120ms settle:120ms",
     });
   };
 
