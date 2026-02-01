@@ -184,6 +184,15 @@ export class CalendarControl extends HTMLElement {
         }
         const calendar = pop.querySelector("#calendar");
         if (!calendar) return;
+        const flashLabel = pop.dataset.calendarFlashLabel;
+        if (flashLabel) {
+          const header = calendar.querySelector(".calendar-month-year");
+          const headerText = header?.querySelector("span")?.textContent?.trim();
+          if (header && headerText && headerText === flashLabel) {
+            triggerLabelFlash(header);
+          }
+          delete pop.dataset.calendarFlashLabel;
+        }
         syncCalendarHeader(calendar);
         this.#configureCalendarGrid(calendar, popover, pop, signal);
         initCalendarPicker(calendar);
@@ -657,6 +666,12 @@ function initCalendarPicker(calendar) {
   const confirmSelection = () => {
     const baseUrl = calendar.dataset.calendarUrl;
     if (!baseUrl) return;
+    const monthLabel = monthNameMap.get(selectedMonth) ?? "";
+    const nextLabel = `${monthLabel} ${selectedYear}`.trim();
+    const pop = calendar.closest("#calendar-popover");
+    if (pop && nextLabel) {
+      pop.dataset.calendarFlashLabel = nextLabel;
+    }
     const url = new URL(baseUrl, window.location.origin);
     url.searchParams.set("year", String(selectedYear));
     url.searchParams.set("month", String(selectedMonth));
