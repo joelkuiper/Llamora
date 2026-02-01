@@ -52,9 +52,15 @@
                  autocomplete="off">
           <button type="submit" disabled>Add</button>
         </form>
+        <div id="tag-suggestions-{{ msg_id }}-loading"
+             class="search-result-load htmx-indicator"
+             aria-hidden="true">
+          <span class="search-load-indicator" aria-hidden="true"></span>
+        </div>
         <div class="tag-suggestions"
-             hx-get="{{ url_for('tags.get_tag_suggestions', msg_id=msg_id) }}"
+             hx-get="{{ url_for('tags.get_entry_tag_suggestions', msg_id=msg_id) }}"
              hx-trigger="tag-popover:show"
+             hx-indicator="#tag-suggestions-{{ msg_id }}-loading"
              hx-swap="innerHTML">
         </div>
       </div>

@@ -284,3 +284,24 @@
   position: relative;
   transform-origin: top right;
 }
+
+.tag-popover .search-result-load {
+  display: none;
+  padding: 0.55rem 0.5rem 0.35rem;
+  margin-top: 0.5rem;
+  min-height: 1.6rem;
+  align-items: center;
+  justify-content: center;
+}
+
+.tag-popover .search-result-load .search-load-indicator {
+  opacity: 0;
+}
+
+.tag-popover .search-result-load.htmx-request {
+  display: flex;
+}
+
+.tag-popover .search-result-load.htmx-request .search-load-indicator {
+  opacity: 1;
+}

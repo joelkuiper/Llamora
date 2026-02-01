@@ -1,5 +1,7 @@
 {% from 'partials/assistant_stream.html' import assistant_stream %}
+{% from 'partials/meta_chips.html' import render_meta_chips %}
 <div id="msg-{{ user_msg_id }}" class="message user">
   <div class="markdown-body">{{ user_text }}</div>
+  {{ render_meta_chips(user_msg_id, []) }}
 </div>
 {{ assistant_stream(user_msg_id, day, user_time, stop_url=url_for('chat.stop_generation', user_msg_id=user_msg_id)) }}

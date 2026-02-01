@@ -84,6 +84,36 @@ async def get_tag_suggestions(msg_id: str):
     return html
 
 
+@tags_bp.get("/t/suggestions/entry/<msg_id>")
+@login_required
+async def get_entry_tag_suggestions(msg_id: str):
+    _, user, dek = await require_user_and_dek()
+    decay_constant = resolve_frecency_lambda(
+        request.args.get("lambda"), default=DEFAULT_FRECENCY_DECAY
+    )
+    services = get_services()
+    llm = services.llm_service.llm
+
+    suggestions = await _tags().suggest_for_entry(
+        user["id"],
+        msg_id,
+        dek,
+        llm=llm,
+        frecency_limit=3,
+        decay_constant=decay_constant,
+    )
+    if suggestions is None:
+        abort(404, description="message not found")
+        raise AssertionError("unreachable")
+
+    html = await render_template(
+        "partials/tag_suggestions.html",
+        suggestions=suggestions,
+        msg_id=msg_id,
+    )
+    return html
+
+
 @tags_bp.get("/tags/autocomplete")
 @login_required
 async def autocomplete_tags():

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any, Iterable, Sequence
 
 from llamora.app.util.tags import canonicalize as _canonicalize, display as _display
 from llamora.persistence.local_db import LocalDB
+from llamora.app.services.chat_meta import generate_metadata
 
 
 logger = logging.getLogger(__name__)
@@ -17,6 +19,8 @@ class TagService:
 
     def __init__(self, db: LocalDB) -> None:
         self._db = db
+        self._entry_suggestion_cache: dict[tuple[str, str], tuple[float, list[str]]] = {}
+        self._entry_suggestion_ttl = 300.0
 
     def canonicalize(self, raw: str) -> str:
         """Return the canonical representation for ``raw``."""
@@ -113,6 +117,89 @@ class TagService:
         ]
 
         return combined
+
+    async def suggest_for_entry(
+        self,
+        user_id: str,
+        msg_id: str,
+        dek: bytes,
+        *,
+        llm,
+        frecency_limit: int = 3,
+        decay_constant: float | None = None,
+    ) -> list[str] | None:
+        messages = await self._db.messages.get_messages_by_ids(user_id, [msg_id], dek)
+        if not messages:
+            return None
+
+        message = messages[0]
+        if message.get("role") != "user":
+            return None
+
+        existing = await self._db.tags.get_tags_for_message(user_id, msg_id, dek)
+        existing_names = self._extract_existing_names(existing)
+
+        meta_suggestions = self._get_cached_entry_suggestions(user_id, msg_id)
+        if meta_suggestions is None:
+            meta_payload = await generate_metadata(llm, message.get("message", ""))
+            keywords: Iterable[Any] = meta_payload.get("keywords") or []
+            meta_suggestions = []
+            seen: set[str] = set()
+            for keyword in keywords:
+                try:
+                    canonical = self.canonicalize(str(keyword))
+                except ValueError:
+                    continue
+                if canonical in seen:
+                    continue
+                seen.add(canonical)
+                meta_suggestions.append(canonical)
+            self._set_cached_entry_suggestions(user_id, msg_id, meta_suggestions)
+
+        frecent_tags = await self._db.tags.get_tag_frecency(
+            user_id, frecency_limit, decay_constant, dek
+        )
+        frecent_suggestions: set[str] = set()
+        for tag in frecent_tags:
+            name = (tag.get("name") or "").strip()
+            if not name:
+                continue
+            try:
+                canonical = self.canonicalize(name)
+            except ValueError:
+                continue
+            frecent_suggestions.add(canonical)
+
+        combined = [
+            suggestion
+            for suggestion in sorted(set(meta_suggestions) | frecent_suggestions)
+            if suggestion.lower() not in existing_names
+        ]
+
+        return combined
+
+    def _get_cached_entry_suggestions(
+        self, user_id: str, msg_id: str
+    ) -> list[str] | None:
+        cache_key = (user_id, msg_id)
+        cached = self._entry_suggestion_cache.get(cache_key)
+        if not cached:
+            return None
+        timestamp, suggestions = cached
+        if time.monotonic() - timestamp > self._entry_suggestion_ttl:
+            self._entry_suggestion_cache.pop(cache_key, None)
+            return None
+        return list(suggestions)
+
+    def _set_cached_entry_suggestions(
+        self, user_id: str, msg_id: str, suggestions: list[str]
+    ) -> None:
+        if len(self._entry_suggestion_cache) > 256:
+            self._entry_suggestion_cache.clear()
+        self._entry_suggestion_cache[(user_id, msg_id)] = (
+            time.monotonic(),
+            list(suggestions),
+        )
 
     def _extract_existing_names(self, existing: Sequence[dict[str, Any]]) -> set[str]:
         names: set[str] = set()

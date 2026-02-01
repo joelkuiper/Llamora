@@ -40,7 +40,7 @@
       <span class="visually-hidden">Response paused after repeating itself.</span>
     </span>
     {% endif %}
-    {% if msg['role'] != 'user' and not msg_meta.get('error') %}
+    {% if msg['role'] == 'user' and not msg_meta.get('error') %}
     {{ render_meta_chips(msg['id'], msg.get('tags', [])) }}
     {% endif %}
   </div>
