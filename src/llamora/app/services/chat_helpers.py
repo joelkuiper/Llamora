@@ -100,9 +100,9 @@ async def locate_message_and_reply(
 
     Returns a tuple of ``(history, assistant_message, actual_date)``. ``history`` is
     the conversation history that includes the user message. ``assistant_message``
-    is ``None`` when no reply has been stored yet. ``actual_date`` reflects the
-    conversation date associated with ``history`` and may differ from the input
-    ``date`` when the message resides on another day.
+    is the first stored reply when one exists, otherwise ``None``. ``actual_date``
+    reflects the conversation date associated with ``history`` and may differ from
+    the input ``date`` when the message resides on another day.
     """
 
     message_info = await db.messages.get_message_with_reply(user_id, user_msg_id)
@@ -158,6 +158,21 @@ def build_conversation_context(
     tz = tz_cookie or "UTC"
     date_str, part = date_and_part(timestamp, tz)
     return {"date": date_str, "part_of_day": part}
+
+
+def apply_reply_kind_prompt(
+    history: Sequence[Mapping[str, Any]],
+    reply_prompt: str | None,
+) -> list[dict[str, Any]]:
+    """Append a reply-kind system prompt to history for LLM generation."""
+
+    if not reply_prompt:
+        return list(history)
+
+    return [
+        *history,
+        {"role": "system", "message": str(reply_prompt).strip()},
+    ]
 
 
 async def start_stream_session(

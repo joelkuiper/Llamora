@@ -135,6 +135,23 @@ DEFAULTS: dict[str, Any] = {
             "repeat_guard_min_length": 12,
         },
         "allowed_config_keys": ["temperature"],
+        "reply_kinds": [
+            {
+                "id": "reply",
+                "label": "Reply",
+                "prompt": "Respond to the user's message with a calm, grounded reply.",
+            },
+            {
+                "id": "reflect",
+                "label": "Reflect",
+                "prompt": "Offer a gentle reflection and emotional acknowledgement of the message.",
+            },
+            {
+                "id": "summarize",
+                "label": "Summarize",
+                "prompt": "Provide a concise, factual summary of the message.",
+            },
+        ],
         "tokenizer": {
             "model": "Qwen/Qwen3-4B-Instruct-2507",
             "trust_remote_code": True,

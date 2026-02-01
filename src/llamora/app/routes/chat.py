@@ -22,6 +22,7 @@ from llamora.app.services.auth_helpers import login_required
 from llamora.app.services.chat_context import get_chat_context
 from llamora.app.services.chat_helpers import (
     augment_history_with_recall,
+    apply_reply_kind_prompt,
     history_has_tag_recall,
     StreamSession,
     build_conversation_context,
@@ -53,6 +54,35 @@ def _chat_stream_manager():
     return get_services().llm_service.chat_stream_manager
 
 
+def _load_reply_kinds() -> tuple[list[dict[str, str]], dict[str, str]]:
+    raw = settings.get("LLM.reply_kinds", []) or []
+    kinds: list[dict[str, str]] = []
+    labels: dict[str, str] = {}
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        kind_id = str(entry.get("id") or "").strip()
+        label = str(entry.get("label") or "").strip()
+        prompt = str(entry.get("prompt") or "").strip()
+        if not kind_id or not label:
+            continue
+        kinds.append({"id": kind_id, "label": label, "prompt": prompt})
+        labels[kind_id] = label
+    if not kinds:
+        kinds = [{"id": "reply", "label": "Reply", "prompt": ""}]
+        labels = {"reply": "Reply"}
+    return kinds, labels
+
+
+def _select_reply_kind(kind_id: str | None) -> dict[str, str]:
+    kinds, _ = _load_reply_kinds()
+    if kind_id:
+        match = next((k for k in kinds if k["id"] == kind_id), None)
+        if match:
+            return match
+    return kinds[0]
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -67,6 +97,7 @@ async def render_chat(
     session = get_session_context()
     user = await session.require_user()
     context = await get_chat_context(user, date)
+    reply_kinds, reply_kind_labels = _load_reply_kinds()
     html = await render_template(
         "partials/chat.html",
         day=date,
@@ -74,6 +105,8 @@ async def render_chat(
         user=user,
         scroll_target=scroll_target,
         view_kind=view_kind,
+        reply_kinds=reply_kinds,
+        reply_kind_labels=reply_kind_labels,
         **context,
     )
 
@@ -302,6 +335,7 @@ async def send_message(date):
     user_time = form.get("user_time")
     _, user, dek = await require_user_and_dek()
     uid = user["id"]
+    reply_kinds, _ = _load_reply_kinds()
 
     max_len = int(settings.LIMITS.max_message_length)
 
@@ -323,6 +357,32 @@ async def send_message(date):
         user_msg_id=user_msg_id,
         day=date,
         user_time=user_time,
+        reply_kinds=reply_kinds,
+    )
+
+
+@chat_bp.route("/c/<date>/ask/<user_msg_id>", methods=["POST"])
+@login_required
+async def ask_llm(date, user_msg_id: str):
+    normalized_date = require_iso_date(date)
+    form = await request.form
+    user_time = form.get("user_time")
+    reply_kind = form.get("reply_kind") or request.args.get("reply_kind")
+    selected_kind = _select_reply_kind(reply_kind)
+    _, user, dek = await require_user_and_dek()
+    uid = user["id"]
+
+    await ensure_message_exists(get_services().db, uid, user_msg_id)
+    actual_date = await get_services().db.messages.get_message_date(uid, user_msg_id)
+    if actual_date is None:
+        abort(404, description="Message not found.")
+
+    return await render_template(
+        "partials/assistant_stream_item.html",
+        user_msg_id=user_msg_id,
+        day=actual_date or normalized_date,
+        user_time=user_time,
+        reply_kind=selected_kind.get("id"),
     )
 
 
@@ -340,7 +400,7 @@ async def sse_reply(user_msg_id: str, date: str):
 
     _, user, dek = await require_user_and_dek()
     uid = user["id"]
-    history, existing_assistant_msg, actual_date = await locate_message_and_reply(
+    history, _, actual_date = await locate_message_and_reply(
         get_services().db, uid, dek, normalized_date, user_msg_id
     )
 
@@ -348,15 +408,14 @@ async def sse_reply(user_msg_id: str, date: str):
         logger.warning("History not found for user message %s", user_msg_id)
         return StreamSession.error("Invalid ID")
 
-    if existing_assistant_msg:
-        return StreamSession.saved(existing_assistant_msg)
-
     params_raw = normalize_llm_config(
         request.args.get("config"),
         set(settings.LLM.allowed_config_keys),
     )
     params = dict(params_raw) if params_raw is not None else None
 
+    reply_kind = request.args.get("reply_kind")
+    selected_kind = _select_reply_kind(reply_kind)
     ctx_mapping = build_conversation_context(
         request.args.get("user_time"), request.cookies.get("tz")
     )
@@ -407,6 +466,9 @@ async def sse_reply(user_msg_id: str, date: str):
                 )
             else:
                 recall_applied = False
+            history_for_stream = apply_reply_kind_prompt(
+                history_for_stream, selected_kind.get("prompt")
+            )
             try:
                 pending_response = await start_stream_session(
                     manager=manager,
@@ -417,7 +479,10 @@ async def sse_reply(user_msg_id: str, date: str):
                     dek=dek,
                     params=params,
                     context=ctx,
-                    meta_extra={"tag_recall_applied": recall_applied},
+                    meta_extra={
+                        "tag_recall_applied": recall_applied,
+                        "reply_kind": selected_kind.get("id"),
+                    },
                 )
             except StreamCapacityError as exc:
                 return StreamSession.backpressure(

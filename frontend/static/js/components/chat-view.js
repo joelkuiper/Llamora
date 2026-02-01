@@ -275,7 +275,6 @@ export class ChatView extends ReactiveElement {
       chatFormReady = this.#wireChatForm(currentForm, {
         chat,
         container,
-        session: this.#session,
         date: activeDay,
       });
       this.#chatFormReady = chatFormReady.then(() => {
@@ -462,7 +461,6 @@ export class ChatView extends ReactiveElement {
         const chatFormReady = this.#wireChatForm(currentForm, {
           chat: this.#chat,
           container: document.getElementById("content-wrapper"),
-          session: this.#session,
           date: this.#lastRenderedDay,
         });
         this.#chatFormReady = chatFormReady.then(() => {
@@ -477,18 +475,14 @@ export class ChatView extends ReactiveElement {
     this.#historyRestoreFrame = frame;
   }
 
-  async #wireChatForm(chatForm, { chat, container, session, date }) {
+  async #wireChatForm(chatForm, { chat, container, date }) {
     if (!chatForm) return;
     await customElements.whenDefined("chat-form");
     if (!chatForm.isConnected) return;
     customElements.upgrade(chatForm);
     chatForm.container = container;
     chatForm.chat = chat;
-    chatForm.session = session;
     chatForm.date = date;
-    if ("streamController" in chatForm) {
-      chatForm.streamController = this.#streamController;
-    }
   }
 
   #cancelHistoryRestoreFrame() {

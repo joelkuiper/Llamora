@@ -244,7 +244,9 @@ class ChatFormElement extends ReactiveElement {
         ) {
           this.#setSubmitting(false);
           this.setStreaming(false);
+          return;
         }
+        this.#setSubmitting(false);
       },
     });
 

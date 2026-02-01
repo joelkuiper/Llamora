@@ -18,7 +18,7 @@ async def get_chat_context(
 
     The returned dictionary contains:
     - ``history``: the conversation history for the requested date
-    - ``pending_msg_id``: the most recent user message awaiting a reply, if any
+    - ``pending_msg_id``: reserved for explicit stream resumes (unused by default)
     - ``is_today``: whether the requested date matches the user's current local day
     - ``opening_stream``: whether the chat should initiate the opening message stream
     """
@@ -34,10 +34,7 @@ async def get_chat_context(
     today = local_date().isoformat()
     is_today = date == today
     pending_msg_id = None
-    if history and history[-1].get("role") == "user":
-        pending_msg_id = history[-1].get("id")
-
-    opening_stream = not history and is_today
+    opening_stream = False
 
     return {
         "history": history,

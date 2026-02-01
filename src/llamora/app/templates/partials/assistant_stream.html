@@ -1,11 +1,14 @@
-{% macro assistant_stream(user_msg_id, day, user_time=None, sse_url=None, stop_url=None) -%}
+{% macro assistant_stream(user_msg_id, day, user_time=None, sse_url=None, stop_url=None, reply_kind=None) -%}
 {# Quart's url_for drops params set to None, so we can always include user_time #}
 {%- if sse_url is none -%}
-{%- set sse_url = url_for('chat.sse_reply', date=day, user_msg_id=user_msg_id, user_time=user_time) -%}
+{%- set sse_url = url_for('chat.sse_reply', date=day, user_msg_id=user_msg_id, user_time=user_time, reply_kind=reply_kind) -%}
 {%- endif -%}
 <llm-stream id="msg-{{ user_msg_id }}"
             class="message assistant-stream"
             data-user-msg-id="{{ user_msg_id }}"
+            {%- if reply_kind %}
+            data-reply-kind="{{ reply_kind }}"
+            {%- endif %}
             data-assistant-msg-id=""
             data-sse-url="{{ sse_url }}"
             {%- if stop_url %}

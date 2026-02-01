@@ -1,11 +1,8 @@
-{% from 'partials/assistant_stream.html' import assistant_stream %}
 {% from 'partials/meta_chips.html' import render_meta_chips %}
+{% from 'partials/ask_llm_button.html' import ask_llm_button %}
 <div id="chat"
      data-date="{{ day }}"
      data-long-date="{{ day|long_date }}"
-     {% if pending_msg_id -%}
-     data-current-stream="{{ pending_msg_id }}"
-     {% endif -%}
      role="log"
      aria-live="polite"
      aria-relevant="additions"
@@ -26,29 +23,34 @@
        aria-labelledby="msg-{{ msg['id'] }}-speaker msg-{{ msg['id'] }}-body">
     <span class="visually-hidden" id="msg-{{ msg['id'] }}-speaker">{{ speaker }} message</span>
     {% set rendered = msg.get('message_html') %}
-    <div class="markdown-body"
-         id="msg-{{ msg['id'] }}-body"{% if rendered is not none %} data-rendered="true"{% endif %}>
-      {% if rendered is not none %}
-      {{ rendered | safe }}
-      {% else %}
-      {{ msg.message }}
-      {% endif %}
+    <div class="message-main">
+      <div class="markdown-body"
+           id="msg-{{ msg['id'] }}-body"{% if rendered is not none %} data-rendered="true"{% endif %}>
+        {% if rendered is not none %}
+        {{ rendered | safe }}
+        {% else %}
+        {{ msg.message }}
+        {% endif %}
+      </div>
     </div>
+    {% if msg['role'] == 'user' and not msg_meta.get('error') %}
+    <div class="message-footer">
+      {{ render_meta_chips(msg['id'], msg.get('tags', [])) }}
+      {{ ask_llm_button(msg['id'], day, reply_kinds) }}
+    </div>
+    {% endif %}
+    {% if msg['role'] == 'assistant' %}
+      {% set reply_kind = msg_meta.get('reply_kind') %}
+      {% if reply_kind and reply_kind_labels and reply_kind_labels.get(reply_kind) %}
+      <span class="message-kind">{{ reply_kind_labels.get(reply_kind) }}</span>
+      {% endif %}
+    {% endif %}
     {% if repeat_guard %}
     <span class="repeat-guard-indicator repeat-guard-indicator--visible repeat-guard-indicator--calm">
       <span class="repeat-guard-indicator__label">response trimmed</span>
       <span class="visually-hidden">Response paused after repeating itself.</span>
     </span>
     {% endif %}
-    {% if msg['role'] == 'user' and not msg_meta.get('error') %}
-    {{ render_meta_chips(msg['id'], msg.get('tags', [])) }}
-    {% endif %}
   </div>
   {% endfor %}
-  {% if opening_stream %}
-  {{ assistant_stream('opening', day, sse_url=url_for('chat.sse_opening', date=day)) }}
-  {% endif %}
-  {% if pending_msg_id %}
-  {{ assistant_stream(pending_msg_id, day, stop_url=url_for('chat.stop_generation', user_msg_id=pending_msg_id)) }}
-  {% endif %}
 </div>
