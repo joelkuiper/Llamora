@@ -187,16 +187,6 @@
       letter-spacing: .1px;
       font-weight: 600;
 
-      &::after {
-        content: "";
-        width: .38rem;
-        height: .38rem;
-        border-right: 1.5px solid currentColor;
-        border-bottom: 1.5px solid currentColor;
-        transform: rotate(45deg);
-        margin-left: .25rem;
-        opacity: .45;
-      }
 
       &:hover {
         background: var(--accent-05);
@@ -533,12 +523,6 @@
   border-color: var(--accent-15);
   box-shadow: 0 0 0 1px var(--accent-10);
   font-weight: 600;
-}
-
-#calendar[data-calendar-mode="picker"] .calendar-month-year::after,
-.calendar-month-year[aria-expanded="true"]::after {
-  transform: rotate(-135deg);
-  opacity: 1;
 }
 
 #calendar[data-calendar-mode="picker"] .cal-nav-btn {
