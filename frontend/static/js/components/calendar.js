@@ -1,4 +1,5 @@
 import { createPopover } from "../popover.js";
+import { getActiveDayParts } from "../chat/active-day-store.js";
 
 export class CalendarControl extends HTMLElement {
   #state = null;
@@ -97,9 +98,20 @@ export class CalendarControl extends HTMLElement {
     const calendarUrl =
       pop.dataset.calendarUrl || pop.getAttribute("hx-get") || null;
 
+    const getActiveDateParts = () => {
+      const parts = getActiveDayParts();
+      if (!parts) return null;
+      return { year: parts.year, month: parts.month };
+    };
+
     const loadCalendarContent = (params = {}) => {
       if (!calendarUrl) return;
       const target = new URL(calendarUrl, window.location.origin);
+      const activeDate = getActiveDateParts();
+      if (activeDate) {
+        target.searchParams.set("year", String(activeDate.year));
+        target.searchParams.set("month", String(activeDate.month));
+      }
       Object.entries(params).forEach(([key, value]) => {
         if (value === undefined || value === null) return;
         target.searchParams.set(key, value);

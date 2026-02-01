@@ -5,6 +5,7 @@ const body = doc?.body ?? null;
 
 let currentDay = null;
 let currentLabel = null;
+let currentParts = null;
 
 const normalize = (value) => {
   if (typeof value !== "string") {
@@ -28,6 +29,15 @@ const syncBodyDataset = () => {
   } else {
     delete body.dataset.activeDayLabel;
   }
+};
+
+const parseParts = (value) => {
+  if (typeof value !== "string") return null;
+  const [year, month, day] = value.split("-").map((part) => Number(part));
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return null;
+  }
+  return { year, month, day };
 };
 
 const dispatchChange = (previousDay, previousLabel, detail = {}) => {
@@ -56,6 +66,10 @@ export function getActiveDayLabel() {
   return currentLabel;
 }
 
+export function getActiveDayParts() {
+  return currentParts;
+}
+
 export function getActiveDayState() {
   return { day: currentDay, label: currentLabel };
 }
@@ -71,6 +85,7 @@ export function setActiveDay(day, label, { force = false, detail = {} } = {}) {
 
   currentDay = nextDay;
   currentLabel = nextLabel;
+  currentParts = nextDay ? parseParts(nextDay) : null;
 
   syncBodyDataset();
 
@@ -103,7 +118,7 @@ const bootstrap = () => {
   const initialLabel = normalize(body.dataset.activeDayLabel);
   currentDay = initialDay;
   currentLabel = initialLabel;
+  currentParts = initialDay ? parseParts(initialDay) : null;
 };
 
 bootstrap();
-
