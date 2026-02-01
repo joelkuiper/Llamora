@@ -160,6 +160,37 @@ def build_conversation_context(
     return {"date": date_str, "part_of_day": part}
 
 
+async def start_stream_session(
+    *,
+    manager,
+    user_msg_id: str,
+    uid: str,
+    date: str,
+    history: list[dict],
+    dek: bytes,
+    params: dict | None = None,
+    context: dict | None = None,
+    reply_to: str | None = None,
+    meta_extra: dict | None = None,
+    use_default_reply_to: bool = True,
+):
+    pending = manager.get(user_msg_id, uid)
+    if pending:
+        return pending
+    return manager.start_stream(
+        user_msg_id,
+        uid,
+        date,
+        history,
+        dek,
+        params,
+        context,
+        reply_to=reply_to,
+        meta_extra=meta_extra,
+        use_default_reply_to=use_default_reply_to,
+    )
+
+
 @dataclass(slots=True)
 class RecallAugmentation:
     """Result of applying recall context to a chat history."""

@@ -92,6 +92,7 @@ class PendingResponse(ResponsePipelineCallbacks):
         reply_to: str | None = None,
         meta_extra: dict | None = None,
         *,
+        use_default_reply_to: bool = True,
         auto_start: bool = True,
     ) -> None:
         self.user_msg_id = user_msg_id
@@ -106,7 +107,10 @@ class PendingResponse(ResponsePipelineCallbacks):
         self.meta: dict | None = None
         self.context = context or {}
         self.messages = messages
-        self.reply_to = reply_to if reply_to is not None else user_msg_id
+        if use_default_reply_to and reply_to is None:
+            self.reply_to = user_msg_id
+        else:
+            self.reply_to = reply_to
         self.meta_extra = meta_extra or {}
         self.cancelled = False
         self.created_at = time.monotonic()
@@ -411,6 +415,7 @@ class ChatStreamManager:
         messages: list[dict[str, str]] | None = None,
         reply_to: str | None = None,
         meta_extra: dict | None = None,
+        use_default_reply_to: bool = True,
     ) -> PendingResponse:
         self._prune_stale_pending()
         self._ensure_queue_worker()
@@ -454,6 +459,7 @@ class ChatStreamManager:
                 messages,
                 reply_to,
                 meta_extra,
+                use_default_reply_to=use_default_reply_to,
                 auto_start=False,
             )
             self._register_pending(pending)
@@ -476,6 +482,7 @@ class ChatStreamManager:
             messages,
             reply_to,
             meta_extra,
+            use_default_reply_to=use_default_reply_to,
             auto_start=False,
         )
         self._register_pending(pending)

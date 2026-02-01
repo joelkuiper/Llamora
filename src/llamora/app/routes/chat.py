@@ -27,6 +27,7 @@ from llamora.app.services.chat_helpers import (
     build_conversation_context,
     locate_message_and_reply,
     normalize_llm_config,
+    start_stream_session,
 )
 from llamora.app.services.chat_stream.manager import StreamCapacityError
 from llamora.app.services.tag_recall import build_tag_recall_context
@@ -282,6 +283,7 @@ async def sse_opening(date: str):
             messages=opening_messages,
             reply_to=None,
             meta_extra={"auto_opening": True},
+            use_default_reply_to=False,
         )
     except StreamCapacityError as exc:
         return StreamSession.backpressure(
@@ -406,14 +408,15 @@ async def sse_reply(user_msg_id: str, date: str):
             else:
                 recall_applied = False
             try:
-                pending_response = manager.start_stream(
-                    user_msg_id,
-                    uid,
-                    actual_date or normalized_date,
-                    history_for_stream,
-                    dek,
-                    params,
-                    ctx,
+                pending_response = await start_stream_session(
+                    manager=manager,
+                    user_msg_id=user_msg_id,
+                    uid=uid,
+                    date=actual_date or normalized_date,
+                    history=history_for_stream,
+                    dek=dek,
+                    params=params,
+                    context=ctx,
                     meta_extra={"tag_recall_applied": recall_applied},
                 )
             except StreamCapacityError as exc:

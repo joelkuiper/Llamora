@@ -63,7 +63,7 @@ class AssistantMessageWriter:
         content: str,
         dek: bytes,
         meta: dict,
-        reply_to: str,
+        reply_to: str | None,
         date: str,
     ) -> str:
         append: Callable[..., Awaitable[str]] | None = getattr(
@@ -195,7 +195,7 @@ class ResponsePipeline:
         writer: AssistantMessageWriter,
         metadata_builder: Callable[[str], Awaitable[Mapping[str, Any]]] | None,
         uid: str,
-        reply_to: str,
+        reply_to: str | None,
         date: str,
         dek: bytes,
         meta_extra: dict | None = None,
