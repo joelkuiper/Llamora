@@ -172,7 +172,7 @@
       background: transparent;
       color: inherit;
       font: inherit;
-      padding: .2rem .5rem;
+      padding: .15rem .45rem;
       border-radius: var(--radius-sm);
       display: inline-flex;
       align-items: center;
@@ -184,16 +184,18 @@
         border-color var(--motion-tight),
         box-shadow var(--motion-tight),
         transform var(--motion-snap);
+      letter-spacing: .1px;
+      font-weight: 600;
 
       &::after {
         content: "";
-        width: .4rem;
-        height: .4rem;
+        width: .38rem;
+        height: .38rem;
         border-right: 1.5px solid currentColor;
         border-bottom: 1.5px solid currentColor;
         transform: rotate(45deg);
         margin-left: .25rem;
-        opacity: .5;
+        opacity: .45;
       }
 
       &:hover {
@@ -482,9 +484,9 @@
 
   .calendar-picker-footer {
     margin-top: 0.35rem;
-    border-radius: calc(var(--radius-lg));
+    border-radius: var(--radius-md);
     background: var(--glass-bg);
-    border: 1px solid transparent;
+    border: 1px solid var(--border);
     padding: 0.6rem 0.8rem;
     text-align: center;
     font-size: 0.82rem;
@@ -497,6 +499,7 @@
       color var(--motion-tight),
       transform var(--motion-tight);
     user-select: none;
+    box-shadow: var(--subtle-raised-shadow);
   }
 
   .calendar-picker-footer:hover {
@@ -526,9 +529,9 @@
 #calendar[data-calendar-mode="picker"] .calendar-month-year,
 .calendar-month-year[aria-expanded="true"] {
   color: var(--accent-hover);
-  background: var(--accent-15);
-  border-color: var(--accent-30);
-  box-shadow: 0 0 0 2px var(--accent-10);
+  background: var(--accent-05);
+  border-color: var(--accent-15);
+  box-shadow: 0 0 0 1px var(--accent-10);
   font-weight: 600;
 }
 
