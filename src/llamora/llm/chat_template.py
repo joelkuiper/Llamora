@@ -41,12 +41,31 @@ class ChatPromptSeries:
 
 
 def _normalise_tokens(raw: Any) -> tuple[int, ...]:
+    sequence: Any
     if isinstance(raw, (list, tuple)):
         sequence = raw
+    elif isinstance(raw, Mapping):
+        if "input_ids" in raw:
+            sequence = raw["input_ids"]
+        elif "ids" in raw:
+            sequence = raw["ids"]
+        else:  # pragma: no cover - defensive
+            raise TypeError("Tokenizer.apply_chat_template returned unsupported token data")
+    elif hasattr(raw, "input_ids"):
+        sequence = getattr(raw, "input_ids")
     elif hasattr(raw, "tolist"):
         sequence = raw.tolist()
     else:  # pragma: no cover - defensive
         raise TypeError("Tokenizer.apply_chat_template returned unsupported token data")
+
+    if isinstance(sequence, (list, tuple)) and sequence:
+        first = sequence[0]
+        if isinstance(first, (list, tuple)):
+            if len(sequence) != 1:  # pragma: no cover - defensive
+                raise TypeError("Tokenizer tokens must be a single sequence of integers")
+            sequence = first
+    elif hasattr(sequence, "tolist"):
+        sequence = sequence.tolist()
 
     try:
         return tuple(int(token) for token in sequence)
