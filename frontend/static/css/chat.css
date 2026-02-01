@@ -125,7 +125,7 @@ body {
     &.assistant,
     &.assistant-stream {
       align-self: flex-end;
-      width: clamp(14rem, 62%, 30rem);
+      width: clamp(16rem, 68%, 34rem);
       margin-left: auto;
       padding: var(--spacing-sm) var(--spacing-lg);
       border-radius: var(--radius-sm);
@@ -505,9 +505,10 @@ scroll-bottom-button {
   left: var(--chat-center, 50%);  /* pixel value set by JS */
   transform: translateX(-50%);
   position: fixed;
-  bottom: 5rem;
+  bottom: 7.5rem;
   pointer-events: none;
   display: block;
+  z-index: 9000;
 }
 
 scroll-bottom-button.visible {
@@ -530,7 +531,7 @@ scroll-bottom-button .scroll-btn {
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--motion-sigh) ease, transform var(--motion-gentle) ease, background var(--motion-gentle) ease;
-  z-index: 1000;
+  z-index: 9001;
   cursor: pointer;
 
   scroll-bottom-button.visible & {
