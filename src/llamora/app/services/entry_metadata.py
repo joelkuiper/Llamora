@@ -81,7 +81,7 @@ async def generate_metadata(llm, text: str) -> dict[str, Any]:
     ]
 
     try:
-        raw = await llm.complete_chat(messages)
+        raw = await llm.complete_messages(messages)
     except Exception:
         logger.exception("Metadata generation request failed")
         return {"emoji": DEFAULT_METADATA_EMOJI, "keywords": []}

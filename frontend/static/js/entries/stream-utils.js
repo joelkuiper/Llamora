@@ -23,7 +23,7 @@ export function findStreamByUserMsgId(root, msgId) {
 
   const searchRoot = getSearchRoot(root);
   return searchRoot.querySelector(
-    `llm-stream[data-user-msg-id="${escapeAttributeValue(normalized)}"]`
+    `response-stream[data-user-msg-id="${escapeAttributeValue(normalized)}"]`
   );
 }
 

@@ -122,7 +122,7 @@ def _normalise_text(value: Any) -> str:
     return str(value or "").strip()
 
 
-def _conversation_vibes(history: Sequence[Mapping[str, Any] | dict[str, Any]]) -> str:
+def _entry_vibes(history: Sequence[Mapping[str, Any] | dict[str, Any]]) -> str:
     line = format_vibes_text(history)
     return line.strip()
 
@@ -162,7 +162,7 @@ def _build_system_message(
     history: Sequence[Mapping[str, Any] | dict[str, Any]] = (),
 ) -> str:
     context_lines = _context_lines(date, part_of_day)
-    vibes_line = _conversation_vibes(history)
+    vibes_line = _entry_vibes(history)
     rendered = render_prompt_template(
         "system.txt.j2",
         context_lines=context_lines,
@@ -180,7 +180,7 @@ def _build_opening_system_message(
     has_no_activity: bool = False,
 ) -> str:
     context_lines = _context_lines(date, part_of_day)
-    vibes_line = _conversation_vibes(yesterday_messages)
+    vibes_line = _entry_vibes(yesterday_messages)
     rendered = render_prompt_template(
         "opening_system.txt.j2",
         context_lines=context_lines,

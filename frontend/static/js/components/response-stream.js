@@ -40,7 +40,7 @@ function parseMetaPayload(data) {
 }
 
 function requestScrollToBottom(detail = {}) {
-  requestScrollForceBottom({ source: "llm-stream", ...detail });
+  requestScrollForceBottom({ source: "response-stream", ...detail });
 }
 
 function revealMetaChips(container) {
@@ -83,7 +83,7 @@ function revealMetaChips(container) {
   });
 }
 
-class LlmStreamElement extends HTMLElement {
+class ResponseStreamElement extends HTMLElement {
   #eventSource = null;
   #renderer = null;
   #renderFrame = null;
@@ -277,7 +277,7 @@ class LlmStreamElement extends HTMLElement {
       requestScrollForceBottom({ source: "stream:start" });
     }
     this.dispatchEvent(
-      new CustomEvent("llm-stream:start", {
+      new CustomEvent("response-stream:start", {
         bubbles: true,
         composed: true,
         detail: { element: this, userMsgId: this.userMsgId },
@@ -409,7 +409,7 @@ class LlmStreamElement extends HTMLElement {
     }
 
     this.dispatchEvent(
-      new CustomEvent("llm-stream:meta", {
+      new CustomEvent("response-stream:meta", {
         bubbles: true,
         composed: true,
         detail: {
@@ -568,7 +568,7 @@ class LlmStreamElement extends HTMLElement {
     }
 
     this.dispatchEvent(
-      new CustomEvent("llm-stream:complete", {
+      new CustomEvent("response-stream:complete", {
         bubbles: true,
         composed: true,
         detail: {
@@ -868,6 +868,6 @@ class LlmStreamElement extends HTMLElement {
   }
 }
 
-if (!customElements.get("llm-stream")) {
-  customElements.define("llm-stream", LlmStreamElement);
+if (!customElements.get("response-stream")) {
+  customElements.define("response-stream", ResponseStreamElement);
 }

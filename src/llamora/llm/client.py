@@ -552,7 +552,7 @@ class LLMClient:
     async def _trim_history(
         self, history: list[dict[str, Any]], max_input: int, context: dict[str, Any]
     ) -> list[dict[str, Any]]:
-        """Trim the conversation history to respect the model context window.
+        """Trim the entry history to respect the model context window.
 
         The function reuses cached token counts where possible, ensuring the
         number of tokenisation calls is bounded by the history length for a
@@ -767,7 +767,7 @@ class LLMClient:
             finally:
                 await stream.aclose()
 
-    async def complete_chat(
+    async def complete_messages(
         self,
         messages: Sequence[Mapping[str, Any]] | list[dict[str, Any]],
         *,

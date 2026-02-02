@@ -152,7 +152,7 @@ export function renderAllMarkdown(root, nodes = null, options = {}) {
 
   targets.forEach((el) => {
     const isStreaming =
-      el.closest("llm-stream")?.dataset.streaming === "true";
+      el.closest("response-stream")?.dataset.streaming === "true";
     if (isStreaming) {
       // Streaming responses manage their own incremental rendering to avoid deleting the typing indicator mid-update.
       return;

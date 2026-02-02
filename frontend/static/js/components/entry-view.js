@@ -19,7 +19,7 @@ import {
 } from "../services/time.js";
 import { afterNextFrame, scheduleFrame } from "../utils/scheduler.js";
 import "./entry-form.js";
-import "./llm-stream.js";
+import "./response-stream.js";
 import "./message-actions.js";
 
 function activateAnimations(node) {
@@ -260,7 +260,7 @@ export class EntryView extends ReactiveElement {
         return;
       }
 
-      const activeStream = el?.closest?.("llm-stream[data-streaming='true']");
+      const activeStream = el?.closest?.("response-stream[data-streaming='true']");
       if (activeStream) {
         return;
       }
@@ -505,7 +505,7 @@ export class EntryView extends ReactiveElement {
   }
 
   #handleMarkdownRendered(el) {
-    const stream = el?.closest?.("llm-stream");
+    const stream = el?.closest?.("response-stream");
     stream?.handleMarkdownRendered(el);
   }
 
@@ -519,11 +519,11 @@ export class EntryView extends ReactiveElement {
       }
     };
 
-    if (this.#entries instanceof Element && this.#entries.matches("llm-stream")) {
+    if (this.#entries instanceof Element && this.#entries.matches("response-stream")) {
       resume(this.#entries);
     }
 
-    this.#entries.querySelectorAll?.("llm-stream").forEach((stream) => resume(stream));
+    this.#entries.querySelectorAll?.("response-stream").forEach((stream) => resume(stream));
   }
 
 }

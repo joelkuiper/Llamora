@@ -147,7 +147,7 @@ def _format_vibes_line(display_emojis: Sequence[str]) -> str:
     if not display_emojis:
         return ""
     joined = " ".join(display_emojis)
-    return f"Emoji vibes for this conversation: {joined}\n"
+    return f"Emoji vibes for these entries: {joined}\n"
 
 
 def format_vibes_text(history: Sequence[Mapping[str, Any] | dict[str, Any]]) -> str:

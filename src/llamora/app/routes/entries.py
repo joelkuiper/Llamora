@@ -410,7 +410,7 @@ async def request_response(date, user_msg_id: str):
         abort(404, description="Message not found.")
 
     return await render_template(
-        "partials/entry_reply_stream_item.html",
+        "partials/entry_response_stream_item.html",
         user_msg_id=user_msg_id,
         day=actual_date or normalized_date,
         user_time=user_time,

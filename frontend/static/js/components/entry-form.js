@@ -419,7 +419,7 @@ class EntryFormElement extends ReactiveElement {
       ? findStreamByUserMsgId(this.#entries, currentId)
       : null;
     if (!stream && indicator) {
-      stream = indicator.closest("llm-stream");
+      stream = indicator.closest("response-stream");
     }
     const stopEndpoint = stream?.dataset?.stopUrl || indicator?.dataset?.stopUrl;
     const abortedViaController = this.#streamController?.abortActiveStream({
