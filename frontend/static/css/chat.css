@@ -138,7 +138,7 @@ body {
         margin-top: 0;
       }
 
-      .message-actions {
+      .message-actions-row {
         display: inline-flex;
         align-items: center;
         gap: 0.4rem;
@@ -147,12 +147,12 @@ body {
         transition: opacity var(--motion-gentle) ease;
       }
 
-      &:hover .message-actions,
-      &:focus-within .message-actions {
+      &:hover .message-actions-row,
+      &:focus-within .message-actions-row {
         opacity: 1;
       }
 
-      .message-actions .ask-llm {
+      .message-actions-row .ask-llm {
         flex: 0 0 auto;
       }
 
@@ -340,6 +340,55 @@ body {
     position: static;
   }
 
+  .message.assistant .message-delete,
+  .message.assistant-stream .message-delete {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    opacity: 0.4;
+  }
+
+  .message.assistant .message-delete img,
+  .message.assistant-stream .message-delete img {
+    filter: grayscale(1) brightness(0.6);
+  }
+
+  .message.assistant:hover .message-delete,
+  .message.assistant:focus-within .message-delete,
+  .message.assistant-stream:hover .message-delete,
+  .message.assistant-stream:focus-within .message-delete {
+    opacity: 0.75;
+    background: linear-gradient(
+      0deg,
+      rgba(208, 0, 48, 0.16),
+      rgba(208, 0, 48, 0.12)
+    ) var(--color-danger);
+    border-color: var(--color-danger);
+    box-shadow:
+      var(--raised-shadow),
+      0 0 0 2px var(--danger-25);
+  }
+
+  .message.assistant:hover .message-delete img,
+  .message.assistant:focus-within .message-delete img,
+  .message.assistant-stream:hover .message-delete img,
+  .message.assistant-stream:focus-within .message-delete img {
+    filter: none;
+  }
+
+  .message-delete:hover,
+  .message-delete:focus-visible {
+    border-color: var(--color-danger);
+    box-shadow:
+      var(--raised-shadow),
+      0 0 0 2px var(--danger-25);
+    background: linear-gradient(
+      0deg,
+      rgba(208, 0, 48, 0.16),
+      rgba(208, 0, 48, 0.12)
+    ) var(--color-danger);
+  }
+
   .message.htmx-swapping {
     pointer-events: none;
     animation: var(--motion-message-delete-animation);
@@ -517,6 +566,7 @@ chat-view[data-rendering="true"] #chat {
       width: 1.35rem;
       height: 1.35rem;
       display: block;
+      opacity: 0.6;
     }
 
     /* submitting: gradient in accent palette */

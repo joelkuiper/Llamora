@@ -113,9 +113,9 @@ repeat_guard_min_length = 12
 [default.LLM]
 allowed_config_keys = ["temperature"]
 reply_kinds = [
-  { id = "reply", label = "Reply", prompt = "Respond to the user's message with a calm, grounded reply." },
-  { id = "reflect", label = "Reflect", prompt = "Offer a gentle reflection and emotional acknowledgement of the message." },
-  { id = "summarize", label = "Summarize", prompt = "Provide a concise, factual summary of the message." },
+  { id = "reply", label = "Reply", prompt = "Generate a direct continuation of the thread, responding normally to the content." },
+  { id = "acknowledge", label = "Acknowledge", prompt = "Generate a supportive, validating response that focuses on reassurance, empathy, or positive acknowledgment. Do not introduce new analysis or advice unless clearly implied." },
+  { id = "notice", label = "Notice", prompt = "Generate an observational response that points out patterns, themes, or notable aspects of the message, without judgment or encouragement. Keep it descriptive rather than reactive." },
 ]
 
 [default.LLM.tokenizer]

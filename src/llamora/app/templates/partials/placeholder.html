@@ -1,26 +1,26 @@
 {% from 'partials/meta_chips.html' import render_meta_chips %}
-{% from 'partials/ask_llm_button.html' import ask_llm_button %}
+{% from 'partials/message_actions.html' import message_actions %}
 <div id="msg-{{ user_msg_id }}" class="message user">
   <div class="message-main">
     <div class="markdown-body">{{ user_text }}</div>
   </div>
   <div class="message-footer">
     {{ render_meta_chips(user_msg_id, []) }}
-    <div class="message-actions" aria-label="Message actions">
+    <div class="message-actions-row" aria-label="Message actions">
       <button class="message-action message-delete"
               type="button"
               hx-delete="{{ url_for('chat.delete_message', msg_id=user_msg_id) }}"
               hx-target="#msg-{{ user_msg_id }}"
               hx-swap="outerHTML swap:180ms"
               aria-label="Delete message"
-              title="Delete message"
+              data-tooltip-title="Delete message"
               data-ready="true">
         <img class="message-action__icon"
              src="{{ url_for('static', filename='icons/trash.svg') }}"
              alt=""
              aria-hidden="true">
       </button>
-      {{ ask_llm_button(user_msg_id, day, reply_kinds) }}
+      {{ message_actions(user_msg_id, day, reply_kinds) }}
     </div>
   </div>
 </div>

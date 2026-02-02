@@ -36,7 +36,7 @@
           type="button"
           disabled
           aria-label="Delete message"
-          title="Delete message"
+          data-tooltip-title="Delete message"
           data-ready="false"
           hx-swap="outerHTML swap:180ms"
           data-delete-template="{{ url_for('chat.delete_message', msg_id='__MSG_ID__') }}"

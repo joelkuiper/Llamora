@@ -141,17 +141,12 @@
     transform var(--motion-press) ease,
     background-color var(--motion-gentle) ease;
   color: var(--glass-text-stronger);
+  --icon-glyph-size: 0.9rem;
 
   &:active {
     transform: translateY(1px);
     box-shadow: var(--inset-shadow-disabled);
   }
-}
-
-.add-tag-btn img {
-  width: 1.05rem;
-  height: 1.05rem;
-  display: block;
 }
 
 .message-action {
@@ -173,6 +168,7 @@
   justify-content: center;
   flex: 0 0 auto;
   padding: 0;
+  --icon-glyph-size: 0.9rem;
 
   &:active {
     transform: translateY(1px);
@@ -180,9 +176,10 @@
   }
 }
 
+.add-tag-btn img,
 .message-action__icon {
-  width: 1rem;
-  height: 1rem;
+  width: var(--icon-glyph-size);
+  height: var(--icon-glyph-size);
   display: block;
 }
 
@@ -316,6 +313,72 @@
     }
     &:active { transform: translateY(1px); }
   }
+}
+
+.action-popover {
+  width: 13rem;
+  padding: 8px;
+}
+
+.action-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.action-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--glass-bg-alt);
+  color: var(--glass-text-stronger);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+  font: inherit;
+  transition:
+    box-shadow var(--motion-gentle) ease,
+    border-color var(--motion-gentle) ease,
+    transform var(--motion-press) ease,
+    background-color var(--motion-gentle) ease;
+}
+
+.action-item:hover {
+  border-color: var(--accent);
+  box-shadow:
+    var(--raised-shadow),
+    0 0 0 2px var(--accent-10);
+  background: linear-gradient(0deg, var(--accent-15), var(--accent-05)) var(--glass-bg-alt);
+}
+
+.action-item:active {
+  transform: translateY(1px);
+  box-shadow: var(--inset-shadow-disabled);
+}
+
+.action-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.action-item__icon {
+  width: 1rem;
+  height: 1rem;
+  display: block;
+  flex: 0 0 auto;
+}
+
+.action-item__label {
+  font-size: 0.85rem;
+  letter-spacing: 0.01em;
 }
 
 

@@ -19,6 +19,7 @@ import {
 import { afterNextFrame, scheduleFrame } from "../utils/scheduler.js";
 import "./chat-form.js";
 import "./llm-stream.js";
+import "./message-actions.js";
 
 function activateAnimations(node) {
   if (!node || node.nodeType !== Node.ELEMENT_NODE) return;
