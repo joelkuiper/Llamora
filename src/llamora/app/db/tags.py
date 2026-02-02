@@ -375,8 +375,13 @@ class TagsRepository(BaseRepository):
         tag_hashes: list[bytes],
         *,
         limit: int | None = None,
+        max_message_id: str | None = None,
+        max_created_at: str | None = None,
     ) -> list[str]:
-        """Return recent message IDs associated with any of ``tag_hashes``."""
+        """Return recent message IDs associated with any of ``tag_hashes``.
+
+        Optional cutoff values limit matches to messages at-or-before the entry.
+        """
 
         if not tag_hashes:
             return []
@@ -384,14 +389,28 @@ class TagsRepository(BaseRepository):
             return []
 
         tag_placeholders = ",".join("?" * len(tag_hashes))
+        joins = ""
+        conditions = [f"x.user_id = ? AND x.tag_hash IN ({tag_placeholders})"]
+        params: list[object] = [user_id, *tag_hashes]
+
+        if max_message_id or max_created_at:
+            joins = "JOIN messages m ON m.user_id = x.user_id AND m.id = x.message_id"
+            if max_message_id:
+                conditions.append("m.id <= ?")
+                params.append(max_message_id)
+            if max_created_at:
+                conditions.append("m.created_at <= ?")
+                params.append(max_created_at)
+
+        where_clause = " AND ".join(conditions)
         sql = f"""
-            SELECT message_id, MAX(ulid) AS latest_ulid
-            FROM tag_message_xref
-            WHERE user_id = ? AND tag_hash IN ({tag_placeholders})
-            GROUP BY message_id
+            SELECT x.message_id, MAX(x.ulid) AS latest_ulid
+            FROM tag_message_xref x
+            {joins}
+            WHERE {where_clause}
+            GROUP BY x.message_id
             ORDER BY latest_ulid DESC
         """
-        params: list[object] = [user_id, *tag_hashes]
         if limit is not None:
             sql += " LIMIT ?"
             params.append(limit)

@@ -167,9 +167,14 @@ async def build_tag_recall_context(
     *,
     history: Sequence[Mapping[str, Any] | dict[str, Any]],
     current_date: str | None,
+    max_message_id: str | None = None,
+    max_created_at: str | None = None,
     config: TagRecallConfig | None = None,
 ) -> TagRecallContext | None:
-    """Return summarised memories linked to the user's recent tags."""
+    """Return summarised memories linked to the user's recent tags.
+
+    Cutoffs prevent recalling messages created after the triggering entry.
+    """
 
     if not history:
         return None
@@ -193,7 +198,11 @@ async def build_tag_recall_context(
         return None
 
     candidate_ids = await db.tags.get_recent_messages_for_tag_hashes(
-        user_id, focus_tags, limit=cfg.max_snippets * 4
+        user_id,
+        focus_tags,
+        limit=cfg.max_snippets * 4,
+        max_message_id=max_message_id,
+        max_created_at=max_created_at,
     )
 
     if not candidate_ids:

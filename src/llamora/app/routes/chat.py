@@ -30,6 +30,7 @@ from llamora.app.services.chat_helpers import (
     normalize_llm_config,
     start_stream_session,
 )
+from llamora.app.services.entry_context import build_entry_context
 from llamora.app.services.chat_stream.manager import StreamCapacityError
 from llamora.app.services.tag_recall import build_tag_recall_context
 from llamora.app.services.session_context import get_session_context
@@ -401,7 +402,12 @@ async def sse_reply(user_msg_id: str, date: str):
     _, user, dek = await require_user_and_dek()
     uid = user["id"]
     history, _, actual_date = await locate_message_and_reply(
-        get_services().db, uid, dek, normalized_date, user_msg_id
+        get_services().db,
+        uid,
+        dek,
+        normalized_date,
+        user_msg_id,
+        slice_history=True,
     )
 
     if not history:
@@ -424,6 +430,14 @@ async def sse_reply(user_msg_id: str, date: str):
     services = get_services()
     db = services.db
     manager = services.llm_service.chat_stream_manager
+    entry_context = await build_entry_context(
+        db,
+        uid,
+        dek,
+        user_msg_id=user_msg_id,
+    )
+    if entry_context:
+        ctx.update(entry_context)
 
     try:
         pending_response = manager.get(user_msg_id, uid)
@@ -434,6 +448,7 @@ async def sse_reply(user_msg_id: str, date: str):
                 dek,
                 history=history,
                 current_date=actual_date or normalized_date,
+                max_message_id=user_msg_id,
             )
             llm_client = services.llm_service.llm
             recall_date = actual_date or normalized_date

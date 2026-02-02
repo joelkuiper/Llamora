@@ -89,12 +89,29 @@ def find_existing_assistant_reply(
     return None
 
 
+def slice_history_to_entry(
+    history: Sequence[Mapping[str, Any]], user_msg_id: str
+) -> list[dict[str, Any]]:
+    """Return ``history`` up to and including ``user_msg_id``."""
+
+    sliced: list[dict[str, Any]] = []
+    target_id = str(user_msg_id)
+    for message in history:
+        message_dict = dict(message)
+        sliced.append(message_dict)
+        if str(message_dict.get("id")) == target_id:
+            break
+    return sliced or list(history)
+
+
 async def locate_message_and_reply(
     db,
     user_id: str,
     dek: bytes,
     date: str,
     user_msg_id: str,
+    *,
+    slice_history: bool = False,
 ):
     """Fetch history containing ``user_msg_id`` and any existing reply.
 
@@ -121,6 +138,9 @@ async def locate_message_and_reply(
 
     if assistant_message is None:
         assistant_message = find_existing_assistant_reply(history, user_msg_id)
+
+    if slice_history:
+        history = slice_history_to_entry(history, user_msg_id)
 
     return history, assistant_message, actual_date
 
