@@ -19,7 +19,6 @@ function buildSnapshotDetail(state, overrides = {}) {
     streaming,
     reason: state?.reason ?? null,
     result: null,
-    session: null,
     ...overrides,
   };
 }

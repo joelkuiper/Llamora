@@ -5,7 +5,6 @@ from __future__ import annotations
 import math
 import logging
 from contextlib import suppress
-from datetime import datetime, timezone
 from types import MappingProxyType
 from typing import Any, Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -14,7 +13,6 @@ import orjson
 from quart import Response
 from werkzeug.datastructures import Headers
 
-from llamora.app.services.time import date_and_part
 from llamora.app.services.tag_recall import TagRecallContext
 
 
@@ -85,19 +83,6 @@ def normalize_llm_config(
     filtered = {key: parsed[key] for key in parsed if key in allowed}
 
     return filtered or None
-
-
-def build_conversation_context(
-    user_time: str | None, tz_cookie: str | None
-) -> Mapping[str, str]:
-    """Compute contextual metadata for downstream LLM prompts."""
-
-    timestamp = user_time or datetime.now(timezone.utc).isoformat().replace(
-        "+00:00", "Z"
-    )
-    tz = tz_cookie or "UTC"
-    date_str, part = date_and_part(timestamp, tz)
-    return {"date": date_str, "part_of_day": part}
 
 
 def apply_response_kind_prompt(

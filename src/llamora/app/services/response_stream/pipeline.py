@@ -190,7 +190,9 @@ class ResponsePipeline:
     def __init__(
         self,
         *,
-        session,
+        stream,
+        abort: Callable[[], Awaitable[None]] | None,
+        entry_id: str,
         writer: AssistantEntryWriter,
         uid: str,
         reply_to: str | None,
@@ -199,7 +201,9 @@ class ResponsePipeline:
         meta_extra: dict | None = None,
         config: LLMStreamConfig,
     ) -> None:
-        self._session = session
+        self._stream_iter = stream
+        self._abort = abort
+        self._entry_id = entry_id
         self._writer = writer
         self._uid = uid
         self._reply_to = reply_to
@@ -232,7 +236,7 @@ class ResponsePipeline:
         except asyncio.TimeoutError:
             logger.warning(
                 "Streaming timed out for %s",
-                getattr(self._session, "entry_id", "<unknown>"),
+                self._entry_id or "<unknown>",
             )
             self._cancelled = True
             self._error = True
@@ -279,11 +283,10 @@ class ResponsePipeline:
         await self._abort_session()
 
     async def _abort_session(self) -> None:
-        abort = getattr(self._session, "abort", None)
-        if abort is None:
+        if self._abort is None:
             return
         try:
-            await abort()
+            await self._abort()
         except Exception:  # pragma: no cover - defensive
             logger.exception("Failed to abort LLM session")
 
@@ -321,9 +324,11 @@ class ResponsePipeline:
         return await consume()
 
     async def _fetch_chunks(self):
-        async for chunk in self._session:
+        async for chunk in self._stream_iter:
             if self._cancel_requested:
                 break
+            if isinstance(chunk, dict) and chunk.get("type") == "error":
+                raise LLMStreamError(chunk.get("data", "Unknown error"))
             yield chunk
 
     async def _persist(

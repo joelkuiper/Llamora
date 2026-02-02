@@ -18,19 +18,21 @@ from llamora.llm.entry_template import build_opening_messages, render_entry_prom
 
 from llamora.app.services.container import get_services
 from llamora.app.services.auth_helpers import login_required
-from llamora.app.services.entry_context import get_entries_context
+from llamora.app.services.entry_context import (
+    get_entries_context,
+    build_entry_context,
+    build_llm_context,
+)
 from llamora.app.services.entry_helpers import (
     augment_history_with_recall,
     augment_opening_with_recall,
     apply_response_kind_prompt,
     history_has_tag_recall,
     StreamSession,
-    build_conversation_context,
     build_entry_history,
     normalize_llm_config,
     start_stream_session,
 )
-from llamora.app.services.entry_context import build_entry_context
 from llamora.app.services.response_stream.manager import StreamCapacityError
 from llamora.app.services.tag_recall import build_tag_recall_context
 from llamora.app.services.session_context import get_session_context
@@ -476,11 +478,6 @@ async def sse_response(entry_id: str, date: str):
 
     response_kind = request.args.get("response_kind")
     selected_kind = _select_response_kind(response_kind)
-    ctx_mapping = build_conversation_context(
-        request.args.get("user_time"), request.cookies.get("tz")
-    )
-    ctx = dict(ctx_mapping)
-
     services = get_services()
     db = services.db
     manager = services.llm_service.response_stream_manager
@@ -490,8 +487,11 @@ async def sse_response(entry_id: str, date: str):
         dek,
         entry_id=entry_id,
     )
-    if entry_context:
-        ctx.update(entry_context)
+    ctx = build_llm_context(
+        user_time=request.args.get("user_time"),
+        tz_cookie=request.cookies.get("tz"),
+        entry_context=entry_context,
+    )
 
     try:
         pending_response = manager.get(entry_id, uid)

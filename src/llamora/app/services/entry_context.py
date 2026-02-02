@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
 from llamora.app.services.container import get_services
 from llamora.app.services.markdown import render_markdown_to_html
 from llamora.app.services.session_context import get_session_context
-from llamora.app.services.time import local_date
+from llamora.app.services.time import local_date, date_and_part
 
 
 logger = logging.getLogger(__name__)
@@ -130,3 +131,22 @@ async def get_entries_context(
         "is_today": is_today,
         "opening_stream": opening_stream,
     }
+
+
+def build_llm_context(
+    *,
+    user_time: str | None,
+    tz_cookie: str | None,
+    entry_context: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Return the LLM context payload shared across response flows."""
+
+    timestamp = user_time or datetime.now(timezone.utc).isoformat().replace(
+        "+00:00", "Z"
+    )
+    tz = tz_cookie or "UTC"
+    date_str, part = date_and_part(timestamp, tz)
+    ctx: dict[str, Any] = {"date": date_str, "part_of_day": part}
+    if entry_context:
+        ctx.update(entry_context)
+    return ctx

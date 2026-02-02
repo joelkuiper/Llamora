@@ -1,12 +1,12 @@
 {% from 'partials/entry_tags.html' import render_entry_tags %}
 {% from 'partials/entry_actions.html' import entry_actions %}
 {% from 'partials/response_kind.html' import response_kind_icon %}
-{% macro render_entry(e, day, response_kinds=(), response_kind_labels=None, is_today=True, replies=None) -%}
-{% set msg_meta = e.get('meta', {}) %}
-{% set is_error = msg_meta.get('error') %}
-{% set repeat_guard = msg_meta.get('repeat_guard') %}
-{% set response_kind = msg_meta.get('response_kind') %}
-{% set is_opening = msg_meta.get('auto_opening') %}
+{% macro render_entry(e, day, response_kinds=(), response_kind_labels=None, is_today=True, responses=None) -%}
+{% set entry_meta = e.get('meta', {}) %}
+{% set is_error = entry_meta.get('error') %}
+{% set repeat_guard = entry_meta.get('repeat_guard') %}
+{% set response_kind = entry_meta.get('response_kind') %}
+{% set is_opening = entry_meta.get('auto_opening') %}
 {% set opening_cookie = 'opening_collapsed_' ~ day %}
 {% set opening_collapsed = is_opening and request.cookies.get(opening_cookie) == '1' %}
 {% set speaker = 'Your' if e['role'] == 'user' else 'Assistant' %}
@@ -46,7 +46,7 @@
       </div>
     </div>
   </div>
-  {% if e['role'] == 'user' and not msg_meta.get('error') %}
+  {% if e['role'] == 'user' and not entry_meta.get('error') %}
   <div class="entry-footer">
     {{ render_entry_tags(entry_id=e['id'], tags=e.get('tags', [])) }}
     <div class="entry-actions-row" aria-label="Entry actions">
@@ -110,8 +110,8 @@
 <div class="entry-responses"
      id="entry-responses-{{ e['id'] }}"
      data-responses-for="{{ e['id'] }}">
-  {% for reply in replies or [] %}
-  {{ render_entry(reply, day, response_kinds, response_kind_labels, is_today) }}
+  {% for response in responses or [] %}
+  {{ render_entry(response, day, response_kinds, response_kind_labels, is_today) }}
   {% endfor %}
 </div>
 {% endif %}

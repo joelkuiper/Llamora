@@ -17,7 +17,6 @@ from ..llm_stream_config import LLMStreamConfig
 
 from .pipeline import (
     AssistantEntryWriter,
-    LLMStreamError,
     PipelineResult,
     ResponsePipeline,
     ResponsePipelineCallbacks,
@@ -25,49 +24,6 @@ from .pipeline import (
 
 
 logger = logging.getLogger(__name__)
-
-
-class LLMStreamSession:
-    """Encapsulates an LLM streaming session for a single response."""
-
-    def __init__(
-        self,
-        llm: LLMClient,
-        entry_id: str,
-        history: list[dict],
-        params: dict | None,
-        context: dict | None,
-        messages: list[dict[str, str]] | None,
-    ) -> None:
-        self._llm = llm
-        self.entry_id = entry_id
-        self._history = history
-        self._params = params
-        self._context = context or {}
-        self._messages = messages
-        self._first_chunk = True
-
-    async def __aiter__(self) -> AsyncIterator[str]:
-        async for chunk in self._llm.stream_response(
-            self.entry_id,
-            self._history,
-            self._params,
-            self._context,
-            messages=self._messages,
-        ):
-            if isinstance(chunk, dict) and chunk.get("type") == "error":
-                logger.info("Error chunk received for %s: %s", self.entry_id, chunk)
-                raise LLMStreamError(chunk.get("data", "Unknown error"))
-            text = chunk
-            if not isinstance(text, str):
-                text = str(text)
-            if self._first_chunk:
-                text = text.lstrip()
-                self._first_chunk = False
-            yield text
-
-    async def abort(self) -> None:
-        await self._llm.abort(self.entry_id)
 
 
 class PendingResponse(ResponsePipelineCallbacks):
@@ -120,14 +76,29 @@ class PendingResponse(ResponsePipelineCallbacks):
         self._start_event = asyncio.Event()
         self._activated = False
         self.started_at: float | None = None
-        self._session = LLMStreamSession(
-            llm, entry_id, history, params, context, messages
-        )
+        async def _stream_response() -> AsyncIterator[str]:
+            first_chunk = True
+            async for chunk in llm.stream_response(
+                entry_id,
+                history,
+                params,
+                context,
+                messages=messages,
+            ):
+                if first_chunk and isinstance(chunk, str):
+                    chunk = chunk.lstrip()
+                    first_chunk = False
+                yield chunk
+
+        self._stream = _stream_response()
+        self._abort = lambda: llm.abort(entry_id)
         self._visible_total = ""
         _repeat_guard_size = config.repeat_guard_size
         _repeat_guard_min_length = config.repeat_guard_min_length
         self._pipeline = ResponsePipeline(
-            session=self._session,
+            stream=self._stream,
+            abort=self._abort,
+            entry_id=entry_id,
             writer=AssistantEntryWriter(db),
             uid=uid,
             reply_to=self.reply_to,
@@ -693,7 +664,6 @@ class ResponseStreamManager:
 
 __all__ = [
     "ResponseStreamManager",
-    "LLMStreamSession",
     "PendingResponse",
     "StreamCapacityError",
 ]
