@@ -19,7 +19,7 @@ from llamora.llm.chat_template import build_opening_messages, render_chat_prompt
 
 from llamora.app.services.container import get_services
 from llamora.app.services.auth_helpers import login_required
-from llamora.app.services.chat_context import get_chat_context
+from llamora.app.services.entry_context import get_entries_context
 from llamora.app.services.chat_helpers import (
     augment_history_with_recall,
     apply_reply_kind_prompt,
@@ -27,7 +27,6 @@ from llamora.app.services.chat_helpers import (
     StreamSession,
     build_conversation_context,
     normalize_llm_config,
-    slice_history_to_entry,
     start_stream_session,
 )
 from llamora.app.services.entry_context import build_entry_context
@@ -49,6 +48,19 @@ from llamora.settings import settings
 
 
 entries_bp = Blueprint("entries", __name__)
+
+
+def _trim_history_to_entry(
+    history: list[dict[str, Any]], user_msg_id: str
+) -> list[dict[str, Any]]:
+    trimmed: list[dict[str, Any]] = []
+    target_id = str(user_msg_id)
+    for message in history:
+        message_dict = dict(message)
+        trimmed.append(message_dict)
+        if str(message_dict.get("id")) == target_id:
+            break
+    return trimmed or list(history)
 
 
 def _entry_stream_manager():
@@ -97,7 +109,7 @@ async def render_entries(
 ) -> Response:
     session = get_session_context()
     user = await session.require_user()
-    context = await get_chat_context(user, date)
+    context = await get_entries_context(user, date)
     reply_kinds, reply_kind_labels = _load_reply_kinds()
     html = await render_template(
         "partials/entries.html",
@@ -227,7 +239,7 @@ async def sse_opening(date: str):
     db = services.db
     is_new = not await db.messages.user_has_messages(uid)
 
-    yesterday_msgs = await db.messages.get_recent_history(
+    yesterday_msgs = await db.messages.get_recent_messages(
         uid, yesterday_iso, dek, limit=20
     )
     had_yesterday_activity = bool(yesterday_msgs)
@@ -424,11 +436,13 @@ async def sse_reply(user_msg_id: str, date: str):
     if not actual_date:
         logger.warning("History not found for user message %s", user_msg_id)
         return StreamSession.error("Invalid ID")
-    history = await get_services().db.messages.get_history(uid, actual_date, dek)
+    history = await get_services().db.messages.get_message_history(
+        uid, actual_date, dek
+    )
     if not history:
         logger.warning("History not found for user message %s", user_msg_id)
         return StreamSession.error("Invalid ID")
-    history = slice_history_to_entry(history, user_msg_id)
+    history = _trim_history_to_entry(history, user_msg_id)
 
     params_raw = normalize_llm_config(
         request.args.get("config"),

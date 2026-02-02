@@ -123,6 +123,32 @@ class MessagesRepository(BaseRepository):
                 )
         return history
 
+    @staticmethod
+    def _thread_entries(history: list[dict]) -> list[dict]:
+        entries: list[dict] = []
+        by_user_id: dict[str, dict] = {}
+
+        for message in history:
+            role = message.get("role")
+            msg_id = str(message.get("id") or "")
+            reply_to = message.get("reply_to")
+            reply_key = str(reply_to) if reply_to else ""
+
+            if role == "user":
+                entry = {"message": message, "replies": []}
+                entries.append(entry)
+                if msg_id:
+                    by_user_id[msg_id] = entry
+                continue
+
+            if reply_key and reply_key in by_user_id:
+                by_user_id[reply_key]["replies"].append(message)
+                continue
+
+            entries.append({"message": message, "replies": []})
+
+        return entries
+
     async def append_message(
         self,
         user_id: str,
@@ -388,9 +414,15 @@ class MessagesRepository(BaseRepository):
     async def get_history(
         self, user_id: str, created_date: str, dek: bytes
     ) -> list[dict]:
+        history = await self.get_message_history(user_id, created_date, dek)
+        return self._thread_entries(list(history))
+
+    async def get_message_history(
+        self, user_id: str, created_date: str, dek: bytes
+    ) -> list[dict]:
         cached = await self._get_cached_history(user_id, created_date)
         if cached is not None:
-            return cached
+            return list(cached)
 
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
@@ -414,7 +446,7 @@ class MessagesRepository(BaseRepository):
         await self._store_history_cache(user_id, created_date, history)
         return history
 
-    async def get_recent_history(
+    async def get_recent_messages(
         self, user_id: str, created_date: str, dek: bytes, limit: int
     ) -> list[dict]:
         if limit <= 0:
@@ -422,7 +454,7 @@ class MessagesRepository(BaseRepository):
 
         cached = await self._get_cached_history(user_id, created_date)
         if cached is not None:
-            return cached[-limit:]
+            return list(cached[-limit:])
 
         async with self.pool.connection() as conn:
             cursor = await conn.execute(

@@ -65,21 +65,6 @@ def format_sse_event(event_type: str, payload: Any) -> str:
     return f"event: {event_type}\ndata: {serialized}\n\n"
 
 
-def slice_history_to_entry(
-    history: Sequence[Mapping[str, Any]], user_msg_id: str
-) -> list[dict[str, Any]]:
-    """Return ``history`` up to and including ``user_msg_id``."""
-
-    sliced: list[dict[str, Any]] = []
-    target_id = str(user_msg_id)
-    for message in history:
-        message_dict = dict(message)
-        sliced.append(message_dict)
-        if str(message_dict.get("id")) == target_id:
-            break
-    return sliced or list(history)
-
-
 def normalize_llm_config(
     raw_config: str | None, allowed_keys: Iterable[str] | None
 ) -> Mapping[str, Any] | None:
