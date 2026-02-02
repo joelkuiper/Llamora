@@ -604,34 +604,6 @@ entry-view[data-rendering="true"] #entries {
       pointer-events: none;
     }
 
-    .btn.stopping::before {
-      content: "\23F9"; /* ⏹ */
-      opacity: 1;
-      transform: none;
-    }
-
-    .btn.stopping {
-      background: linear-gradient(
-        135deg,
-        var(--accent-20) 0%,
-        color-mix(in srgb, var(--accent-05), transparent 15%) 55%,
-        var(--glass-bg-alt) 100%
-      );
-      background-size: 200% 200%;
-      animation: stopping-wave calc(var(--motion-wave, 1.6s) * 0.9) ease-in-out infinite;
-      box-shadow:
-        inset 0 0 0 1px var(--accent-20),
-        0 0 8px color-mix(in srgb, var(--accent-drop-shadow), transparent 20%);
-    }
-
-    .btn.stopping .send-icon {
-      opacity: 0;
-    }
-
-    .btn.stopping:active {
-      animation-play-state: paused;
-    }
-
     textarea:disabled,
     button:disabled {
       opacity: 0.6;
@@ -661,10 +633,6 @@ entry-view[data-rendering="true"] #entries {
 @media (prefers-reduced-motion: reduce) {
   #message-form.is-submitting::after,
   .input-wrapper .btn.submitting,
-  .input-wrapper .btn.stopping {
-    animation: none;
-    background-position: 50% 50%;
-  }
   .input-wrapper .btn.submitting::after {
     animation: none;
   }
@@ -749,17 +717,6 @@ scroll-bottom-button .scroll-btn {
 
 
 .user, .assistant, .response-stream { animation: fade-in-up var(--motion-sigh) ease-out; }
-
-@keyframes stopping-wave {
-  0%, 100% {
-    background-position: 50% 0%;
-    filter: saturate(105%);
-  }
-  50% {
-    background-position: 50% 100%;
-    filter: saturate(125%);
-  }
-}
 
 @keyframes submitting-wave {
   0%, 100% {

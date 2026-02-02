@@ -494,6 +494,7 @@ input[type="checkbox"]:focus {
 .icon-heart { --icon: url("../icons/heart.svg"); }
 .icon-eye { --icon: url("../icons/eye.svg"); }
 .icon-feather { --icon: url("../icons/feather.svg"); }
+.icon-square { --icon: url("../icons/square.svg"); }
 
 .icon-btn.active {
   background: var(--accent-15);

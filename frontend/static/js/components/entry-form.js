@@ -1,8 +1,4 @@
 import { isNearBottom } from "../entries/scroll-utils.js";
-import {
-  findStreamByUserMsgId,
-  findTypingIndicator,
-} from "../entries/stream-utils.js";
 import { getAlertContainer } from "../utils/alert-center.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 
@@ -18,7 +14,6 @@ class EntryFormElement extends ReactiveElement {
   #isToday = false;
   #draftKey = null;
   #listeners = null;
-  #stopListeners = null;
   #streamFocusListeners = null;
   #connected = false;
   #initialized = false;
@@ -185,7 +180,6 @@ class EntryFormElement extends ReactiveElement {
   #teardown() {
     this.#setSubmitting(false);
     this.#listeners = this.disposeListenerBag(this.#listeners);
-    this.#stopListeners = this.disposeListenerBag(this.#stopListeners);
     this.#streamFocusListeners = this.disposeListenerBag(
       this.#streamFocusListeners
     );
@@ -370,19 +364,12 @@ class EntryFormElement extends ReactiveElement {
           }
         });
       }
-      this.#button.classList.add("stopping");
-      this.#button.type = "button";
-      this.#button.disabled = false;
-      this.#button.setAttribute("aria-label", "Stop");
       this.#textarea.disabled = true;
-      this.#attachStopHandler();
+      this.#button.disabled = true;
     } else {
-      this.#stopListeners = this.disposeListenerBag(this.#stopListeners);
       this.#streamFocusListeners = this.disposeListenerBag(
         this.#streamFocusListeners
       );
-      this.#button.classList.remove("stopping");
-      this.#button.type = "submit";
       this.#textarea.disabled = false;
       this.#button.disabled = !this.#textarea.value.trim();
       const active = document.activeElement;
@@ -397,59 +384,6 @@ class EntryFormElement extends ReactiveElement {
       this.#shouldRestoreFocus = false;
       this.#button.setAttribute("aria-label", "Send");
     }
-  }
-
-  #attachStopHandler() {
-    if (!this.#button) return;
-    this.#stopListeners = this.resetListenerBag(this.#stopListeners);
-    this.#stopListeners.add(this.#button, "click", () => this.#handleStopClick(), {
-      once: true,
-    });
-  }
-
-  #handleStopClick() {
-    if (!this.#entries) return;
-    const indicator = this.#getTypingIndicator();
-    const currentId =
-      this.#streamingMsgId ||
-      this.#session?.currentMsgId ||
-      indicator?.dataset.userMsgId ||
-      null;
-    let stream = currentId
-      ? findStreamByUserMsgId(this.#entries, currentId)
-      : null;
-    if (!stream && indicator) {
-      stream = indicator.closest("response-stream");
-    }
-    const stopEndpoint = stream?.dataset?.stopUrl || indicator?.dataset?.stopUrl;
-    const abortedViaController = this.#streamController?.abortActiveStream({
-      reason: "entry-form:stop",
-    });
-
-    let abortedLocally = false;
-    if (!abortedViaController) {
-      if (stream && typeof stream.abort === "function") {
-        stream.abort();
-        abortedLocally = true;
-      } else if (indicator) {
-        indicator.classList.add("stopped");
-        setTimeout(() => indicator.remove(), 1000);
-      }
-    }
-
-    if (stopEndpoint) {
-      htmx.ajax("POST", stopEndpoint, { swap: "none" });
-    }
-
-    if (!abortedViaController && !abortedLocally && this.#session) {
-      this.#session.abort({ reason: "entry-form:stop" });
-    }
-  }
-
-  #getTypingIndicator() {
-    if (!this.#entries) return null;
-    const targetId = this.#streamingMsgId || this.#session?.currentMsgId || null;
-    return findTypingIndicator(this.#entries, targetId);
   }
 
   #setSubmitting(value) {

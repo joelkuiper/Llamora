@@ -10,6 +10,6 @@
 - [ ] Day opening is broken (and where to put it), midnight refresh seems broken
 - [ ] Edit for user messages?
 - [x] No concept of time / timestamp on messages (should be accessible somewhere)
-- [ ] A lot of code clean up / refactoring
+- [x] A lot of code clean up / refactoring
   * Two stage LLM call is now redundant, should be removed
   * Form submitting logic can be simplified

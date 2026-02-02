@@ -13,9 +13,14 @@ class MessageActions extends ReactiveElement {
   connectedCallback() {
     super.connectedCallback();
     this.#cacheElements();
-    this.#initPopover();
+    if (!this.#isResponseActive()) {
+      this.#initPopover();
+    }
     this.#listeners = this.resetListenerBag(this.#listeners);
     this.#listeners.add(this.#button, "click", (event) => {
+      if (this.#isResponseActive()) {
+        return;
+      }
       event.preventDefault();
       this.#togglePopover();
     });
@@ -97,6 +102,10 @@ class MessageActions extends ReactiveElement {
       return;
     }
     this.#popover?.hide();
+  }
+
+  #isResponseActive() {
+    return this.dataset.responseActive === "true";
   }
 }
 

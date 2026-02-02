@@ -401,6 +401,7 @@ async def request_response(date, user_msg_id: str):
     user_time = form.get("user_time")
     reply_kind = form.get("reply_kind") or request.args.get("reply_kind")
     selected_kind = _select_reply_kind(reply_kind)
+    reply_kinds, _ = _load_reply_kinds()
     _, user, dek = await require_user_and_dek()
     uid = user["id"]
 
@@ -409,13 +410,49 @@ async def request_response(date, user_msg_id: str):
     if actual_date is None:
         abort(404, description="Message not found.")
 
-    return await render_template(
+    stream_html = await render_template(
         "partials/entry_response_stream_item.html",
         user_msg_id=user_msg_id,
         day=actual_date or normalized_date,
         user_time=user_time,
         reply_kind=selected_kind.get("id"),
     )
+    actions_html = await render_template(
+        "partials/entry_actions_item.html",
+        user_msg_id=user_msg_id,
+        day=actual_date or normalized_date,
+        reply_kinds=reply_kinds,
+        is_today=normalized_date == local_date().isoformat(),
+        stop_url=url_for("entries.stop_response", user_msg_id=user_msg_id),
+        response_active=True,
+    )
+    return Response(
+        f"{stream_html}\n{actions_html}",
+        status=200,
+        mimetype="text/html",
+    )
+
+
+@entries_bp.get("/e/actions/<user_msg_id>")
+@login_required
+async def entry_actions_item(user_msg_id: str):
+    _, user, dek = await require_user_and_dek()
+    uid = user["id"]
+    await ensure_message_exists(get_services().db, uid, user_msg_id)
+    actual_date = await get_services().db.messages.get_message_date(uid, user_msg_id)
+    if actual_date is None:
+        abort(404, description="Message not found.")
+    reply_kinds, _ = _load_reply_kinds()
+    html = await render_template(
+        "partials/entry_actions_item.html",
+        user_msg_id=user_msg_id,
+        day=actual_date,
+        reply_kinds=reply_kinds,
+        is_today=actual_date == local_date().isoformat(),
+        stop_url=None,
+        response_active=False,
+    )
+    return Response(html, status=200, mimetype="text/html")
 
 
 @entries_bp.route("/e/<date>/response/stream/<user_msg_id>")

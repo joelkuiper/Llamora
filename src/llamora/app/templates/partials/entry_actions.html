@@ -1,12 +1,28 @@
 {% from 'partials/reply_kind.html' import reply_kind_icon %}
-{% macro entry_actions(user_msg_id, day, reply_kinds=(), is_today=True) -%}
-<message-actions class="message-actions" data-msg-id="{{ user_msg_id }}">
+{% macro entry_actions(user_msg_id, day, reply_kinds=(), is_today=True, stop_url=None, response_active=False, oob=False) -%}
+<message-actions id="msg-actions-{{ user_msg_id }}"
+                 class="message-actions"
+                 data-msg-id="{{ user_msg_id }}"
+                 {% if stop_url %}data-stop-url="{{ stop_url }}"{% endif %}
+                 {% if response_active %}data-response-active="true"{% endif %}
+                 {% if oob %}hx-swap-oob="outerHTML"{% endif %}>
   <button class="message-action action-trigger"
           type="button"
+          {% if response_active %}
+          aria-label="Stop response"
+          data-tooltip-title="Stop response"
+          {% if stop_url %}hx-post="{{ stop_url }}"{% endif %}
+          {% if stop_url %}hx-swap="none"{% endif %}
+          {% else %}
           aria-label="Reply actions"
           {% if is_today %}data-tooltip-title="Choose a response"{% endif %}
-          {% if not is_today %}disabled aria-disabled="true"{% endif %}>
+          {% if not is_today %}disabled aria-disabled="true"{% endif %}
+          {% endif %}>
+    {% if response_active %}
+    <span class="icon-mask icon-square message-action__icon" aria-hidden="true"></span>
+    {% else %}
     <span class="icon-mask icon-message-more message-action__icon" aria-hidden="true"></span>
+    {% endif %}
   </button>
   <div class="tag-popover action-popover glass-panel" role="dialog" aria-modal="true" hidden>
     <div class="tp-content action-panel">

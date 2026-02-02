@@ -96,6 +96,7 @@ class ResponseStreamElement extends HTMLElement {
   #markdown = null;
   #typingIndicator = null;
   #meta = null;
+  #wasPartial = false;
   #repeatGuardIndicator = null;
   #repeatGuardHideTimer = null;
   #repeatGuardWavesDismissed = false;
@@ -266,6 +267,7 @@ class ResponseStreamElement extends HTMLElement {
     this.dataset.streaming = "true";
     this.setAttribute("aria-busy", "true");
     this.#meta = null;
+    this.#wasPartial = false;
     const controller = this.#controller || this.#getStreamController();
     if (controller && typeof controller.notifyStreamStart === "function") {
       controller.notifyStreamStart(this, { reason: "stream:start" });
@@ -401,6 +403,9 @@ class ResponseStreamElement extends HTMLElement {
     if (!meta) return;
 
     this.#meta = meta;
+    if (meta.partial) {
+      this.#wasPartial = true;
+    }
 
     if (meta.repeat_guard) {
       this.#showRepeatGuardIndicator();
@@ -530,7 +535,8 @@ class ResponseStreamElement extends HTMLElement {
 
     const typing = this.#typingIndicator;
     if (typing) {
-      if (status === "aborted") {
+      const shouldStopAnimate = status === "aborted" || (status === "done" && this.#wasPartial);
+      if (shouldStopAnimate) {
         typing.classList.add("stopped");
         window.setTimeout(() => typing.remove(), 1000);
       } else {
@@ -581,6 +587,11 @@ class ResponseStreamElement extends HTMLElement {
         },
       })
     );
+
+    const htmxRef = (typeof window !== "undefined" && window.htmx) || null;
+    if (htmxRef?.ajax && this.userMsgId) {
+      htmxRef.ajax("GET", `/e/actions/${this.userMsgId}`, { swap: "none" });
+    }
   }
 
   #syncDeleteButton() {
