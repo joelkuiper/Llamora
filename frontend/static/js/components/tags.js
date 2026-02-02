@@ -178,6 +178,9 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
         this.#button.classList.add("active");
         this.#button?.setAttribute("aria-expanded", "true");
         this.classList.add("popover-open");
+        if (this.#suggestions && this.dataset?.suggestionsUrl) {
+          this.#suggestions.setAttribute("hx-get", this.dataset.suggestionsUrl);
+        }
         if (this.#suggestions && !this.#suggestions.dataset.loaded) {
           htmx.trigger(this.#suggestions, "tag-popover:show");
         }

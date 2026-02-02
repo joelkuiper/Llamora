@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any, Iterable, Sequence
 
 from llamora.app.util.tags import canonicalize as _canonicalize, display as _display
 from llamora.persistence.local_db import LocalDB
+from llamora.app.services.chat_meta import generate_metadata
 
 
 logger = logging.getLogger(__name__)
@@ -17,6 +19,8 @@ class TagService:
 
     def __init__(self, db: LocalDB) -> None:
         self._db = db
+        self._suggestion_cache: dict[tuple[str, str], tuple[float, list[str]]] = {}
+        self._suggestion_ttl = 300.0
 
     def canonicalize(self, raw: str) -> str:
         """Return the canonical representation for ``raw``."""
@@ -69,6 +73,7 @@ class TagService:
         msg_id: str,
         dek: bytes,
         *,
+        llm,
         frecency_limit: int = 3,
         decay_constant: float | None = None,
     ) -> list[str] | None:
@@ -81,6 +86,14 @@ class TagService:
         message = messages[0]
         meta = message.get("meta") or {}
         keywords: Iterable[Any] = meta.get("keywords") or []
+        if (not keywords) and message.get("role") == "user":
+            cached = self._get_cached_suggestions(user_id, msg_id)
+            if cached is None:
+                meta_payload = await generate_metadata(llm, message.get("message", ""))
+                keywords = meta_payload.get("keywords") or []
+                self._set_cached_suggestions(user_id, msg_id, list(keywords))
+            else:
+                keywords = cached
         existing = await self._db.tags.get_tags_for_message(user_id, msg_id, dek)
         existing_names = self._extract_existing_names(existing)
 
@@ -155,6 +168,27 @@ class TagService:
         ]
 
         return combined
+
+    def _get_cached_suggestions(self, user_id: str, msg_id: str) -> list[str] | None:
+        cache_key = (user_id, msg_id)
+        cached = self._suggestion_cache.get(cache_key)
+        if not cached:
+            return None
+        timestamp, suggestions = cached
+        if time.monotonic() - timestamp > self._suggestion_ttl:
+            self._suggestion_cache.pop(cache_key, None)
+            return None
+        return list(suggestions)
+
+    def _set_cached_suggestions(
+        self, user_id: str, msg_id: str, suggestions: list[str]
+    ) -> None:
+        if len(self._suggestion_cache) > 256:
+            self._suggestion_cache.clear()
+        self._suggestion_cache[(user_id, msg_id)] = (
+            time.monotonic(),
+            list(suggestions),
+        )
 
     def _extract_existing_names(self, existing: Sequence[dict[str, Any]]) -> set[str]:
         names: set[str] = set()

@@ -21,6 +21,7 @@
   <meta-chips class="meta-chips"
               data-msg-id="{{ msg_id }}"
               data-autocomplete-url="{{ url_for('tags.autocomplete_tags') }}"
+              data-suggestions-url="{{ url_for('tags.get_tag_suggestions', msg_id=msg_id) }}"
               data-autocomplete-limit="12"
               {% if hidden %}hidden{% endif %}>
     <button
@@ -56,7 +57,7 @@
           <span class="search-load-indicator" aria-hidden="true"></span>
         </div>
         <div class="tag-suggestions"
-             hx-get="{{ url_for('tags.get_entry_tag_suggestions', msg_id=msg_id) }}"
+             hx-get="{{ url_for('tags.get_tag_suggestions', msg_id=msg_id) }}"
              hx-trigger="tag-popover:show"
              hx-indicator="#tag-suggestions-{{ msg_id }}-loading"
              hx-swap="innerHTML">

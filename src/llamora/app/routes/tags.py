@@ -64,11 +64,13 @@ async def get_tag_suggestions(msg_id: str):
     decay_constant = resolve_frecency_lambda(
         request.args.get("lambda"), default=DEFAULT_FRECENCY_DECAY
     )
+    llm = get_services().llm_service.llm
 
     suggestions = await _tags().suggest_for_message(
         user["id"],
         msg_id,
         dek,
+        llm=llm,
         frecency_limit=3,
         decay_constant=decay_constant,
     )
