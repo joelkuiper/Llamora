@@ -143,15 +143,15 @@ class SearchStreamManager:
             if desired_k2 >= total_count:
                 session.exhausted = True
             for candidate in candidates:
-                message_id = candidate.get("id")
-                if not message_id:
+                entry_id = candidate.get("id")
+                if not entry_id:
                     continue
-                existing = session.candidate_map.get(message_id)
+                existing = session.candidate_map.get(entry_id)
                 if existing is None or candidate.get("cosine", 0.0) > existing.get(
                     "cosine",
                     0.0,
                 ):
-                    session.candidate_map[message_id] = candidate
+                    session.candidate_map[entry_id] = candidate
             session.current_k2 = desired_k2
 
         limit = max(desired_k2, len(session.candidate_map), 1)

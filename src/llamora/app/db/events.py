@@ -7,8 +7,8 @@ from typing import Awaitable, Callable, Dict, List
 
 EventHandler = Callable[..., Awaitable[None]]
 
-MESSAGE_TAGS_CHANGED_EVENT = "message.tags.changed"
-MESSAGE_HISTORY_CHANGED_EVENT = "message.history.changed"
+ENTRY_TAGS_CHANGED_EVENT = "entry.tags.changed"
+ENTRY_HISTORY_CHANGED_EVENT = "entry.history.changed"
 
 
 class RepositoryEventBus:
@@ -51,10 +51,10 @@ class RepositoryEventBus:
                     exc_info=result,
                 )
 
-    async def emit_for_message_date(
+    async def emit_for_entry_date(
         self, event: str, *, user_id: str, created_date: str, **payload
     ) -> None:
-        """Emit *event* at multiple granularities for a message date.
+        """Emit *event* at multiple granularities for an entry date.
 
         The event is emitted three times:
 

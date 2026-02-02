@@ -3,7 +3,7 @@ import time
 from typing import List
 
 from llamora.app.embed.model import async_embed_texts
-from llamora.app.index.message_ann import MessageIndexStore
+from llamora.app.index.entry_ann import EntryIndexStore
 from llamora.app.services.search_config import SearchConfig
 
 
@@ -11,12 +11,12 @@ logger = logging.getLogger(__name__)
 
 
 class VectorSearchService:
-    """Handles ANN index access and progressive warm-up for message search."""
+    """Handles ANN index access and progressive warm-up for entry search."""
 
     def __init__(self, db, config: SearchConfig, index_max_elements: int | None = None):
         self._config = config
-        max_elements = index_max_elements or config.limits.message_index_max_elements
-        self.index_store = MessageIndexStore(db, max_elements=max_elements)
+        max_elements = index_max_elements or config.limits.entry_index_max_elements
+        self.index_store = EntryIndexStore(db, max_elements=max_elements)
 
     def _quality_satisfied(self, ids: List[str], cosines: List[float], k2: int) -> bool:
         if len(ids) < k2:
@@ -100,22 +100,22 @@ class VectorSearchService:
         seen = set()
         dedup_ids: List[str] = []
         id_cos: dict[str, float] = {}
-        for mid, cos in zip(ids, cosines):
-            if mid is None:
+        for entry_id, cos in zip(ids, cosines):
+            if entry_id is None:
                 continue
-            if mid not in seen:
-                seen.add(mid)
-                dedup_ids.append(mid)
-            existing = id_cos.get(mid)
+            if entry_id not in seen:
+                seen.add(entry_id)
+                dedup_ids.append(entry_id)
+            existing = id_cos.get(entry_id)
             if existing is None or cos > existing:
-                id_cos[mid] = cos
+                id_cos[entry_id] = cos
 
-        rows = await self.index_store.hydrate_messages(user_id, dedup_ids, dek)
+        rows = await self.index_store.hydrate_entries(user_id, dedup_ids, dek)
         row_map = {r["id"]: r for r in rows}
 
         results: List[dict] = []
-        for mid in dedup_ids:
-            row = row_map.get(mid)
+        for entry_id in dedup_ids:
+            row = row_map.get(entry_id)
             if not row:
                 continue
             content = row.get("message", "")
@@ -126,7 +126,7 @@ class VectorSearchService:
                     "created_date": row.get("created_date"),
                     "role": row["role"],
                     "content": content,
-                    "cosine": id_cos.get(mid, 0.0),
+                    "cosine": id_cos.get(entry_id, 0.0),
                 }
             )
 
@@ -136,13 +136,13 @@ class VectorSearchService:
             return results, total_count
         return results
 
-    async def append_message(
-        self, user_id: str, message_id: str, content: str, dek: bytes
+    async def append_entry(
+        self, user_id: str, entry_id: str, content: str, dek: bytes
     ) -> None:
         logger.debug(
-            "Adding message %s to vector index for user %s", message_id, user_id
+            "Adding entry %s to vector index for user %s", entry_id, user_id
         )
-        await self.index_store.index_message(user_id, message_id, content, dek)
+        await self.index_store.index_entry(user_id, entry_id, content, dek)
 
     async def maintenance_tick(self) -> None:
         logger.debug("Running vector search maintenance")

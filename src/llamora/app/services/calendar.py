@@ -63,7 +63,7 @@ async def get_month_context(
 
     services = get_services()
     state = await services.db.users.get_state(user_id)
-    min_date_iso = await services.db.messages.get_first_message_date(user_id)
+    min_date_iso = await services.db.entries.get_first_entry_date(user_id)
     if min_date_iso:
         min_date_obj = date.fromisoformat(min_date_iso)
     else:
@@ -116,7 +116,7 @@ async def get_month_context(
         desired_day = active_candidate.day
         clamped_day = _clamp(desired_day, month_min_day, month_max_day)
         active_day_iso = date(selected_year, selected_month, clamped_day).isoformat()
-    active_days = await services.db.messages.get_days_with_messages(
+    active_days = await services.db.entries.get_days_with_entries(
         user_id, selected_year, selected_month
     )
     prev_year, prev_month, next_year, next_month = _nav_months(

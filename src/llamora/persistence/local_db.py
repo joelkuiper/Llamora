@@ -26,7 +26,7 @@ from llamora.app.db.base import run_in_transaction
 from llamora.app.db.events import RepositoryEventBus
 from llamora.app.services.history_cache import HistoryCache, HistoryCacheSynchronizer
 from llamora.app.db.users import UsersRepository
-from llamora.app.db.messages import MessagesRepository
+from llamora.app.db.entries import EntriesRepository
 from llamora.app.db.tags import TagsRepository
 from llamora.app.db.vectors import VectorsRepository
 from llamora.app.db.search_history import SearchHistoryRepository
@@ -53,7 +53,7 @@ class LocalDB:
         self.pool: SQLiteConnectionPool | None = None
         self.search_api = None
         self._users: UsersRepository | None = None
-        self._messages: MessagesRepository | None = None
+        self._entries: EntriesRepository | None = None
         self._tags: TagsRepository | None = None
         self._vectors: VectorsRepository | None = None
         self._search_history: SearchHistoryRepository | None = None
@@ -91,8 +91,8 @@ class LocalDB:
 
     def set_search_api(self, api) -> None:
         self.search_api = api
-        if self._messages:
-            self._messages.set_on_message_appended(self._on_message_appended)
+        if self._entries:
+            self._entries.set_on_entry_appended(self._on_entry_appended)
 
     async def init(self) -> None:
         async with self._init_lock:
@@ -118,7 +118,7 @@ class LocalDB:
                 await pool.close()
                 self.pool = None
                 self._users = None
-                self._messages = None
+                self._entries = None
                 self._tags = None
                 self._vectors = None
                 self._search_history = None
@@ -134,7 +134,7 @@ class LocalDB:
                 finally:
                     self.pool = None
             self._users = None
-            self._messages = None
+            self._entries = None
             self._tags = None
             self._vectors = None
             self._search_history = None
@@ -191,7 +191,7 @@ class LocalDB:
             ttl=int(history_cache_cfg.ttl),
         )
         self._users = UsersRepository(self.pool)
-        self._messages = MessagesRepository(
+        self._entries = EntriesRepository(
             self.pool,
             encrypt_message,
             decrypt_message,
@@ -201,7 +201,7 @@ class LocalDB:
         self._history_synchronizer = HistoryCacheSynchronizer(
             event_bus=self._events,
             history_cache=self._history_cache,
-            messages_repository=self._messages,
+            entries_repository=self._entries,
         )
         self._tags = TagsRepository(
             self.pool,
@@ -213,7 +213,7 @@ class LocalDB:
         self._search_history = SearchHistoryRepository(
             self.pool, encrypt_message, decrypt_message
         )
-        self._messages.set_on_message_appended(self._on_message_appended)
+        self._entries.set_on_entry_appended(self._on_entry_appended)
 
     def _require_repository(
         self, repository: RepositoryT | None, name: str
@@ -235,14 +235,14 @@ class LocalDB:
         return self._require_repository(self._users, "Users")
 
     @property
-    def messages(self) -> MessagesRepository:
-        """Return the messages repository."""
+    def entries(self) -> EntriesRepository:
+        """Return the entries repository."""
 
-        return self._require_repository(self._messages, "Messages")
+        return self._require_repository(self._entries, "Entries")
 
     @property
     def history_cache(self) -> HistoryCache:
-        """Expose the shared message history cache."""
+        """Expose the shared entry history cache."""
 
         return self._require_repository(self._history_cache, "History cache")
 
@@ -264,8 +264,8 @@ class LocalDB:
 
         return self._require_repository(self._search_history, "Search history")
 
-    async def _on_message_appended(
-        self, user_id: str, message_id: str, plaintext: str, dek: bytes
+    async def _on_entry_appended(
+        self, user_id: str, entry_id: str, plaintext: str, dek: bytes
     ) -> None:
         if self.search_api:
-            await self.search_api.enqueue_index_job(user_id, message_id, plaintext, dek)
+            await self.search_api.enqueue_index_job(user_id, entry_id, plaintext, dek)

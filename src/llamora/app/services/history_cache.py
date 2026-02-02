@@ -10,8 +10,8 @@ from typing import TYPE_CHECKING, Any, cast
 from cachetools import TTLCache
 
 from llamora.app.db.events import (
-    MESSAGE_HISTORY_CHANGED_EVENT,
-    MESSAGE_TAGS_CHANGED_EVENT,
+    ENTRY_HISTORY_CHANGED_EVENT,
+    ENTRY_TAGS_CHANGED_EVENT,
 )
 
 logger = getLogger(__name__)
@@ -20,7 +20,7 @@ CacheKey = tuple[str, str]
 
 if TYPE_CHECKING:
     from llamora.app.db.events import RepositoryEventBus
-    from llamora.app.db.messages import MessagesRepository
+    from llamora.app.db.entries import EntriesRepository
 
 
 HistoryCacheBackend = MutableMapping[CacheKey, object]
@@ -42,22 +42,22 @@ _INVALID_HISTORY_SENTINEL = object()
 def _freeze_history(
     history: Sequence[Mapping[str, Any] | dict[str, Any]],
 ) -> FrozenHistory:
-    frozen_messages: list[Mapping[str, Any]] = []
-    for message in history:
-        raw_message = dict(message)
-        tags = raw_message.get("tags") or []
-        raw_message["tags"] = tuple(MappingProxyType(dict(tag)) for tag in tags)
-        raw_message["meta"] = MappingProxyType(dict(raw_message.get("meta") or {}))
-        frozen_messages.append(MappingProxyType(raw_message))
-    return tuple(frozen_messages)
+    frozen_entries: list[Mapping[str, Any]] = []
+    for entry in history:
+        raw_entry = dict(entry)
+        tags = raw_entry.get("tags") or []
+        raw_entry["tags"] = tuple(MappingProxyType(dict(tag)) for tag in tags)
+        raw_entry["meta"] = MappingProxyType(dict(raw_entry.get("meta") or {}))
+        frozen_entries.append(MappingProxyType(raw_entry))
+    return tuple(frozen_entries)
 
 
 def _thaw_history(history: FrozenHistory) -> list[dict[str, Any]]:
     thawed: list[dict[str, Any]] = []
-    for message in history:
-        hydrated = dict(message)
-        hydrated["tags"] = [dict(tag) for tag in message.get("tags", ())]
-        hydrated["meta"] = dict(message.get("meta", {}))
+    for entry in history:
+        hydrated = dict(entry)
+        hydrated["tags"] = [dict(tag) for tag in entry.get("tags", ())]
+        hydrated["meta"] = dict(entry.get("meta", {}))
         thawed.append(hydrated)
     return thawed
 
@@ -67,7 +67,7 @@ def default_backend_factory(maxsize: int, ttl: int) -> HistoryCacheBackend:
 
 
 class HistoryCache:
-    """Manage cached message history with observer hooks."""
+    """Manage cached entry history with observer hooks."""
 
     __slots__ = ("_lock", "_backend", "_listeners")
 
@@ -123,7 +123,7 @@ class HistoryCache:
         self._notify("store", key, payload=_thaw_history(frozen))
 
     async def append(
-        self, user_id: str, created_date: str, message: Mapping[str, Any]
+        self, user_id: str, created_date: str, entry: Mapping[str, Any]
     ) -> None:
         key = (user_id, created_date)
         while True:
@@ -134,7 +134,7 @@ class HistoryCache:
                 return
             frozen = cast(FrozenHistory, cached)
             history = _thaw_history(frozen)
-            new_entry = dict(message)
+            new_entry = dict(entry)
             new_entry["tags"] = list(new_entry.get("tags", []))
             new_id = new_entry.get("id")
             inserted = False
@@ -158,7 +158,7 @@ class HistoryCache:
                 current = self._backend.get(key)
                 if current is cached:
                     self._backend[key] = updated
-                    self._notify("append", key, payload=dict(message))
+                    self._notify("append", key, payload=dict(entry))
                     return
 
     async def invalidate(self, user_id: str, created_date: str) -> None:
@@ -179,26 +179,26 @@ class HistoryCache:
 
 
 class HistoryCacheSynchronizer:
-    """Bridge repository events with the history cache."""
+    """Bridge repository events with the entry history cache."""
 
-    __slots__ = ("_cache", "_events", "_messages")
+    __slots__ = ("_cache", "_events", "_entries")
 
     def __init__(
         self,
         *,
         event_bus: RepositoryEventBus | None,
         history_cache: HistoryCache | None,
-        messages_repository: MessagesRepository | None,
+        entries_repository: EntriesRepository | None,
     ) -> None:
         self._cache = history_cache
         self._events = event_bus
-        self._messages = messages_repository
+        self._entries = entries_repository
         if not self._events:
             return
         self._events.subscribe(
-            MESSAGE_HISTORY_CHANGED_EVENT, self._handle_history_changed
+            ENTRY_HISTORY_CHANGED_EVENT, self._handle_history_changed
         )
-        self._events.subscribe(MESSAGE_TAGS_CHANGED_EVENT, self._handle_tags_changed)
+        self._events.subscribe(ENTRY_TAGS_CHANGED_EVENT, self._handle_tags_changed)
 
     async def _handle_history_changed(
         self,
@@ -206,27 +206,27 @@ class HistoryCacheSynchronizer:
         user_id: str,
         created_date: str,
         reason: str,
-        message_id: str | None = None,
-        message: Mapping[str, Any] | None = None,
+        entry_id: str | None = None,
+        entry: Mapping[str, Any] | None = None,
     ) -> None:
         if not self._cache:
             return
-        if reason == "insert" and message is not None:
-            await self._cache.append(user_id, created_date, message)
+        if reason == "insert" and entry is not None:
+            await self._cache.append(user_id, created_date, entry)
             return
         await self._cache.invalidate(user_id, created_date)
 
-    async def _handle_tags_changed(self, *, user_id: str, message_id: str) -> None:
-        if not self._events or not self._messages:
+    async def _handle_tags_changed(self, *, user_id: str, entry_id: str) -> None:
+        if not self._events or not self._entries:
             return
-        created_date = await self._messages.get_message_date(user_id, message_id)
+        created_date = await self._entries.get_entry_date(user_id, entry_id)
         if not created_date:
             return
-        await self._events.emit_for_message_date(
-            MESSAGE_HISTORY_CHANGED_EVENT,
+        await self._events.emit_for_entry_date(
+            ENTRY_HISTORY_CHANGED_EVENT,
             user_id=user_id,
             created_date=created_date,
-            message_id=message_id,
+            entry_id=entry_id,
             reason="tags-changed",
         )
 

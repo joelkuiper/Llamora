@@ -116,12 +116,12 @@ def apply_response_kind_prompt(
 
 
 def build_entry_history(
-    entries: Sequence[Mapping[str, Any]], user_msg_id: str
+    entries: Sequence[Mapping[str, Any]], entry_id: str
 ) -> list[dict[str, Any]]:
-    """Flatten entry aggregates into a linear history up to ``user_msg_id``."""
+    """Flatten entry aggregates into a linear history up to ``entry_id``."""
 
     history: list[dict[str, Any]] = []
-    target_id = str(user_msg_id)
+    target_id = str(entry_id)
     for entry in entries:
         message = entry.get("message")
         if isinstance(message, Mapping):
@@ -137,7 +137,7 @@ def build_entry_history(
 async def start_stream_session(
     *,
     manager,
-    user_msg_id: str,
+    entry_id: str,
     uid: str,
     date: str,
     history: list[dict],
@@ -148,11 +148,11 @@ async def start_stream_session(
     meta_extra: dict | None = None,
     use_default_reply_to: bool = True,
 ):
-    pending = manager.get(user_msg_id, uid)
+    pending = manager.get(entry_id, uid)
     if pending:
         return pending
     return manager.start_stream(
-        user_msg_id,
+        entry_id,
         uid,
         date,
         history,
@@ -245,7 +245,7 @@ async def augment_history_with_recall(
     params: Mapping[str, Any] | None = None,
     context: Mapping[str, Any] | None = None,
     message_key: str = "message",
-    target_message_id: str | None = None,
+    target_entry_id: str | None = None,
     insert_index: int | None = None,
     include_tag_metadata: bool = False,
     tag_recall_date: str | None = None,
@@ -282,8 +282,8 @@ async def augment_history_with_recall(
             entry_dict = dict(entry)
             if (
                 not recall_inserted
-                and target_message_id is not None
-                and str(entry_dict.get("id")) == str(target_message_id)
+                and target_entry_id is not None
+                and str(entry_dict.get("id")) == str(target_entry_id)
             ):
                 recall_index = len(augmented)
                 augmented.append(dict(recall_entry))
@@ -417,7 +417,7 @@ class StreamSession(Response):
     @staticmethod
     async def _stream_saved(message: Mapping[str, Any]):
         yield format_sse_event("message", message.get("message", ""))
-        yield format_sse_event("done", {"assistant_msg_id": message.get("id")})
+        yield format_sse_event("done", {"assistant_entry_id": message.get("id")})
 
     @staticmethod
     async def _stream_pending(pending_response):
@@ -439,7 +439,7 @@ class StreamSession(Response):
             yield format_sse_event("meta", pending_response.meta)
 
         yield format_sse_event(
-            "done", {"assistant_msg_id": pending_response.assistant_msg_id}
+            "done", {"assistant_entry_id": pending_response.assistant_entry_id}
         )
 
     @staticmethod

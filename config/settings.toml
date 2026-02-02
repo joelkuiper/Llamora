@@ -29,7 +29,7 @@ max_snippets = 6
 [default.SEARCH]
 recent_limit = 50
 recent_suggestion_limit = 8
-message_index_max_elements = 100000
+entry_index_max_elements = 100000
 page_size = 10
 initial_page_size = 15
 result_window = 100

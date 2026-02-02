@@ -424,14 +424,14 @@ class EntryFormElement extends ReactiveElement {
     const currentId = info.currentMsgId ?? null;
 
     if (type === "begin") {
-      const activeId = currentId || info.userMsgId || null;
+      const activeId = currentId || info.entryId || null;
       this.streamingMsgId = activeId;
       this.setStreaming(true);
       return;
     }
 
     if (type === "abort" || type === "complete") {
-      const targetId = info.userMsgId || null;
+      const targetId = info.entryId || null;
       if (!targetId || targetId === this.streamingMsgId) {
         this.streamingMsgId = currentId || null;
         this.setStreaming(false);
@@ -440,14 +440,14 @@ class EntryFormElement extends ReactiveElement {
     }
 
     if (info.streaming) {
-      const activeId = currentId || info.userMsgId || null;
+      const activeId = currentId || info.entryId || null;
       this.streamingMsgId = activeId;
       this.setStreaming(true);
       return;
     }
 
     const targetId =
-      info.userMsgId ?? info.previousMsgId ?? this.streamingMsgId;
+      info.entryId ?? info.previousMsgId ?? this.streamingMsgId;
     if (!targetId || targetId === this.streamingMsgId) {
       this.streamingMsgId = currentId || null;
       this.setStreaming(false);

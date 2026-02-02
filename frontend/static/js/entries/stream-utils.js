@@ -15,24 +15,24 @@ function getSearchRoot(root) {
   return document;
 }
 
-export function findStreamByUserMsgId(root, msgId) {
-  const normalized = normalizeStreamId(msgId);
+export function findStreamByEntryId(root, entryId) {
+  const normalized = normalizeStreamId(entryId);
   if (!normalized) {
     return null;
   }
 
   const searchRoot = getSearchRoot(root);
   return searchRoot.querySelector(
-    `response-stream[data-user-msg-id="${escapeAttributeValue(normalized)}"]`
+    `response-stream[data-entry-id="${escapeAttributeValue(normalized)}"]`
   );
 }
 
-export function findTypingIndicator(root, msgId) {
+export function findTypingIndicator(root, entryId) {
   const searchRoot = getSearchRoot(root);
-  const normalized = normalizeStreamId(msgId);
+  const normalized = normalizeStreamId(entryId);
 
   if (normalized) {
-    const stream = findStreamByUserMsgId(searchRoot, normalized);
+    const stream = findStreamByEntryId(searchRoot, normalized);
     const scoped = stream?.querySelector(TYPING_INDICATOR_SELECTOR);
     if (scoped) {
       return scoped;
@@ -40,7 +40,7 @@ export function findTypingIndicator(root, msgId) {
 
     const typed = Array.from(
       searchRoot.querySelectorAll(TYPING_INDICATOR_SELECTOR)
-    ).find((node) => node?.dataset?.userMsgId === normalized);
+    ).find((node) => node?.dataset?.entryId === normalized);
     if (typed) {
       return typed;
     }

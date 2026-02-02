@@ -9,7 +9,7 @@ function buildSnapshotDetail(session) {
       previousStatus: "idle",
       previousMsgId: null,
       currentMsgId: null,
-      userMsgId: null,
+      entryId: null,
       streaming: false,
       reason: null,
       result: null,
@@ -28,7 +28,7 @@ function buildSnapshotDetail(session) {
     previousStatus: status,
     previousMsgId: currentMsgId,
     currentMsgId,
-    userMsgId: currentMsgId,
+    entryId: currentMsgId,
     streaming,
     reason: snapshot?.reason ?? null,
     result: null,
@@ -107,7 +107,7 @@ export class StreamController {
     }
     this.#updateStreamIndex(stream);
     return () => {
-      const id = normalizeStreamId(stream?.userMsgId);
+      const id = normalizeStreamId(stream?.entryId);
       if (id && this.#streams.get(id) === stream) {
         this.#streams.delete(id);
       }
@@ -115,7 +115,7 @@ export class StreamController {
   }
 
   notifyStreamStart(stream, { reason = "stream:start" } = {}) {
-    const id = normalizeStreamId(stream?.userMsgId);
+    const id = normalizeStreamId(stream?.entryId);
     if (id) {
       this.#streams.set(id, stream);
     }
@@ -124,17 +124,17 @@ export class StreamController {
   }
 
   notifyStreamAbort(stream, { reason = "user:abort" } = {}) {
-    const id = normalizeStreamId(stream?.userMsgId);
-    return this.#session?.abort({ reason, userMsgId: id }) ?? false;
+    const id = normalizeStreamId(stream?.entryId);
+    return this.#session?.abort({ reason, entryId: id }) ?? false;
   }
 
-  notifyStreamComplete(stream, { status, reason, userMsgId } = {}) {
-    const id = normalizeStreamId(userMsgId ?? stream?.userMsgId);
+  notifyStreamComplete(stream, { status, reason, entryId } = {}) {
+    const id = normalizeStreamId(entryId ?? stream?.entryId);
     if (id && this.#streams.get(id) === stream) {
       this.#streams.delete(id);
     }
     const completionReason = reason || defaultCompletionReason(status);
-    this.#session?.complete({ result: status, reason: completionReason, userMsgId: id });
+    this.#session?.complete({ result: status, reason: completionReason, entryId: id });
     if (status !== "aborted") {
       requestScrollForceBottom({ source: "stream:complete" });
     }
@@ -150,7 +150,7 @@ export class StreamController {
       stream.abort({ reason });
       return true;
     }
-    return this.#session?.abort({ reason, userMsgId: id }) ?? false;
+    return this.#session?.abort({ reason, entryId: id }) ?? false;
   }
 
   refresh() {
@@ -181,7 +181,7 @@ export class StreamController {
   }
 
   #updateStreamIndex(stream) {
-    const id = normalizeStreamId(stream?.userMsgId);
+    const id = normalizeStreamId(stream?.entryId);
     if (!id) {
       return;
     }

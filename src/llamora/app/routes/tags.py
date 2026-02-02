@@ -7,7 +7,7 @@ from llamora.app.util.frecency import (
     DEFAULT_FRECENCY_DECAY,
     resolve_frecency_lambda,
 )
-from llamora.app.routes.helpers import ensure_message_exists, require_user_and_dek
+from llamora.app.routes.helpers import ensure_entry_exists, require_user_and_dek
 
 tags_bp = Blueprint("tags", __name__)
 
@@ -26,7 +26,7 @@ async def remove_tag(msg_id: str, tag_hash: str):
     except ValueError as exc:
         abort(400, description="invalid tag hash")
         raise AssertionError("unreachable") from exc
-    await get_services().db.tags.unlink_tag_message(user["id"], tag_hash_bytes, msg_id)
+    await get_services().db.tags.unlink_tag_entry(user["id"], tag_hash_bytes, msg_id)
     return "<span class='chip-tombstone'></span>"
 
 
@@ -45,9 +45,9 @@ async def add_tag(msg_id: str):
         abort(400, description="empty tag")
         raise AssertionError("unreachable")
     db = get_services().db
-    await ensure_message_exists(db, user["id"], msg_id)
+    await ensure_entry_exists(db, user["id"], msg_id)
     tag_hash = await db.tags.resolve_or_create_tag(user["id"], canonical, dek)
-    await db.tags.xref_tag_message(user["id"], tag_hash, msg_id)
+    await db.tags.xref_tag_entry(user["id"], tag_hash, msg_id)
     html = await render_template(
         "partials/tag_chip.html",
         keyword=canonical,
@@ -92,7 +92,7 @@ async def get_tag_suggestions(msg_id: str):
         decay_constant=decay_constant,
     )
     if suggestions is None:
-        abort(404, description="message not found")
+        abort(404, description="entry not found")
         raise AssertionError("unreachable")
 
     wants_json = request.accept_mimetypes.best == "application/json"

@@ -13,7 +13,7 @@ function createDetail(session, overrides = {}) {
     previousStatus: STATUS_IDLE,
     previousMsgId: null,
     currentMsgId: null,
-    userMsgId: null,
+    entryId: null,
     streaming: false,
     reason: null,
     result: null,
@@ -82,8 +82,8 @@ export class StreamingSession extends EventTarget {
     };
   }
 
-  begin(userMsgId, { reason = "stream:start" } = {}) {
-    const normalized = normalizeMsgId(userMsgId);
+  begin(entryId, { reason = "stream:start" } = {}) {
+    const normalized = normalizeMsgId(entryId);
     if (!normalized) {
       return false;
     }
@@ -97,7 +97,7 @@ export class StreamingSession extends EventTarget {
 
     const detail = this.#transition(STATUS_STREAMING, {
       type: "begin",
-      userMsgId: normalized,
+      entryId: normalized,
       currentMsgId: normalized,
       reason,
     });
@@ -111,8 +111,8 @@ export class StreamingSession extends EventTarget {
     return true;
   }
 
-  abort({ reason = "user:abort", userMsgId = null } = {}) {
-    if (!this.#state.currentMsgId && !userMsgId) {
+  abort({ reason = "user:abort", entryId = null } = {}) {
+    if (!this.#state.currentMsgId && !entryId) {
       return false;
     }
 
@@ -121,14 +121,14 @@ export class StreamingSession extends EventTarget {
     }
 
     const targetId =
-      normalizeMsgId(userMsgId) || this.#state.currentMsgId || null;
+      normalizeMsgId(entryId) || this.#state.currentMsgId || null;
     if (!targetId) {
       return false;
     }
 
     const detail = this.#transition(STATUS_ABORTING, {
       type: "abort",
-      userMsgId: targetId,
+      entryId: targetId,
       currentMsgId: null,
       reason,
     });
@@ -142,16 +142,16 @@ export class StreamingSession extends EventTarget {
     return true;
   }
 
-  complete({ result = "done", reason = "stream:complete", userMsgId } = {}) {
+  complete({ result = "done", reason = "stream:complete", entryId } = {}) {
     const finalResult = result || "done";
     const targetId =
-      normalizeMsgId(userMsgId) || this.#state.currentMsgId || null;
+      normalizeMsgId(entryId) || this.#state.currentMsgId || null;
 
     const nextStatus = finalResult === "done" ? STATUS_IDLE : finalResult;
 
     const detail = this.#transition(nextStatus, {
       type: "complete",
-      userMsgId: targetId,
+      entryId: targetId,
       currentMsgId: null,
       reason,
       result: finalResult,
@@ -189,8 +189,8 @@ export class StreamingSession extends EventTarget {
       previousStatus: previous.status,
       previousMsgId: previous.currentMsgId,
       currentMsgId: this.#state.currentMsgId,
-      userMsgId:
-        detail.userMsgId ?? this.#state.currentMsgId ?? previous.currentMsgId ?? null,
+      entryId:
+        detail.entryId ?? this.#state.currentMsgId ?? previous.currentMsgId ?? null,
       streaming: nextStatus === STATUS_STREAMING,
       reason: nextReason,
       result: detail.result ?? null,

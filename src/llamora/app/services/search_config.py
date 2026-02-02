@@ -24,11 +24,11 @@ class ProgressiveSearchConfig:
 
 @dataclass(slots=True, frozen=True)
 class SearchLimits:
-    """Limits applied to search operations."""
+    """Limits applied to entry search operations."""
 
     recent_limit: int
     recent_suggestion_limit: int
-    message_index_max_elements: int
+    entry_index_max_elements: int
     max_search_query_length: int
 
     def as_dict(self) -> dict[str, Any]:
@@ -53,7 +53,7 @@ class SearchConfig:
         limits = SearchLimits(
             recent_limit=int(search_settings.recent_limit),
             recent_suggestion_limit=int(search_settings.recent_suggestion_limit),
-            message_index_max_elements=int(search_settings.message_index_max_elements),
+            entry_index_max_elements=int(search_settings.entry_index_max_elements),
             max_search_query_length=int(settings.LIMITS.max_search_query_length),
         )
         progressive = ProgressiveSearchConfig(

@@ -53,7 +53,7 @@ def _extract_tag_metadata(meta: Mapping[str, Any] | None) -> dict[str, Any]:
 class EntryContext:
     """Payload container for a single user entry."""
 
-    message_id: str
+    entry_id: str
     text: str
     tags: tuple[dict[str, Any], ...]
     tag_metadata: Mapping[str, Any]
@@ -61,7 +61,7 @@ class EntryContext:
     def to_payload(self) -> dict[str, Any]:
         return {
             "entry": {
-                "id": self.message_id,
+                "id": self.entry_id,
                 "text": self.text,
                 "tags": [dict(tag) for tag in self.tags],
                 "tag_metadata": dict(self.tag_metadata),
@@ -74,21 +74,21 @@ async def build_entry_context(
     user_id: str,
     dek: bytes,
     *,
-    user_msg_id: str,
+    entry_id: str,
 ) -> dict[str, Any] | None:
     """Build a context payload for a single user entry."""
 
-    messages = await db.messages.get_messages_by_ids(user_id, [user_msg_id], dek)
-    if not messages:
-        logger.info("Entry context skipped; message %s not found", user_msg_id)
+    entries = await db.entries.get_entries_by_ids(user_id, [entry_id], dek)
+    if not entries:
+        logger.info("Entry context skipped; entry %s not found", entry_id)
         return None
 
-    message = messages[0]
-    text = str(message.get("message") or "").strip()
-    tags = await db.tags.get_tags_for_message(user_id, user_msg_id, dek)
-    tag_metadata = _extract_tag_metadata(message.get("meta"))
+    entry = entries[0]
+    text = str(entry.get("message") or "").strip()
+    tags = await db.tags.get_tags_for_entry(user_id, entry_id, dek)
+    tag_metadata = _extract_tag_metadata(entry.get("meta"))
     payload = EntryContext(
-        message_id=str(message.get("id") or user_msg_id),
+        entry_id=str(entry.get("id") or entry_id),
         text=text,
         tags=tuple(tags),
         tag_metadata=tag_metadata,
@@ -104,7 +104,7 @@ async def get_entries_context(
 
     services = get_services()
     dek = await get_session_context().require_dek()
-    entries = await services.db.messages.get_entries_for_date(user["id"], date, dek)
+    entries = await services.db.entries.get_entries_for_date(user["id"], date, dek)
     _render_entries_markdown(entries)
 
     today = local_date().isoformat()

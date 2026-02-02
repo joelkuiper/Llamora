@@ -6,7 +6,7 @@ from aiosqlitepool import SQLiteConnectionPool
 from ulid import ULID
 
 from .base import BaseRepository
-from .events import RepositoryEventBus, MESSAGE_TAGS_CHANGED_EVENT
+from .events import RepositoryEventBus, ENTRY_TAGS_CHANGED_EVENT
 from .utils import cached_tag_name
 from llamora.app.util.tags import canonicalize, tag_hash
 from llamora.app.util.frecency import DEFAULT_FRECENCY_DECAY, resolve_frecency_lambda
@@ -59,8 +59,8 @@ class TagsRepository(BaseRepository):
             await self._run_in_transaction(conn, _tx)
         return digest
 
-    async def xref_tag_message(
-        self, user_id: str, tag_hash: bytes, message_id: str
+    async def xref_tag_entry(
+        self, user_id: str, tag_hash: bytes, entry_id: str
     ) -> None:
         async with self.pool.connection() as conn:
             changed = False
@@ -69,7 +69,7 @@ class TagsRepository(BaseRepository):
                 nonlocal changed
                 cursor = await conn.execute(
                     "INSERT OR IGNORE INTO tag_message_xref (user_id, tag_hash, message_id, ulid) VALUES (?, ?, ?, ?)",
-                    (user_id, tag_hash, message_id, str(ULID())),
+                    (user_id, tag_hash, entry_id, str(ULID())),
                 )
                 if cursor.rowcount:
                     changed = True
@@ -82,13 +82,13 @@ class TagsRepository(BaseRepository):
 
         if changed and self._event_bus:
             await self._event_bus.emit(
-                MESSAGE_TAGS_CHANGED_EVENT,
+                ENTRY_TAGS_CHANGED_EVENT,
                 user_id=user_id,
-                message_id=message_id,
+                entry_id=entry_id,
             )
 
-    async def unlink_tag_message(
-        self, user_id: str, tag_hash: bytes, message_id: str
+    async def unlink_tag_entry(
+        self, user_id: str, tag_hash: bytes, entry_id: str
     ) -> None:
         async with self.pool.connection() as conn:
             changed = False
@@ -97,7 +97,7 @@ class TagsRepository(BaseRepository):
                 nonlocal changed
                 cursor = await conn.execute(
                     "DELETE FROM tag_message_xref WHERE user_id = ? AND tag_hash = ? AND message_id = ?",
-                    (user_id, tag_hash, message_id),
+                    (user_id, tag_hash, entry_id),
                 )
                 if cursor.rowcount:
                     changed = True
@@ -110,13 +110,13 @@ class TagsRepository(BaseRepository):
 
         if changed and self._event_bus:
             await self._event_bus.emit(
-                MESSAGE_TAGS_CHANGED_EVENT,
+                ENTRY_TAGS_CHANGED_EVENT,
                 user_id=user_id,
-                message_id=message_id,
+                entry_id=entry_id,
             )
 
-    async def get_tags_for_message(
-        self, user_id: str, message_id: str, dek: bytes
+    async def get_tags_for_entry(
+        self, user_id: str, entry_id: str, dek: bytes
     ) -> list[dict]:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
@@ -127,7 +127,7 @@ class TagsRepository(BaseRepository):
                 WHERE x.user_id = ? AND x.message_id = ?
                 ORDER BY x.ulid ASC
                 """,
-                (user_id, message_id),
+                (user_id, entry_id),
             )
             rows = await cursor.fetchall()
 
@@ -145,15 +145,15 @@ class TagsRepository(BaseRepository):
             tags.append({"name": tag_name, "hash": row["tag_hash"].hex()})
         return tags
 
-    async def get_tags_for_messages(
+    async def get_tags_for_entries(
         self,
         user_id: str,
-        message_ids: Sequence[str],
+        entry_ids: Sequence[str],
         dek: bytes,
     ) -> dict[str, list[dict]]:
-        """Return decrypted tags for each message in ``message_ids``."""
+        """Return decrypted tags for each entry in ``entry_ids``."""
 
-        ids = [mid for mid in message_ids if mid]
+        ids = [eid for eid in entry_ids if eid]
         if not ids:
             return {}
 
@@ -188,7 +188,8 @@ class TagsRepository(BaseRepository):
                 dek,
                 self._decrypt_message,
             )
-            mapping.setdefault(row["message_id"], []).append(
+            entry_id = row["message_id"]
+            mapping.setdefault(entry_id, []).append(
                 {"name": tag_name, "hash": row["tag_hash"].hex()}
             )
         return mapping
@@ -342,17 +343,17 @@ class TagsRepository(BaseRepository):
         return results
 
     async def get_tag_match_counts(
-        self, user_id: str, tag_hashes: Sequence[bytes], message_ids: Sequence[str]
+        self, user_id: str, tag_hashes: Sequence[bytes], entry_ids: Sequence[str]
     ) -> dict[str, int]:
-        """Return the number of matching tag hashes for each ``message_id``."""
+        """Return the number of matching tag hashes for each ``entry_id``."""
 
         tags = [digest for digest in tag_hashes if digest]
-        ids = [mid for mid in message_ids if mid]
+        ids = [eid for eid in entry_ids if eid]
         if not tags or not ids:
             return {}
 
         tag_placeholders = ",".join("?" * len(tags))
-        msg_placeholders = ",".join("?" * len(ids))
+        entry_placeholders = ",".join("?" * len(ids))
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 f"""
@@ -360,7 +361,7 @@ class TagsRepository(BaseRepository):
                 FROM tag_message_xref
                 WHERE user_id = ?
                   AND tag_hash IN ({tag_placeholders})
-                  AND message_id IN ({msg_placeholders})
+                  AND message_id IN ({entry_placeholders})
                 GROUP BY message_id
                 """,
                 (user_id, *tags, *ids),
@@ -369,18 +370,18 @@ class TagsRepository(BaseRepository):
 
         return {row["message_id"]: int(row["match_count"]) for row in rows}
 
-    async def get_recent_messages_for_tag_hashes(
+    async def get_recent_entries_for_tag_hashes(
         self,
         user_id: str,
         tag_hashes: list[bytes],
         *,
         limit: int | None = None,
-        max_message_id: str | None = None,
+        max_entry_id: str | None = None,
         max_created_at: str | None = None,
     ) -> list[str]:
-        """Return recent message IDs associated with any of ``tag_hashes``.
+        """Return recent entry IDs associated with any of ``tag_hashes``.
 
-        Optional cutoff values limit matches to messages at-or-before the entry.
+        Optional cutoff values limit matches to entries at-or-before the entry.
         """
 
         if not tag_hashes:
@@ -393,11 +394,11 @@ class TagsRepository(BaseRepository):
         conditions = [f"x.user_id = ? AND x.tag_hash IN ({tag_placeholders})"]
         params: list[object] = [user_id, *tag_hashes]
 
-        if max_message_id or max_created_at:
+        if max_entry_id or max_created_at:
             joins = "JOIN messages m ON m.user_id = x.user_id AND m.id = x.message_id"
-            if max_message_id:
+            if max_entry_id:
                 conditions.append("m.id <= ?")
-                params.append(max_message_id)
+                params.append(max_entry_id)
             if max_created_at:
                 conditions.append("m.created_at <= ?")
                 params.append(max_created_at)

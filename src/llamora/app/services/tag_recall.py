@@ -167,13 +167,13 @@ async def build_tag_recall_context(
     *,
     history: Sequence[Mapping[str, Any] | dict[str, Any]],
     current_date: str | None,
-    max_message_id: str | None = None,
+    max_entry_id: str | None = None,
     max_created_at: str | None = None,
     config: TagRecallConfig | None = None,
 ) -> TagRecallContext | None:
     """Return summarised memories linked to the user's recent tags.
 
-    Cutoffs prevent recalling messages created after the triggering entry.
+    Cutoffs prevent recalling entries created after the triggering entry.
     """
 
     if not history:
@@ -197,11 +197,11 @@ async def build_tag_recall_context(
     if not focus_tags:
         return None
 
-    candidate_ids = await db.tags.get_recent_messages_for_tag_hashes(
+    candidate_ids = await db.tags.get_recent_entries_for_tag_hashes(
         user_id,
         focus_tags,
         limit=cfg.max_snippets * 4,
-        max_message_id=max_message_id,
+        max_entry_id=max_entry_id,
         max_created_at=max_created_at,
     )
 
@@ -220,18 +220,18 @@ async def build_tag_recall_context(
         history_ids.add(key)
         history_map[key] = entry
 
-    candidate_messages = await db.messages.get_messages_by_ids(
+    candidate_entries = await db.entries.get_entries_by_ids(
         user_id, candidate_ids, dek
     )
 
-    if not candidate_messages:
+    if not candidate_entries:
         return None
 
-    by_id = {str(item.get("id")): item for item in candidate_messages if item.get("id")}
+    by_id = {str(item.get("id")): item for item in candidate_entries if item.get("id")}
 
     reply_to_ids: list[str] = []
-    for message in candidate_messages:
-        reply_to = message.get("reply_to")
+    for entry in candidate_entries:
+        reply_to = entry.get("reply_to")
         if not reply_to:
             continue
         reply_key = str(reply_to)
@@ -240,14 +240,14 @@ async def build_tag_recall_context(
         if reply_key not in by_id and reply_key not in reply_to_ids:
             reply_to_ids.append(reply_key)
 
-    reply_messages: list[Mapping[str, Any]] = []
+    reply_entries: list[Mapping[str, Any]] = []
     if reply_to_ids:
-        reply_messages = await db.messages.get_messages_by_ids(
+        reply_entries = await db.entries.get_entries_by_ids(
             user_id, reply_to_ids, dek
         )
 
     reply_lookup: dict[str, Mapping[str, Any]] = {
-        **{str(item.get("id")): item for item in reply_messages if item.get("id")},
+        **{str(item.get("id")): item for item in reply_entries if item.get("id")},
         **history_map,
     }
 
@@ -256,15 +256,15 @@ async def build_tag_recall_context(
     for msg_id in candidate_ids:
         if len(snippets) >= cfg.max_snippets:
             break
-        message = by_id.get(str(msg_id))
-        if not message:
+        entry = by_id.get(str(msg_id))
+        if not entry:
             continue
         if str(msg_id) in history_ids:
             continue
-        created_at = message.get("created_at")
+        created_at = entry.get("created_at")
         if current_date and _extract_date(created_at) == current_date:
             continue
-        text = str(message.get("message") or "").strip()
+        text = str(entry.get("message") or "").strip()
         if not text:
             continue
         summary_assistant = _summarize(
@@ -275,11 +275,11 @@ async def build_tag_recall_context(
         if not summary_assistant:
             continue
         reply_summary = ""
-        reply_to = message.get("reply_to")
+        reply_to = entry.get("reply_to")
         if reply_to:
-            reply_message = reply_lookup.get(str(reply_to))
-            if isinstance(reply_message, Mapping):
-                reply_text = str(reply_message.get("message") or "").strip()
+            reply_entry = reply_lookup.get(str(reply_to))
+            if isinstance(reply_entry, Mapping):
+                reply_text = str(reply_entry.get("message") or "").strip()
                 if reply_text:
                     reply_summary = _summarize(
                         reply_text,

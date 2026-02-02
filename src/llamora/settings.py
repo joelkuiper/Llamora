@@ -84,7 +84,7 @@ DEFAULTS: dict[str, Any] = {
     "SEARCH": {
         "recent_limit": 50,
         "recent_suggestion_limit": 8,
-        "message_index_max_elements": 100_000,
+        "entry_index_max_elements": 100_000,
         "progressive": {
             "k1": 128,
             "k2": 10,

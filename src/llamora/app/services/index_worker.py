@@ -22,7 +22,7 @@ DEFAULT_ENQUEUE_TIMEOUT = 5.0
 
 
 class IndexWorker:
-    """Background worker that indexes messages for search."""
+    """Background worker that indexes entries for search."""
 
     def __init__(
         self,
@@ -63,13 +63,13 @@ class IndexWorker:
             self._task = None
 
     async def enqueue(
-        self, user_id: str, message_id: str, plaintext: str, dek: bytes
+        self, user_id: str, entry_id: str, plaintext: str, dek: bytes
     ) -> None:
-        """Queue a message for indexing."""
+        """Queue an entry for indexing."""
         try:
-            self._queue.put_nowait((user_id, message_id, plaintext, dek))
+            self._queue.put_nowait((user_id, entry_id, plaintext, dek))
         except asyncio.QueueFull:
-            job = (user_id, message_id, plaintext, dek)
+            job = (user_id, entry_id, plaintext, dek)
             self._backpressure_events += 1
             logger.warning(
                 "Index queue full (%s/%s); waiting up to %s seconds",
@@ -102,11 +102,11 @@ class IndexWorker:
         try:
             await self._search_api.bulk_index(batch)
         except Exception:  # pragma: no cover - defensive logging
-            logger.exception("Failed to index batch of %d messages", len(batch))
+            logger.exception("Failed to index batch of %d entries", len(batch))
         else:
             elapsed_ms = (time.perf_counter() - start) * 1000
             logger.info(
-                "Indexed %d messages in %.1fms (queue=%d, dropped=%d)",
+                "Indexed %d entries in %.1fms (queue=%d, dropped=%d)",
                 len(batch),
                 elapsed_ms,
                 self._queue.qsize(),

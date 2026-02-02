@@ -17,7 +17,7 @@ CandidateMap = OrderedDict[str, Candidate]
 
 
 class BaseSearchCandidateGenerator(Protocol):
-    """Interface for producing ranked candidate messages."""
+    """Interface for producing ranked candidate entries."""
 
     async def generate(
         self,
@@ -27,7 +27,7 @@ class BaseSearchCandidateGenerator(Protocol):
         k1: int,
         k2: int,
     ) -> CandidateMap:
-        """Return candidate messages ordered by recency and vector distance."""
+        """Return candidate entries ordered by recency and vector distance."""
 
         ...
 
@@ -65,15 +65,15 @@ class DefaultSearchCandidateGenerator:
 
         candidate_map: CandidateMap = OrderedDict()
         for candidate in candidates:
-            message_id = candidate.get("id")
-            if not message_id:
+            entry_id = candidate.get("id")
+            if not entry_id:
                 continue
-            existing = candidate_map.get(message_id)
+            existing = candidate_map.get(entry_id)
             if existing is None or candidate.get("cosine", 0.0) > existing.get(
                 "cosine",
                 0.0,
             ):
-                candidate_map[message_id] = candidate
+                candidate_map[entry_id] = candidate
 
         return candidate_map
 

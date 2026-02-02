@@ -12,8 +12,8 @@ from llamora.app.embed.model import async_embed_texts
 logger = logging.getLogger(__name__)
 
 
-class MessageIndex:
-    """In-memory ANN index for a single user's messages."""
+class EntryIndex:
+    """In-memory ANN index for a single user's entries."""
 
     def __init__(self, dim: int, max_elements: int = 100000):
         self.index = hnswlib.Index(space="cosine", dim=dim)
@@ -28,9 +28,9 @@ class MessageIndex:
     def touch(self) -> None:
         self.last_used = time.monotonic()
 
-    def contains(self, msg_id: str) -> bool:
-        """Return True if msg_id already indexed."""
-        return msg_id in self.id_to_idx
+    def contains(self, entry_id: str) -> bool:
+        """Return True if entry_id already indexed."""
+        return entry_id in self.id_to_idx
 
     def add_batch(self, ids: list[str], vecs: np.ndarray) -> None:
         if not ids:
@@ -56,7 +56,7 @@ class MessageIndex:
         if required > current_capacity:
             new_capacity = max(current_capacity * 2, required)
             logger.warning(
-                "Resizing message index from %d to %d to accommodate %d new items",
+                "Resizing entry index from %d to %d to accommodate %d new items",
                 current_capacity,
                 new_capacity,
                 len(ids),
@@ -67,9 +67,9 @@ class MessageIndex:
         idxs = np.arange(self.next_idx, self.next_idx + len(ids))
         logger.debug("Adding %d vectors starting at index %d", len(ids), self.next_idx)
         self.index.add_items(vecs, idxs)
-        for msg_id, idx in zip(ids, idxs):
-            self.id_to_idx[msg_id] = int(idx)
-            self.idx_to_id[int(idx)] = msg_id
+        for entry_id, idx in zip(ids, idxs):
+            self.id_to_idx[entry_id] = int(idx)
+            self.idx_to_id[int(idx)] = entry_id
         self.next_idx += len(ids)
 
     def search(self, query_vec: np.ndarray, k: int) -> tuple[list[str], np.ndarray]:
@@ -91,15 +91,15 @@ class MessageIndex:
         ids: list[str] = []
         for label in labels_arr[0]:
             idx_label = int(label)
-            msg_id = self.idx_to_id.get(idx_label)
-            if msg_id is not None:
-                ids.append(msg_id)
+            entry_id = self.idx_to_id.get(idx_label)
+            if entry_id is not None:
+                ids.append(entry_id)
         return ids, dists[0][: len(ids)]
 
     def remove_ids(self, ids: Iterable[str]) -> None:
         removed = False
-        for msg_id in ids:
-            idx = self.id_to_idx.pop(msg_id, None)
+        for entry_id in ids:
+            idx = self.id_to_idx.pop(entry_id, None)
             if idx is None:
                 continue
             self.idx_to_id.pop(idx, None)
@@ -110,7 +110,7 @@ class MessageIndex:
             self.touch()
 
 
-class MessageIndexStore:
+class EntryIndexStore:
     """Manages per-user ANN indexes, persistence and maintenance."""
 
     def __init__(
@@ -126,7 +126,7 @@ class MessageIndexStore:
         self.warm_limit = warm_limit
         self.maintenance_interval = maintenance_interval
         self.max_elements = max_elements
-        self.indexes: Dict[str, MessageIndex] = {}
+        self.indexes: Dict[str, EntryIndex] = {}
         self.cursors: Dict[str, Optional[str]] = {}
         self.locks: Dict[str, asyncio.Lock] = {}
         self._next_maintenance = time.monotonic() + maintenance_interval
@@ -150,42 +150,42 @@ class MessageIndexStore:
     async def _embed_and_store(
         self,
         user_id: str,
-        msgs: Iterable[dict],
+        entries: Iterable[dict],
         dek: bytes,
-        idx: Optional[MessageIndex],
-    ) -> MessageIndex:
-        """Embed messages, add to index and persist vectors."""
+        idx: Optional[EntryIndex],
+    ) -> EntryIndex:
+        """Embed entries, add to index and persist vectors."""
 
-        msg_list = list(msgs)
-        if not msg_list:
+        entry_list = list(entries)
+        if not entry_list:
             if idx is not None:
                 return idx
             dim = await self._get_default_dim()
-            fresh = MessageIndex(dim, self.max_elements)
+            fresh = EntryIndex(dim, self.max_elements)
             self.indexes[user_id] = fresh
             return fresh
 
-        texts = [m["message"] for m in msg_list]
-        ids = [m["id"] for m in msg_list]
+        texts = [entry["message"] for entry in entry_list]
+        ids = [entry["id"] for entry in entry_list]
         vecs = await async_embed_texts(texts)
         if idx is None:
             dim = vecs.shape[1]
-            idx = MessageIndex(dim, self.max_elements)
+            idx = EntryIndex(dim, self.max_elements)
         idx.add_batch(ids, vecs)
         await self.db.vectors.store_vectors_batch(
             user_id,
             [(mid, vec) for mid, vec in zip(ids, vecs)],
             dek,
         )
-        if msg_list:
-            cursor = msg_list[-1]["id"]
+        if entry_list:
+            cursor = entry_list[-1]["id"]
             existing = self.cursors.get(user_id)
             if existing is None or cursor < existing:
                 self.cursors[user_id] = cursor
         self.indexes[user_id] = idx
         return idx
 
-    async def ensure_index(self, user_id: str, dek: bytes) -> MessageIndex:
+    async def ensure_index(self, user_id: str, dek: bytes) -> EntryIndex:
         logger.debug("Ensuring index for user %s", user_id)
         lock = self._get_lock(user_id)
         async with lock:
@@ -203,7 +203,7 @@ class MessageIndexStore:
                     "Warming index for user %s with %d vectors", user_id, len(rows)
                 )
                 dim = rows[0]["vec"].shape[0]
-                idx = MessageIndex(dim, self.max_elements)
+                idx = EntryIndex(dim, self.max_elements)
                 ids = [r["id"] for r in rows]
                 vecs = np.array([r["vec"] for r in rows], dtype=np.float32)
                 if vecs.ndim == 1:
@@ -213,33 +213,35 @@ class MessageIndexStore:
                 self.cursors[user_id] = cursor
                 self.indexes[user_id] = idx
 
-                msgs = await self.db.messages.get_latest_messages(
+                entries = await self.db.entries.get_latest_entries(
                     user_id, self.warm_limit, dek
                 )
-                missing = [m for m in msgs if not idx.contains(m["id"])]
+                missing = [entry for entry in entries if not idx.contains(entry["id"])]
                 if missing:
                     logger.debug(
-                        "Embedding %d messages missing vectors for user %s",
+                        "Embedding %d entries missing vectors for user %s",
                         len(missing),
                         user_id,
                     )
                     await self._embed_and_store(user_id, missing, dek, idx)
                 return idx
 
-            msgs = await self.db.messages.get_latest_messages(
+            entries = await self.db.entries.get_latest_entries(
                 user_id, self.warm_limit, dek
             )
-            if msgs:
+            if entries:
                 logger.debug(
-                    "Embedding and indexing %d messages for user %s", len(msgs), user_id
+                    "Embedding and indexing %d entries for user %s",
+                    len(entries),
+                    user_id,
                 )
-                idx = await self._embed_and_store(user_id, msgs, dek, None)
+                idx = await self._embed_and_store(user_id, entries, dek, None)
                 return idx
 
             logger.debug("No existing data for user %s, creating empty index", user_id)
             dim = await self._get_default_dim()
-            idx = MessageIndex(dim, self.max_elements)
-            latest = await self.db.messages.get_user_latest_id(user_id)
+            idx = EntryIndex(dim, self.max_elements)
+            latest = await self.db.entries.get_user_latest_entry_id(user_id)
             self.cursors[user_id] = latest
             self.indexes[user_id] = idx
             return idx
@@ -279,13 +281,13 @@ class MessageIndexStore:
                 added += len(ids)
                 new_cursor = rows[-1]["id"]
 
-            msgs = await self.db.messages.get_messages_older_than(
+            entries = await self.db.entries.get_entries_older_than(
                 user_id, cursor, batch, dek
             )
-            missing = [m for m in msgs if not idx.contains(m["id"])]
+            missing = [entry for entry in entries if not idx.contains(entry["id"])]
             if missing:
                 logger.debug(
-                    "Embedding %d messages older than %s for user %s",
+                    "Embedding %d entries older than %s for user %s",
                     len(missing),
                     cursor,
                     user_id,
@@ -295,7 +297,7 @@ class MessageIndexStore:
                 new_cursor = missing[-1]["id"]
 
             if added == 0:
-                logger.debug("No older messages for user %s", user_id)
+                logger.debug("No older entries for user %s", user_id)
                 return 0
 
             existing = self.cursors.get(user_id)
@@ -303,18 +305,18 @@ class MessageIndexStore:
                 self.cursors[user_id] = new_cursor
             return added
 
-    async def hydrate_messages(
-        self, user_id: str, message_ids: list[str], dek: bytes
+    async def hydrate_entries(
+        self, user_id: str, entry_ids: list[str], dek: bytes
     ) -> list[dict]:
-        if not message_ids:
+        if not entry_ids:
             return []
-        rows = await self.db.messages.get_messages_by_ids(user_id, message_ids, dek)
+        rows = await self.db.entries.get_entries_by_ids(user_id, entry_ids, dek)
         return rows
 
-    async def index_message(
-        self, user_id: str, message_id: str, content: str, dek: bytes
+    async def index_entry(
+        self, user_id: str, entry_id: str, content: str, dek: bytes
     ) -> None:
-        await self.bulk_index([(user_id, message_id, content, dek)])
+        await self.bulk_index([(user_id, entry_id, content, dek)])
 
     async def bulk_index(self, entries: Iterable[tuple[str, str, str, bytes]]) -> None:
         items = list(entries)
@@ -327,30 +329,32 @@ class MessageIndexStore:
             raise ValueError("Embedding count does not match input items")
 
         per_user: Dict[str, list[tuple[str, np.ndarray, bytes]]] = {}
-        for (user_id, msg_id, _, dek), vec in zip(items, vecs):
-            per_user.setdefault(user_id, []).append((msg_id, vec, dek))
+        for (user_id, entry_id, _, dek), vec in zip(items, vecs):
+            per_user.setdefault(user_id, []).append((entry_id, vec, dek))
 
         logger.debug(
-            "Bulk indexing %d messages across %d users", len(items), len(per_user)
+            "Bulk indexing %d entries across %d users", len(items), len(per_user)
         )
 
         for user_id, user_entries in per_user.items():
             dek = user_entries[0][2]
             idx = await self.ensure_index(user_id, dek)
             lock = self._get_lock(user_id)
-            ids = [mid for mid, _, _ in user_entries]
-            vec_arr = np.asarray([vec for _, vec, _ in user_entries], dtype=np.float32)
+            ids = [entry_id for entry_id, _, _ in user_entries]
+            vec_arr = np.asarray(
+                [vec for _, vec, _ in user_entries], dtype=np.float32
+            )
             async with lock:
                 await self.db.vectors.store_vectors_batch(
                     user_id,
-                    [(mid, vec) for mid, vec, _ in user_entries],
+                    [(entry_id, vec) for entry_id, vec, _ in user_entries],
                     dek,
                 )
                 idx.add_batch(ids, vec_arr)
-                for mid in ids:
+                for entry_id in ids:
                     current = self.cursors.get(user_id)
-                    if current is None or mid < current:
-                        self.cursors[user_id] = mid
+                    if current is None or entry_id < current:
+                        self.cursors[user_id] = entry_id
                 self.indexes[user_id] = idx
 
     def _evict_idle(self) -> None:
@@ -374,8 +378,8 @@ class MessageIndexStore:
         self._next_maintenance = now + self.maintenance_interval
         self._evict_idle()
 
-    async def remove_messages(self, user_id: str, message_ids: Iterable[str]) -> None:
-        ids = [mid for mid in message_ids if mid]
+    async def remove_entries(self, user_id: str, entry_ids: Iterable[str]) -> None:
+        ids = [entry_id for entry_id in entry_ids if entry_id]
         if not ids:
             return
         idx = self.indexes.get(user_id)

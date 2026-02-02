@@ -19,7 +19,7 @@ class LLMStreamError(Exception):
     """Raised when the LLM reports an error while streaming."""
 
 
-class AssistantMessagePersistenceError(Exception):
+class AssistantEntryPersistenceError(Exception):
     """Raised when the assistant response cannot be persisted."""
 
 
@@ -43,14 +43,14 @@ class PipelineResult:
 
     final_text: str
     meta: dict | None
-    assistant_message_id: str | None
+    assistant_entry_id: str | None
     error: bool
     error_message: str | None
     cancelled: bool
     partial: bool
 
 
-class AssistantMessageWriter:
+class AssistantEntryWriter:
     """Handles persistence of assistant responses."""
 
     def __init__(self, db) -> None:
@@ -66,13 +66,13 @@ class AssistantMessageWriter:
         date: str,
     ) -> str:
         append: Callable[..., Awaitable[str]] | None = getattr(
-            self._db, "append_message", None
+            self._db, "append_entry", None
         )
-        if append is None and hasattr(self._db, "messages"):
-            append = getattr(self._db.messages, "append_message", None)
+        if append is None and hasattr(self._db, "entries"):
+            append = getattr(self._db.entries, "append_entry", None)
         if append is None:
-            raise AssistantMessagePersistenceError(
-                "Database does not support append_message"
+            raise AssistantEntryPersistenceError(
+                "Database does not support append_entry"
             )
         try:
             return await append(
@@ -85,7 +85,7 @@ class AssistantMessageWriter:
                 created_date=date,
             )
         except Exception as exc:  # pragma: no cover - defensive
-            raise AssistantMessagePersistenceError(
+            raise AssistantEntryPersistenceError(
                 str(exc) or "Failed to save response"
             ) from exc
 
@@ -191,7 +191,7 @@ class ResponsePipeline:
         self,
         *,
         session,
-        writer: AssistantMessageWriter,
+        writer: AssistantEntryWriter,
         uid: str,
         reply_to: str | None,
         date: str,
@@ -232,7 +232,7 @@ class ResponsePipeline:
         except asyncio.TimeoutError:
             logger.warning(
                 "Streaming timed out for %s",
-                getattr(self._session, "user_msg_id", "<unknown>"),
+                getattr(self._session, "entry_id", "<unknown>"),
             )
             self._cancelled = True
             self._error = True
@@ -335,9 +335,9 @@ class ResponsePipeline:
     ) -> tuple[str | None, bool]:
         if not content.strip():
             return None, False
-        label = "partial assistant message" if partial else "assistant message"
+        label = "partial assistant entry" if partial else "assistant entry"
         try:
-            message_id = await self._writer.save(
+            entry_id = await self._writer.save(
                 self._uid,
                 content,
                 self._dek,
@@ -345,11 +345,11 @@ class ResponsePipeline:
                 self._reply_to,
                 self._date,
             )
-        except AssistantMessagePersistenceError:
+        except AssistantEntryPersistenceError:
             logger.exception("Failed to save %s", label)
             return None, True
-        logger.debug("Saved %s %s", label, message_id)
-        return message_id, False
+        logger.debug("Saved %s %s", label, entry_id)
+        return entry_id, False
 
     async def _build_metadata(
         self,
@@ -380,7 +380,7 @@ class ResponsePipeline:
             partial=False,
             include_repeat_guard=self._repeat_guard_triggered,
         )
-        assistant_msg_id, failed = await self._persist(final_text, meta, partial=False)
+        assistant_entry_id, failed = await self._persist(final_text, meta, partial=False)
         if failed:
             final_text = self._append_persistence_warning(final_text)
             self._error = True
@@ -388,7 +388,7 @@ class ResponsePipeline:
         return PipelineResult(
             final_text=final_text,
             meta=meta,
-            assistant_message_id=assistant_msg_id,
+            assistant_entry_id=assistant_entry_id,
             error=self._error,
             error_message=self._error_message,
             cancelled=self._cancelled,
@@ -407,14 +407,14 @@ class ResponsePipeline:
             partial=True,
             include_repeat_guard=self._repeat_guard_triggered,
         )
-        assistant_msg_id, failed = await self._persist(final_text, meta, partial=True)
+        assistant_entry_id, failed = await self._persist(final_text, meta, partial=True)
         if failed:
             final_text = self._append_persistence_warning(final_text)
             self._error = True
         return PipelineResult(
             final_text=final_text,
             meta=meta,
-            assistant_message_id=assistant_msg_id,
+            assistant_entry_id=assistant_entry_id,
             error=self._error,
             error_message=self._error_message,
             cancelled=True,
@@ -430,7 +430,7 @@ class ResponsePipeline:
             partial=False,
             include_repeat_guard=False,
         )
-        assistant_msg_id, failed = await self._persist(final_text, meta, partial=False)
+        assistant_entry_id, failed = await self._persist(final_text, meta, partial=False)
         if failed:
             final_text = self._append_persistence_warning(final_text)
             self._error = True
@@ -438,7 +438,7 @@ class ResponsePipeline:
         return PipelineResult(
             final_text=final_text,
             meta=meta,
-            assistant_message_id=assistant_msg_id,
+            assistant_entry_id=assistant_entry_id,
             error=True,
             error_message=self._error_message,
             cancelled=self._cancelled,
@@ -465,8 +465,8 @@ class ResponsePipeline:
 
 
 __all__ = [
-    "AssistantMessagePersistenceError",
-    "AssistantMessageWriter",
+    "AssistantEntryPersistenceError",
+    "AssistantEntryWriter",
     "ChunkRingGuard",
     "LLMStreamError",
     "PipelineResult",

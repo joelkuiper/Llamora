@@ -39,7 +39,7 @@ IndexJob = Tuple[str, str, str, bytes]
 
 
 class SearchAPI:
-    """High level search interface operating on encrypted messages."""
+    """High level search interface operating on encrypted entries."""
 
     def __init__(
         self,
@@ -128,11 +128,11 @@ class SearchAPI:
     async def enqueue_index_job(
         self,
         user_id: str,
-        message_id: str,
+        entry_id: str,
         plaintext: str,
         dek: bytes,
     ) -> None:
-        await self._index_worker.enqueue(user_id, message_id, plaintext, dek)
+        await self._index_worker.enqueue(user_id, entry_id, plaintext, dek)
 
     async def bulk_index(self, jobs: Sequence[IndexJob]) -> None:
         if not jobs:
@@ -141,26 +141,26 @@ class SearchAPI:
         start = time.perf_counter()
         decode_fallbacks = 0
         parsed: list[IndexJob] = []
-        for user_id, msg_id, plaintext, dek in jobs:
+        for user_id, entry_id, plaintext, dek in jobs:
             content = plaintext
             try:
                 record = orjson.loads(plaintext)
             except orjson.JSONDecodeError:
                 decode_fallbacks += 1
                 logger.debug(
-                    "Failed to decode plaintext for message %s (user %s)",
-                    msg_id,
+                    "Failed to decode plaintext for entry %s (user %s)",
+                    entry_id,
                     user_id,
                 )
             else:
                 content = record.get("message", content)
-            parsed.append((user_id, msg_id, content, dek))
+            parsed.append((user_id, entry_id, content, dek))
 
         await self.vector_search.index_store.bulk_index(parsed)
 
         elapsed_ms = (time.perf_counter() - start) * 1000
         logger.info(
-            "Bulk indexed %d messages for %d users in %.1fms (decode_fallbacks=%d, dropped=%d)",
+            "Bulk indexed %d entries for %d users in %.1fms (decode_fallbacks=%d, dropped=%d)",
             len(parsed),
             len({job[0] for job in parsed}),
             elapsed_ms,
@@ -228,20 +228,20 @@ class SearchAPI:
             self.config.progressive.batch_size,
         )
 
-    async def on_message_appended(
+    async def on_entry_appended(
         self,
         user_id: str,
-        msg_id: str,
+        entry_id: str,
         plaintext: str,
         dek: bytes,
     ) -> None:
-        await self.bulk_index([(user_id, msg_id, plaintext, dek)])
+        await self.bulk_index([(user_id, entry_id, plaintext, dek)])
 
     async def maintenance_tick(self) -> None:
         await self.vector_search.maintenance_tick()
 
-    async def delete_messages(self, user_id: str, message_ids: Sequence[str]) -> None:
-        await self.vector_search.index_store.remove_messages(user_id, message_ids)
+    async def delete_entries(self, user_id: str, entry_ids: Sequence[str]) -> None:
+        await self.vector_search.index_store.remove_entries(user_id, entry_ids)
 
     async def search_stream(
         self,

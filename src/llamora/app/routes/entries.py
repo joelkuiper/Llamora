@@ -40,7 +40,7 @@ from llamora.app.services.time import (
     part_of_day,
 )
 from llamora.app.routes.helpers import (
-    ensure_message_exists,
+    ensure_entry_exists,
     require_iso_date,
     require_user_and_dek,
 )
@@ -152,29 +152,29 @@ async def entries_htmx_today():
     )
 
 
-@entries_bp.route("/e/response/stop/<user_msg_id>", methods=["POST"])
+@entries_bp.route("/e/response/stop/<entry_id>", methods=["POST"])
 @login_required
-async def stop_response(user_msg_id: str):
-    logger.info("Stop requested for user message %s", user_msg_id)
+async def stop_response(entry_id: str):
+    logger.info("Stop requested for entry %s", entry_id)
     _, user, _ = await require_user_and_dek()
 
     try:
-        await ensure_message_exists(get_services().db, user["id"], user_msg_id)
+        await ensure_entry_exists(get_services().db, user["id"], entry_id)
     except HTTPException as exc:
         if exc.code == 404:
-            logger.warning("Stop request for unauthorized message %s", user_msg_id)
+            logger.warning("Stop request for unauthorized entry %s", entry_id)
         raise
 
     manager = _entry_stream_manager()
-    handled, was_pending = await manager.stop(user_msg_id, user["id"])
+    handled, was_pending = await manager.stop(entry_id, user["id"])
     if not was_pending:
-        logger.debug("No pending response for %s, aborting active stream", user_msg_id)
+        logger.debug("No pending response for %s, aborting active stream", entry_id)
     if not handled:
-        logger.debug("Stop request for %s not handled by manager", user_msg_id)
-        return Response("unknown message id", status=404)
+        logger.debug("Stop request for %s not handled by manager", entry_id)
+        return Response("unknown entry id", status=404)
     logger.debug(
         "Stop request handled for %s (pending=%s)",
-        user_msg_id,
+        entry_id,
         was_pending,
     )
     return Response("", status=200)
@@ -185,8 +185,8 @@ async def stop_response(user_msg_id: str):
 async def meta_chips(msg_id: str):
     _, user, dek = await require_user_and_dek()
     db = get_services().db
-    await ensure_message_exists(db, user["id"], msg_id)
-    tags = await db.tags.get_tags_for_message(user["id"], msg_id, dek)
+    await ensure_entry_exists(db, user["id"], msg_id)
+    tags = await db.tags.get_tags_for_entry(user["id"], msg_id, dek)
     html = await render_template(
         "partials/meta_chips_wrapper.html",
         msg_id=msg_id,
@@ -198,13 +198,13 @@ async def meta_chips(msg_id: str):
 
 @entries_bp.route("/e/message/<msg_id>", methods=["DELETE"])
 @login_required
-async def delete_message(msg_id: str):
+async def delete_entry(msg_id: str):
     _, user, _ = await require_user_and_dek()
     db = get_services().db
-    await ensure_message_exists(db, user["id"], msg_id)
-    deleted_ids = await db.messages.delete_message(user["id"], msg_id)
+    await ensure_entry_exists(db, user["id"], msg_id)
+    deleted_ids = await db.entries.delete_entry(user["id"], msg_id)
     if deleted_ids:
-        await get_services().search_api.delete_messages(user["id"], deleted_ids)
+        await get_services().search_api.delete_entries(user["id"], deleted_ids)
     oob_deletes = "\n".join(
         f'<div id="msg-{mid}" hx-swap-oob="delete"></div>' for mid in deleted_ids
     )
@@ -224,9 +224,9 @@ async def sse_opening(date: str):
     yesterday_iso = (now - timedelta(days=1)).date().isoformat()
     services = get_services()
     db = services.db
-    is_new = not await db.messages.user_has_messages(uid)
+    is_new = not await db.entries.user_has_entries(uid)
 
-    yesterday_msgs = await db.messages.get_recent_messages(
+    yesterday_msgs = await db.entries.get_recent_entries(
         uid, yesterday_iso, dek, limit=20
     )
     had_yesterday_activity = bool(yesterday_msgs)
@@ -355,22 +355,22 @@ async def send_message(date):
     max_len = int(settings.LIMITS.max_message_length)
 
     if not user_text or len(user_text) > max_len:
-        abort(400, description="Message is empty or too long.")
+        abort(400, description="Entry is empty or too long.")
 
     try:
-        user_msg_id = await get_services().db.messages.append_message(
+        entry_id = await get_services().db.entries.append_entry(
             uid, "user", user_text, dek, created_date=date
         )
-        logger.debug("Saved user message %s", user_msg_id)
+        logger.debug("Saved entry %s", entry_id)
     except Exception:
-        logger.exception("Failed to save user message")
+        logger.exception("Failed to save entry")
         raise
 
     created_at = user_time or datetime.now(timezone.utc).isoformat()
     return await render_template(
         "partials/placeholder.html",
         user_text=user_text,
-        user_msg_id=user_msg_id,
+        entry_id=entry_id,
         created_at=created_at,
         day=date,
         user_time=user_time,
@@ -380,9 +380,9 @@ async def send_message(date):
     )
 
 
-@entries_bp.route("/e/<date>/response/<user_msg_id>", methods=["POST"])
+@entries_bp.route("/e/<date>/response/<entry_id>", methods=["POST"])
 @login_required
-async def request_response(date, user_msg_id: str):
+async def request_response(date, entry_id: str):
     normalized_date = require_iso_date(date)
     form = await request.form
     user_time = form.get("user_time")
@@ -392,25 +392,25 @@ async def request_response(date, user_msg_id: str):
     _, user, dek = await require_user_and_dek()
     uid = user["id"]
 
-    await ensure_message_exists(get_services().db, uid, user_msg_id)
-    actual_date = await get_services().db.messages.get_message_date(uid, user_msg_id)
+    await ensure_entry_exists(get_services().db, uid, entry_id)
+    actual_date = await get_services().db.entries.get_entry_date(uid, entry_id)
     if actual_date is None:
-        abort(404, description="Message not found.")
+        abort(404, description="Entry not found.")
 
     stream_html = await render_template(
         "partials/entry_response_stream_item.html",
-        user_msg_id=user_msg_id,
+        entry_id=entry_id,
         day=actual_date or normalized_date,
         user_time=user_time,
         response_kind=selected_kind.get("id"),
     )
     actions_html = await render_template(
         "partials/entry_actions_item.html",
-        user_msg_id=user_msg_id,
+        entry_id=entry_id,
         day=actual_date or normalized_date,
         response_kinds=response_kinds,
         is_today=normalized_date == local_date().isoformat(),
-        stop_url=url_for("entries.stop_response", user_msg_id=user_msg_id),
+        stop_url=url_for("entries.stop_response", entry_id=entry_id),
         response_active=True,
     )
     return Response(
@@ -420,19 +420,19 @@ async def request_response(date, user_msg_id: str):
     )
 
 
-@entries_bp.get("/e/actions/<user_msg_id>")
+@entries_bp.get("/e/actions/<entry_id>")
 @login_required
-async def entry_actions_item(user_msg_id: str):
+async def entry_actions_item(entry_id: str):
     _, user, dek = await require_user_and_dek()
     uid = user["id"]
-    await ensure_message_exists(get_services().db, uid, user_msg_id)
-    actual_date = await get_services().db.messages.get_message_date(uid, user_msg_id)
+    await ensure_entry_exists(get_services().db, uid, entry_id)
+    actual_date = await get_services().db.entries.get_entry_date(uid, entry_id)
     if actual_date is None:
-        abort(404, description="Message not found.")
+        abort(404, description="Entry not found.")
     response_kinds, _ = _load_response_kinds()
     html = await render_template(
         "partials/entry_actions_item.html",
-        user_msg_id=user_msg_id,
+        entry_id=entry_id,
         day=actual_date,
         response_kinds=response_kinds,
         is_today=actual_date == local_date().isoformat(),
@@ -442,13 +442,13 @@ async def entry_actions_item(user_msg_id: str):
     return Response(html, status=200, mimetype="text/html")
 
 
-@entries_bp.route("/e/<date>/response/stream/<user_msg_id>")
+@entries_bp.route("/e/<date>/response/stream/<entry_id>")
 @login_required
-async def sse_response(user_msg_id: str, date: str):
-    """Stream the assistant's response for a given user message.
+async def sse_response(entry_id: str, date: str):
+    """Stream the assistant's response for a given entry.
 
-    The ``user_msg_id`` corresponds to the user's prompt message. When the
-    assistant finishes responding, the ``assistant_msg_id`` of the stored response
+    The ``entry_id`` corresponds to the user's prompt entry. When the
+    assistant finishes responding, the ``assistant_entry_id`` of the stored response
     is sent in a final ``done`` event.
     """
 
@@ -456,17 +456,17 @@ async def sse_response(user_msg_id: str, date: str):
 
     _, user, dek = await require_user_and_dek()
     uid = user["id"]
-    actual_date = await get_services().db.messages.get_message_date(uid, user_msg_id)
+    actual_date = await get_services().db.entries.get_entry_date(uid, entry_id)
     if not actual_date:
-        logger.warning("History not found for user message %s", user_msg_id)
+        logger.warning("Entry date not found for entry %s", entry_id)
         return StreamSession.error("Invalid ID")
-    entries = await get_services().db.messages.get_entries_for_date(
+    entries = await get_services().db.entries.get_entries_for_date(
         uid, actual_date, dek
     )
     if not entries:
-        logger.warning("Entries not found for user message %s", user_msg_id)
+        logger.warning("Entries not found for entry %s", entry_id)
         return StreamSession.error("Invalid ID")
-    history = build_entry_history(entries, user_msg_id)
+    history = build_entry_history(entries, entry_id)
 
     params_raw = normalize_llm_config(
         request.args.get("config"),
@@ -488,13 +488,13 @@ async def sse_response(user_msg_id: str, date: str):
         db,
         uid,
         dek,
-        user_msg_id=user_msg_id,
+        entry_id=entry_id,
     )
     if entry_context:
         ctx.update(entry_context)
 
     try:
-        pending_response = manager.get(user_msg_id, uid)
+        pending_response = manager.get(entry_id, uid)
         if not pending_response:
             recall_context = await build_tag_recall_context(
                 db,
@@ -502,7 +502,7 @@ async def sse_response(user_msg_id: str, date: str):
                 dek,
                 history=history,
                 current_date=actual_date or normalized_date,
-                max_message_id=user_msg_id,
+                max_entry_id=entry_id,
             )
             llm_client = services.llm_service.llm
             recall_date = actual_date or normalized_date
@@ -521,7 +521,7 @@ async def sse_response(user_msg_id: str, date: str):
                 params=params,
                 context=ctx,
                 message_key="message",
-                target_message_id=user_msg_id,
+                target_entry_id=entry_id,
                 include_tag_metadata=True,
                 tag_recall_date=recall_date,
             )
@@ -541,7 +541,7 @@ async def sse_response(user_msg_id: str, date: str):
             try:
                 pending_response = await start_stream_session(
                     manager=manager,
-                    user_msg_id=user_msg_id,
+                    entry_id=entry_id,
                     uid=uid,
                     date=actual_date or normalized_date,
                     history=history_for_stream,
@@ -562,7 +562,7 @@ async def sse_response(user_msg_id: str, date: str):
     except HTTPException:
         raise
     except Exception:
-        logger.exception("Failed to start streaming response for %s", user_msg_id)
+        logger.exception("Failed to start streaming response for %s", entry_id)
         return StreamSession.error(
             "The assistant ran into an unexpected error. Please try again."
         )

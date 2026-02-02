@@ -29,9 +29,9 @@ async def require_user_and_dek(
     return session, user, dek
 
 
-async def ensure_message_exists(db: Any, user_id: str, msg_id: str) -> None:
-    """Ensure the given message exists for the user or abort with 404."""
+async def ensure_entry_exists(db: Any, user_id: str, entry_id: str) -> None:
+    """Ensure the given entry exists for the user or abort with 404."""
 
-    if not await db.messages.message_exists(user_id, msg_id):
-        abort(404, description="message not found")
+    if not await db.entries.entry_exists(user_id, entry_id):
+        abort(404, description="entry not found")
         raise AssertionError("unreachable")

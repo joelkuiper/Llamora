@@ -46,16 +46,16 @@ class TagService:
         if not results:
             return
 
-        message_ids: list[str] = []
+        entry_ids: list[str] = []
         for res in results:
             msg_id = res.get("id")
             if isinstance(msg_id, str) and msg_id:
-                message_ids.append(msg_id)
-        if not message_ids:
+                entry_ids.append(msg_id)
+        if not entry_ids:
             return
 
         token_lookup = {token.lower() for token in tokens}
-        tag_map = await self._db.tags.get_tags_for_messages(user_id, message_ids, dek)
+        tag_map = await self._db.tags.get_tags_for_entries(user_id, entry_ids, dek)
 
         for res in results:
             msg_id = res.get("id")
@@ -81,12 +81,12 @@ class TagService:
     ) -> list[str] | None:
         """Return suggested tags for an entry."""
 
-        messages = await self._db.messages.get_messages_by_ids(user_id, [msg_id], dek)
-        if not messages:
+        entries = await self._db.entries.get_entries_by_ids(user_id, [msg_id], dek)
+        if not entries:
             return None
 
-        message = messages[0]
-        existing = await self._db.tags.get_tags_for_message(user_id, msg_id, dek)
+        entry = entries[0]
+        existing = await self._db.tags.get_tags_for_entry(user_id, msg_id, dek)
         existing_names = self._extract_existing_names(existing)
 
         query_value = str(query or "").strip()
@@ -113,13 +113,13 @@ class TagService:
                 suggestions.append(canonical)
             return suggestions
 
-        meta = message.get("meta") or {}
+        meta = entry.get("meta") or {}
         keywords: Iterable[Any] = meta.get("keywords") or []
-        if (not keywords) and message.get("role") == "user":
+        if (not keywords) and entry.get("role") == "user":
             cached = self._get_cached_suggestions(user_id, msg_id)
             if cached is None:
                 meta_payload = await generate_metadata(
-                    llm, message.get("message", "")
+                    llm, entry.get("message", "")
                 )
                 keywords = meta_payload.get("keywords") or []
                 self._set_cached_suggestions(user_id, msg_id, list(keywords))

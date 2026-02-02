@@ -438,7 +438,7 @@ async def download_user_data():
         response.status_code = 400
         return response
 
-    messages = await get_services().db.messages.get_latest_messages(
+    messages = await get_services().db.entries.get_latest_entries(
         user["id"], 1000000, dek
     )
     user_data = {

@@ -16,7 +16,7 @@ from llamora.app.services.queues import FairAsyncQueue
 from ..llm_stream_config import LLMStreamConfig
 
 from .pipeline import (
-    AssistantMessageWriter,
+    AssistantEntryWriter,
     LLMStreamError,
     PipelineResult,
     ResponsePipeline,
@@ -33,14 +33,14 @@ class LLMStreamSession:
     def __init__(
         self,
         llm: LLMClient,
-        user_msg_id: str,
+        entry_id: str,
         history: list[dict],
         params: dict | None,
         context: dict | None,
         messages: list[dict[str, str]] | None,
     ) -> None:
         self._llm = llm
-        self.user_msg_id = user_msg_id
+        self.entry_id = entry_id
         self._history = history
         self._params = params
         self._context = context or {}
@@ -49,14 +49,14 @@ class LLMStreamSession:
 
     async def __aiter__(self) -> AsyncIterator[str]:
         async for chunk in self._llm.stream_response(
-            self.user_msg_id,
+            self.entry_id,
             self._history,
             self._params,
             self._context,
             messages=self._messages,
         ):
             if isinstance(chunk, dict) and chunk.get("type") == "error":
-                logger.info("Error chunk received for %s: %s", self.user_msg_id, chunk)
+                logger.info("Error chunk received for %s: %s", self.entry_id, chunk)
                 raise LLMStreamError(chunk.get("data", "Unknown error"))
             text = chunk
             if not isinstance(text, str):
@@ -67,15 +67,15 @@ class LLMStreamSession:
             yield text
 
     async def abort(self) -> None:
-        await self._llm.abort(self.user_msg_id)
+        await self._llm.abort(self.entry_id)
 
 
 class PendingResponse(ResponsePipelineCallbacks):
-    """Tracks an in-flight assistant reply to a user's message."""
+    """Tracks an in-flight assistant response to a user's entry."""
 
     def __init__(
         self,
-        user_msg_id: str,
+        entry_id: str,
         uid: str,
         date: str,
         history: list[dict],
@@ -93,7 +93,7 @@ class PendingResponse(ResponsePipelineCallbacks):
         use_default_reply_to: bool = True,
         auto_start: bool = True,
     ) -> None:
-        self.user_msg_id = user_msg_id
+        self.entry_id = entry_id
         self._uid = uid
         self.date = date
         self.text = ""
@@ -106,13 +106,13 @@ class PendingResponse(ResponsePipelineCallbacks):
         self.context = context or {}
         self.messages = messages
         if use_default_reply_to and reply_to is None:
-            self.reply_to = user_msg_id
+            self.reply_to = entry_id
         else:
             self.reply_to = reply_to
         self.meta_extra = meta_extra or {}
         self.cancelled = False
         self.created_at = time.monotonic()
-        self.assistant_msg_id: str | None = None
+        self.assistant_entry_id: str | None = None
         self._chunks: deque[str] = deque()
         self._total_len = 0
         self._cleanup = on_cleanup
@@ -121,14 +121,14 @@ class PendingResponse(ResponsePipelineCallbacks):
         self._activated = False
         self.started_at: float | None = None
         self._session = LLMStreamSession(
-            llm, user_msg_id, history, params, context, messages
+            llm, entry_id, history, params, context, messages
         )
         self._visible_total = ""
         _repeat_guard_size = config.repeat_guard_size
         _repeat_guard_min_length = config.repeat_guard_min_length
         self._pipeline = ResponsePipeline(
             session=self._session,
-            writer=AssistantMessageWriter(db),
+            writer=AssistantEntryWriter(db),
             uid=uid,
             reply_to=self.reply_to,
             date=self.date,
@@ -136,9 +136,9 @@ class PendingResponse(ResponsePipelineCallbacks):
             meta_extra=self.meta_extra,
             config=config,
         )
-        logger.debug("Starting generation for user message %s", user_msg_id)
+        logger.debug("Starting generation for entry %s", entry_id)
         self._task = asyncio.create_task(
-            self._run_pipeline(), name=f"pending:{user_msg_id}"
+            self._run_pipeline(), name=f"pending:{entry_id}"
         )
         self._task.add_done_callback(self._handle_task_result)
         if auto_start:
@@ -158,7 +158,7 @@ class PendingResponse(ResponsePipelineCallbacks):
 
         logger.exception(
             "Pending response pipeline task failed for %s",
-            self.user_msg_id,
+            self.entry_id,
             exc_info=exc,
         )
 
@@ -186,8 +186,8 @@ class PendingResponse(ResponsePipelineCallbacks):
         self.error = result.error
         self.error_message = result.error_message or ""
         self.cancelled = result.cancelled
-        if result.assistant_message_id:
-            self.assistant_msg_id = result.assistant_message_id
+        if result.assistant_entry_id:
+            self.assistant_entry_id = result.assistant_entry_id
         async with self._cond:
             final_text = result.final_text
             if final_text:
@@ -203,9 +203,9 @@ class PendingResponse(ResponsePipelineCallbacks):
         if not self._cleanup_called:
             self._cleanup_called = True
             try:
-                self._cleanup(self.user_msg_id)
+                self._cleanup(self.entry_id)
             except Exception:  # pragma: no cover - defensive
-                logger.exception("Cleanup callback failed for %s", self.user_msg_id)
+                logger.exception("Cleanup callback failed for %s", self.entry_id)
 
     async def cancel(self) -> None:
         self.cancelled = True
@@ -307,7 +307,7 @@ class ResponseStreamManager:
         self._heap_counter = count()
         self._queue_limit = max(0, stream_config.queue_limit)
         self._queue = FairAsyncQueue[str, PendingResponse](
-            id_getter=lambda pending: pending.user_msg_id
+            id_getter=lambda pending: pending.entry_id
         )
         self._queue.add_listener(self._handle_queue_change)
         self._queue_hooks: set[Callable[[dict[str, int]], None]] = set()
@@ -322,20 +322,20 @@ class ResponseStreamManager:
     def set_db(self, db) -> None:
         self._db = db
 
-    def get(self, user_msg_id: str, uid: str) -> PendingResponse | None:
-        pending = self._pending.get(user_msg_id)
+    def get(self, entry_id: str, uid: str) -> PendingResponse | None:
+        pending = self._pending.get(entry_id)
         if not pending:
             return None
 
         if pending.uid != uid:
             logger.warning(
                 "UID mismatch for pending response %s (stored=%s, caller=%s)",
-                user_msg_id,
+                entry_id,
                 pending.uid,
                 uid,
             )
-            self._pending.pop(user_msg_id, None)
-            self._schedule_pending_cancellation(user_msg_id, pending)
+            self._pending.pop(entry_id, None)
+            self._schedule_pending_cancellation(entry_id, pending)
             return None
 
         return pending
@@ -350,12 +350,12 @@ class ResponseStreamManager:
         ttl = self._pending_ttl
         heap = self._pending_heap
         while heap:
-            expiry, _, user_msg_id, pending = heap[0]
+            expiry, _, entry_id, pending = heap[0]
             if expiry > now:
                 break
 
             heappop(heap)
-            current = self._pending.get(user_msg_id)
+            current = self._pending.get(entry_id)
             if current is not pending:
                 continue
 
@@ -363,25 +363,25 @@ class ResponseStreamManager:
             if actual_expiry > now:
                 heappush(
                     heap,
-                    (actual_expiry, next(self._heap_counter), user_msg_id, pending),
+                    (actual_expiry, next(self._heap_counter), entry_id, pending),
                 )
                 continue
 
-            logger.debug("Dropping stale pending response %s", user_msg_id)
-            self._schedule_pending_cancellation(user_msg_id, pending)
+            logger.debug("Dropping stale pending response %s", entry_id)
+            self._schedule_pending_cancellation(entry_id, pending)
 
     def _schedule_pending_cancellation(
-        self, user_msg_id: str, pending: "PendingResponse"
+        self, entry_id: str, pending: "PendingResponse"
     ) -> None:
         async def _cancel_and_remove() -> None:
             try:
                 await pending.cancel()
             except Exception:  # pragma: no cover - defensive
                 logger.exception(
-                    "Failed to cancel stale pending response %s", user_msg_id
+                    "Failed to cancel stale pending response %s", entry_id
                 )
             finally:
-                self._on_pending_cleanup(user_msg_id)
+                self._on_pending_cleanup(entry_id)
 
         loop = pending._task.get_loop()
         if loop.is_running():
@@ -394,13 +394,13 @@ class ResponseStreamManager:
         else:  # pragma: no cover - defensive
             logger.warning(
                 "Event loop already closed while cancelling stale response %s",
-                user_msg_id,
+                entry_id,
             )
-            self._on_pending_cleanup(user_msg_id)
+            self._on_pending_cleanup(entry_id)
 
     def start_stream(
         self,
-        user_msg_id: str,
+        entry_id: str,
         uid: str,
         date: str,
         history: list[dict],
@@ -415,19 +415,19 @@ class ResponseStreamManager:
     ) -> PendingResponse:
         self._prune_stale_pending()
         self._ensure_queue_worker()
-        pending = self._pending.get(user_msg_id)
+        pending = self._pending.get(entry_id)
         if pending:
             if pending.uid == uid:
                 return pending
 
             logger.warning(
                 "UID mismatch on start for %s (stored=%s, caller=%s)",
-                user_msg_id,
+                entry_id,
                 pending.uid,
                 uid,
             )
-            self._pending.pop(user_msg_id, None)
-            self._schedule_pending_cancellation(user_msg_id, pending)
+            self._pending.pop(entry_id, None)
+            self._schedule_pending_cancellation(entry_id, pending)
 
         if self._db is None:
             raise RuntimeError("ResponseStreamManager database is not configured")
@@ -441,7 +441,7 @@ class ResponseStreamManager:
                 raise StreamCapacityError(retry_after, queue_depth=queue_depth)
 
             pending = PendingResponse(
-                user_msg_id,
+                entry_id,
                 uid,
                 date,
                 history,
@@ -464,7 +464,7 @@ class ResponseStreamManager:
             return pending
 
         pending = PendingResponse(
-            user_msg_id,
+            entry_id,
             uid,
             date,
             history,
@@ -485,56 +485,56 @@ class ResponseStreamManager:
         self._activate_pending(pending)
         return pending
 
-    async def stop(self, user_msg_id: str, uid: str) -> tuple[bool, bool]:
+    async def stop(self, entry_id: str, uid: str) -> tuple[bool, bool]:
         self._prune_stale_pending()
-        pending = self._pending.get(user_msg_id)
+        pending = self._pending.get(entry_id)
         if pending and pending.uid != uid:
             logger.warning(
                 "UID mismatch on stop for %s (stored=%s, caller=%s)",
-                user_msg_id,
+                entry_id,
                 pending.uid,
                 uid,
             )
-            self._pending.pop(user_msg_id, None)
-            self._schedule_pending_cancellation(user_msg_id, pending)
+            self._pending.pop(entry_id, None)
+            self._schedule_pending_cancellation(entry_id, pending)
             pending = None
 
         if pending:
             if not pending.activated:
-                self._queue.remove(user_msg_id)
-            logger.debug("Cancelling pending response %s", user_msg_id)
+                self._queue.remove(entry_id)
+            logger.debug("Cancelling pending response %s", entry_id)
             await pending.cancel()
             return True, True
-        handled = await self._llm.abort(user_msg_id)
+        handled = await self._llm.abort(entry_id)
         return handled, False
 
-    def _on_pending_cleanup(self, user_msg_id: str) -> None:
-        pending = self._pending.pop(user_msg_id, None)
+    def _on_pending_cleanup(self, entry_id: str) -> None:
+        pending = self._pending.pop(entry_id, None)
         if pending and pending.started_at is not None:
             duration = max(0.0, time.monotonic() - pending.started_at)
             self._update_stream_duration(duration)
-        self._queue.remove(user_msg_id)
-        self._active_ids.discard(user_msg_id)
+        self._queue.remove(entry_id)
+        self._active_ids.discard(entry_id)
         self._publish_queue_state()
         self._update_slot_event()
         self._ensure_queue_worker()
 
     def _register_pending(self, pending: PendingResponse) -> None:
-        user_msg_id = pending.user_msg_id
-        self._pending[user_msg_id] = pending
+        entry_id = pending.entry_id
+        self._pending[entry_id] = pending
         heappush(
             self._pending_heap,
             (
                 pending.created_at + self._pending_ttl,
                 next(self._heap_counter),
-                user_msg_id,
+                entry_id,
                 pending,
             ),
         )
 
     def _activate_pending(self, pending: PendingResponse) -> None:
         if pending.start():
-            self._active_ids.add(pending.user_msg_id)
+            self._active_ids.add(pending.entry_id)
             if pending.started_at is not None:
                 wait_time = max(0.0, pending.started_at - pending.created_at)
                 self._update_wait_estimate(wait_time)

@@ -103,31 +103,31 @@ class DefaultTagEnricher:
         if not tag_hashes:
             return
 
-        tag_message_ids = await self._db.tags.get_recent_messages_for_tag_hashes(
+        tag_entry_ids = await self._db.tags.get_recent_entries_for_tag_hashes(
             user_id,
             tag_hashes,
             limit=limit,
         )
-        if not tag_message_ids:
+        if not tag_entry_ids:
             return
 
-        missing_ids = [mid for mid in tag_message_ids if mid not in candidate_map]
+        missing_ids = [eid for eid in tag_entry_ids if eid not in candidate_map]
         if not missing_ids:
             return
 
-        rows = await self._vector_search.index_store.hydrate_messages(
+        rows = await self._vector_search.index_store.hydrate_entries(
             user_id,
             missing_ids,
             dek,
         )
         row_map = {row["id"]: row for row in rows}
-        for message_id in tag_message_ids:
-            if message_id in candidate_map:
+        for entry_id in tag_entry_ids:
+            if entry_id in candidate_map:
                 continue
-            row = row_map.get(message_id)
+            row = row_map.get(entry_id)
             if not row:
                 continue
-            candidate_map[message_id] = {
+            candidate_map[entry_id] = {
                 "id": row["id"],
                 "created_at": row["created_at"],
                 "created_date": row.get("created_date"),
@@ -145,19 +145,19 @@ class DefaultTagEnricher:
         if not candidate_map or not tag_hashes:
             return {}
 
-        message_ids = list(candidate_map.keys())
-        if not message_ids:
+        entry_ids = list(candidate_map.keys())
+        if not entry_ids:
             return {}
 
         match_counts = await self._db.tags.get_tag_match_counts(
             user_id,
             tag_hashes,
-            message_ids,
+            entry_ids,
         )
         boosts: dict[str, float] = {}
-        for message_id, count in match_counts.items():
+        for entry_id, count in match_counts.items():
             if count > 0:
-                boosts[message_id] = 1.0 + 0.1 * (count - 1)
+                boosts[entry_id] = 1.0 + 0.1 * (count - 1)
         return boosts
 
 

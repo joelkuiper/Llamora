@@ -201,8 +201,8 @@ class ResponseStreamElement extends HTMLElement {
     this.#teardownMetaChipsListener();
   }
 
-  get userMsgId() {
-    return this.dataset.userMsgId || null;
+  get entryId() {
+    return this.dataset.entryId || null;
   }
 
   get sseUrl() {
@@ -211,14 +211,14 @@ class ResponseStreamElement extends HTMLElement {
 
   abort({ reason = "user:abort" } = {}) {
     if (this.#completed) return;
-    const userMsgId = this.userMsgId;
+    const entryId = this.entryId;
     const controller = this.#controller || this.#getStreamController();
     let aborted = false;
     if (controller && typeof controller.notifyStreamAbort === "function") {
       aborted = controller.notifyStreamAbort(this, { reason });
     } else {
       const session = this.#getStreamingSession();
-      aborted = session?.abort({ reason, userMsgId }) ?? false;
+      aborted = session?.abort({ reason, entryId }) ?? false;
     }
 
     this.#finalize({ status: "aborted", reason });
@@ -273,8 +273,8 @@ class ResponseStreamElement extends HTMLElement {
       controller.notifyStreamStart(this, { reason: "stream:start" });
     } else {
       const session = this.#getStreamingSession();
-      if (session && this.userMsgId) {
-        session.begin(this.userMsgId);
+      if (session && this.entryId) {
+        session.begin(this.entryId);
       }
       requestScrollForceBottom({ source: "stream:start" });
     }
@@ -282,7 +282,7 @@ class ResponseStreamElement extends HTMLElement {
       new CustomEvent("response-stream:start", {
         bubbles: true,
         composed: true,
-        detail: { element: this, userMsgId: this.userMsgId },
+        detail: { element: this, entryId: this.entryId },
       })
     );
 
@@ -357,16 +357,20 @@ class ResponseStreamElement extends HTMLElement {
     if (this.#completed) return;
 
     const payload = parseDonePayload(event?.data || "");
-    const assistantMsgId = payload?.assistant_msg_id || payload?.assistantMsgId;
+    const assistantEntryId =
+      payload?.assistant_entry_id || payload?.assistantEntryId;
 
-    if (assistantMsgId) {
-      this.dataset.assistantMsgId = assistantMsgId;
-      this.dataset.messageId = assistantMsgId;
+    if (assistantEntryId) {
+      this.dataset.assistantEntryId = assistantEntryId;
       this.#syncDeleteButton();
     }
 
     this.#renderNow({ repositionTyping: false, shouldScroll: true });
-    this.#finalize({ status: "done", assistantMsgId, reason: "stream:complete" });
+    this.#finalize({
+      status: "done",
+      assistantEntryId,
+      reason: "stream:complete",
+    });
     this.#ensureInlineTimestamp();
   }
 
@@ -420,7 +424,7 @@ class ResponseStreamElement extends HTMLElement {
         detail: {
           element: this,
           meta,
-          userMsgId: this.userMsgId,
+          entryId: this.entryId,
         },
       })
     );
@@ -521,7 +525,12 @@ class ResponseStreamElement extends HTMLElement {
     container.appendChild(timeEl);
   }
 
-  #finalize({ status, assistantMsgId = null, message = "", reason = null }) {
+  #finalize({
+    status,
+    assistantEntryId = null,
+    message = "",
+    reason = null,
+  }) {
     if (this.#completed) return;
     this.#completed = true;
 
@@ -549,8 +558,8 @@ class ResponseStreamElement extends HTMLElement {
       this.#markAsError();
     }
 
-    if (status === "done" && assistantMsgId) {
-      this.#loadMetaChips(assistantMsgId);
+    if (status === "done" && assistantEntryId) {
+      this.#loadMetaChips(assistantEntryId);
     } else {
       const placeholder = this.querySelector(".meta-chips-placeholder");
       placeholder?.remove();
@@ -561,12 +570,12 @@ class ResponseStreamElement extends HTMLElement {
       controller.notifyStreamComplete(this, {
         status,
         reason,
-        userMsgId: this.userMsgId,
+        entryId: this.entryId,
       });
     } else {
       const session = this.#getStreamingSession();
       if (session) {
-        session.complete({ result: status, reason, userMsgId: this.userMsgId });
+        session.complete({ result: status, reason, entryId: this.entryId });
       }
       if (status !== "aborted") {
         requestScrollForceBottom({ source: "stream:complete" });
@@ -580,17 +589,17 @@ class ResponseStreamElement extends HTMLElement {
         detail: {
           element: this,
           status,
-          assistantMsgId,
+          assistantEntryId,
           message,
           meta: this.#meta,
-          userMsgId: this.userMsgId,
+          entryId: this.entryId,
         },
       })
     );
 
     const htmxRef = (typeof window !== "undefined" && window.htmx) || null;
-    if (htmxRef?.ajax && this.userMsgId) {
-      htmxRef.ajax("GET", `/e/actions/${this.userMsgId}`, { swap: "none" });
+    if (htmxRef?.ajax && this.entryId) {
+      htmxRef.ajax("GET", `/e/actions/${this.entryId}`, { swap: "none" });
     }
   }
 
@@ -600,7 +609,7 @@ class ResponseStreamElement extends HTMLElement {
       return;
     }
 
-    const msgId = this.dataset?.assistantMsgId || null;
+    const msgId = this.dataset?.assistantEntryId || null;
     const template = button.dataset?.deleteTemplate || "";
     const placeholder = button.dataset?.deletePlaceholder || "";
     const targetTemplate = button.dataset?.targetTemplate || "";
