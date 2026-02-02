@@ -13,10 +13,10 @@
             hx-on::after-request="this.reset()"
             hx-swap="beforeend">
         <div class="input-wrapper">
-          <label class="visually-hidden" for="entry-message">Message for {{ day|long_date }}</label>
+          <label class="visually-hidden" for="entry-text">Entry for {{ day|long_date }}</label>
           <textarea class="input"
-                    id="entry-message"
-                    name="message"
+                    id="entry-text"
+                    name="text"
                     rows="3"
                     placeholder="{{ 'Write your thoughts here…' if is_today else 'This day has passed.' }}"
                     cols="40"

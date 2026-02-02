@@ -118,7 +118,7 @@ class VectorSearchService:
             row = row_map.get(entry_id)
             if not row:
                 continue
-            content = row.get("message", "")
+            content = row.get("text", "")
             results.append(
                 {
                     "id": row["id"],

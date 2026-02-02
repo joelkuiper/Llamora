@@ -21,7 +21,7 @@
      role="article"
      aria-labelledby="entry-{{ e['id'] }}-speaker entry-{{ e['id'] }}-body">
   <span class="visually-hidden" id="entry-{{ e['id'] }}-speaker">{{ speaker }} entry</span>
-  {% set rendered = e.get('message_html') %}
+{% set rendered = e.get('text_html') %}
   <div class="entry-main">
     {% if is_opening %}
     <div class="entry-opening-header">
@@ -39,7 +39,7 @@
     <div class="opening-content"{% if not is_opening %} data-opening-content="false"{% endif %}>
       <div class="markdown-body"
            id="entry-{{ e['id'] }}-body"
-           {% if rendered is not none %}data-rendered="true"{% else %}data-markdown-source="{{ e.message }}"{% endif %}>
+           {% if rendered is not none %}data-rendered="true"{% else %}data-markdown-source="{{ e.text }}"{% endif %}>
         {% if rendered is not none %}
         {{ rendered | safe }}
         {% endif %}

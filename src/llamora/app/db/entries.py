@@ -75,7 +75,7 @@ class EntriesRepository(BaseRepository):
                     "created_date": created_date,
                     "role": row["role"],
                     "reply_to": row["reply_to"],
-                    "message": rec.get("message", ""),
+                    "text": rec.get("text", ""),
                     "meta": rec.get("meta", {}),
                     "prompt_tokens": int(row["prompt_tokens"] or 0),
                 }
@@ -102,7 +102,7 @@ class EntriesRepository(BaseRepository):
                     "created_at": row["created_at"],
                     "role": row["role"],
                     "reply_to": row["reply_to"],
-                    "message": rec.get("message", ""),
+                    "text": rec.get("text", ""),
                     "meta": rec.get("meta", {}),
                     "prompt_tokens": int(row["prompt_tokens"] or 0),
                     "tags": [],
@@ -160,11 +160,11 @@ class EntriesRepository(BaseRepository):
         created_date: str | None = None,
     ) -> str:
         entry_id = str(ULID())
-        record = {"message": content, "meta": meta or {}}
+        record = {"text": content, "meta": meta or {}}
         plaintext = orjson.dumps(record).decode()
         nonce, ct, alg = self._encrypt_message(dek, user_id, entry_id, plaintext)
         prompt_tokens = await asyncio.to_thread(
-            count_message_tokens, role, record.get("message", "")
+            count_message_tokens, role, record.get("text", "")
         )
 
         async with self.pool.connection() as conn:
@@ -216,7 +216,7 @@ class EntriesRepository(BaseRepository):
             "created_at": created_at,
             "role": role,
             "reply_to": reply_to,
-            "message": record.get("message", ""),
+            "text": record.get("text", ""),
             "meta": record.get("meta", {}),
             "prompt_tokens": prompt_tokens,
             "tags": [],

@@ -1,27 +1,14 @@
 import { requestScrollForceBottom } from "./scroll-manager.js";
 import { normalizeStreamId } from "./stream-id.js";
 
-function buildSnapshotDetail(session) {
-  if (!session) {
-    return {
-      type: "statuschange",
-      status: "idle",
-      previousStatus: "idle",
-      previousMsgId: null,
-      currentMsgId: null,
-      entryId: null,
-      streaming: false,
-      reason: null,
-      result: null,
-      session: null,
-    };
-  }
+const STATUS_IDLE = "idle";
+const STATUS_STREAMING = "streaming";
+const STATUS_ABORTING = "aborting";
 
-  const snapshot = typeof session.snapshot === "function" ? session.snapshot() : null;
-  const status = snapshot?.status ?? session.status ?? "idle";
-  const currentMsgId = snapshot?.currentMsgId ?? session.currentMsgId ?? null;
-  const streaming = snapshot?.streaming ?? session.isStreaming ?? false;
-
+function buildSnapshotDetail(state, overrides = {}) {
+  const status = state?.status ?? STATUS_IDLE;
+  const currentMsgId = state?.currentMsgId ?? null;
+  const streaming = status === STATUS_STREAMING;
   return {
     type: "statuschange",
     status,
@@ -30,9 +17,10 @@ function buildSnapshotDetail(session) {
     currentMsgId,
     entryId: currentMsgId,
     streaming,
-    reason: snapshot?.reason ?? null,
+    reason: state?.reason ?? null,
     result: null,
-    session,
+    session: null,
+    ...overrides,
   };
 }
 
@@ -48,37 +36,36 @@ function defaultCompletionReason(status) {
 }
 
 export class StreamController {
-  #session = null;
   #entries = null;
   #forms = new Set();
   #streams = new Map();
-  #statusUnsubscribe = null;
+  #state = {
+    status: STATUS_IDLE,
+    currentMsgId: null,
+    reason: null,
+  };
 
-  constructor(session) {
-    this.#session = session || null;
-    if (this.#session && typeof this.#session.onStatusChange === "function") {
-      this.#statusUnsubscribe = this.#session.onStatusChange((detail) =>
-        this.#handleStatusChange(detail)
-      );
-    }
-  }
-
-  get session() {
-    return this.#session;
-  }
+  constructor() {}
 
   dispose() {
-    if (this.#statusUnsubscribe) {
-      this.#statusUnsubscribe();
-      this.#statusUnsubscribe = null;
-    }
     this.#forms.clear();
     this.#streams.clear();
     this.#entries = null;
+    this.#state = {
+      status: STATUS_IDLE,
+      currentMsgId: null,
+      reason: null,
+    };
   }
 
   setEntries(entries) {
     this.#entries = entries || null;
+    const current = normalizeStreamId(entries?.dataset?.currentStream ?? null);
+    this.#state = {
+      status: current ? STATUS_STREAMING : STATUS_IDLE,
+      currentMsgId: current,
+      reason: null,
+    };
     this.refresh();
     return () => {
       if (this.#entries === entries) {
@@ -92,7 +79,7 @@ export class StreamController {
       return () => {};
     }
     this.#forms.add(form);
-    const detail = buildSnapshotDetail(this.#session);
+    const detail = buildSnapshotDetail(this.#state);
     if (typeof form.handleStreamStatus === "function") {
       form.handleStreamStatus(detail);
     }
@@ -119,13 +106,48 @@ export class StreamController {
     if (id) {
       this.#streams.set(id, stream);
     }
-    this.#session?.begin(id, { reason });
+    const previous = { ...this.#state };
+    this.#state = {
+      status: STATUS_STREAMING,
+      currentMsgId: id,
+      reason,
+    };
+    this.#handleStatusChange(
+      buildSnapshotDetail(this.#state, {
+        type: "begin",
+        previousStatus: previous.status,
+        previousMsgId: previous.currentMsgId,
+        currentMsgId: id,
+        entryId: id,
+        reason,
+      })
+    );
     requestScrollForceBottom({ source: "stream:start" });
   }
 
   notifyStreamAbort(stream, { reason = "user:abort" } = {}) {
     const id = normalizeStreamId(stream?.entryId);
-    return this.#session?.abort({ reason, entryId: id }) ?? false;
+    if (!id && !this.#state.currentMsgId) {
+      return false;
+    }
+    const targetId = id || this.#state.currentMsgId;
+    const previous = { ...this.#state };
+    this.#state = {
+      status: STATUS_ABORTING,
+      currentMsgId: null,
+      reason,
+    };
+    this.#handleStatusChange(
+      buildSnapshotDetail(this.#state, {
+        type: "abort",
+        previousStatus: previous.status,
+        previousMsgId: previous.currentMsgId,
+        currentMsgId: null,
+        entryId: targetId,
+        reason,
+      })
+    );
+    return true;
   }
 
   notifyStreamComplete(stream, { status, reason, entryId } = {}) {
@@ -134,14 +156,31 @@ export class StreamController {
       this.#streams.delete(id);
     }
     const completionReason = reason || defaultCompletionReason(status);
-    this.#session?.complete({ result: status, reason: completionReason, entryId: id });
+    const previous = { ...this.#state };
+    const nextStatus = status === "done" ? STATUS_IDLE : status || STATUS_IDLE;
+    this.#state = {
+      status: nextStatus,
+      currentMsgId: null,
+      reason: completionReason,
+    };
+    this.#handleStatusChange(
+      buildSnapshotDetail(this.#state, {
+        type: "complete",
+        previousStatus: previous.status,
+        previousMsgId: previous.currentMsgId,
+        currentMsgId: null,
+        entryId: id ?? previous.currentMsgId,
+        reason: completionReason,
+        result: status || "done",
+      })
+    );
     if (status !== "aborted") {
       requestScrollForceBottom({ source: "stream:complete" });
     }
   }
 
   abortActiveStream({ reason = "user:stop" } = {}) {
-    const id = normalizeStreamId(this.#session?.currentMsgId);
+    const id = normalizeStreamId(this.#state.currentMsgId);
     if (!id) {
       return false;
     }
@@ -150,11 +189,11 @@ export class StreamController {
       stream.abort({ reason });
       return true;
     }
-    return this.#session?.abort({ reason, entryId: id }) ?? false;
+    return this.notifyStreamAbort(stream, { reason });
   }
 
   refresh() {
-    const detail = buildSnapshotDetail(this.#session);
+    const detail = buildSnapshotDetail(this.#state);
     this.#handleStatusChange(detail);
   }
 

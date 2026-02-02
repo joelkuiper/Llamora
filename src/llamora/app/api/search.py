@@ -153,7 +153,7 @@ class SearchAPI:
                     user_id,
                 )
             else:
-                content = record.get("message", content)
+                content = record.get("text", content)
             parsed.append((user_id, entry_id, content, dek))
 
         await self.vector_search.index_store.bulk_index(parsed)

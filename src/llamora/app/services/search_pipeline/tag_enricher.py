@@ -132,7 +132,7 @@ class DefaultTagEnricher:
                 "created_at": row["created_at"],
                 "created_date": row.get("created_date"),
                 "role": row["role"],
-                "content": row.get("message", ""),
+                "content": row.get("text", ""),
                 "cosine": 0.0,
             }
 

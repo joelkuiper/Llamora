@@ -1,7 +1,6 @@
 import { scrollEvents } from "../entries/scroll-manager.js";
 import { appReady } from "../app-init.js";
 import { MarkdownObserver } from "../entries/markdown-observer.js";
-import { StreamingSession } from "../entries/streaming-session.js";
 import { StreamController } from "../entries/stream-controller.js";
 import { renderMarkdownInElement } from "../markdown.js";
 import { initDayNav, navigateToDate } from "../day.js";
@@ -44,8 +43,6 @@ export class EntryView extends ReactiveElement {
   #historyRestoreFrame = null;
   #connectionListeners = null;
   #entryListeners = null;
-  #session = null;
-  #sessionListeners = null;
   #streamController = null;
   #markdownObserver = null;
   #initialized = false;
@@ -61,10 +58,6 @@ export class EntryView extends ReactiveElement {
     this.#beforeSwapHandler = (event) => this.#handleEntriesBeforeSwap(event);
     this.#pageShowHandler = (event) => this.#handlePageShow(event);
     this.#historyRestoreHandler = (event) => this.#handleHistoryRestore(event);
-  }
-
-  get streamingSession() {
-    return this.#session;
   }
 
   get streamController() {
@@ -221,13 +214,8 @@ export class EntryView extends ReactiveElement {
     const container = document.getElementById("content-wrapper");
 
     const initialStreamMsgId = entries?.dataset?.currentStream || null;
-    this.#sessionListeners = this.disposeListenerBag(this.#sessionListeners);
-    this.#session = new StreamingSession({
-      currentMsgId: initialStreamMsgId || null,
-    });
-
     this.#streamController?.dispose();
-    this.#streamController = new StreamController(this.#session);
+    this.#streamController = new StreamController();
     this.#streamController.setEntries(entries);
 
     this.#entries = entries;
@@ -362,14 +350,11 @@ export class EntryView extends ReactiveElement {
     this.#markdownObserver = null;
 
     this.#entryListeners = this.disposeListenerBag(this.#entryListeners);
-    this.#sessionListeners = this.disposeListenerBag(this.#sessionListeners);
-
     this.#streamController?.dispose();
     this.#streamController = null;
 
     this.#entries = null;
     this.#entryForm = null;
-    this.#session = null;
     this.#entryFormReady = Promise.resolve();
     this.#pendingScrollTarget = null;
   }
@@ -402,7 +387,7 @@ export class EntryView extends ReactiveElement {
         return;
       }
 
-      if (target?.classList?.contains("message")) {
+      if (target?.classList?.contains("entry")) {
         activateAnimations(target);
       }
     });

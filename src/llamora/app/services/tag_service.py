@@ -119,7 +119,7 @@ class TagService:
             cached = self._get_cached_suggestions(user_id, entry_id)
             if cached is None:
                 meta_payload = await generate_metadata(
-                    llm, entry.get("message", "")
+                    llm, entry.get("text", "")
                 )
                 tags = meta_payload.get("tags") or []
                 self._set_cached_suggestions(user_id, entry_id, list(tags))

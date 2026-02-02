@@ -264,7 +264,7 @@ async def build_tag_recall_context(
         created_at = entry.get("created_at")
         if current_date and _extract_date(created_at) == current_date:
             continue
-        text = str(entry.get("message") or "").strip()
+        text = str(entry.get("text") or "").strip()
         if not text:
             continue
         summary_assistant = _summarize(
@@ -279,7 +279,7 @@ async def build_tag_recall_context(
         if reply_to:
             reply_entry = reply_lookup.get(str(reply_to))
             if isinstance(reply_entry, Mapping):
-                reply_text = str(reply_entry.get("message") or "").strip()
+                reply_text = str(reply_entry.get("text") or "").strip()
                 if reply_text:
                     reply_summary = _summarize(
                         reply_text,

@@ -82,7 +82,7 @@ def _coerce_entry_messages(
         role = _normalise_text(data.get("role"))
         content_source = data.get("content")
         if content_source is None:
-            content_source = data.get("message")
+            content_source = data.get("text")
         content = _normalise_text(content_source)
         normalised.append(
             {
@@ -142,7 +142,7 @@ def _format_yesterday_messages(
         yield humanized
         for message in grouped:
             role = "You" if message.get("role") == "assistant" else "user"
-            text = _normalise_text(message.get("message"))
+            text = _normalise_text(message.get("text"))
             if text:
                 yield f"({role}) {text}"
             else:
@@ -214,7 +214,7 @@ def build_entry_messages(
 
     for entry in history:
         role = _normalise_text(entry.get("role")) or "user"
-        content = _normalise_text(entry.get("message"))
+        content = _normalise_text(entry.get("text"))
         messages.append({"role": role, "content": content})
 
     return messages

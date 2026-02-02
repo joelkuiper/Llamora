@@ -111,7 +111,7 @@ def apply_response_kind_prompt(
 
     return [
         *history,
-        {"role": "system", "message": str(response_prompt).strip()},
+        {"role": "system", "text": str(response_prompt).strip()},
     ]
 
 
@@ -260,7 +260,7 @@ async def augment_history_with_recall(
         recall_entry = {
             "id": None,
             "role": "system",
-            "message": recall_context.text,
+            "text": recall_context.text,
         }
         if include_tag_metadata:
             tag_meta: dict[str, Any] = {"tags": list(recall_context.tags)}
@@ -310,7 +310,7 @@ async def augment_history_with_recall(
 
     if recall_context and recall_entry is not None:
         recall_index = _locate_recall_entry(
-            trimmed_history, text_key="message", recall_text=recall_context.text
+            trimmed_history, text_key="text", recall_text=recall_context.text
         )
         recall_inserted = recall_index is not None
     else:
@@ -488,7 +488,7 @@ class StreamSession(Response):
 
     @staticmethod
     async def _stream_saved(message: Mapping[str, Any]):
-        yield format_sse_event("message", message.get("message", ""))
+        yield format_sse_event("message", message.get("text", ""))
         yield format_sse_event("done", {"assistant_entry_id": message.get("id")})
 
     @staticmethod

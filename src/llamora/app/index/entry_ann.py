@@ -165,7 +165,7 @@ class EntryIndexStore:
             self.indexes[user_id] = fresh
             return fresh
 
-        texts = [entry["message"] for entry in entry_list]
+        texts = [entry["text"] for entry in entry_list]
         ids = [entry["id"] for entry in entry_list]
         vecs = await async_embed_texts(texts)
         if idx is None:

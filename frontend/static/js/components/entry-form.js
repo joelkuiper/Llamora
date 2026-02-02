@@ -8,7 +8,6 @@ class EntryFormElement extends ReactiveElement {
   #date = null;
   #form = null;
   #textarea = null;
-  #session = null;
   #button = null;
   #errors = null;
   #isToday = false;
@@ -88,20 +87,6 @@ class EntryFormElement extends ReactiveElement {
   }
 
 
-  set session(value) {
-    if (this.#session === value) {
-      return;
-    }
-
-    this.#session = value || null;
-
-    if (this.#initialized) {
-      const currentId = this.#session?.currentMsgId || null;
-      this.streamingMsgId = currentId;
-      this.setStreaming(Boolean(currentId));
-    }
-  }
-
   set streamController(value) {
     if (this.#streamController === value) {
       return;
@@ -144,8 +129,6 @@ class EntryFormElement extends ReactiveElement {
     )}`;
     this.#isToday = this.#date === today;
     this.#draftKey = `entry-draft-${this.#date}`;
-
-    this.streamingMsgId = this.#session?.currentMsgId || null;
 
     this.#restoreDraft();
     this.#configureForm();
@@ -264,7 +247,7 @@ class EntryFormElement extends ReactiveElement {
       if (this.#draftKey) {
         sessionStorage.setItem(this.#draftKey, this.#textarea.value);
       }
-      if (!this.#session?.currentMsgId && !this.#isSubmitting) {
+      if (!this.#isStreaming && !this.#isSubmitting) {
         this.#button.disabled = !this.#textarea.value.trim();
       }
     };

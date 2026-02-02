@@ -76,8 +76,8 @@ async def generate_metadata(llm, text: str) -> dict[str, Any]:
 
     system_prompt = _metadata_system_prompt()
     messages = [
-        {"role": "system", "message": system_prompt},
-        {"role": "user", "message": str(text)},
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": str(text)},
     ]
 
     try:

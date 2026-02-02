@@ -24,6 +24,7 @@
     <span class="icon-mask icon-message-more entry-action__icon" aria-hidden="true"></span>
     {% endif %}
   </button>
+  {% if is_today %}
   <div class="tag-popover action-popover glass-panel" role="dialog" aria-modal="true" hidden>
     <div class="tp-content action-panel">
       <button type="button" class="overlay-close" aria-label="Close">×</button>
@@ -46,5 +47,6 @@
       </div>
     </div>
   </div>
+  {% endif %}
 </entry-actions>
 {%- endmacro %}

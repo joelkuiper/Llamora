@@ -19,12 +19,12 @@ def _render_entries_markdown(entries: list[dict[str, Any]]) -> None:
     for entry in entries:
         entry_item = entry.get("entry")
         if isinstance(entry_item, dict):
-            text = entry_item.get("message", "")
-            entry_item["message_html"] = render_markdown_to_html(text)
+            text = entry_item.get("text", "")
+            entry_item["text_html"] = render_markdown_to_html(text)
         for response in entry.get("responses") or []:
             if isinstance(response, dict):
-                text = response.get("message", "")
-                response["message_html"] = render_markdown_to_html(text)
+                text = response.get("text", "")
+                response["text_html"] = render_markdown_to_html(text)
 
 
 def _extract_tag_metadata(meta: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -84,7 +84,7 @@ async def build_entry_context(
         return None
 
     entry = entries[0]
-    text = str(entry.get("message") or "").strip()
+    text = str(entry.get("text") or "").strip()
     tags = await db.tags.get_tags_for_entry(user_id, entry_id, dek)
     tag_metadata = _extract_tag_metadata(entry.get("meta"))
     payload = EntryContext(

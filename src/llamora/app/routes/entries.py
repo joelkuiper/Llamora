@@ -346,7 +346,7 @@ async def sse_opening(date: str):
 @login_required
 async def send_entry(date):
     form = await request.form
-    user_text = form.get("message", "").strip()
+    user_text = form.get("text", "").strip()
     user_time = form.get("user_time")
     _, user, dek = await require_user_and_dek()
     uid = user["id"]
