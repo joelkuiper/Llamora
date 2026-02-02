@@ -253,13 +253,13 @@ async def build_tag_recall_context(
 
     snippets: list[str] = []
     per_summary_max_chars = max(cfg.summary_max_chars // 2, 1)
-    for msg_id in candidate_ids:
+    for entry_id in candidate_ids:
         if len(snippets) >= cfg.max_snippets:
             break
-        entry = by_id.get(str(msg_id))
+        entry = by_id.get(str(entry_id))
         if not entry:
             continue
-        if str(msg_id) in history_ids:
+        if str(entry_id) in history_ids:
             continue
         created_at = entry.get("created_at")
         if current_date and _extract_date(created_at) == current_date:

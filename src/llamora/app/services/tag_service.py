@@ -48,9 +48,9 @@ class TagService:
 
         entry_ids: list[str] = []
         for res in results:
-            msg_id = res.get("id")
-            if isinstance(msg_id, str) and msg_id:
-                entry_ids.append(msg_id)
+            entry_id = res.get("id")
+            if isinstance(entry_id, str) and entry_id:
+                entry_ids.append(entry_id)
         if not entry_ids:
             return
 
@@ -58,8 +58,8 @@ class TagService:
         tag_map = await self._db.tags.get_tags_for_entries(user_id, entry_ids, dek)
 
         for res in results:
-            msg_id = res.get("id")
-            raw_tags = tag_map.get(msg_id, []) if msg_id else []
+            entry_id = res.get("id")
+            raw_tags = tag_map.get(entry_id, []) if entry_id else []
             prepared, visible, has_more = self._prepare_tags(
                 raw_tags, token_lookup, max_visible=max_visible
             )
@@ -70,7 +70,7 @@ class TagService:
     async def suggest_for_entry(
         self,
         user_id: str,
-        msg_id: str,
+        entry_id: str,
         dek: bytes,
         *,
         llm,
@@ -81,12 +81,12 @@ class TagService:
     ) -> list[str] | None:
         """Return suggested tags for an entry."""
 
-        entries = await self._db.entries.get_entries_by_ids(user_id, [msg_id], dek)
+        entries = await self._db.entries.get_entries_by_ids(user_id, [entry_id], dek)
         if not entries:
             return None
 
         entry = entries[0]
-        existing = await self._db.tags.get_tags_for_entry(user_id, msg_id, dek)
+        existing = await self._db.tags.get_tags_for_entry(user_id, entry_id, dek)
         existing_names = self._extract_existing_names(existing)
 
         query_value = str(query or "").strip()
@@ -116,13 +116,13 @@ class TagService:
         meta = entry.get("meta") or {}
         tags: Iterable[Any] = meta.get("tags") or []
         if (not tags) and entry.get("role") == "user":
-            cached = self._get_cached_suggestions(user_id, msg_id)
+            cached = self._get_cached_suggestions(user_id, entry_id)
             if cached is None:
                 meta_payload = await generate_metadata(
                     llm, entry.get("message", "")
                 )
                 tags = meta_payload.get("tags") or []
-                self._set_cached_suggestions(user_id, msg_id, list(tags))
+                self._set_cached_suggestions(user_id, entry_id, list(tags))
             else:
                 tags = cached
 
@@ -159,8 +159,8 @@ class TagService:
 
         return combined
 
-    def _get_cached_suggestions(self, user_id: str, msg_id: str) -> list[str] | None:
-        cache_key = (user_id, msg_id)
+    def _get_cached_suggestions(self, user_id: str, entry_id: str) -> list[str] | None:
+        cache_key = (user_id, entry_id)
         cached = self._suggestion_cache.get(cache_key)
         if not cached:
             return None
@@ -171,11 +171,11 @@ class TagService:
         return list(suggestions)
 
     def _set_cached_suggestions(
-        self, user_id: str, msg_id: str, suggestions: list[str]
+        self, user_id: str, entry_id: str, suggestions: list[str]
     ) -> None:
         if len(self._suggestion_cache) > 256:
             self._suggestion_cache.clear()
-        self._suggestion_cache[(user_id, msg_id)] = (
+        self._suggestion_cache[(user_id, entry_id)] = (
             time.monotonic(),
             list(suggestions),
         )

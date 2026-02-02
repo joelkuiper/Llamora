@@ -704,13 +704,14 @@ class LLMClient:
 
     async def stream_response(
         self,
-        msg_id: str,
+        entry_id: str,
         history: list[dict[str, Any]] | None = None,
         params: dict[str, Any] | None = None,
         context: dict[str, Any] | None = None,
         messages: list[dict[str, Any]] | None = None,
     ) -> AsyncGenerator[Any, None]:
         self.process_manager.ensure_server_running()
+        msg_id = entry_id
 
         cfg = {**self.default_request, **(params or {})}
 
@@ -873,7 +874,8 @@ class LLMClient:
 
         return str(payload or "")
 
-    async def abort(self, msg_id: str) -> bool:
+    async def abort(self, entry_id: str) -> bool:
+        msg_id = entry_id
         slot_id: int | None = None
         async with self._streams_lock:
             task = self._active_streams.pop(msg_id, None)

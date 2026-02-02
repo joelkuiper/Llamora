@@ -54,9 +54,9 @@ def unwrap_key(ct: bytes, salt: bytes, nonce: bytes, secret: str) -> bytes:
     return crypto_aead_xchacha20poly1305_ietf_decrypt(ct, None, nonce, k)
 
 
-def encrypt_message(dek: bytes, user_id: str, msg_id: str, plaintext: str):
+def encrypt_message(dek: bytes, user_id: str, entry_id: str, plaintext: str):
     nonce = utils.random(24)
-    aad = f"{user_id}|{msg_id}|{ALG.decode()}".encode("utf-8")
+    aad = f"{user_id}|{entry_id}|{ALG.decode()}".encode("utf-8")
     ct = crypto_aead_xchacha20poly1305_ietf_encrypt(
         plaintext.encode("utf-8"), aad, nonce, dek
     )
@@ -66,17 +66,17 @@ def encrypt_message(dek: bytes, user_id: str, msg_id: str, plaintext: str):
 def decrypt_message(
     dek: bytes,
     user_id: str,
-    msg_id: str,
+    entry_id: str,
     nonce: bytes,
     ct: bytes,
     alg: bytes,
 ) -> str:
-    aad = f"{user_id}|{msg_id}|{alg.decode()}".encode("utf-8")
+    aad = f"{user_id}|{entry_id}|{alg.decode()}".encode("utf-8")
     pt = crypto_aead_xchacha20poly1305_ietf_decrypt(ct, aad, nonce, dek)
     return pt.decode("utf-8")
 
 
-def encrypt_vector(dek: bytes, user_id: str, msg_id: str, vec: bytes):
+def encrypt_vector(dek: bytes, user_id: str, entry_id: str, vec: bytes):
     """Encrypt a vector embedding for storage.
 
     The vector is provided as raw bytes and is encrypted using the same AEAD
@@ -85,7 +85,7 @@ def encrypt_vector(dek: bytes, user_id: str, msg_id: str, vec: bytes):
     """
 
     nonce = utils.random(24)
-    aad = f"{user_id}|{msg_id}|vector|{ALG.decode()}".encode("utf-8")
+    aad = f"{user_id}|{entry_id}|vector|{ALG.decode()}".encode("utf-8")
     ct = crypto_aead_xchacha20poly1305_ietf_encrypt(vec, aad, nonce, dek)
     return nonce, ct, ALG
 
@@ -93,12 +93,12 @@ def encrypt_vector(dek: bytes, user_id: str, msg_id: str, vec: bytes):
 def decrypt_vector(
     dek: bytes,
     user_id: str,
-    msg_id: str,
+    entry_id: str,
     nonce: bytes,
     ct: bytes,
     alg: bytes,
 ) -> bytes:
     """Decrypt an encrypted vector embedding."""
 
-    aad = f"{user_id}|{msg_id}|vector|{alg.decode()}".encode("utf-8")
+    aad = f"{user_id}|{entry_id}|vector|{alg.decode()}".encode("utf-8")
     return crypto_aead_xchacha20poly1305_ietf_decrypt(ct, aad, nonce, dek)

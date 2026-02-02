@@ -315,9 +315,9 @@ async def sse_opening(date: str):
     except Exception as exc:
         logger.exception("Failed to prepare opening prompt")
 
-        msg = f"⚠️ {exc}"
+        error_text = f"⚠️ {exc}"
 
-        return StreamSession.error(msg)
+        return StreamSession.error(error_text)
     stream_id = f"opening:{uid}:{today_iso}"
     manager = _entry_stream_manager()
     try:

@@ -19,14 +19,14 @@ class VectorsRepository(BaseRepository):
         self._decrypt_vector = decrypt_vector
 
     async def store_vector(
-        self, msg_id: str, user_id: str, vec: np.ndarray, dek: bytes
+        self, entry_id: str, user_id: str, vec: np.ndarray, dek: bytes
     ) -> None:
         dim, nonce, ct, alg = await asyncio.to_thread(
             self._prepare_encrypted_vector,
             vec,
             dek,
             user_id,
-            msg_id,
+            entry_id,
         )
         async with self.pool.connection() as conn:
             await self._run_in_transaction(
@@ -36,7 +36,7 @@ class VectorsRepository(BaseRepository):
                     INSERT OR REPLACE INTO vectors (id, user_id, dim, nonce, ciphertext, alg)
                     VALUES (?, ?, ?, ?, ?, ?)
                     """,
-                (msg_id, user_id, dim, nonce, ct, alg),
+                (entry_id, user_id, dim, nonce, ct, alg),
             )
 
     async def store_vectors_batch(
@@ -114,14 +114,14 @@ class VectorsRepository(BaseRepository):
         )
 
     def _prepare_encrypted_vector(
-        self, vec: np.ndarray, dek: bytes, user_id: str, msg_id: str
+        self, vec: np.ndarray, dek: bytes, user_id: str, entry_id: str
     ) -> tuple[int, bytes, bytes, bytes]:
         vec_arr = np.asarray(vec, dtype=np.float32)
         dim = int(vec_arr.shape[0])
         nonce, ct, alg = self._encrypt_vector(
             dek,
             user_id,
-            msg_id,
+            entry_id,
             vec_arr.tobytes(),
         )
         return dim, nonce, ct, alg
@@ -133,16 +133,16 @@ class VectorsRepository(BaseRepository):
         user_id: str,
     ) -> list[tuple[str, str, int, bytes, bytes, bytes]]:
         records: list[tuple[str, str, int, bytes, bytes, bytes]] = []
-        for msg_id, vec in vectors:
+        for entry_id, vec in vectors:
             vec_arr = np.asarray(vec, dtype=np.float32).ravel()
             dim = int(vec_arr.shape[0])
             nonce, ct, alg = self._encrypt_vector(
                 dek,
                 user_id,
-                msg_id,
+                entry_id,
                 vec_arr.tobytes(),
             )
-            records.append((msg_id, user_id, dim, nonce, ct, alg))
+            records.append((entry_id, user_id, dim, nonce, ct, alg))
         return records
 
     def _decrypt_vector_rows(self, rows, dek: bytes, user_id: str) -> list[dict]:

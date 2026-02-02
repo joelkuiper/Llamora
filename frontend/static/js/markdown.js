@@ -67,7 +67,7 @@ export function renderMarkdownInElement(el, text) {
   el.dataset.rendered = "true";
 }
 
-const MARKDOWN_SELECTOR = ".message .markdown-body";
+const MARKDOWN_SELECTOR = ".entry .markdown-body";
 
 const markdownRenderListeners = new Set();
 
@@ -113,7 +113,7 @@ function collectMarkdownBodies(root, nodes) {
 
     if (
       node.matches?.(MARKDOWN_SELECTOR) ||
-      (node.matches?.(".markdown-body") && node.closest?.(".message"))
+      (node.matches?.(".markdown-body") && node.closest?.(".entry"))
     ) {
       markdownNodes.add(node);
     }

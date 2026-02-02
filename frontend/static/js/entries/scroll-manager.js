@@ -162,7 +162,7 @@ export class ScrollManager {
     // the animation is in progress. When either marker is present we should
     // treat the highlight as active and avoid clobbering the scroll position.
     const highlight = this.container.querySelector?.(
-      "[data-flash-timer-id], .message.highlight"
+      "[data-flash-timer-id], .entry.highlight"
     );
     return highlight instanceof HTMLElement;
   }
@@ -688,7 +688,7 @@ export class ScrollManager {
   needsMarkdownRender() {
     this.ensureContainer();
     if (!this.container) return false;
-    const nodes = this.container.querySelectorAll?.(".message .markdown-body");
+    const nodes = this.container.querySelectorAll?.(".entry .markdown-body");
     if (!nodes || nodes.length === 0) return false;
 
     return Array.from(nodes).some((node) => {

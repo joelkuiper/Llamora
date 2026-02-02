@@ -109,7 +109,7 @@ async def get_entries_context(
 
     today = local_date().isoformat()
     is_today = date == today
-    pending_msg_id = None
+    pending_entry_id = None
 
     opening_entries: list[dict[str, Any]] = []
     regular_entries: list[dict[str, Any]] = []
@@ -126,7 +126,7 @@ async def get_entries_context(
 
     return {
         "entries": entries,
-        "pending_msg_id": pending_msg_id,
+        "pending_entry_id": pending_entry_id,
         "is_today": is_today,
         "opening_stream": opening_stream,
     }

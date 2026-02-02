@@ -1,5 +1,5 @@
 {% from 'partials/entry_item.html' import render_entry %}
-{% set msg = {
+{% set e = {
   "id": entry_id,
   "role": "user",
   "message": user_text,
@@ -8,4 +8,4 @@
   "tags": [],
   "created_at": created_at
 } %}
-{{ render_entry(msg, day, response_kinds, response_kind_labels, is_today) }}
+{{ render_entry(e, day, response_kinds, response_kind_labels, is_today) }}
