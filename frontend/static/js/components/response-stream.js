@@ -68,7 +68,6 @@ class ResponseStreamElement extends HTMLElement {
   #controller = null;
   #controllerDisconnect = null;
   #deleteButton = null;
-  #untracked = false;
 
   constructor() {
     super();
@@ -76,14 +75,6 @@ class ResponseStreamElement extends HTMLElement {
     this.#boundHandleDone = (event) => this.#handleDone(event);
     this.#boundHandleError = (event) => this.#handleError(event);
     this.#boundHandleMeta = (event) => this.#handleMeta(event);
-  }
-
-  #getStreamingSession() {
-    const host = this.closest?.("entry-view");
-    if (host && "streamingSession" in host) {
-      return host.streamingSession || null;
-    }
-    return null;
   }
 
   #getStreamController() {
@@ -134,12 +125,8 @@ class ResponseStreamElement extends HTMLElement {
       this.#renderer = new IncrementalMarkdownRenderer(this.#markdown);
     }
 
-    this.#untracked =
-      this.dataset?.streamKind === "opening" || this.dataset?.untracked === "true";
-    if (!this.#untracked) {
-      this.#syncController();
-      this.#syncDeleteButton();
-    }
+    this.#syncController();
+    this.#syncDeleteButton();
 
     if (!this.#completed) {
       this.#startStream();
@@ -172,14 +159,9 @@ class ResponseStreamElement extends HTMLElement {
 
   abort({ reason = "user:abort" } = {}) {
     if (this.#completed) return;
-    const entryId = this.entryId;
     const controller = this.#controller || this.#getStreamController();
-    let aborted = false;
     if (controller && typeof controller.notifyStreamAbort === "function") {
-      aborted = controller.notifyStreamAbort(this, { reason });
-    } else {
-      const session = this.#getStreamingSession();
-      aborted = session?.abort({ reason, entryId }) ?? false;
+      controller.notifyStreamAbort(this, { reason });
     }
 
     this.#finalize({ status: "aborted", reason });
@@ -229,20 +211,11 @@ class ResponseStreamElement extends HTMLElement {
     this.setAttribute("aria-busy", "true");
     this.#meta = null;
     this.#wasPartial = false;
-    if (!this.#untracked) {
-      const controller = this.#controller || this.#getStreamController();
-      if (controller && typeof controller.notifyStreamStart === "function") {
-        controller.notifyStreamStart(this, { reason: "stream:start" });
-      } else {
-        const session = this.#getStreamingSession();
-        if (session && this.entryId) {
-          session.begin(this.entryId);
-        }
-        requestScrollForceBottom({ source: "stream:start" });
-      }
-    } else {
-      requestScrollForceBottom({ source: "stream:start" });
+    const controller = this.#controller || this.#getStreamController();
+    if (controller && typeof controller.notifyStreamStart === "function") {
+      controller.notifyStreamStart(this, { reason: "stream:start" });
     }
+    requestScrollForceBottom({ source: "stream:start" });
     this.dispatchEvent(
       new CustomEvent("response-stream:start", {
         bubbles: true,
@@ -526,23 +499,13 @@ class ResponseStreamElement extends HTMLElement {
     const placeholder = this.querySelector(".entry-tags-placeholder");
     placeholder?.remove();
 
-    if (!this.#untracked) {
-      const controller = this.#controller || this.#getStreamController();
-      if (controller && typeof controller.notifyStreamComplete === "function") {
-        controller.notifyStreamComplete(this, {
-          status,
-          reason,
-          entryId: this.entryId,
-        });
-      } else {
-        const session = this.#getStreamingSession();
-        if (session) {
-          session.complete({ result: status, reason, entryId: this.entryId });
-        }
-        if (status !== "aborted") {
-          requestScrollForceBottom({ source: "stream:complete" });
-        }
-      }
+    const controller = this.#controller || this.#getStreamController();
+    if (controller && typeof controller.notifyStreamComplete === "function") {
+      controller.notifyStreamComplete(this, {
+        status,
+        reason,
+        entryId: this.entryId,
+      });
     }
 
     this.dispatchEvent(
@@ -560,11 +523,9 @@ class ResponseStreamElement extends HTMLElement {
       })
     );
 
-    if (!this.#untracked) {
-      const htmxRef = (typeof window !== "undefined" && window.htmx) || null;
-      if (htmxRef?.ajax && this.entryId) {
-        htmxRef.ajax("GET", `/e/actions/${this.entryId}`, { swap: "none" });
-      }
+    const htmxRef = (typeof window !== "undefined" && window.htmx) || null;
+    if (htmxRef?.ajax && this.entryId) {
+      htmxRef.ajax("GET", `/e/actions/${this.entryId}`, { swap: "none" });
     }
   }
 

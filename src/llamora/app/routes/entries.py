@@ -21,6 +21,7 @@ from llamora.app.services.auth_helpers import login_required
 from llamora.app.services.entry_context import get_entries_context
 from llamora.app.services.entry_helpers import (
     augment_history_with_recall,
+    augment_opening_with_recall,
     apply_response_kind_prompt,
     history_has_tag_recall,
     StreamSession,
@@ -258,11 +259,10 @@ async def sse_opening(date: str):
             history=yesterday_msgs,
             current_date=today_iso,
         )
-        augmentation = await augment_history_with_recall(
+        augmentation = await augment_opening_with_recall(
             opening_messages,
             recall_context,
             llm_client=None,
-            message_key="content",
             insert_index=1,
         )
         opening_messages = augmentation.messages
@@ -520,7 +520,6 @@ async def sse_response(entry_id: str, date: str):
                 llm_client=llm_client,
                 params=params,
                 context=ctx,
-                message_key="message",
                 target_entry_id=entry_id,
                 include_tag_metadata=True,
                 tag_recall_date=recall_date,

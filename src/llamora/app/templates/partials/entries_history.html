@@ -1,4 +1,3 @@
-{% from 'partials/entry_item.html' import render_entry %}
 <div id="entries"
      data-date="{{ day }}"
      data-long-date="{{ day|long_date }}"
@@ -10,10 +9,5 @@
   {% if opening_stream %}
   {% include 'partials/entry_opening_stream.html' %}
   {% endif %}
-  {% if not entries|length and not is_today %}
-  <div class="no-content">Nothing was written this day.</div>
-  {% endif %}
-  {% for item in entries or [] %}
-  {{ render_entry(item.entry, day, response_kinds, response_kind_labels, is_today, replies=item.responses) }}
-  {% endfor %}
+  {% include 'partials/entries_list.html' %}
 </div>

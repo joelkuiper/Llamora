@@ -177,13 +177,13 @@ class RecallAugmentation:
 def _locate_recall_entry(
     messages: Sequence[Mapping[str, Any]],
     *,
-    message_key: str,
+    text_key: str,
     recall_text: str,
 ) -> int | None:
     for idx, entry in enumerate(messages):
         if entry.get("role") != "system":
             continue
-        if str(entry.get(message_key) or "") == recall_text:
+        if str(entry.get(text_key) or "") == recall_text:
             return idx
     return None
 
@@ -244,7 +244,6 @@ async def augment_history_with_recall(
     llm_client,
     params: Mapping[str, Any] | None = None,
     context: Mapping[str, Any] | None = None,
-    message_key: str = "message",
     target_entry_id: str | None = None,
     insert_index: int | None = None,
     include_tag_metadata: bool = False,
@@ -261,7 +260,7 @@ async def augment_history_with_recall(
         recall_entry = {
             "id": None,
             "role": "system",
-            message_key: recall_context.text,
+            "message": recall_context.text,
         }
         if include_tag_metadata:
             tag_meta: dict[str, Any] = {"tags": list(recall_context.tags)}
@@ -311,7 +310,80 @@ async def augment_history_with_recall(
 
     if recall_context and recall_entry is not None:
         recall_index = _locate_recall_entry(
-            trimmed_history, message_key=message_key, recall_text=recall_context.text
+            trimmed_history, text_key="message", recall_text=recall_context.text
+        )
+        recall_inserted = recall_index is not None
+    else:
+        recall_index = None
+        recall_inserted = False
+
+    return RecallAugmentation(
+        messages=list(trimmed_history),
+        recall_inserted=recall_inserted,
+        recall_index=recall_index,
+    )
+
+
+async def augment_opening_with_recall(
+    messages: Sequence[Mapping[str, Any] | dict[str, Any]],
+    recall_context: TagRecallContext | None,
+    *,
+    llm_client,
+    params: Mapping[str, Any] | None = None,
+    context: Mapping[str, Any] | None = None,
+    insert_index: int | None = None,
+    include_tag_metadata: bool = False,
+    tag_recall_date: str | None = None,
+) -> RecallAugmentation:
+    """Insert recall context into opening messages using ``content`` keys."""
+
+    augmented: list[dict[str, Any]] = [dict(entry) for entry in messages]
+    recall_inserted = False
+    recall_index: int | None = None
+    recall_entry: dict[str, Any] | None = None
+
+    if recall_context:
+        recall_entry = {
+            "id": None,
+            "role": "system",
+            "content": recall_context.text,
+        }
+        if include_tag_metadata:
+            tag_meta: dict[str, Any] = {"tags": list(recall_context.tags)}
+            if tag_recall_date:
+                tag_meta["date"] = str(tag_recall_date)
+            recall_entry["meta"] = {"tag_recall": tag_meta}
+            tag_items = [
+                {"name": tag}
+                for tag in recall_context.tags
+                if str(tag or "").strip()
+            ]
+            if tag_items:
+                recall_entry["tags"] = tag_items
+
+    if recall_entry is not None:
+        if insert_index is not None:
+            bounded_index = max(0, min(insert_index, len(augmented)))
+            augmented.insert(bounded_index, dict(recall_entry))
+            recall_index = bounded_index
+            recall_inserted = True
+        else:
+            recall_index = len(augmented)
+            augmented.append(dict(recall_entry))
+            recall_inserted = True
+
+    trimmed_history = augmented
+    if llm_client is not None:
+        try:
+            trimmed_history = await llm_client.trim_history(
+                augmented, params=params, context=context
+            )
+        except Exception:
+            logger.exception("Failed to trim opening messages with recall context")
+
+    if recall_context and recall_entry is not None:
+        recall_index = _locate_recall_entry(
+            trimmed_history, text_key="content", recall_text=recall_context.text
         )
         recall_inserted = recall_index is not None
     else:
