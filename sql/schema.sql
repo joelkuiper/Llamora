@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS messages (
+CREATE TABLE IF NOT EXISTS entries (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
     role TEXT NOT NULL,
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS vectors (
     alg BLOB NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (id) REFERENCES messages(id) ON DELETE CASCADE
+    FOREIGN KEY (id) REFERENCES entries(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS tags (
@@ -49,15 +49,15 @@ CREATE TABLE IF NOT EXISTS tags (
     PRIMARY KEY(user_id, tag_hash)
 );
 
-CREATE TABLE IF NOT EXISTS tag_message_xref (
+CREATE TABLE IF NOT EXISTS tag_entry_xref (
     user_id TEXT NOT NULL,
     tag_hash BLOB(32) NOT NULL,
-    message_id TEXT NOT NULL,
+    entry_id TEXT NOT NULL,
     ulid TEXT NOT NULL,
-    PRIMARY KEY(user_id, tag_hash, message_id),
+    PRIMARY KEY(user_id, tag_hash, entry_id),
     FOREIGN KEY (user_id, tag_hash)
         REFERENCES tags(user_id, tag_hash) ON DELETE CASCADE,
-    FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE
+    FOREIGN KEY (entry_id) REFERENCES entries(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS search_history (
@@ -71,11 +71,11 @@ CREATE TABLE IF NOT EXISTS search_history (
     PRIMARY KEY(user_id, query_hash)
 );
 
-CREATE INDEX IF NOT EXISTS idx_messages_user_date ON messages(user_id, created_date);
-CREATE INDEX IF NOT EXISTS idx_messages_reply_to ON messages(reply_to);
+CREATE INDEX IF NOT EXISTS idx_entries_user_date ON entries(user_id, created_date);
+CREATE INDEX IF NOT EXISTS idx_entries_reply_to ON entries(reply_to);
 CREATE INDEX IF NOT EXISTS idx_vectors_user_id ON vectors(user_id);
 
-CREATE INDEX IF NOT EXISTS idx_tag_message_hash ON tag_message_xref(user_id, tag_hash);
-CREATE INDEX IF NOT EXISTS idx_tag_message_message ON tag_message_xref(user_id, message_id);
+CREATE INDEX IF NOT EXISTS idx_tag_entry_hash ON tag_entry_xref(user_id, tag_hash);
+CREATE INDEX IF NOT EXISTS idx_tag_entry_entry ON tag_entry_xref(user_id, entry_id);
 CREATE INDEX IF NOT EXISTS idx_search_history_user_last_used
     ON search_history(user_id, last_used DESC);

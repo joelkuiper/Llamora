@@ -74,7 +74,7 @@ class VectorsRepository(BaseRepository):
                 """
                 SELECT v.id, v.dim, v.nonce, v.ciphertext, v.alg, m.created_at
                 FROM vectors v
-                JOIN messages m ON v.id = m.id AND m.user_id = ?
+                JOIN entries m ON v.id = m.id AND m.user_id = ?
                 ORDER BY m.id DESC
                 LIMIT ?
                 """,
@@ -97,7 +97,7 @@ class VectorsRepository(BaseRepository):
                 """
                 SELECT v.id, v.dim, v.nonce, v.ciphertext, v.alg, m.created_at
                 FROM vectors v
-                JOIN messages m ON v.id = m.id AND m.user_id = ?
+                JOIN entries m ON v.id = m.id AND m.user_id = ?
                 WHERE m.id < ?
                 ORDER BY m.id DESC
                 LIMIT ?

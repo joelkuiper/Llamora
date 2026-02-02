@@ -68,7 +68,7 @@ class TagsRepository(BaseRepository):
             async def _tx():
                 nonlocal changed
                 cursor = await conn.execute(
-                    "INSERT OR IGNORE INTO tag_message_xref (user_id, tag_hash, message_id, ulid) VALUES (?, ?, ?, ?)",
+                    "INSERT OR IGNORE INTO tag_entry_xref (user_id, tag_hash, entry_id, ulid) VALUES (?, ?, ?, ?)",
                     (user_id, tag_hash, entry_id, str(ULID())),
                 )
                 if cursor.rowcount:
@@ -96,7 +96,7 @@ class TagsRepository(BaseRepository):
             async def _tx():
                 nonlocal changed
                 cursor = await conn.execute(
-                    "DELETE FROM tag_message_xref WHERE user_id = ? AND tag_hash = ? AND message_id = ?",
+                    "DELETE FROM tag_entry_xref WHERE user_id = ? AND tag_hash = ? AND entry_id = ?",
                     (user_id, tag_hash, entry_id),
                 )
                 if cursor.rowcount:
@@ -122,9 +122,9 @@ class TagsRepository(BaseRepository):
             cursor = await conn.execute(
                 """
                 SELECT t.tag_hash, t.name_ct, t.name_nonce, t.alg AS tag_alg
-                FROM tag_message_xref x
+                FROM tag_entry_xref x
                 JOIN tags t ON t.user_id = x.user_id AND t.tag_hash = x.tag_hash
-                WHERE x.user_id = ? AND x.message_id = ?
+                WHERE x.user_id = ? AND x.entry_id = ?
                 ORDER BY x.ulid ASC
                 """,
                 (user_id, entry_id),
@@ -161,17 +161,17 @@ class TagsRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 f"""
-                SELECT x.message_id,
+                SELECT x.entry_id,
                        t.tag_hash,
                        t.name_ct,
                        t.name_nonce,
                        t.alg AS tag_alg,
                        x.ulid
-                FROM tag_message_xref x
+                FROM tag_entry_xref x
                 JOIN tags t
                   ON t.user_id = x.user_id AND t.tag_hash = x.tag_hash
-                WHERE x.user_id = ? AND x.message_id IN ({placeholders})
-                ORDER BY x.message_id ASC, x.ulid ASC
+                WHERE x.user_id = ? AND x.entry_id IN ({placeholders})
+                ORDER BY x.entry_id ASC, x.ulid ASC
                 """,
                 (user_id, *ids),
             )
@@ -188,7 +188,7 @@ class TagsRepository(BaseRepository):
                 dek,
                 self._decrypt_message,
             )
-            entry_id = row["message_id"]
+            entry_id = row["entry_id"]
             mapping.setdefault(entry_id, []).append(
                 {"name": tag_name, "hash": row["tag_hash"].hex()}
             )
@@ -357,18 +357,18 @@ class TagsRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 f"""
-                SELECT message_id, COUNT(*) AS match_count
-                FROM tag_message_xref
+                SELECT entry_id, COUNT(*) AS match_count
+                FROM tag_entry_xref
                 WHERE user_id = ?
                   AND tag_hash IN ({tag_placeholders})
-                  AND message_id IN ({entry_placeholders})
-                GROUP BY message_id
+                  AND entry_id IN ({entry_placeholders})
+                GROUP BY entry_id
                 """,
                 (user_id, *tags, *ids),
             )
             rows = await cursor.fetchall()
 
-        return {row["message_id"]: int(row["match_count"]) for row in rows}
+        return {row["entry_id"]: int(row["match_count"]) for row in rows}
 
     async def get_recent_entries_for_tag_hashes(
         self,
@@ -395,7 +395,7 @@ class TagsRepository(BaseRepository):
         params: list[object] = [user_id, *tag_hashes]
 
         if max_entry_id or max_created_at:
-            joins = "JOIN messages m ON m.user_id = x.user_id AND m.id = x.message_id"
+            joins = "JOIN entries m ON m.user_id = x.user_id AND m.id = x.entry_id"
             if max_entry_id:
                 conditions.append("m.id <= ?")
                 params.append(max_entry_id)
@@ -405,11 +405,11 @@ class TagsRepository(BaseRepository):
 
         where_clause = " AND ".join(conditions)
         sql = f"""
-            SELECT x.message_id, MAX(x.ulid) AS latest_ulid
-            FROM tag_message_xref x
+            SELECT x.entry_id, MAX(x.ulid) AS latest_ulid
+            FROM tag_entry_xref x
             {joins}
             WHERE {where_clause}
-            GROUP BY x.message_id
+            GROUP BY x.entry_id
             ORDER BY latest_ulid DESC
         """
         if limit is not None:
@@ -420,4 +420,4 @@ class TagsRepository(BaseRepository):
             cursor = await conn.execute(sql, params)
             rows = await cursor.fetchall()
 
-        return [row["message_id"] for row in rows]
+        return [row["entry_id"] for row in rows]

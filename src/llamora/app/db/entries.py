@@ -195,7 +195,7 @@ class EntriesRepository(BaseRepository):
 
             placeholders = ", ".join(["?"] * len(columns))
             sql = (
-                f"INSERT INTO messages ({', '.join(columns)}) "
+                f"INSERT INTO entries ({', '.join(columns)}) "
                 f"VALUES ({placeholders}) "
                 "RETURNING created_at, created_date"
             )
@@ -240,7 +240,7 @@ class EntriesRepository(BaseRepository):
     async def entry_exists(self, user_id: str, entry_id: str) -> bool:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
-                "SELECT 1 FROM messages WHERE id = ? AND user_id = ?",
+                "SELECT 1 FROM entries WHERE id = ? AND user_id = ?",
                 (entry_id, user_id),
             )
             row = await cursor.fetchone()
@@ -249,7 +249,7 @@ class EntriesRepository(BaseRepository):
     async def delete_entry(self, user_id: str, entry_id: str) -> list[str]:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
-                "SELECT id, role, created_date FROM messages WHERE id = ? AND user_id = ?",
+                "SELECT id, role, created_date FROM entries WHERE id = ? AND user_id = ?",
                 (entry_id, user_id),
             )
             row = await cursor.fetchone()
@@ -263,7 +263,7 @@ class EntriesRepository(BaseRepository):
                 reply_cursor = await conn.execute(
                     """
                     SELECT id, created_date
-                    FROM messages
+                    FROM entries
                     WHERE user_id = ? AND reply_to = ?
                     """,
                     (user_id, entry_id),
@@ -279,8 +279,8 @@ class EntriesRepository(BaseRepository):
             async def _execute_deletes():
                 await conn.execute(
                     f"""
-                    DELETE FROM tag_message_xref
-                    WHERE user_id = ? AND message_id IN ({placeholders})
+                    DELETE FROM tag_entry_xref
+                    WHERE user_id = ? AND entry_id IN ({placeholders})
                     """,
                     (user_id, *delete_ids),
                 )
@@ -293,7 +293,7 @@ class EntriesRepository(BaseRepository):
                 )
                 await conn.execute(
                     f"""
-                    DELETE FROM messages
+                    DELETE FROM entries
                     WHERE user_id = ? AND id IN ({placeholders})
                     """,
                     (user_id, *delete_ids),
@@ -316,7 +316,7 @@ class EntriesRepository(BaseRepository):
     async def get_entry_date(self, user_id: str, entry_id: str) -> str | None:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
-                "SELECT created_date FROM messages WHERE id = ? AND user_id = ?",
+                "SELECT created_date FROM entries WHERE id = ? AND user_id = ?",
                 (entry_id, user_id),
             )
             row = await cursor.fetchone()
@@ -346,7 +346,7 @@ class EntriesRepository(BaseRepository):
                 """
                 SELECT m.id, m.role, m.reply_to, m.nonce, m.ciphertext, m.alg,
                        m.created_at, m.created_date, m.prompt_tokens
-                FROM messages m
+                FROM entries m
                 WHERE m.user_id = ?
                 ORDER BY m.id DESC
                 LIMIT ?
@@ -365,7 +365,7 @@ class EntriesRepository(BaseRepository):
                 """
                 SELECT m.id, m.role, m.reply_to, m.nonce, m.ciphertext, m.alg,
                        m.created_at, m.created_date, m.prompt_tokens
-                FROM messages m
+                FROM entries m
                 WHERE m.user_id = ? AND m.id < ?
                 ORDER BY m.id DESC
                 LIMIT ?
@@ -381,7 +381,7 @@ class EntriesRepository(BaseRepository):
             cursor = await conn.execute(
                 """
                 SELECT m.id
-                FROM messages m
+                FROM entries m
                 WHERE m.user_id = ?
                 ORDER BY m.id DESC
                 LIMIT 1
@@ -402,7 +402,7 @@ class EntriesRepository(BaseRepository):
                 f"""
                 SELECT m.id, m.created_at, m.created_date, m.role, m.reply_to,
                        m.nonce, m.ciphertext, m.alg, m.prompt_tokens
-                FROM messages m
+                FROM entries m
                 WHERE m.user_id = ? AND m.id IN ({placeholders})
                 """,
                 (user_id, *ids),
@@ -432,8 +432,8 @@ class EntriesRepository(BaseRepository):
                        m.prompt_tokens,
                        x.ulid AS tag_ulid,
                        t.tag_hash, t.name_ct, t.name_nonce, t.alg AS tag_alg
-                FROM messages m
-                LEFT JOIN tag_message_xref x ON x.message_id = m.id AND x.user_id = ?
+                FROM entries m
+                LEFT JOIN tag_entry_xref x ON x.entry_id = m.id AND x.user_id = ?
                 LEFT JOIN tags t ON t.user_id = x.user_id AND t.tag_hash = x.tag_hash
                 WHERE m.user_id = ? AND m.created_date = ?
                 ORDER BY m.id ASC, x.ulid ASC
@@ -462,7 +462,7 @@ class EntriesRepository(BaseRepository):
                 WITH recent AS (
                     SELECT m.id, m.created_at, m.role, m.reply_to, m.nonce,
                            m.ciphertext, m.alg, m.prompt_tokens
-                    FROM messages m
+                    FROM entries m
                     WHERE m.user_id = ? AND m.created_date = ?
                     ORDER BY m.id DESC
                     LIMIT ?
@@ -473,8 +473,8 @@ class EntriesRepository(BaseRepository):
                        x.ulid AS tag_ulid,
                        t.tag_hash, t.name_ct, t.name_nonce, t.alg AS tag_alg
                 FROM recent
-                LEFT JOIN tag_message_xref x
-                    ON x.message_id = recent.id AND x.user_id = ?
+                LEFT JOIN tag_entry_xref x
+                    ON x.entry_id = recent.id AND x.user_id = ?
                 LEFT JOIN tags t
                     ON t.user_id = x.user_id AND t.tag_hash = x.tag_hash
                 ORDER BY recent.id ASC, x.ulid ASC
@@ -493,7 +493,7 @@ class EntriesRepository(BaseRepository):
             cursor = await conn.execute(
                 """
                 SELECT DISTINCT CAST(substr(created_date, 9, 2) AS INTEGER) AS day
-                FROM messages
+                FROM entries
                 WHERE user_id = ? AND substr(created_date, 1, 7) = ?
                 """,
                 (user_id, month_prefix),
@@ -506,7 +506,7 @@ class EntriesRepository(BaseRepository):
             cursor = await conn.execute(
                 """
                 SELECT MIN(created_date) AS first_date
-                FROM messages
+                FROM entries
                 WHERE user_id = ? AND created_date IS NOT NULL
                 """,
                 (user_id,),
@@ -519,7 +519,7 @@ class EntriesRepository(BaseRepository):
     async def user_has_entries(self, user_id: str) -> bool:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
-                "SELECT 1 FROM messages WHERE user_id = ? LIMIT 1",
+                "SELECT 1 FROM entries WHERE user_id = ? LIMIT 1",
                 (user_id,),
             )
             row = await cursor.fetchone()
