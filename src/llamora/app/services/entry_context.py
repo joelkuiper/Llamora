@@ -17,14 +17,14 @@ logger = logging.getLogger(__name__)
 
 def _render_entries_markdown(entries: list[dict[str, Any]]) -> None:
     for entry in entries:
-        message = entry.get("message")
-        if isinstance(message, dict):
-            text = message.get("message", "")
-            message["message_html"] = render_markdown_to_html(text)
-        for reply in entry.get("replies") or []:
-            if isinstance(reply, dict):
-                text = reply.get("message", "")
-                reply["message_html"] = render_markdown_to_html(text)
+        entry_item = entry.get("entry")
+        if isinstance(entry_item, dict):
+            text = entry_item.get("message", "")
+            entry_item["message_html"] = render_markdown_to_html(text)
+        for response in entry.get("responses") or []:
+            if isinstance(response, dict):
+                text = response.get("message", "")
+                response["message_html"] = render_markdown_to_html(text)
 
 
 def _extract_tag_metadata(meta: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -114,8 +114,8 @@ async def get_entries_context(
     opening_entries: list[dict[str, Any]] = []
     regular_entries: list[dict[str, Any]] = []
     for item in entries:
-        message = item.get("message", {}) if isinstance(item, dict) else {}
-        meta = message.get("meta", {}) if isinstance(message, dict) else {}
+        entry_item = item.get("entry", {}) if isinstance(item, dict) else {}
+        meta = entry_item.get("meta", {}) if isinstance(entry_item, dict) else {}
         if meta.get("auto_opening"):
             opening_entries.append(item)
         else:

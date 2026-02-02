@@ -196,7 +196,7 @@ async def entry_tags(entry_id: str):
     return html
 
 
-@entries_bp.route("/e/message/<entry_id>", methods=["DELETE"])
+@entries_bp.route("/e/entry/<entry_id>", methods=["DELETE"])
 @login_required
 async def delete_entry(entry_id: str):
     _, user, _ = await require_user_and_dek()
@@ -342,9 +342,9 @@ async def sse_opening(date: str):
     return StreamSession.pending(pending)
 
 
-@entries_bp.route("/e/<date>/message", methods=["POST"])
+@entries_bp.route("/e/<date>/entry", methods=["POST"])
 @login_required
-async def send_message(date):
+async def send_entry(date):
     form = await request.form
     user_text = form.get("message", "").strip()
     user_time = form.get("user_time")

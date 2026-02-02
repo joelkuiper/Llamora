@@ -15,9 +15,9 @@
 
     --motion-tactile-animation: motion-tactile-pulse var(--motion-pulse) ease;
 
-    --motion-message-delete-duration: var(--motion-gentle);
-    --motion-message-delete-animation:
-      motion-message-delete var(--motion-message-delete-duration) ease forwards;
+    --motion-entry-delete-duration: var(--motion-gentle);
+    --motion-entry-delete-animation:
+      motion-entry-delete var(--motion-entry-delete-duration) ease forwards;
   }
 }
 
@@ -66,7 +66,7 @@
     }
   }
 
-  @keyframes motion-message-delete {
+  @keyframes motion-entry-delete {
     0% {
       opacity: 1;
       transform: translateY(0) scale(1);
@@ -103,9 +103,9 @@
     animation: var(--motion-tactile-animation);
   }
 
-  :where(.motion-animate-message-delete),
+  :where(.motion-animate-entry-delete),
   :where(.entry.htmx-swapping) {
-    animation: var(--motion-message-delete-animation);
+    animation: var(--motion-entry-delete-animation);
   }
 }
 
@@ -119,7 +119,7 @@
     :where(.entry-tag).motion-animate-tag-exit,
     :where(.entry-tag).htmx-swapping,
     :where(.scroll-btn).motion-animate-tactile,
-    :where(.motion-animate-message-delete),
+    :where(.motion-animate-entry-delete),
     :where(.entry.htmx-swapping) {
       animation: none !important;
     }
@@ -136,7 +136,7 @@
       opacity: 1;
     }
 
-    :where(.motion-animate-message-delete),
+    :where(.motion-animate-entry-delete),
     :where(.entry.htmx-swapping) {
       opacity: 0;
     }

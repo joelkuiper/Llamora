@@ -8,7 +8,7 @@
     {% if is_today %}
     <entry-form data-date="{{ day }}">
       <form id="entry-form"
-            hx-post="{{ url_for('entries.send_message', date=day) }}"
+            hx-post="{{ url_for('entries.send_entry', date=day) }}"
             hx-target="#entries"
             hx-on::after-request="this.reset()"
             hx-swap="beforeend">

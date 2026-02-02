@@ -123,14 +123,14 @@ def build_entry_history(
     history: list[dict[str, Any]] = []
     target_id = str(entry_id)
     for entry in entries:
-        message = entry.get("message")
-        if isinstance(message, Mapping):
-            history.append(dict(message))
-            if str(message.get("id")) == target_id:
+        entry_item = entry.get("entry")
+        if isinstance(entry_item, Mapping):
+            history.append(dict(entry_item))
+            if str(entry_item.get("id")) == target_id:
                 return history
-        for reply in entry.get("replies") or []:
-            if isinstance(reply, Mapping):
-                history.append(dict(reply))
+        for response in entry.get("responses") or []:
+            if isinstance(response, Mapping):
+                history.append(dict(response))
     return history
 
 

@@ -135,17 +135,17 @@ class EntriesRepository(BaseRepository):
             reply_key = str(reply_to) if reply_to else ""
 
             if role == "user":
-                entry_item = {"message": entry, "replies": []}
+                entry_item = {"entry": entry, "responses": []}
                 entries.append(entry_item)
                 if entry_id:
                     by_user_id[entry_id] = entry_item
                 continue
 
             if reply_key and reply_key in by_user_id:
-                by_user_id[reply_key]["replies"].append(entry)
+                by_user_id[reply_key]["responses"].append(entry)
                 continue
 
-            entries.append({"message": entry, "replies": []})
+            entries.append({"entry": entry, "responses": []})
 
         return entries
 
