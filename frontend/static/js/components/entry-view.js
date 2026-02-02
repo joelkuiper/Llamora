@@ -396,7 +396,7 @@ export class EntryView extends ReactiveElement {
       }
 
       if (target?.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
-        target.querySelectorAll?.(".message").forEach((node) => {
+        target.querySelectorAll?.(".entry").forEach((node) => {
           activateAnimations(node);
         });
         return;

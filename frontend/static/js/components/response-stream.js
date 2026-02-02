@@ -46,7 +46,7 @@ function requestScrollToBottom(detail = {}) {
 function revealMetaChips(container) {
   if (!container || !container.hidden) return;
 
-  const parent = container.closest(".message");
+  const parent = container.closest(".entry");
   const reduceMotion = isMotionReduced();
   const start = reduceMotion ? undefined : parent?.offsetHeight;
   container.hidden = false;

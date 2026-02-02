@@ -104,7 +104,7 @@
   }
 
   :where(.motion-animate-message-delete),
-  :where(.message.htmx-swapping) {
+  :where(.entry.htmx-swapping) {
     animation: var(--motion-message-delete-animation);
   }
 }
@@ -120,7 +120,7 @@
     :where(.entry-tag).htmx-swapping,
     :where(.scroll-btn).motion-animate-tactile,
     :where(.motion-animate-message-delete),
-    :where(.message.htmx-swapping) {
+    :where(.entry.htmx-swapping) {
       animation: none !important;
     }
 
@@ -137,7 +137,7 @@
     }
 
     :where(.motion-animate-message-delete),
-    :where(.message.htmx-swapping) {
+    :where(.entry.htmx-swapping) {
       opacity: 0;
     }
   }
