@@ -54,7 +54,10 @@ CREATE TABLE IF NOT EXISTS tag_message_xref (
     tag_hash BLOB(32) NOT NULL,
     message_id TEXT NOT NULL,
     ulid TEXT NOT NULL,
-    PRIMARY KEY(user_id, tag_hash, message_id)
+    PRIMARY KEY(user_id, tag_hash, message_id),
+    FOREIGN KEY (user_id, tag_hash)
+        REFERENCES tags(user_id, tag_hash) ON DELETE CASCADE,
+    FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS search_history (

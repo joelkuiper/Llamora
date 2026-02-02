@@ -220,6 +220,73 @@ class MessagesRepository(BaseRepository):
             row = await cursor.fetchone()
         return bool(row)
 
+    async def delete_message(self, user_id: str, message_id: str) -> list[str]:
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                "SELECT id, role, created_date FROM messages WHERE id = ? AND user_id = ?",
+                (message_id, user_id),
+            )
+            row = await cursor.fetchone()
+            if not row:
+                return []
+
+            delete_ids = [row["id"]]
+            created_dates = {row["created_date"]} if row["created_date"] else set()
+
+            if row["role"] == "user":
+                reply_cursor = await conn.execute(
+                    """
+                    SELECT id, created_date
+                    FROM messages
+                    WHERE user_id = ? AND reply_to = ?
+                    """,
+                    (user_id, message_id),
+                )
+                reply_rows = await reply_cursor.fetchall()
+                for reply_row in reply_rows:
+                    delete_ids.append(reply_row["id"])
+                    if reply_row["created_date"]:
+                        created_dates.add(reply_row["created_date"])
+
+            placeholders = ",".join("?" for _ in delete_ids)
+
+            async def _execute_deletes():
+                await conn.execute(
+                    f"""
+                    DELETE FROM tag_message_xref
+                    WHERE user_id = ? AND message_id IN ({placeholders})
+                    """,
+                    (user_id, *delete_ids),
+                )
+                await conn.execute(
+                    f"""
+                    DELETE FROM vectors
+                    WHERE user_id = ? AND id IN ({placeholders})
+                    """,
+                    (user_id, *delete_ids),
+                )
+                await conn.execute(
+                    f"""
+                    DELETE FROM messages
+                    WHERE user_id = ? AND id IN ({placeholders})
+                    """,
+                    (user_id, *delete_ids),
+                )
+
+            await self._run_in_transaction(conn, _execute_deletes)
+
+        if self._event_bus:
+            for created_date in created_dates:
+                await self._event_bus.emit_for_message_date(
+                    MESSAGE_HISTORY_CHANGED_EVENT,
+                    user_id=user_id,
+                    created_date=created_date,
+                    message_id=message_id,
+                    reason="delete",
+                )
+
+        return delete_ids
+
     async def get_message_date(self, user_id: str, message_id: str) -> str | None:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(

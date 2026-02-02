@@ -240,6 +240,9 @@ class SearchAPI:
     async def maintenance_tick(self) -> None:
         await self.vector_search.maintenance_tick()
 
+    async def delete_messages(self, user_id: str, message_ids: Sequence[str]) -> None:
+        await self.vector_search.index_store.remove_messages(user_id, message_ids)
+
     async def search_stream(
         self,
         user_id: str,

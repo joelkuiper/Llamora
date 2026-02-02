@@ -96,6 +96,19 @@ class MessageIndex:
                 ids.append(msg_id)
         return ids, dists[0][: len(ids)]
 
+    def remove_ids(self, ids: Iterable[str]) -> None:
+        removed = False
+        for msg_id in ids:
+            idx = self.id_to_idx.pop(msg_id, None)
+            if idx is None:
+                continue
+            self.idx_to_id.pop(idx, None)
+            if hasattr(self.index, "mark_deleted"):
+                self.index.mark_deleted(idx)
+            removed = True
+        if removed:
+            self.touch()
+
 
 class MessageIndexStore:
     """Manages per-user ANN indexes, persistence and maintenance."""
@@ -360,3 +373,14 @@ class MessageIndexStore:
             return
         self._next_maintenance = now + self.maintenance_interval
         self._evict_idle()
+
+    async def remove_messages(self, user_id: str, message_ids: Iterable[str]) -> None:
+        ids = [mid for mid in message_ids if mid]
+        if not ids:
+            return
+        idx = self.indexes.get(user_id)
+        if not idx:
+            return
+        lock = self._get_lock(user_id)
+        async with lock:
+            idx.remove_ids(ids)

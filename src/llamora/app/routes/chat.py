@@ -197,6 +197,18 @@ async def meta_chips(msg_id: str):
     return html
 
 
+@chat_bp.route("/c/message/<msg_id>", methods=["DELETE"])
+@login_required
+async def delete_message(msg_id: str):
+    _, user, _ = await require_user_and_dek()
+    db = get_services().db
+    await ensure_message_exists(db, user["id"], msg_id)
+    deleted_ids = await db.messages.delete_message(user["id"], msg_id)
+    if deleted_ids:
+        await get_services().search_api.delete_messages(user["id"], deleted_ids)
+    return Response(status=204)
+
+
 @chat_bp.get("/c/opening/<date>")
 @login_required
 async def sse_opening(date: str):
