@@ -165,9 +165,9 @@ async def entries_htmx_today():
     )
 
 
-@entries_bp.route("/e/stop/<user_msg_id>", methods=["POST"])
+@entries_bp.route("/e/response/stop/<user_msg_id>", methods=["POST"])
 @login_required
-async def stop_generation(user_msg_id: str):
+async def stop_response(user_msg_id: str):
     logger.info("Stop requested for user message %s", user_msg_id)
     _, user, _ = await require_user_and_dek()
 
@@ -393,9 +393,9 @@ async def send_message(date):
     )
 
 
-@entries_bp.route("/e/<date>/ask/<user_msg_id>", methods=["POST"])
+@entries_bp.route("/e/<date>/response/<user_msg_id>", methods=["POST"])
 @login_required
-async def ask_llm(date, user_msg_id: str):
+async def request_response(date, user_msg_id: str):
     normalized_date = require_iso_date(date)
     form = await request.form
     user_time = form.get("user_time")
@@ -418,9 +418,9 @@ async def ask_llm(date, user_msg_id: str):
     )
 
 
-@entries_bp.route("/e/<date>/stream/<user_msg_id>")
+@entries_bp.route("/e/<date>/response/stream/<user_msg_id>")
 @login_required
-async def sse_reply(user_msg_id: str, date: str):
+async def sse_response(user_msg_id: str, date: str):
     """Stream the assistant's reply for a given user message.
 
     The ``user_msg_id`` corresponds to the user's prompt message. When the
