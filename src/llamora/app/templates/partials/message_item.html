@@ -32,6 +32,13 @@
   <div class="message-footer">
     {{ render_meta_chips(msg['id'], msg.get('tags', [])) }}
     <div class="message-actions-row" aria-label="Message actions">
+      {% if msg.get('created_at') %}
+      <time class="message-time"
+            datetime="{{ msg['created_at'] }}"
+            title="{{ msg['created_at']|timestamp }}">
+        {{ msg['created_at']|time_of_day }}
+      </time>
+      {% endif %}
       <button class="message-action message-delete"
               type="button"
               hx-delete="{{ url_for('chat.delete_message', msg_id=msg['id']) }}"
@@ -54,6 +61,13 @@
   {% endif %}
   {% if msg['role'] != 'user' %}
   <div class="message-actions-inline" aria-label="Assistant message actions">
+    {% if msg.get('created_at') %}
+    <time class="message-time"
+          datetime="{{ msg['created_at'] }}"
+          title="{{ msg['created_at']|timestamp }}">
+      {{ msg['created_at']|time_of_day }}
+    </time>
+    {% endif %}
     {% if reply_kind and reply_kind_labels and reply_kind_labels.get(reply_kind) %}
     <span class="message-action message-kind-indicator"
           role="img"

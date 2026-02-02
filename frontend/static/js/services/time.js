@@ -3,11 +3,15 @@ import {
   applyTimezoneSearchParam,
   buildTimezoneQueryParam,
   formatIsoDate,
+  applyLocaleHeader,
+  applyHourCycleHeader,
+  getHourCycle,
+  getLocale,
   getTimezone,
   TIMEZONE_QUERY_PARAM,
 } from "./datetime.js";
 import { createListenerBag } from "../utils/events.js";
-export { getTimezone } from "./datetime.js";
+export { getTimezone, getLocale, getHourCycle } from "./datetime.js";
 
 const ESCAPED_TIMEZONE_PARAM = TIMEZONE_QUERY_PARAM.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const TIMEZONE_QUERY_PARAM_PATTERN = new RegExp(`[?&]${ESCAPED_TIMEZONE_PARAM}=`);
@@ -26,13 +30,46 @@ export function updateClientToday(target = document?.body, now = new Date()) {
 
 export function applyRequestTimeHeaders(headers) {
   const timezone = applyTimezoneHeader(headers, getTimezone());
+  const locale = applyLocaleHeader(headers, getLocale());
+  const hourCycle = applyHourCycleHeader(headers, getHourCycle());
   const clientToday = updateClientToday();
 
   if (headers && typeof headers === "object" && clientToday) {
     headers["X-Client-Today"] = clientToday;
   }
 
-  return { timezone, clientToday };
+  return { timezone, locale, hourCycle, clientToday };
+}
+
+export function formatLocalTime(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const locale = getLocale();
+  const hourCycle = getHourCycle();
+  return new Intl.DateTimeFormat(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle,
+  }).format(date);
+}
+
+export function formatLocalTimestamp(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const locale = getLocale();
+  const hourCycle = getHourCycle();
+  return new Intl.DateTimeFormat(locale, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle,
+  }).format(date);
 }
 
 export function applyTimezoneSearch(searchParams, zone = getTimezone()) {

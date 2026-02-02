@@ -373,6 +373,30 @@ body {
     position: static;
   }
 
+  .message-time {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+    margin-top: var(--spacing-xs);
+    gap: 0.35rem;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    transform: translateY(-2px);
+    opacity: 0;
+    transition: opacity var(--motion-gentle) ease;
+    pointer-events: none;
+  }
+
+  .message-actions-row .message-time {
+    margin-right: 0.4rem;
+  }
+
+  .message:hover .message-time,
+  .message:focus-within .message-time {
+    opacity: 1;
+  }
+
   .message-replies {
     display: grid;
     gap: var(--spacing-md);

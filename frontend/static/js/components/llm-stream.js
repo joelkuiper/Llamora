@@ -6,7 +6,7 @@ import {
 import { IncrementalMarkdownRenderer } from "../chat/incremental-markdown-renderer.js";
 import { requestScrollForceBottom } from "../chat/scroll-manager.js";
 import { animateMotion, isMotionReduced } from "../services/motion.js";
-import { applyTimezoneQuery } from "../services/time.js";
+import { applyTimezoneQuery, formatLocalTime, formatLocalTimestamp } from "../services/time.js";
 import { scheduleFrame } from "../utils/scheduler.js";
 
 const NEWLINE_REGEX = /\[newline\]/g;
@@ -425,6 +425,7 @@ class LlmStreamElement extends HTMLElement {
 
     this.#renderNow({ repositionTyping: false, shouldScroll: true });
     this.#finalize({ status: "done", assistantMsgId, reason: "stream:complete" });
+    this.#ensureInlineTimestamp();
   }
 
   #handleError(event) {
@@ -449,6 +450,7 @@ class LlmStreamElement extends HTMLElement {
     this.#renderNow({ repositionTyping: false, shouldScroll: true });
     this.#markAsError();
     this.#finalize({ status: "error", message, reason: "stream:error" });
+    this.#ensureInlineTimestamp();
   }
 
   #handleMeta(event) {
@@ -546,6 +548,31 @@ class LlmStreamElement extends HTMLElement {
     }
 
     return changed;
+  }
+
+  #ensureInlineTimestamp() {
+    const container = this.querySelector(".message-actions-inline");
+    if (!container) return;
+    if (container.querySelector(".message-time")) return;
+
+    const now = new Date();
+    const timeEl = document.createElement("time");
+    timeEl.className = "message-time";
+    timeEl.dateTime = now.toISOString();
+    timeEl.title = formatLocalTimestamp(now);
+    timeEl.textContent = formatLocalTime(now);
+
+    const kindIndicator = container.querySelector(".message-kind-indicator");
+    if (kindIndicator) {
+      container.insertBefore(timeEl, kindIndicator);
+      return;
+    }
+    const deleteBtn = container.querySelector(".message-delete");
+    if (deleteBtn) {
+      container.insertBefore(timeEl, deleteBtn);
+      return;
+    }
+    container.appendChild(timeEl);
   }
 
   #finalize({ status, assistantMsgId = null, message = "", reason = null }) {

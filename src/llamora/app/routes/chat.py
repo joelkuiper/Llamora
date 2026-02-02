@@ -10,7 +10,7 @@ from quart import (
     url_for,
 )
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from typing import Any
 from werkzeug.exceptions import HTTPException
@@ -367,10 +367,12 @@ async def send_message(date):
         logger.exception("Failed to save user message")
         raise
 
+    created_at = user_time or datetime.now(timezone.utc).isoformat()
     return await render_template(
         "partials/placeholder.html",
         user_text=user_text,
         user_msg_id=user_msg_id,
+        created_at=created_at,
         day=date,
         user_time=user_time,
         reply_kinds=reply_kinds,
