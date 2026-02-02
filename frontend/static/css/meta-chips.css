@@ -318,45 +318,53 @@
 .action-popover {
   width: 13rem;
   padding: 8px;
+  --action-reply: color-mix(in srgb, var(--accent) 55%, var(--color-text-muted));
+  --action-acknowledge: color-mix(in srgb, var(--color-danger-mix) 45%, var(--color-text-muted));
+  --action-notice: color-mix(in srgb, var(--highlight-color) 55%, var(--color-text-muted));
+  --action-tint: 6%;
 }
 
 .action-panel {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.5rem;
   min-width: 0;
 }
 
 .action-list {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.4rem;
 }
 
 .action-item {
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   border-radius: var(--radius-md);
-  background: var(--glass-bg-alt);
+  background: color-mix(in srgb, var(--glass-bg-alt) 85%, transparent);
   color: var(--glass-text-stronger);
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.6rem;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem;
   cursor: pointer;
   font: inherit;
   transition:
     box-shadow var(--motion-gentle) ease,
     border-color var(--motion-gentle) ease,
     transform var(--motion-press) ease,
-    background-color var(--motion-gentle) ease;
+    background-color var(--motion-gentle) ease,
+    color var(--motion-gentle) ease;
+  box-shadow: var(--subtle-raised-shadow);
+  --action-color: var(--accent);
+  --action-border: color-mix(in srgb, var(--action-color) 35%, var(--border));
+  --action-bg: color-mix(in srgb, var(--action-color) var(--action-tint), var(--glass-bg-alt));
+  --action-icon: color-mix(in srgb, var(--action-color) 65%, var(--color-text));
 }
 
 .action-item:hover {
-  border-color: var(--accent);
-  box-shadow:
-    var(--raised-shadow),
-    0 0 0 2px var(--accent-10);
-  background: linear-gradient(0deg, var(--accent-15), var(--accent-05)) var(--glass-bg-alt);
+  border-color: var(--action-border);
+  background: var(--action-bg);
+  box-shadow: var(--raised-shadow);
 }
 
 .action-item:active {
@@ -365,7 +373,7 @@
 }
 
 .action-item:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid color-mix(in srgb, var(--action-color) 30%, transparent);
   outline-offset: 2px;
 }
 
@@ -374,11 +382,35 @@
   height: 1rem;
   display: block;
   flex: 0 0 auto;
+  color: var(--action-icon);
+  transition: color var(--motion-gentle) ease;
 }
 
 .action-item__label {
   font-size: 0.85rem;
   letter-spacing: 0.01em;
+  color: color-mix(in srgb, var(--color-text) 88%, transparent);
+  transition: color var(--motion-gentle) ease 60ms;
+}
+
+.action-item[data-action-kind="reply"] {
+  --action-color: var(--action-reply);
+}
+
+.action-item[data-action-kind="acknowledge"] {
+  --action-color: var(--action-acknowledge);
+}
+
+.action-item[data-action-kind="notice"] {
+  --action-color: var(--action-notice);
+}
+
+.action-item:hover .action-item__icon {
+  color: color-mix(in srgb, var(--action-color) 85%, var(--color-text));
+}
+
+.action-item:hover .action-item__label {
+  color: color-mix(in srgb, var(--color-text) 94%, transparent);
 }
 
 
