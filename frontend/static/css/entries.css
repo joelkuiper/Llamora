@@ -115,10 +115,10 @@ body {
     &.user {
       align-self: stretch;
       width: 100%;
-      border: 1px solid var(--border);
+      border: 1px solid color-mix(in srgb, var(--border) 85%, var(--color-text-muted));
       color: var(--color-text);
-      background: var(--color-surface);
-      box-shadow: none;
+      background: color-mix(in srgb, var(--color-surface) 92%, white);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
       border-radius: var(--radius-md);
       padding: var(--spacing-lg) var(--spacing-xl);
 
@@ -159,23 +159,22 @@ body {
       --assistant-action-color: var(--accent);
       --assistant-delete-color: color-mix(
         in srgb,
-        var(--assistant-bubble-icon) 70%,
-        var(--color-text-muted)
+        var(--color-text-muted) 75%,
+        transparent
       );
       align-self: flex-end;
-      width: clamp(16rem, 68%, 34rem);
+      width: clamp(15rem, 60%, 32rem);
       margin-left: auto;
       padding: var(--spacing-sm) var(--spacing-lg) calc(var(--spacing-sm) + 2rem);
       border-radius: var(--radius-sm);
-      box-shadow: 0 1px 2px rgba(0,0,0,0.03),
-                  inset 0 1px 0 rgba(255,255,255,0.9);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
       color: var(--assistant-bubble-text);
       word-wrap: break-word;
       word-break: break-word;
-      background: var(--assistant-bubble-bg);
-      border: 1px solid var(--assistant-bubble-border);
+      background: color-mix(in srgb, var(--color-surface) 78%, transparent);
+      border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
       font-size: 0.95em;
-      opacity: 0.9;
+      line-height: 1.7;
     }
 
     &[data-response-kind="reply"] {
@@ -277,20 +276,23 @@ body {
     }
 
     &.message--opening .message-opening-label {
-      font-size: 0.75rem;
-      letter-spacing: 0.12em;
+      font-size: 0.7rem;
+      letter-spacing: 0.16em;
       text-transform: uppercase;
-      color: var(--brand-muted);
+      color: var(--color-text-muted);
       margin-bottom: var(--spacing-xs);
     }
 
     &.message--opening {
+      align-self: stretch;
       width: 100%;
-      border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
-      background: color-mix(in srgb, var(--color-surface) 80%, transparent);
-      padding: var(--spacing-lg) var(--spacing-xl);
+      border: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
+      background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+      padding: calc(var(--spacing-lg) + var(--spacing-xs)) var(--spacing-xl);
       border-radius: var(--radius-md);
       box-shadow: none;
+      color: color-mix(in srgb, var(--color-text) 85%, var(--color-text-muted));
+      margin-bottom: var(--spacing-xl);
     }
   }
 
@@ -327,8 +329,8 @@ body {
   .message-time {
     display: inline-flex;
     align-items: center;
-    font-size: 0.7rem;
-    color: var(--color-text-muted);
+    font-size: 0.65rem;
+    color: color-mix(in srgb, var(--color-text-muted) 85%, transparent);
     margin-top: var(--spacing-xs);
     gap: 0.35rem;
     letter-spacing: 0.02em;
@@ -355,8 +357,8 @@ body {
 
   .message-replies {
     display: grid;
-    gap: var(--spacing-md);
-    margin-top: var(--spacing-sm);
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-md);
   }
 
   .message-kind-indicator {
