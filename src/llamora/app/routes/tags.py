@@ -91,14 +91,11 @@ async def get_entry_tag_suggestions(msg_id: str):
     decay_constant = resolve_frecency_lambda(
         request.args.get("lambda"), default=DEFAULT_FRECENCY_DECAY
     )
-    services = get_services()
-    llm = services.llm_service.llm
 
     suggestions = await _tags().suggest_for_entry(
         user["id"],
         msg_id,
         dek,
-        llm=llm,
         frecency_limit=3,
         decay_constant=decay_constant,
     )

@@ -65,30 +65,6 @@ def format_sse_event(event_type: str, payload: Any) -> str:
     return f"event: {event_type}\ndata: {serialized}\n\n"
 
 
-def find_existing_assistant_reply(
-    history: Sequence[Mapping[str, Any]], user_msg_id: str
-) -> Mapping[str, Any] | None:
-    """Locate an assistant reply paired with ``user_msg_id`` in ``history``."""
-
-    expect_adjacent_reply = False
-
-    for message in history:
-        if (
-            message.get("reply_to") == user_msg_id
-            and message.get("role") == "assistant"
-        ):
-            return message
-
-        if expect_adjacent_reply:
-            if message.get("role") == "assistant":
-                return message
-            expect_adjacent_reply = False
-
-        expect_adjacent_reply = message.get("id") == user_msg_id
-
-    return None
-
-
 def slice_history_to_entry(
     history: Sequence[Mapping[str, Any]], user_msg_id: str
 ) -> list[dict[str, Any]]:
@@ -102,47 +78,6 @@ def slice_history_to_entry(
         if str(message_dict.get("id")) == target_id:
             break
     return sliced or list(history)
-
-
-async def locate_message_and_reply(
-    db,
-    user_id: str,
-    dek: bytes,
-    date: str,
-    user_msg_id: str,
-    *,
-    slice_history: bool = False,
-):
-    """Fetch history containing ``user_msg_id`` and any existing reply.
-
-    Returns a tuple of ``(history, assistant_message, actual_date)``. ``history`` is
-    the conversation history that includes the user message. ``assistant_message``
-    is the first stored reply when one exists, otherwise ``None``. ``actual_date``
-    reflects the conversation date associated with ``history`` and may differ from
-    the input ``date`` when the message resides on another day.
-    """
-
-    message_info = await db.messages.get_message_with_reply(user_id, user_msg_id)
-    actual_date = (message_info or {}).get("created_date") or date
-
-    history = await db.messages.get_history(user_id, actual_date, dek)
-
-    messages_by_id = {message.get("id"): message for message in history}
-    user_message = messages_by_id.get(user_msg_id)
-    if not user_message:
-        return [], None, actual_date
-
-    assistant_message = None
-    if message_info and message_info.get("reply_id"):
-        assistant_message = messages_by_id.get(message_info["reply_id"])
-
-    if assistant_message is None:
-        assistant_message = find_existing_assistant_reply(history, user_msg_id)
-
-    if slice_history:
-        history = slice_history_to_entry(history, user_msg_id)
-
-    return history, assistant_message, actual_date
 
 
 def normalize_llm_config(

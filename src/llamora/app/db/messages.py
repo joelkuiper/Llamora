@@ -312,35 +312,6 @@ class MessagesRepository(BaseRepository):
                 reason=reason,
             )
 
-    async def get_message_with_reply(
-        self, user_id: str, message_id: str
-    ) -> dict | None:
-        async with self.pool.connection() as conn:
-            cursor = await conn.execute(
-                """
-                SELECT m.id, m.created_date, reply.id AS reply_id
-                FROM messages m
-                LEFT JOIN messages reply
-                    ON reply.reply_to = m.id
-                    AND reply.user_id = m.user_id
-                    AND reply.role = 'assistant'
-                WHERE m.user_id = ? AND m.id = ?
-                ORDER BY reply.created_at ASC
-                LIMIT 1
-                """,
-                (user_id, message_id),
-            )
-            row = await cursor.fetchone()
-
-        if not row:
-            return None
-
-        return {
-            "id": row["id"],
-            "created_date": row["created_date"],
-            "reply_id": row["reply_id"],
-        }
-
     async def get_latest_messages(
         self, user_id: str, limit: int, dek: bytes
     ) -> list[dict]:

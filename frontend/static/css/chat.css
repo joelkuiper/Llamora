@@ -152,68 +152,6 @@ body {
         opacity: 1;
       }
 
-      .message-actions-row .ask-llm {
-        flex: 0 0 auto;
-      }
-
-      .ask-llm-menu {
-        position: relative;
-        flex: 0 0 auto;
-      }
-
-      .ask-llm-menu summary {
-        list-style: none;
-      }
-
-      .ask-llm-menu summary::-webkit-details-marker {
-        display: none;
-      }
-
-      .ask-llm-menu[open] .ask-llm {
-        color: color-mix(in srgb, var(--color-text) 70%, var(--accent));
-        background: color-mix(in srgb, var(--accent-05) 65%, transparent);
-        border-color: color-mix(in srgb, var(--accent) 18%, transparent);
-      }
-
-      .ask-llm-menu__panel {
-        position: absolute;
-        right: 0;
-        top: calc(100% + 0.35rem);
-        min-width: 9rem;
-        background: var(--color-surface);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-md);
-        padding: 0.4rem;
-        box-shadow: var(--subtle-raised-shadow);
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-        z-index: 10;
-      }
-
-      .ask-llm-menu__item {
-        border: 0;
-        background: transparent;
-        color: var(--color-text);
-        text-align: left;
-        padding: 0.4rem 0.5rem;
-        border-radius: var(--radius-sm);
-        font: inherit;
-        cursor: pointer;
-        transition: background var(--motion-fast) ease,
-          color var(--motion-fast) ease;
-      }
-
-      .ask-llm-menu__item:hover {
-        background: color-mix(in srgb, var(--accent-05) 65%, transparent);
-        color: color-mix(in srgb, var(--color-text) 75%, var(--accent));
-      }
-
-      .ask-llm-menu__item:focus-visible {
-        outline: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
-        outline-offset: 2px;
-      }
-
       .message-kind {
         display: inline-flex;
         align-items: center;

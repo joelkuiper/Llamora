@@ -6,9 +6,8 @@ import asyncio
 import logging
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Mapping, Protocol
+from typing import Any, Awaitable, Callable, Protocol
 
-from llamora.app.services.chat_meta import normalise_metadata_emoji
 
 from ..llm_stream_config import LLMStreamConfig
 
@@ -193,7 +192,6 @@ class ResponsePipeline:
         *,
         session,
         writer: AssistantMessageWriter,
-        metadata_builder: Callable[[str], Awaitable[Mapping[str, Any]]] | None,
         uid: str,
         reply_to: str | None,
         date: str,
@@ -203,7 +201,6 @@ class ResponsePipeline:
     ) -> None:
         self._session = session
         self._writer = writer
-        self._metadata_builder = metadata_builder
         self._uid = uid
         self._reply_to = reply_to
         self._date = date
@@ -358,35 +355,11 @@ class ResponsePipeline:
         self,
         text: str,
         *,
-        allow_generation: bool,
         error: bool,
         partial: bool,
         include_repeat_guard: bool,
     ) -> dict[str, Any]:
         meta: dict[str, Any] = {}
-
-        if allow_generation and self._metadata_builder and text.strip():
-            try:
-                generated = await self._metadata_builder(text)
-            except Exception:
-                logger.exception("Metadata builder failed")
-            else:
-                if isinstance(generated, Mapping):
-                    meta.update(dict(generated))
-                else:
-                    logger.debug(
-                        "Metadata builder returned unexpected payload: %r", generated
-                    )
-
-        meta["emoji"] = normalise_metadata_emoji(meta.get("emoji"))
-
-        keywords = meta.get("keywords")
-        if not isinstance(keywords, list) or any(
-            not isinstance(item, str) for item in keywords
-        ):
-            meta["keywords"] = []
-        else:
-            meta["keywords"] = [item for item in keywords if isinstance(item, str)]
 
         if include_repeat_guard:
             meta["repeat_guard"] = True
@@ -403,7 +376,6 @@ class ResponsePipeline:
         final_text = full_response
         meta = await self._build_metadata(
             final_text,
-            allow_generation=True,
             error=self._error,
             partial=False,
             include_repeat_guard=self._repeat_guard_triggered,
@@ -431,7 +403,6 @@ class ResponsePipeline:
             )
         meta = await self._build_metadata(
             final_text,
-            allow_generation=False,
             error=self._error,
             partial=True,
             include_repeat_guard=self._repeat_guard_triggered,
@@ -455,7 +426,6 @@ class ResponsePipeline:
     ) -> PipelineResult:
         meta = await self._build_metadata(
             final_text,
-            allow_generation=False,
             error=error_meta or self._error,
             partial=False,
             include_repeat_guard=False,

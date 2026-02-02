@@ -26,8 +26,8 @@ from llamora.app.services.chat_helpers import (
     history_has_tag_recall,
     StreamSession,
     build_conversation_context,
-    locate_message_and_reply,
     normalize_llm_config,
+    slice_history_to_entry,
     start_stream_session,
 )
 from llamora.app.services.entry_context import build_entry_context
@@ -420,18 +420,15 @@ async def sse_reply(user_msg_id: str, date: str):
 
     _, user, dek = await require_user_and_dek()
     uid = user["id"]
-    history, _, actual_date = await locate_message_and_reply(
-        get_services().db,
-        uid,
-        dek,
-        normalized_date,
-        user_msg_id,
-        slice_history=True,
-    )
-
+    actual_date = await get_services().db.messages.get_message_date(uid, user_msg_id)
+    if not actual_date:
+        logger.warning("History not found for user message %s", user_msg_id)
+        return StreamSession.error("Invalid ID")
+    history = await get_services().db.messages.get_history(uid, actual_date, dek)
     if not history:
         logger.warning("History not found for user message %s", user_msg_id)
         return StreamSession.error("Invalid ID")
+    history = slice_history_to_entry(history, user_msg_id)
 
     params_raw = normalize_llm_config(
         request.args.get("config"),

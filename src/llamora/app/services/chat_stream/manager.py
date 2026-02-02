@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from functools import partial
 from heapq import heappop, heappush
 from itertools import count
 from collections import deque
@@ -11,7 +10,6 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import suppress
 
 from llamora.llm.client import LLMClient
-from llamora.app.services.chat_meta import generate_metadata
 from llamora.app.services.service_pulse import ServicePulse
 from llamora.app.services.queues import FairAsyncQueue
 
@@ -128,11 +126,9 @@ class PendingResponse(ResponsePipelineCallbacks):
         self._visible_total = ""
         _repeat_guard_size = config.repeat_guard_size
         _repeat_guard_min_length = config.repeat_guard_min_length
-        metadata_builder = partial(generate_metadata, llm)
         self._pipeline = ResponsePipeline(
             session=self._session,
             writer=AssistantMessageWriter(db),
-            metadata_builder=metadata_builder,
             uid=uid,
             reply_to=self.reply_to,
             date=self.date,
