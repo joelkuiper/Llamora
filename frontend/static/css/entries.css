@@ -79,7 +79,7 @@ body {
   margin: 0 auto var(--spacing-xl) auto;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-xl);
   align-items: stretch;
   position: relative;
   z-index: 2;
@@ -334,7 +334,7 @@ body {
       border-radius: var(--radius-md);
       box-shadow: none;
       color: color-mix(in srgb, var(--color-text) 85%, var(--color-text-muted));
-      margin-bottom: calc(var(--spacing-xl) + var(--spacing-sm));
+      margin-bottom: var(--spacing-sm);
     }
 
     &.message--opening .markdown-body {
@@ -436,8 +436,16 @@ body {
 
   .message-replies {
     display: grid;
-    gap: var(--spacing-sm);
-    margin-top: var(--spacing-md);
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-sm);
+  }
+
+  .message.user + .message-replies {
+    margin-top: var(--spacing-xs);
+  }
+
+  .message--opening + .message {
+    margin-top: var(--spacing-sm);
   }
 
   .message-kind-indicator {
