@@ -7,9 +7,11 @@
 {% set repeat_guard = msg_meta.get('repeat_guard') %}
 {% set response_kind = msg_meta.get('response_kind') %}
 {% set is_opening = msg_meta.get('auto_opening') %}
+{% set opening_cookie = 'opening_collapsed_' ~ day %}
+{% set opening_collapsed = is_opening and request.cookies.get(opening_cookie) == '1' %}
 {% set speaker = 'Your' if msg['role'] == 'user' else 'Assistant' %}
 <div id="msg-{{ msg['id'] }}"
-     class="message {{ 'assistant' if msg['role'] != 'user' else 'user'}}{% if is_error %} message--error{% endif %}{% if is_opening %} message--opening{% endif %}"
+     class="message {{ 'assistant' if msg['role'] != 'user' else 'user'}}{% if is_error %} message--error{% endif %}{% if is_opening %} message--opening{% if opening_collapsed %} is-collapsed{% endif %}{% endif %}"
      data-message-id="{{ msg['id'] }}"
      {% if response_kind %}data-response-kind="{{ response_kind }}"{% endif %}
      {% if msg['role'] == 'assistant' and msg.get('reply_to') %}
@@ -27,8 +29,8 @@
       <button type="button"
               class="opening-toggle"
               data-opening-toggle
-              aria-expanded="true"
-              aria-label="Collapse day opening">
+              aria-expanded="{{ 'false' if opening_collapsed else 'true' }}"
+              aria-label="{{ 'Expand day opening' if opening_collapsed else 'Collapse day opening' }}">
         <span class="icon-mask icon-chevron-up" aria-hidden="true" data-opening-icon-open></span>
         <span class="icon-mask icon-chevron-down" aria-hidden="true" data-opening-icon-closed></span>
       </button>
