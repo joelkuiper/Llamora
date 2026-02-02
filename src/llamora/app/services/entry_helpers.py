@@ -230,7 +230,6 @@ async def augment_history_with_recall(
     params: Mapping[str, Any] | None = None,
     context: Mapping[str, Any] | None = None,
     target_entry_id: str | None = None,
-    insert_index: int | None = None,
     include_tag_metadata: bool = False,
     tag_recall_date: str | None = None,
 ) -> RecallAugmentation:
@@ -275,13 +274,8 @@ async def augment_history_with_recall(
             augmented.append(entry_dict)
 
         if not recall_inserted:
-            if insert_index is not None:
-                bounded_index = max(0, min(insert_index, len(augmented)))
-                augmented.insert(bounded_index, dict(recall_entry))
-                recall_index = bounded_index
-            else:
-                recall_index = len(augmented)
-                augmented.append(dict(recall_entry))
+            recall_index = len(augmented)
+            augmented.append(dict(recall_entry))
             recall_inserted = True
 
     trimmed_history = augmented

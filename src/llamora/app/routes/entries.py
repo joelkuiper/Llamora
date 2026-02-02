@@ -39,8 +39,6 @@ from llamora.app.services.session_context import get_session_context
 from llamora.app.services.time import (
     local_date,
     get_timezone,
-    format_date,
-    part_of_day,
 )
 from llamora.app.routes.helpers import (
     ensure_entry_exists,
@@ -222,8 +220,12 @@ async def sse_opening(date: str):
     tz = get_timezone()
     now = datetime.now(ZoneInfo(tz))
     today_iso = now.date().isoformat()
-    date_str = format_date(now)
-    pod = part_of_day(now)
+    ctx = build_llm_context(
+        user_time=now.isoformat(),
+        tz_cookie=tz,
+    )
+    date_str = str(ctx.get("date") or "")
+    pod = str(ctx.get("part_of_day") or "")
     yesterday_iso = (now - timedelta(days=1)).date().isoformat()
     services = get_services()
     db = services.db
@@ -234,13 +236,12 @@ async def sse_opening(date: str):
     )
     had_yesterday_activity = bool(yesterday_msgs)
 
-    trim_context = {"date": date_str, "part_of_day": pod}
     llm_client = services.llm_service.llm
 
     try:
         yesterday_msgs = await llm_client.trim_history(
             yesterday_msgs,
-            context=trim_context,
+            context=ctx,
         )
     except Exception:  # pragma: no cover - defensive
         logger.exception("Failed to trim opening history")

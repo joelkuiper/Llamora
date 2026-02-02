@@ -491,7 +491,7 @@ input[type="checkbox"]:focus {
 .icon-tag { --icon: url("../icons/tag.svg"); }
 .icon-trash { --icon: url("../icons/trash.svg"); }
 .icon-reply { --icon: url("../icons/reply.svg"); }
-.icon-message-more { --icon: url("../icons/message-circle-more.svg"); }
+.icon-entry-actions { --icon: url("../icons/message-circle-more.svg"); }
 .icon-corner-down-left { --icon: url("../icons/corner-down-left.svg"); }
 .icon-heart { --icon: url("../icons/heart.svg"); }
 .icon-eye { --icon: url("../icons/eye.svg"); }
