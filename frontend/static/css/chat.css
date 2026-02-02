@@ -106,6 +106,7 @@ body {
     font-size: var(--font-size);
     background: transparent;
     box-shadow: none;
+    position: relative;
     /* content-visibility: auto; */
     /* contain-intrinsic-size: inherit; */
 
@@ -127,7 +128,7 @@ body {
 
       .message-footer {
         display: flex;
-        align-items: flex-start;
+        align-items: center;
         justify-content: space-between;
         gap: var(--spacing-sm);
         margin-top: var(--spacing-sm);
@@ -137,45 +138,22 @@ body {
         margin-top: 0;
       }
 
-      .ask-llm {
-        flex: 0 0 auto;
-        width: 2rem;
-        height: 2rem;
-        border-radius: 999px;
-        border: 1px solid transparent;
-        background: color-mix(in srgb, var(--color-bg) 72%, transparent);
-        color: var(--color-text-muted);
+      .message-actions {
         display: inline-flex;
         align-items: center;
-        justify-content: center;
-        padding: 0;
-        cursor: pointer;
-        transition: color var(--motion-fast) ease,
-          background var(--motion-fast) ease,
-          transform var(--motion-fast) ease,
-          border-color var(--motion-fast) ease;
+        gap: 0.4rem;
+        flex: 0 0 auto;
+        opacity: 0.55;
+        transition: opacity var(--motion-gentle) ease;
+      }
 
-        svg {
-          width: 1.15rem;
-          height: 1.15rem;
-        }
+      &:hover .message-actions,
+      &:focus-within .message-actions {
+        opacity: 1;
+      }
 
-        &:hover {
-          color: color-mix(in srgb, var(--color-text) 70%, var(--accent));
-          background: color-mix(in srgb, var(--accent-05) 65%, transparent);
-          border-color: color-mix(in srgb, var(--accent) 18%, transparent);
-        }
-
-        &:active {
-          transform: translateY(1px);
-          background: color-mix(in srgb, var(--accent-05) 80%, transparent);
-        }
-
-        &:focus-visible {
-          outline: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
-          outline-offset: 2px;
-        }
-
+      .message-actions .ask-llm {
+        flex: 0 0 auto;
       }
 
       .ask-llm-menu {
@@ -253,7 +231,7 @@ body {
       align-self: flex-end;
       width: clamp(16rem, 68%, 34rem);
       margin-left: auto;
-      padding: var(--spacing-sm) var(--spacing-lg);
+      padding: var(--spacing-sm) var(--spacing-lg) calc(var(--spacing-sm) + 2rem);
       border-radius: var(--radius-sm);
       box-shadow: none;
       color: color-mix(in srgb, var(--color-assistant-text) 82%, var(--accent));
@@ -350,6 +328,21 @@ body {
     .repeat-guard-indicator__label {
       white-space: nowrap;
     }
+  }
+
+  .message-delete {
+    position: absolute;
+    right: var(--spacing-sm);
+    bottom: var(--spacing-sm);
+  }
+
+  .message.user .message-delete {
+    position: static;
+  }
+
+  .message.htmx-swapping {
+    pointer-events: none;
+    animation: var(--motion-message-delete-animation);
   }
 
 

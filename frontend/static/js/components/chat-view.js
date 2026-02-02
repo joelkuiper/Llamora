@@ -415,6 +415,7 @@ export class ChatView extends ReactiveElement {
     this.#syncToChatDate();
   }
 
+
   #collectSwapTargets(event) {
     const nodes = new Set();
 

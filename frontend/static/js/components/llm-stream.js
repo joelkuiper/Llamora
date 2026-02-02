@@ -109,6 +109,7 @@ class LlmStreamElement extends HTMLElement {
   #metaChipsAssistantId = null;
   #metaChipsListenerController = null;
   #hasEnsuredPlacement = false;
+  #deleteButton = null;
 
   constructor() {
     super();
@@ -161,6 +162,7 @@ class LlmStreamElement extends HTMLElement {
     this.#typingIndicator = this.querySelector(TYPING_INDICATOR_SELECTOR) || null;
     this.#repeatGuardIndicator =
       this.querySelector(".repeat-guard-indicator") || null;
+    this.#deleteButton = this.querySelector(".message-delete") || null;
     this.#repeatGuardWavesDismissed = Boolean(
       this.#repeatGuardIndicator?.classList.contains("repeat-guard-indicator--calm")
     );
@@ -175,6 +177,7 @@ class LlmStreamElement extends HTMLElement {
 
     this.#syncController();
     this.#ensurePlacement();
+    this.#syncDeleteButton();
 
     if (!this.#completed) {
       this.#startStream();
@@ -189,6 +192,7 @@ class LlmStreamElement extends HTMLElement {
       this.#repeatGuardHideTimer = null;
     }
     this.#repeatGuardWavesDismissed = false;
+    this.#deleteButton = null;
     if (this.#controllerDisconnect) {
       this.#controllerDisconnect();
       this.#controllerDisconnect = null;
@@ -229,15 +233,21 @@ class LlmStreamElement extends HTMLElement {
     });
 
     if (lastMatch) {
-      lastMatch.insertAdjacentElement("afterend", this);
+      if (lastMatch.nextElementSibling === this) {
+        this.#hasEnsuredPlacement = true;
+        return;
+      }
       this.#hasEnsuredPlacement = true;
+      lastMatch.insertAdjacentElement("afterend", this);
       return;
     }
 
     const userMessage = document.getElementById(`msg-${userMsgId}`);
     if (userMessage) {
-      userMessage.insertAdjacentElement("afterend", this);
       this.#hasEnsuredPlacement = true;
+      if (userMessage.nextElementSibling !== this) {
+        userMessage.insertAdjacentElement("afterend", this);
+      }
     }
   }
 
@@ -400,6 +410,8 @@ class LlmStreamElement extends HTMLElement {
 
     if (assistantMsgId) {
       this.dataset.assistantMsgId = assistantMsgId;
+      this.dataset.messageId = assistantMsgId;
+      this.#syncDeleteButton();
     }
 
     this.#renderNow({ repositionTyping: false, shouldScroll: true });
@@ -592,6 +604,38 @@ class LlmStreamElement extends HTMLElement {
         },
       })
     );
+  }
+
+  #syncDeleteButton() {
+    const button = this.#deleteButton;
+    if (!button) {
+      return;
+    }
+
+    const msgId = this.dataset?.assistantMsgId || null;
+    const template = button.dataset?.deleteTemplate || "";
+    const placeholder = button.dataset?.deletePlaceholder || "";
+    const targetTemplate = button.dataset?.targetTemplate || "";
+
+    if (!msgId || !template || !placeholder) {
+      button.disabled = true;
+      button.dataset.ready = "false";
+      button.removeAttribute("hx-delete");
+      button.removeAttribute("hx-target");
+      return;
+    }
+
+    this.id = `msg-${msgId}`;
+    const deleteUrl = template.replace(placeholder, msgId);
+    button.setAttribute("hx-delete", deleteUrl);
+    if (targetTemplate) {
+      button.setAttribute("hx-target", targetTemplate.replace(placeholder, msgId));
+    }
+    button.disabled = false;
+    button.dataset.ready = "true";
+    if (window.htmx?.process) {
+      window.htmx.process(button);
+    }
   }
 
   #showRepeatGuardIndicator() {

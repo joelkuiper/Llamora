@@ -57,7 +57,9 @@
 
 .meta-chip:hover,
 .add-tag-btn:hover,
-.add-tag-btn.active {
+.add-tag-btn.active,
+.message-action:hover,
+.message-action.active {
   border-color: var(--accent);
   box-shadow:
     var(--raised-shadow),
@@ -144,6 +146,37 @@
     transform: translateY(1px);
     box-shadow: var(--inset-shadow-disabled);
   }
+}
+
+.message-action {
+  background: var(--glass-bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 2px 6px;
+  cursor: pointer;
+  transition:
+    box-shadow var(--motion-gentle) ease,
+    border-color var(--motion-gentle) ease,
+    transform var(--motion-press) ease,
+    background-color var(--motion-gentle) ease;
+  width: 1.85rem;
+  height: 1.85rem;
+  color: var(--glass-text-stronger);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding: 0;
+
+  &:active {
+    transform: translateY(1px);
+    box-shadow: var(--inset-shadow-disabled);
+  }
+}
+
+.message-action__icon {
+  width: 1rem;
+  height: 1rem;
 }
 
 .tag-popover {

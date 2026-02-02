@@ -178,7 +178,7 @@ async def stop_generation(user_msg_id: str):
         user_msg_id,
         was_pending,
     )
-    return Response(status=204)
+    return Response("", status=200)
 
 
 @chat_bp.get("/c/meta-chips/<msg_id>")
@@ -206,7 +206,10 @@ async def delete_message(msg_id: str):
     deleted_ids = await db.messages.delete_message(user["id"], msg_id)
     if deleted_ids:
         await get_services().search_api.delete_messages(user["id"], deleted_ids)
-    return Response(status=204)
+    oob_deletes = "\n".join(
+        f'<div id="msg-{mid}" hx-swap-oob="delete"></div>' for mid in deleted_ids
+    )
+    return Response(oob_deletes, status=200, mimetype="text/html")
 
 
 @chat_bp.get("/c/opening/<date>")
