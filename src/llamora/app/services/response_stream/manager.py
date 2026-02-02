@@ -76,6 +76,7 @@ class PendingResponse(ResponsePipelineCallbacks):
         self._start_event = asyncio.Event()
         self._activated = False
         self.started_at: float | None = None
+
         async def _stream_response() -> AsyncIterator[str]:
             first_chunk = True
             async for chunk in llm.stream_response(
@@ -91,6 +92,7 @@ class PendingResponse(ResponsePipelineCallbacks):
                 yield chunk
 
         self._stream = _stream_response()
+
         async def _abort_stream() -> None:
             await llm.abort(entry_id)
 
@@ -351,9 +353,7 @@ class ResponseStreamManager:
             try:
                 await pending.cancel()
             except Exception:  # pragma: no cover - defensive
-                logger.exception(
-                    "Failed to cancel stale pending response %s", entry_id
-                )
+                logger.exception("Failed to cancel stale pending response %s", entry_id)
             finally:
                 self._on_pending_cleanup(entry_id)
 

@@ -69,8 +69,7 @@ class VectorSearchService:
         query_vec: "np.ndarray | None" = None,
         *,
         include_count: Literal[False] = False,
-    ) -> List[dict[str, Any]]:
-        ...
+    ) -> List[dict[str, Any]]: ...
 
     @overload
     async def search_candidates(
@@ -83,8 +82,7 @@ class VectorSearchService:
         query_vec: "np.ndarray | None" = None,
         *,
         include_count: Literal[True] = True,
-    ) -> tuple[List[dict[str, Any]], int]:
-        ...
+    ) -> tuple[List[dict[str, Any]], int]: ...
 
     async def search_candidates(
         self,
@@ -172,9 +170,7 @@ class VectorSearchService:
     async def append_entry(
         self, user_id: str, entry_id: str, content: str, dek: bytes
     ) -> None:
-        logger.debug(
-            "Adding entry %s to vector index for user %s", entry_id, user_id
-        )
+        logger.debug("Adding entry %s to vector index for user %s", entry_id, user_id)
         await self.index_store.index_entry(user_id, entry_id, content, dek)
 
     async def maintenance_tick(self) -> None:

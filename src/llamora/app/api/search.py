@@ -84,7 +84,9 @@ class SearchAPI:
             pipeline_components=components,
             config=self.config,
             stream_ttl=float(getattr(settings.SEARCH, "stream_ttl", 900)),
-            stream_max_sessions=int(getattr(settings.SEARCH, "stream_max_sessions", 200)),
+            stream_max_sessions=int(
+                getattr(settings.SEARCH, "stream_max_sessions", 200)
+            ),
             tag_service=self._tag_service,
         )
 
@@ -269,6 +271,7 @@ class SearchAPI:
             k1=k1,
             k2=k2,
         )
+
     def _build_pipeline_components(
         self,
         lexical_reranker: LexicalReranker,

@@ -70,7 +70,9 @@ async def _render_auth_error(template: str, error: str, **context: Any):
     return await render_template(template, error=error, **context)
 
 
-async def _issue_auth_response(user_id: str | int, dek: bytes, redirect_url: str) -> Response:
+async def _issue_auth_response(
+    user_id: str | int, dek: bytes, redirect_url: str
+) -> Response:
     redirect_value = redirect(redirect_url)
     resp = await make_response(redirect_value)
     assert isinstance(resp, Response)
@@ -79,6 +81,7 @@ async def _issue_auth_response(user_id: str | int, dek: bytes, redirect_url: str
     manager.set_secure_cookie(resp, "uid", str(user_id))
     manager.set_dek(resp, dek)
     return resp
+
 
 async def _hash_password(password: bytes) -> bytes:
     return await asyncio.to_thread(pwhash.argon2id.str, password)
@@ -363,11 +366,15 @@ async def reset_password():
         min_pass = int(settings.LIMITS.min_password_length)
 
         if not username or not recovery:
-            return await _render_auth_error("reset_password.html", error="Invalid input")
+            return await _render_auth_error(
+                "reset_password.html", error="Invalid input"
+            )
 
         length_error = _length_error(username, None, max_user=max_user, max_pass=None)
         if length_error:
-            return await _render_auth_error("reset_password.html", error="Invalid input")
+            return await _render_auth_error(
+                "reset_password.html", error="Invalid input"
+            )
 
         password_error = await validate_password(
             password,
@@ -379,7 +386,9 @@ async def reset_password():
             require_digit=True,
         )
         if password_error:
-            return await _render_auth_error("reset_password.html", error="Invalid input")
+            return await _render_auth_error(
+                "reset_password.html", error="Invalid input"
+            )
 
         db = get_services().db
         user = await db.users.get_user_by_username(username)

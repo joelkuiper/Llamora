@@ -50,7 +50,9 @@ def _normalise_tokens(raw: Any) -> tuple[int, ...]:
         elif "ids" in raw:
             sequence = raw["ids"]
         else:  # pragma: no cover - defensive
-            raise TypeError("Tokenizer.apply_chat_template returned unsupported token data")
+            raise TypeError(
+                "Tokenizer.apply_chat_template returned unsupported token data"
+            )
     elif hasattr(raw, "input_ids"):
         sequence = getattr(raw, "input_ids")
     elif hasattr(raw, "tolist"):
@@ -62,7 +64,9 @@ def _normalise_tokens(raw: Any) -> tuple[int, ...]:
         first = sequence[0]
         if isinstance(first, (list, tuple)):
             if len(sequence) != 1:  # pragma: no cover - defensive
-                raise TypeError("Tokenizer tokens must be a single sequence of integers")
+                raise TypeError(
+                    "Tokenizer tokens must be a single sequence of integers"
+                )
             sequence = first
     elif hasattr(sequence, "tolist"):
         sequence = cast(Any, sequence).tolist()

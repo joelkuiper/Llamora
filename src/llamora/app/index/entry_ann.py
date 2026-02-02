@@ -341,9 +341,7 @@ class EntryIndexStore:
             idx = await self.ensure_index(user_id, dek)
             lock = self._get_lock(user_id)
             ids = [entry_id for entry_id, _, _ in user_entries]
-            vec_arr = np.asarray(
-                [vec for _, vec, _ in user_entries], dtype=np.float32
-            )
+            vec_arr = np.asarray([vec for _, vec, _ in user_entries], dtype=np.float32)
             async with lock:
                 await self.db.vectors.store_vectors_batch(
                     user_id,

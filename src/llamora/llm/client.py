@@ -529,9 +529,7 @@ class LLMClient:
             meta = entry.get("meta")
             if isinstance(meta, Mapping):
                 tags = meta.get("tags")
-                if isinstance(tags, Sequence) and not isinstance(
-                    tags, (str, bytes)
-                ):
+                if isinstance(tags, Sequence) and not isinstance(tags, (str, bytes)):
                     for tag in tags:
                         canonical_tag = self._canonicalize_tag_value(tag)
                         if canonical_tag:

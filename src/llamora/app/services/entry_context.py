@@ -36,9 +36,7 @@ def _extract_tag_metadata(meta: Mapping[str, Any] | None) -> dict[str, Any]:
 
     tag_metadata: dict[str, Any] = {}
     tags = meta.get("tags")
-    if isinstance(tags, Sequence) and not isinstance(
-        tags, (str, bytes, bytearray)
-    ):
+    if isinstance(tags, Sequence) and not isinstance(tags, (str, bytes, bytearray)):
         cleaned = [str(item).strip() for item in tags if str(item).strip()]
         if cleaned:
             tag_metadata["tags"] = cleaned

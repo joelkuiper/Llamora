@@ -220,9 +220,7 @@ async def build_tag_recall_context(
         history_ids.add(key)
         history_map[key] = entry
 
-    candidate_entries = await db.entries.get_entries_by_ids(
-        user_id, candidate_ids, dek
-    )
+    candidate_entries = await db.entries.get_entries_by_ids(user_id, candidate_ids, dek)
 
     if not candidate_entries:
         return None
@@ -242,9 +240,7 @@ async def build_tag_recall_context(
 
     reply_entries: list[Mapping[str, Any]] = []
     if reply_to_ids:
-        reply_entries = await db.entries.get_entries_by_ids(
-            user_id, reply_to_ids, dek
-        )
+        reply_entries = await db.entries.get_entries_by_ids(user_id, reply_to_ids, dek)
 
     reply_lookup: dict[str, Mapping[str, Any]] = {
         **{str(item.get("id")): item for item in reply_entries if item.get("id")},

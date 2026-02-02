@@ -58,18 +58,22 @@ def _esbuild_common_args(mode: str) -> List[str]:
     return args
 
 
-def _run_esbuild(entries: Iterable[Path], outdir: Path, outbase: Path, mode: str, watch: bool) -> subprocess.Popen | None:
+def _run_esbuild(
+    entries: Iterable[Path], outdir: Path, outbase: Path, mode: str, watch: bool
+) -> subprocess.Popen | None:
     entry_list = list(entries)
     if not entry_list:
         return None
 
     args = [str(ESBUILD_BIN), *map(str, entry_list)]
     args.extend(_esbuild_common_args(mode))
-    args.extend([
-        f"--outdir={outdir}",
-        f"--outbase={outbase}",
-        "--entry-names=[name]",
-    ])
+    args.extend(
+        [
+            f"--outdir={outdir}",
+            f"--outbase={outbase}",
+            "--entry-names=[name]",
+        ]
+    )
 
     if watch:
         args.append("--watch")
@@ -184,13 +188,17 @@ def watch(mode: str) -> None:
     css_entries = _discover_entries(CSS_ENTRIES_DIR, "css")
 
     stop_event = threading.Event()
-    watcher_thread = threading.Thread(target=_watch_passthrough, args=(stop_event,), daemon=True)
+    watcher_thread = threading.Thread(
+        target=_watch_passthrough, args=(stop_event,), daemon=True
+    )
     watcher_thread.start()
 
     processes: List[subprocess.Popen] = []
     try:
         js_process = _run_esbuild(js_entries, js_out, JS_ENTRIES_DIR, mode, watch=True)
-        css_process = _run_esbuild(css_entries, css_out, CSS_ENTRIES_DIR, mode, watch=True)
+        css_process = _run_esbuild(
+            css_entries, css_out, CSS_ENTRIES_DIR, mode, watch=True
+        )
         if js_process:
             processes.append(js_process)
         if css_process:
@@ -221,7 +229,9 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build front-end assets with esbuild.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    build_parser = subparsers.add_parser("build", help="Bundle assets for production or development.")
+    build_parser = subparsers.add_parser(
+        "build", help="Bundle assets for production or development."
+    )
     build_parser.add_argument(
         "--mode",
         choices=("prod", "dev"),
@@ -229,7 +239,9 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
         help="Build mode. Defaults to 'prod' (minified).",
     )
 
-    watch_parser = subparsers.add_parser("watch", help="Watch entry files and rebuild on change.")
+    watch_parser = subparsers.add_parser(
+        "watch", help="Watch entry files and rebuild on change."
+    )
     watch_parser.add_argument(
         "--mode",
         choices=("prod", "dev"),

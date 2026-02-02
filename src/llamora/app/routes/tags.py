@@ -98,8 +98,7 @@ async def get_tag_suggestions(entry_id: str):
     wants_json = request.accept_mimetypes.best == "application/json"
     if wants_json:
         payload = [
-            {"name": tag, "display": _tags().display(tag)}
-            for tag in suggestions
+            {"name": tag, "display": _tags().display(tag)} for tag in suggestions
         ]
         return jsonify({"results": payload})
 

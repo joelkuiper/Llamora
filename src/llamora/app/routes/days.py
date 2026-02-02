@@ -96,9 +96,7 @@ async def calendar_view():
         target_month = today.month
     if mode not in {"calendar", "picker"}:
         mode = "calendar"
-    html = await _render_calendar(
-        target_year, target_month, today=today, mode=mode
-    )
+    html = await _render_calendar(target_year, target_month, today=today, mode=mode)
     return await make_response(html)
 
 

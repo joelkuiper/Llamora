@@ -41,7 +41,6 @@ def get_timezone() -> str:
     return "UTC"
 
 
-
 def local_date() -> date:
     """Get the current date in the client's timezone."""
     client_today = request.args.get("client_today")
@@ -96,7 +95,6 @@ def humanize(value: datetime | str) -> str:
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     return _humanize.naturaltime(value)
-
 
 
 def date_and_part(user_time: str, tz: str) -> tuple[str, str]:

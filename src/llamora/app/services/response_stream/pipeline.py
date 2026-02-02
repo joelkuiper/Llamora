@@ -385,7 +385,9 @@ class ResponsePipeline:
             partial=False,
             include_repeat_guard=self._repeat_guard_triggered,
         )
-        assistant_entry_id, failed = await self._persist(final_text, meta, partial=False)
+        assistant_entry_id, failed = await self._persist(
+            final_text, meta, partial=False
+        )
         if failed:
             final_text = self._append_persistence_warning(final_text)
             self._error = True
@@ -435,7 +437,9 @@ class ResponsePipeline:
             partial=False,
             include_repeat_guard=False,
         )
-        assistant_entry_id, failed = await self._persist(final_text, meta, partial=False)
+        assistant_entry_id, failed = await self._persist(
+            final_text, meta, partial=False
+        )
         if failed:
             final_text = self._append_persistence_warning(final_text)
             self._error = True

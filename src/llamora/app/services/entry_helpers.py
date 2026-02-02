@@ -251,9 +251,7 @@ async def augment_history_with_recall(
                 tag_meta["date"] = str(tag_recall_date)
             recall_entry["meta"] = {"tag_recall": tag_meta}
             tag_items = [
-                {"name": tag}
-                for tag in recall_context.tags
-                if str(tag or "").strip()
+                {"name": tag} for tag in recall_context.tags if str(tag or "").strip()
             ]
             if tag_items:
                 recall_entry["tags"] = tag_items
@@ -332,9 +330,7 @@ async def augment_opening_with_recall(
                 tag_meta["date"] = str(tag_recall_date)
             recall_entry["meta"] = {"tag_recall": tag_meta}
             tag_items = [
-                {"name": tag}
-                for tag in recall_context.tags
-                if str(tag or "").strip()
+                {"name": tag} for tag in recall_context.tags if str(tag or "").strip()
             ]
             if tag_items:
                 recall_entry["tags"] = tag_items

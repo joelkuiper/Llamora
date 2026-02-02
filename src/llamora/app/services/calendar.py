@@ -128,9 +128,7 @@ async def get_month_context(
         "year": selected_year,
         "month": selected_month,
         "month_name": _calendar.month_name[selected_month],
-        "weeks": _calendar.Calendar().monthdayscalendar(
-            selected_year, selected_month
-        ),
+        "weeks": _calendar.Calendar().monthdayscalendar(selected_year, selected_month),
         "active_day": active_day_iso,
         "today": today_iso,
         "today_year": today_date.year,

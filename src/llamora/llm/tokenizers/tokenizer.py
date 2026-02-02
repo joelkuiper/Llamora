@@ -125,4 +125,3 @@ def history_suffix_token_totals(
 
     series = render_entry_prompt_series(history, **ctx)
     return series.suffix_token_counts
-
