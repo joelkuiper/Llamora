@@ -405,36 +405,28 @@ class EntryFormElement extends ReactiveElement {
     const info = detail || {};
     const type = info.type || "statuschange";
     const currentId = info.currentMsgId ?? null;
+    const targetId = info.entryId ?? currentId ?? null;
 
     if (type === "begin") {
-      const activeId = currentId || info.entryId || null;
-      this.streamingMsgId = activeId;
+      this.streamingMsgId = targetId;
       this.setStreaming(true);
       return;
     }
 
     if (type === "abort" || type === "complete") {
-      const targetId = info.entryId || null;
-      if (!targetId || targetId === this.streamingMsgId) {
-        this.streamingMsgId = currentId || null;
-        this.setStreaming(false);
-      }
+      this.streamingMsgId = null;
+      this.setStreaming(false);
       return;
     }
 
     if (info.streaming) {
-      const activeId = currentId || info.entryId || null;
-      this.streamingMsgId = activeId;
+      this.streamingMsgId = targetId;
       this.setStreaming(true);
       return;
     }
 
-    const targetId =
-      info.entryId ?? info.previousMsgId ?? this.streamingMsgId;
-    if (!targetId || targetId === this.streamingMsgId) {
-      this.streamingMsgId = currentId || null;
-      this.setStreaming(false);
-    }
+    this.streamingMsgId = null;
+    this.setStreaming(false);
   }
 }
 

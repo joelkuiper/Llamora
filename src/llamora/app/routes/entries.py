@@ -370,13 +370,19 @@ async def send_entry(date):
         raise
 
     created_at = user_time or datetime.now(timezone.utc).isoformat()
+    entry_payload = {
+        "id": entry_id,
+        "role": "user",
+        "text": user_text,
+        "text_html": None,
+        "meta": {},
+        "tags": [],
+        "created_at": created_at,
+    }
     return await render_template(
-        "partials/placeholder.html",
-        user_text=user_text,
-        entry_id=entry_id,
-        created_at=created_at,
+        "partials/entries_list.html",
+        entries=[{"entry": entry_payload, "responses": []}],
         day=date,
-        user_time=user_time,
         response_kinds=response_kinds,
         response_kind_labels=response_kind_labels,
         is_today=date == local_date().isoformat(),

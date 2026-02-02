@@ -61,7 +61,7 @@ class ResponseStreamElement extends HTMLElement {
   #repeatGuardIndicator = null;
   #repeatGuardHideTimer = null;
   #repeatGuardWavesDismissed = false;
-  #boundHandleMessage;
+  #boundHandleChunk;
   #boundHandleDone;
   #boundHandleError;
   #boundHandleMeta;
@@ -70,7 +70,7 @@ class ResponseStreamElement extends HTMLElement {
 
   constructor() {
     super();
-    this.#boundHandleMessage = (event) => this.#handleMessage(event);
+    this.#boundHandleChunk = (event) => this.#handleChunk(event);
     this.#boundHandleDone = (event) => this.#handleDone(event);
     this.#boundHandleError = (event) => this.#handleError(event);
     this.#boundHandleMeta = (event) => this.#handleMeta(event);
@@ -223,11 +223,11 @@ class ResponseStreamElement extends HTMLElement {
         this.#sink.textContent = this.#text;
       }
       this.#renderNow({ repositionTyping: false, shouldScroll: true });
-      this.#finalize({ status: "error", message: "Connection failed", reason: "stream:error" });
+    this.#finalize({ status: "error", text: "Connection failed", reason: "stream:error" });
       return;
     }
 
-    this.#eventSource.addEventListener("message", this.#boundHandleMessage);
+    this.#eventSource.addEventListener("message", this.#boundHandleChunk);
     this.#eventSource.addEventListener("done", this.#boundHandleDone);
     this.#eventSource.addEventListener("error", this.#boundHandleError);
     this.#eventSource.addEventListener("meta", this.#boundHandleMeta);
@@ -235,7 +235,7 @@ class ResponseStreamElement extends HTMLElement {
 
   #closeEventSource() {
     if (!this.#eventSource) return;
-    this.#eventSource.removeEventListener("message", this.#boundHandleMessage);
+    this.#eventSource.removeEventListener("message", this.#boundHandleChunk);
     this.#eventSource.removeEventListener("done", this.#boundHandleDone);
     this.#eventSource.removeEventListener("error", this.#boundHandleError);
     this.#eventSource.removeEventListener("meta", this.#boundHandleMeta);
@@ -259,7 +259,7 @@ class ResponseStreamElement extends HTMLElement {
     }
   }
 
-  #handleMessage(event) {
+  #handleChunk(event) {
     if (this.#completed) return;
     const chunk = decodeChunk(event?.data || "");
     if (!chunk) return;
@@ -308,14 +308,14 @@ class ResponseStreamElement extends HTMLElement {
     const data = decodeChunk(event?.data || "");
     const trimmed = data.trim();
     const hasExistingText = Boolean(this.#text && this.#text.trim());
-    const message = trimmed
+    const errorText = trimmed
       ? trimmed
       : hasExistingText
         ? this.#text
         : FALLBACK_ERROR_MESSAGE;
 
-    if (!hasExistingText || message !== this.#text) {
-      this.#text = message;
+    if (!hasExistingText || errorText !== this.#text) {
+      this.#text = errorText;
       if (this.#sink) {
         this.#sink.textContent = this.#text;
       }
@@ -323,7 +323,7 @@ class ResponseStreamElement extends HTMLElement {
 
     this.#renderNow({ repositionTyping: false, shouldScroll: true });
     this.#markAsError();
-    this.#finalize({ status: "error", message, reason: "stream:error" });
+    this.#finalize({ status: "error", text: errorText, reason: "stream:error" });
     this.#ensureInlineTimestamp();
   }
 
@@ -456,7 +456,7 @@ class ResponseStreamElement extends HTMLElement {
   #finalize({
     status,
     assistantEntryId = null,
-    message = "",
+    text = "",
     reason = null,
   }) {
     if (this.#completed) return;
@@ -510,7 +510,7 @@ class ResponseStreamElement extends HTMLElement {
           element: this,
           status,
           assistantEntryId,
-          message,
+          text,
           meta: this.#meta,
           entryId: this.entryId,
         },
