@@ -515,7 +515,7 @@ class ResponseStreamElement extends HTMLElement {
 
     const now = new Date();
     const timeEl = document.createElement("time");
-    timeEl.className = "message-time";
+    timeEl.className = "entry-time";
     timeEl.dateTime = now.toISOString();
     timeEl.dataset.timeRaw = now.toISOString();
     timeEl.title = formatLocalTimestamp(now);
