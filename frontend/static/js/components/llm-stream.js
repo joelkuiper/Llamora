@@ -213,8 +213,7 @@ class LlmStreamElement extends HTMLElement {
       return;
     }
 
-    const userMessage = document.getElementById(`msg-${userMsgId}`);
-    const chat = this.closest("#chat") || userMessage?.closest?.("#chat") || null;
+    const chat = this.closest("#chat");
     if (!chat) {
       return;
     }
@@ -243,6 +242,7 @@ class LlmStreamElement extends HTMLElement {
       return;
     }
 
+    const userMessage = document.getElementById(`msg-${userMsgId}`);
     if (userMessage) {
       this.#hasEnsuredPlacement = true;
       if (userMessage.nextElementSibling !== this) {
