@@ -108,6 +108,7 @@ class LlmStreamElement extends HTMLElement {
   #metaChipsRequest = null;
   #metaChipsAssistantId = null;
   #metaChipsListenerController = null;
+  #hasEnsuredPlacement = false;
 
   constructor() {
     super();
@@ -173,6 +174,7 @@ class LlmStreamElement extends HTMLElement {
     }
 
     this.#syncController();
+    this.#ensurePlacement();
 
     if (!this.#completed) {
       this.#startStream();
@@ -192,8 +194,51 @@ class LlmStreamElement extends HTMLElement {
       this.#controllerDisconnect = null;
     }
     this.#controller = null;
+    this.#hasEnsuredPlacement = false;
     this.#cancelMetaChipsRequest();
     this.#teardownMetaChipsListener();
+  }
+
+  #ensurePlacement() {
+    if (this.#hasEnsuredPlacement) {
+      return;
+    }
+
+    const userMsgId = this.dataset?.userMsgId;
+    if (!userMsgId) {
+      return;
+    }
+
+    const chat = this.closest("#chat");
+    if (!chat) {
+      return;
+    }
+
+    const candidates = chat.querySelectorAll(
+      '.message.assistant[data-reply-to], llm-stream[data-user-msg-id]'
+    );
+    let lastMatch = null;
+    candidates.forEach((node) => {
+      if (node === this) {
+        return;
+      }
+      const replyTo = node?.dataset?.replyTo || node?.dataset?.userMsgId;
+      if (replyTo === userMsgId) {
+        lastMatch = node;
+      }
+    });
+
+    if (lastMatch) {
+      lastMatch.insertAdjacentElement("afterend", this);
+      this.#hasEnsuredPlacement = true;
+      return;
+    }
+
+    const userMessage = document.getElementById(`msg-${userMsgId}`);
+    if (userMessage) {
+      userMessage.insertAdjacentElement("afterend", this);
+      this.#hasEnsuredPlacement = true;
+    }
   }
 
   get userMsgId() {

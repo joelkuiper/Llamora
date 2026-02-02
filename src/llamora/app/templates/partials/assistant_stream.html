@@ -3,7 +3,7 @@
 {%- if sse_url is none -%}
 {%- set sse_url = url_for('chat.sse_reply', date=day, user_msg_id=user_msg_id, user_time=user_time, reply_kind=reply_kind) -%}
 {%- endif -%}
-<llm-stream id="msg-{{ user_msg_id }}"
+<llm-stream id="assistant-stream-{{ user_msg_id }}"
             class="message assistant-stream"
             data-user-msg-id="{{ user_msg_id }}"
             {%- if reply_kind %}

@@ -18,6 +18,9 @@
   {% set speaker = 'Your' if msg['role'] == 'user' else 'Assistant' %}
   <div id="msg-{{ msg['id'] }}"
        class="message {{ 'assistant' if msg['role'] != 'user' else 'user'}}{% if is_error %} message--error{% endif %}"
+       {% if msg['role'] == 'assistant' and msg.get('reply_to') %}
+       data-reply-to="{{ msg['reply_to'] }}"
+       {% endif %}
        {% if repeat_guard %}data-repeat-guard="true"{% endif %}
        role="article"
        aria-labelledby="msg-{{ msg['id'] }}-speaker msg-{{ msg['id'] }}-body">

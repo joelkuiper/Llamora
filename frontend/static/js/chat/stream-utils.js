@@ -22,19 +22,9 @@ export function findStreamByUserMsgId(root, msgId) {
   }
 
   const searchRoot = getSearchRoot(root);
-  const byAttr = searchRoot.querySelector(
+  return searchRoot.querySelector(
     `llm-stream[data-user-msg-id="${escapeAttributeValue(normalized)}"]`
   );
-  if (byAttr) {
-    return byAttr;
-  }
-
-  const byId = document.getElementById(`msg-${normalized}`);
-  if (byId && byId.tagName === "LLM-STREAM") {
-    return byId;
-  }
-
-  return null;
 }
 
 export function findTypingIndicator(root, msgId) {
@@ -42,12 +32,10 @@ export function findTypingIndicator(root, msgId) {
   const normalized = normalizeStreamId(msgId);
 
   if (normalized) {
-    const message = document.getElementById(`msg-${normalized}`);
-    if (message) {
-      const scoped = message.querySelector(TYPING_INDICATOR_SELECTOR);
-      if (scoped) {
-        return scoped;
-      }
+    const stream = findStreamByUserMsgId(searchRoot, normalized);
+    const scoped = stream?.querySelector(TYPING_INDICATOR_SELECTOR);
+    if (scoped) {
+      return scoped;
     }
 
     const typed = Array.from(
