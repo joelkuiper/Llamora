@@ -160,6 +160,9 @@ DEFAULTS: dict[str, Any] = {
     "PROMPTS": {
         "template_dir": str(PACKAGE_DIR / "llm" / "templates"),
     },
+    "UI": {
+        "clock_format": "24h",
+    },
     "COOKIES": {
         "name": "llamora",
         "secret": None,

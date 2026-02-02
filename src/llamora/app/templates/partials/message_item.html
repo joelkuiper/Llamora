@@ -35,9 +35,7 @@
       {% if msg.get('created_at') %}
       <time class="message-time"
             datetime="{{ msg['created_at'] }}"
-            title="{{ msg['created_at']|timestamp }}">
-        {{ msg['created_at']|time_of_day }}
-      </time>
+            data-time-raw="{{ msg['created_at'] }}"></time>
       {% endif %}
       <button class="message-action message-delete"
               type="button"
@@ -64,9 +62,7 @@
     {% if msg.get('created_at') %}
     <time class="message-time"
           datetime="{{ msg['created_at'] }}"
-          title="{{ msg['created_at']|timestamp }}">
-      {{ msg['created_at']|time_of_day }}
-    </time>
+          data-time-raw="{{ msg['created_at'] }}"></time>
     {% endif %}
     {% if reply_kind and reply_kind_labels and reply_kind_labels.get(reply_kind) %}
     <span class="message-action message-kind-indicator"

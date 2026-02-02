@@ -108,7 +108,6 @@ class LlmStreamElement extends HTMLElement {
   #metaChipsRequest = null;
   #metaChipsAssistantId = null;
   #metaChipsListenerController = null;
-  #hasEnsuredPlacement = false;
   #deleteButton = null;
 
   constructor() {
@@ -176,7 +175,6 @@ class LlmStreamElement extends HTMLElement {
     }
 
     this.#syncController();
-    this.#ensurePlacement();
     this.#syncDeleteButton();
 
     if (!this.#completed) {
@@ -198,66 +196,8 @@ class LlmStreamElement extends HTMLElement {
       this.#controllerDisconnect = null;
     }
     this.#controller = null;
-    this.#hasEnsuredPlacement = false;
     this.#cancelMetaChipsRequest();
     this.#teardownMetaChipsListener();
-  }
-
-  #ensurePlacement() {
-    if (this.#hasEnsuredPlacement) {
-      return;
-    }
-
-    const userMsgId = this.dataset?.userMsgId;
-    if (!userMsgId) {
-      return;
-    }
-
-    const replySlot = document.getElementById(`replies-${userMsgId}`);
-    if (replySlot) {
-      this.#hasEnsuredPlacement = true;
-      if (this.parentElement !== replySlot) {
-        replySlot.appendChild(this);
-      }
-      return;
-    }
-
-    const userMessage = document.getElementById(`msg-${userMsgId}`);
-    const chat = this.closest("#chat") || userMessage?.closest?.("#chat") || null;
-    if (!chat) {
-      return;
-    }
-
-    const candidates = chat.querySelectorAll(
-      '.message.assistant[data-reply-to], llm-stream[data-user-msg-id]'
-    );
-    let lastMatch = null;
-    candidates.forEach((node) => {
-      if (node === this) {
-        return;
-      }
-      const replyTo = node?.dataset?.replyTo || node?.dataset?.userMsgId;
-      if (replyTo === userMsgId) {
-        lastMatch = node;
-      }
-    });
-
-    if (lastMatch) {
-      if (lastMatch.nextElementSibling === this) {
-        this.#hasEnsuredPlacement = true;
-        return;
-      }
-      this.#hasEnsuredPlacement = true;
-      lastMatch.insertAdjacentElement("afterend", this);
-      return;
-    }
-
-    if (userMessage) {
-      this.#hasEnsuredPlacement = true;
-      if (userMessage.nextElementSibling !== this) {
-        userMessage.insertAdjacentElement("afterend", this);
-      }
-    }
   }
 
   get userMsgId() {
@@ -559,6 +499,7 @@ class LlmStreamElement extends HTMLElement {
     const timeEl = document.createElement("time");
     timeEl.className = "message-time";
     timeEl.dateTime = now.toISOString();
+    timeEl.dataset.timeRaw = now.toISOString();
     timeEl.title = formatLocalTimestamp(now);
     timeEl.textContent = formatLocalTime(now);
 

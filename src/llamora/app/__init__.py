@@ -148,13 +148,9 @@ def create_app():
     from .services.time import (
         humanize as humanize_filter,
         format_date,
-        format_time,
-        format_timestamp,
     )
 
     app.template_filter("humanize")(humanize_filter)
-    app.template_filter("time_of_day")(format_time)
-    app.template_filter("timestamp")(format_timestamp)
 
     @app.template_filter("long_date")
     def long_date_filter(value):

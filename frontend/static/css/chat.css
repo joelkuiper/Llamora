@@ -152,16 +152,6 @@ body {
         opacity: 1;
       }
 
-      .message-kind {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.25rem;
-        font-size: 0.65rem;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        color: var(--color-text-muted);
-        margin-top: 0.35rem;
-      }
     }
 
     &.assistant,

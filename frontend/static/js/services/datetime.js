@@ -3,10 +3,6 @@ export const TIMEZONE_COOKIE_NAME = "tz";
 export const TIMEZONE_HEADER_NAME = "X-Timezone";
 export const TIMEZONE_QUERY_PARAM = "tz";
 export const TIMEZONE_CHANGE_EVENT = "timezonechange";
-export const LOCALE_COOKIE_NAME = "locale";
-export const LOCALE_HEADER_NAME = "X-Locale";
-export const HOUR_CYCLE_COOKIE_NAME = "hc";
-export const HOUR_CYCLE_HEADER_NAME = "X-Hour-Cycle";
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
 function isDocumentAvailable() {
@@ -70,36 +66,6 @@ function resolveTimezone() {
   return DEFAULT_TIMEZONE;
 }
 
-function resolveLocale() {
-  if (typeof Intl !== "object" || typeof Intl.DateTimeFormat !== "function") {
-    return "en-US";
-  }
-  try {
-    const locale = Intl.DateTimeFormat().resolvedOptions().locale;
-    if (typeof locale === "string" && locale.trim()) {
-      return locale;
-    }
-  } catch (err) {
-    // ignore and fall back to default
-  }
-  return "en-US";
-}
-
-function resolveHourCycle(locale) {
-  if (typeof Intl !== "object" || typeof Intl.DateTimeFormat !== "function") {
-    return "24h";
-  }
-  try {
-    const fmt = new Intl.DateTimeFormat(locale || undefined, { hour: "numeric" });
-    const parts = fmt.formatToParts(new Date(2026, 0, 1, 13));
-    const hasDayPeriod = parts.some((part) => part.type === "dayPeriod");
-    return hasDayPeriod ? "12h" : "24h";
-  } catch (err) {
-    // ignore and fall back to default
-  }
-  return "24h";
-}
-
 function dispatchTimezoneChange(nextTimezone, previousTimezone) {
   if (!isWindowAvailable() || typeof window.dispatchEvent !== "function") {
     return;
@@ -125,8 +91,6 @@ function dispatchTimezoneChange(nextTimezone, previousTimezone) {
 }
 
 let memoizedTimezone = sanitizeStoredTimezone(readCookie(TIMEZONE_COOKIE_NAME));
-let memoizedLocale = sanitizeStoredTimezone(readCookie(LOCALE_COOKIE_NAME));
-let memoizedHourCycle = sanitizeStoredTimezone(readCookie(HOUR_CYCLE_COOKIE_NAME));
 
 export function getTimezone() {
   const resolved = resolveTimezone();
@@ -143,51 +107,11 @@ export function getTimezone() {
   return zone;
 }
 
-export function getLocale() {
-  const resolved = resolveLocale();
-  const locale = typeof resolved === "string" && resolved.trim() ? resolved : "en-US";
-  const previous = memoizedLocale;
-
-  memoizedLocale = locale;
-  writeCookie(LOCALE_COOKIE_NAME, locale);
-
-  if (previous && previous !== locale) {
-    dispatchTimezoneChange(locale, previous);
-  }
-
-  return locale;
-}
-
-export function getHourCycle() {
-  const locale = getLocale();
-  const resolved = resolveHourCycle(locale);
-  const cycle = typeof resolved === "string" && resolved.trim() ? resolved : "24h";
-
-  memoizedHourCycle = cycle;
-  writeCookie(HOUR_CYCLE_COOKIE_NAME, cycle);
-
-  return cycle;
-}
-
 export function applyTimezoneHeader(headers, zone = getTimezone()) {
   if (headers && typeof headers === "object") {
     headers[TIMEZONE_HEADER_NAME] = zone;
   }
   return zone;
-}
-
-export function applyLocaleHeader(headers, locale = getLocale()) {
-  if (headers && typeof headers === "object") {
-    headers[LOCALE_HEADER_NAME] = locale;
-  }
-  return locale;
-}
-
-export function applyHourCycleHeader(headers, cycle = getHourCycle()) {
-  if (headers && typeof headers === "object") {
-    headers[HOUR_CYCLE_HEADER_NAME] = cycle;
-  }
-  return cycle;
 }
 
 export function applyTimezoneSearchParam(searchParams, zone = getTimezone()) {

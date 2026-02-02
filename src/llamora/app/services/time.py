@@ -9,8 +9,6 @@ import humanize as _humanize
 
 
 logger = logging.getLogger(__name__)
-_DEFAULT_LOCALE = "en-US"
-_DEFAULT_HOUR_CYCLE = "24h"
 
 
 def get_timezone() -> str:
@@ -42,42 +40,6 @@ def get_timezone() -> str:
             logger.debug("Invalid timezone '%s' from cookie", tz_cookie)
     return "UTC"
 
-
-def get_locale() -> str:
-    locale = request.args.get("locale")
-    if locale:
-        return locale
-    header = request.headers.get("X-Locale")
-    if header:
-        return header
-    cookie = request.cookies.get("locale")
-    if cookie:
-        return cookie
-    return _DEFAULT_LOCALE
-
-
-def get_hour_cycle() -> str:
-    cycle = request.args.get("hc")
-    if cycle:
-        return cycle
-    header = request.headers.get("X-Hour-Cycle")
-    if header:
-        return header
-    cookie = request.cookies.get("hc")
-    if cookie:
-        return cookie
-    return _DEFAULT_HOUR_CYCLE
-
-
-def _use_24h(cycle: str | None) -> bool:
-    if not cycle:
-        return True
-    normalized = str(cycle).strip().lower()
-    if normalized in {"h23", "h24", "23", "24", "24h"}:
-        return True
-    if normalized in {"h11", "h12", "11", "12", "12h"}:
-        return False
-    return True
 
 
 def local_date() -> date:
@@ -129,40 +91,6 @@ def humanize(value: datetime | str) -> str:
         value = value.replace(tzinfo=timezone.utc)
     return _humanize.naturaltime(value)
 
-
-def _coerce_datetime(value: datetime | str) -> datetime:
-    if isinstance(value, str):
-        try:
-            value = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        except Exception:
-            value = datetime.now(timezone.utc)
-    if value.tzinfo is None:
-        value = value.replace(tzinfo=timezone.utc)
-    return value
-
-
-def format_time(value: datetime | str) -> str:
-    dt = _coerce_datetime(value)
-    tz = get_timezone()
-    try:
-        dt_local = dt.astimezone(ZoneInfo(tz))
-    except Exception:
-        dt_local = dt.astimezone(timezone.utc)
-    if _use_24h(get_hour_cycle()):
-        return dt_local.strftime("%H:%M")
-    return dt_local.strftime("%I:%M %p").lstrip("0")
-
-
-def format_timestamp(value: datetime | str) -> str:
-    dt = _coerce_datetime(value)
-    tz = get_timezone()
-    try:
-        dt_local = dt.astimezone(ZoneInfo(tz))
-    except Exception:
-        dt_local = dt.astimezone(timezone.utc)
-    if _use_24h(get_hour_cycle()):
-        return dt_local.strftime("%b %d, %Y %H:%M").replace(" 0", " ")
-    return dt_local.strftime("%b %d, %Y %I:%M %p").replace(" 0", " ")
 
 
 def date_and_part(user_time: str, tz: str) -> tuple[str, str]:

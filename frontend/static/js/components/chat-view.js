@@ -15,6 +15,7 @@ import {
   getTimezone,
   scheduleMidnightRollover,
   updateClientToday,
+  formatTimeElements,
 } from "../services/time.js";
 import { afterNextFrame, scheduleFrame } from "../utils/scheduler.js";
 import "./chat-form.js";
@@ -268,6 +269,7 @@ export class ChatView extends ReactiveElement {
         renderMarkdownInElement(el);
       }
     });
+    formatTimeElements(chat);
 
     this.#chatForm = this.querySelector("chat-form");
     let chatFormReady = Promise.resolve();
@@ -403,6 +405,14 @@ export class ChatView extends ReactiveElement {
       if (target?.classList?.contains("message")) {
         activateAnimations(target);
       }
+    });
+    swapTargets.forEach((target) => {
+      if (!target) return;
+      if (target === this.#chat) {
+        formatTimeElements(target);
+        return;
+      }
+      formatTimeElements(target);
     });
 
     this.#markdownObserver?.resume(swapTargets);

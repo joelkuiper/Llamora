@@ -3,15 +3,11 @@ import {
   applyTimezoneSearchParam,
   buildTimezoneQueryParam,
   formatIsoDate,
-  applyLocaleHeader,
-  applyHourCycleHeader,
-  getHourCycle,
-  getLocale,
   getTimezone,
   TIMEZONE_QUERY_PARAM,
 } from "./datetime.js";
 import { createListenerBag } from "../utils/events.js";
-export { getTimezone, getLocale, getHourCycle } from "./datetime.js";
+export { getTimezone } from "./datetime.js";
 
 const ESCAPED_TIMEZONE_PARAM = TIMEZONE_QUERY_PARAM.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const TIMEZONE_QUERY_PARAM_PATTERN = new RegExp(`[?&]${ESCAPED_TIMEZONE_PARAM}=`);
@@ -30,15 +26,29 @@ export function updateClientToday(target = document?.body, now = new Date()) {
 
 export function applyRequestTimeHeaders(headers) {
   const timezone = applyTimezoneHeader(headers, getTimezone());
-  const locale = applyLocaleHeader(headers, getLocale());
-  const hourCycle = applyHourCycleHeader(headers, getHourCycle());
   const clientToday = updateClientToday();
 
   if (headers && typeof headers === "object" && clientToday) {
     headers["X-Client-Today"] = clientToday;
   }
 
-  return { timezone, locale, hourCycle, clientToday };
+  return { timezone, clientToday };
+}
+
+export function getClockFormat() {
+  const raw = document?.body?.dataset?.clockFormat ?? "";
+  return raw === "12h" ? "12h" : "24h";
+}
+
+function getLocaleForTime() {
+  const docLocale = document?.documentElement?.lang ?? "";
+  if (docLocale) {
+    return docLocale;
+  }
+  if (typeof navigator !== "undefined" && navigator.language) {
+    return navigator.language;
+  }
+  return "en-US";
 }
 
 export function formatLocalTime(value) {
@@ -46,9 +56,8 @@ export function formatLocalTime(value) {
   if (Number.isNaN(date.getTime())) {
     return "";
   }
-  const locale = getLocale();
-  const hourCycle = getHourCycle();
-  const hour12 = hourCycle === "12h";
+  const hour12 = getClockFormat() === "12h";
+  const locale = getLocaleForTime();
   return new Intl.DateTimeFormat(locale, {
     hour: "2-digit",
     minute: "2-digit",
@@ -61,9 +70,8 @@ export function formatLocalTimestamp(value) {
   if (Number.isNaN(date.getTime())) {
     return "";
   }
-  const locale = getLocale();
-  const hourCycle = getHourCycle();
-  const hour12 = hourCycle === "12h";
+  const hour12 = getClockFormat() === "12h";
+  const locale = getLocaleForTime();
   return new Intl.DateTimeFormat(locale, {
     year: "numeric",
     month: "short",
@@ -72,6 +80,28 @@ export function formatLocalTimestamp(value) {
     minute: "2-digit",
     hour12,
   }).format(date);
+}
+
+export function formatTimeElements(root = document) {
+  if (!root || typeof root.querySelectorAll !== "function") {
+    return;
+  }
+  const nodes = root.querySelectorAll("time.message-time");
+  if (!nodes.length) {
+    return;
+  }
+  nodes.forEach((el) => {
+    const raw = el.dataset?.timeRaw || el.getAttribute("datetime") || "";
+    if (!raw) return;
+    const timeText = formatLocalTime(raw);
+    if (timeText) {
+      el.textContent = timeText;
+    }
+    const stamp = formatLocalTimestamp(raw);
+    if (stamp) {
+      el.title = stamp;
+    }
+  });
 }
 
 export function applyTimezoneSearch(searchParams, zone = getTimezone()) {
