@@ -373,6 +373,12 @@ body {
     position: static;
   }
 
+  .message-replies {
+    display: grid;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-sm);
+  }
+
   .message-kind-indicator {
     background: transparent;
     border-color: transparent;

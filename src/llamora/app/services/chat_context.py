@@ -10,6 +10,32 @@ from llamora.app.services.session_context import get_session_context
 from llamora.app.services.time import local_date
 
 
+def _thread_history(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    threaded: list[dict[str, Any]] = []
+    by_user_id: dict[str, dict[str, Any]] = {}
+
+    for message in history:
+        role = message.get("role")
+        msg_id = str(message.get("id") or "")
+        reply_to = message.get("reply_to")
+        reply_key = str(reply_to) if reply_to else ""
+
+        if role == "user":
+            entry = {"message": message, "replies": []}
+            threaded.append(entry)
+            if msg_id:
+                by_user_id[msg_id] = entry
+            continue
+
+        if reply_key and reply_key in by_user_id:
+            by_user_id[reply_key]["replies"].append(message)
+            continue
+
+        threaded.append({"message": message, "replies": None})
+
+    return threaded
+
+
 async def get_chat_context(
     user: Mapping[str, Any],
     date: str,
@@ -31,6 +57,8 @@ async def get_chat_context(
         message = entry.get("message", "") if isinstance(entry, dict) else ""
         entry["message_html"] = render_markdown_to_html(message)
 
+    threaded_history = _thread_history(history)
+
     today = local_date().isoformat()
     is_today = date == today
     pending_msg_id = None
@@ -38,6 +66,7 @@ async def get_chat_context(
 
     return {
         "history": history,
+        "threaded_history": threaded_history,
         "pending_msg_id": pending_msg_id,
         "is_today": is_today,
         "opening_stream": opening_stream,

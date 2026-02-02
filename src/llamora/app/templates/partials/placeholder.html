@@ -1,23 +1,10 @@
-{% from 'partials/meta_chips.html' import render_meta_chips %}
-{% from 'partials/message_actions.html' import message_actions %}
-<div id="msg-{{ user_msg_id }}" class="message user">
-  <div class="message-main">
-    <div class="markdown-body">{{ user_text }}</div>
-  </div>
-  <div class="message-footer">
-    {{ render_meta_chips(user_msg_id, []) }}
-    <div class="message-actions-row" aria-label="Message actions">
-      <button class="message-action message-delete"
-              type="button"
-              hx-delete="{{ url_for('chat.delete_message', msg_id=user_msg_id) }}"
-              hx-target="#msg-{{ user_msg_id }}"
-              hx-swap="outerHTML swap:180ms"
-              aria-label="Delete message"
-              data-tooltip-title="Delete message"
-              data-ready="true">
-        <span class="icon-mask icon-trash message-action__icon" aria-hidden="true"></span>
-      </button>
-      {{ message_actions(user_msg_id, day, reply_kinds, is_today=is_today) }}
-    </div>
-  </div>
-</div>
+{% from 'partials/message_item.html' import render_message %}
+{% set msg = {
+  "id": user_msg_id,
+  "role": "user",
+  "message": user_text,
+  "message_html": None,
+  "meta": {},
+  "tags": []
+} %}
+{{ render_message(msg, day, reply_kinds, reply_kind_labels, is_today) }}

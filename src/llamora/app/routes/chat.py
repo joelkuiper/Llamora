@@ -351,7 +351,7 @@ async def send_message(date):
     user_time = form.get("user_time")
     _, user, dek = await require_user_and_dek()
     uid = user["id"]
-    reply_kinds, _ = _load_reply_kinds()
+    reply_kinds, reply_kind_labels = _load_reply_kinds()
 
     max_len = int(settings.LIMITS.max_message_length)
 
@@ -374,6 +374,8 @@ async def send_message(date):
         day=date,
         user_time=user_time,
         reply_kinds=reply_kinds,
+        reply_kind_labels=reply_kind_labels,
+        is_today=date == local_date().isoformat(),
     )
 
 

@@ -17,8 +17,8 @@
                 type="button"
                 role="menuitem"
                 hx-post="{{ url_for('chat.ask_llm', date=day, user_msg_id=user_msg_id) }}"
-                hx-target="closest .message"
-                hx-swap="afterend"
+                hx-target="#replies-{{ user_msg_id }}"
+                hx-swap="beforeend"
                 hx-include="#user-time"
                 hx-vals='{"reply_kind":"{{ kind.id }}"}'
                 data-action-kind="{{ kind.id }}"

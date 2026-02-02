@@ -213,6 +213,15 @@ class LlmStreamElement extends HTMLElement {
       return;
     }
 
+    const replySlot = document.getElementById(`replies-${userMsgId}`);
+    if (replySlot) {
+      this.#hasEnsuredPlacement = true;
+      if (this.parentElement !== replySlot) {
+        replySlot.appendChild(this);
+      }
+      return;
+    }
+
     const userMessage = document.getElementById(`msg-${userMsgId}`);
     const chat = this.closest("#chat") || userMessage?.closest?.("#chat") || null;
     if (!chat) {
