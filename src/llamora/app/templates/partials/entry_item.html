@@ -22,14 +22,26 @@
   {% set rendered = msg.get('message_html') %}
   <div class="message-main">
     {% if is_opening %}
-    <div class="message-opening-label">Day opening</div>
+    <div class="message-opening-header">
+      <span class="message-opening-title">day opening</span>
+      <button type="button"
+              class="opening-toggle"
+              data-opening-toggle
+              aria-expanded="true"
+              aria-label="Collapse day opening">
+        <span class="icon-mask icon-chevron-up" aria-hidden="true" data-opening-icon-open></span>
+        <span class="icon-mask icon-chevron-down" aria-hidden="true" data-opening-icon-closed></span>
+      </button>
+    </div>
     {% endif %}
-    <div class="markdown-body"
-         id="msg-{{ msg['id'] }}-body"
-         {% if rendered is not none %}data-rendered="true"{% else %}data-markdown-source="{{ msg.message }}"{% endif %}>
-      {% if rendered is not none %}
-      {{ rendered | safe }}
-      {% endif %}
+    <div class="opening-content"{% if not is_opening %} data-opening-content="false"{% endif %}>
+      <div class="markdown-body"
+           id="msg-{{ msg['id'] }}-body"
+           {% if rendered is not none %}data-rendered="true"{% else %}data-markdown-source="{{ msg.message }}"{% endif %}>
+        {% if rendered is not none %}
+        {{ rendered | safe }}
+        {% endif %}
+      </div>
     </div>
   </div>
   {% if msg['role'] == 'user' and not msg_meta.get('error') %}
@@ -63,7 +75,7 @@
   {% endif %}
   {% if msg['role'] != 'user' %}
   <div class="message-actions-inline" aria-label="Assistant message actions">
-    {% if msg.get('created_at') %}
+    {% if msg.get('created_at') and not is_opening %}
     <time class="message-time"
           datetime="{{ msg['created_at'] }}"
           data-time-raw="{{ msg['created_at'] }}"></time>

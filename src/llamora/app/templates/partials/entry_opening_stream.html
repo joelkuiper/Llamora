@@ -9,14 +9,26 @@
   <span class="raw-response" hidden></span>
   <span class="visually-hidden" id="opening-{{ day }}-speaker">{{ config.APP_NAME }} opening</span>
   <div class="message-main">
-    <div class="message-opening-label">Day opening</div>
-    <div class="markdown-body" id="opening-{{ day }}-body">
-    <span id="typing-indicator-opening-{{ day }}"
-          class="typing-indicator"
-          data-typing-indicator
-          data-entry-id="opening-{{ day }}">
-      <span class="cursor">❚</span>
-    </span>
+    <div class="message-opening-header">
+      <span class="message-opening-title">day opening</span>
+      <button type="button"
+              class="opening-toggle"
+              data-opening-toggle
+              aria-expanded="true"
+              aria-label="Collapse day opening">
+        <span class="icon-mask icon-chevron-up" aria-hidden="true" data-opening-icon-open></span>
+        <span class="icon-mask icon-chevron-down" aria-hidden="true" data-opening-icon-closed></span>
+      </button>
+    </div>
+    <div class="opening-content">
+      <div class="markdown-body" id="opening-{{ day }}-body">
+        <span id="typing-indicator-opening-{{ day }}"
+              class="typing-indicator"
+              data-typing-indicator
+              data-entry-id="opening-{{ day }}">
+          <span class="cursor">❚</span>
+        </span>
+      </div>
     </div>
   </div>
 </response-stream>
