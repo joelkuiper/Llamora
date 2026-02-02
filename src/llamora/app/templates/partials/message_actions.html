@@ -4,10 +4,7 @@
           type="button"
           aria-label="Reply actions"
           data-tooltip-title="Reply actions">
-    <img class="message-action__icon"
-         src="{{ url_for('static', filename='icons/message-circle-more.svg') }}"
-         alt=""
-         aria-hidden="true">
+    <span class="icon-mask icon-message-more message-action__icon" aria-hidden="true"></span>
   </button>
   <div class="tag-popover action-popover glass-panel" role="dialog" aria-modal="true" hidden>
     <div class="tp-content action-panel">
@@ -25,13 +22,13 @@
                 data-action-kind="{{ kind.id }}"
                 hx-on::config-request="const t=document.getElementById('user-time'); if(t){t.value=new Date().toISOString();}">
           {% if kind.id == "reply" %}
-          <img class="action-item__icon" src="{{ url_for('static', filename='icons/corner-down-left.svg') }}" alt="" aria-hidden="true">
-        {% elif kind.id == "acknowledge" %}
-          <img class="action-item__icon" src="{{ url_for('static', filename='icons/heart.svg') }}" alt="" aria-hidden="true">
+          <span class="icon-mask icon-corner-down-left action-item__icon" aria-hidden="true"></span>
+          {% elif kind.id == "acknowledge" %}
+          <span class="icon-mask icon-heart action-item__icon" aria-hidden="true"></span>
           {% elif kind.id == "notice" %}
-          <img class="action-item__icon" src="{{ url_for('static', filename='icons/eye.svg') }}" alt="" aria-hidden="true">
+          <span class="icon-mask icon-eye action-item__icon" aria-hidden="true"></span>
           {% else %}
-          <img class="action-item__icon" src="{{ url_for('static', filename='icons/reply.svg') }}" alt="" aria-hidden="true">
+          <span class="icon-mask icon-reply action-item__icon" aria-hidden="true"></span>
           {% endif %}
           <span class="action-item__label">{{ kind.label }}</span>
         </button>

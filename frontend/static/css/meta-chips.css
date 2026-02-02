@@ -141,7 +141,7 @@
     transform var(--motion-press) ease,
     background-color var(--motion-gentle) ease;
   color: var(--glass-text-stronger);
-  --icon-glyph-size: 0.9rem;
+  --icon-size: 0.9rem;
 
   &:active {
     transform: translateY(1px);
@@ -168,7 +168,7 @@
   justify-content: center;
   flex: 0 0 auto;
   padding: 0;
-  --icon-glyph-size: 0.9rem;
+  --icon-size: 0.9rem;
 
   &:active {
     transform: translateY(1px);
@@ -176,10 +176,10 @@
   }
 }
 
-.add-tag-btn img,
+.add-tag-btn .icon-mask,
 .message-action__icon {
-  width: var(--icon-glyph-size);
-  height: var(--icon-glyph-size);
+  width: var(--icon-size);
+  height: var(--icon-size);
   display: block;
 }
 

@@ -42,10 +42,7 @@
           data-delete-template="{{ url_for('chat.delete_message', msg_id='__MSG_ID__') }}"
           data-delete-placeholder="__MSG_ID__"
           data-target-template="#msg-__MSG_ID__">
-    <img class="message-action__icon"
-         src="{{ url_for('static', filename='icons/trash.svg') }}"
-         alt=""
-         aria-hidden="true">
+    <span class="icon-mask icon-trash message-action__icon" aria-hidden="true"></span>
   </button>
 
 </llm-stream>

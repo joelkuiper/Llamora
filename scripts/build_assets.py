@@ -48,6 +48,8 @@ def _esbuild_common_args(mode: str) -> List[str]:
         "--format=esm",
         "--target=es2022",
         "--log-level=info",
+        "--loader:.svg=file",
+        "--asset-names=../icons/[name]",
     ]
     if mode == "dev":
         args.append("--sourcemap")

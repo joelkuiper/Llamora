@@ -26,16 +26,12 @@
 
   <calendar-control id="calendar-control">
     <button id="prev-day" type="button" class="icon-btn" aria-label="Previous day" data-tooltip-title="Previous day">
-      <img src="{{ url_for('static', filename='icons/chevron-left.svg') }}"
-           alt=""
-           aria-hidden="true">
+      <span class="icon-mask icon-chevron-left" aria-hidden="true"></span>
     </button>
     <button id="calendar-btn" type="button" class="icon-btn" aria-label="Calendar"
             aria-haspopup="dialog" aria-expanded="false" aria-controls="calendar-popover"
             data-tooltip-title="Change day">
-      <img src="{{ url_for('static', filename='icons/calendar-days.svg') }}"
-           alt=""
-           aria-hidden="true">
+      <span class="icon-mask icon-calendar-days" aria-hidden="true"></span>
       <span id="calendar-label">{{ day|long_date }}</span>
     </button>
     <button id="next-day"
@@ -44,9 +40,7 @@
             aria-label="Next day"
             {% if is_today %}disabled aria-disabled="true"{% endif %}
             {% if not is_today %}data-tooltip-title="Next day"{% endif %}>
-      <img src="{{ url_for('static', filename='icons/chevron-right.svg') }}"
-           alt=""
-           aria-hidden="true">
+      <span class="icon-mask icon-chevron-right" aria-hidden="true"></span>
     </button>
     <div id="calendar-popover"
          class="calendar-popover"
@@ -73,16 +67,12 @@
          hx-push-url="true"
          class="icon-btn"
          aria-label="Profile" data-tooltip-title="Profile">
-        <img src="{{ url_for('static', filename='icons/user-round.svg') }}"
-             alt=""
-             aria-hidden="true">
+        <span class="icon-mask icon-user-round" aria-hidden="true"></span>
       </a>
       <form method="post" action="{{ url_for('auth.logout') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="icon-btn" aria-label="Logout" data-tooltip-title="Logout">
-          <img src="{{ url_for('static', filename='icons/log-out.svg') }}"
-               alt=""
-               aria-hidden="true">
+          <span class="icon-mask icon-log-out" aria-hidden="true"></span>
         </button>
       </form>
     </div>

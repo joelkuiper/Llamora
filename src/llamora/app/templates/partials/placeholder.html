@@ -15,10 +15,7 @@
               aria-label="Delete message"
               data-tooltip-title="Delete message"
               data-ready="true">
-        <img class="message-action__icon"
-             src="{{ url_for('static', filename='icons/trash.svg') }}"
-             alt=""
-             aria-hidden="true">
+        <span class="icon-mask icon-trash message-action__icon" aria-hidden="true"></span>
       </button>
       {{ message_actions(user_msg_id, day, reply_kinds) }}
     </div>

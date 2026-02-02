@@ -4,9 +4,7 @@
   <section id="profile-page">
     <header class="profile-header">
       <button id="profile-back" class="back-btn" aria-label="Back" data-tooltip-title="Back">
-        <img src="{{ url_for('static', filename='icons/chevron-left.svg') }}"
-             alt=""
-             aria-hidden="true">
+        <span class="icon-mask icon-chevron-left" aria-hidden="true"></span>
       </button>
       <h1>Profile for {{ user.username }}</h1>
     </header>
