@@ -127,48 +127,6 @@ class TagService:
 
         return combined
 
-    async def suggest_for_entry(
-        self,
-        user_id: str,
-        msg_id: str,
-        dek: bytes,
-        *,
-        frecency_limit: int = 3,
-        decay_constant: float | None = None,
-    ) -> list[str] | None:
-        messages = await self._db.messages.get_messages_by_ids(user_id, [msg_id], dek)
-        if not messages:
-            return None
-
-        message = messages[0]
-        if message.get("role") != "user":
-            return None
-
-        existing = await self._db.tags.get_tags_for_message(user_id, msg_id, dek)
-        existing_names = self._extract_existing_names(existing)
-
-        frecent_tags = await self._db.tags.get_tag_frecency(
-            user_id, frecency_limit, decay_constant, dek
-        )
-        frecent_suggestions: set[str] = set()
-        for tag in frecent_tags:
-            name = (tag.get("name") or "").strip()
-            if not name:
-                continue
-            try:
-                canonical = self.canonicalize(name)
-            except ValueError:
-                continue
-            frecent_suggestions.add(canonical)
-
-        combined = [
-            suggestion
-            for suggestion in sorted(frecent_suggestions)
-            if suggestion.lower() not in existing_names
-        ]
-
-        return combined
-
     def _get_cached_suggestions(self, user_id: str, msg_id: str) -> list[str] | None:
         cache_key = (user_id, msg_id)
         cached = self._suggestion_cache.get(cache_key)
