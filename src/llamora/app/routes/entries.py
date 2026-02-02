@@ -180,16 +180,16 @@ async def stop_response(entry_id: str):
     return Response("", status=200)
 
 
-@entries_bp.get("/e/meta-chips/<msg_id>")
+@entries_bp.get("/e/entry-tags/<entry_id>")
 @login_required
-async def meta_chips(msg_id: str):
+async def entry_tags(entry_id: str):
     _, user, dek = await require_user_and_dek()
     db = get_services().db
-    await ensure_entry_exists(db, user["id"], msg_id)
-    tags = await db.tags.get_tags_for_entry(user["id"], msg_id, dek)
+    await ensure_entry_exists(db, user["id"], entry_id)
+    tags = await db.tags.get_tags_for_entry(user["id"], entry_id, dek)
     html = await render_template(
-        "partials/meta_chips_wrapper.html",
-        entry_id=msg_id,
+        "partials/entry_tags_wrapper.html",
+        entry_id=entry_id,
         tags=tags,
         hidden=True,
     )

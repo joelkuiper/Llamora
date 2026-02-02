@@ -258,7 +258,7 @@
   display: block;
 }
 
-.search-result-tags .meta-chips {
+.search-result-tags .entry-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
@@ -266,16 +266,16 @@
   pointer-events: none;
 }
 
-.meta-chips--static {
-  --meta-chip-max-width: 16ch;
+.entry-tags--static {
+  --entry-tag-max-width: 16ch;
 }
 
-.meta-chips--static .meta-chip {
+.entry-tags--static .entry-tag {
   pointer-events: none;
   cursor: default;
 }
 
-.meta-chips--static .meta-chip.is-highlighted {
+.entry-tags--static .entry-tag.is-highlighted {
   background: var(--highlight-color);
   border-color: var(--border);
   box-shadow: none;

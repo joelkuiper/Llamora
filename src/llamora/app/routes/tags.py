@@ -27,7 +27,7 @@ async def remove_tag(entry_id: str, tag_hash: str):
         abort(400, description="invalid tag hash")
         raise AssertionError("unreachable") from exc
     await get_services().db.tags.unlink_tag_entry(user["id"], tag_hash_bytes, entry_id)
-    return "<span class='chip-tombstone'></span>"
+    return "<span class='tag-tombstone'></span>"
 
 
 @tags_bp.post("/t/<entry_id>")
@@ -49,8 +49,8 @@ async def add_tag(entry_id: str):
     tag_hash = await db.tags.resolve_or_create_tag(user["id"], canonical, dek)
     await db.tags.xref_tag_entry(user["id"], tag_hash, entry_id)
     html = await render_template(
-        "partials/tag_chip.html",
-        keyword=canonical,
+        "partials/tag_item.html",
+        tag=canonical,
         tag_hash=tag_hash.hex(),
         entry_id=entry_id,
     )

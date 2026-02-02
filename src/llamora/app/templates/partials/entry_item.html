@@ -1,4 +1,4 @@
-{% from 'partials/meta_chips.html' import render_meta_chips %}
+{% from 'partials/entry_tags.html' import render_entry_tags %}
 {% from 'partials/entry_actions.html' import entry_actions %}
 {% from 'partials/response_kind.html' import response_kind_icon %}
 {% macro render_entry(e, day, response_kinds=(), response_kind_labels=None, is_today=True, replies=None) -%}
@@ -48,7 +48,7 @@
   </div>
   {% if e['role'] == 'user' and not msg_meta.get('error') %}
   <div class="entry-footer">
-    {{ render_meta_chips(entry_id=e['id'], tags=e.get('tags', [])) }}
+    {{ render_entry_tags(entry_id=e['id'], tags=e.get('tags', [])) }}
     <div class="entry-actions-row" aria-label="Entry actions">
       {% if e.get('created_at') %}
       <time class="entry-time"

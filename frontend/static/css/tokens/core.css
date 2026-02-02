@@ -91,8 +91,8 @@
     --glass-text-muted: rgba(0,0,0,0.72);
     --glass-text-strong: rgba(0,0,0,0.80);
     --glass-text-stronger: rgba(0,0,0,0.92);
-    --chip-remove-bg: rgba(0,0,0,0.48);
-    --chip-remove-bg-hover: #000;
+    --tag-remove-bg: rgba(0,0,0,0.48);
+    --tag-remove-bg-hover: #000;
 
     /* Response kinds */
     --action-reply: color-mix(in srgb, var(--accent) 55%, var(--color-text-muted));

@@ -528,14 +528,14 @@ class LLMClient:
 
             meta = entry.get("meta")
             if isinstance(meta, Mapping):
-                keywords = meta.get("keywords")
-                if isinstance(keywords, Sequence) and not isinstance(
-                    keywords, (str, bytes)
+                tags = meta.get("tags")
+                if isinstance(tags, Sequence) and not isinstance(
+                    tags, (str, bytes)
                 ):
-                    for keyword in keywords:
-                        canonical_keyword = self._canonicalize_tag_value(keyword)
-                        if canonical_keyword:
-                            canonical_tags.add(canonical_keyword)
+                    for tag in tags:
+                        canonical_tag = self._canonicalize_tag_value(tag)
+                        if canonical_tag:
+                            canonical_tags.add(canonical_tag)
 
             if not canonical_tags:
                 continue
@@ -560,7 +560,7 @@ class LLMClient:
         context yields a different cache key, forcing token counts to be
         recomputed for the new inputs. When trimming drops messages that carry
         canonicalised tags (either attached by the user or emitted via
-        ``meta.keywords``), the function reintroduces the most recent instance
+        ``meta.tags``), the function reintroduces the most recent instance
         for each tag so long as the combined prompt still fits within
         ``max_input`` tokens.
         """

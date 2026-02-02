@@ -44,7 +44,7 @@ export const mergeTagCandidateValues = (
   return merged;
 };
 
-export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
+export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   #popover = null;
   #button = null;
   #popoverEl = null;
@@ -65,8 +65,8 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
   #afterRequestHandler;
   #afterSwapHandler;
   #suggestionsSwapHandler;
-  #chipActivationHandler;
-  #chipKeydownHandler;
+  #tagActivationHandler;
+  #tagKeydownHandler;
   #tagHistory;
   
   constructor() {
@@ -82,8 +82,8 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#afterRequestHandler = () => this.#handleAfterRequest();
     this.#afterSwapHandler = (event) => this.#handleAfterSwap(event);
     this.#suggestionsSwapHandler = () => this.#handleSuggestionsSwap();
-    this.#chipActivationHandler = (event) => this.#handleChipActivation(event);
-    this.#chipKeydownHandler = (event) => this.#handleChipKeydown(event);
+    this.#tagActivationHandler = (event) => this.#handleTagActivation(event);
+    this.#tagKeydownHandler = (event) => this.#handleTagKeydown(event);
     this.#tagHistory = new AutocompleteHistory({
       maxEntries: TAG_HISTORY_MAX,
       prepare: (value) => {
@@ -134,8 +134,8 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
       "htmx:afterSwap",
       this.#suggestionsSwapHandler,
     );
-    listeners.add(this.#tagContainer, "click", this.#chipActivationHandler);
-    listeners.add(this.#tagContainer, "keydown", this.#chipKeydownHandler);
+    listeners.add(this.#tagContainer, "click", this.#tagActivationHandler);
+    listeners.add(this.#tagContainer, "keydown", this.#tagKeydownHandler);
 
     this.#initPopover();
     this.#updateSubmitState();
@@ -157,7 +157,7 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#panel = this.#popoverEl?.querySelector(".tp-content") ?? null;
     this.#suggestions = this.#popoverEl?.querySelector(".tag-suggestions") ?? null;
     this.#closeButton = this.#popoverEl?.querySelector(".overlay-close") ?? null;
-    this.#tagContainer = this.querySelector(".meta-tags");
+    this.#tagContainer = this.querySelector(".entry-tags-list");
 
     this.#button?.setAttribute("aria-expanded", "false");
   }
@@ -238,7 +238,7 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
     const seen = new Set();
     if (!this.#tagContainer) return seen;
     const limit = this.#getCanonicalMaxLength();
-    this.#tagContainer.querySelectorAll(".chip-label").forEach((el) => {
+    this.#tagContainer.querySelectorAll(".tag-label").forEach((el) => {
       const canonical = canonicalizeTag(el.textContent ?? "", limit);
       if (!canonical) return;
       seen.add(canonical.toLowerCase());
@@ -318,12 +318,12 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
     if (!target) return;
 
     if (target === this.#tagContainer) {
-      const chip = this.#tagContainer?.lastElementChild;
-      if (chip?.classList?.contains("meta-chip")) {
-        animateMotion(chip, "motion-animate-chip-enter");
+      const tag = this.#tagContainer?.lastElementChild;
+      if (tag?.classList?.contains("entry-tag")) {
+        animateMotion(tag, "motion-animate-tag-enter");
         const limit = this.#getCanonicalMaxLength();
-        const label = chip
-          .querySelector(".chip-label")
+        const label = tag
+          .querySelector(".tag-label")
           ?.textContent?.trim();
         const canonicalValue = canonicalizeTag(label ?? "", limit);
         const canonicalKey = canonicalValue?.toLowerCase();
@@ -349,7 +349,7 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
       }
       this.#updateSubmitState();
       this.#invalidateAutocompleteCache({ immediate: true });
-    } else if (target.classList?.contains("chip-tombstone")) {
+    } else if (target.classList?.contains("tag-tombstone")) {
       target.remove();
       this.#updateSubmitState();
       this.#invalidateAutocompleteCache({ immediate: true });
@@ -611,8 +611,8 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
     return inputLimit;
   }
 
-  #handleChipActivation(event) {
-    const label = event.target.closest?.(".chip-label");
+  #handleTagActivation(event) {
+    const label = event.target.closest?.(".tag-label");
     if (!label || !(label instanceof HTMLElement)) return;
 
     const searchInput = document.getElementById("search-input");
@@ -631,9 +631,9 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
     }
   }
 
-  #handleChipKeydown(event) {
+  #handleTagKeydown(event) {
     if (![" ", "Enter"].includes(event.key)) return;
-    const label = event.target.closest?.(".chip-label");
+    const label = event.target.closest?.(".tag-label");
     if (!label) return;
 
     event.preventDefault();
@@ -641,6 +641,6 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 }
 
-if (typeof customElements !== "undefined" && !customElements.get("meta-chips")) {
-  customElements.define("meta-chips", Tags);
+if (typeof customElements !== "undefined" && !customElements.get("entry-tags")) {
+  customElements.define("entry-tags", EntryTags);
 }

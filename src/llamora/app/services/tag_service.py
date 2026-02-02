@@ -114,22 +114,22 @@ class TagService:
             return suggestions
 
         meta = entry.get("meta") or {}
-        keywords: Iterable[Any] = meta.get("keywords") or []
-        if (not keywords) and entry.get("role") == "user":
+        tags: Iterable[Any] = meta.get("tags") or []
+        if (not tags) and entry.get("role") == "user":
             cached = self._get_cached_suggestions(user_id, msg_id)
             if cached is None:
                 meta_payload = await generate_metadata(
                     llm, entry.get("message", "")
                 )
-                keywords = meta_payload.get("keywords") or []
-                self._set_cached_suggestions(user_id, msg_id, list(keywords))
+                tags = meta_payload.get("tags") or []
+                self._set_cached_suggestions(user_id, msg_id, list(tags))
             else:
-                keywords = cached
+                tags = cached
 
         meta_suggestions: set[str] = set()
-        for keyword in keywords:
+        for tag in tags:
             try:
-                canonical = self.canonicalize(str(keyword))
+                canonical = self.canonicalize(str(tag))
             except ValueError:
                 continue
             meta_suggestions.add(canonical)

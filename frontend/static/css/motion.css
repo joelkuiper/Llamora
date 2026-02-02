@@ -6,12 +6,12 @@
     --motion-highlight-animation:
       motion-highlight-flash var(--motion-highlight-duration) ease-in-out;
 
-    --motion-chip-enter-duration: var(--motion-gentle);
-    --motion-chip-exit-duration: var(--motion-hover);
-    --motion-chip-enter-animation:
-      motion-chip-enter var(--motion-chip-enter-duration) ease both;
-    --motion-chip-exit-animation:
-      motion-chip-exit var(--motion-chip-exit-duration) ease forwards;
+    --motion-tag-enter-duration: var(--motion-gentle);
+    --motion-tag-exit-duration: var(--motion-hover);
+    --motion-tag-enter-animation:
+      motion-tag-enter var(--motion-tag-enter-duration) ease both;
+    --motion-tag-exit-animation:
+      motion-tag-exit var(--motion-tag-exit-duration) ease forwards;
 
     --motion-tactile-animation: motion-tactile-pulse var(--motion-pulse) ease;
 
@@ -31,7 +31,7 @@
     }
   }
 
-  @keyframes motion-chip-enter {
+  @keyframes motion-tag-enter {
     from {
       opacity: 0;
     }
@@ -40,7 +40,7 @@
     }
   }
 
-  @keyframes motion-chip-exit {
+  @keyframes motion-tag-exit {
     from {
       opacity: 1;
       transform: scale(1);
@@ -87,16 +87,16 @@
     animation: var(--motion-highlight-animation) !important;
   }
 
-  :where(.meta-chips).motion-animate-chip-enter,
-  :where(.meta-chips).htmx-added,
-  :where(.meta-chip).motion-animate-chip-enter,
-  :where(.meta-chip).htmx-added {
-    animation: var(--motion-chip-enter-animation);
+  :where(.entry-tags).motion-animate-tag-enter,
+  :where(.entry-tags).htmx-added,
+  :where(.entry-tag).motion-animate-tag-enter,
+  :where(.entry-tag).htmx-added {
+    animation: var(--motion-tag-enter-animation);
   }
 
-  :where(.meta-chip).motion-animate-chip-exit,
-  :where(.meta-chip).htmx-swapping {
-    animation: var(--motion-chip-exit-animation);
+  :where(.entry-tag).motion-animate-tag-exit,
+  :where(.entry-tag).htmx-swapping {
+    animation: var(--motion-tag-exit-animation);
   }
 
   :where(.scroll-btn).motion-animate-tactile {
@@ -112,27 +112,27 @@
 @layer motion.utilities {
   @media (prefers-reduced-motion: reduce) {
     :where(.motion-animate-highlight),
-    :where(.meta-chips).motion-animate-chip-enter,
-    :where(.meta-chips).htmx-added,
-    :where(.meta-chip).motion-animate-chip-enter,
-    :where(.meta-chip).htmx-added,
-    :where(.meta-chip).motion-animate-chip-exit,
-    :where(.meta-chip).htmx-swapping,
+    :where(.entry-tags).motion-animate-tag-enter,
+    :where(.entry-tags).htmx-added,
+    :where(.entry-tag).motion-animate-tag-enter,
+    :where(.entry-tag).htmx-added,
+    :where(.entry-tag).motion-animate-tag-exit,
+    :where(.entry-tag).htmx-swapping,
     :where(.scroll-btn).motion-animate-tactile,
     :where(.motion-animate-message-delete),
     :where(.message.htmx-swapping) {
       animation: none !important;
     }
 
-    :where(.meta-chip).motion-animate-chip-exit,
-    :where(.meta-chip).htmx-swapping {
+    :where(.entry-tag).motion-animate-tag-exit,
+    :where(.entry-tag).htmx-swapping {
       opacity: 0;
     }
 
-    :where(.meta-chip).motion-animate-chip-enter,
-    :where(.meta-chip).htmx-added,
-    :where(.meta-chips).motion-animate-chip-enter,
-    :where(.meta-chips).htmx-added {
+    :where(.entry-tag).motion-animate-tag-enter,
+    :where(.entry-tag).htmx-added,
+    :where(.entry-tags).motion-animate-tag-enter,
+    :where(.entry-tags).htmx-added {
       opacity: 1;
     }
 

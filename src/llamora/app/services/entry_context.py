@@ -34,13 +34,13 @@ def _extract_tag_metadata(meta: Mapping[str, Any] | None) -> dict[str, Any]:
         return {}
 
     tag_metadata: dict[str, Any] = {}
-    keywords = meta.get("keywords")
-    if isinstance(keywords, Sequence) and not isinstance(
-        keywords, (str, bytes, bytearray)
+    tags = meta.get("tags")
+    if isinstance(tags, Sequence) and not isinstance(
+        tags, (str, bytes, bytearray)
     ):
-        cleaned = [str(item).strip() for item in keywords if str(item).strip()]
+        cleaned = [str(item).strip() for item in tags if str(item).strip()]
         if cleaned:
-            tag_metadata["keywords"] = cleaned
+            tag_metadata["tags"] = cleaned
 
     emoji = meta.get("emoji")
     if emoji:

@@ -25,15 +25,15 @@
       {% set visible_tags = item.visible_tags|default([]) %}
       {% if visible_tags %}
       <div class="search-result-tags">
-        <div class="meta-chips meta-chips--static">
+        <div class="entry-tags entry-tags--static">
           {% for tag in visible_tags %}
-          <span class="meta-chip keyword{% if tag.is_match %} is-highlighted{% endif %}">
-            <span class="chip-label" title="{{ tag.name }}">{{ tag.name }}</span>
+          <span class="entry-tag keyword{% if tag.is_match %} is-highlighted{% endif %}">
+            <span class="tag-label" title="{{ tag.name }}">{{ tag.name }}</span>
           </span>
           {% endfor %}
           {% if item.has_more_tags %}
-          <span class="meta-chip keyword meta-chip--overflow" aria-hidden="true">
-            <span class="chip-label">...</span>
+          <span class="entry-tag keyword entry-tag--overflow" aria-hidden="true">
+            <span class="tag-label">...</span>
           </span>
           {% endif %}
         </div>

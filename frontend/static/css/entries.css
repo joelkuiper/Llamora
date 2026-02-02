@@ -134,7 +134,7 @@ body {
         margin-top: var(--spacing-sm);
       }
 
-      .entry-footer .meta-chips {
+      .entry-footer .entry-tags {
         margin-top: 0;
       }
 

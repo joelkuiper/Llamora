@@ -69,8 +69,8 @@
     --glass-text-strong-dark: rgba(238,239,241,0.86);
     --glass-text-stronger-dark: rgba(248,249,250,0.95);
 
-    --chip-remove-bg-dark: rgba(163,168,176,0.45);
-    --chip-remove-bg-hover-dark: rgba(163,168,176,0.82);
+    --tag-remove-bg-dark: rgba(163,168,176,0.45);
+    --tag-remove-bg-hover-dark: rgba(163,168,176,0.82);
 
     /* Password strength (dark) */
     --password-strength-1-dark: #ff8080;
@@ -160,8 +160,8 @@
       --glass-text-muted: var(--glass-text-muted-dark);
       --glass-text-strong: var(--glass-text-strong-dark);
       --glass-text-stronger: var(--glass-text-stronger-dark);
-      --chip-remove-bg: var(--chip-remove-bg-dark);
-      --chip-remove-bg-hover: var(--chip-remove-bg-hover-dark);
+      --tag-remove-bg: var(--tag-remove-bg-dark);
+      --tag-remove-bg-hover: var(--tag-remove-bg-hover-dark);
       --password-strength-1: var(--password-strength-1-dark);
       --password-strength-2: var(--password-strength-2-dark);
       --password-strength-3: var(--password-strength-3-dark);

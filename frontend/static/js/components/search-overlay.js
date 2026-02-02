@@ -465,7 +465,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       panel &&
       !panel.contains(target) &&
       target !== this.#inputEl &&
-      !target.closest(".meta-chip")
+      !target.closest(".entry-tag")
     ) {
       this.#closeResults(true);
     }

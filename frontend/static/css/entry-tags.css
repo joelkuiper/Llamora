@@ -1,12 +1,13 @@
 @import url("./tokens/base.css");
 @import url("./motion.css");
 
-.meta-chips {
-  --meta-chip-max-width: 32ch;
+.entry-tags {
+  --entry-tag-max-width: 32ch;
   margin-top: var(--spacing-sm);
   display: flex;
   gap: 0.25rem;
   flex-wrap: wrap;
+  pointer-events: auto;
   /* flex-direction: row-reverse; */
   opacity: 0.66;
   transition: opacity var(--motion-gentle) ease;
@@ -23,11 +24,11 @@
   }
 }
 
-.meta-chips[hidden] {
+.entry-tags[hidden] {
   display: none;
 }
 
-.meta-chip {
+.entry-tag {
   background: var(--glass-bg-alt);
   box-shadow: var(--inset-shadow);
   border-radius: var(--radius-md);
@@ -36,6 +37,7 @@
   text-decoration: none;
   color: var(--glass-text-stronger);
   cursor: pointer;
+  pointer-events: auto;
   transition:
     box-shadow var(--motion-gentle) ease,
     border-color var(--motion-gentle) ease,
@@ -47,15 +49,15 @@
   position: relative;
   overflow: visible;
   padding: 0;
-  max-width: var(--meta-chip-max-width, 24ch);
+  max-width: var(--entry-tag-max-width, 24ch);
   min-width: 0;
 }
 
-.meta-chip--overflow {
-  --meta-chip-max-width: none;
+.entry-tag--overflow {
+  --entry-tag-max-width: none;
 }
 
-.meta-chip:hover,
+.entry-tag:hover,
 .add-tag-btn:hover,
 .add-tag-btn.active,
 .entry-action:hover,
@@ -67,8 +69,8 @@
   background: linear-gradient(0deg, var(--accent-15), var(--accent-05)) var(--glass-bg-alt);
 }
 
-.meta-chip:focus,
-.meta-chip:focus-visible {
+.entry-tag:focus,
+.entry-tag:focus-visible {
   outline: none;
   border-color: var(--accent);
   box-shadow:
@@ -77,17 +79,17 @@
     0 8px 20px var(--accent-10);
 }
 
-.meta-chip:active {
+.entry-tag:active {
   transform: translateY(1px);
   box-shadow: var(--inset-shadow-disabled);
 }
 
-.chip-label {
+.tag-label {
   text-decoration: none;
   color: inherit;
   display: inline-block;
   padding: 2px 6px;
-  max-width: var(--meta-chip-max-width, 24ch);
+  max-width: var(--entry-tag-max-width, 24ch);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -96,12 +98,12 @@
 }
 
 
-.chip-remove {
+.tag-remove {
   position: absolute;
   top: -8px;
   right: -8px;
   transform: scale(0);
-  background: var(--chip-remove-bg);
+  background: var(--tag-remove-bg);
   border: none;
   color: var(--color-white);
   width: 18px;
@@ -116,12 +118,17 @@
   transition: transform var(--motion-gentle) ease, opacity var(--motion-gentle) ease, background-color var(--motion-gentle) ease;
 }
 
-.chip-remove:hover {
-  background: var(--chip-remove-bg-hover);
+.tag-remove:hover {
+  background: var(--tag-remove-bg-hover);
   font-weight: bold;
 }
 
-.meta-chip:hover .chip-remove {
+.entry-tag:hover .tag-remove {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.entry-tag:focus-within .tag-remove {
   transform: scale(1);
   opacity: 1;
 }
@@ -281,7 +288,7 @@
     }
   }
 
-  /* Suggestions/chips under the bar (inside popover) */
+  /* Suggestions/tags under the bar (inside popover) */
   .tag-suggestions {
     margin-top: 10px;
     display: flex;

@@ -1,24 +1,24 @@
-{% macro keyword_chip(keyword, tag_hash, entry_id=None) -%}
-  {% set canonical_value = display(keyword) %}
-  <span class="meta-chip keyword">
-    <a class="chip-label"
+{% macro entry_tag_item(label, tag_hash, entry_id=None) -%}
+  {% set canonical_value = display(label) %}
+  <span class="entry-tag">
+    <a class="tag-label"
        href="{{ url_for('search.search') }}?q={{ canonical_value | urlencode }}"
        hx-get="{{ url_for('search.search') }}?q={{ canonical_value | urlencode }}"
        hx-target="#search-results"
        hx-indicator="#search-spinner"
        hx-swap="innerHTML">{{ canonical_value }}</a>
     {% if entry_id %}
-    <button class="chip-remove"
+    <button class="tag-remove"
             aria-label="Remove tag {{ canonical_value }}"
             hx-delete="{{ url_for('tags.remove_tag', entry_id=entry_id, tag_hash=tag_hash) }}"
-            hx-target="closest .meta-chip"
+            hx-target="closest .entry-tag"
             hx-swap="outerHTML swap:0.15s">&times;</button>
     {% endif %}
   </span>
 {%- endmacro %}
 
-{% macro render_meta_chips(entry_id, tags=[], hidden=False) -%}
-  <meta-chips class="meta-chips"
+{% macro render_entry_tags(entry_id, tags=[], hidden=False) -%}
+  <entry-tags class="entry-tags"
               data-entry-id="{{ entry_id }}"
               data-suggestions-url="{{ url_for('tags.get_tag_suggestions', entry_id=entry_id) }}"
               data-autocomplete-limit="12"
@@ -31,9 +31,9 @@
       <span class="icon-mask icon-tag" aria-hidden="true"></span>
     </button>
 
-    <div class="meta-tags" id="entry-tags-{{ entry_id }}">
+    <div class="entry-tags-list" id="entry-tags-{{ entry_id }}">
       {% for tag in tags %}
-      {{ keyword_chip(tag.name, tag.hash, entry_id) }}
+      {{ entry_tag_item(tag.name, tag.hash, entry_id) }}
       {% endfor %}
     </div>
 
@@ -63,5 +63,5 @@
         </div>
       </div>
     </div>
-  </meta-chips>
+  </entry-tags>
 {%- endmacro %}

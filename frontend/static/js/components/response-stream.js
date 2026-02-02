@@ -74,7 +74,7 @@ function revealMetaChips(container) {
     requestScrollToBottom({ reason: "meta" });
   };
 
-  animateMotion(container, "motion-animate-chip-enter", {
+  animateMotion(container, "motion-animate-tag-enter", {
     onFinish: notifyScroll,
     onCancel: notifyScroll,
     reducedMotion: (_, done) => {
@@ -570,7 +570,7 @@ class ResponseStreamElement extends HTMLElement {
     if (status === "done" && assistantEntryId) {
       this.#loadMetaChips(assistantEntryId);
     } else {
-      const placeholder = this.querySelector(".meta-chips-placeholder");
+      const placeholder = this.querySelector(".entry-tags-placeholder");
       placeholder?.remove();
     }
 
@@ -756,7 +756,7 @@ class ResponseStreamElement extends HTMLElement {
     }
 
     if (!indicator.isConnected) {
-      const placeholder = this.querySelector(".meta-chips-placeholder");
+      const placeholder = this.querySelector(".entry-tags-placeholder");
       if (placeholder?.parentNode === this) {
         this.insertBefore(indicator, placeholder);
       } else {
@@ -807,7 +807,7 @@ class ResponseStreamElement extends HTMLElement {
   #loadMetaChips(assistantId) {
     if (!assistantId) return;
 
-    const placeholder = this.querySelector(".meta-chips-placeholder");
+    const placeholder = this.querySelector(".entry-tags-placeholder");
     if (!placeholder) return;
 
     if (this.#metaChipsAssistantId === assistantId) {
@@ -819,7 +819,7 @@ class ResponseStreamElement extends HTMLElement {
     this.#cancelMetaChipsRequest();
 
     try {
-      const request = htmx.ajax("GET", `/e/meta-chips/${assistantId}`, {
+      const request = htmx.ajax("GET", `/e/entry-tags/${assistantId}`, {
         target: placeholder,
         swap: "outerHTML",
       });
@@ -844,7 +844,7 @@ class ResponseStreamElement extends HTMLElement {
         }
       }
     } catch (err) {
-      console.error("failed to load meta chips", err);
+      console.error("failed to load entry tags", err);
     }
   }
 
@@ -875,7 +875,7 @@ class ResponseStreamElement extends HTMLElement {
     this.addEventListener(
       "htmx:afterSwap",
       (event) => {
-        if (event.target?.classList?.contains("meta-chips")) {
+        if (event.target?.classList?.contains("entry-tags")) {
           revealMetaChips(event.target);
           this.#teardownMetaChipsListener();
         }

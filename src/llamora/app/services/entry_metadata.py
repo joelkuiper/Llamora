@@ -53,26 +53,26 @@ def _extract_json_object(raw: str) -> dict[str, Any] | None:
 
 def _sanitise_metadata(payload: Mapping[str, Any] | None) -> dict[str, Any]:
     if not payload:
-        return {"emoji": DEFAULT_METADATA_EMOJI, "keywords": []}
+        return {"emoji": DEFAULT_METADATA_EMOJI, "tags": []}
 
     emoji = payload.get("emoji") or DEFAULT_METADATA_EMOJI
     if not isinstance(emoji, str) or not emoji.strip():
         emoji = DEFAULT_METADATA_EMOJI
 
-    keywords = payload.get("keywords")
-    if not isinstance(keywords, list):
-        keywords = []
+    tags = payload.get("tags")
+    if not isinstance(tags, list):
+        tags = []
     else:
-        keywords = [str(item).strip() for item in keywords if str(item).strip()]
+        tags = [str(item).strip() for item in tags if str(item).strip()]
 
-    return {"emoji": emoji, "keywords": keywords}
+    return {"emoji": emoji, "tags": tags}
 
 
 async def generate_metadata(llm, text: str) -> dict[str, Any]:
     """Generate metadata for ``text`` using a single LLM pass."""
 
     if not text or not str(text).strip():
-        return {"emoji": DEFAULT_METADATA_EMOJI, "keywords": []}
+        return {"emoji": DEFAULT_METADATA_EMOJI, "tags": []}
 
     system_prompt = _metadata_system_prompt()
     messages = [
@@ -84,7 +84,7 @@ async def generate_metadata(llm, text: str) -> dict[str, Any]:
         raw = await llm.complete_messages(messages)
     except Exception:
         logger.exception("Metadata generation request failed")
-        return {"emoji": DEFAULT_METADATA_EMOJI, "keywords": []}
+        return {"emoji": DEFAULT_METADATA_EMOJI, "tags": []}
 
     metadata = _extract_json_object(raw)
     if metadata is None:
