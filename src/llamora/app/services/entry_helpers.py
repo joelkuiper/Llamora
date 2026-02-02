@@ -1,4 +1,4 @@
-"""Helpers for chat routes and streaming logic."""
+"""Helpers for entry routes and streaming logic."""
 
 from __future__ import annotations
 
@@ -148,7 +148,7 @@ async def start_stream_session(
 
 @dataclass(slots=True)
 class RecallAugmentation:
-    """Result of applying recall context to a chat history."""
+    """Result of applying recall context to an entry history."""
 
     messages: list[dict[str, Any]]
     recall_inserted: bool
@@ -317,7 +317,7 @@ def _error_events(pending_response, chunk: str | None = None):
 class StreamSession(Response):
     """Facade for Server-Sent Event responses.
 
-    ``StreamSession`` encapsulates the boilerplate required to stream chat
+    ``StreamSession`` encapsulates the boilerplate required to stream entry
     responses over SSE.  It standardises headers, formatting, and pending
     response lifecycle management so callers only need to select the desired
     flavour of stream.

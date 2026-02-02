@@ -1,4 +1,4 @@
-"""Chat prompt assembly helpers backed by the tokenizer's chat template."""
+"""Entry prompt assembly helpers backed by the tokenizer's chat template."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from .tokenizers.tokenizer import format_vibes_text, get_tokenizer
 
 
 @dataclass(frozen=True, slots=True)
-class ChatPromptRender:
+class EntryPromptRender:
     """Container for a rendered prompt and its tokenisation."""
 
     prompt: str
@@ -25,11 +25,11 @@ class ChatPromptRender:
 
 
 @dataclass(frozen=True, slots=True)
-class ChatPromptSeries:
+class EntryPromptSeries:
     """Collection of rendered prompts for the base and history suffixes."""
 
-    base: ChatPromptRender
-    suffixes: tuple[ChatPromptRender, ...]
+    base: EntryPromptRender
+    suffixes: tuple[EntryPromptRender, ...]
 
     @property
     def base_token_count(self) -> int:
@@ -73,7 +73,7 @@ def _normalise_tokens(raw: Any) -> tuple[int, ...]:
         raise TypeError("Tokenizer tokens must be integers") from exc
 
 
-def _coerce_chat_messages(
+def _coerce_entry_messages(
     messages: Sequence[Mapping[str, Any] | dict[str, Any]],
 ) -> list[dict[str, str]]:
     normalised: list[dict[str, str]] = []
@@ -93,13 +93,13 @@ def _coerce_chat_messages(
     return normalised
 
 
-def _render_chat_prompt(
+def _render_entry_prompt(
     messages: Sequence[Mapping[str, Any] | dict[str, Any]],
     *,
     add_generation_prompt: bool = True,
-) -> ChatPromptRender:
+) -> EntryPromptRender:
     tokenizer = get_tokenizer()
-    message_list = _coerce_chat_messages(messages)
+    message_list = _coerce_entry_messages(messages)
 
     prompt = tokenizer.apply_chat_template(
         message_list,
@@ -115,7 +115,7 @@ def _render_chat_prompt(
         add_generation_prompt=add_generation_prompt,
     )
     tokens = _normalise_tokens(token_data)
-    return ChatPromptRender(prompt=prompt, tokens=tokens)
+    return EntryPromptRender(prompt=prompt, tokens=tokens)
 
 
 def _normalise_text(value: Any) -> str:
@@ -207,11 +207,11 @@ def _build_opening_recap_message(
     return rendered.strip()
 
 
-def build_chat_messages(
+def build_entry_messages(
     history: Sequence[Mapping[str, Any] | dict[str, Any]],
     **context: Any,
 ) -> list[dict[str, str]]:
-    """Return chat messages representing ``history`` and ``context``."""
+    """Return entry messages representing ``history`` and ``context``."""
 
     system_message = _build_system_message(
         date=_normalise_text(context.get("date")) or None,
@@ -233,7 +233,7 @@ def build_opening_messages(
     yesterday_messages: Sequence[Mapping[str, Any] | dict[str, Any]],
     **context: Any,
 ) -> list[dict[str, str]]:
-    """Return chat messages for the automated opening greeting."""
+    """Return entry messages for the automated opening greeting."""
 
     is_new = bool(context.get("is_new"))
     has_no_activity = bool(context.get("has_no_activity"))
@@ -257,28 +257,28 @@ def build_opening_messages(
     ]
 
 
-def render_chat_prompt(
+def render_entry_prompt(
     messages: Sequence[Mapping[str, Any] | dict[str, Any]],
-) -> ChatPromptRender:
+) -> EntryPromptRender:
     """Render ``messages`` to a prompt using the tokenizer's chat template."""
 
-    return _render_chat_prompt(messages)
+    return _render_entry_prompt(messages)
 
 
-def render_chat_prompt_series(
+def render_entry_prompt_series(
     history: Sequence[Mapping[str, Any] | dict[str, Any]],
     **context: Any,
-) -> ChatPromptSeries:
+) -> EntryPromptSeries:
     """Render prompts for the base system message and each history suffix."""
 
     ctx_history = list(history)
-    base_messages = build_chat_messages((), **context)
-    base_render = _render_chat_prompt(base_messages)
+    base_messages = build_entry_messages((), **context)
+    base_render = _render_entry_prompt(base_messages)
 
-    suffix_renders: list[ChatPromptRender] = []
+    suffix_renders: list[EntryPromptRender] = []
     for idx in range(len(ctx_history)):
         suffix_history = ctx_history[idx:]
-        messages = build_chat_messages(suffix_history, **context)
-        suffix_renders.append(_render_chat_prompt(messages))
+        messages = build_entry_messages(suffix_history, **context)
+        suffix_renders.append(_render_entry_prompt(messages))
 
-    return ChatPromptSeries(base=base_render, suffixes=tuple(suffix_renders))
+    return EntryPromptSeries(base=base_render, suffixes=tuple(suffix_renders))

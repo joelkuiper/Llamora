@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class LLMStreamConfig:
-    """Container for chat stream configuration values."""
+    """Container for response stream configuration values."""
 
     pending_ttl: int
     queue_limit: int

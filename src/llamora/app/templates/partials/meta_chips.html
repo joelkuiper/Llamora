@@ -20,7 +20,6 @@
 {% macro render_meta_chips(msg_id, tags=[], hidden=False) -%}
   <meta-chips class="meta-chips"
               data-msg-id="{{ msg_id }}"
-              data-autocomplete-url="{{ url_for('tags.autocomplete_tags') }}"
               data-suggestions-url="{{ url_for('tags.get_tag_suggestions', msg_id=msg_id) }}"
               data-autocomplete-limit="12"
               {% if hidden %}hidden{% endif %}>

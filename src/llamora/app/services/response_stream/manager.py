@@ -289,7 +289,7 @@ class StreamCapacityError(RuntimeError):
         super().__init__(message or "Streaming capacity exhausted")
 
 
-class ChatStreamManager:
+class ResponseStreamManager:
     def __init__(
         self,
         llm: LLMClient,
@@ -430,7 +430,7 @@ class ChatStreamManager:
             self._schedule_pending_cancellation(user_msg_id, pending)
 
         if self._db is None:
-            raise RuntimeError("ChatStreamManager database is not configured")
+            raise RuntimeError("ResponseStreamManager database is not configured")
 
         max_slots = self._max_slots()
         queue_depth = len(self._queue)
@@ -549,7 +549,7 @@ class ChatStreamManager:
         try:
             callback(self._build_queue_snapshot())
         except Exception:  # pragma: no cover - defensive
-            logger.exception("Chat stream queue hook failed")
+            logger.exception("Response stream queue hook failed")
 
     def remove_queue_hook(self, callback: Callable[[dict[str, int]], None]) -> None:
         self._queue_hooks.discard(callback)
@@ -572,14 +572,14 @@ class ChatStreamManager:
         snapshot = self._build_queue_snapshot()
         if self._service_pulse is not None:
             try:
-                self._service_pulse.emit("chat_stream.queue", snapshot)
+                self._service_pulse.emit("response_stream.queue", snapshot)
             except Exception:  # pragma: no cover - defensive
-                logger.exception("Failed to emit chat stream queue pulse")
+                logger.exception("Failed to emit response stream queue pulse")
         for hook in list(self._queue_hooks):
             try:
                 hook(snapshot)
             except Exception:  # pragma: no cover - defensive
-                logger.exception("Chat stream queue hook failed")
+                logger.exception("Response stream queue hook failed")
 
     def _ensure_queue_worker(self) -> None:
         if self._queue_consumer is not None and not self._queue_consumer.done():
@@ -605,7 +605,7 @@ class ChatStreamManager:
         except asyncio.CancelledError:
             raise
         except Exception:  # pragma: no cover - defensive
-            logger.exception("Chat stream queue worker failed")
+            logger.exception("Response stream queue worker failed")
             raise
 
     async def _wait_for_slot(self) -> None:
@@ -633,7 +633,7 @@ class ChatStreamManager:
             return
         exc = task.exception()
         if exc is not None:
-            logger.exception("Chat stream queue worker exited", exc_info=exc)
+            logger.exception("Response stream queue worker exited", exc_info=exc)
             if self._queue:
                 self._ensure_queue_worker()
 
@@ -692,7 +692,7 @@ class ChatStreamManager:
 
 
 __all__ = [
-    "ChatStreamManager",
+    "ResponseStreamManager",
     "LLMStreamSession",
     "PendingResponse",
     "StreamCapacityError",

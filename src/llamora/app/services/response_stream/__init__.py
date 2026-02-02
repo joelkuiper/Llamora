@@ -1,4 +1,4 @@
-from .manager import ChatStreamManager, LLMStreamSession, PendingResponse
+from .manager import ResponseStreamManager, LLMStreamSession, PendingResponse
 from .pipeline import (
     AssistantMessageWriter,
     LLMStreamError,
@@ -8,7 +8,7 @@ from .pipeline import (
 )
 
 __all__ = [
-    "ChatStreamManager",
+    "ResponseStreamManager",
     "LLMStreamSession",
     "PendingResponse",
     "ResponsePipeline",

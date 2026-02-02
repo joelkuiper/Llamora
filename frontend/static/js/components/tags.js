@@ -420,9 +420,8 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
 
   buildAutocompleteFetchParams() {
     const input = this.autocompleteInput;
-    const url = this.#getAutocompleteUrl();
-    const msgId = this.dataset?.msgId ?? "";
-    if (!input || !url || !msgId) {
+    const url = this.#getSuggestionsUrl();
+    if (!input || !url) {
       return null;
     }
     let query = prepareTagAutocompleteValue(input.value ?? "");
@@ -430,7 +429,7 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
     if (maxLength) {
       query = query.slice(0, maxLength);
     }
-    return { query, context: { msgId, url } };
+    return { query, context: { url } };
   }
 
   onAutocompleteCommit() {
@@ -507,14 +506,12 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   async #fetchTagAutocompleteCandidates(query, context = {}) {
-    const url = context.url ?? this.#getAutocompleteUrl();
-    const msgId = context.msgId ?? this.dataset?.msgId ?? "";
-    if (!url || !msgId) {
+    const url = context.url ?? this.#getSuggestionsUrl();
+    if (!url) {
       return [];
     }
 
     const params = new URLSearchParams();
-    params.set("msg_id", msgId);
     if (query) {
       params.set("q", query);
     }
@@ -563,8 +560,8 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
     const normalized = canonical
       ? canonical.toLowerCase()
       : (query ?? "").trim().toLowerCase();
-    const msgId = context.msgId ?? this.dataset?.msgId ?? "";
-    return `${msgId}::${normalized}`;
+    const url = context.url ?? this.#getSuggestionsUrl() ?? "";
+    return `${url}::${normalized}`;
   }
 
   #normalizeTagCandidate(candidate) {
@@ -592,8 +589,8 @@ export class Tags extends AutocompleteOverlayMixin(ReactiveElement) {
     return mergeTagCandidateValues(remote ?? [], locals, limit);
   }
 
-  #getAutocompleteUrl() {
-    return this.dataset?.autocompleteUrl ?? "";
+  #getSuggestionsUrl() {
+    return this.dataset?.suggestionsUrl ?? "";
   }
 
   #getAutocompleteLimit() {

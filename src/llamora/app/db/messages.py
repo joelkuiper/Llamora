@@ -19,7 +19,7 @@ MessageAppendedCallback = Callable[[str, str, str, bytes], Awaitable[None]]
 
 
 class MessagesRepository(BaseRepository):
-    """Persistence helpers for encrypted chat messages."""
+    """Persistence helpers for encrypted entry messages."""
 
     def __init__(
         self,

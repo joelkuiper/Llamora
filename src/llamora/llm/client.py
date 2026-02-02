@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 from llamora.app.util import canonicalize
 from llamora.settings import settings
 from .process_manager import LlamafileProcessManager
-from .chat_template import build_chat_messages, render_chat_prompt
+from .entry_template import build_entry_messages, render_entry_prompt
 from .tokenizers.tokenizer import count_tokens, history_suffix_token_totals
 
 DEFAULT_LLM_REQUEST = dict(settings.LLM.request)
@@ -728,22 +728,22 @@ class LLMClient:
                 yield {"type": "error", "data": f"Prompt error: {e}"}
                 return
             try:
-                messages = build_chat_messages(history, **ctx)
+                messages = build_entry_messages(history, **ctx)
             except Exception as e:
                 self.logger.exception("Failed to build prompt messages")
                 yield {"type": "error", "data": f"Prompt error: {e}"}
                 return
         try:
-            prompt_render = render_chat_prompt(messages)
+            prompt_render = render_entry_prompt(messages)
         except Exception as e:
-            self.logger.exception("Failed to render chat prompt")
+            self.logger.exception("Failed to render entry prompt")
             yield {"type": "error", "data": f"Prompt error: {e}"}
             return
 
         self.prompt_budget.diagnostics(
             prompt_tokens=prompt_render.token_count,
             params=cfg,
-            label="chat:stream",
+            label="entry:stream",
             extra={
                 "history_messages": len(history or []) if history is not None else 0,
                 "prompt_messages": len(messages or []),
@@ -783,7 +783,7 @@ class LLMClient:
         message_list = list(messages)
 
         try:
-            prompt_render = render_chat_prompt(message_list)
+            prompt_render = render_entry_prompt(message_list)
         except Exception as exc:
             self.logger.exception("Failed to render completion prompt")
             raise RuntimeError("Prompt rendering failed") from exc
@@ -791,7 +791,7 @@ class LLMClient:
         self.prompt_budget.diagnostics(
             prompt_tokens=prompt_render.token_count,
             params=cfg,
-            label="chat:complete",
+            label="entry:complete",
             extra={"prompt_messages": len(message_list)},
         )
 

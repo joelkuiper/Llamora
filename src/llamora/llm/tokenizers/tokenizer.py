@@ -88,7 +88,7 @@ def count_tokens(prompt: str) -> int:
 
 
 def format_message_fragment(role: str, message: str) -> str:
-    """Render a history entry in the format used by the chat prompt template."""
+    """Render a history entry in the format used by the entry prompt template."""
 
     safe_role = (role or "user").strip() or "user"
     safe_message = (message or "").strip()
@@ -98,10 +98,10 @@ def format_message_fragment(role: str, message: str) -> str:
 def count_message_tokens(role: str, message: str) -> int:
     """Return the token count for a single history entry."""
 
-    from llamora.llm.chat_template import render_chat_prompt_series
+    from llamora.llm.entry_template import render_entry_prompt_series
 
     history = ({"role": role, "message": message},)
-    series = render_chat_prompt_series(history)
+    series = render_entry_prompt_series(history)
     totals = series.suffix_token_counts
     if not totals:
         return 0
@@ -116,7 +116,7 @@ def history_suffix_token_totals(
 ) -> tuple[int, ...]:
     """Return cumulative token totals for each suffix of ``history``."""
 
-    from llamora.llm.chat_template import render_chat_prompt_series
+    from llamora.llm.entry_template import render_entry_prompt_series
 
     ctx: dict[str, Any] = {}
     if context:
@@ -124,7 +124,7 @@ def history_suffix_token_totals(
     if context_kwargs:
         ctx.update(context_kwargs)
 
-    series = render_chat_prompt_series(history, **ctx)
+    series = render_entry_prompt_series(history, **ctx)
     return series.suffix_token_counts
 
 

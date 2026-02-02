@@ -15,12 +15,12 @@ from zoneinfo import ZoneInfo
 from typing import Any
 from werkzeug.exceptions import HTTPException
 
-from llamora.llm.chat_template import build_opening_messages, render_chat_prompt
+from llamora.llm.entry_template import build_opening_messages, render_entry_prompt
 
 from llamora.app.services.container import get_services
 from llamora.app.services.auth_helpers import login_required
 from llamora.app.services.entry_context import get_entries_context
-from llamora.app.services.chat_helpers import (
+from llamora.app.services.entry_helpers import (
     augment_history_with_recall,
     apply_reply_kind_prompt,
     history_has_tag_recall,
@@ -30,7 +30,7 @@ from llamora.app.services.chat_helpers import (
     start_stream_session,
 )
 from llamora.app.services.entry_context import build_entry_context
-from llamora.app.services.chat_stream.manager import StreamCapacityError
+from llamora.app.services.response_stream.manager import StreamCapacityError
 from llamora.app.services.tag_recall import build_tag_recall_context
 from llamora.app.services.session_context import get_session_context
 from llamora.app.services.time import (
@@ -64,7 +64,7 @@ def _trim_history_to_entry(
 
 
 def _entry_stream_manager():
-    return get_services().llm_service.chat_stream_manager
+    return get_services().llm_service.response_stream_manager
 
 
 def _load_reply_kinds() -> tuple[list[dict[str, str]], dict[str, str]]:
@@ -283,10 +283,10 @@ async def sse_opening(date: str):
         recall_index = augmentation.recall_index
 
         budget = llm_client.prompt_budget
-        prompt_render = render_chat_prompt(opening_messages)
+        prompt_render = render_entry_prompt(opening_messages)
         snapshot = budget.diagnostics(
             prompt_tokens=prompt_render.token_count,
-            label="chat:opening",
+            label="entry:opening",
             extra={
                 "phase": "initial",
                 "messages": len(opening_messages),
@@ -304,10 +304,10 @@ async def sse_opening(date: str):
                 drop_index = recall_index if recall_index is not None else 1
                 if 0 <= drop_index < len(opening_messages):
                     opening_messages.pop(drop_index)
-                prompt_render = render_chat_prompt(opening_messages)
+                prompt_render = render_entry_prompt(opening_messages)
                 budget.diagnostics(
                     prompt_tokens=prompt_render.token_count,
-                    label="chat:opening",
+                    label="entry:opening",
                     extra={
                         "phase": "after-recall-drop",
                         "messages": len(opening_messages),
@@ -317,7 +317,7 @@ async def sse_opening(date: str):
             if prompt_render.token_count > max_tokens:
                 budget.diagnostics(
                     prompt_tokens=prompt_render.token_count,
-                    label="chat:opening",
+                    label="entry:opening",
                     extra={
                         "phase": "overflow-after-trim",
                         "messages": len(opening_messages),
@@ -459,7 +459,7 @@ async def sse_reply(user_msg_id: str, date: str):
 
     services = get_services()
     db = services.db
-    manager = services.llm_service.chat_stream_manager
+    manager = services.llm_service.response_stream_manager
     entry_context = await build_entry_context(
         db,
         uid,

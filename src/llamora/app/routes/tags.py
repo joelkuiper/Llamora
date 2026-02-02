@@ -7,7 +7,7 @@ from llamora.app.util.frecency import (
     DEFAULT_FRECENCY_DECAY,
     resolve_frecency_lambda,
 )
-from llamora.app.routes.helpers import ensure_message_exists, require_user_and_dek
+from llamora.app.routes.helpers import require_user_and_dek
 
 tags_bp = Blueprint("tags", __name__)
 
@@ -66,11 +66,28 @@ async def get_tag_suggestions(msg_id: str):
     )
     llm = get_services().llm_service.llm
 
-    suggestions = await _tags().suggest_for_message(
+    max_tag_length = int(settings.LIMITS.max_tag_length)
+    raw_query = (request.args.get("q") or "").strip()[:max_tag_length]
+    query_canonical = raw_query.lstrip("#").strip()
+    query_canonical = query_canonical[:max_tag_length].strip()
+
+    limit = request.args.get("limit")
+    clamped_limit: int | None = None
+    if limit is not None:
+        try:
+            clamped_limit = int(limit)
+        except (TypeError, ValueError) as exc:
+            abort(400, description="invalid limit")
+            raise AssertionError("unreachable") from exc
+        clamped_limit = max(1, min(clamped_limit, 50))
+
+    suggestions = await _tags().suggest_for_entry(
         user["id"],
         msg_id,
         dek,
         llm=llm,
+        query=query_canonical or None,
+        limit=clamped_limit,
         frecency_limit=3,
         decay_constant=decay_constant,
     )
@@ -78,85 +95,17 @@ async def get_tag_suggestions(msg_id: str):
         abort(404, description="message not found")
         raise AssertionError("unreachable")
 
+    wants_json = request.accept_mimetypes.best == "application/json"
+    if wants_json:
+        payload = [
+            {"name": tag, "display": _tags().display(tag)}
+            for tag in suggestions
+        ]
+        return jsonify({"results": payload})
+
     html = await render_template(
         "partials/tag_suggestions.html",
         suggestions=suggestions,
         msg_id=msg_id,
     )
     return html
-
-
-@tags_bp.get("/tags/autocomplete")
-@login_required
-async def autocomplete_tags():
-    _, user, dek = await require_user_and_dek()
-
-    msg_id = (request.args.get("msg_id") or "").strip()
-    if not msg_id:
-        abort(400, description="message id required")
-        raise AssertionError("unreachable")
-
-    try:
-        limit = int(request.args.get("limit", 12))
-    except (TypeError, ValueError) as exc:
-        abort(400, description="invalid limit")
-        raise AssertionError("unreachable") from exc
-
-    limit = max(1, min(limit, 50))
-
-    db = get_services().db
-    await ensure_message_exists(db, user["id"], msg_id)
-
-    max_tag_length = int(settings.LIMITS.max_tag_length)
-    raw_query = (request.args.get("q") or "").strip()[:max_tag_length]
-    query_canonical = raw_query.lstrip("#").strip()
-    query_canonical = query_canonical[:max_tag_length].strip()
-
-    existing = await db.tags.get_tags_for_message(user["id"], msg_id, dek)
-    excluded: set[str] = set()
-    for tag in existing:
-        name = (tag.get("name") or "").strip().lower()
-        if not name:
-            continue
-        excluded.add(name)
-
-    lambda_param = request.args.get("lambda")
-    decay_constant = resolve_frecency_lambda(
-        lambda_param, default=DEFAULT_FRECENCY_DECAY
-    )
-
-    results = await db.tags.search_tags(
-        user["id"],
-        dek,
-        limit=limit,
-        prefix=query_canonical or None,
-        lambda_=decay_constant,
-        exclude_names=excluded,
-    )
-
-    payload = []
-    seen: set[str] = set()
-    prefix_lower = query_canonical.lower()
-    for entry in results:
-        name = (entry.get("name") or "").strip()
-        if not name:
-            continue
-        canonical_name = name[:max_tag_length].strip()
-        lower_name = canonical_name.lower()
-        if prefix_lower:
-            if not lower_name.startswith(prefix_lower):
-                continue
-        if lower_name in excluded:
-            continue
-        if lower_name in seen:
-            continue
-        seen.add(lower_name)
-        payload.append(
-            {
-                "name": canonical_name,
-                "display": _tags().display(canonical_name),
-                "hash": entry.get("hash"),
-            }
-        )
-
-    return jsonify({"results": payload})

@@ -40,7 +40,7 @@ def _merge_attributes(
 
 @lru_cache
 def _html_cleaner() -> Cleaner:
-    """Return a reusable Bleach cleaner with chat-safe defaults."""
+    """Return a reusable Bleach cleaner with entry-safe defaults."""
 
     allowed_tags = set(bleach.sanitizer.ALLOWED_TAGS)
     allowed_tags.update(

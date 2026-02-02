@@ -9,7 +9,7 @@ from typing import Any
 from llamora.llm.client import LLMClient
 from llamora.llm.process_manager import LlamafileProcessManager
 
-from .chat_stream import ChatStreamManager
+from .response_stream import ResponseStreamManager
 from .llm_stream_config import LLMStreamConfig
 from .service_pulse import ServicePulse
 
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class LLMService:
-    """Own the llamafile process, client, and chat streaming manager."""
+    """Own the llamafile process, client, and response streaming manager."""
 
     def __init__(
         self,
@@ -30,7 +30,7 @@ class LLMService:
         self._db = db
         self._process_manager: LlamafileProcessManager | None = None
         self._llm: LLMClient | None = None
-        self._chat_stream_manager: ChatStreamManager | None = None
+        self._response_stream_manager: ResponseStreamManager | None = None
         self._lock = asyncio.Lock()
         self._stream_config = stream_config
         self._service_pulse = service_pulse
@@ -59,7 +59,7 @@ class LLMService:
 
             process_manager: LlamafileProcessManager | None = None
             llm_client: LLMClient | None = None
-            chat_stream_manager: ChatStreamManager | None = None
+            response_stream_manager: ResponseStreamManager | None = None
 
             try:
                 process_manager = LlamafileProcessManager()
@@ -68,21 +68,21 @@ class LLMService:
                     process_manager, service_pulse=self._service_pulse
                 )
 
-                chat_stream_manager = ChatStreamManager(
+                response_stream_manager = ResponseStreamManager(
                     llm_client,
                     stream_config=self._stream_config,
                     service_pulse=self._service_pulse,
                 )
-                chat_stream_manager.set_db(self._db)
+                response_stream_manager.set_db(self._db)
             except Exception:
                 logger.exception("Failed to initialise LLM service stack")
 
-                if chat_stream_manager is not None:
+                if response_stream_manager is not None:
                     try:
-                        await chat_stream_manager.shutdown()
+                        await response_stream_manager.shutdown()
                     except Exception:
                         logger.exception(
-                            "Error shutting down chat stream manager after failed start"
+                            "Error shutting down response stream manager after failed start"
                         )
 
                 if llm_client is not None:
@@ -103,7 +103,7 @@ class LLMService:
 
             self._process_manager = process_manager
             self._llm = llm_client
-            self._chat_stream_manager = chat_stream_manager
+            self._response_stream_manager = response_stream_manager
 
             logger.info("LLM service stack started")
 
@@ -116,22 +116,22 @@ class LLMService:
 
             logger.debug("Tearing down LLM service stack")
 
-            chat_stream_manager = self._chat_stream_manager
+            response_stream_manager = self._response_stream_manager
             llm_client = self._llm
             process_manager = self._process_manager
 
-            self._chat_stream_manager = None
+            self._response_stream_manager = None
             self._llm = None
             self._process_manager = None
 
         errors: list[Exception] = []
 
-        if chat_stream_manager is not None:
+        if response_stream_manager is not None:
             try:
-                await chat_stream_manager.shutdown()
+                await response_stream_manager.shutdown()
             except Exception as exc:
                 errors.append(exc)
-                logger.exception("Error shutting down chat stream manager")
+                logger.exception("Error shutting down response stream manager")
 
         if llm_client is not None:
             try:
@@ -167,10 +167,10 @@ class LLMService:
         return self._llm
 
     @property
-    def chat_stream_manager(self) -> ChatStreamManager:
-        if self._chat_stream_manager is None:
+    def response_stream_manager(self) -> ResponseStreamManager:
+        if self._response_stream_manager is None:
             raise RuntimeError("LLM service has not been started")
-        return self._chat_stream_manager
+        return self._response_stream_manager
 
 
 __all__ = ["LLMService"]
