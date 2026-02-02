@@ -4,9 +4,9 @@
   <section id="profile-page">
     <header class="profile-header">
       <button id="profile-back" class="back-btn" aria-label="Back" data-tooltip-title="Back">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="15 18 9 12 15 6"></polyline>
-        </svg>
+        <img src="{{ url_for('static', filename='icons/chevron-left.svg') }}"
+             alt=""
+             aria-hidden="true">
       </button>
       <h1>Profile for {{ user.username }}</h1>
     </header>

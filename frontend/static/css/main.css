@@ -463,7 +463,12 @@ input[type="checkbox"]:focus {
     opacity: 1;
   }
 
-  svg { width: 1.25rem; height: 1.25rem; }
+  svg,
+  img {
+    width: 1.25rem;
+    height: 1.25rem;
+    display: block;
+  }
 }
 
 .icon-btn.active {

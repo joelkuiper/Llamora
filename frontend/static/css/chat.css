@@ -508,11 +508,15 @@ chat-view[data-rendering="true"] #chat {
       overflow: hidden;
     }
 
-    /* default icon */
     .btn::before {
-      content: "\27A4"; /* ➤ */
+      content: "";
       pointer-events: none;
-      transition: opacity 120ms ease-out, transform 120ms ease-out;
+    }
+
+    .btn .send-icon {
+      width: 1.35rem;
+      height: 1.35rem;
+      display: block;
     }
 
     /* submitting: gradient in accent palette */
@@ -530,7 +534,7 @@ chat-view[data-rendering="true"] #chat {
         0 0 8px var(--accent-drop-shadow);
     }
 
-    .btn.submitting::before {
+    .btn.submitting .send-icon {
       opacity: 0;
     }
 
@@ -569,6 +573,10 @@ chat-view[data-rendering="true"] #chat {
       box-shadow:
         inset 0 0 0 1px var(--accent-20),
         0 0 8px color-mix(in srgb, var(--accent-drop-shadow), transparent 20%);
+    }
+
+    .btn.stopping .send-icon {
+      opacity: 0;
     }
 
     .btn.stopping:active {

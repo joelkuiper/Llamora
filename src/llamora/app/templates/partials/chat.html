@@ -22,7 +22,9 @@
                     cols="40"
                     maxlength="{{ config.MAX_MESSAGE_LENGTH }}"></textarea>
           <input type="hidden" name="user_time" id="user-time" />
-          <button id="send-btn" class="btn" type="submit" aria-label="Send"{% if not is_today %} disabled{% endif %}></button>
+          <button id="send-btn" class="btn" type="submit" aria-label="Send"{% if not is_today %} disabled{% endif %}>
+            <img class="send-icon" src="{{ url_for('static', filename='icons/feather.svg') }}" alt="" aria-hidden="true">
+          </button>
         </div>
       </form>
     </chat-form>

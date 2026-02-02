@@ -4,26 +4,10 @@
            aria-label="Ask {{ config.APP_NAME }}"
            title="Ask {{ config.APP_NAME }}">
     <span class="visually-hidden">Ask {{ config.APP_NAME }}</span>
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M12 3.5l1.1 2.7 2.7 1.1-2.7 1.1L12 11.1l-1.1-2.7-2.7-1.1 2.7-1.1L12 3.5z"
-            fill="none"
-            stroke="currentColor"
-            stroke-linejoin="round"
-            stroke-linecap="round"
-            stroke-width="1.5" />
-      <path d="M18 9l.8 1.9 1.9.8-1.9.8L18 14.4l-.8-1.9-1.9-.8 1.9-.8L18 9z"
-            fill="none"
-            stroke="currentColor"
-            stroke-linejoin="round"
-            stroke-linecap="round"
-            stroke-width="1.5" />
-      <path d="M6 12.5l.7 1.6 1.6.7-1.6.7L6 17.1l-.7-1.6-1.6-.7 1.6-.7L6 12.5z"
-            fill="none"
-            stroke="currentColor"
-            stroke-linejoin="round"
-            stroke-linecap="round"
-            stroke-width="1.5" />
-    </svg>
+    <img class="message-action__icon"
+         src="{{ url_for('static', filename='icons/reply.svg') }}"
+         alt=""
+         aria-hidden="true">
   </summary>
   <div class="ask-llm-menu__panel" role="menu">
     {% for kind in reply_kinds %}

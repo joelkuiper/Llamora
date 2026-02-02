@@ -148,6 +148,12 @@
   }
 }
 
+.add-tag-btn img {
+  width: 1.05rem;
+  height: 1.05rem;
+  display: block;
+}
+
 .message-action {
   background: var(--glass-bg-alt);
   border: 1px solid var(--border);
@@ -177,6 +183,7 @@
 .message-action__icon {
   width: 1rem;
   height: 1rem;
+  display: block;
 }
 
 .tag-popover {
