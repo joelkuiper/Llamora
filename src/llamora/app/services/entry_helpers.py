@@ -91,13 +91,12 @@ def apply_response_kind_prompt(
 ) -> list[dict[str, Any]]:
     """Append a response-kind system prompt to history for LLM generation."""
 
+    normalized = [dict(entry) for entry in history]
     if not response_prompt:
-        return list(history)
+        return normalized
 
-    return [
-        *history,
-        {"role": "system", "text": str(response_prompt).strip()},
-    ]
+    normalized.append({"role": "system", "text": str(response_prompt).strip()})
+    return normalized
 
 
 def build_entry_history(

@@ -17,7 +17,7 @@ class OwnerCapacityError(RuntimeError):
 
     __slots__ = ("owner", "limit")
 
-    def __init__(self, owner: _Owner, limit: int) -> None:
+    def __init__(self, owner: Hashable, limit: int) -> None:
         self.owner = owner
         self.limit = limit
         super().__init__(f"Owner {owner!r} queue capacity reached ({limit})")

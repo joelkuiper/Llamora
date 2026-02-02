@@ -91,7 +91,10 @@ class PendingResponse(ResponsePipelineCallbacks):
                 yield chunk
 
         self._stream = _stream_response()
-        self._abort = lambda: llm.abort(entry_id)
+        async def _abort_stream() -> None:
+            await llm.abort(entry_id)
+
+        self._abort = _abort_stream
         self._visible_total = ""
         _repeat_guard_size = config.repeat_guard_size
         _repeat_guard_min_length = config.repeat_guard_min_length

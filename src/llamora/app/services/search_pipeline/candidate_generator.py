@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections import OrderedDict
-from typing import Iterable, Protocol
+from typing import Any, Iterable, Protocol
 
 from llamora.app.services.search_config import SearchConfig
 from llamora.app.services.vector_search import VectorSearchService
@@ -12,7 +12,7 @@ from llamora.app.services.vector_search import VectorSearchService
 logger = logging.getLogger(__name__)
 
 
-Candidate = dict
+Candidate = dict[str, Any]
 CandidateMap = OrderedDict[str, Candidate]
 
 

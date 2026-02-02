@@ -1,6 +1,11 @@
 import logging
 import time
-from typing import List
+from typing import Any, List, TYPE_CHECKING, overload, Literal
+
+if TYPE_CHECKING:
+    import numpy as np
+else:
+    np = Any  # type: ignore[assignment]
 
 from llamora.app.embed.model import async_embed_texts
 from llamora.app.index.entry_ann import EntryIndexStore
@@ -53,6 +58,34 @@ class VectorSearchService:
             return False
         return True
 
+    @overload
+    async def search_candidates(
+        self,
+        user_id: str,
+        dek: bytes,
+        query: str,
+        k1: int | None = None,
+        k2: int | None = None,
+        query_vec: "np.ndarray | None" = None,
+        *,
+        include_count: Literal[False] = False,
+    ) -> List[dict[str, Any]]:
+        ...
+
+    @overload
+    async def search_candidates(
+        self,
+        user_id: str,
+        dek: bytes,
+        query: str,
+        k1: int | None = None,
+        k2: int | None = None,
+        query_vec: "np.ndarray | None" = None,
+        *,
+        include_count: Literal[True] = True,
+    ) -> tuple[List[dict[str, Any]], int]:
+        ...
+
     async def search_candidates(
         self,
         user_id: str,
@@ -63,7 +96,7 @@ class VectorSearchService:
         query_vec: "np.ndarray | None" = None,
         *,
         include_count: bool = False,
-    ) -> List[dict] | tuple[List[dict], int]:
+    ) -> List[dict[str, Any]] | tuple[List[dict[str, Any]], int]:
         cfg = self._config.progressive
         k1 = int(k1) if k1 is not None else cfg.k1
         k2 = int(k2) if k2 is not None else cfg.k2
@@ -113,7 +146,7 @@ class VectorSearchService:
         rows = await self.index_store.hydrate_entries(user_id, dedup_ids, dek)
         row_map = {r["id"]: r for r in rows}
 
-        results: List[dict] = []
+        results: List[dict[str, Any]] = []
         for entry_id in dedup_ids:
             row = row_map.get(entry_id)
             if not row:

@@ -4,6 +4,7 @@ import logging
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 from ulid import ULID
@@ -24,7 +25,7 @@ class SearchStreamSession:
     normalized_query: str
     truncated: bool
     query_vec: np.ndarray
-    candidate_map: OrderedDict[str, dict] = field(default_factory=OrderedDict)
+    candidate_map: OrderedDict[str, Candidate] = field(default_factory=OrderedDict)
     delivered_ids: set[str] = field(default_factory=set)
     current_k2: int = 0
     exhausted: bool = False
@@ -35,7 +36,7 @@ class SearchStreamSession:
 class SearchStreamResult:
     session_id: str
     normalized_query: str
-    results: list[dict]
+    results: list[Candidate]
     truncated: bool
     has_more: bool
     showing_count: int
@@ -215,3 +216,4 @@ class SearchStreamManager:
 
 
 __all__ = ["SearchStreamManager", "SearchStreamResult"]
+Candidate = dict[str, Any]
