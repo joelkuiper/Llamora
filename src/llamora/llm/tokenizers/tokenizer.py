@@ -18,7 +18,6 @@ __all__ = [
     "format_message_fragment",
     "count_message_tokens",
     "history_suffix_token_totals",
-    "format_vibes_text",
 ]
 
 _TOKENIZER: PreTrainedTokenizerBase | None = None
@@ -127,48 +126,3 @@ def history_suffix_token_totals(
     series = render_entry_prompt_series(history, **ctx)
     return series.suffix_token_counts
 
-
-def _coerce_mapping(entry: Mapping[str, Any] | dict[str, Any]) -> Mapping[str, Any]:
-    return entry if isinstance(entry, Mapping) else dict(entry)
-
-
-def _extract_emoji(entry: Mapping[str, Any] | dict[str, Any]) -> str | None:
-    mapping = _coerce_mapping(entry)
-    meta = mapping.get("meta")
-    if not isinstance(meta, Mapping):
-        return None
-    emoji = meta.get("emoji")
-    if not emoji:
-        return None
-    return str(emoji)
-
-
-def _format_vibes_line(display_emojis: Sequence[str]) -> str:
-    if not display_emojis:
-        return ""
-    joined = " ".join(display_emojis)
-    return f"Emoji vibes for these entries: {joined}\n"
-
-
-def format_vibes_text(history: Sequence[Mapping[str, Any] | dict[str, Any]]) -> str:
-    """Render the optional emoji vibes line for ``history``.
-
-    Shows up to five *distinct* recent emojis from the history, newest first.
-    """
-    seen: set[str] = set()
-    ordered: list[str] = []
-
-    # walk from newest to oldest
-    for entry in reversed(history):
-        emoji = _extract_emoji(entry)
-        if not emoji:
-            continue
-        if emoji in seen:
-            continue
-        seen.add(emoji)
-        ordered.append(emoji)
-        if len(ordered) == 5:
-            break
-
-    # ordered is newest→oldest
-    return _format_vibes_line(ordered)

@@ -9,7 +9,7 @@ from typing import Any, Iterable, Mapping, Sequence, cast
 from llamora.app.services.time import humanize
 
 from .prompt_templates import render_prompt_template
-from .tokenizers.tokenizer import format_vibes_text, get_tokenizer
+from .tokenizers.tokenizer import get_tokenizer
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,11 +122,6 @@ def _normalise_text(value: Any) -> str:
     return str(value or "").strip()
 
 
-def _entry_vibes(history: Sequence[Mapping[str, Any] | dict[str, Any]]) -> str:
-    line = format_vibes_text(history)
-    return line.strip()
-
-
 def _context_lines(date: str | None, part_of_day: str | None) -> list[str]:
     lines: list[str] = []
     if date and part_of_day:
@@ -162,11 +157,9 @@ def _build_system_message(
     history: Sequence[Mapping[str, Any] | dict[str, Any]] = (),
 ) -> str:
     context_lines = _context_lines(date, part_of_day)
-    vibes_line = _entry_vibes(history)
     rendered = render_prompt_template(
         "system.txt.j2",
         context_lines=context_lines,
-        vibes_line=vibes_line,
     )
     return rendered.strip()
 
@@ -180,11 +173,9 @@ def _build_opening_system_message(
     has_no_activity: bool = False,
 ) -> str:
     context_lines = _context_lines(date, part_of_day)
-    vibes_line = _entry_vibes(yesterday_messages)
     rendered = render_prompt_template(
         "opening_system.txt.j2",
         context_lines=context_lines,
-        vibes_line=vibes_line,
         is_new=is_new,
         has_no_activity=has_no_activity,
     )

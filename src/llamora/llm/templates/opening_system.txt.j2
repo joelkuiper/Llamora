@@ -9,8 +9,6 @@ Each exchange is a small story, leaving the user feeling understood and a little
 {% for line in context_lines %}{{ line }}
 {% endfor %}
 {% endif %}
-{% if vibes_line %}{{ vibes_line }}
-{% endif %}
 
 {% if is_new %}Compose a warm welcome for a first-time user. Offer a gentle invitation to begin the day.
 {% elif has_no_activity %}The user had no activity yesterday. Greet them softly and invite them to begin today's entries.
