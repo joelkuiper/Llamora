@@ -345,39 +345,15 @@ body {
     background: transparent;
     border-color: transparent;
     box-shadow: none;
-    opacity: 0.4;
-  }
-
-  .message.assistant .message-delete img,
-  .message.assistant-stream .message-delete img {
-    filter: grayscale(1) brightness(0.6);
-  }
-
-  .message.assistant:hover .message-delete,
-  .message.assistant:focus-within .message-delete,
-  .message.assistant-stream:hover .message-delete,
-  .message.assistant-stream:focus-within .message-delete {
-    opacity: 0.75;
-    background: linear-gradient(
-      0deg,
-      rgba(208, 0, 48, 0.16),
-      rgba(208, 0, 48, 0.12)
-    ) var(--color-danger);
-    border-color: var(--color-danger);
-    box-shadow:
-      var(--raised-shadow),
-      0 0 0 2px var(--danger-25);
-  }
-
-  .message.assistant:hover .message-delete img,
-  .message.assistant:focus-within .message-delete img,
-  .message.assistant-stream:hover .message-delete img,
-  .message.assistant-stream:focus-within .message-delete img {
-    filter: none;
+    color: color-mix(in srgb, var(--accent) 45%, var(--color-text-muted));
   }
 
   .message-delete:hover,
-  .message-delete:focus-visible {
+  .message-delete:focus-visible,
+  .message.assistant .message-delete:hover,
+  .message.assistant .message-delete:focus-visible,
+  .message.assistant-stream .message-delete:hover,
+  .message.assistant-stream .message-delete:focus-visible {
     border-color: var(--color-danger);
     box-shadow:
       var(--raised-shadow),
@@ -387,6 +363,7 @@ body {
       rgba(208, 0, 48, 0.16),
       rgba(208, 0, 48, 0.12)
     ) var(--color-danger);
+    color: color-mix(in srgb, var(--color-white) 92%, var(--danger-25));
   }
 
   .message.htmx-swapping {
