@@ -237,11 +237,6 @@ async def register():
         if settings.FEATURES.disable_registration:
             current_app.config["REGISTRATION_TOKEN"] = None
 
-        html = await render_template(
-            "recovery.html",
-            code=format_recovery_code(recovery_code),
-            next_url=url_for("days.index"),
-        )
         return await _issue_auth_response(user_id, dek, url_for("days.index"))
 
     return await render_template("register.html")

@@ -5,7 +5,6 @@ from quart import (
     url_for,
     render_template,
     make_response,
-    abort,
 )
 from llamora.app.services.auth_helpers import login_required
 from llamora.app.services.session_context import get_session_context
@@ -80,7 +79,6 @@ async def day(date):
 @days_bp.route("/calendar")
 @login_required
 async def calendar_view():
-    session = get_session_context()
     today = local_date()
     requested_year = request.args.get("year", type=int)
     requested_month = request.args.get("month", type=int)
