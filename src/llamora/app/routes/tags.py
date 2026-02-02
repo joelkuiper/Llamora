@@ -7,7 +7,7 @@ from llamora.app.util.frecency import (
     DEFAULT_FRECENCY_DECAY,
     resolve_frecency_lambda,
 )
-from llamora.app.routes.helpers import require_user_and_dek
+from llamora.app.routes.helpers import ensure_message_exists, require_user_and_dek
 
 tags_bp = Blueprint("tags", __name__)
 
