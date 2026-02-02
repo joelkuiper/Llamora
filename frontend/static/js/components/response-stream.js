@@ -43,45 +43,6 @@ function requestScrollToBottom(detail = {}) {
   requestScrollForceBottom({ source: "response-stream", ...detail });
 }
 
-function revealMetaChips(container) {
-  if (!container || !container.hidden) return;
-
-  const parent = container.closest(".entry");
-  const reduceMotion = isMotionReduced();
-  const start = reduceMotion ? undefined : parent?.offsetHeight;
-  container.hidden = false;
-
-  if (!reduceMotion) {
-    const end = parent?.offsetHeight;
-
-    if (parent && start !== undefined && end !== undefined) {
-      parent.style.height = start + "px";
-      parent.offsetHeight;
-      parent.style.transition = "height var(--motion-gentle, 0.2s) ease";
-      parent.style.height = end + "px";
-      parent.addEventListener(
-        "transitionend",
-        () => {
-          parent.style.height = "";
-          parent.style.transition = "";
-        },
-        { once: true }
-      );
-    }
-  }
-
-  const notifyScroll = () => {
-    requestScrollToBottom({ reason: "meta" });
-  };
-
-  animateMotion(container, "motion-animate-tag-enter", {
-    onFinish: notifyScroll,
-    onCancel: notifyScroll,
-    reducedMotion: (_, done) => {
-      done();
-    },
-  });
-}
 
 class ResponseStreamElement extends HTMLElement {
   #eventSource = null;
@@ -106,9 +67,6 @@ class ResponseStreamElement extends HTMLElement {
   #boundHandleMeta;
   #controller = null;
   #controllerDisconnect = null;
-  #metaChipsRequest = null;
-  #metaChipsAssistantId = null;
-  #metaChipsListenerController = null;
   #deleteButton = null;
   #untracked = false;
 
@@ -202,8 +160,6 @@ class ResponseStreamElement extends HTMLElement {
       this.#controllerDisconnect = null;
     }
     this.#controller = null;
-    this.#cancelMetaChipsRequest();
-    this.#teardownMetaChipsListener();
   }
 
   get entryId() {
@@ -567,12 +523,8 @@ class ResponseStreamElement extends HTMLElement {
       this.#markAsError();
     }
 
-    if (status === "done" && assistantEntryId) {
-      this.#loadMetaChips(assistantEntryId);
-    } else {
-      const placeholder = this.querySelector(".entry-tags-placeholder");
-      placeholder?.remove();
-    }
+    const placeholder = this.querySelector(".entry-tags-placeholder");
+    placeholder?.remove();
 
     if (!this.#untracked) {
       const controller = this.#controller || this.#getStreamController();
@@ -756,12 +708,7 @@ class ResponseStreamElement extends HTMLElement {
     }
 
     if (!indicator.isConnected) {
-      const placeholder = this.querySelector(".entry-tags-placeholder");
-      if (placeholder?.parentNode === this) {
-        this.insertBefore(indicator, placeholder);
-      } else {
-        this.appendChild(indicator);
-      }
+      this.appendChild(indicator);
     }
 
     this.#repeatGuardIndicator = indicator;
@@ -804,96 +751,6 @@ class ResponseStreamElement extends HTMLElement {
     return indicator;
   }
 
-  #loadMetaChips(assistantId) {
-    if (!assistantId) return;
-
-    const placeholder = this.querySelector(".entry-tags-placeholder");
-    if (!placeholder) return;
-
-    if (this.#metaChipsAssistantId === assistantId) {
-      return;
-    }
-
-    this.#metaChipsAssistantId = assistantId;
-    this.#ensureMetaChipsListener();
-    this.#cancelMetaChipsRequest();
-
-    try {
-      const request = htmx.ajax("GET", `/e/entry-tags/${assistantId}`, {
-        target: placeholder,
-        swap: "outerHTML",
-      });
-
-      if (request) {
-        this.#metaChipsRequest = request;
-        const cleanup = () => {
-          if (this.#metaChipsRequest === request) {
-            this.#metaChipsRequest = null;
-          }
-        };
-
-        if (typeof request.addEventListener === "function") {
-          request.addEventListener("abort", cleanup, { once: true });
-          request.addEventListener("loadend", cleanup, { once: true });
-        } else if (typeof request.finally === "function") {
-          request.finally(cleanup);
-        } else if (typeof request.then === "function") {
-          request.then(cleanup, cleanup);
-        } else {
-          cleanup();
-        }
-      }
-    } catch (err) {
-      console.error("failed to load entry tags", err);
-    }
-  }
-
-  #cancelMetaChipsRequest() {
-    if (!this.#metaChipsRequest) {
-      return;
-    }
-
-    const request = this.#metaChipsRequest;
-    const abortFn = typeof request.abort === "function" ? request.abort : null;
-    if (abortFn) {
-      try {
-        abortFn.call(request);
-      } catch (_) {
-        // ignored
-      }
-    }
-
-    this.#metaChipsRequest = null;
-  }
-
-  #ensureMetaChipsListener() {
-    if (this.#metaChipsListenerController) {
-      return;
-    }
-
-    const controller = new AbortController();
-    this.addEventListener(
-      "htmx:afterSwap",
-      (event) => {
-        if (event.target?.classList?.contains("entry-tags")) {
-          revealMetaChips(event.target);
-          this.#teardownMetaChipsListener();
-        }
-      },
-      { signal: controller.signal }
-    );
-
-    this.#metaChipsListenerController = controller;
-  }
-
-  #teardownMetaChipsListener() {
-    if (!this.#metaChipsListenerController) {
-      return;
-    }
-
-    this.#metaChipsListenerController.abort();
-    this.#metaChipsListenerController = null;
-  }
 
   #markAsError() {
     this.dataset.error = "true";
