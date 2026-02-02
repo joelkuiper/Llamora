@@ -328,10 +328,6 @@
 .action-popover {
   width: 13rem;
   padding: 8px;
-  --action-reply: color-mix(in srgb, var(--accent) 55%, var(--color-text-muted));
-  --action-acknowledge: color-mix(in srgb, var(--color-danger-mix) 45%, var(--color-text-muted));
-  --action-notice: color-mix(in srgb, var(--highlight-color) 55%, var(--color-text-muted));
-  --action-tint: 6%;
 }
 
 .action-panel {

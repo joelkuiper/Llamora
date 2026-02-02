@@ -228,19 +228,34 @@ body {
 
     &.assistant,
     &.assistant-stream {
+      --assistant-action-color: var(--accent);
+      --assistant-delete-color: var(--assistant-bubble-icon);
       align-self: flex-end;
       width: clamp(16rem, 68%, 34rem);
       margin-left: auto;
       padding: var(--spacing-sm) var(--spacing-lg) calc(var(--spacing-sm) + 2rem);
       border-radius: var(--radius-sm);
-      box-shadow: none;
-      color: color-mix(in srgb, var(--color-assistant-text) 82%, var(--accent));
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03),
+                  inset 0 1px 0 rgba(255,255,255,0.9);
+      color: var(--assistant-bubble-text);
       word-wrap: break-word;
       word-break: break-word;
-      background: color-mix(in srgb, var(--accent-05) 55%, var(--color-surface));
-      border: 1px solid color-mix(in srgb, var(--accent) 14%, var(--border));
+      background: var(--assistant-bubble-bg);
+      border: 1px solid var(--assistant-bubble-border);
       font-size: 0.95em;
       opacity: 0.9;
+    }
+
+    &[data-reply-kind="reply"] {
+      --assistant-action-color: var(--action-reply);
+    }
+
+    &[data-reply-kind="acknowledge"] {
+      --assistant-action-color: var(--action-acknowledge);
+    }
+
+    &[data-reply-kind="notice"] {
+      --assistant-action-color: var(--action-notice);
     }
 
     &[data-repeat-guard="true"] {
@@ -345,12 +360,45 @@ body {
     position: static;
   }
 
+  .message-actions-inline {
+    position: absolute;
+    right: var(--spacing-sm);
+    bottom: var(--spacing-sm);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .message-actions-inline .message-delete {
+    position: static;
+  }
+
+  .message-kind-indicator {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    color: color-mix(in srgb, var(--assistant-action-color) 70%, var(--color-text-muted));
+    cursor: default;
+  }
+
+  .message-kind-indicator:hover,
+  .message-kind-indicator:focus-visible {
+    border-color: transparent;
+    box-shadow: none;
+    background: transparent;
+  }
+
+  .message-kind-indicator .message-kind-icon {
+    width: 0.85rem;
+    height: 0.85rem;
+  }
+
   .message.assistant .message-delete,
   .message.assistant-stream .message-delete {
     background: transparent;
     border-color: transparent;
     box-shadow: none;
-    color: color-mix(in srgb, var(--accent) 45%, var(--color-text-muted));
+    color: var(--assistant-delete-color);
   }
 
   .message-delete:hover,

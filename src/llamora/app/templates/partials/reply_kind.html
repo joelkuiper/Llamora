@@ -1,0 +1,10 @@
+{% set reply_kind_icons = {
+  "reply": "icon-corner-down-left",
+  "acknowledge": "icon-heart",
+  "notice": "icon-eye",
+} %}
+
+{% macro reply_kind_icon(kind_id, class_name="") -%}
+  {% set icon_class = reply_kind_icons.get(kind_id, "icon-reply") %}
+  <span class="icon-mask {{ icon_class }} {{ class_name }}" aria-hidden="true"></span>
+{%- endmacro %}

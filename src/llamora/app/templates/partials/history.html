@@ -1,5 +1,6 @@
 {% from 'partials/meta_chips.html' import render_meta_chips %}
 {% from 'partials/message_actions.html' import message_actions %}
+{% from 'partials/reply_kind.html' import reply_kind_icon %}
 <div id="chat"
      data-date="{{ day }}"
      data-long-date="{{ day|long_date }}"
@@ -15,10 +16,12 @@
   {% set msg_meta = msg.get('meta', {}) %}
   {% set is_error = msg_meta.get('error') %}
   {% set repeat_guard = msg_meta.get('repeat_guard') %}
+  {% set reply_kind = msg_meta.get('reply_kind') %}
   {% set speaker = 'Your' if msg['role'] == 'user' else 'Assistant' %}
   <div id="msg-{{ msg['id'] }}"
        class="message {{ 'assistant' if msg['role'] != 'user' else 'user'}}{% if is_error %} message--error{% endif %}"
        data-message-id="{{ msg['id'] }}"
+       {% if reply_kind %}data-reply-kind="{{ reply_kind }}"{% endif %}
        {% if msg['role'] == 'assistant' and msg.get('reply_to') %}
        data-reply-to="{{ msg['reply_to'] }}"
        {% endif %}
@@ -55,12 +58,6 @@
       </div>
     </div>
     {% endif %}
-    {% if msg['role'] == 'assistant' %}
-      {% set reply_kind = msg_meta.get('reply_kind') %}
-      {% if reply_kind and reply_kind_labels and reply_kind_labels.get(reply_kind) %}
-      <span class="message-kind">{{ reply_kind_labels.get(reply_kind) }}</span>
-      {% endif %}
-    {% endif %}
     {% if repeat_guard %}
     <span class="repeat-guard-indicator repeat-guard-indicator--visible repeat-guard-indicator--calm">
       <span class="repeat-guard-indicator__label">response trimmed</span>
@@ -68,16 +65,27 @@
     </span>
     {% endif %}
     {% if msg['role'] != 'user' %}
-    <button class="message-action message-delete"
-            type="button"
-            hx-delete="{{ url_for('chat.delete_message', msg_id=msg['id']) }}"
-            hx-target="#msg-{{ msg['id'] }}"
-            hx-swap="outerHTML swap:180ms"
-            aria-label="Delete message"
-            data-tooltip-title="Delete message"
-            data-ready="true">
-      <span class="icon-mask icon-trash message-action__icon" aria-hidden="true"></span>
-    </button>
+    <div class="message-actions-inline" aria-label="Assistant message actions">
+      {% if reply_kind and reply_kind_labels and reply_kind_labels.get(reply_kind) %}
+      <span class="message-action message-kind-indicator"
+            role="img"
+            aria-label="{{ reply_kind_labels.get(reply_kind) }}"
+            data-tooltip-title="{{ reply_kind_labels.get(reply_kind) }}">
+        {{ reply_kind_icon(reply_kind, "message-kind-icon") }}
+        <span class="visually-hidden">{{ reply_kind_labels.get(reply_kind) }}</span>
+      </span>
+      {% endif %}
+      <button class="message-action message-delete"
+              type="button"
+              hx-delete="{{ url_for('chat.delete_message', msg_id=msg['id']) }}"
+              hx-target="#msg-{{ msg['id'] }}"
+              hx-swap="outerHTML swap:180ms"
+              aria-label="Delete message"
+              data-tooltip-title="Delete message"
+              data-ready="true">
+        <span class="icon-mask icon-trash message-action__icon" aria-hidden="true"></span>
+      </button>
+    </div>
     {% endif %}
   </div>
   {% endfor %}

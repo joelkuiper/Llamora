@@ -94,6 +94,18 @@
     --chip-remove-bg: rgba(0,0,0,0.48);
     --chip-remove-bg-hover: #000;
 
+    /* Reply kinds */
+    --action-reply: color-mix(in srgb, var(--accent) 55%, var(--color-text-muted));
+    --action-acknowledge: color-mix(in srgb, var(--color-danger-mix) 45%, var(--color-text-muted));
+    --action-notice: color-mix(in srgb, var(--highlight-color) 55%, var(--color-text-muted));
+    --action-tint: 6%;
+
+    --assistant-bubble-bg: #f9fafb;
+    --assistant-bubble-border: rgba(54, 166, 244, 0.18);
+    --assistant-bubble-text: var(--color-assistant-text);
+    --assistant-bubble-icon: rgba(54, 166, 244, 0.65);
+
+
     /* Password strength meter */
     --password-strength-1: #ff6b6b;
     --password-strength-2: #feca57;

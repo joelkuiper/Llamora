@@ -1,3 +1,4 @@
+{% from 'partials/reply_kind.html' import reply_kind_icon %}
 {% macro message_actions(user_msg_id, day, reply_kinds=(), is_today=True) -%}
 <message-actions class="message-actions" data-msg-id="{{ user_msg_id }}">
   <button class="message-action action-trigger"
@@ -22,15 +23,7 @@
                 hx-vals='{"reply_kind":"{{ kind.id }}"}'
                 data-action-kind="{{ kind.id }}"
                 hx-on::config-request="const t=document.getElementById('user-time'); if(t){t.value=new Date().toISOString();}">
-          {% if kind.id == "reply" %}
-          <span class="icon-mask icon-corner-down-left action-item__icon" aria-hidden="true"></span>
-          {% elif kind.id == "acknowledge" %}
-          <span class="icon-mask icon-heart action-item__icon" aria-hidden="true"></span>
-          {% elif kind.id == "notice" %}
-          <span class="icon-mask icon-eye action-item__icon" aria-hidden="true"></span>
-          {% else %}
-          <span class="icon-mask icon-reply action-item__icon" aria-hidden="true"></span>
-          {% endif %}
+          {{ reply_kind_icon(kind.id, "action-item__icon") }}
           <span class="action-item__label">{{ kind.label }}</span>
         </button>
         {% endfor %}

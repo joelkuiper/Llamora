@@ -1,3 +1,4 @@
+{% from 'partials/reply_kind.html' import reply_kind_icon %}
 {% macro assistant_stream(user_msg_id, day, user_time=None, sse_url=None, stop_url=None, reply_kind=None) -%}
 {# Quart's url_for drops params set to None, so we can always include user_time #}
 {%- if sse_url is none -%}
@@ -32,18 +33,29 @@
     </span>
   </div>
 
-  <button class="message-action message-delete"
-          type="button"
-          disabled
-          aria-label="Delete message"
-          data-tooltip-title="Delete message"
-          data-ready="false"
-          hx-swap="outerHTML swap:180ms"
-          data-delete-template="{{ url_for('chat.delete_message', msg_id='__MSG_ID__') }}"
-          data-delete-placeholder="__MSG_ID__"
-          data-target-template="#msg-__MSG_ID__">
-    <span class="icon-mask icon-trash message-action__icon" aria-hidden="true"></span>
-  </button>
+  <div class="message-actions-inline" aria-label="Assistant message actions">
+    {% if reply_kind %}
+    <span class="message-action message-kind-indicator"
+          role="img"
+          aria-label="{{ reply_kind }}"
+          data-tooltip-title="{{ reply_kind }}">
+      {{ reply_kind_icon(reply_kind, "message-kind-icon") }}
+      <span class="visually-hidden">{{ reply_kind }}</span>
+    </span>
+    {% endif %}
+    <button class="message-action message-delete"
+            type="button"
+            disabled
+            aria-label="Delete message"
+            data-tooltip-title="Delete message"
+            data-ready="false"
+            hx-swap="outerHTML swap:180ms"
+            data-delete-template="{{ url_for('chat.delete_message', msg_id='__MSG_ID__') }}"
+            data-delete-placeholder="__MSG_ID__"
+            data-target-template="#msg-__MSG_ID__">
+      <span class="icon-mask icon-trash message-action__icon" aria-hidden="true"></span>
+    </button>
+  </div>
 
 </llm-stream>
 {%- endmacro %}
