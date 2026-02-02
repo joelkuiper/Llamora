@@ -176,6 +176,16 @@
   }
 }
 
+.message-action:disabled,
+.message-action[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+  box-shadow: none;
+  border-color: color-mix(in srgb, var(--border) 60%, transparent);
+  background: color-mix(in srgb, var(--glass-bg-alt) 70%, transparent);
+}
+
 .add-tag-btn .icon-mask,
 .message-action__icon {
   width: var(--icon-size);

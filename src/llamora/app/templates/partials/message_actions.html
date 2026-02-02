@@ -1,9 +1,10 @@
-{% macro message_actions(user_msg_id, day, reply_kinds=()) -%}
+{% macro message_actions(user_msg_id, day, reply_kinds=(), is_today=True) -%}
 <message-actions class="message-actions" data-msg-id="{{ user_msg_id }}">
   <button class="message-action action-trigger"
           type="button"
           aria-label="Reply actions"
-          data-tooltip-title="Reply actions">
+          {% if is_today %}data-tooltip-title="Choose a response"{% endif %}
+          {% if not is_today %}disabled aria-disabled="true"{% endif %}>
     <span class="icon-mask icon-message-more message-action__icon" aria-hidden="true"></span>
   </button>
   <div class="tag-popover action-popover glass-panel" role="dialog" aria-modal="true" hidden>
