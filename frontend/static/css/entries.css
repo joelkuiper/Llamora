@@ -155,7 +155,7 @@ body {
     }
 
     &.assistant,
-    &.assistant-stream {
+    &.response-stream {
       --assistant-action-color: var(--accent);
       --assistant-delete-color: color-mix(
         in srgb,
@@ -363,7 +363,7 @@ body {
   }
 
   .message.assistant .message-delete,
-  .message.assistant-stream .message-delete {
+  .message.response-stream .message-delete {
     background: transparent;
     border-color: transparent;
     box-shadow: none;
@@ -374,8 +374,8 @@ body {
   .message-delete:focus-visible,
   .message.assistant .message-delete:hover,
   .message.assistant .message-delete:focus-visible,
-  .message.assistant-stream .message-delete:hover,
-  .message.assistant-stream .message-delete:focus-visible {
+  .message.response-stream .message-delete:hover,
+  .message.response-stream .message-delete:focus-visible {
     border-color: var(--color-danger);
     box-shadow:
       var(--raised-shadow),
@@ -748,7 +748,7 @@ scroll-bottom-button .scroll-btn {
 }
 
 
-.user, .assistant, .assistant-stream { animation: fade-in-up var(--motion-sigh) ease-out; }
+.user, .assistant, .response-stream { animation: fade-in-up var(--motion-sigh) ease-out; }
 
 @keyframes stopping-wave {
   0%, 100% {
