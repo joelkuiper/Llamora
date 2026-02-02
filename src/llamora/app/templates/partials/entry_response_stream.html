@@ -1,5 +1,5 @@
-{% from 'partials/response_kind.html' import response_kind_icon %}
-{% macro entry_response_stream(entry_id, day, user_time=None, sse_url=None, stop_url=None, response_kind=None) -%}
+{% from 'partials/response_kind.html' import response_kind_icon, response_kind_label %}
+{% macro entry_response_stream(entry_id, day, user_time=None, sse_url=None, stop_url=None, response_kind=None, response_kinds=()) -%}
 {# Quart's url_for drops params set to None, so we can always include user_time #}
 {%- if sse_url is none -%}
 {%- set sse_url = url_for('entries.sse_response', date=day, entry_id=entry_id, user_time=user_time, response_kind=response_kind) -%}
@@ -34,12 +34,13 @@
 
   <div class="entry-actions-inline" aria-label="Assistant entry actions">
     {% if response_kind %}
+    {% set response_label = response_kind_label(response_kind, response_kinds) %}
     <span class="entry-action entry-kind-indicator"
           role="img"
-          aria-label="{{ response_kind }}"
-          data-tooltip-title="{{ response_kind }}">
+          aria-label="{{ response_label }}"
+          data-tooltip-title="{{ response_label }}">
       {{ response_kind_icon(response_kind, "entry-kind-icon") }}
-      <span class="visually-hidden">{{ response_kind }}</span>
+      <span class="visually-hidden">{{ response_label }}</span>
     </span>
     {% endif %}
     <button class="entry-action entry-delete"

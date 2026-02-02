@@ -1,7 +1,7 @@
 {% from 'partials/entry_tags.html' import render_entry_tags %}
 {% from 'partials/entry_actions.html' import entry_actions %}
-{% from 'partials/response_kind.html' import response_kind_icon %}
-{% macro render_entry(e, day, response_kinds=(), response_kind_labels=None, is_today=True, responses=None) -%}
+{% from 'partials/response_kind.html' import response_kind_icon, response_kind_label %}
+{% macro render_entry(e, day, response_kinds=(), is_today=True, responses=None) -%}
 {% set entry_meta = e.get('meta', {}) %}
 {% set is_error = entry_meta.get('error') %}
 {% set repeat_guard = entry_meta.get('repeat_guard') %}
@@ -82,13 +82,14 @@
           datetime="{{ e['created_at'] }}"
           data-time-raw="{{ e['created_at'] }}"></time>
     {% endif %}
-    {% if response_kind and response_kind_labels and response_kind_labels.get(response_kind) %}
+    {% if response_kind %}
+    {% set response_label = response_kind_label(response_kind, response_kinds) %}
     <span class="entry-action entry-kind-indicator"
           role="img"
-          aria-label="{{ response_kind_labels.get(response_kind) }}"
-          data-tooltip-title="{{ response_kind_labels.get(response_kind) }}">
+          aria-label="{{ response_label }}"
+          data-tooltip-title="{{ response_label }}">
       {{ response_kind_icon(response_kind, "entry-kind-icon") }}
-      <span class="visually-hidden">{{ response_kind_labels.get(response_kind) }}</span>
+      <span class="visually-hidden">{{ response_label }}</span>
     </span>
     {% endif %}
     {% if not is_opening %}
@@ -111,7 +112,7 @@
      id="entry-responses-{{ e['id'] }}"
      data-responses-for="{{ e['id'] }}">
   {% for response in responses or [] %}
-  {{ render_entry(response, day, response_kinds, response_kind_labels, is_today) }}
+  {{ render_entry(response, day, response_kinds, is_today) }}
   {% endfor %}
 </div>
 {% endif %}

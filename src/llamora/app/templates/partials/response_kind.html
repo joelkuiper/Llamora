@@ -8,3 +8,13 @@
   {% set icon_class = response_kind_icons.get(kind_id, "icon-reply") %}
   <span class="icon-mask {{ icon_class }} {{ class_name }}" aria-hidden="true"></span>
 {%- endmacro %}
+
+{% macro response_kind_label(kind_id, response_kinds=()) -%}
+  {% set ns = namespace(label=kind_id) %}
+  {% for kind in response_kinds %}
+    {% if kind.id == kind_id %}
+      {% set ns.label = kind.label %}
+    {% endif %}
+  {% endfor %}
+  {{ ns.label }}
+{%- endmacro %}

@@ -77,6 +77,9 @@ class ResponseStreamElement extends HTMLElement {
   }
 
   #getStreamController() {
+    if (this.dataset?.controller === "off") {
+      return null;
+    }
     const host = this.closest?.("entry-view");
     if (host && "streamController" in host) {
       return host.streamController || null;
@@ -142,11 +145,7 @@ class ResponseStreamElement extends HTMLElement {
   abort({ reason = "user:abort" } = {}) {
     if (this.#completed) return;
     const controller = this.#controller || this.#getStreamController();
-    if (
-      controller &&
-      typeof controller.notifyStreamAbort === "function" &&
-      this.dataset?.streamKind !== "opening"
-    ) {
+    if (controller && typeof controller.notifyStreamAbort === "function") {
       controller.notifyStreamAbort(this, { reason });
     }
 
@@ -198,11 +197,7 @@ class ResponseStreamElement extends HTMLElement {
     this.#meta = null;
     this.#wasPartial = false;
     const controller = this.#controller || this.#getStreamController();
-    if (
-      controller &&
-      typeof controller.notifyStreamStart === "function" &&
-      this.dataset?.streamKind !== "opening"
-    ) {
+    if (controller && typeof controller.notifyStreamStart === "function") {
       controller.notifyStreamStart(this, { reason: "stream:start" });
     }
     requestScrollForceBottom({ source: "stream:start" });
@@ -490,11 +485,7 @@ class ResponseStreamElement extends HTMLElement {
     placeholder?.remove();
 
     const controller = this.#controller || this.#getStreamController();
-    if (
-      controller &&
-      typeof controller.notifyStreamComplete === "function" &&
-      this.dataset?.streamKind !== "opening"
-    ) {
+    if (controller && typeof controller.notifyStreamComplete === "function") {
       controller.notifyStreamComplete(this, {
         status,
         reason,

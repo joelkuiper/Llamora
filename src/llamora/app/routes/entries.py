@@ -55,10 +55,9 @@ def _entry_stream_manager():
     return get_services().llm_service.response_stream_manager
 
 
-def _load_response_kinds() -> tuple[list[dict[str, str]], dict[str, str]]:
+def _load_response_kinds() -> list[dict[str, str]]:
     raw = settings.get("LLM.response_kinds", []) or []
     kinds: list[dict[str, str]] = []
-    labels: dict[str, str] = {}
     for entry in raw:
         if not isinstance(entry, dict):
             continue
@@ -68,15 +67,13 @@ def _load_response_kinds() -> tuple[list[dict[str, str]], dict[str, str]]:
         if not kind_id or not label:
             continue
         kinds.append({"id": kind_id, "label": label, "prompt": prompt})
-        labels[kind_id] = label
     if not kinds:
         kinds = [{"id": "reply", "label": "Reply", "prompt": ""}]
-        labels = {"reply": "Reply"}
-    return kinds, labels
+    return kinds
 
 
 def _select_response_kind(kind_id: str | None) -> dict[str, str]:
-    kinds, _ = _load_response_kinds()
+    kinds = _load_response_kinds()
     if kind_id:
         match = next((k for k in kinds if k["id"] == kind_id), None)
         if match:
@@ -98,7 +95,7 @@ async def render_entries(
     session = get_session_context()
     user = await session.require_user()
     context = await get_entries_context(user, date)
-    response_kinds, response_kind_labels = _load_response_kinds()
+    response_kinds = _load_response_kinds()
     html = await render_template(
         "partials/entries.html",
         day=date,
@@ -107,7 +104,6 @@ async def render_entries(
         scroll_target=scroll_target,
         view_kind=view_kind,
         response_kinds=response_kinds,
-        response_kind_labels=response_kind_labels,
         **context,
     )
 
@@ -353,7 +349,7 @@ async def send_entry(date):
     user_time = form.get("user_time")
     _, user, dek = await require_user_and_dek()
     uid = user["id"]
-    response_kinds, response_kind_labels = _load_response_kinds()
+    response_kinds = _load_response_kinds()
 
     max_len = int(settings.LIMITS.max_message_length)
 
@@ -384,7 +380,6 @@ async def send_entry(date):
         entries=[{"entry": entry_payload, "responses": []}],
         day=date,
         response_kinds=response_kinds,
-        response_kind_labels=response_kind_labels,
         is_today=date == local_date().isoformat(),
     )
 
@@ -397,7 +392,7 @@ async def request_response(date, entry_id: str):
     user_time = form.get("user_time")
     response_kind = form.get("response_kind") or request.args.get("response_kind")
     selected_kind = _select_response_kind(response_kind)
-    response_kinds, _ = _load_response_kinds()
+    response_kinds = _load_response_kinds()
     _, user, dek = await require_user_and_dek()
     uid = user["id"]
 
@@ -412,6 +407,7 @@ async def request_response(date, entry_id: str):
         day=actual_date or normalized_date,
         user_time=user_time,
         response_kind=selected_kind.get("id"),
+        response_kinds=response_kinds,
     )
     actions_html = await render_template(
         "partials/entry_actions_item.html",
@@ -438,7 +434,7 @@ async def entry_actions_item(entry_id: str):
     actual_date = await get_services().db.entries.get_entry_date(uid, entry_id)
     if actual_date is None:
         abort(404, description="Entry not found.")
-    response_kinds, _ = _load_response_kinds()
+    response_kinds = _load_response_kinds()
     html = await render_template(
         "partials/entry_actions_item.html",
         entry_id=entry_id,
