@@ -172,7 +172,7 @@ body {
       word-wrap: break-word;
       word-break: break-word;
       background: color-mix(in srgb, var(--color-surface) 78%, transparent);
-      border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent) 12%, var(--border));
       font-size: 0.95em;
       line-height: 1.7;
     }
