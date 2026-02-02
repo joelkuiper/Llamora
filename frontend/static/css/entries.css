@@ -163,7 +163,7 @@ body {
         transparent
       );
       align-self: flex-end;
-      width: clamp(15rem, 60%, 32rem);
+      width: clamp(18rem, 82%, 42rem);
       margin-left: auto;
       padding: var(--spacing-sm) var(--spacing-lg) calc(var(--spacing-sm) + 2rem);
       border-radius: var(--radius-sm);
