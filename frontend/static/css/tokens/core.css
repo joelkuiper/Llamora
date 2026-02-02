@@ -94,7 +94,7 @@
     --chip-remove-bg: rgba(0,0,0,0.48);
     --chip-remove-bg-hover: #000;
 
-    /* Reply kinds */
+    /* Response kinds */
     --action-reply: color-mix(in srgb, var(--accent) 55%, var(--color-text-muted));
     --action-acknowledge: color-mix(in srgb, var(--color-danger-mix) 45%, var(--color-text-muted));
     --action-notice: color-mix(in srgb, var(--highlight-color) 55%, var(--color-text-muted));

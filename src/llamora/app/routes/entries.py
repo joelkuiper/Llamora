@@ -12,7 +12,6 @@ from quart import (
 import logging
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
-from typing import Any
 from werkzeug.exceptions import HTTPException
 
 from llamora.llm.entry_template import build_opening_messages, render_entry_prompt
@@ -22,10 +21,11 @@ from llamora.app.services.auth_helpers import login_required
 from llamora.app.services.entry_context import get_entries_context
 from llamora.app.services.entry_helpers import (
     augment_history_with_recall,
-    apply_reply_kind_prompt,
+    apply_response_kind_prompt,
     history_has_tag_recall,
     StreamSession,
     build_conversation_context,
+    build_entry_history,
     normalize_llm_config,
     start_stream_session,
 )
@@ -50,25 +50,12 @@ from llamora.settings import settings
 entries_bp = Blueprint("entries", __name__)
 
 
-def _trim_history_to_entry(
-    history: list[dict[str, Any]], user_msg_id: str
-) -> list[dict[str, Any]]:
-    trimmed: list[dict[str, Any]] = []
-    target_id = str(user_msg_id)
-    for message in history:
-        message_dict = dict(message)
-        trimmed.append(message_dict)
-        if str(message_dict.get("id")) == target_id:
-            break
-    return trimmed or list(history)
-
-
 def _entry_stream_manager():
     return get_services().llm_service.response_stream_manager
 
 
-def _load_reply_kinds() -> tuple[list[dict[str, str]], dict[str, str]]:
-    raw = settings.get("LLM.reply_kinds", []) or []
+def _load_response_kinds() -> tuple[list[dict[str, str]], dict[str, str]]:
+    raw = settings.get("LLM.response_kinds", []) or []
     kinds: list[dict[str, str]] = []
     labels: dict[str, str] = {}
     for entry in raw:
@@ -87,8 +74,8 @@ def _load_reply_kinds() -> tuple[list[dict[str, str]], dict[str, str]]:
     return kinds, labels
 
 
-def _select_reply_kind(kind_id: str | None) -> dict[str, str]:
-    kinds, _ = _load_reply_kinds()
+def _select_response_kind(kind_id: str | None) -> dict[str, str]:
+    kinds, _ = _load_response_kinds()
     if kind_id:
         match = next((k for k in kinds if k["id"] == kind_id), None)
         if match:
@@ -110,7 +97,7 @@ async def render_entries(
     session = get_session_context()
     user = await session.require_user()
     context = await get_entries_context(user, date)
-    reply_kinds, reply_kind_labels = _load_reply_kinds()
+    response_kinds, response_kind_labels = _load_response_kinds()
     html = await render_template(
         "partials/entries.html",
         day=date,
@@ -118,8 +105,8 @@ async def render_entries(
         user=user,
         scroll_target=scroll_target,
         view_kind=view_kind,
-        reply_kinds=reply_kinds,
-        reply_kind_labels=reply_kind_labels,
+        response_kinds=response_kinds,
+        response_kind_labels=response_kind_labels,
         **context,
     )
 
@@ -363,7 +350,7 @@ async def send_message(date):
     user_time = form.get("user_time")
     _, user, dek = await require_user_and_dek()
     uid = user["id"]
-    reply_kinds, reply_kind_labels = _load_reply_kinds()
+    response_kinds, response_kind_labels = _load_response_kinds()
 
     max_len = int(settings.LIMITS.max_message_length)
 
@@ -387,8 +374,8 @@ async def send_message(date):
         created_at=created_at,
         day=date,
         user_time=user_time,
-        reply_kinds=reply_kinds,
-        reply_kind_labels=reply_kind_labels,
+        response_kinds=response_kinds,
+        response_kind_labels=response_kind_labels,
         is_today=date == local_date().isoformat(),
     )
 
@@ -399,9 +386,9 @@ async def request_response(date, user_msg_id: str):
     normalized_date = require_iso_date(date)
     form = await request.form
     user_time = form.get("user_time")
-    reply_kind = form.get("reply_kind") or request.args.get("reply_kind")
-    selected_kind = _select_reply_kind(reply_kind)
-    reply_kinds, _ = _load_reply_kinds()
+    response_kind = form.get("response_kind") or request.args.get("response_kind")
+    selected_kind = _select_response_kind(response_kind)
+    response_kinds, _ = _load_response_kinds()
     _, user, dek = await require_user_and_dek()
     uid = user["id"]
 
@@ -415,13 +402,13 @@ async def request_response(date, user_msg_id: str):
         user_msg_id=user_msg_id,
         day=actual_date or normalized_date,
         user_time=user_time,
-        reply_kind=selected_kind.get("id"),
+        response_kind=selected_kind.get("id"),
     )
     actions_html = await render_template(
         "partials/entry_actions_item.html",
         user_msg_id=user_msg_id,
         day=actual_date or normalized_date,
-        reply_kinds=reply_kinds,
+        response_kinds=response_kinds,
         is_today=normalized_date == local_date().isoformat(),
         stop_url=url_for("entries.stop_response", user_msg_id=user_msg_id),
         response_active=True,
@@ -442,12 +429,12 @@ async def entry_actions_item(user_msg_id: str):
     actual_date = await get_services().db.messages.get_message_date(uid, user_msg_id)
     if actual_date is None:
         abort(404, description="Message not found.")
-    reply_kinds, _ = _load_reply_kinds()
+    response_kinds, _ = _load_response_kinds()
     html = await render_template(
         "partials/entry_actions_item.html",
         user_msg_id=user_msg_id,
         day=actual_date,
-        reply_kinds=reply_kinds,
+        response_kinds=response_kinds,
         is_today=actual_date == local_date().isoformat(),
         stop_url=None,
         response_active=False,
@@ -458,10 +445,10 @@ async def entry_actions_item(user_msg_id: str):
 @entries_bp.route("/e/<date>/response/stream/<user_msg_id>")
 @login_required
 async def sse_response(user_msg_id: str, date: str):
-    """Stream the assistant's reply for a given user message.
+    """Stream the assistant's response for a given user message.
 
     The ``user_msg_id`` corresponds to the user's prompt message. When the
-    assistant finishes responding, the ``assistant_msg_id`` of the stored reply
+    assistant finishes responding, the ``assistant_msg_id`` of the stored response
     is sent in a final ``done`` event.
     """
 
@@ -473,13 +460,13 @@ async def sse_response(user_msg_id: str, date: str):
     if not actual_date:
         logger.warning("History not found for user message %s", user_msg_id)
         return StreamSession.error("Invalid ID")
-    history = await get_services().db.messages.get_message_history(
+    entries = await get_services().db.messages.get_entries_for_date(
         uid, actual_date, dek
     )
-    if not history:
-        logger.warning("History not found for user message %s", user_msg_id)
+    if not entries:
+        logger.warning("Entries not found for user message %s", user_msg_id)
         return StreamSession.error("Invalid ID")
-    history = _trim_history_to_entry(history, user_msg_id)
+    history = build_entry_history(entries, user_msg_id)
 
     params_raw = normalize_llm_config(
         request.args.get("config"),
@@ -487,8 +474,8 @@ async def sse_response(user_msg_id: str, date: str):
     )
     params = dict(params_raw) if params_raw is not None else None
 
-    reply_kind = request.args.get("reply_kind")
-    selected_kind = _select_reply_kind(reply_kind)
+    response_kind = request.args.get("response_kind")
+    selected_kind = _select_response_kind(response_kind)
     ctx_mapping = build_conversation_context(
         request.args.get("user_time"), request.cookies.get("tz")
     )
@@ -548,7 +535,7 @@ async def sse_response(user_msg_id: str, date: str):
                 )
             else:
                 recall_applied = False
-            history_for_stream = apply_reply_kind_prompt(
+            history_for_stream = apply_response_kind_prompt(
                 history_for_stream, selected_kind.get("prompt")
             )
             try:
@@ -563,7 +550,7 @@ async def sse_response(user_msg_id: str, date: str):
                     context=ctx,
                     meta_extra={
                         "tag_recall_applied": recall_applied,
-                        "reply_kind": selected_kind.get("id"),
+                        "response_kind": selected_kind.get("id"),
                     },
                 )
             except StreamCapacityError as exc:
@@ -575,7 +562,7 @@ async def sse_response(user_msg_id: str, date: str):
     except HTTPException:
         raise
     except Exception:
-        logger.exception("Failed to start streaming reply for %s", user_msg_id)
+        logger.exception("Failed to start streaming response for %s", user_msg_id)
         return StreamSession.error(
             "The assistant ran into an unexpected error. Please try again."
         )

@@ -135,7 +135,7 @@ DEFAULTS: dict[str, Any] = {
             "repeat_guard_min_length": 12,
         },
         "allowed_config_keys": ["temperature"],
-        "reply_kinds": [
+        "response_kinds": [
             {
                 "id": "reply",
                 "label": "Reply",

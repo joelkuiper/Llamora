@@ -1,18 +1,18 @@
 {% from 'partials/meta_chips.html' import render_meta_chips %}
 {% from 'partials/entry_actions.html' import entry_actions %}
-{% from 'partials/reply_kind.html' import reply_kind_icon %}
-{% macro render_entry(msg, day, reply_kinds=(), reply_kind_labels=None, is_today=True, replies=None) -%}
+{% from 'partials/response_kind.html' import response_kind_icon %}
+{% macro render_entry(msg, day, response_kinds=(), response_kind_labels=None, is_today=True, replies=None) -%}
 {% set msg_meta = msg.get('meta', {}) %}
 {% set is_error = msg_meta.get('error') %}
 {% set repeat_guard = msg_meta.get('repeat_guard') %}
-{% set reply_kind = msg_meta.get('reply_kind') %}
+{% set response_kind = msg_meta.get('response_kind') %}
 {% set speaker = 'Your' if msg['role'] == 'user' else 'Assistant' %}
 <div id="msg-{{ msg['id'] }}"
      class="message {{ 'assistant' if msg['role'] != 'user' else 'user'}}{% if is_error %} message--error{% endif %}"
      data-message-id="{{ msg['id'] }}"
-     {% if reply_kind %}data-reply-kind="{{ reply_kind }}"{% endif %}
+     {% if response_kind %}data-response-kind="{{ response_kind }}"{% endif %}
      {% if msg['role'] == 'assistant' and msg.get('reply_to') %}
-     data-reply-to="{{ msg['reply_to'] }}"
+     data-response-to="{{ msg['reply_to'] }}"
      {% endif %}
      {% if repeat_guard %}data-repeat-guard="true"{% endif %}
      role="article"
@@ -47,7 +47,7 @@
               data-ready="true">
         <span class="icon-mask icon-trash message-action__icon" aria-hidden="true"></span>
       </button>
-      {{ entry_actions(msg['id'], day, reply_kinds, is_today=is_today) }}
+      {{ entry_actions(msg['id'], day, response_kinds, is_today=is_today) }}
     </div>
   </div>
   {% endif %}
@@ -64,13 +64,13 @@
           datetime="{{ msg['created_at'] }}"
           data-time-raw="{{ msg['created_at'] }}"></time>
     {% endif %}
-    {% if reply_kind and reply_kind_labels and reply_kind_labels.get(reply_kind) %}
+    {% if response_kind and response_kind_labels and response_kind_labels.get(response_kind) %}
     <span class="message-action message-kind-indicator"
           role="img"
-          aria-label="{{ reply_kind_labels.get(reply_kind) }}"
-          data-tooltip-title="{{ reply_kind_labels.get(reply_kind) }}">
-      {{ reply_kind_icon(reply_kind, "message-kind-icon") }}
-      <span class="visually-hidden">{{ reply_kind_labels.get(reply_kind) }}</span>
+          aria-label="{{ response_kind_labels.get(response_kind) }}"
+          data-tooltip-title="{{ response_kind_labels.get(response_kind) }}">
+      {{ response_kind_icon(response_kind, "message-kind-icon") }}
+      <span class="visually-hidden">{{ response_kind_labels.get(response_kind) }}</span>
     </span>
     {% endif %}
     <button class="message-action message-delete"
@@ -91,7 +91,7 @@
      id="replies-{{ msg['id'] }}"
      data-replies-for="{{ msg['id'] }}">
   {% for reply in replies or [] %}
-  {{ render_entry(reply, day, reply_kinds, reply_kind_labels, is_today) }}
+  {{ render_entry(reply, day, response_kinds, response_kind_labels, is_today) }}
   {% endfor %}
 </div>
 {% endif %}

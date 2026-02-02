@@ -1,14 +1,14 @@
-{% from 'partials/reply_kind.html' import reply_kind_icon %}
-{% macro entry_response_stream(user_msg_id, day, user_time=None, sse_url=None, stop_url=None, reply_kind=None) -%}
+{% from 'partials/response_kind.html' import response_kind_icon %}
+{% macro entry_response_stream(user_msg_id, day, user_time=None, sse_url=None, stop_url=None, response_kind=None) -%}
 {# Quart's url_for drops params set to None, so we can always include user_time #}
 {%- if sse_url is none -%}
-{%- set sse_url = url_for('entries.sse_response', date=day, user_msg_id=user_msg_id, user_time=user_time, reply_kind=reply_kind) -%}
+{%- set sse_url = url_for('entries.sse_response', date=day, user_msg_id=user_msg_id, user_time=user_time, response_kind=response_kind) -%}
 {%- endif -%}
 <response-stream id="response-stream-{{ user_msg_id }}"
             class="message response-stream"
             data-user-msg-id="{{ user_msg_id }}"
-            {%- if reply_kind %}
-            data-reply-kind="{{ reply_kind }}"
+            {%- if response_kind %}
+            data-response-kind="{{ response_kind }}"
             {%- endif %}
             data-assistant-msg-id=""
             data-message-id=""
@@ -34,13 +34,13 @@
   </div>
 
   <div class="message-actions-inline" aria-label="Assistant message actions">
-    {% if reply_kind %}
+    {% if response_kind %}
     <span class="message-action message-kind-indicator"
           role="img"
-          aria-label="{{ reply_kind }}"
-          data-tooltip-title="{{ reply_kind }}">
-      {{ reply_kind_icon(reply_kind, "message-kind-icon") }}
-      <span class="visually-hidden">{{ reply_kind }}</span>
+          aria-label="{{ response_kind }}"
+          data-tooltip-title="{{ response_kind }}">
+      {{ response_kind_icon(response_kind, "message-kind-icon") }}
+      <span class="visually-hidden">{{ response_kind }}</span>
     </span>
     {% endif %}
     <button class="message-action message-delete"

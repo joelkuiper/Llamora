@@ -411,13 +411,13 @@ class MessagesRepository(BaseRepository):
 
         return self._rows_to_messages(rows, user_id, dek)
 
-    async def get_history(
+    async def get_entries_for_date(
         self, user_id: str, created_date: str, dek: bytes
     ) -> list[dict]:
-        history = await self.get_message_history(user_id, created_date, dek)
+        history = await self.get_flat_messages_for_date(user_id, created_date, dek)
         return self._thread_entries(list(history))
 
-    async def get_message_history(
+    async def get_flat_messages_for_date(
         self, user_id: str, created_date: str, dek: bytes
     ) -> list[dict]:
         cached = await self._get_cached_history(user_id, created_date)

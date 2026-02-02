@@ -5,7 +5,7 @@
 - [x] Delete replies / user messages
 - [x] Better UI for the different kinds of replies
 - [x] Message kind in the reply? (mimic icon)
-- [ ] Stop button?
+- [x] Stop button?
 - [x] Disable replies after today?
 - [ ] Day opening is broken (and where to put it), midnight refresh seems broken
 - [ ] Edit for user messages?

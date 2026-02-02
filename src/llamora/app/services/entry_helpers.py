@@ -100,19 +100,38 @@ def build_conversation_context(
     return {"date": date_str, "part_of_day": part}
 
 
-def apply_reply_kind_prompt(
+def apply_response_kind_prompt(
     history: Sequence[Mapping[str, Any]],
-    reply_prompt: str | None,
+    response_prompt: str | None,
 ) -> list[dict[str, Any]]:
-    """Append a reply-kind system prompt to history for LLM generation."""
+    """Append a response-kind system prompt to history for LLM generation."""
 
-    if not reply_prompt:
+    if not response_prompt:
         return list(history)
 
     return [
         *history,
-        {"role": "system", "message": str(reply_prompt).strip()},
+        {"role": "system", "message": str(response_prompt).strip()},
     ]
+
+
+def build_entry_history(
+    entries: Sequence[Mapping[str, Any]], user_msg_id: str
+) -> list[dict[str, Any]]:
+    """Flatten entry aggregates into a linear history up to ``user_msg_id``."""
+
+    history: list[dict[str, Any]] = []
+    target_id = str(user_msg_id)
+    for entry in entries:
+        message = entry.get("message")
+        if isinstance(message, Mapping):
+            history.append(dict(message))
+            if str(message.get("id")) == target_id:
+                return history
+        for reply in entry.get("replies") or []:
+            if isinstance(reply, Mapping):
+                history.append(dict(reply))
+    return history
 
 
 async def start_stream_session(

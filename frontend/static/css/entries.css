@@ -178,15 +178,15 @@ body {
       opacity: 0.9;
     }
 
-    &[data-reply-kind="reply"] {
+    &[data-response-kind="reply"] {
       --assistant-action-color: var(--action-reply);
     }
 
-    &[data-reply-kind="acknowledge"] {
+    &[data-response-kind="acknowledge"] {
       --assistant-action-color: var(--action-acknowledge);
     }
 
-    &[data-reply-kind="notice"] {
+    &[data-response-kind="notice"] {
       --assistant-action-color: var(--action-notice);
     }
 

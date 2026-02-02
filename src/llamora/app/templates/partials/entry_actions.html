@@ -1,5 +1,5 @@
-{% from 'partials/reply_kind.html' import reply_kind_icon %}
-{% macro entry_actions(user_msg_id, day, reply_kinds=(), is_today=True, stop_url=None, response_active=False, oob=False) -%}
+{% from 'partials/response_kind.html' import response_kind_icon %}
+{% macro entry_actions(user_msg_id, day, response_kinds=(), is_today=True, stop_url=None, response_active=False, oob=False) -%}
 <message-actions id="msg-actions-{{ user_msg_id }}"
                  class="message-actions"
                  data-msg-id="{{ user_msg_id }}"
@@ -14,7 +14,7 @@
           {% if stop_url %}hx-post="{{ stop_url }}"{% endif %}
           {% if stop_url %}hx-swap="none"{% endif %}
           {% else %}
-          aria-label="Reply actions"
+          aria-label="Response actions"
           {% if is_today %}data-tooltip-title="Choose a response"{% endif %}
           {% if not is_today %}disabled aria-disabled="true"{% endif %}
           {% endif %}>
@@ -27,8 +27,8 @@
   <div class="tag-popover action-popover glass-panel" role="dialog" aria-modal="true" hidden>
     <div class="tp-content action-panel">
       <button type="button" class="overlay-close" aria-label="Close">×</button>
-      <div class="action-list" role="menu" aria-label="Reply actions">
-        {% for kind in reply_kinds %}
+      <div class="action-list" role="menu" aria-label="Response actions">
+        {% for kind in response_kinds %}
         <button class="action-item"
                 type="button"
                 role="menuitem"
@@ -36,10 +36,10 @@
                 hx-target="#replies-{{ user_msg_id }}"
                 hx-swap="beforeend"
                 hx-include="#user-time"
-                hx-vals='{"reply_kind":"{{ kind.id }}"}'
+                hx-vals='{"response_kind":"{{ kind.id }}"}'
                 data-action-kind="{{ kind.id }}"
                 hx-on::config-request="const t=document.getElementById('user-time'); if(t){t.value=new Date().toISOString();}">
-          {{ reply_kind_icon(kind.id, "action-item__icon") }}
+          {{ response_kind_icon(kind.id, "action-item__icon") }}
           <span class="action-item__label">{{ kind.label }}</span>
         </button>
         {% endfor %}

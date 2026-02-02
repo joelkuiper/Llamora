@@ -104,7 +104,7 @@ async def get_entries_context(
 
     services = get_services()
     dek = await get_session_context().require_dek()
-    entries = await services.db.messages.get_history(user["id"], date, dek)
+    entries = await services.db.messages.get_entries_for_date(user["id"], date, dek)
     _render_entries_markdown(entries)
 
     today = local_date().isoformat()

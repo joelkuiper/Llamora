@@ -11,6 +11,6 @@
   <div class="no-content">Nothing was written this day.</div>
   {% endif %}
   {% for item in entries or [] %}
-  {{ render_entry(item.message, day, reply_kinds, reply_kind_labels, is_today, replies=item.replies) }}
+  {{ render_entry(item.message, day, response_kinds, response_kind_labels, is_today, replies=item.replies) }}
   {% endfor %}
 </div>
