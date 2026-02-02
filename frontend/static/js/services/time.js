@@ -52,7 +52,7 @@ function getLocaleForTime() {
 }
 
 export function formatLocalTime(value) {
-  const date = value instanceof Date ? value : new Date(value);
+  const date = normalizeTimeValue(value);
   if (Number.isNaN(date.getTime())) {
     return "";
   }
@@ -66,7 +66,7 @@ export function formatLocalTime(value) {
 }
 
 export function formatLocalTimestamp(value) {
-  const date = value instanceof Date ? value : new Date(value);
+  const date = normalizeTimeValue(value);
   if (Number.isNaN(date.getTime())) {
     return "";
   }
@@ -104,6 +104,23 @@ export function formatTimeElements(root = document) {
   });
 }
 
+function normalizeTimeValue(value) {
+  if (value instanceof Date) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const raw = value.trim();
+    if (!raw) {
+      return new Date("");
+    }
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/.test(raw)) {
+      return new Date(raw.replace(" ", "T") + "Z");
+    }
+    return new Date(raw);
+  }
+  return new Date(value);
+}
+
 export function applyTimezoneSearch(searchParams, zone = getTimezone()) {
   return applyTimezoneSearchParam(searchParams, zone);
 }
@@ -134,9 +151,18 @@ export function navigateToToday(zone = getTimezone()) {
   try {
     const url = new URL("/d/today", window.location.origin);
     applyTimezoneSearchParam(url.searchParams, zone);
+    const today = updateClientToday(document?.body, new Date());
+    if (today) {
+      url.searchParams.set("client_today", today);
+    }
     window.location.href = `${url.pathname}${url.search}`;
   } catch (err) {
-    window.location.href = `/d/today?${buildTimezoneQueryParam(zone)}`;
+    const today = updateClientToday(document?.body, new Date());
+    const params = new URLSearchParams(buildTimezoneQueryParam(zone));
+    if (today) {
+      params.set("client_today", today);
+    }
+    window.location.href = `/d/today?${params.toString()}`;
   }
 }
 

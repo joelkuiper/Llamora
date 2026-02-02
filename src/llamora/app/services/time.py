@@ -44,6 +44,12 @@ def get_timezone() -> str:
 
 def local_date() -> date:
     """Get the current date in the client's timezone."""
+    client_today = request.args.get("client_today")
+    if client_today:
+        try:
+            return date.fromisoformat(client_today)
+        except ValueError:
+            logger.debug("Invalid client today query '%s'", client_today)
     client_today = request.headers.get("X-Client-Today")
     if client_today:
         try:

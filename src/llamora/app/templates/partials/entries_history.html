@@ -7,6 +7,9 @@
      aria-relevant="additions"
      aria-labelledby="entries-log-label-{{ day }}">
   <h2 class="visually-hidden" id="entries-log-label-{{ day }}">Entries for {{ day|long_date }}</h2>
+  {% if opening_stream %}
+  {% include 'partials/entry_opening_stream.html' %}
+  {% endif %}
   {% if not entries|length and not is_today %}
   <div class="no-content">Nothing was written this day.</div>
   {% endif %}

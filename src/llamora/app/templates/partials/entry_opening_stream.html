@@ -1,0 +1,22 @@
+{% set sse_url = url_for('entries.sse_opening', date=day) %}
+<response-stream id="opening-stream-{{ day }}"
+                 class="message assistant opening-stream message--opening"
+                 data-entry-id="opening-{{ day }}"
+                 data-stream-kind="opening"
+                 data-sse-url="{{ sse_url }}"
+                 role="article"
+                 aria-labelledby="opening-{{ day }}-speaker opening-{{ day }}-body">
+  <span class="raw-response" hidden></span>
+  <span class="visually-hidden" id="opening-{{ day }}-speaker">{{ config.APP_NAME }} opening</span>
+  <div class="message-main">
+    <div class="message-opening-label">Day opening</div>
+    <div class="markdown-body" id="opening-{{ day }}-body">
+    <span id="typing-indicator-opening-{{ day }}"
+          class="typing-indicator"
+          data-typing-indicator
+          data-entry-id="opening-{{ day }}">
+      <span class="cursor">❚</span>
+    </span>
+    </div>
+  </div>
+</response-stream>

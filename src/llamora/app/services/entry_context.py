@@ -110,7 +110,19 @@ async def get_entries_context(
     today = local_date().isoformat()
     is_today = date == today
     pending_msg_id = None
-    opening_stream = False
+
+    opening_entries: list[dict[str, Any]] = []
+    regular_entries: list[dict[str, Any]] = []
+    for item in entries:
+        message = item.get("message", {}) if isinstance(item, dict) else {}
+        meta = message.get("meta", {}) if isinstance(message, dict) else {}
+        if meta.get("auto_opening"):
+            opening_entries.append(item)
+        else:
+            regular_entries.append(item)
+
+    entries = [*opening_entries, *regular_entries]
+    opening_stream = is_today and not opening_entries
 
     return {
         "entries": entries,

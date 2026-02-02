@@ -7,7 +7,7 @@
 - [x] Message kind in the reply? (mimic icon)
 - [x] Stop button?
 - [x] Disable replies after today?
-- [ ] Day opening is broken (and where to put it), midnight refresh seems broken
+- [x] Day opening is broken (and where to put it), midnight refresh seems broken
 - [ ] Edit for user messages?
 - [x] No concept of time / timestamp on messages (should be accessible somewhere)
 - [x] A lot of code clean up / refactoring

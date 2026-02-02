@@ -110,6 +110,7 @@ class ResponseStreamElement extends HTMLElement {
   #metaChipsAssistantId = null;
   #metaChipsListenerController = null;
   #deleteButton = null;
+  #untracked = false;
 
   constructor() {
     super();
@@ -175,8 +176,12 @@ class ResponseStreamElement extends HTMLElement {
       this.#renderer = new IncrementalMarkdownRenderer(this.#markdown);
     }
 
-    this.#syncController();
-    this.#syncDeleteButton();
+    this.#untracked =
+      this.dataset?.streamKind === "opening" || this.dataset?.untracked === "true";
+    if (!this.#untracked) {
+      this.#syncController();
+      this.#syncDeleteButton();
+    }
 
     if (!this.#completed) {
       this.#startStream();
@@ -268,14 +273,18 @@ class ResponseStreamElement extends HTMLElement {
     this.setAttribute("aria-busy", "true");
     this.#meta = null;
     this.#wasPartial = false;
-    const controller = this.#controller || this.#getStreamController();
-    if (controller && typeof controller.notifyStreamStart === "function") {
-      controller.notifyStreamStart(this, { reason: "stream:start" });
-    } else {
-      const session = this.#getStreamingSession();
-      if (session && this.entryId) {
-        session.begin(this.entryId);
+    if (!this.#untracked) {
+      const controller = this.#controller || this.#getStreamController();
+      if (controller && typeof controller.notifyStreamStart === "function") {
+        controller.notifyStreamStart(this, { reason: "stream:start" });
+      } else {
+        const session = this.#getStreamingSession();
+        if (session && this.entryId) {
+          session.begin(this.entryId);
+        }
+        requestScrollForceBottom({ source: "stream:start" });
       }
+    } else {
       requestScrollForceBottom({ source: "stream:start" });
     }
     this.dispatchEvent(
@@ -565,20 +574,22 @@ class ResponseStreamElement extends HTMLElement {
       placeholder?.remove();
     }
 
-    const controller = this.#controller || this.#getStreamController();
-    if (controller && typeof controller.notifyStreamComplete === "function") {
-      controller.notifyStreamComplete(this, {
-        status,
-        reason,
-        entryId: this.entryId,
-      });
-    } else {
-      const session = this.#getStreamingSession();
-      if (session) {
-        session.complete({ result: status, reason, entryId: this.entryId });
-      }
-      if (status !== "aborted") {
-        requestScrollForceBottom({ source: "stream:complete" });
+    if (!this.#untracked) {
+      const controller = this.#controller || this.#getStreamController();
+      if (controller && typeof controller.notifyStreamComplete === "function") {
+        controller.notifyStreamComplete(this, {
+          status,
+          reason,
+          entryId: this.entryId,
+        });
+      } else {
+        const session = this.#getStreamingSession();
+        if (session) {
+          session.complete({ result: status, reason, entryId: this.entryId });
+        }
+        if (status !== "aborted") {
+          requestScrollForceBottom({ source: "stream:complete" });
+        }
       }
     }
 
@@ -597,9 +608,11 @@ class ResponseStreamElement extends HTMLElement {
       })
     );
 
-    const htmxRef = (typeof window !== "undefined" && window.htmx) || null;
-    if (htmxRef?.ajax && this.entryId) {
-      htmxRef.ajax("GET", `/e/actions/${this.entryId}`, { swap: "none" });
+    if (!this.#untracked) {
+      const htmxRef = (typeof window !== "undefined" && window.htmx) || null;
+      if (htmxRef?.ajax && this.entryId) {
+        htmxRef.ajax("GET", `/e/actions/${this.entryId}`, { swap: "none" });
+      }
     }
   }
 

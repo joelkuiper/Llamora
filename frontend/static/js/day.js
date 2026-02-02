@@ -1,10 +1,11 @@
 import {
-  buildTimezoneQueryParam,
+  applyTimezoneSearchParam,
   formatIsoDate,
   getTimezone,
   parseDateFromSource,
 } from "./services/datetime.js";
 export { formatIsoDate, parseDateFromSource } from "./services/datetime.js";
+import { updateClientToday } from "./services/time.js";
 import {
   ACTIVE_DAY_CHANGED_EVENT,
   getActiveDay,
@@ -56,9 +57,15 @@ export function navigateToDate(dateStr) {
   }
 
   const zone = getTimezone();
-  const tzQuery = `?${buildTimezoneQueryParam(zone)}`;
-  const htmxUrl = `/e/${dateStr}${tzQuery}`;
-  const pushUrl = `/d/${dateStr}${tzQuery}`;
+  const params = new URLSearchParams();
+  applyTimezoneSearchParam(params, zone);
+  const today = updateClientToday();
+  if (today) {
+    params.set("client_today", today);
+  }
+  const query = params.toString();
+  const htmxUrl = `/e/${dateStr}?${query}`;
+  const pushUrl = `/d/${dateStr}?${query}`;
 
   const targetId = "#content-wrapper";
   if (window.htmx) {

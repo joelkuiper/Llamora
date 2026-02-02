@@ -275,6 +275,23 @@ body {
     .repeat-guard-indicator__label {
       white-space: nowrap;
     }
+
+    &.message--opening .message-opening-label {
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--brand-muted);
+      margin-bottom: var(--spacing-xs);
+    }
+
+    &.message--opening {
+      width: 100%;
+      border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+      background: color-mix(in srgb, var(--color-surface) 80%, transparent);
+      padding: var(--spacing-lg) var(--spacing-xl);
+      border-radius: var(--radius-md);
+      box-shadow: none;
+    }
   }
 
   .message-delete {
