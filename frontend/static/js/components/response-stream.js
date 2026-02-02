@@ -66,7 +66,6 @@ class ResponseStreamElement extends HTMLElement {
   #boundHandleError;
   #boundHandleMeta;
   #controller = null;
-  #controllerDisconnect = null;
   #deleteButton = null;
 
   constructor() {
@@ -90,20 +89,7 @@ class ResponseStreamElement extends HTMLElement {
     if (controller === this.#controller) {
       return;
     }
-
-    if (this.#controllerDisconnect) {
-      this.#controllerDisconnect();
-      this.#controllerDisconnect = null;
-    }
-
     this.#controller = controller || null;
-
-    if (this.#controller && typeof this.#controller.registerStream === "function") {
-      const cleanup = this.#controller.registerStream(this);
-      if (typeof cleanup === "function") {
-        this.#controllerDisconnect = cleanup;
-      }
-    }
   }
 
   connectedCallback() {
@@ -142,10 +128,6 @@ class ResponseStreamElement extends HTMLElement {
     }
     this.#repeatGuardWavesDismissed = false;
     this.#deleteButton = null;
-    if (this.#controllerDisconnect) {
-      this.#controllerDisconnect();
-      this.#controllerDisconnect = null;
-    }
     this.#controller = null;
   }
 

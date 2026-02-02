@@ -290,8 +290,8 @@
         box-shadow var(--motion-tight);
     }
 
-    td a:not(.no-messages),
-    td span:not(.no-messages) {
+    td a:not(.no-entries),
+    td span:not(.no-entries) {
       &:hover {
         background: var(--accent-05);
         border-color: var(--accent);
@@ -349,9 +349,9 @@
       pointer-events: none;
     }
 
-    td.active .no-messages { opacity: 1; }
+    td.active .no-entries { opacity: 1; }
 
-    td .no-messages {
+    td .no-entries {
       opacity: .5;
       cursor: default;
       &:hover { opacity: 1 !important; }
