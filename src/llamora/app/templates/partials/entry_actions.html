@@ -1,5 +1,5 @@
 {% from 'partials/reply_kind.html' import reply_kind_icon %}
-{% macro message_actions(user_msg_id, day, reply_kinds=(), is_today=True) -%}
+{% macro entry_actions(user_msg_id, day, reply_kinds=(), is_today=True) -%}
 <message-actions class="message-actions" data-msg-id="{{ user_msg_id }}">
   <button class="message-action action-trigger"
           type="button"

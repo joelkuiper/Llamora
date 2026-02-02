@@ -1,7 +1,7 @@
 {% from 'partials/meta_chips.html' import render_meta_chips %}
-{% from 'partials/message_actions.html' import message_actions %}
+{% from 'partials/entry_actions.html' import entry_actions %}
 {% from 'partials/reply_kind.html' import reply_kind_icon %}
-{% macro render_message(msg, day, reply_kinds=(), reply_kind_labels=None, is_today=True, replies=None) -%}
+{% macro render_entry(msg, day, reply_kinds=(), reply_kind_labels=None, is_today=True, replies=None) -%}
 {% set msg_meta = msg.get('meta', {}) %}
 {% set is_error = msg_meta.get('error') %}
 {% set repeat_guard = msg_meta.get('repeat_guard') %}
@@ -47,7 +47,7 @@
               data-ready="true">
         <span class="icon-mask icon-trash message-action__icon" aria-hidden="true"></span>
       </button>
-      {{ message_actions(msg['id'], day, reply_kinds, is_today=is_today) }}
+      {{ entry_actions(msg['id'], day, reply_kinds, is_today=is_today) }}
     </div>
   </div>
   {% endif %}
@@ -91,7 +91,7 @@
      id="replies-{{ msg['id'] }}"
      data-replies-for="{{ msg['id'] }}">
   {% for reply in replies or [] %}
-  {{ render_message(reply, day, reply_kinds, reply_kind_labels, is_today) }}
+  {{ render_entry(reply, day, reply_kinds, reply_kind_labels, is_today) }}
   {% endfor %}
 </div>
 {% endif %}

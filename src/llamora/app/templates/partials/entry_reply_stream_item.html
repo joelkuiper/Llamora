@@ -1,0 +1,2 @@
+{% from 'partials/entry_reply_stream.html' import entry_reply_stream %}
+{{ entry_reply_stream(user_msg_id, day, user_time, stop_url=url_for('entries.stop_generation', user_msg_id=user_msg_id), reply_kind=reply_kind) }}

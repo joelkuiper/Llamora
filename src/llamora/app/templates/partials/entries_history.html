@@ -1,4 +1,4 @@
-{% from 'partials/message_item.html' import render_message %}
+{% from 'partials/entry_item.html' import render_entry %}
 <div id="entries"
      data-date="{{ day }}"
      data-long-date="{{ day|long_date }}"
@@ -11,6 +11,6 @@
   <div class="no-content">Nothing was written this day.</div>
   {% endif %}
   {% for item in threaded_history or [] %}
-  {{ render_message(item.message, day, reply_kinds, reply_kind_labels, is_today, replies=item.replies) }}
+  {{ render_entry(item.message, day, reply_kinds, reply_kind_labels, is_today, replies=item.replies) }}
   {% endfor %}
 </div>

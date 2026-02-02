@@ -4,7 +4,7 @@
   <entry-view{% if request.headers.get('HX-Request') == 'true' %} data-rendering="true"{% endif %}{% if scroll_target %} data-scroll-target="{{ scroll_target }}"{% endif %}
              data-view-kind="{{ view_kind }}"
              aria-busy="{{ 'true' if request.headers.get('HX-Request') == 'true' else 'false' }}">
-    {% include 'partials/history.html' %}
+    {% include 'partials/entries_history.html' %}
     {% if is_today %}
     <entry-form data-date="{{ day }}">
       <form id="message-form"

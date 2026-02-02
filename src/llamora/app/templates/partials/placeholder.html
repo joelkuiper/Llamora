@@ -1,4 +1,4 @@
-{% from 'partials/message_item.html' import render_message %}
+{% from 'partials/entry_item.html' import render_entry %}
 {% set msg = {
   "id": user_msg_id,
   "role": "user",
@@ -8,4 +8,4 @@
   "tags": [],
   "created_at": created_at
 } %}
-{{ render_message(msg, day, reply_kinds, reply_kind_labels, is_today) }}
+{{ render_entry(msg, day, reply_kinds, reply_kind_labels, is_today) }}
