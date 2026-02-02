@@ -20,7 +20,7 @@ import {
 import { afterNextFrame, scheduleFrame } from "../utils/scheduler.js";
 import "./entry-form.js";
 import "./response-stream.js";
-import "./message-actions.js";
+import "./entry-actions.js";
 
 function activateAnimations(node) {
   if (!node || node.nodeType !== Node.ELEMENT_NODE) return;

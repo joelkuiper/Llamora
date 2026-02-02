@@ -1,31 +1,31 @@
 {% from 'partials/meta_chips.html' import render_meta_chips %}
 {% from 'partials/entry_actions.html' import entry_actions %}
 {% from 'partials/response_kind.html' import response_kind_icon %}
-{% macro render_entry(msg, day, response_kinds=(), response_kind_labels=None, is_today=True, replies=None) -%}
-{% set msg_meta = msg.get('meta', {}) %}
+{% macro render_entry(e, day, response_kinds=(), response_kind_labels=None, is_today=True, replies=None) -%}
+{% set msg_meta = e.get('meta', {}) %}
 {% set is_error = msg_meta.get('error') %}
 {% set repeat_guard = msg_meta.get('repeat_guard') %}
 {% set response_kind = msg_meta.get('response_kind') %}
 {% set is_opening = msg_meta.get('auto_opening') %}
 {% set opening_cookie = 'opening_collapsed_' ~ day %}
 {% set opening_collapsed = is_opening and request.cookies.get(opening_cookie) == '1' %}
-{% set speaker = 'Your' if msg['role'] == 'user' else 'Assistant' %}
-<div id="msg-{{ msg['id'] }}"
-     class="message {{ 'assistant' if msg['role'] != 'user' else 'user'}}{% if is_error %} message--error{% endif %}{% if is_opening %} message--opening{% if opening_collapsed %} is-collapsed{% endif %}{% endif %}"
-     data-message-id="{{ msg['id'] }}"
+{% set speaker = 'Your' if e['role'] == 'user' else 'Assistant' %}
+<div id="entry-{{ e['id'] }}"
+     class="entry {{ 'assistant' if e['role'] != 'user' else 'user'}}{% if is_error %} entry--error{% endif %}{% if is_opening %} entry--opening{% if opening_collapsed %} is-collapsed{% endif %}{% endif %}"
+     data-entry-id="{{ e['id'] }}"
      {% if response_kind %}data-response-kind="{{ response_kind }}"{% endif %}
-     {% if msg['role'] == 'assistant' and msg.get('reply_to') %}
-     data-response-to="{{ msg['reply_to'] }}"
+     {% if e['role'] == 'assistant' and e.get('reply_to') %}
+     data-response-to="{{ e['reply_to'] }}"
      {% endif %}
      {% if repeat_guard %}data-repeat-guard="true"{% endif %}
      role="article"
-     aria-labelledby="msg-{{ msg['id'] }}-speaker msg-{{ msg['id'] }}-body">
-  <span class="visually-hidden" id="msg-{{ msg['id'] }}-speaker">{{ speaker }} message</span>
-  {% set rendered = msg.get('message_html') %}
-  <div class="message-main">
+     aria-labelledby="entry-{{ e['id'] }}-speaker entry-{{ e['id'] }}-body">
+  <span class="visually-hidden" id="entry-{{ e['id'] }}-speaker">{{ speaker }} entry</span>
+  {% set rendered = e.get('message_html') %}
+  <div class="entry-main">
     {% if is_opening %}
-    <div class="message-opening-header">
-      <span class="message-opening-title">day opening</span>
+    <div class="entry-opening-header">
+      <span class="entry-opening-title">day opening</span>
       <button type="button"
               class="opening-toggle"
               data-opening-toggle
@@ -38,34 +38,34 @@
     {% endif %}
     <div class="opening-content"{% if not is_opening %} data-opening-content="false"{% endif %}>
       <div class="markdown-body"
-           id="msg-{{ msg['id'] }}-body"
-           {% if rendered is not none %}data-rendered="true"{% else %}data-markdown-source="{{ msg.message }}"{% endif %}>
+           id="entry-{{ e['id'] }}-body"
+           {% if rendered is not none %}data-rendered="true"{% else %}data-markdown-source="{{ e.message }}"{% endif %}>
         {% if rendered is not none %}
         {{ rendered | safe }}
         {% endif %}
       </div>
     </div>
   </div>
-  {% if msg['role'] == 'user' and not msg_meta.get('error') %}
-  <div class="message-footer">
-    {{ render_meta_chips(msg['id'], msg.get('tags', [])) }}
-    <div class="message-actions-row" aria-label="Message actions">
-      {% if msg.get('created_at') %}
-      <time class="message-time"
-            datetime="{{ msg['created_at'] }}"
-            data-time-raw="{{ msg['created_at'] }}"></time>
+  {% if e['role'] == 'user' and not msg_meta.get('error') %}
+  <div class="entry-footer">
+    {{ render_meta_chips(entry_id=e['id'], tags=e.get('tags', [])) }}
+    <div class="entry-actions-row" aria-label="Entry actions">
+      {% if e.get('created_at') %}
+      <time class="entry-time"
+            datetime="{{ e['created_at'] }}"
+            data-time-raw="{{ e['created_at'] }}"></time>
       {% endif %}
-      <button class="message-action message-delete"
+      <button class="entry-action entry-delete"
               type="button"
-              hx-delete="{{ url_for('entries.delete_entry', msg_id=msg['id']) }}"
-              hx-target="#msg-{{ msg['id'] }}"
+              hx-delete="{{ url_for('entries.delete_entry', entry_id=e['id']) }}"
+              hx-target="#entry-{{ e['id'] }}"
               hx-swap="outerHTML swap:180ms"
-              aria-label="Delete message"
-              data-tooltip-title="Delete message"
+              aria-label="Delete entry"
+              data-tooltip-title="Delete entry"
               data-ready="true">
-        <span class="icon-mask icon-trash message-action__icon" aria-hidden="true"></span>
+        <span class="icon-mask icon-trash entry-action__icon" aria-hidden="true"></span>
       </button>
-      {{ entry_actions(msg['id'], day, response_kinds, is_today=is_today) }}
+      {{ entry_actions(e['id'], day, response_kinds, is_today=is_today) }}
     </div>
   </div>
   {% endif %}
@@ -75,41 +75,41 @@
     <span class="visually-hidden">Response paused after repeating itself.</span>
   </span>
   {% endif %}
-  {% if msg['role'] != 'user' %}
-  <div class="message-actions-inline" aria-label="Assistant message actions">
-    {% if msg.get('created_at') and not is_opening %}
-    <time class="message-time"
-          datetime="{{ msg['created_at'] }}"
-          data-time-raw="{{ msg['created_at'] }}"></time>
+  {% if e['role'] != 'user' %}
+  <div class="entry-actions-inline" aria-label="Assistant entry actions">
+    {% if e.get('created_at') and not is_opening %}
+    <time class="entry-time"
+          datetime="{{ e['created_at'] }}"
+          data-time-raw="{{ e['created_at'] }}"></time>
     {% endif %}
     {% if response_kind and response_kind_labels and response_kind_labels.get(response_kind) %}
-    <span class="message-action message-kind-indicator"
+    <span class="entry-action entry-kind-indicator"
           role="img"
           aria-label="{{ response_kind_labels.get(response_kind) }}"
           data-tooltip-title="{{ response_kind_labels.get(response_kind) }}">
-      {{ response_kind_icon(response_kind, "message-kind-icon") }}
+      {{ response_kind_icon(response_kind, "entry-kind-icon") }}
       <span class="visually-hidden">{{ response_kind_labels.get(response_kind) }}</span>
     </span>
     {% endif %}
     {% if not is_opening %}
-    <button class="message-action message-delete"
+    <button class="entry-action entry-delete"
             type="button"
-            hx-delete="{{ url_for('entries.delete_entry', msg_id=msg['id']) }}"
-            hx-target="#msg-{{ msg['id'] }}"
+            hx-delete="{{ url_for('entries.delete_entry', entry_id=e['id']) }}"
+            hx-target="#entry-{{ e['id'] }}"
             hx-swap="outerHTML swap:180ms"
-            aria-label="Delete message"
-            data-tooltip-title="Delete message"
+            aria-label="Delete entry"
+            data-tooltip-title="Delete entry"
             data-ready="true">
-      <span class="icon-mask icon-trash message-action__icon" aria-hidden="true"></span>
+      <span class="icon-mask icon-trash entry-action__icon" aria-hidden="true"></span>
     </button>
     {% endif %}
   </div>
   {% endif %}
 </div>
-{% if msg['role'] == 'user' %}
-<div class="message-replies"
-     id="replies-{{ msg['id'] }}"
-     data-replies-for="{{ msg['id'] }}">
+{% if e['role'] == 'user' %}
+<div class="entry-responses"
+     id="entry-responses-{{ e['id'] }}"
+     data-responses-for="{{ e['id'] }}">
   {% for reply in replies or [] %}
   {{ render_entry(reply, day, response_kinds, response_kind_labels, is_today) }}
   {% endfor %}

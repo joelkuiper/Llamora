@@ -1,12 +1,12 @@
 {% from 'partials/response_kind.html' import response_kind_icon %}
 {% macro entry_actions(entry_id, day, response_kinds=(), is_today=True, stop_url=None, response_active=False, oob=False) -%}
-<message-actions id="msg-actions-{{ entry_id }}"
-                 class="message-actions"
-                 data-msg-id="{{ entry_id }}"
+<entry-actions id="entry-actions-{{ entry_id }}"
+                 class="entry-actions"
+                 data-entry-id="{{ entry_id }}"
                  {% if stop_url %}data-stop-url="{{ stop_url }}"{% endif %}
                  {% if response_active %}data-response-active="true"{% endif %}
                  {% if oob %}hx-swap-oob="outerHTML"{% endif %}>
-  <button class="message-action action-trigger"
+  <button class="entry-action action-trigger"
           type="button"
           {% if response_active %}
           aria-label="Stop response"
@@ -19,9 +19,9 @@
           {% if not is_today %}disabled aria-disabled="true"{% endif %}
           {% endif %}>
     {% if response_active %}
-    <span class="icon-mask icon-square message-action__icon" aria-hidden="true"></span>
+    <span class="icon-mask icon-square entry-action__icon" aria-hidden="true"></span>
     {% else %}
-    <span class="icon-mask icon-message-more message-action__icon" aria-hidden="true"></span>
+    <span class="icon-mask icon-message-more entry-action__icon" aria-hidden="true"></span>
     {% endif %}
   </button>
   <div class="tag-popover action-popover glass-panel" role="dialog" aria-modal="true" hidden>
@@ -33,7 +33,7 @@
                 type="button"
                 role="menuitem"
                 hx-post="{{ url_for('entries.request_response', date=day, entry_id=entry_id) }}"
-                hx-target="#replies-{{ entry_id }}"
+                hx-target="#entry-responses-{{ entry_id }}"
                 hx-swap="beforeend"
                 hx-include="#user-time"
                 hx-vals='{"response_kind":"{{ kind.id }}"}'
@@ -46,5 +46,5 @@
       </div>
     </div>
   </div>
-</message-actions>
+</entry-actions>
 {%- endmacro %}

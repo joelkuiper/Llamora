@@ -163,7 +163,7 @@ class ResponseStreamElement extends HTMLElement {
     this.#typingIndicator = this.querySelector(TYPING_INDICATOR_SELECTOR) || null;
     this.#repeatGuardIndicator =
       this.querySelector(".repeat-guard-indicator") || null;
-    this.#deleteButton = this.querySelector(".message-delete") || null;
+    this.#deleteButton = this.querySelector(".entry-delete") || null;
     this.#repeatGuardWavesDismissed = Boolean(
       this.#repeatGuardIndicator?.classList.contains("repeat-guard-indicator--calm")
     );
@@ -509,9 +509,9 @@ class ResponseStreamElement extends HTMLElement {
   }
 
   #ensureInlineTimestamp() {
-    const container = this.querySelector(".message-actions-inline");
+    const container = this.querySelector(".entry-actions-inline");
     if (!container) return;
-    if (container.querySelector(".message-time")) return;
+    if (container.querySelector(".entry-time")) return;
 
     const now = new Date();
     const timeEl = document.createElement("time");
@@ -521,12 +521,12 @@ class ResponseStreamElement extends HTMLElement {
     timeEl.title = formatLocalTimestamp(now);
     timeEl.textContent = formatLocalTime(now);
 
-    const kindIndicator = container.querySelector(".message-kind-indicator");
+    const kindIndicator = container.querySelector(".entry-kind-indicator");
     if (kindIndicator) {
       container.insertBefore(timeEl, kindIndicator);
       return;
     }
-    const deleteBtn = container.querySelector(".message-delete");
+    const deleteBtn = container.querySelector(".entry-delete");
     if (deleteBtn) {
       container.insertBefore(timeEl, deleteBtn);
       return;
@@ -635,7 +635,7 @@ class ResponseStreamElement extends HTMLElement {
       return;
     }
 
-    this.id = `msg-${msgId}`;
+    this.id = `entry-${msgId}`;
     const deleteUrl = template.replace(placeholder, msgId);
     button.setAttribute("hx-delete", deleteUrl);
     if (targetTemplate) {
@@ -897,7 +897,7 @@ class ResponseStreamElement extends HTMLElement {
 
   #markAsError() {
     this.dataset.error = "true";
-    this.classList.add("message--error");
+    this.classList.add("entry--error");
   }
 }
 

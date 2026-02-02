@@ -715,7 +715,7 @@ export class ScrollManager {
     const params = new URLSearchParams(window.location.search);
     const hasTarget =
       params.has("target") ||
-      (window.location.hash && window.location.hash.startsWith("#msg-"));
+      (window.location.hash && window.location.hash.startsWith("#entry-"));
 
     if (hasTarget) {
       return;

@@ -2,7 +2,7 @@
 {% set opening_cookie = 'opening_collapsed_' ~ day %}
 {% set opening_collapsed = request.cookies.get(opening_cookie) == '1' %}
 <response-stream id="opening-stream-{{ day }}"
-                 class="message assistant opening-stream message--opening{% if opening_collapsed %} is-collapsed{% endif %}"
+                 class="entry assistant opening-stream entry--opening{% if opening_collapsed %} is-collapsed{% endif %}"
                  data-entry-id="opening-{{ day }}"
                  data-stream-kind="opening"
                  data-sse-url="{{ sse_url }}"
@@ -10,9 +10,9 @@
                  aria-labelledby="opening-{{ day }}-speaker opening-{{ day }}-body">
   <span class="raw-response" hidden></span>
   <span class="visually-hidden" id="opening-{{ day }}-speaker">{{ config.APP_NAME }} opening</span>
-  <div class="message-main">
-    <div class="message-opening-header">
-      <span class="message-opening-title">day opening</span>
+  <div class="entry-main">
+    <div class="entry-opening-header">
+      <span class="entry-opening-title">day opening</span>
       <button type="button"
               class="opening-toggle"
               data-opening-toggle

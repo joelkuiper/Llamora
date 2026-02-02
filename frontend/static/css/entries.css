@@ -97,7 +97,7 @@ body {
     user-select: none;
   }
 
-  .message {
+  .entry {
     border: 1px solid transparent;
     padding: var(--spacing-md) 0;
     border-radius: 0;
@@ -122,11 +122,11 @@ body {
       border-radius: var(--radius-md);
       padding: var(--spacing-lg) var(--spacing-xl);
 
-      .message-main {
+      .entry-main {
         display: block;
       }
 
-      .message-footer {
+      .entry-footer {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -134,11 +134,11 @@ body {
         margin-top: var(--spacing-sm);
       }
 
-      .message-footer .meta-chips {
+      .entry-footer .meta-chips {
         margin-top: 0;
       }
 
-      .message-actions-row {
+      .entry-actions-row {
         display: inline-flex;
         align-items: center;
         gap: 0.4rem;
@@ -147,8 +147,8 @@ body {
         transition: opacity var(--motion-gentle) ease;
       }
 
-      &:hover .message-actions-row,
-      &:focus-within .message-actions-row {
+      &:hover .entry-actions-row,
+      &:focus-within .entry-actions-row {
         opacity: 1;
       }
 
@@ -275,7 +275,7 @@ body {
       white-space: nowrap;
     }
 
-    &.message--opening .message-opening-header {
+    &.entry--opening .entry-opening-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -283,18 +283,18 @@ body {
       margin-bottom: var(--spacing-sm);
     }
 
-    &.message--opening.is-collapsed .message-opening-header {
+    &.entry--opening.is-collapsed .entry-opening-header {
       margin-bottom: 0;
     }
 
-    &.message--opening .message-opening-title {
+    &.entry--opening .entry-opening-title {
       font-size: 0.7rem;
       letter-spacing: 0.16em;
       text-transform: uppercase;
       color: var(--color-text-muted);
     }
 
-    &.message--opening .opening-toggle {
+    &.entry--opening .opening-toggle {
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -308,24 +308,24 @@ body {
       transition: color 180ms ease, border-color 180ms ease, background 180ms ease;
     }
 
-    &.message--opening .opening-toggle:hover,
-    &.message--opening .opening-toggle:focus-visible {
+    &.entry--opening .opening-toggle:hover,
+    &.entry--opening .opening-toggle:focus-visible {
       color: var(--color-text);
       border-color: color-mix(in srgb, var(--border) 65%, transparent);
       background: color-mix(in srgb, var(--color-surface) 85%, transparent);
     }
 
-    &.message--opening .opening-toggle:active {
+    &.entry--opening .opening-toggle:active {
       transform: translateY(1px);
       background: color-mix(in srgb, var(--color-surface) 70%, transparent);
     }
 
-    &.message--opening .opening-toggle .icon-mask {
+    &.entry--opening .opening-toggle .icon-mask {
       width: 0.9rem;
       height: 0.9rem;
     }
 
-    &.message--opening {
+    &.entry--opening {
       align-self: stretch;
       width: 100%;
       border: 1px solid color-mix(in srgb, var(--border) 25%, transparent);
@@ -337,13 +337,13 @@ body {
       margin-bottom: var(--spacing-sm);
     }
 
-    &.message--opening .markdown-body {
+    &.entry--opening .markdown-body {
       font-size: 0.92em;
       line-height: 1.85;
       color: color-mix(in srgb, var(--color-text-muted) 85%, transparent);
     }
 
-    &.message--opening .opening-content {
+    &.entry--opening .opening-content {
       padding: var(--spacing-md) 0 var(--spacing-sm);
       max-height: 60vh;
       opacity: 1;
@@ -355,27 +355,27 @@ body {
       overflow: hidden;
     }
 
-    &.message--opening.is-collapsed .opening-content {
+    &.entry--opening.is-collapsed .opening-content {
       max-height: 0;
       opacity: 0;
       transform: translateY(-4px);
       padding: 0;
     }
 
-    &.message--opening .opening-toggle [data-opening-icon-closed] {
+    &.entry--opening .opening-toggle [data-opening-icon-closed] {
       display: none;
     }
 
-    &.message--opening.is-collapsed .opening-toggle [data-opening-icon-open] {
+    &.entry--opening.is-collapsed .opening-toggle [data-opening-icon-open] {
       display: none;
     }
 
-    &.message--opening.is-collapsed .opening-toggle [data-opening-icon-closed] {
+    &.entry--opening.is-collapsed .opening-toggle [data-opening-icon-closed] {
       display: block;
     }
   }
 
-  .message-delete {
+  .entry-delete {
     position: absolute;
     right: var(--spacing-sm);
     bottom: var(--spacing-sm);
@@ -386,11 +386,11 @@ body {
       color 200ms ease;
   }
 
-  .message.user .message-delete {
+  .entry.user .entry-delete {
     position: static;
   }
 
-  .message-actions-inline {
+  .entry-actions-inline {
     position: absolute;
     right: var(--spacing-sm);
     bottom: var(--spacing-sm);
@@ -401,11 +401,11 @@ body {
     transition: opacity var(--motion-gentle) ease;
   }
 
-  .message-actions-inline .message-delete {
+  .entry-actions-inline .entry-delete {
     position: static;
   }
 
-  .message-time {
+  .entry-time {
     display: inline-flex;
     align-items: center;
     font-size: 0.65rem;
@@ -420,35 +420,35 @@ body {
     pointer-events: none;
   }
 
-  .message-actions-row .message-time {
+  .entry-actions-row .entry-time {
     margin-right: 0.4rem;
   }
 
-  .message:hover .message-time,
-  .message:focus-within .message-time {
+  .entry:hover .entry-time,
+  .entry:focus-within .entry-time {
     opacity: 1;
   }
 
-  .message:hover .message-actions-inline,
-  .message:focus-within .message-actions-inline {
+  .entry:hover .entry-actions-inline,
+  .entry:focus-within .entry-actions-inline {
     opacity: 1;
   }
 
-  .message-replies {
+  .entry-responses {
     display: grid;
     gap: var(--spacing-xs);
     margin-top: var(--spacing-sm);
   }
 
-  .message.user + .message-replies {
+  .entry.user + .entry-responses {
     margin-top: var(--spacing-xs);
   }
 
-  .message--opening + .message {
+  .entry--opening + .entry {
     margin-top: var(--spacing-sm);
   }
 
-  .message-kind-indicator {
+  .entry-kind-indicator {
     background: transparent;
     border-color: transparent;
     box-shadow: none;
@@ -456,32 +456,32 @@ body {
     cursor: default;
   }
 
-  .message-kind-indicator:hover,
-  .message-kind-indicator:focus-visible {
+  .entry-kind-indicator:hover,
+  .entry-kind-indicator:focus-visible {
     border-color: transparent;
     box-shadow: none;
     background: transparent;
   }
 
-  .message-kind-indicator .message-kind-icon {
+  .entry-kind-indicator .entry-kind-icon {
     width: 0.85rem;
     height: 0.85rem;
   }
 
-  .message.assistant .message-delete,
-  .message.response-stream .message-delete {
+  .entry.assistant .entry-delete,
+  .entry.response-stream .entry-delete {
     background: transparent;
     border-color: transparent;
     box-shadow: none;
     color: var(--assistant-delete-color);
   }
 
-  .message-delete:hover,
-  .message-delete:focus-visible,
-  .message.assistant .message-delete:hover,
-  .message.assistant .message-delete:focus-visible,
-  .message.response-stream .message-delete:hover,
-  .message.response-stream .message-delete:focus-visible {
+  .entry-delete:hover,
+  .entry-delete:focus-visible,
+  .entry.assistant .entry-delete:hover,
+  .entry.assistant .entry-delete:focus-visible,
+  .entry.response-stream .entry-delete:hover,
+  .entry.response-stream .entry-delete:focus-visible {
     border-color: color-mix(in srgb, var(--color-danger) 45%, var(--border));
     box-shadow:
       0 0 0 2px color-mix(in srgb, var(--color-danger) 18%, transparent);
@@ -489,9 +489,9 @@ body {
     color: color-mix(in srgb, var(--color-danger) 70%, var(--color-text-muted));
   }
 
-  .message.htmx-swapping {
+  .entry.htmx-swapping {
     pointer-events: none;
-    animation: var(--motion-message-delete-animation);
+    animation: var(--motion-entry-delete-animation);
   }
 
 
@@ -613,7 +613,7 @@ entry-view[data-rendering="true"] #entries {
   box-shadow: var(--inset-shadow-disabled);
 }
 
-#message-form {
+#entry-form {
   max-width: 60rem;
   margin: 0 auto var(--spacing-xl);
   background: var(--glass-bg-opaque);
@@ -732,7 +732,7 @@ entry-view[data-rendering="true"] #entries {
 
 /* respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  #message-form.is-submitting::after,
+  #entry-form.is-submitting::after,
   .input-wrapper .btn.submitting,
   .input-wrapper .btn.submitting::after {
     animation: none;

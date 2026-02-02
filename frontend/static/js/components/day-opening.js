@@ -16,7 +16,7 @@ function setCollapsedCookie(day, collapsed) {
 }
 
 function syncInitialState() {
-  document.querySelectorAll(".message--opening").forEach((opening) => {
+  document.querySelectorAll(".entry--opening").forEach((opening) => {
     if (!opening.classList.contains("is-collapsed")) {
       return;
     }
@@ -32,7 +32,7 @@ function syncInitialState() {
 function handleToggle(event) {
   const toggle = event.target?.closest?.("[data-opening-toggle]");
   if (!toggle) return;
-  const opening = toggle.closest?.(".message--opening");
+  const opening = toggle.closest?.(".entry--opening");
   if (!opening) return;
 
   const isCollapsed = opening.classList.toggle("is-collapsed");

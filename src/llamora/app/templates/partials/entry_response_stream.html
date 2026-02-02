@@ -5,23 +5,22 @@
 {%- set sse_url = url_for('entries.sse_response', date=day, entry_id=entry_id, user_time=user_time, response_kind=response_kind) -%}
 {%- endif -%}
 <response-stream id="response-stream-{{ entry_id }}"
-            class="message response-stream"
+            class="entry response-stream"
             data-entry-id="{{ entry_id }}"
             {%- if response_kind %}
             data-response-kind="{{ response_kind }}"
             {%- endif %}
-            data-assistant-msg-id=""
-            data-message-id=""
+            data-assistant-entry-id=""
             data-sse-url="{{ sse_url }}"
             {%- if stop_url %}
             data-stop-url="{{ stop_url }}"
             {%- endif %}
             role="article"
-            aria-labelledby="msg-{{ entry_id }}-speaker msg-{{ entry_id }}-body">
+            aria-labelledby="entry-{{ entry_id }}-speaker entry-{{ entry_id }}-body">
   <span class="raw-response" hidden></span>
 
-  <span class="visually-hidden" id="msg-{{ entry_id }}-speaker">{{ config.APP_NAME }} response</span>
-  <div class="markdown-body" id="msg-{{ entry_id }}-body">
+  <span class="visually-hidden" id="entry-{{ entry_id }}-speaker">{{ config.APP_NAME }} response</span>
+  <div class="markdown-body" id="entry-{{ entry_id }}-body">
     <span id="typing-indicator-{{ entry_id }}"
           class="typing-indicator"
           data-typing-indicator
@@ -33,27 +32,27 @@
     </span>
   </div>
 
-  <div class="message-actions-inline" aria-label="Assistant message actions">
+  <div class="entry-actions-inline" aria-label="Assistant entry actions">
     {% if response_kind %}
-    <span class="message-action message-kind-indicator"
+    <span class="entry-action entry-kind-indicator"
           role="img"
           aria-label="{{ response_kind }}"
           data-tooltip-title="{{ response_kind }}">
-      {{ response_kind_icon(response_kind, "message-kind-icon") }}
+      {{ response_kind_icon(response_kind, "entry-kind-icon") }}
       <span class="visually-hidden">{{ response_kind }}</span>
     </span>
     {% endif %}
-    <button class="message-action message-delete"
+    <button class="entry-action entry-delete"
             type="button"
             disabled
-            aria-label="Delete message"
-            data-tooltip-title="Delete message"
+            aria-label="Delete entry"
+            data-tooltip-title="Delete entry"
             data-ready="false"
             hx-swap="outerHTML swap:180ms"
-            data-delete-template="{{ url_for('entries.delete_entry', msg_id='__MSG_ID__') }}"
-            data-delete-placeholder="__MSG_ID__"
-            data-target-template="#msg-__MSG_ID__">
-      <span class="icon-mask icon-trash message-action__icon" aria-hidden="true"></span>
+            data-delete-template="{{ url_for('entries.delete_entry', entry_id='__ENTRY_ID__') }}"
+            data-delete-placeholder="__ENTRY_ID__"
+            data-target-template="#entry-__ENTRY_ID__">
+      <span class="icon-mask icon-trash entry-action__icon" aria-hidden="true"></span>
     </button>
   </div>
 

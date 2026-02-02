@@ -86,7 +86,7 @@ export function formatTimeElements(root = document) {
   if (!root || typeof root.querySelectorAll !== "function") {
     return;
   }
-  const nodes = root.querySelectorAll("time.message-time");
+  const nodes = root.querySelectorAll("time.entry-time");
   if (!nodes.length) {
     return;
   }

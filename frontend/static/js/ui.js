@@ -197,7 +197,7 @@ export function scrollToHighlight(fallbackTarget, options = {}) {
     params.set("target", targetId);
   }
 
-  if (!target && initialHash.startsWith("#msg-")) {
+  if (!target && initialHash.startsWith("#entry-")) {
     target = initialHash.substring(1);
     params.set("target", target);
     shouldUpdateHistory = true;

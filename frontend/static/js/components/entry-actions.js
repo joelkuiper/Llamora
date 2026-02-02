@@ -2,7 +2,7 @@ import { createPopover } from "../popover.js";
 import { createListenerBag } from "../utils/events.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 
-class MessageActions extends ReactiveElement {
+class EntryActions extends ReactiveElement {
   #button = null;
   #popoverEl = null;
   #panel = null;
@@ -109,6 +109,6 @@ class MessageActions extends ReactiveElement {
   }
 }
 
-if (typeof customElements !== "undefined" && !customElements.get("message-actions")) {
-  customElements.define("message-actions", MessageActions);
+if (typeof customElements !== "undefined" && !customElements.get("entry-actions")) {
+  customElements.define("entry-actions", EntryActions);
 }

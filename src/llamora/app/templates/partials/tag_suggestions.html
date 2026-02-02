@@ -4,8 +4,8 @@
         hx-indicator="none"
         hx-disinherit="hx-indicator"
         data-tag="{{ canonical_value }}"
-        hx-post="{{ url_for('tags.add_tag', msg_id=msg_id) }}"
-        hx-target="#msg-tags-{{ msg_id }}"
+        hx-post="{{ url_for('tags.add_tag', entry_id=entry_id) }}"
+        hx-target="#entry-tags-{{ entry_id }}"
         hx-swap="beforeend"
         hx-vals='{"tag": {{ canonical_value|tojson }} }'
         hx-on:after-request="this.remove()">{{ canonical_value }}</button>

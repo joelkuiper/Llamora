@@ -58,8 +58,8 @@
 .meta-chip:hover,
 .add-tag-btn:hover,
 .add-tag-btn.active,
-.message-action:hover,
-.message-action.active {
+.entry-action:hover,
+.entry-action.active {
   border-color: var(--accent);
   box-shadow:
     var(--raised-shadow),
@@ -149,7 +149,7 @@
   }
 }
 
-.message-action {
+.entry-action {
   background: var(--glass-bg-alt);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -176,8 +176,8 @@
   }
 }
 
-.message-action:disabled,
-.message-action[aria-disabled="true"] {
+.entry-action:disabled,
+.entry-action[aria-disabled="true"] {
   opacity: 0.4;
   cursor: default;
   pointer-events: none;
@@ -187,7 +187,7 @@
 }
 
 .add-tag-btn .icon-mask,
-.message-action__icon {
+.entry-action__icon {
   width: var(--icon-size);
   height: var(--icon-size);
   display: block;

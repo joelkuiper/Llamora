@@ -189,24 +189,24 @@ async def meta_chips(msg_id: str):
     tags = await db.tags.get_tags_for_entry(user["id"], msg_id, dek)
     html = await render_template(
         "partials/meta_chips_wrapper.html",
-        msg_id=msg_id,
+        entry_id=msg_id,
         tags=tags,
         hidden=True,
     )
     return html
 
 
-@entries_bp.route("/e/message/<msg_id>", methods=["DELETE"])
+@entries_bp.route("/e/message/<entry_id>", methods=["DELETE"])
 @login_required
-async def delete_entry(msg_id: str):
+async def delete_entry(entry_id: str):
     _, user, _ = await require_user_and_dek()
     db = get_services().db
-    await ensure_entry_exists(db, user["id"], msg_id)
-    deleted_ids = await db.entries.delete_entry(user["id"], msg_id)
+    await ensure_entry_exists(db, user["id"], entry_id)
+    deleted_ids = await db.entries.delete_entry(user["id"], entry_id)
     if deleted_ids:
         await get_services().search_api.delete_entries(user["id"], deleted_ids)
     oob_deletes = "\n".join(
-        f'<div id="msg-{mid}" hx-swap-oob="delete"></div>' for mid in deleted_ids
+        f'<div id="entry-{mid}" hx-swap-oob="delete"></div>' for mid in deleted_ids
     )
     return Response(oob_deletes, status=200, mimetype="text/html")
 

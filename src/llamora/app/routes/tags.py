@@ -16,9 +16,9 @@ def _tags():
     return get_tag_service()
 
 
-@tags_bp.delete("/t/<msg_id>/<tag_hash>")
+@tags_bp.delete("/t/<entry_id>/<tag_hash>")
 @login_required
-async def remove_tag(msg_id: str, tag_hash: str):
+async def remove_tag(entry_id: str, tag_hash: str):
     session = get_session_context()
     user = await session.require_user()
     try:
@@ -26,13 +26,13 @@ async def remove_tag(msg_id: str, tag_hash: str):
     except ValueError as exc:
         abort(400, description="invalid tag hash")
         raise AssertionError("unreachable") from exc
-    await get_services().db.tags.unlink_tag_entry(user["id"], tag_hash_bytes, msg_id)
+    await get_services().db.tags.unlink_tag_entry(user["id"], tag_hash_bytes, entry_id)
     return "<span class='chip-tombstone'></span>"
 
 
-@tags_bp.post("/t/<msg_id>")
+@tags_bp.post("/t/<entry_id>")
 @login_required
-async def add_tag(msg_id: str):
+async def add_tag(entry_id: str):
     _, user, dek = await require_user_and_dek()
     form = await request.form
     raw_tag = (form.get("tag") or "").strip()
@@ -45,21 +45,21 @@ async def add_tag(msg_id: str):
         abort(400, description="empty tag")
         raise AssertionError("unreachable")
     db = get_services().db
-    await ensure_entry_exists(db, user["id"], msg_id)
+    await ensure_entry_exists(db, user["id"], entry_id)
     tag_hash = await db.tags.resolve_or_create_tag(user["id"], canonical, dek)
-    await db.tags.xref_tag_entry(user["id"], tag_hash, msg_id)
+    await db.tags.xref_tag_entry(user["id"], tag_hash, entry_id)
     html = await render_template(
         "partials/tag_chip.html",
         keyword=canonical,
         tag_hash=tag_hash.hex(),
-        msg_id=msg_id,
+        entry_id=entry_id,
     )
     return html
 
 
-@tags_bp.get("/t/suggestions/<msg_id>")
+@tags_bp.get("/t/suggestions/<entry_id>")
 @login_required
-async def get_tag_suggestions(msg_id: str):
+async def get_tag_suggestions(entry_id: str):
     _, user, dek = await require_user_and_dek()
     decay_constant = resolve_frecency_lambda(
         request.args.get("lambda"), default=DEFAULT_FRECENCY_DECAY
@@ -83,7 +83,7 @@ async def get_tag_suggestions(msg_id: str):
 
     suggestions = await _tags().suggest_for_entry(
         user["id"],
-        msg_id,
+        entry_id,
         dek,
         llm=llm,
         query=query_canonical or None,
@@ -106,6 +106,6 @@ async def get_tag_suggestions(msg_id: str):
     html = await render_template(
         "partials/tag_suggestions.html",
         suggestions=suggestions,
-        msg_id=msg_id,
+        entry_id=entry_id,
     )
     return html
