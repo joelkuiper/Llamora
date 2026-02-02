@@ -48,10 +48,11 @@ export function formatLocalTime(value) {
   }
   const locale = getLocale();
   const hourCycle = getHourCycle();
+  const hour12 = hourCycle === "12h";
   return new Intl.DateTimeFormat(locale, {
     hour: "2-digit",
     minute: "2-digit",
-    hourCycle,
+    hour12,
   }).format(date);
 }
 
@@ -62,13 +63,14 @@ export function formatLocalTimestamp(value) {
   }
   const locale = getLocale();
   const hourCycle = getHourCycle();
+  const hour12 = hourCycle === "12h";
   return new Intl.DateTimeFormat(locale, {
     year: "numeric",
     month: "short",
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
-    hourCycle,
+    hour12,
   }).format(date);
 }
 

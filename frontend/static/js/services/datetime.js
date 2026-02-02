@@ -87,26 +87,17 @@ function resolveLocale() {
 
 function resolveHourCycle(locale) {
   if (typeof Intl !== "object" || typeof Intl.DateTimeFormat !== "function") {
-    return "h23";
+    return "24h";
   }
   try {
-    const options = Intl.DateTimeFormat(locale || undefined, {
-      hour: "numeric",
-    }).resolvedOptions();
-    const cycle = options.hourCycle;
-    if (typeof cycle === "string" && cycle.trim()) {
-      return cycle;
-    }
-    if (options.hour12 === true) {
-      return "h12";
-    }
-    if (options.hour12 === false) {
-      return "h23";
-    }
+    const fmt = new Intl.DateTimeFormat(locale || undefined, { hour: "numeric" });
+    const parts = fmt.formatToParts(new Date(2026, 0, 1, 13));
+    const hasDayPeriod = parts.some((part) => part.type === "dayPeriod");
+    return hasDayPeriod ? "12h" : "24h";
   } catch (err) {
     // ignore and fall back to default
   }
-  return "h23";
+  return "24h";
 }
 
 function dispatchTimezoneChange(nextTimezone, previousTimezone) {
@@ -170,7 +161,7 @@ export function getLocale() {
 export function getHourCycle() {
   const locale = getLocale();
   const resolved = resolveHourCycle(locale);
-  const cycle = typeof resolved === "string" && resolved.trim() ? resolved : "h23";
+  const cycle = typeof resolved === "string" && resolved.trim() ? resolved : "24h";
 
   memoizedHourCycle = cycle;
   writeCookie(HOUR_CYCLE_COOKIE_NAME, cycle);

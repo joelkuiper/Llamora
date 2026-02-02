@@ -10,7 +10,7 @@ import humanize as _humanize
 
 logger = logging.getLogger(__name__)
 _DEFAULT_LOCALE = "en-US"
-_DEFAULT_HOUR_CYCLE = "h23"
+_DEFAULT_HOUR_CYCLE = "24h"
 
 
 def get_timezone() -> str:
@@ -73,9 +73,9 @@ def _use_24h(cycle: str | None) -> bool:
     if not cycle:
         return True
     normalized = str(cycle).strip().lower()
-    if normalized in {"h23", "h24", "23", "24"}:
+    if normalized in {"h23", "h24", "23", "24", "24h"}:
         return True
-    if normalized in {"h11", "h12", "11", "12"}:
+    if normalized in {"h11", "h12", "11", "12", "12h"}:
         return False
     return True
 
