@@ -39,7 +39,7 @@
       {% endif %}
       <button class="message-action message-delete"
               type="button"
-              hx-delete="{{ url_for('chat.delete_message', msg_id=msg['id']) }}"
+              hx-delete="{{ url_for('entries.delete_message', msg_id=msg['id']) }}"
               hx-target="#msg-{{ msg['id'] }}"
               hx-swap="outerHTML swap:180ms"
               aria-label="Delete message"
@@ -75,7 +75,7 @@
     {% endif %}
     <button class="message-action message-delete"
             type="button"
-            hx-delete="{{ url_for('chat.delete_message', msg_id=msg['id']) }}"
+            hx-delete="{{ url_for('entries.delete_message', msg_id=msg['id']) }}"
             hx-target="#msg-{{ msg['id'] }}"
             hx-swap="outerHTML swap:180ms"
             aria-label="Delete message"

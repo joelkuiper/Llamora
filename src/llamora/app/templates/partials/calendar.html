@@ -46,7 +46,7 @@
     <div class="calendar-today">
       <button class="today-btn"
          type="button"
-         hx-get="{{ url_for('chat.chat_htmx_today') }}"
+         hx-get="{{ url_for('entries.entries_htmx_today') }}"
          hx-target="#content-wrapper"
          hx-swap="outerHTML"
          hx-push-url="true"
@@ -87,7 +87,7 @@
               {% if is_today or day in active_days %}
               <a{% if not is_today %} class="not-today"{% endif %}
                  href="{{ url_for('days.day', date=date_str) }}"
-                 hx-get="{{ url_for('chat.chat_htmx', date=date_str) }}"
+                 hx-get="{{ url_for('entries.entries_htmx', date=date_str) }}"
                  hx-target="#content-wrapper"
                  hx-swap="outerHTML"
                  hx-push-url="true"

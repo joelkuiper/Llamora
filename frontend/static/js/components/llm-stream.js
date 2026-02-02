@@ -3,8 +3,8 @@ import {
   positionTypingIndicator,
   TYPING_INDICATOR_SELECTOR,
 } from "../typing-indicator.js";
-import { IncrementalMarkdownRenderer } from "../chat/incremental-markdown-renderer.js";
-import { requestScrollForceBottom } from "../chat/scroll-manager.js";
+import { IncrementalMarkdownRenderer } from "../entries/incremental-markdown-renderer.js";
+import { requestScrollForceBottom } from "../entries/scroll-manager.js";
 import { animateMotion, isMotionReduced } from "../services/motion.js";
 import { applyTimezoneQuery, formatLocalTime, formatLocalTimestamp } from "../services/time.js";
 import { scheduleFrame } from "../utils/scheduler.js";
@@ -119,7 +119,7 @@ class LlmStreamElement extends HTMLElement {
   }
 
   #getStreamingSession() {
-    const host = this.closest?.("chat-view");
+    const host = this.closest?.("entry-view");
     if (host && "streamingSession" in host) {
       return host.streamingSession || null;
     }
@@ -127,7 +127,7 @@ class LlmStreamElement extends HTMLElement {
   }
 
   #getStreamController() {
-    const host = this.closest?.("chat-view");
+    const host = this.closest?.("entry-view");
     if (host && "streamController" in host) {
       return host.streamController || null;
     }
@@ -786,7 +786,7 @@ class LlmStreamElement extends HTMLElement {
     this.#cancelMetaChipsRequest();
 
     try {
-      const request = htmx.ajax("GET", `/c/meta-chips/${assistantId}`, {
+      const request = htmx.ajax("GET", `/e/meta-chips/${assistantId}`, {
         target: placeholder,
         swap: "outerHTML",
       });

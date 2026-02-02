@@ -1,2 +1,2 @@
 {% from 'partials/assistant_stream.html' import assistant_stream %}
-{{ assistant_stream(user_msg_id, day, user_time, stop_url=url_for('chat.stop_generation', user_msg_id=user_msg_id), reply_kind=reply_kind) }}
+{{ assistant_stream(user_msg_id, day, user_time, stop_url=url_for('entries.stop_generation', user_msg_id=user_msg_id), reply_kind=reply_kind) }}

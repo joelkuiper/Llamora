@@ -1,5 +1,5 @@
 import { createPopover } from "../popover.js";
-import { getActiveDayParts } from "../chat/active-day-store.js";
+import { getActiveDayParts } from "../entries/active-day-store.js";
 
 export class CalendarControl extends HTMLElement {
   #state = null;

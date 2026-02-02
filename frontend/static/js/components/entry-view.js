@@ -1,15 +1,15 @@
-import { scrollEvents } from "../chat/scroll-manager.js";
+import { scrollEvents } from "../entries/scroll-manager.js";
 import { appReady } from "../app-init.js";
-import { MarkdownObserver } from "../chat/markdown-observer.js";
-import { StreamingSession } from "../chat/streaming-session.js";
-import { StreamController } from "../chat/stream-controller.js";
+import { MarkdownObserver } from "../entries/markdown-observer.js";
+import { StreamingSession } from "../entries/streaming-session.js";
+import { StreamController } from "../entries/stream-controller.js";
 import { renderMarkdownInElement } from "../markdown.js";
 import { initDayNav, navigateToDate } from "../day.js";
 import { scrollToHighlight } from "../ui.js";
 import { createListenerBag } from "../utils/events.js";
 import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
-import { setActiveDay, clearActiveDay } from "../chat/active-day-store.js";
+import { setActiveDay, clearActiveDay } from "../entries/active-day-store.js";
 import {
   getClientToday,
   getTimezone,
@@ -18,7 +18,7 @@ import {
   formatTimeElements,
 } from "../services/time.js";
 import { afterNextFrame, scheduleFrame } from "../utils/scheduler.js";
-import "./chat-form.js";
+import "./entry-form.js";
 import "./llm-stream.js";
 import "./message-actions.js";
 
@@ -31,11 +31,11 @@ function activateAnimations(node) {
   });
 }
 
-export class ChatView extends ReactiveElement {
-  #chatForm = null;
+export class EntryView extends ReactiveElement {
+  #entryForm = null;
   #scrollManager = null;
   #scrollEventListeners = null;
-  #chat = null;
+  #entries = null;
   #midnightCleanup = null;
   #afterSwapHandler;
   #beforeSwapHandler;
@@ -43,22 +43,22 @@ export class ChatView extends ReactiveElement {
   #historyRestoreHandler;
   #historyRestoreFrame = null;
   #connectionListeners = null;
-  #chatListeners = null;
+  #entryListeners = null;
   #session = null;
   #sessionListeners = null;
   #streamController = null;
   #markdownObserver = null;
   #initialized = false;
   #lastRenderedDay = null;
-  #chatFormReady = Promise.resolve();
+  #entryFormReady = Promise.resolve();
   #pendingScrollTarget = null;
   #forceNavFlash = false;
   #appReadyPromise = null;
 
   constructor() {
     super();
-    this.#afterSwapHandler = (event) => this.#handleChatAfterSwap(event);
-    this.#beforeSwapHandler = (event) => this.#handleChatBeforeSwap(event);
+    this.#afterSwapHandler = (event) => this.#handleEntriesAfterSwap(event);
+    this.#beforeSwapHandler = (event) => this.#handleEntriesBeforeSwap(event);
     this.#pageShowHandler = (event) => this.#handlePageShow(event);
     this.#historyRestoreHandler = (event) => this.#handleHistoryRestore(event);
   }
@@ -81,9 +81,9 @@ export class ChatView extends ReactiveElement {
     }
   }
 
-  #scheduleRenderingComplete(chat) {
+  #scheduleRenderingComplete(entries) {
     const finalize = () => {
-      if (this.#chat === chat) {
+      if (this.#entries === entries) {
         this.#setRenderingState(false);
         this.#queuePendingScrollTarget();
       }
@@ -116,12 +116,12 @@ export class ChatView extends ReactiveElement {
       return;
     }
 
-    const chat = this.#chat;
-    if (!chat || !this.isConnected) {
+    const entries = this.#entries;
+    if (!entries || !this.isConnected) {
       return;
     }
 
-    const isVisible = this.offsetParent !== null && chat.offsetParent !== null;
+    const isVisible = this.offsetParent !== null && entries.offsetParent !== null;
     if (!isVisible) {
       scheduleFrame(() => this.#applyPendingScrollTarget());
       return;
@@ -145,12 +145,12 @@ export class ChatView extends ReactiveElement {
 
         const manager = app?.scroll ?? window.appInit?.scroll ?? null;
         if (manager && manager !== this.#scrollManager) {
-          if (this.#scrollManager && this.#chat) {
-            this.#scrollManager.detachChat(this.#chat);
+          if (this.#scrollManager && this.#entries) {
+            this.#scrollManager.detachEntries(this.#entries);
           }
           this.#scrollManager = manager;
-          if (this.#chat) {
-            this.#scrollManager.attachChat(this.#chat);
+          if (this.#entries) {
+            this.#scrollManager.attachEntries(this.#entries);
           }
         }
       });
@@ -180,12 +180,12 @@ export class ChatView extends ReactiveElement {
 
     this.#scrollEventListeners = this.resetListenerBag(this.#scrollEventListeners);
     this.#scrollEventListeners.add(scrollEvents, "scroll:markdown-complete", () => {
-      if (this.#chat) {
-        this.#scheduleRenderingComplete(this.#chat);
+      if (this.#entries) {
+        this.#scheduleRenderingComplete(this.#entries);
       }
     });
 
-    this.#syncToChatDate();
+    this.#syncToEntryDate();
   }
 
   disconnectedCallback() {
@@ -199,8 +199,8 @@ export class ChatView extends ReactiveElement {
   }
 
   #initialize(
-    chat = this.querySelector("#chat"),
-    chatDate = chat?.dataset?.date ?? null
+    entries = this.querySelector("#entries"),
+    entriesDate = entries?.dataset?.date ?? null
   ) {
     this.#initialized = false;
     this.#teardown();
@@ -209,9 +209,9 @@ export class ChatView extends ReactiveElement {
 
     getTimezone();
 
-    if (!chat) {
+    if (!entries) {
       this.#setRenderingState(false);
-      this.#chat = null;
+      this.#entries = null;
       this.#lastRenderedDay = null;
       this.#forceNavFlash = false;
       clearActiveDay();
@@ -220,7 +220,7 @@ export class ChatView extends ReactiveElement {
 
     const container = document.getElementById("content-wrapper");
 
-    const initialStreamMsgId = chat?.dataset?.currentStream || null;
+    const initialStreamMsgId = entries?.dataset?.currentStream || null;
     this.#sessionListeners = this.disposeListenerBag(this.#sessionListeners);
     this.#session = new StreamingSession({
       currentMsgId: initialStreamMsgId || null,
@@ -228,16 +228,16 @@ export class ChatView extends ReactiveElement {
 
     this.#streamController?.dispose();
     this.#streamController = new StreamController(this.#session);
-    this.#streamController.setChat(chat);
+    this.#streamController.setEntries(entries);
 
-    this.#chat = chat;
+    this.#entries = entries;
 
     if (this.#pendingScrollTarget) {
       this.#queuePendingScrollTarget();
     }
 
-    const activeDay = chatDate || null;
-    const activeDayLabel = chat?.dataset?.longDate ?? null;
+    const activeDay = entriesDate || null;
+    const activeDayLabel = entries?.dataset?.longDate ?? null;
     const viewKind = this.dataset?.viewKind || null;
     const clientToday = updateClientToday() || getClientToday();
 
@@ -252,10 +252,10 @@ export class ChatView extends ReactiveElement {
     this.#lastRenderedDay = activeDay;
 
     setActiveDay(activeDay, activeDayLabel, {
-      detail: { source: "chat-view" },
+      detail: { source: "entry-view" },
     });
 
-    chat.querySelectorAll?.(".markdown-body").forEach((el) => {
+    entries.querySelectorAll?.(".markdown-body").forEach((el) => {
       if (el?.dataset?.rendered === "true") {
         return;
       }
@@ -269,49 +269,49 @@ export class ChatView extends ReactiveElement {
         renderMarkdownInElement(el);
       }
     });
-    formatTimeElements(chat);
+    formatTimeElements(entries);
 
-    this.#chatForm = this.querySelector("chat-form");
-    let chatFormReady = Promise.resolve();
-    if (this.#chatForm) {
-      const currentForm = this.#chatForm;
-      chatFormReady = this.#wireChatForm(currentForm, {
-        chat,
+    this.#entryForm = this.querySelector("entry-form");
+    let entryFormReady = Promise.resolve();
+    if (this.#entryForm) {
+      const currentForm = this.#entryForm;
+      entryFormReady = this.#wireEntryForm(currentForm, {
+        entries,
         container,
         date: activeDay,
       });
-      this.#chatFormReady = chatFormReady.then(() => {
-        if (this.#chatForm !== currentForm) return;
+      this.#entryFormReady = entryFormReady.then(() => {
+        if (this.#entryForm !== currentForm) return;
         this.#streamController?.refresh();
       });
     } else {
-      this.#chatFormReady = Promise.resolve();
+      this.#entryFormReady = Promise.resolve();
     }
 
     if (isClientToday) {
-      this.#midnightCleanup = scheduleMidnightRollover(chat);
+      this.#midnightCleanup = scheduleMidnightRollover(entries);
     }
 
     if (!this.#scrollManager) {
       this.#scrollManager = window.appInit?.scroll ?? null;
     }
-    this.#scrollManager?.attachChat(chat);
+    this.#scrollManager?.attachEntries(entries);
 
-    this.#chatListeners = this.resetListenerBag(this.#chatListeners);
-    this.#chatListeners.add(chat, "htmx:afterSwap", this.#afterSwapHandler);
-    this.#chatListeners.add(chat, "htmx:beforeSwap", this.#beforeSwapHandler);
+    this.#entryListeners = this.resetListenerBag(this.#entryListeners);
+    this.#entryListeners.add(entries, "htmx:afterSwap", this.#afterSwapHandler);
+    this.#entryListeners.add(entries, "htmx:beforeSwap", this.#beforeSwapHandler);
 
-    activateAnimations(chat);
+    activateAnimations(entries);
 
     this.#markdownObserver = new MarkdownObserver({
-      root: chat,
+      root: entries,
       onRender: (el) => this.#handleMarkdownRendered(el),
     });
     this.#markdownObserver.start();
-    chatFormReady.then(() => this.#streamController?.refresh());
+    entryFormReady.then(() => this.#streamController?.refresh());
 
     const shouldForceNavFlash = this.#forceNavFlash;
-    initDayNav(chat, {
+    initDayNav(entries, {
       activeDay,
       label: activeDayLabel,
       forceFlash: shouldForceNavFlash,
@@ -327,24 +327,24 @@ export class ChatView extends ReactiveElement {
     }
 
     this.#initialized = true;
-    this.#scheduleRenderingComplete(chat);
+    this.#scheduleRenderingComplete(entries);
   }
 
-  #syncToChatDate() {
-    const chat = this.querySelector("#chat");
-    const chatDate = chat?.dataset?.date ?? null;
-    const chatChanged = chat !== this.#chat;
-    const dateChanged = chatDate !== this.#lastRenderedDay;
+  #syncToEntryDate() {
+    const entries = this.querySelector("#entries");
+    const entriesDate = entries?.dataset?.date ?? null;
+    const entriesChanged = entries !== this.#entries;
+    const dateChanged = entriesDate !== this.#lastRenderedDay;
 
-    if (!chat) {
-      if (this.#initialized || this.#chat || this.#lastRenderedDay) {
+    if (!entries) {
+      if (this.#initialized || this.#entries || this.#lastRenderedDay) {
         this.#initialize(null, null);
       }
       return;
     }
 
-    if (!this.#initialized || chatChanged || dateChanged) {
-      this.#initialize(chat, chatDate);
+    if (!this.#initialized || entriesChanged || dateChanged) {
+      this.#initialize(entries, entriesDate);
     }
   }
 
@@ -354,43 +354,43 @@ export class ChatView extends ReactiveElement {
       this.#midnightCleanup = null;
     }
 
-    if (this.#scrollManager && this.#chat) {
-      this.#scrollManager.detachChat(this.#chat);
+    if (this.#scrollManager && this.#entries) {
+      this.#scrollManager.detachEntries(this.#entries);
     }
 
     this.#markdownObserver?.stop();
     this.#markdownObserver = null;
 
-    this.#chatListeners = this.disposeListenerBag(this.#chatListeners);
+    this.#entryListeners = this.disposeListenerBag(this.#entryListeners);
     this.#sessionListeners = this.disposeListenerBag(this.#sessionListeners);
 
     this.#streamController?.dispose();
     this.#streamController = null;
 
-    this.#chat = null;
-    this.#chatForm = null;
+    this.#entries = null;
+    this.#entryForm = null;
     this.#session = null;
-    this.#chatFormReady = Promise.resolve();
+    this.#entryFormReady = Promise.resolve();
     this.#pendingScrollTarget = null;
   }
 
-  #handleChatBeforeSwap(event) {
-    if (!this.#chat || !this.#markdownObserver) return;
+  #handleEntriesBeforeSwap(event) {
+    if (!this.#entries || !this.#markdownObserver) return;
 
     const swapTargets = this.#collectSwapTargets(event);
-    if (swapTargets.includes(this.#chat)) {
+    if (swapTargets.includes(this.#entries)) {
       this.#setRenderingState(true);
       this.#markdownObserver.pause();
     }
   }
 
-  #handleChatAfterSwap(event) {
-    if (!this.#chat) return;
+  #handleEntriesAfterSwap(event) {
+    if (!this.#entries) return;
 
     const swapTargets = this.#collectSwapTargets(event);
 
     swapTargets.forEach((target) => {
-      if (target === this.#chat) {
+      if (target === this.#entries) {
         activateAnimations(target);
         return;
       }
@@ -408,7 +408,7 @@ export class ChatView extends ReactiveElement {
     });
     swapTargets.forEach((target) => {
       if (!target) return;
-      if (target === this.#chat) {
+      if (target === this.#entries) {
         formatTimeElements(target);
         return;
       }
@@ -417,13 +417,13 @@ export class ChatView extends ReactiveElement {
 
     this.#markdownObserver?.resume(swapTargets);
 
-    if (swapTargets.includes(this.#chat)) {
+    if (swapTargets.includes(this.#entries)) {
       this.#streamController?.refresh();
       this.#scrollManager?.scrollToBottom(true);
-      this.#scheduleRenderingComplete(this.#chat);
+      this.#scheduleRenderingComplete(this.#entries);
     }
 
-    this.#syncToChatDate();
+    this.#syncToEntryDate();
   }
 
 
@@ -454,7 +454,7 @@ export class ChatView extends ReactiveElement {
   #handlePageShow(event) {
     if (event.persisted) {
       this.#initialized = false;
-      this.#syncToChatDate();
+      this.#syncToEntryDate();
     }
   }
 
@@ -467,34 +467,34 @@ export class ChatView extends ReactiveElement {
         return;
       }
       this.#historyRestoreFrame = null;
-      this.#syncToChatDate();
-      if (this.#chatForm) {
-        const currentForm = this.#chatForm;
-        const chatFormReady = this.#wireChatForm(currentForm, {
-          chat: this.#chat,
+      this.#syncToEntryDate();
+      if (this.#entryForm) {
+        const currentForm = this.#entryForm;
+        const entryFormReady = this.#wireEntryForm(currentForm, {
+          entries: this.#entries,
           container: document.getElementById("content-wrapper"),
           date: this.#lastRenderedDay,
         });
-        this.#chatFormReady = chatFormReady.then(() => {
-          if (this.#chatForm !== currentForm) return;
+        this.#entryFormReady = entryFormReady.then(() => {
+          if (this.#entryForm !== currentForm) return;
           this.#streamController?.refresh();
         });
       } else {
-        this.#chatFormReady = Promise.resolve();
+        this.#entryFormReady = Promise.resolve();
       }
       this.#resumeDormantStreams();
     });
     this.#historyRestoreFrame = frame;
   }
 
-  async #wireChatForm(chatForm, { chat, container, date }) {
-    if (!chatForm) return;
-    await customElements.whenDefined("chat-form");
-    if (!chatForm.isConnected) return;
-    customElements.upgrade(chatForm);
-    chatForm.container = container;
-    chatForm.chat = chat;
-    chatForm.date = date;
+  async #wireEntryForm(entryForm, { entries, container, date }) {
+    if (!entryForm) return;
+    await customElements.whenDefined("entry-form");
+    if (!entryForm.isConnected) return;
+    customElements.upgrade(entryForm);
+    entryForm.container = container;
+    entryForm.entries = entries;
+    entryForm.date = date;
   }
 
   #cancelHistoryRestoreFrame() {
@@ -510,7 +510,7 @@ export class ChatView extends ReactiveElement {
   }
 
   #resumeDormantStreams() {
-    if (!this.#chat) return;
+    if (!this.#entries) return;
 
     const resume = (stream) => {
       if (!stream || stream.dataset?.streaming !== "true") return;
@@ -519,11 +519,11 @@ export class ChatView extends ReactiveElement {
       }
     };
 
-    if (this.#chat instanceof Element && this.#chat.matches("llm-stream")) {
-      resume(this.#chat);
+    if (this.#entries instanceof Element && this.#entries.matches("llm-stream")) {
+      resume(this.#entries);
     }
 
-    this.#chat.querySelectorAll?.("llm-stream").forEach((stream) => resume(stream));
+    this.#entries.querySelectorAll?.("llm-stream").forEach((stream) => resume(stream));
   }
 
 }

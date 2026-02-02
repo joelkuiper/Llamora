@@ -7,7 +7,7 @@
        aria-label="Return to today"
        data-tooltip-title="Return to today"
        data-tooltip-offset-y="0"
-       hx-get="{{ url_for('chat.chat_htmx_today') }}"
+       hx-get="{{ url_for('entries.entries_htmx_today') }}"
        hx-target="#content-wrapper"
        hx-swap="outerHTML"
        hx-push-url="true"
@@ -81,10 +81,10 @@
 
 {% block content %}
   <div id="content">
-    {% if chat_html is defined %}
-      {{ chat_html|safe }}
+    {% if entries_html is defined %}
+      {{ entries_html|safe }}
     {% else %}
-      {% set tpl = content_template if content_template is defined else 'partials/chat.html' %}
+      {% set tpl = content_template if content_template is defined else 'partials/entries.html' %}
       {% include tpl %}
     {% endif %}
   </div>

@@ -472,7 +472,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   #navigateToResult(link, evt) {
-    const currentId = document.getElementById("chat")?.dataset.date;
+    const currentId = document.getElementById("entries")?.dataset.date;
     const targetId = link.dataset.target;
 
     if (link.dataset.date === currentId) {

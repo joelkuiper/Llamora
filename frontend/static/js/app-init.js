@@ -1,6 +1,6 @@
-import { ScrollManager } from "./chat/scroll-manager.js";
+import { ScrollManager } from "./entries/scroll-manager.js";
 import { initGlobalShortcuts } from "./global-shortcuts.js";
-import { getActiveDay } from "./chat/active-day-store.js";
+import { getActiveDay } from "./entries/active-day-store.js";
 import {
   getAlertContainer,
   onAlertDismiss,

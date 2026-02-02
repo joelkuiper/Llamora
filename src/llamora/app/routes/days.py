@@ -12,7 +12,7 @@ from llamora.app.services.session_context import get_session_context
 from llamora.app.services.time import local_date
 from llamora.app.routes.helpers import require_iso_date
 from llamora.app.services.calendar import get_month_context
-from llamora.app.routes.chat import render_chat
+from llamora.app.routes.entries import render_entries
 
 days_bp = Blueprint("days", __name__)
 
@@ -25,19 +25,19 @@ async def index():
 
 async def _render_day(date: str, target: str | None, view_kind: str):
     today = local_date().isoformat()
-    chat_response = await render_chat(
+    entries_response = await render_entries(
         date,
         oob=False,
         scroll_target=target,
         view_kind=view_kind,
     )
-    chat_html = await chat_response.get_data(as_text=True)
+    entries_html = await entries_response.get_data(as_text=True)
     html = await render_template(
         "index.html",
         day=date,
         is_today=date == today,
         today=today,
-        chat_html=chat_html,
+        entries_html=entries_html,
         scroll_target=target,
         view_kind=view_kind,
     )

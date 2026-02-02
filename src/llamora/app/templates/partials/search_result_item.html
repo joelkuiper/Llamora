@@ -1,12 +1,12 @@
 {% set item_date = item.created_date or item.created_at[:10] %}
 <li class="{{ item.css_class }}" role="option" data-role="{{ item.role }}">
   <a href="{{ url_for('days.day', date=item_date) }}?target=msg-{{ item.id }}"
-     hx-get="{{ url_for('chat.chat_htmx', date=item_date) }}?target=msg-{{ item.id }}"
+     hx-get="{{ url_for('entries.entries_htmx', date=item_date) }}?target=msg-{{ item.id }}"
      hx-target="#content-wrapper"
      hx-swap="outerHTML"
      data-date="{{ item_date }}"
      data-target="msg-{{ item.id }}"
-     hx-trigger="click[!document.getElementById('chat') || document.getElementById('chat').dataset.date !== this.dataset.date]">
+     hx-trigger="click[!document.getElementById('entries') || document.getElementById('entries').dataset.date !== this.dataset.date]">
     <div class="search-result-time">
       {{ item.created_at|humanize }}
     </div>

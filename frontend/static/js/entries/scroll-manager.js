@@ -138,7 +138,7 @@ export class ScrollManager {
     this.containerSelector = containerSelector;
     this.buttonSelector = buttonSelector;
 
-    this.chat = null;
+    this.entries = null;
     this.container = null;
     this.scrollElement = null;
     this.scrollBtn = null;
@@ -229,7 +229,7 @@ export class ScrollManager {
   }
 
   stop() {
-    this.detachChat();
+    this.detachEntries();
     this.#listeners?.abort();
     this.#listeners = null;
     this.#started = false;
@@ -247,13 +247,13 @@ export class ScrollManager {
     }
 
     if (this.container && this.container !== next && this.#contextListeners) {
-      // listeners will be reset when attachChat() is called.
+      // listeners will be reset when attachEntries() is called.
       this.#contextListeners.abort();
       this.#contextListeners = null;
     }
 
     this.container = next instanceof HTMLElement ? next : null;
-    if (this.container && this.chat) {
+    if (this.container && this.entries) {
       this.#attachContextListeners();
     }
     return this.container;
@@ -314,13 +314,13 @@ export class ScrollManager {
     }
   }
 
-  attachChat(chat) {
-    if (chat === this.chat) {
+  attachEntries(entries) {
+    if (entries === this.entries) {
       this.toggleScrollBtn();
       return;
     }
 
-    this.chat = chat || null;
+    this.entries = entries || null;
     this.ensureElements();
     this.#attachContextListeners();
     this.autoScrollEnabled = this.isUserNearBottom(0);
@@ -332,12 +332,12 @@ export class ScrollManager {
     this.alignScrollButton();
   }
 
-  detachChat(chat = null) {
-    if (chat && chat !== this.chat) {
+  detachEntries(entries = null) {
+    if (entries && entries !== this.entries) {
       return;
     }
 
-    const shouldResetCenter = !chat || chat === this.chat;
+    const shouldResetCenter = !entries || entries === this.entries;
 
     this.#cancelInitRelease();
     this.#cancelAlign();
@@ -348,10 +348,10 @@ export class ScrollManager {
     this.#resizeObserver?.disconnect();
     this.#resizeObserver = null;
 
-    this.chat = null;
+    this.entries = null;
 
     if (shouldResetCenter) {
-      document.documentElement?.style?.removeProperty?.("--chat-center");
+      document.documentElement?.style?.removeProperty?.("--entries-center");
     }
   }
 
@@ -456,7 +456,7 @@ export class ScrollManager {
   }
 
   alignScrollButton() {
-    if (this.#alignFrame != null || !this.chat) {
+    if (this.#alignFrame != null || !this.entries) {
       return;
     }
 
@@ -471,17 +471,17 @@ export class ScrollManager {
   }
 
   alignScrollButtonNow() {
-    if (!this.chat) return;
+    if (!this.entries) return;
 
     this.#cancelAlign();
 
-    const rect = this.chat.getBoundingClientRect();
+    const rect = this.entries.getBoundingClientRect();
     if (rect.width === 0) {
       return;
     }
 
     const centerPx = rect.left + rect.width / 2;
-    document.documentElement.style.setProperty("--chat-center", `${centerPx}px`);
+    document.documentElement.style.setProperty("--entries-center", `${centerPx}px`);
   }
 
   onScroll() {
@@ -535,10 +535,10 @@ export class ScrollManager {
     bag.add(window, "resize", this.alignScrollButton);
     bag.add(window, "scroll", this.alignScrollButton, { passive: true });
 
-    if (typeof ResizeObserver === "function" && this.chat) {
+    if (typeof ResizeObserver === "function" && this.entries) {
       this.#resizeObserver?.disconnect();
       this.#resizeObserver = new ResizeObserver(() => this.alignScrollButton());
-      this.#resizeObserver.observe(this.chat);
+      this.#resizeObserver.observe(this.entries);
     }
   }
 
@@ -815,4 +815,3 @@ export class ScrollManager {
     }
   }
 }
-

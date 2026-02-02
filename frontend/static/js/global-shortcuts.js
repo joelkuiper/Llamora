@@ -4,14 +4,14 @@ import {
   parseDateFromSource,
   navigateToDate,
 } from "./day.js";
-import { requestScrollForceBottom } from "./chat/scroll-manager.js";
+import { requestScrollForceBottom } from "./entries/scroll-manager.js";
 import { motionSafeBehavior } from "./utils/motion.js";
-import { getActiveDay } from "./chat/active-day-store.js";
+import { getActiveDay } from "./entries/active-day-store.js";
 
 let registered = false;
 
-const focusChatComposer = () => {
-  const textarea = document.querySelector("chat-form textarea");
+const focusEntryComposer = () => {
+  const textarea = document.querySelector("entry-form textarea");
   if (!(textarea instanceof HTMLTextAreaElement) || textarea.disabled) {
     return false;
   }
@@ -98,7 +98,7 @@ const goToToday = () => {
   const todayIso = formatIsoDate(today);
   const active = getActiveDate();
   if (active && active.getTime() === today.getTime()) {
-    return focusChatComposer();
+    return focusEntryComposer();
   }
 
   const returnLink = document.querySelector(".return-today a");
@@ -113,7 +113,7 @@ const goToToday = () => {
 
 const toggleCalendar = () => clickIfEnabled("#calendar-btn");
 
-const scrollChatToBottom = () => {
+const scrollEntriesToBottom = () => {
   requestScrollForceBottom({ source: "shortcut", force: true });
   return true;
 };
@@ -127,7 +127,7 @@ export function initGlobalShortcuts() {
   registerShortcut({
     key: "c",
     shiftKey: true,
-    handler: () => focusChatComposer(),
+    handler: () => focusEntryComposer(),
     preventDefault: true,
   });
 
@@ -155,7 +155,7 @@ export function initGlobalShortcuts() {
   registerShortcut({
     key: "b",
     shiftKey: true,
-    handler: () => scrollChatToBottom(),
+    handler: () => scrollEntriesToBottom(),
     preventDefault: true,
   });
 

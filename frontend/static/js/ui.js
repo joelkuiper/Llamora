@@ -2,7 +2,7 @@ import {
   requestScrollTarget,
   requestScrollTargetConsumed,
   scrollEvents,
-} from "./chat/scroll-manager.js";
+} from "./entries/scroll-manager.js";
 import {
   animateMotion,
   motionSafeBehavior,
@@ -219,9 +219,9 @@ export function scrollToHighlight(fallbackTarget, options = {}) {
       cleanupTimeoutId = null;
     }
 
-    const chatView = document.querySelector("chat-view");
-    if (chatView?.dataset.scrollTarget === fallbackTarget) {
-      delete chatView.dataset.scrollTarget;
+    const entryView = document.querySelector("entry-view");
+    if (entryView?.dataset.scrollTarget === fallbackTarget) {
+      delete entryView.dataset.scrollTarget;
     }
   };
 

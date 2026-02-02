@@ -1,21 +1,21 @@
 <main
   id="content-wrapper"
   {% if oob %} hx-swap-oob="true" {% endif %}>
-  <chat-view{% if request.headers.get('HX-Request') == 'true' %} data-rendering="true"{% endif %}{% if scroll_target %} data-scroll-target="{{ scroll_target }}"{% endif %}
+  <entry-view{% if request.headers.get('HX-Request') == 'true' %} data-rendering="true"{% endif %}{% if scroll_target %} data-scroll-target="{{ scroll_target }}"{% endif %}
              data-view-kind="{{ view_kind }}"
              aria-busy="{{ 'true' if request.headers.get('HX-Request') == 'true' else 'false' }}">
     {% include 'partials/history.html' %}
     {% if is_today %}
-    <chat-form data-date="{{ day }}">
+    <entry-form data-date="{{ day }}">
       <form id="message-form"
-            hx-post="{{ url_for('chat.send_message', date=day) }}"
-            hx-target="#chat"
+            hx-post="{{ url_for('entries.send_message', date=day) }}"
+            hx-target="#entries"
             hx-on::after-request="this.reset()"
             hx-swap="beforeend">
         <div class="input-wrapper">
-          <label class="visually-hidden" for="chat-message">Message for {{ day|long_date }}</label>
+          <label class="visually-hidden" for="entry-message">Message for {{ day|long_date }}</label>
           <textarea class="input"
-                    id="chat-message"
+                    id="entry-message"
                     name="message"
                     rows="3"
                     placeholder="{{ 'Write your thoughts here…' if is_today else 'This day has passed.' }}"
@@ -27,7 +27,7 @@
           </button>
         </div>
       </form>
-    </chat-form>
+    </entry-form>
 
     {% else %}
     <div class="return-today" role="group" aria-label="Archived day divider">
@@ -40,7 +40,7 @@
       <a
         class="return-today__action"
         href="{{ url_for('days.day_today') }}"
-        hx-get="{{ url_for('chat.chat_htmx_today') }}"
+        hx-get="{{ url_for('entries.entries_htmx_today') }}"
         hx-target="#content-wrapper"
         hx-swap="outerHTML"
         hx-push-url="true">
@@ -50,5 +50,5 @@
     {% endif %}
 
     <scroll-bottom-button></scroll-bottom-button>
-  </chat-view>
+  </entry-view>
 </main>

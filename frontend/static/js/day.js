@@ -9,7 +9,7 @@ import {
   ACTIVE_DAY_CHANGED_EVENT,
   getActiveDay,
   getActiveDayLabel,
-} from "./chat/active-day-store.js";
+} from "./entries/active-day-store.js";
 
 function ordinalSuffix(day) {
   if (!Number.isFinite(day)) return "";
@@ -57,7 +57,7 @@ export function navigateToDate(dateStr) {
 
   const zone = getTimezone();
   const tzQuery = `?${buildTimezoneQueryParam(zone)}`;
-  const htmxUrl = `/c/${dateStr}${tzQuery}`;
+  const htmxUrl = `/e/${dateStr}${tzQuery}`;
   const pushUrl = `/d/${dateStr}${tzQuery}`;
 
   const targetId = "#content-wrapper";
@@ -174,12 +174,12 @@ const handleActiveDayChange = (event) => {
   applyDayStateToNav({ activeDay, label, forceFlash });
 };
 
-export function initDayNav(chat, options = {}) {
+export function initDayNav(entries, options = {}) {
   const { forceFlash = false, activeDay, label } = options;
   const currentDay =
-    activeDay || getActiveDay() || chat?.dataset?.date || "";
+    activeDay || getActiveDay() || entries?.dataset?.date || "";
   const currentLabel =
-    label || getActiveDayLabel() || chat?.dataset?.longDate || null;
+    label || getActiveDayLabel() || entries?.dataset?.longDate || null;
 
   applyDayStateToNav({
     activeDay: currentDay,

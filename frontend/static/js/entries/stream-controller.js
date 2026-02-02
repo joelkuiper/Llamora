@@ -49,7 +49,7 @@ function defaultCompletionReason(status) {
 
 export class StreamController {
   #session = null;
-  #chat = null;
+  #entries = null;
   #forms = new Set();
   #streams = new Map();
   #statusUnsubscribe = null;
@@ -74,15 +74,15 @@ export class StreamController {
     }
     this.#forms.clear();
     this.#streams.clear();
-    this.#chat = null;
+    this.#entries = null;
   }
 
-  setChat(chat) {
-    this.#chat = chat || null;
+  setEntries(entries) {
+    this.#entries = entries || null;
     this.refresh();
     return () => {
-      if (this.#chat === chat) {
-        this.#chat = null;
+      if (this.#entries === entries) {
+        this.#entries = null;
       }
     };
   }
@@ -160,7 +160,7 @@ export class StreamController {
 
   #handleStatusChange(detail = {}) {
     const msgId = normalizeStreamId(detail.currentMsgId);
-    this.#syncChatDataset(msgId);
+    this.#syncEntriesDataset(msgId);
     this.#forms.forEach((form) => {
       if (typeof form.handleStreamStatus === "function") {
         form.handleStreamStatus(detail);
@@ -169,14 +169,14 @@ export class StreamController {
     return detail;
   }
 
-  #syncChatDataset(msgId) {
-    if (!this.#chat || !this.#chat.dataset) {
+  #syncEntriesDataset(msgId) {
+    if (!this.#entries || !this.#entries.dataset) {
       return;
     }
     if (msgId) {
-      this.#chat.dataset.currentStream = msgId;
+      this.#entries.dataset.currentStream = msgId;
     } else {
-      delete this.#chat.dataset.currentStream;
+      delete this.#entries.dataset.currentStream;
     }
   }
 

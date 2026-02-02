@@ -48,10 +48,10 @@ from llamora.app.routes.helpers import (
 from llamora.settings import settings
 
 
-chat_bp = Blueprint("chat", __name__)
+entries_bp = Blueprint("entries", __name__)
 
 
-def _chat_stream_manager():
+def _entry_stream_manager():
     return get_services().llm_service.chat_stream_manager
 
 
@@ -87,7 +87,7 @@ def _select_reply_kind(kind_id: str | None) -> dict[str, str]:
 logger = logging.getLogger(__name__)
 
 
-async def render_chat(
+async def render_entries(
     date: str,
     *,
     oob: bool = False,
@@ -100,7 +100,7 @@ async def render_chat(
     context = await get_chat_context(user, date)
     reply_kinds, reply_kind_labels = _load_reply_kinds()
     html = await render_template(
-        "partials/chat.html",
+        "partials/entries.html",
         day=date,
         oob=oob,
         user=user,
@@ -123,13 +123,13 @@ async def render_chat(
     return resp
 
 
-@chat_bp.route("/c/<date>")
+@entries_bp.route("/e/<date>")
 @login_required
-async def chat_htmx(date):
+async def entries_htmx(date):
     normalized_date = require_iso_date(date)
     target = request.args.get("target")
     push_url = url_for("days.day", date=normalized_date)
-    return await render_chat(
+    return await render_entries(
         normalized_date,
         oob=False,
         scroll_target=target,
@@ -138,13 +138,13 @@ async def chat_htmx(date):
     )
 
 
-@chat_bp.route("/c/today")
+@entries_bp.route("/e/today")
 @login_required
-async def chat_htmx_today():
+async def entries_htmx_today():
     target = request.args.get("target")
     date = local_date().isoformat()
     push_url = url_for("days.day_today")
-    return await render_chat(
+    return await render_entries(
         date,
         oob=False,
         scroll_target=target,
@@ -153,7 +153,7 @@ async def chat_htmx_today():
     )
 
 
-@chat_bp.route("/c/stop/<user_msg_id>", methods=["POST"])
+@entries_bp.route("/e/stop/<user_msg_id>", methods=["POST"])
 @login_required
 async def stop_generation(user_msg_id: str):
     logger.info("Stop requested for user message %s", user_msg_id)
@@ -166,7 +166,7 @@ async def stop_generation(user_msg_id: str):
             logger.warning("Stop request for unauthorized message %s", user_msg_id)
         raise
 
-    manager = _chat_stream_manager()
+    manager = _entry_stream_manager()
     handled, was_pending = await manager.stop(user_msg_id, user["id"])
     if not was_pending:
         logger.debug("No pending response for %s, aborting active stream", user_msg_id)
@@ -181,7 +181,7 @@ async def stop_generation(user_msg_id: str):
     return Response("", status=200)
 
 
-@chat_bp.get("/c/meta-chips/<msg_id>")
+@entries_bp.get("/e/meta-chips/<msg_id>")
 @login_required
 async def meta_chips(msg_id: str):
     _, user, dek = await require_user_and_dek()
@@ -197,7 +197,7 @@ async def meta_chips(msg_id: str):
     return html
 
 
-@chat_bp.route("/c/message/<msg_id>", methods=["DELETE"])
+@entries_bp.route("/e/message/<msg_id>", methods=["DELETE"])
 @login_required
 async def delete_message(msg_id: str):
     _, user, _ = await require_user_and_dek()
@@ -212,7 +212,7 @@ async def delete_message(msg_id: str):
     return Response(oob_deletes, status=200, mimetype="text/html")
 
 
-@chat_bp.get("/c/opening/<date>")
+@entries_bp.get("/e/opening/<date>")
 @login_required
 async def sse_opening(date: str):
     _, user, dek = await require_user_and_dek()
@@ -320,7 +320,7 @@ async def sse_opening(date: str):
 
         return StreamSession.error(msg)
     stream_id = f"opening:{uid}:{today_iso}"
-    manager = _chat_stream_manager()
+    manager = _entry_stream_manager()
     try:
         pending = manager.start_stream(
             stream_id,
@@ -343,7 +343,7 @@ async def sse_opening(date: str):
     return StreamSession.pending(pending)
 
 
-@chat_bp.route("/c/<date>/message", methods=["POST"])
+@entries_bp.route("/e/<date>/message", methods=["POST"])
 @login_required
 async def send_message(date):
     form = await request.form
@@ -381,7 +381,7 @@ async def send_message(date):
     )
 
 
-@chat_bp.route("/c/<date>/ask/<user_msg_id>", methods=["POST"])
+@entries_bp.route("/e/<date>/ask/<user_msg_id>", methods=["POST"])
 @login_required
 async def ask_llm(date, user_msg_id: str):
     normalized_date = require_iso_date(date)
@@ -406,7 +406,7 @@ async def ask_llm(date, user_msg_id: str):
     )
 
 
-@chat_bp.route("/c/<date>/stream/<user_msg_id>")
+@entries_bp.route("/e/<date>/stream/<user_msg_id>")
 @login_required
 async def sse_reply(user_msg_id: str, date: str):
     """Stream the assistant's reply for a given user message.

@@ -140,8 +140,8 @@ export function navigateToToday(zone = getTimezone()) {
   }
 }
 
-export function scheduleMidnightRollover(chatElement) {
-  if (!chatElement) return () => {};
+export function scheduleMidnightRollover(entriesElement) {
+  if (!entriesElement) return () => {};
 
   let timeoutId = null;
   const listeners = createListenerBag();
@@ -155,7 +155,7 @@ export function scheduleMidnightRollover(chatElement) {
     const now = new Date();
     const today = updateClientToday(document?.body, now);
 
-    if (chatElement.dataset.date !== today) {
+    if (entriesElement.dataset.date !== today) {
       navigateToToday(getTimezone());
       return;
     }

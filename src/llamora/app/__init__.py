@@ -132,13 +132,13 @@ def create_app():
 
     from .routes.auth import auth_bp
     from .routes.days import days_bp
-    from .routes.chat import chat_bp
+    from .routes.entries import entries_bp
     from .routes.search import search_bp
     from .routes.tags import tags_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(days_bp)
-    app.register_blueprint(chat_bp)
+    app.register_blueprint(entries_bp)
     app.register_blueprint(search_bp)
     app.register_blueprint(tags_bp)
 

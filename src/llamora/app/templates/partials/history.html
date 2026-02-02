@@ -1,12 +1,12 @@
 {% from 'partials/message_item.html' import render_message %}
-<div id="chat"
+<div id="entries"
      data-date="{{ day }}"
      data-long-date="{{ day|long_date }}"
      role="log"
      aria-live="polite"
      aria-relevant="additions"
-     aria-labelledby="chat-log-label-{{ day }}">
-  <h2 class="visually-hidden" id="chat-log-label-{{ day }}">Conversation for {{ day|long_date }}</h2>
+     aria-labelledby="entries-log-label-{{ day }}">
+  <h2 class="visually-hidden" id="entries-log-label-{{ day }}">Entries for {{ day|long_date }}</h2>
   {% if not history|length and not is_today %}
   <div class="no-content">Nothing was written this day.</div>
   {% endif %}

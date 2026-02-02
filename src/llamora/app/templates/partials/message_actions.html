@@ -16,7 +16,7 @@
         <button class="action-item"
                 type="button"
                 role="menuitem"
-                hx-post="{{ url_for('chat.ask_llm', date=day, user_msg_id=user_msg_id) }}"
+                hx-post="{{ url_for('entries.ask_llm', date=day, user_msg_id=user_msg_id) }}"
                 hx-target="#replies-{{ user_msg_id }}"
                 hx-swap="beforeend"
                 hx-include="#user-time"

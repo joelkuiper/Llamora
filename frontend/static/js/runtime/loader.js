@@ -58,9 +58,9 @@ async function ensureShell() {
 }
 
 const FEATURE_IMPORTS = {
-  chat: {
-    selector: "chat-view",
-    loader: () => import("../chat-entry.js"),
+  entries: {
+    selector: "entry-view",
+    loader: () => import("../entries-entry.js"),
   },
   calendar: {
     selector: "calendar-control",

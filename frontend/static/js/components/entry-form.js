@@ -1,13 +1,13 @@
-import { isNearBottom } from "../chat/scroll-utils.js";
+import { isNearBottom } from "../entries/scroll-utils.js";
 import {
   findStreamByUserMsgId,
   findTypingIndicator,
-} from "../chat/stream-utils.js";
+} from "../entries/stream-utils.js";
 import { getAlertContainer } from "../utils/alert-center.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 
-class ChatFormElement extends ReactiveElement {
-  #chat = null;
+class EntryFormElement extends ReactiveElement {
+  #entries = null;
   #container = null;
   #date = null;
   #form = null;
@@ -40,10 +40,10 @@ class ChatFormElement extends ReactiveElement {
     if (!this.#date && this.dataset.date) {
       this.#date = this.dataset.date;
     }
-    if (!this.#chat) {
-      const chat = this.closest("#chat");
-      if (chat) {
-        this.#chat = chat;
+    if (!this.#entries) {
+      const entries = this.closest("#entries");
+      if (entries) {
+        this.#entries = entries;
       }
     }
     this.#maybeInit();
@@ -63,8 +63,8 @@ class ChatFormElement extends ReactiveElement {
     super.disconnectedCallback();
   }
 
-  set chat(value) {
-    this.#chat = value;
+  set entries(value) {
+    this.#entries = value;
     this.#maybeInit();
   }
 
@@ -138,7 +138,7 @@ class ChatFormElement extends ReactiveElement {
     if (!this.#form || !this.#textarea || !this.#button) {
       return;
     }
-    if (!this.#chat || !this.#date) {
+    if (!this.#entries || !this.#date) {
       return;
     }
 
@@ -148,7 +148,7 @@ class ChatFormElement extends ReactiveElement {
       now.getDate()
     )}`;
     this.#isToday = this.#date === today;
-    this.#draftKey = `chat-draft-${this.#date}`;
+    this.#draftKey = `entry-draft-${this.#date}`;
 
     this.streamingMsgId = this.#session?.currentMsgId || null;
 
@@ -408,7 +408,7 @@ class ChatFormElement extends ReactiveElement {
   }
 
   #handleStopClick() {
-    if (!this.#chat) return;
+    if (!this.#entries) return;
     const indicator = this.#getTypingIndicator();
     const currentId =
       this.#streamingMsgId ||
@@ -416,14 +416,14 @@ class ChatFormElement extends ReactiveElement {
       indicator?.dataset.userMsgId ||
       null;
     let stream = currentId
-      ? findStreamByUserMsgId(this.#chat, currentId)
+      ? findStreamByUserMsgId(this.#entries, currentId)
       : null;
     if (!stream && indicator) {
       stream = indicator.closest("llm-stream");
     }
     const stopEndpoint = stream?.dataset?.stopUrl || indicator?.dataset?.stopUrl;
     const abortedViaController = this.#streamController?.abortActiveStream({
-      reason: "chat-form:stop",
+      reason: "entry-form:stop",
     });
 
     let abortedLocally = false;
@@ -442,14 +442,14 @@ class ChatFormElement extends ReactiveElement {
     }
 
     if (!abortedViaController && !abortedLocally && this.#session) {
-      this.#session.abort({ reason: "chat-form:stop" });
+      this.#session.abort({ reason: "entry-form:stop" });
     }
   }
 
   #getTypingIndicator() {
-    if (!this.#chat) return null;
+    if (!this.#entries) return null;
     const targetId = this.#streamingMsgId || this.#session?.currentMsgId || null;
-    return findTypingIndicator(this.#chat, targetId);
+    return findTypingIndicator(this.#entries, targetId);
   }
 
   #setSubmitting(value) {
@@ -521,6 +521,6 @@ class ChatFormElement extends ReactiveElement {
   }
 }
 
-if (!customElements.get("chat-form")) {
-  customElements.define("chat-form", ChatFormElement);
+if (!customElements.get("entry-form")) {
+  customElements.define("entry-form", EntryFormElement);
 }
