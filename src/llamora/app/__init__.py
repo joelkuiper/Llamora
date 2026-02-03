@@ -77,14 +77,19 @@ def create_app():
     manifest_path = dist_dir / "manifest.json"
     asset_manifest: dict[str, dict[str, str]] = {"js": {}, "css": {}}
     static_bundles = False
+    manifest_mtime: float | None = None
 
-    if manifest_path.exists():
+    def _load_manifest() -> tuple[dict[str, dict[str, str]], bool, float | None]:
+        if not manifest_path.exists():
+            return {"js": {}, "css": {}}, False, None
         try:
-            asset_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             logger.warning("Failed to parse asset manifest at %s", manifest_path)
-        else:
-            static_bundles = True
+            return {"js": {}, "css": {}}, False, None
+        return manifest, True, manifest_path.stat().st_mtime
+
+    asset_manifest, static_bundles, manifest_mtime = _load_manifest()
 
     app = Quart(__name__, static_folder=None, static_url_path="/static")
     app.secret_key = settings.SECRET_KEY
@@ -106,6 +111,8 @@ def create_app():
         STATIC_MANIFEST=asset_manifest,
         STATIC_DIST_PATH=str(dist_dir),
         STATIC_FALLBACK_PATH=str(static_fallback_dir),
+        STATIC_MANIFEST_MTIME=manifest_mtime,
+        DEBUG=bool(getattr(settings, "DEBUG", False)),
     )
 
     app.extensions["llamora"] = services
@@ -176,7 +183,25 @@ def create_app():
 
     from .services.auth_helpers import load_user
 
+    async def _refresh_manifest() -> None:
+        if not app.config.get("DEBUG"):
+            return
+        if not manifest_path.exists():
+            if app.config.get("STATIC_BUNDLES"):
+                app.config["STATIC_BUNDLES"] = False
+                app.config["STATIC_MANIFEST"] = {"js": {}, "css": {}}
+                app.config["STATIC_MANIFEST_MTIME"] = None
+            return
+        last_mtime = app.config.get("STATIC_MANIFEST_MTIME")
+        current_mtime = manifest_path.stat().st_mtime
+        if last_mtime is None or current_mtime > last_mtime:
+            manifest, bundles, mtime = _load_manifest()
+            app.config["STATIC_MANIFEST"] = manifest
+            app.config["STATIC_BUNDLES"] = bundles
+            app.config["STATIC_MANIFEST_MTIME"] = mtime
+
     app.before_request(load_user)
+    app.before_request(_refresh_manifest)
     app.extensions["llamora_lifecycle"] = lifecycle
 
     def _install_lifecycle() -> None:
