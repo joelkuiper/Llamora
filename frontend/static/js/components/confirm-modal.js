@@ -22,17 +22,19 @@ function getConfig(trigger, question) {
   const dataset = trigger?.dataset ?? {};
   return {
     title: dataset.confirmTitle || DEFAULTS.title,
-    message: question || dataset.confirmMessage || DEFAULTS.message,
+    message: dataset.confirmMessage || question || DEFAULTS.message,
     confirmLabel: dataset.confirmConfirm || DEFAULTS.confirmLabel,
     cancelLabel: dataset.confirmCancel || DEFAULTS.cancelLabel,
     variant: dataset.confirmVariant || "default",
   };
 }
 
-export function initConfirmModal() {
+export function initConfirmModal(options = {}) {
   const modal = document.getElementById("confirm-modal");
   if (!modal || modal.dataset.confirmInit === "true") {
-    return;
+    if (!modal || !options.force) {
+      return;
+    }
   }
 
   const titleEl = modal.querySelector("#confirm-modal-title");
@@ -43,8 +45,9 @@ export function initConfirmModal() {
     return;
   }
 
-  let activeRequest = null;
-  let lastFocused = null;
+  const state = (globalThis.__confirmModalState ??= { bound: false });
+  let activeRequest = state.activeRequest || null;
+  let lastFocused = state.lastFocused || null;
 
   const openModal = (config, requestCallback) => {
     activeRequest = requestCallback;
@@ -75,45 +78,50 @@ export function initConfirmModal() {
     }
   };
 
-  modal.addEventListener("click", (event) => {
-    const action = event.target?.closest?.("[data-confirm-action]");
-    if (!action) {
-      return;
-    }
-    const value = action.getAttribute("data-confirm-action");
-    closeModal(value === "confirm");
-  });
+  if (!state.bound) {
+    modal.addEventListener("click", (event) => {
+      const action = event.target?.closest?.("[data-confirm-action]");
+      if (!action) {
+        return;
+      }
+      const value = action.getAttribute("data-confirm-action");
+      closeModal(value === "confirm");
+    });
 
-  document.addEventListener("keydown", (event) => {
-    if (!modal.classList.contains("is-open")) {
-      return;
-    }
-    if (event.key === "Escape") {
+    document.addEventListener("keydown", (event) => {
+      if (!modal.classList.contains("is-open")) {
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeModal(false);
+      }
+    });
+
+    document.body.addEventListener("htmx:confirm", (event) => {
+      if (!modal) {
+        return;
+      }
+      const detail = event.detail || {};
+      const trigger = resolveTrigger(event);
+      const hasConfirmData =
+        Boolean(detail.question) ||
+        Boolean(trigger?.getAttribute?.("hx-confirm")) ||
+        Boolean(trigger?.dataset?.confirmTitle) ||
+        Boolean(trigger?.dataset?.confirmMessage) ||
+        Boolean(trigger?.dataset?.confirmConfirm) ||
+        Boolean(trigger?.dataset?.confirmCancel) ||
+        Boolean(trigger?.dataset?.confirmVariant);
+      if (!hasConfirmData) {
+        return;
+      }
+      const config = getConfig(trigger, detail.question);
       event.preventDefault();
-      closeModal(false);
-    }
-  });
+      openModal(config, () => detail.issueRequest(true));
+    });
 
-  document.body.addEventListener("htmx:confirm", (event) => {
-    if (!modal) {
-      return;
-    }
-    const detail = event.detail || {};
-    const trigger = resolveTrigger(event);
-    const hasConfirmData =
-      Boolean(detail.question) ||
-      Boolean(trigger?.getAttribute?.("hx-confirm")) ||
-      Boolean(trigger?.dataset?.confirmTitle) ||
-      Boolean(trigger?.dataset?.confirmConfirm) ||
-      Boolean(trigger?.dataset?.confirmCancel) ||
-      Boolean(trigger?.dataset?.confirmVariant);
-    if (!hasConfirmData) {
-      return;
-    }
-    const config = getConfig(trigger, detail.question);
-    event.preventDefault();
-    openModal(config, () => detail.issueRequest(true));
-  });
+    state.bound = true;
+  }
 
   modal.dataset.confirmInit = "true";
 }
@@ -123,3 +131,9 @@ if (document.readyState === "loading") {
 } else {
   initConfirmModal();
 }
+
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) {
+    initConfirmModal({ force: true });
+  }
+});
