@@ -290,15 +290,26 @@
 
   /* Suggestions/tags under the bar (inside popover) */
   .tag-suggestions {
-    margin-top: 10px;
+    margin-top: 0;
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
     position: relative;
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(-4px);
+    overflow: hidden;
+    transition:
+      max-height var(--motion-gentle) ease,
+      opacity var(--motion-gentle) ease,
+      transform var(--motion-gentle) ease;
+  }
 
-    &:empty {
-      margin-top: 0;
-    }
+  .tag-suggestions:not(:empty) {
+    margin-top: 10px;
+    max-height: 12rem;
+    opacity: 1;
+    transform: translateY(0);
   }
 
   .tag-suggestion {
@@ -330,6 +341,46 @@
     }
     &:active { transform: translateY(1px); }
   }
+
+  .tag-suggestion--skeleton {
+    width: clamp(4rem, 20vw, 7.5rem);
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    height: 1.4rem;
+    display: inline-flex;
+    align-items: center;
+    border-color: color-mix(in srgb, var(--border) 85%, var(--color-text-muted));
+    background: color-mix(in srgb, var(--glass-bg-alt) 88%, var(--color-bg));
+    box-shadow: var(--inset-shadow);
+    cursor: default;
+    animation: tag-skeleton-breathe 2.8s ease-in-out infinite;
+    animation-delay: 0s;
+  }
+
+  .tag-suggestion--skeleton:nth-child(2n) {
+    width: clamp(3.5rem, 16vw, 6rem);
+  }
+
+  .tag-suggestion--skeleton:nth-child(3n) {
+    width: clamp(5rem, 22vw, 8.5rem);
+  }
+
+  .tag-suggestion--skeleton:hover {
+    border-color: color-mix(in srgb, var(--border) 55%, transparent);
+    background: inherit;
+    box-shadow: none;
+  }
+}
+
+@keyframes tag-skeleton-breathe {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 0.92;
+  }
 }
 
 .action-popover {
@@ -344,19 +395,6 @@
 
 .tag-popover .search-result-load {
   display: none;
-  padding: 0.55rem 0.5rem 0.35rem;
-  margin-top: 0.5rem;
-  min-height: 1.6rem;
-  align-items: center;
-  justify-content: center;
-}
-
-.tag-popover .search-result-load .search-load-indicator {
-  opacity: 0;
-}
-
-.tag-popover .search-result-load.htmx-request {
-  display: flex;
 }
 
 .tag-popover .search-result-load.htmx-request .search-load-indicator {
