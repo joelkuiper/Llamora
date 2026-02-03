@@ -4,7 +4,24 @@ import { renderAllMarkdown } from "../markdown.js";
 
 function getEntryText(entry, body) {
   if (body?.dataset?.markdownSource) return body.dataset.markdownSource;
-  return (body?.textContent || "");
+  const raw = body?.innerText || body?.textContent || "";
+  const normalized = raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const lines = normalized.split("\n");
+  const nonEmpty = lines.filter((line) => line.trim().length > 0);
+  if (nonEmpty.length === 0) {
+    return "";
+  }
+  const indent = Math.min(
+    ...nonEmpty.map((line) => {
+      const match = line.match(/^\s*/);
+      return match ? match[0].length : 0;
+    }),
+  );
+  const stripped = lines.map((line) => line.slice(indent));
+  while (stripped.length && stripped[0].trim() === "") stripped.shift();
+  while (stripped.length && stripped[stripped.length - 1].trim() === "")
+    stripped.pop();
+  return stripped.join("\n");
 }
 
 function setEditable(body, enabled) {
