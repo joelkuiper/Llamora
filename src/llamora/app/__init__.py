@@ -145,6 +145,10 @@ def create_app():
 
     CSRFProtect(app)
     app.jinja_env.auto_reload = debug_flag
+    if debug_flag:
+        @app.before_request
+        async def _clear_template_cache() -> None:
+            app.jinja_env.cache.clear()
 
     from .routes.auth import auth_bp
     from .routes.days import days_bp
