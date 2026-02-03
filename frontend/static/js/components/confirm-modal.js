@@ -46,6 +46,9 @@ export function initConfirmModal(options = {}) {
   }
 
   const state = (globalThis.__confirmModalState ??= { bound: false });
+  if (options.force) {
+    state.bound = false;
+  }
   let activeRequest = state.activeRequest || null;
   let lastFocused = state.lastFocused || null;
   let closeTimer = null;
@@ -61,7 +64,11 @@ export function initConfirmModal(options = {}) {
     confirmBtn.textContent = config.confirmLabel;
     cancelBtn.textContent = config.cancelLabel;
     modal.dataset.confirmVariant = config.variant;
+    if (modal.parentElement !== document.body) {
+      document.body.appendChild(modal);
+    }
     modal.hidden = false;
+    modal.removeAttribute("hidden");
     modal.setAttribute("aria-hidden", "false");
     lastFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     requestAnimationFrame(() => {
@@ -92,6 +99,12 @@ export function initConfirmModal(options = {}) {
   };
 
   if (!state.bound) {
+    if (state.controller) {
+      state.controller.abort();
+    }
+    state.controller = new AbortController();
+    const { signal } = state.controller;
+
     modal.addEventListener("click", (event) => {
       const action = event.target?.closest?.("[data-confirm-action]");
       if (!action) {
@@ -99,7 +112,7 @@ export function initConfirmModal(options = {}) {
       }
       const value = action.getAttribute("data-confirm-action");
       closeModal(value === "confirm");
-    });
+    }, { signal });
 
     document.addEventListener("keydown", (event) => {
       if (!modal.classList.contains("is-open")) {
@@ -109,7 +122,7 @@ export function initConfirmModal(options = {}) {
         event.preventDefault();
         closeModal(false);
       }
-    });
+    }, { signal });
 
     document.body.addEventListener("htmx:confirm", (event) => {
       if (!modal) {
@@ -131,7 +144,7 @@ export function initConfirmModal(options = {}) {
       const config = getConfig(trigger, detail.question);
       event.preventDefault();
       openModal(config, () => detail.issueRequest(true));
-    });
+    }, { signal });
 
     state.bound = true;
   }

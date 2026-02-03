@@ -438,6 +438,9 @@ export class EntryView extends ReactiveElement {
 
   #handlePageShow(event) {
     if (event.persisted) {
+      if (globalThis.htmx?.process) {
+        globalThis.htmx.process(document.body);
+      }
       this.#initialized = false;
       this.#syncToEntryDate();
     }
