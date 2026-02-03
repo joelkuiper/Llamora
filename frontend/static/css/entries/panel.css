@@ -188,7 +188,7 @@
         transparent
       );
       align-self: flex-end;
-      width: clamp(18rem, 82%, 42rem);
+      width: clamp(18rem, 92%, 52rem);
       margin-left: auto;
       padding: var(--spacing-sm) var(--spacing-lg) calc(var(--spacing-sm) + 2rem);
       border-radius: var(--radius-sm);
@@ -664,11 +664,14 @@
     display: grid;
     gap: calc(var(--spacing-xs) * 1.2);
     margin-top: calc(var(--spacing-xs) * 0.6);
+    position: relative;
+    padding-left: 0;
   }
 
   .entry.user + .entry-responses {
     margin-top: var(--spacing-sm);
   }
+
 
   .entry--opening + .entry {
     margin-top: var(--spacing-xs);
