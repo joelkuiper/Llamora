@@ -115,12 +115,12 @@ body {
     &.user {
       align-self: stretch;
       width: 100%;
-      border: 1px solid color-mix(in srgb, var(--border) 85%, var(--color-text-muted));
+      border: 1px solid color-mix(in srgb, var(--border) 92%, var(--color-text-muted));
       color: var(--color-text);
       background: color-mix(in srgb, var(--color-surface) 92%, white);
       box-shadow: 0 1px 3px rgba(0,0,0,0.06);
       border-radius: var(--radius-md);
-      padding: var(--spacing-lg) var(--spacing-xl);
+      padding: calc(var(--spacing-lg) + 0.1rem) var(--spacing-xl);
 
       .entry-main {
         display: block;
@@ -232,7 +232,7 @@ body {
         align-items: center;
         gap: 0.4rem;
         flex: 0 0 auto;
-        opacity: 0.38;
+        opacity: 0.3;
         transition: opacity var(--motion-gentle) ease;
       }
 
@@ -503,10 +503,18 @@ body {
     gap: 0.35rem;
     letter-spacing: 0.02em;
     line-height: 1;
-    transform: translateY(-2px);
+    transform: translateY(0);
     opacity: 0;
     transition: opacity var(--motion-gentle) ease;
     pointer-events: none;
+  }
+
+  .entry-actions-row .entry-time {
+    transform: translateY(-2px);
+  }
+
+  .entry-actions-inline .entry-time {
+    transform: translateY(-4px);
   }
 
   .entry-actions-row .entry-time {
@@ -523,18 +531,31 @@ body {
     opacity: 1;
   }
 
+  .entry-actions-row .entry-action__icon,
+  .entry-actions-inline .entry-action__icon {
+    opacity: 0.45;
+    transition: opacity var(--motion-gentle) ease;
+  }
+
+  .entry:hover .entry-actions-row .entry-action__icon,
+  .entry:focus-within .entry-actions-row .entry-action__icon,
+  .entry:hover .entry-actions-inline .entry-action__icon,
+  .entry:focus-within .entry-actions-inline .entry-action__icon {
+    opacity: 0.9;
+  }
+
   .entry-responses {
     display: grid;
-    gap: var(--spacing-xs);
-    margin-top: var(--spacing-sm);
+    gap: calc(var(--spacing-xs) * 1.2);
+    margin-top: calc(var(--spacing-xs) * 0.6);
   }
 
   .entry.user + .entry-responses {
-    margin-top: var(--spacing-xs);
+    margin-top: var(--spacing-sm);
   }
 
   .entry--opening + .entry {
-    margin-top: var(--spacing-sm);
+    margin-top: var(--spacing-xs);
   }
 
   .entry-kind-indicator {
