@@ -22,6 +22,8 @@ PASSTHROUGH_DIRECTORIES = [
     (STATIC_DIR / "js" / "vendor", DIST_DIR / "js" / "vendor"),
     (STATIC_DIR / "fonts", DIST_DIR / "fonts"),
 ]
+META_JS = DIST_DIR / "meta-js.json"
+META_CSS = DIST_DIR / "meta-css.json"
 
 
 class BuildError(RuntimeError):
@@ -50,6 +52,7 @@ def _esbuild_common_args(mode: str) -> List[str]:
         "--log-level=info",
         "--loader:.svg=file",
         "--asset-names=../icons/[name]",
+        "--entry-names=[name]-[hash]",
     ]
     if mode == "dev":
         args.append("--sourcemap")
@@ -59,7 +62,12 @@ def _esbuild_common_args(mode: str) -> List[str]:
 
 
 def _run_esbuild(
-    entries: Iterable[Path], outdir: Path, outbase: Path, mode: str, watch: bool
+    entries: Iterable[Path],
+    outdir: Path,
+    outbase: Path,
+    mode: str,
+    watch: bool,
+    meta_path: Path | None = None,
 ) -> subprocess.Popen | None:
     entry_list = list(entries)
     if not entry_list:
@@ -71,9 +79,10 @@ def _run_esbuild(
         [
             f"--outdir={outdir}",
             f"--outbase={outbase}",
-            "--entry-names=[name]",
         ]
     )
+    if meta_path is not None:
+        args.append(f"--metafile={meta_path}")
 
     if watch:
         args.append("--watch")
@@ -96,16 +105,73 @@ def _copy_passthrough_assets() -> None:
         shutil.copytree(source, destination)
 
 
+def _load_metafile(meta_path: Path) -> dict[str, str]:
+    if not meta_path.exists():
+        return {}
+    try:
+        payload = json.loads(meta_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    outputs = payload.get("outputs", {})
+    resolved: dict[str, str] = {}
+    for output_path, entry in outputs.items():
+        entry_point = entry.get("entryPoint")
+        if not entry_point:
+            continue
+        entry_name = Path(entry_point).stem
+        resolved[entry_name] = output_path
+    return resolved
+
+
+def _normalize_output_path(output_path: str) -> str:
+    output = Path(output_path)
+    if not output.is_absolute():
+        output = (PROJECT_ROOT / output).resolve()
+    try:
+        output = output.relative_to(DIST_DIR)
+    except ValueError:
+        output = output.name
+    return output.as_posix()
+
+
+def _cleanup_outputs(valid_outputs: set[str], directory: Path, suffix: str) -> None:
+    if not directory.exists():
+        return
+    for path in directory.glob(f"*.{suffix}"):
+        rel = path.relative_to(DIST_DIR).as_posix()
+        if rel not in valid_outputs:
+            path.unlink()
+
+
 def _write_manifest() -> None:
     manifest: Dict[str, Dict[str, str]] = {"js": {}, "css": {}}
+    js_meta = _load_metafile(META_JS)
+    css_meta = _load_metafile(META_CSS)
+    valid_outputs: set[str] = set()
 
-    if (DIST_DIR / "js").exists():
+    for entry_name, output_path in js_meta.items():
+        normalized = _normalize_output_path(output_path)
+        manifest["js"][entry_name] = normalized
+        valid_outputs.add(normalized)
+
+    for entry_name, output_path in css_meta.items():
+        normalized = _normalize_output_path(output_path)
+        manifest["css"][entry_name] = normalized
+        valid_outputs.add(normalized)
+
+    if not manifest["js"] and (DIST_DIR / "js").exists():
         for path in sorted((DIST_DIR / "js").glob("*.js")):
             manifest["js"][path.stem] = path.relative_to(DIST_DIR).as_posix()
+            valid_outputs.add(path.relative_to(DIST_DIR).as_posix())
 
-    if (DIST_DIR / "css").exists():
+    if not manifest["css"] and (DIST_DIR / "css").exists():
         for path in sorted((DIST_DIR / "css").glob("*.css")):
             manifest["css"][path.stem] = path.relative_to(DIST_DIR).as_posix()
+            valid_outputs.add(path.relative_to(DIST_DIR).as_posix())
+
+    if valid_outputs:
+        _cleanup_outputs(valid_outputs, DIST_DIR / "js", "js")
+        _cleanup_outputs(valid_outputs, DIST_DIR / "css", "css")
 
     manifest_path = DIST_DIR / "manifest.json"
     DIST_DIR.mkdir(parents=True, exist_ok=True)
@@ -129,8 +195,12 @@ def build(mode: str) -> None:
     js_entries = _discover_entries(JS_ENTRIES_DIR, "js")
     css_entries = _discover_entries(CSS_ENTRIES_DIR, "css")
 
-    _run_esbuild(js_entries, js_out, JS_ENTRIES_DIR, mode, watch=False)
-    _run_esbuild(css_entries, css_out, CSS_ENTRIES_DIR, mode, watch=False)
+    _run_esbuild(
+        js_entries, js_out, JS_ENTRIES_DIR, mode, watch=False, meta_path=META_JS
+    )
+    _run_esbuild(
+        css_entries, css_out, CSS_ENTRIES_DIR, mode, watch=False, meta_path=META_CSS
+    )
 
     _copy_passthrough_assets()
     _write_manifest()
@@ -195,9 +265,16 @@ def watch(mode: str) -> None:
 
     processes: List[subprocess.Popen] = []
     try:
-        js_process = _run_esbuild(js_entries, js_out, JS_ENTRIES_DIR, mode, watch=True)
+        js_process = _run_esbuild(
+            js_entries, js_out, JS_ENTRIES_DIR, mode, watch=True, meta_path=META_JS
+        )
         css_process = _run_esbuild(
-            css_entries, css_out, CSS_ENTRIES_DIR, mode, watch=True
+            css_entries,
+            css_out,
+            CSS_ENTRIES_DIR,
+            mode,
+            watch=True,
+            meta_path=META_CSS,
         )
         if js_process:
             processes.append(js_process)
