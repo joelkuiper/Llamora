@@ -37,6 +37,28 @@ export function renderMarkdown(text) {
   return DOMPurify.sanitize(rawHtml);
 }
 
+function normalizeMarkdownSource(value) {
+  const normalized = String(value || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n");
+  const lines = normalized.split("\n");
+  const nonEmpty = lines.filter((line) => line.trim().length > 0);
+  if (nonEmpty.length === 0) {
+    return "";
+  }
+  const indent = Math.min(
+    ...nonEmpty.map((line) => {
+      const match = line.match(/^\s*/);
+      return match ? match[0].length : 0;
+    }),
+  );
+  const stripped = lines.map((line) => line.slice(indent));
+  while (stripped.length && stripped[0].trim() === "") stripped.shift();
+  while (stripped.length && stripped[stripped.length - 1].trim() === "")
+    stripped.pop();
+  return stripped.join("\n");
+}
+
 export function renderMarkdownInElement(el, text) {
   if (!el) return;
 
@@ -54,7 +76,7 @@ export function renderMarkdownInElement(el, text) {
     if (el.dataset.markdownSource !== undefined) {
       src = el.dataset.markdownSource;
     } else {
-      src = el.textContent || "";
+      src = normalizeMarkdownSource(el.textContent || "");
     }
   }
 
@@ -63,8 +85,14 @@ export function renderMarkdownInElement(el, text) {
   }
 
   const markdownHtml = renderMarkdown(src);
+  const prevDisplay = el.style.display;
+  const prevVisibility = el.style.visibility;
+  el.style.visibility = "hidden";
   el.innerHTML = markdownHtml;
   el.dataset.rendered = "true";
+  void el.offsetHeight;
+  el.style.visibility = prevVisibility;
+  el.style.display = prevDisplay;
 }
 
 const MARKDOWN_SELECTOR = ".entry .markdown-body";
