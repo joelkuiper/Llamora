@@ -48,8 +48,13 @@ export function initConfirmModal(options = {}) {
   const state = (globalThis.__confirmModalState ??= { bound: false });
   let activeRequest = state.activeRequest || null;
   let lastFocused = state.lastFocused || null;
+  let closeTimer = null;
 
   const openModal = (config, requestCallback) => {
+    if (closeTimer) {
+      clearTimeout(closeTimer);
+      closeTimer = null;
+    }
     activeRequest = requestCallback;
     titleEl.textContent = config.title;
     messageEl.textContent = config.message;
@@ -58,18 +63,26 @@ export function initConfirmModal(options = {}) {
     modal.dataset.confirmVariant = config.variant;
     modal.hidden = false;
     modal.setAttribute("aria-hidden", "false");
-    modal.classList.add("is-open");
     lastFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    confirmBtn.focus();
+    requestAnimationFrame(() => {
+      modal.classList.add("is-open");
+      confirmBtn.focus();
+    });
   };
 
   const closeModal = (confirmed) => {
     modal.classList.remove("is-open");
     modal.setAttribute("aria-hidden", "true");
-    modal.hidden = true;
     modal.removeAttribute("data-confirm-variant");
     const callback = activeRequest;
     activeRequest = null;
+    if (closeTimer) {
+      clearTimeout(closeTimer);
+    }
+    closeTimer = setTimeout(() => {
+      modal.hidden = true;
+      closeTimer = null;
+    }, 200);
     if (confirmed && typeof callback === "function") {
       callback();
     }

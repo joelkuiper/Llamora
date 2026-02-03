@@ -5,6 +5,7 @@
   display: grid;
   place-items: center;
   padding: 24px;
+  opacity: 0;
   transition: opacity 180ms ease;
 }
 
@@ -12,11 +13,17 @@
   display: none;
 }
 
+.confirm-modal.is-open {
+  opacity: 1;
+}
+
 .confirm-modal__backdrop {
   position: absolute;
   inset: 0;
   background: rgba(12, 12, 14, 0.32);
   backdrop-filter: blur(2px);
+  opacity: 0;
+  transition: opacity 200ms ease;
 }
 
 .confirm-modal__panel {
@@ -25,6 +32,18 @@
   padding: 20px 22px 18px;
   border-radius: 16px;
   box-shadow: 0 18px 50px rgba(12, 12, 14, 0.16);
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+  transition: opacity 200ms ease, transform 220ms ease;
+}
+
+.confirm-modal.is-open .confirm-modal__backdrop {
+  opacity: 1;
+}
+
+.confirm-modal.is-open .confirm-modal__panel {
+  opacity: 1;
+  transform: translateY(0) scale(1);
 }
 
 .confirm-modal__header {
