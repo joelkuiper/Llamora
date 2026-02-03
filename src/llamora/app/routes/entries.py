@@ -205,7 +205,9 @@ async def delete_entry(entry_id: str):
     if deleted_ids:
         await get_services().search_api.delete_entries(user["id"], deleted_ids)
     oob_deletes = "\n".join(
-        f'<div id="entry-{mid}" hx-swap-oob="delete"></div>' for mid in deleted_ids
+        f'<div id="{target_id}" hx-swap-oob="delete"></div>'
+        for mid in deleted_ids
+        for target_id in (f"entry-{mid}", f"entry-responses-{mid}")
     )
     return Response(oob_deletes, status=200, mimetype="text/html")
 
