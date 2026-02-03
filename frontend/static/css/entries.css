@@ -617,33 +617,48 @@ body {
     background: var(--action-edit-save-bg);
   }
 
-  .entry-edit-form.htmx-request .entry-edit-save {
+  .entry-edit-save {
+    position: relative;
+  }
+
+  .entry-edit-save .entry-edit-label {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    transition: opacity 120ms ease 150ms;
+  }
+
+  .entry-edit-save .entry-edit-saving {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    pointer-events: none;
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+    transition: opacity 120ms ease 150ms;
+  }
+
+  .entry-edit-save .entry-edit-saving::after {
+    content: "···";
+    font-size: 0.9em;
+    margin-left: 4px;
+    animation: entry-edit-dots 1s infinite steps(3);
+  }
+
+  .entry-edit-save:has(.entry-edit-saving.htmx-request) {
     color: color-mix(in srgb, var(--action-edit-save) 80%, var(--color-text-muted));
     background: color-mix(in srgb, var(--action-edit-save-bg) 60%, transparent);
     box-shadow: none;
   }
 
-  .entry-edit-form.htmx-request .entry-edit-save .entry-edit-label {
-    font-size: 0;
+  .entry-edit-save:has(.entry-edit-saving.htmx-request) .entry-edit-label {
+    opacity: 0;
   }
 
-  .entry-edit-form.htmx-request .entry-edit-save .entry-edit-label::after {
-    content: "Saving…";
-    font-size: 0.72rem;
-    letter-spacing: 0.02em;
-  }
-
-  .entry-edit-form.htmx-request .entry-edit-save span[aria-hidden="true"] {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-  }
-
-  .entry-edit-form.htmx-request .entry-edit-save span[aria-hidden="true"]::after {
-    content: "···";
-    font-size: 0.9em;
-    margin-left: 4px;
-    animation: entry-edit-dots 1s infinite steps(3);
+  .entry-edit-save .entry-edit-saving.htmx-request {
+    opacity: 1;
   }
 
   .entry-edit-save:hover,
