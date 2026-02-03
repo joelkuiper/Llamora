@@ -343,7 +343,7 @@
   }
 
   .tag-suggestion--skeleton {
-    width: clamp(4rem, 20vw, 7.5rem);
+    width: clamp(2.6rem, 12vw, 4.2rem);
     padding: 2px 8px;
     font-size: 0.75rem;
     line-height: 1.2;
@@ -359,11 +359,11 @@
   }
 
   .tag-suggestion--skeleton:nth-child(2n) {
-    width: clamp(3.5rem, 16vw, 6rem);
+    width: clamp(2.2rem, 10vw, 3.6rem);
   }
 
   .tag-suggestion--skeleton:nth-child(3n) {
-    width: clamp(5rem, 22vw, 8.5rem);
+    width: clamp(3rem, 14vw, 4.8rem);
   }
 
   .tag-suggestion--skeleton:hover {
