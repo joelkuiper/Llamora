@@ -4,8 +4,8 @@
           hx-put="{{ url_for('entries.update_entry', entry_id=e['id']) }}"
           hx-target="closest .entry-main"
           hx-swap="outerHTML transition:true"
-          hx-on::before-request="this.classList.add('is-saving'); const b=this.querySelector('.entry-edit-save'); if(b){b.classList.add('is-saving'); b.setAttribute('aria-busy','true');}"
-          hx-on::after-request="this.classList.remove('is-saving'); const b=this.querySelector('.entry-edit-save'); if(b){b.classList.remove('is-saving'); b.removeAttribute('aria-busy');}"
+          hx-on::before-request="if(event.detail.elt!==this){return;}this.classList.add('is-saving'); const b=this.querySelector('.entry-edit-save'); if(b){b.classList.add('is-saving'); b.setAttribute('aria-busy','true');}"
+          hx-on::after-request="if(event.detail.elt!==this){return;}this.classList.remove('is-saving'); const b=this.querySelector('.entry-edit-save'); if(b){b.classList.remove('is-saving'); b.removeAttribute('aria-busy');}"
           data-entry-edit-form="true">
       <textarea class="entry-edit-area"
                 name="text"
