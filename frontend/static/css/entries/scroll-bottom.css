@@ -1,0 +1,62 @@
+scroll-bottom-button {
+  left: var(--entries-center, 50%);  /* pixel value set by JS */
+  transform: translateX(-50%);
+  position: fixed;
+  bottom: 7.5rem;
+  pointer-events: none;
+  display: block;
+  z-index: 9000;
+}
+
+scroll-bottom-button.visible {
+  pointer-events: auto;
+}
+
+scroll-bottom-button .scroll-btn {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  background: var(--glass-bg);
+  border: 1px solid var(--border);
+  box-shadow: var(--raised-shadow);
+  color: var(--scroll-btn-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-sigh) ease, transform var(--motion-gentle) ease, background var(--motion-gentle) ease;
+  z-index: 9001;
+  cursor: pointer;
+
+  scroll-bottom-button.visible & {
+    opacity: 0.9;
+    pointer-events: auto;
+  }
+
+  &:hover {
+    transform: scale(.96);
+    color: var(--accent);
+
+    svg {
+      filter: drop-shadow(0 0 4px var(--accent-drop-shadow));
+    }
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
+    background: var(--accent-20);
+    color: var(--accent-active);
+    opacity: 1;
+  }
+
+  &:active {
+    box-shadow: var(--inset-shadow);
+    transform: none scale(0.95);
+    color: var(--accent-hover);
+  }
+
+}

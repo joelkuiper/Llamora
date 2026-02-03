@@ -1,0 +1,116 @@
+/* Animations */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+
+.user, .assistant, .response-stream { animation: fade-in-up var(--motion-sigh) ease-out; }
+
+@keyframes submitting-wave {
+  0%, 100% {
+    background-position: 50% 0%;
+  }
+  50% {
+    background-position: 50% 90%;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  #entries {
+    .typing-indicator {
+      animation: blink var(--motion-blink) step-start infinite;
+    }
+
+    .typing-indicator.stopped {
+      animation: pop-fade var(--motion-exhale) ease forwards;
+    }
+  }
+
+  scroll-bottom-button .scroll-btn {
+    scroll-bottom-button.visible & {
+      animation: appear var(--motion-fade) ease-out,
+                 breathe var(--motion-breathe) ease-in-out var(--motion-delay-short) infinite;
+    }
+  }
+
+  @keyframes blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+
+  @keyframes appear {
+    from { transform: none scale(0.92); opacity: 0; }
+    to   { transform: none scale(1);     opacity: 0.9; }
+  }
+
+  @keyframes breathe {
+    0%,100% { transform: none scale(1); }
+    50%     { transform: none scale(1.015); }
+  }
+
+  @keyframes pop-fade {
+    0% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    20% {
+      transform: scale(1.3);
+    }
+    40% {
+      transform: scale(1.1);
+    }
+    100% {
+      transform: scale(1);
+      opacity: 0;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #entries {
+    .typing-indicator {
+      animation: none;
+    }
+
+    .typing-indicator.stopped {
+      animation: none;
+      opacity: 0;
+    }
+  }
+
+  scroll-bottom-button .scroll-btn {
+    scroll-bottom-button.visible & {
+      animation: none;
+      opacity: 0.9;
+      transform: none;
+    }
+  }
+}
+
+@keyframes repeat-guard-wave {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+
+  50% {
+    opacity: 0.85;
+    transform: translateY(-0.15rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .repeat-guard-indicator {
+    transition: none;
+  }
+
+  .repeat-guard-indicator__waves {
+    transition: none;
+  }
+
+  .repeat-guard-indicator__dot {
+    animation: none;
+  }
+}
