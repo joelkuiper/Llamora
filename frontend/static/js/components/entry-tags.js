@@ -201,10 +201,6 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       onHidden: () => {
         this.#button?.setAttribute("aria-expanded", "false");
         this.classList.remove("popover-open");
-        if (this.#suggestions) {
-          this.#suggestions.innerHTML = "";
-          delete this.#suggestions.dataset.loaded;
-        }
         this.cancelAutocompleteFetch();
         this.resetAutocompleteStore({ clearLocal: true });
       },
