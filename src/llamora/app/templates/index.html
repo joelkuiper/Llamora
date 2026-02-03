@@ -81,6 +81,20 @@
 
 {% block content %}
   <div id="content">
+    <script>
+      (() => {
+        try {
+          const key = "opening_collapsed_{{ day }}";
+          if (localStorage.getItem(key) === "1") {
+            document.documentElement.dataset.openingCollapsed = "1";
+          } else {
+            delete document.documentElement.dataset.openingCollapsed;
+          }
+        } catch (error) {
+          delete document.documentElement.dataset.openingCollapsed;
+        }
+      })();
+    </script>
     {% if entries_html is defined %}
       {{ entries_html|safe }}
     {% else %}
