@@ -37,8 +37,8 @@ export function initConfirmModal(options = {}) {
 
   const titleEl = modal.querySelector("#confirm-modal-title");
   const messageEl = modal.querySelector("#confirm-modal-message");
-  const confirmBtn = modal.querySelector("[data-confirm-action='confirm']");
-  const cancelBtn = modal.querySelector("[data-confirm-action='cancel']");
+  const confirmBtn = modal.querySelector("button.confirm-modal__confirm");
+  const cancelBtn = modal.querySelector("button.confirm-modal__cancel");
   if (!titleEl || !messageEl || !confirmBtn || !cancelBtn) {
     return;
   }
