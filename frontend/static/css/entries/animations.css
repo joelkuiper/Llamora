@@ -88,6 +88,36 @@
   }
 }
 
+.tag-suggestion--skeleton {
+  animation:
+    tag-skeleton-breathe 2.6s ease-in-out infinite,
+    tag-skeleton-shimmer 2.2s ease-in-out infinite;
+}
+
+@keyframes tag-skeleton-breathe {
+  0%,
+  100% {
+    opacity: 0.65;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+@keyframes tag-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: 0% 0;
+  }
+}
+
+@keyframes tag-skeleton-pulse {
+  0% { opacity: 0.2; }
+  50% { opacity: 1; }
+  100% { opacity: 0.2; }
+}
 .entry-edit-form.is-saving .entry-edit-dot {
   animation: entry-edit-pulse 0.7s infinite ease-in-out;
 }

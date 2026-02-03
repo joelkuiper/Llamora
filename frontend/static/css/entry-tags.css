@@ -355,8 +355,8 @@
     background: color-mix(in srgb, var(--glass-bg-alt) 88%, var(--color-bg));
     box-shadow: var(--inset-shadow);
     cursor: default;
-    animation: tag-skeleton-breathe 2.8s ease-in-out infinite;
-    animation-delay: 0s;
+    animation: tag-skeleton-pulse 2.2s ease-in-out infinite;
+    animation-delay: -0.6s;
     transition:
       opacity var(--motion-gentle) ease,
       transform var(--motion-gentle) ease;
@@ -364,10 +364,19 @@
 
   .tag-suggestion--skeleton:nth-child(2n) {
     width: clamp(2.2rem, 10vw, 3.6rem);
+    animation-delay: -0.45s;
+    animation-duration: 2.4s;
   }
 
   .tag-suggestion--skeleton:nth-child(3n) {
     width: clamp(3rem, 14vw, 4.8rem);
+    animation-delay: -0.2s;
+    animation-duration: 2.6s;
+  }
+
+  .tag-suggestion--skeleton:nth-child(4n) {
+    animation-delay: -0.05s;
+    animation-duration: 2.8s;
   }
 
   .tag-suggestion--skeleton:hover {
@@ -393,15 +402,6 @@
   }
 }
 
-@keyframes tag-skeleton-breathe {
-  0%,
-  100% {
-    opacity: 0.75;
-  }
-  50% {
-    opacity: 0.92;
-  }
-}
 
 .action-popover {
   width: 13rem;
