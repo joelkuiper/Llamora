@@ -110,7 +110,8 @@ export function initTooltips() {
   });
 
   document.addEventListener('click', hide);
+  document.addEventListener('htmx:beforeSwap', hide);
+  document.addEventListener('htmx:afterSwap', hide);
 }
 
 initTooltips();
-
