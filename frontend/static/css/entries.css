@@ -548,8 +548,8 @@ body {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    outline: 1px dashed color-mix(in srgb, var(--accent) 40%, transparent);
-    outline-offset: 6px;
+    border-radius: var(--radius-md);
+    padding: 6px 0 0;
     color: color-mix(in srgb, var(--color-text) 85%, var(--color-text-muted));
   }
 
@@ -601,21 +601,53 @@ body {
     align-items: center;
     gap: 6px;
     cursor: pointer;
-    padding: 2px 4px;
+    padding: 2px 8px 2px 6px;
+    border-radius: 999px;
+    transition: color 140ms ease, background 140ms ease, box-shadow 140ms ease;
   }
 
   .entry-edit-strip button:hover,
   .entry-edit-strip button:focus-visible {
     color: var(--color-text);
+    background: transparent;
   }
 
   .entry-edit-save {
-    color: color-mix(in srgb, var(--accent) 60%, var(--color-text));
+    color: var(--action-edit-save);
+    background: var(--action-edit-save-bg);
   }
 
   .entry-edit-save:hover,
   .entry-edit-save:focus-visible {
-    color: var(--accent);
+    color: var(--color-success-text);
+    background: var(--action-edit-save-bg);
+    box-shadow:
+      0 0 0 2px var(--action-edit-save-glow),
+      0 0 18px color-mix(in srgb, var(--color-success-text) 22%, transparent);
+  }
+
+  .entry-edit-save:active {
+    background: color-mix(in srgb, var(--color-success-text) 24%, transparent);
+    box-shadow: 0 0 0 2px var(--action-edit-save-glow);
+  }
+
+  .entry-edit-cancel {
+    color: var(--action-edit-cancel);
+    background: var(--action-edit-cancel-bg);
+  }
+
+  .entry-edit-cancel:hover,
+  .entry-edit-cancel:focus-visible {
+    color: var(--color-danger);
+    background: var(--action-edit-cancel-bg);
+    box-shadow:
+      0 0 0 2px var(--action-edit-cancel-glow),
+      0 0 18px color-mix(in srgb, var(--color-danger) 22%, transparent);
+  }
+
+  .entry-edit-cancel:active {
+    background: color-mix(in srgb, var(--color-danger) 22%, transparent);
+    box-shadow: 0 0 0 2px var(--action-edit-cancel-glow);
   }
 
   .entry-edit-label {

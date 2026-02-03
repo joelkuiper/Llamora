@@ -37,6 +37,17 @@ function bindTextarea(textarea) {
       }
     }, 0);
   });
+
+  textarea.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    const form = textarea.closest("form[data-entry-edit-form]");
+    if (!form) return;
+    const cancel = form.querySelector(".entry-edit-cancel");
+    if (cancel instanceof HTMLElement) {
+      cancel.click();
+    }
+  });
 }
 
 function bindInNode(node) {

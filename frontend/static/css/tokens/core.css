@@ -98,6 +98,12 @@
     --action-reply: color-mix(in srgb, var(--accent) 55%, var(--color-text-muted));
     --action-acknowledge: color-mix(in srgb, var(--color-danger-mix) 45%, var(--color-text-muted));
     --action-notice: color-mix(in srgb, var(--highlight-color) 55%, var(--color-text-muted));
+    --action-edit-save: color-mix(in srgb, var(--color-success-text) 85%, var(--color-text));
+    --action-edit-save-bg: color-mix(in srgb, var(--color-success-text) 16%, transparent);
+    --action-edit-save-glow: color-mix(in srgb, var(--color-success-text) 26%, transparent);
+    --action-edit-cancel: color-mix(in srgb, var(--color-danger) 75%, var(--color-text));
+    --action-edit-cancel-bg: color-mix(in srgb, var(--color-danger) 12%, transparent);
+    --action-edit-cancel-glow: color-mix(in srgb, var(--color-danger) 24%, transparent);
     --action-tint: 6%;
 
     --assistant-bubble-bg: #f9fafb;
