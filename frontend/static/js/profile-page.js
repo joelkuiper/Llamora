@@ -18,9 +18,23 @@ function sanitizeTarget(value) {
   }
 }
 
-function initProfileNavigation() {
+function initProfileNavigation(force = false) {
   document.title = "Profile";
   const backBtn = document.getElementById("profile-back");
+  if (!backBtn) {
+    return;
+  }
+
+  if (backBtn.dataset.profileBackInit === "true" && !force) {
+    return;
+  }
+
+  if (backBtn._profileBackController) {
+    backBtn._profileBackController.abort();
+  }
+  const abortController = new AbortController();
+  backBtn._profileBackController = abortController;
+
   let target = sanitizeTarget(sessionStorage.getItem("profile-return"));
   if (!target) {
     target = sanitizeTarget(document.referrer) ?? "/";
@@ -29,10 +43,16 @@ function initProfileNavigation() {
   if (!target) {
     target = "/";
   }
-  backBtn?.addEventListener("click", () => {
+  backBtn.addEventListener(
+    "click",
+    () => {
     sessionStorage.removeItem("profile-return");
     window.location.href = target;
-  });
+    },
+    { signal: abortController.signal },
+  );
+
+  backBtn.dataset.profileBackInit = "true";
 }
 
 if (typeof document !== "undefined") {
@@ -42,3 +62,9 @@ if (typeof document !== "undefined") {
     initProfileNavigation();
   }
 }
+
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) {
+    initProfileNavigation(true);
+  }
+});

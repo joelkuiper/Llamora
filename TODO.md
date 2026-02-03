@@ -9,7 +9,7 @@
 - [x] Disable replies after today?
 - [x] Day opening is broken (and where to put it), midnight refresh seems broken
 - [ ] Edit for user messages?
-- [ ] Confirm / modal for entry deletion?
+- [x] Confirm / modal for entry deletion?
 - [x] No concept of time / timestamp on messages (should be accessible somewhere)
 - [x] A lot of code clean up / refactoring
   * Two stage LLM call is now redundant, should be removed
