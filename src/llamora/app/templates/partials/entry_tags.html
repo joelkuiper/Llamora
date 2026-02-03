@@ -54,7 +54,7 @@
              hx-get="{{ url_for('tags.get_tag_suggestions', entry_id=entry_id) }}"
              hx-trigger="tag-popover:show"
              hx-indicator="closest .tag-suggestions"
-             hx-swap="innerHTML">
+             hx-swap="innerHTML swap:120ms">
           {% for _ in range(6) %}
           <span class="tag-suggestion tag-suggestion--skeleton" aria-hidden="true"></span>
           {% endfor %}

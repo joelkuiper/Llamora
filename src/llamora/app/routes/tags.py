@@ -62,7 +62,6 @@ async def add_tag(entry_id: str):
 @login_required
 async def get_tag_suggestions(entry_id: str):
     _, user, dek = await require_user_and_dek()
-    await asyncio.sleep(3)
     decay_constant = resolve_frecency_lambda(
         request.args.get("lambda"), default=DEFAULT_FRECENCY_DECAY
     )

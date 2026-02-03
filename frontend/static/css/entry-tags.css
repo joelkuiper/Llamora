@@ -312,6 +312,28 @@
     transform: translateY(0);
   }
 
+  /* Gentle cross-fade during HTMX swap */
+  .tag-suggestions.htmx-swapping {
+    max-height: 12rem;
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .tag-suggestions.htmx-swapping .tag-suggestion--skeleton {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  .tag-suggestion.htmx-added {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  .tag-suggestions.htmx-settling .tag-suggestion.htmx-added {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
   .tag-suggestion {
     background: var(--glass-bg-alt);
     border: 1px solid var(--border);
