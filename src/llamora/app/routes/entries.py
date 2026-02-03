@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from quart import (
     Blueprint,
     render_template,
@@ -288,11 +289,12 @@ async def entry_edit(entry_id: str):
     day = entry.get("created_date") or local_date().isoformat()
     if day != local_date().isoformat():
         abort(403, description="Editing is available on the current day only.")
+    text_html = entry.get("text_html") or render_markdown_to_html(entry.get("text", ""))
     entry_payload = {
         "id": entry_id,
         "role": entry.get("role"),
         "text": entry.get("text", ""),
-        "text_html": entry.get("text_html"),
+        "text_html": text_html,
         "meta": entry.get("meta", {}),
         "created_at": entry.get("created_at"),
     }
@@ -318,11 +320,12 @@ async def entry_main(entry_id: str):
     tags = []
     if entry.get("role") == "user":
         tags = await db.tags.get_tags_for_entry(uid, entry_id, dek)
+    text_html = entry.get("text_html") or render_markdown_to_html(entry.get("text", ""))
     entry_payload = {
         "id": entry_id,
         "role": entry.get("role"),
         "text": entry.get("text", ""),
-        "text_html": entry.get("text_html"),
+        "text_html": text_html,
         "meta": entry.get("meta", {}),
         "tags": tags,
         "created_at": entry.get("created_at"),
@@ -498,7 +501,7 @@ async def send_entry(date):
         "id": entry_id,
         "role": "user",
         "text": user_text,
-        "text_html": None,
+        "text_html": render_markdown_to_html(user_text),
         "meta": {},
         "tags": [],
         "created_at": created_at,

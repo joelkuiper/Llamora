@@ -537,7 +537,7 @@
     align-items: center;
     gap: 6px;
     cursor: pointer;
-    padding: 2px 8px 2px 6px;
+    padding: 4px 10px 4px 8px;
     border-radius: 999px;
     transition: color 140ms ease, background 140ms ease, box-shadow 140ms ease;
   }
@@ -549,52 +549,62 @@
   }
 
   .entry-edit-save {
+    position: relative;
     color: var(--action-edit-save);
     background: var(--action-edit-save-bg);
-  }
-
-  .entry-edit-save {
-    position: relative;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--action-edit-save) 18%, transparent);
   }
 
   .entry-edit-save .entry-edit-label {
-    position: relative;
     display: inline-flex;
     align-items: center;
-    transition: opacity 120ms ease 150ms;
+    white-space: nowrap;
   }
 
-  .entry-edit-save .entry-edit-saving {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    opacity: 0;
-    pointer-events: none;
-    font-size: 0.72rem;
-    letter-spacing: 0.02em;
-    transition: opacity 120ms ease 150ms;
+  .entry-edit-save .entry-edit-label--saving,
+  .entry-edit-save .entry-edit-dots {
+    display: none;
   }
 
-  .entry-edit-save .entry-edit-saving::after {
-    content: "···";
-    font-size: 0.9em;
+  .entry-edit-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
     margin-left: 4px;
-    animation: entry-edit-dots 1s infinite steps(3);
+    transform: translateX(-2px);
+    will-change: opacity;
   }
 
-  .entry-edit-save:has(.entry-edit-saving.htmx-request) {
-    color: color-mix(in srgb, var(--action-edit-save) 80%, var(--color-text-muted));
-    background: color-mix(in srgb, var(--action-edit-save-bg) 60%, transparent);
-    box-shadow: none;
+  .entry-edit-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.2;
+    will-change: transform, opacity;
   }
 
-  .entry-edit-save:has(.entry-edit-saving.htmx-request) .entry-edit-label {
-    opacity: 0;
+  .entry-edit-dot:nth-child(2) { animation-delay: 0.12s; }
+  .entry-edit-dot:nth-child(3) { animation-delay: 0.24s; }
+
+  .entry-edit-form.is-saving .entry-edit-save {
+    color: color-mix(in srgb, var(--action-edit-save) 85%, var(--color-text-muted));
+    background: color-mix(in srgb, var(--action-edit-save-bg) 70%, transparent);
+    box-shadow: 0 0 0 2px var(--action-edit-save-glow);
   }
 
-  .entry-edit-save .entry-edit-saving.htmx-request {
-    opacity: 1;
+  .entry-edit-form.is-saving .entry-edit-label--save {
+    display: none !important;
+  }
+
+  .entry-edit-form.is-saving .entry-edit-save > span[aria-hidden="true"] {
+    display: none;
+  }
+
+  .entry-edit-form.is-saving .entry-edit-label--saving,
+  .entry-edit-form.is-saving .entry-edit-dots {
+    display: inline-flex !important;
   }
 
   .entry-edit-save:hover,
@@ -614,6 +624,7 @@
   .entry-edit-cancel {
     color: var(--action-edit-cancel);
     background: var(--action-edit-cancel-bg);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--action-edit-cancel) 18%, transparent);
   }
 
   .entry-edit-cancel:hover,
@@ -628,12 +639,6 @@
   .entry-edit-cancel:active {
     background: color-mix(in srgb, var(--color-danger) 22%, transparent);
     box-shadow: 0 0 0 2px var(--action-edit-cancel-glow);
-  }
-
-  @keyframes entry-edit-dots {
-    0% { opacity: 0.2; }
-    50% { opacity: 0.7; }
-    100% { opacity: 0.2; }
   }
 
   .entry-edit-label {

@@ -1,4 +1,12 @@
 const AUTOBOUND_ATTR = "data-autosize-bound";
+const SKIP_BLUR_CANCEL_ATTR = "data-skip-blur-cancel";
+
+const EDIT_FLOW = {
+  blur: "save",
+  escape: "cancel",
+  toggle: "cancel",
+  saveShortcut: "save",
+};
 
 function resizeTextarea(textarea) {
   if (!(textarea instanceof HTMLTextAreaElement)) return;
@@ -15,6 +23,23 @@ function resizeTextarea(textarea) {
   }
 }
 
+function submitEdit(form) {
+  if (!form || form.classList.contains("htmx-request")) return;
+  if (typeof form.requestSubmit === "function") {
+    form.requestSubmit();
+  } else {
+    form.submit();
+  }
+}
+
+function cancelEdit(form) {
+  if (!form) return;
+  const cancel = form.querySelector(".entry-edit-cancel");
+  if (cancel instanceof HTMLElement) {
+    cancel.click();
+  }
+}
+
 function bindTextarea(textarea) {
   if (!(textarea instanceof HTMLTextAreaElement)) return;
   if (textarea.getAttribute(AUTOBOUND_ATTR) === "true") return;
@@ -25,8 +50,8 @@ function bindTextarea(textarea) {
     const form = textarea.closest("form[data-entry-edit-form]");
     if (!form) return;
     if (form.classList.contains("htmx-request")) return;
-    if (form.dataset.skipBlurSave === "true") {
-      delete form.dataset.skipBlurSave;
+    if (form.getAttribute(SKIP_BLUR_CANCEL_ATTR) === "true") {
+      form.removeAttribute(SKIP_BLUR_CANCEL_ATTR);
       return;
     }
     setTimeout(() => {
@@ -34,10 +59,10 @@ function bindTextarea(textarea) {
       if (active && form.contains(active)) {
         return;
       }
-      if (typeof form.requestSubmit === "function") {
-        form.requestSubmit();
+      if (EDIT_FLOW.blur === "cancel") {
+        cancelEdit(form);
       } else {
-        form.submit();
+        submitEdit(form);
       }
     }, 0);
   });
@@ -46,10 +71,20 @@ function bindTextarea(textarea) {
     if (event.key !== "Escape") return;
     event.preventDefault();
     const form = textarea.closest("form[data-entry-edit-form]");
-    if (!form) return;
-    const cancel = form.querySelector(".entry-edit-cancel");
-    if (cancel instanceof HTMLElement) {
-      cancel.click();
+    if (EDIT_FLOW.escape === "cancel") {
+      cancelEdit(form);
+    } else {
+      submitEdit(form);
+    }
+  });
+
+  textarea.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    if (!(event.metaKey || event.ctrlKey)) return;
+    event.preventDefault();
+    const form = textarea.closest("form[data-entry-edit-form]");
+    if (EDIT_FLOW.saveShortcut === "save") {
+      submitEdit(form);
     }
   });
 }
@@ -78,7 +113,9 @@ document.addEventListener("mousedown", (event) => {
   const editForm = entry.querySelector("form[data-entry-edit-form]");
   if (!editForm) return;
   if (!entry.querySelector(".entry-main--editing")) return;
-  editForm.dataset.skipBlurSave = "true";
+  if (EDIT_FLOW.toggle === "cancel") {
+    editForm.setAttribute(SKIP_BLUR_CANCEL_ATTR, "true");
+  }
 });
 
 document.addEventListener("htmx:load", (event) => {

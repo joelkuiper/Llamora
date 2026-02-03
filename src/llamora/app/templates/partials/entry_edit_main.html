@@ -4,7 +4,8 @@
           hx-put="{{ url_for('entries.update_entry', entry_id=e['id']) }}"
           hx-target="closest .entry-main"
           hx-swap="outerHTML transition:true"
-          hx-indicator=".entry-edit-saving"
+          hx-on::before-request="this.classList.add('is-saving'); const b=this.querySelector('.entry-edit-save'); if(b){b.classList.add('is-saving'); b.setAttribute('aria-busy','true');}"
+          hx-on::after-request="this.classList.remove('is-saving'); const b=this.querySelector('.entry-edit-save'); if(b){b.classList.remove('is-saving'); b.removeAttribute('aria-busy');}"
           data-entry-edit-form="true">
       <textarea class="entry-edit-area"
                 name="text"
@@ -16,8 +17,13 @@
                 class="entry-edit-save"
                 aria-label="Save entry">
           <span aria-hidden="true">✓</span>
-          <span class="entry-edit-label">Save</span>
-          <span class="entry-edit-saving htmx-indicator" aria-hidden="true">Saving…</span>
+          <span class="entry-edit-label entry-edit-label--save">Save</span>
+          <span class="entry-edit-label entry-edit-label--saving" aria-live="polite">Saving</span>
+          <span class="entry-edit-dots" aria-hidden="true">
+            <span class="entry-edit-dot"></span>
+            <span class="entry-edit-dot"></span>
+            <span class="entry-edit-dot"></span>
+          </span>
         </button>
         <button type="button"
                 class="entry-edit-cancel"

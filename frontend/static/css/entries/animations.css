@@ -88,6 +88,16 @@
   }
 }
 
+.entry-edit-form.is-saving .entry-edit-dot {
+  animation: entry-edit-pulse 0.7s infinite ease-in-out;
+}
+
+@keyframes entry-edit-pulse {
+  0% { opacity: 0.2; }
+  50% { opacity: 1; }
+  100% { opacity: 0.2; }
+}
+
 @keyframes repeat-guard-wave {
   0%,
   100% {
