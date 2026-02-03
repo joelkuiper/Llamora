@@ -1,7 +1,7 @@
 {% from 'partials/entry_tags.html' import render_entry_tags %}
 {% from 'partials/entry_actions.html' import entry_actions %}
 {% from 'partials/response_kind.html' import response_kind_icon, response_kind_label %}
-{% macro render_entry(e, day, response_kinds=(), is_today=True, responses=None) -%}
+{% macro render_entry(e, day, response_kinds=(), is_today=True, responses=None, include_responses=True) -%}
 {% set entry_meta = e.get('meta', {}) %}
 {% set is_error = entry_meta.get('error') %}
 {% set repeat_guard = entry_meta.get('repeat_guard') %}
@@ -13,6 +13,7 @@
 <div id="entry-{{ e['id'] }}"
      class="entry {{ 'assistant' if e['role'] != 'user' else 'user'}}{% if is_error %} entry--error{% endif %}{% if is_opening %} entry--opening{% if opening_collapsed %} is-collapsed{% endif %}{% endif %}"
      data-entry-id="{{ e['id'] }}"
+     data-entry-text="{{ e['text'] | e }}"
      {% if response_kind %}data-response-kind="{{ response_kind }}"{% endif %}
      {% if e['role'] == 'assistant' and e.get('reply_to') %}
      data-response-to="{{ e['reply_to'] }}"
@@ -55,6 +56,13 @@
             datetime="{{ e['created_at'] }}"
             data-time-raw="{{ e['created_at'] }}"></time>
       {% endif %}
+      <button class="entry-action entry-edit"
+              type="button"
+              aria-label="Edit entry"
+              data-tooltip-title="Edit entry"
+              data-ready="true">
+        <span class="icon-mask icon-feather entry-action__icon" aria-hidden="true"></span>
+      </button>
       <button class="entry-action entry-delete"
               type="button"
               hx-delete="{{ url_for('entries.delete_entry', entry_id=e['id']) }}"
@@ -119,7 +127,7 @@
   </div>
   {% endif %}
 </div>
-{% if e['role'] == 'user' %}
+{% if include_responses and e['role'] == 'user' %}
 <div class="entry-responses"
      id="entry-responses-{{ e['id'] }}"
      data-responses-for="{{ e['id'] }}">

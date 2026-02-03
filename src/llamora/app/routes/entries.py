@@ -9,6 +9,7 @@ from quart import (
     abort,
     url_for,
 )
+import orjson
 import logging
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -206,6 +207,67 @@ async def delete_entry(entry_id: str):
         f'<div id="entry-{mid}" hx-swap-oob="delete"></div>' for mid in deleted_ids
     )
     return Response(oob_deletes, status=200, mimetype="text/html")
+
+
+@entries_bp.route("/e/entry/<entry_id>", methods=["PUT", "PATCH"])
+@login_required
+async def update_entry(entry_id: str):
+    form = await request.form
+    text = form.get("text", "").strip()
+    _, user, dek = await require_user_and_dek()
+    uid = user["id"]
+    db = get_services().db
+
+    max_len = int(settings.LIMITS.max_message_length)
+    if not text or len(text) > max_len:
+        abort(400, description="Entry is empty or too long.")
+
+    await ensure_entry_exists(db, uid, entry_id)
+
+    entries = await db.entries.get_entries_by_ids(uid, [entry_id], dek)
+    if not entries:
+        abort(404, description="Entry not found.")
+    current = entries[0]
+    if current.get("role") != "user":
+        abort(403, description="Only user entries can be edited.")
+
+    updated = await db.entries.update_entry_text(
+        uid, entry_id, text, dek, meta=current.get("meta", {})
+    )
+    if not updated:
+        abort(404, description="Entry not found.")
+
+    try:
+        record_plain = orjson.dumps(
+            {"text": text, "meta": updated.get("meta", {})}
+        ).decode()
+        await get_services().search_api.delete_entries(uid, [entry_id])
+        await get_services().search_api.enqueue_index_job(
+            uid, entry_id, record_plain, dek
+        )
+    except Exception:
+        logger.exception("Failed to update search index for entry %s", entry_id)
+
+    tags = await db.tags.get_tags_for_entry(uid, entry_id, dek)
+    entry_payload = {
+        "id": entry_id,
+        "role": updated.get("role"),
+        "text": updated.get("text", ""),
+        "text_html": None,
+        "meta": updated.get("meta", {}),
+        "tags": tags,
+        "created_at": updated.get("created_at"),
+    }
+    day = updated.get("created_date") or local_date().isoformat()
+    response_kinds = _load_response_kinds()
+
+    return await render_template(
+        "partials/entry_single.html",
+        entry=entry_payload,
+        day=day,
+        response_kinds=response_kinds,
+        is_today=day == local_date().isoformat(),
+    )
 
 
 @entries_bp.get("/e/opening/<date>")

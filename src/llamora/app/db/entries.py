@@ -313,6 +313,83 @@ class EntriesRepository(BaseRepository):
 
         return delete_ids
 
+    async def update_entry_text(
+        self,
+        user_id: str,
+        entry_id: str,
+        text: str,
+        dek: bytes,
+        *,
+        meta: dict | None = None,
+    ) -> dict | None:
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                """
+                SELECT id, role, reply_to, nonce, ciphertext, alg, created_at, created_date
+                FROM entries
+                WHERE id = ? AND user_id = ?
+                """,
+                (entry_id, user_id),
+            )
+            row = await cursor.fetchone()
+            await cursor.close()
+            if not row:
+                return None
+
+            if meta is None:
+                record_json = self._decrypt_message(
+                    dek,
+                    user_id,
+                    row["id"],
+                    row["nonce"],
+                    row["ciphertext"],
+                    row["alg"],
+                )
+                record = orjson.loads(record_json)
+                meta = record.get("meta", {})
+
+            record = {"text": text, "meta": meta or {}}
+            plaintext = orjson.dumps(record).decode()
+            nonce, ct, alg = self._encrypt_message(dek, user_id, entry_id, plaintext)
+            prompt_tokens = await asyncio.to_thread(
+                count_message_tokens, row["role"], record.get("text", "")
+            )
+
+            async def _execute_update():
+                await conn.execute(
+                    """
+                    UPDATE entries
+                    SET nonce = ?, ciphertext = ?, alg = ?, prompt_tokens = ?
+                    WHERE id = ? AND user_id = ?
+                    """,
+                    (nonce, ct, alg, prompt_tokens, entry_id, user_id),
+                )
+
+            await self._run_in_transaction(conn, _execute_update)
+
+        entry_record = {
+            "id": entry_id,
+            "created_at": row["created_at"],
+            "created_date": row["created_date"],
+            "role": row["role"],
+            "reply_to": row["reply_to"],
+            "text": record.get("text", ""),
+            "meta": record.get("meta", {}),
+            "prompt_tokens": prompt_tokens,
+        }
+
+        if row["created_date"] and self._event_bus:
+            await self._event_bus.emit_for_entry_date(
+                ENTRY_HISTORY_CHANGED_EVENT,
+                user_id=user_id,
+                created_date=row["created_date"],
+                entry_id=entry_id,
+                reason="update",
+                entry=entry_record,
+            )
+
+        return entry_record
+
     async def get_entry_date(self, user_id: str, entry_id: str) -> str | None:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
