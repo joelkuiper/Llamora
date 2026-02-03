@@ -2,6 +2,13 @@
 
 .markdown-body {
   display: contents;
+  opacity: 0;
+  transition: opacity 160ms ease;
+
+  &[data-rendered="true"],
+  &[data-editing="true"] {
+    opacity: 1;
+  }
 
   > p:first-of-type,
   > p:last-of-type,

@@ -13,7 +13,6 @@
 <div id="entry-{{ e['id'] }}"
      class="entry {{ 'assistant' if e['role'] != 'user' else 'user'}}{% if is_error %} entry--error{% endif %}{% if is_opening %} entry--opening{% if opening_collapsed %} is-collapsed{% endif %}{% endif %}"
      data-entry-id="{{ e['id'] }}"
-     data-entry-text="{{ e['text'] | e }}"
      {% if response_kind %}data-response-kind="{{ response_kind }}"{% endif %}
      {% if e['role'] == 'assistant' and e.get('reply_to') %}
      data-response-to="{{ e['reply_to'] }}"
@@ -59,8 +58,9 @@
       <button class="entry-action entry-edit"
               type="button"
               aria-label="Edit entry"
-              data-tooltip-title="Edit entry"
-              data-ready="true">
+              data-tooltip-title="{{ 'Edit entry' if is_today else 'Editing is available on the current day only' }}"
+              data-ready="true"
+              {% if not is_today %}disabled aria-disabled="true" data-edit-disabled="true"{% endif %}>
         <span class="icon-mask icon-feather entry-action__icon" aria-hidden="true"></span>
       </button>
       <button class="entry-action entry-delete"

@@ -608,12 +608,23 @@ body {
     box-shadow:
       0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
     background: color-mix(in srgb, var(--accent) 10%, transparent);
+    cursor: pointer;
   }
+
+  .entry-main--animating {
+    transition: height 180ms ease;
+  }
+
 
   .entry.is-editing .entry-actions-row,
   .entry.is-editing .entry-actions-inline {
     opacity: 0.4;
     pointer-events: none;
+  }
+
+  .entry.is-editing .entry-edit {
+    pointer-events: auto;
+    cursor: pointer;
   }
 
   .entry-edit-form {

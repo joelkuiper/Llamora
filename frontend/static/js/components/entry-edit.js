@@ -1,10 +1,10 @@
 const editState = new WeakMap();
+let htmxListenersBound = false;
+import { renderAllMarkdown } from "../markdown.js";
 
 function getEntryText(entry, body) {
-  const raw = entry?.dataset?.entryText;
-  if (raw) return raw;
   if (body?.dataset?.markdownSource) return body.dataset.markdownSource;
-  return (body?.textContent || "").trim();
+  return (body?.textContent || "");
 }
 
 function setEditable(body, enabled) {
@@ -71,14 +71,19 @@ function requestSave(entry) {
   const state = editState.get(entry);
   if (!state) return;
   const { body, text } = state;
-  const value = (body.textContent || "").trim();
-  if (!value) {
+  const value = (body.innerText || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n");
+  if (!value.trim()) {
     restoreEntry(entry);
     return;
   }
-  entry.dataset.entryText = value;
   cleanupEdit(entry);
   if (window.htmx?.ajax) {
+    const main = entry.querySelector(".entry-main");
+    if (main) {
+      entry.dataset.animateHeight = String(main.getBoundingClientRect().height);
+    }
     window.htmx.ajax("PUT", `/e/entry/${entry.dataset.entryId}`, {
       target: `#entry-${entry.dataset.entryId} .entry-main`,
       swap: "innerHTML",
@@ -95,6 +100,13 @@ function startEditing(entry) {
   const body = entry.querySelector(".markdown-body");
   if (!body) return;
   const editButton = entry.querySelector(".entry-edit");
+  const main = entry.querySelector(".entry-main");
+  if (main) {
+    main.classList.remove("entry-main--animating");
+    main.style.height = "";
+    main.style.overflow = "";
+    delete main.dataset.animateHeight;
+  }
 
   const text = getEntryText(entry, body);
   const state = {
@@ -164,6 +176,9 @@ function startEditing(entry) {
 function handleEditClick(event) {
   const button = event.target?.closest?.(".entry-edit");
   if (!button) return;
+  if (button.hasAttribute("disabled") || button.getAttribute("aria-disabled") === "true") {
+    return;
+  }
   const entry = button.closest(".entry.user");
   if (!entry) return;
   event.preventDefault();
@@ -179,6 +194,36 @@ function initEntryEdit() {
     return;
   }
   document.addEventListener("click", handleEditClick);
+  if (!htmxListenersBound && window.htmx) {
+    htmxListenersBound = true;
+    document.body.addEventListener("htmx:afterSwap", (event) => {
+      const target = event.detail?.target;
+      if (!(target instanceof Element)) return;
+      if (!target.classList.contains("entry-main")) return;
+      const entry = target.closest(".entry");
+      const from = parseFloat(entry?.dataset.animateHeight || "");
+      if (entry) {
+        delete entry.dataset.animateHeight;
+      }
+      renderAllMarkdown(target);
+      const to = target.getBoundingClientRect().height;
+      if (Number.isFinite(from) && from > 0 && Number.isFinite(to) && to > 0) {
+        target.style.height = `${from}px`;
+        target.style.overflow = "hidden";
+        target.classList.add("entry-main--animating");
+        requestAnimationFrame(() => {
+          target.style.height = `${to}px`;
+        });
+        const onEnd = () => {
+          target.style.height = "";
+          target.style.overflow = "";
+          target.classList.remove("entry-main--animating");
+          target.removeEventListener("transitionend", onEnd);
+        };
+        target.addEventListener("transitionend", onEnd);
+      }
+    });
+  }
   if (document.body) {
     document.body.dataset.entryEditInit = "true";
   }

@@ -213,13 +213,13 @@ async def delete_entry(entry_id: str):
 @login_required
 async def update_entry(entry_id: str):
     form = await request.form
-    text = form.get("text", "").strip()
+    text = form.get("text", "")
     _, user, dek = await require_user_and_dek()
     uid = user["id"]
     db = get_services().db
 
     max_len = int(settings.LIMITS.max_message_length)
-    if not text or len(text) > max_len:
+    if not text.strip() or len(text) > max_len:
         abort(400, description="Entry is empty or too long.")
 
     await ensure_entry_exists(db, uid, entry_id)
