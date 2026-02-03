@@ -1,0 +1,21 @@
+{% macro entry_edit_button(entry_id, is_today, mode="view", oob=False) -%}
+{% set is_editing = mode == "edit" %}
+{% set tooltip = "Cancel editing" if is_editing else "Edit entry" %}
+{% set target_url = url_for("entries.entry_main", entry_id=entry_id) if is_editing else url_for("entries.entry_edit", entry_id=entry_id) %}
+  <button id="entry-edit-{{ entry_id }}"
+          class="entry-action entry-edit{% if is_editing %} active{% endif %}"
+          type="button"
+          aria-label="{{ tooltip }}"
+          data-tooltip-title="{{ tooltip if is_today else 'Editing is available on the current day only' }}"
+          data-ready="true"
+          {% if is_editing %}aria-pressed="true"{% else %}aria-pressed="false"{% endif %}
+          {% if not is_today %}disabled aria-disabled="true" data-edit-disabled="true"{% endif %}
+          {% if is_today %}
+          hx-get="{{ target_url }}"
+          hx-target="#entry-{{ entry_id }} .entry-main"
+          hx-swap="outerHTML transition:true"
+          {% endif %}
+          {% if oob %}hx-swap-oob="outerHTML"{% endif %}>
+    <span class="icon-mask icon-feather entry-action__icon" aria-hidden="true"></span>
+  </button>
+{%- endmacro %}

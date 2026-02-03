@@ -1,0 +1,32 @@
+{% macro render_entry_edit_main(e, day) -%}
+  <div class="entry-main entry-main--editing">
+    <form class="entry-edit-form"
+          hx-put="{{ url_for('entries.update_entry', entry_id=e['id']) }}"
+          hx-target="closest .entry-main"
+          hx-swap="outerHTML transition:true"
+          data-entry-edit-form="true">
+      <textarea class="entry-edit-area"
+                name="text"
+                rows="1"
+                spellcheck="true"
+                autofocus>{{- e.get('text', '') | e -}}</textarea>
+      <div class="entry-edit-strip">
+        <button type="submit"
+                class="entry-edit-save"
+                aria-label="Save entry">
+          <span aria-hidden="true">✓</span>
+          <span class="entry-edit-label">Save</span>
+        </button>
+        <button type="button"
+                class="entry-edit-cancel"
+                aria-label="Cancel editing"
+                hx-get="{{ url_for('entries.entry_main', entry_id=e['id']) }}"
+                hx-target="closest .entry-main"
+                hx-swap="outerHTML transition:true">
+          <span aria-hidden="true">×</span>
+          <span class="entry-edit-label">Cancel</span>
+        </button>
+      </div>
+    </form>
+  </div>
+{%- endmacro %}

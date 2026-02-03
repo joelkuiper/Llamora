@@ -61,6 +61,9 @@ function normalizeMarkdownSource(value) {
 
 export function renderMarkdownInElement(el, text) {
   if (!el) return;
+  if (el.dataset.editing === "true" || el.closest?.(".entry.is-editing")) {
+    return;
+  }
 
   const hasPreRenderedHtml =
     el.dataset.rendered === "true" &&
@@ -175,6 +178,9 @@ export function renderAllMarkdown(root, nodes = null, options = {}) {
   const targets = collectMarkdownBodies(root, normalizeNodes(nodes));
 
   targets.forEach((el) => {
+    if (el?.dataset?.editing === "true" || el?.closest?.(".entry.is-editing")) {
+      return;
+    }
     const isStreaming =
       el.closest("response-stream")?.dataset.streaming === "true";
     if (isStreaming) {

@@ -1,0 +1,4 @@
+{% from 'partials/entry_edit_main.html' import render_entry_edit_main %}
+{% from 'partials/entry_edit_button.html' import entry_edit_button %}
+{{ render_entry_edit_main(entry, day) }}
+{{ entry_edit_button(entry['id'], is_today, mode="edit", oob=True) }}

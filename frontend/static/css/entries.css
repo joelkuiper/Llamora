@@ -544,16 +544,35 @@ body {
     opacity: 0.9;
   }
 
-  .entry.is-editing .markdown-body {
-    display: block;
+  .entry-main--editing .entry-edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
     outline: 1px dashed color-mix(in srgb, var(--accent) 40%, transparent);
     outline-offset: 6px;
     color: color-mix(in srgb, var(--color-text) 85%, var(--color-text-muted));
-    white-space: pre-wrap;
   }
 
-  .entry.is-editing .markdown-body[contenteditable="true"] {
-    cursor: text;
+  .entry-edit-area {
+    width: 100%;
+    min-height: 2lh;
+    field-sizing: content;
+    resize: none;
+    max-height: 48vh;
+    overflow-y: auto;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    line-height: inherit;
+    padding: 0;
+    margin: 0;
+    outline: none;
+  }
+
+  .entry-main--editing {
+    margin-bottom: var(--spacing-sm);
+    padding-bottom: var(--spacing-sm);
   }
 
   .entry-edit-strip {
@@ -569,7 +588,7 @@ body {
     width: 100%;
   }
 
-  .entry.is-editing .entry-edit-strip {
+  .entry-main--editing .entry-edit-strip {
     opacity: 1;
   }
 
@@ -603,7 +622,7 @@ body {
     font-size: 0.72rem;
   }
 
-  .entry-edit.active {
+  .entry:has(.entry-main--editing) .entry-edit {
     border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
     box-shadow:
       0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
@@ -611,78 +630,8 @@ body {
     cursor: pointer;
   }
 
-  .entry--animating {
-    transition: height 200ms ease;
-  }
 
 
-
-  .entry.is-editing .entry-actions-row,
-  .entry.is-editing .entry-actions-inline {
-    opacity: 0.4;
-    pointer-events: none;
-  }
-
-  .entry.is-editing .entry-edit {
-    pointer-events: auto;
-    cursor: pointer;
-  }
-
-  .entry-edit-form {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .entry-edit-input {
-    width: 100%;
-    min-height: 120px;
-    resize: vertical;
-    padding: 12px 14px;
-    border-radius: 14px;
-    border: 1px solid var(--border);
-    background: var(--glass-bg-alt);
-    color: var(--color-text);
-    font: inherit;
-    line-height: 1.5;
-    box-shadow: var(--inset-shadow);
-  }
-
-  .entry-edit-input:focus {
-    outline: none;
-    border-color: var(--accent);
-    box-shadow:
-      var(--raised-shadow),
-      0 0 0 3px var(--accent-20);
-  }
-
-  .entry-edit-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-  }
-
-  .entry-edit-actions button {
-    border: 1px solid var(--border);
-    background: var(--color-surface);
-    color: var(--color-text);
-    border-radius: 999px;
-    padding: 6px 14px;
-    font-size: 0.86rem;
-    cursor: pointer;
-    transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
-  }
-
-  .entry-edit-actions button:hover,
-  .entry-edit-actions button:focus-visible {
-    background: var(--color-surface-elevated);
-    border-color: var(--color-border-strong);
-  }
-
-  .entry-edit-save {
-    border-color: var(--accent-20);
-    box-shadow: var(--raised-shadow);
-  }
 
   .entry-responses {
     display: grid;
@@ -742,6 +691,15 @@ body {
   .entry.htmx-swapping {
     pointer-events: none;
     animation: var(--motion-entry-delete-animation);
+  }
+
+  .entry-main.htmx-swapping {
+    opacity: 0;
+    transition: opacity 140ms ease;
+  }
+
+  .entry-main.htmx-settling {
+    opacity: 1;
   }
 
 

@@ -3,7 +3,7 @@ import "./components/day-opening.js";
 import "./components/search-overlay.js";
 import "./components/scroll-bottom-button.js";
 import "./components/entry-tags.js";
-import "./components/entry-edit.js";
+import "./components/entry-edit-autosize.js";
 
 function registerEntryElements() {
   if (!customElements.get("entry-view")) {

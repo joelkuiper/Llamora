@@ -1,0 +1,35 @@
+{% from 'partials/entry_raw.html' import entry_raw_text %}
+{% macro render_entry_main(e, day) -%}
+{% set entry_meta = e.get('meta', {}) %}
+{% set is_opening = entry_meta.get('auto_opening') %}
+{% set opening_cookie = 'opening_collapsed_' ~ day %}
+{% set opening_collapsed = is_opening and request.cookies.get(opening_cookie) == '1' %}
+{% set rendered = e.get('text_html') %}
+  <div class="entry-main">
+    {% if is_opening %}
+    <div class="entry-opening-header">
+      <span class="entry-opening-title">day opening</span>
+      <button type="button"
+              class="opening-toggle"
+              data-opening-toggle
+              aria-expanded="{{ 'false' if opening_collapsed else 'true' }}"
+              aria-label="{{ 'Expand day opening' if opening_collapsed else 'Collapse day opening' }}">
+        <span class="icon-mask icon-chevron-up" aria-hidden="true" data-opening-icon-open></span>
+        <span class="icon-mask icon-chevron-down" aria-hidden="true" data-opening-icon-closed></span>
+      </button>
+    </div>
+    {% endif %}
+    <div class="opening-content"{% if not is_opening %} data-opening-content="false"{% endif %}>
+      <div class="markdown-body"
+           id="entry-{{ e['id'] }}-body"
+           {% if rendered is not none %}data-rendered="true"{% else %}data-markdown-source="{{ e.text }}"{% endif %}>
+        {% if rendered is not none %}
+        {{ rendered | safe }}
+        {% endif %}
+      </div>
+    </div>
+    {% if e['role'] == 'user' %}
+    {{ entry_raw_text(e.get('text', '')) }}
+    {% endif %}
+  </div>
+{%- endmacro %}

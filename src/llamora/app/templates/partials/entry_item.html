@@ -1,5 +1,7 @@
 {% from 'partials/entry_tags.html' import render_entry_tags %}
 {% from 'partials/entry_actions.html' import entry_actions %}
+{% from 'partials/entry_edit_button.html' import entry_edit_button %}
+{% from 'partials/entry_main.html' import render_entry_main %}
 {% from 'partials/response_kind.html' import response_kind_icon, response_kind_label %}
 {% macro render_entry(e, day, response_kinds=(), is_today=True, responses=None, include_responses=True) -%}
 {% set entry_meta = e.get('meta', {}) %}
@@ -7,8 +9,6 @@
 {% set repeat_guard = entry_meta.get('repeat_guard') %}
 {% set response_kind = entry_meta.get('response_kind') %}
 {% set is_opening = entry_meta.get('auto_opening') %}
-{% set opening_cookie = 'opening_collapsed_' ~ day %}
-{% set opening_collapsed = is_opening and request.cookies.get(opening_cookie) == '1' %}
 {% set speaker = 'Your' if e['role'] == 'user' else 'Assistant' %}
 <div id="entry-{{ e['id'] }}"
      class="entry {{ 'assistant' if e['role'] != 'user' else 'user'}}{% if is_error %} entry--error{% endif %}{% if is_opening %} entry--opening{% if opening_collapsed %} is-collapsed{% endif %}{% endif %}"
@@ -21,31 +21,7 @@
      role="article"
      aria-labelledby="entry-{{ e['id'] }}-speaker entry-{{ e['id'] }}-body">
   <span class="visually-hidden" id="entry-{{ e['id'] }}-speaker">{{ speaker }} entry</span>
-{% set rendered = e.get('text_html') %}
-  <div class="entry-main">
-    {% if is_opening %}
-    <div class="entry-opening-header">
-      <span class="entry-opening-title">day opening</span>
-      <button type="button"
-              class="opening-toggle"
-              data-opening-toggle
-              aria-expanded="{{ 'false' if opening_collapsed else 'true' }}"
-              aria-label="{{ 'Expand day opening' if opening_collapsed else 'Collapse day opening' }}">
-        <span class="icon-mask icon-chevron-up" aria-hidden="true" data-opening-icon-open></span>
-        <span class="icon-mask icon-chevron-down" aria-hidden="true" data-opening-icon-closed></span>
-      </button>
-    </div>
-    {% endif %}
-    <div class="opening-content"{% if not is_opening %} data-opening-content="false"{% endif %}>
-      <div class="markdown-body"
-           id="entry-{{ e['id'] }}-body"
-           {% if rendered is not none %}data-rendered="true"{% else %}data-markdown-source="{{ e.text }}"{% endif %}>
-        {% if rendered is not none %}
-        {{ rendered | safe }}
-        {% endif %}
-      </div>
-    </div>
-  </div>
+  {{ render_entry_main(e, day) }}
   {% if e['role'] == 'user' and not entry_meta.get('error') %}
   <div class="entry-footer">
     {{ render_entry_tags(entry_id=e['id'], tags=e.get('tags', [])) }}
@@ -55,14 +31,7 @@
             datetime="{{ e['created_at'] }}"
             data-time-raw="{{ e['created_at'] }}"></time>
       {% endif %}
-      <button class="entry-action entry-edit"
-              type="button"
-              aria-label="Edit entry"
-              data-tooltip-title="{{ 'Edit entry' if is_today else 'Editing is available on the current day only' }}"
-              data-ready="true"
-              {% if not is_today %}disabled aria-disabled="true" data-edit-disabled="true"{% endif %}>
-        <span class="icon-mask icon-feather entry-action__icon" aria-hidden="true"></span>
-      </button>
+      {{ entry_edit_button(e['id'], is_today, mode="view") }}
       <button class="entry-action entry-delete"
               type="button"
               hx-delete="{{ url_for('entries.delete_entry', entry_id=e['id']) }}"

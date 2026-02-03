@@ -41,6 +41,7 @@ from llamora.app.services.time import (
     local_date,
     get_timezone,
 )
+from llamora.app.services.markdown import render_markdown_to_html
 from llamora.app.routes.helpers import (
     ensure_entry_exists,
     require_iso_date,
@@ -253,7 +254,7 @@ async def update_entry(entry_id: str):
         "id": entry_id,
         "role": updated.get("role"),
         "text": updated.get("text", ""),
-        "text_html": None,
+        "text_html": render_markdown_to_html(updated.get("text", "")),
         "meta": updated.get("meta", {}),
         "tags": tags,
         "created_at": updated.get("created_at"),
@@ -262,10 +263,73 @@ async def update_entry(entry_id: str):
     response_kinds = _load_response_kinds()
 
     return await render_template(
-        "partials/entry_single.html",
+        "partials/entry_main_only.html",
         entry=entry_payload,
         day=day,
-        response_kinds=response_kinds,
+        is_today=day == local_date().isoformat(),
+    )
+
+
+@entries_bp.get("/e/entry/<entry_id>/edit")
+@login_required
+async def entry_edit(entry_id: str):
+    _, user, dek = await require_user_and_dek()
+    uid = user["id"]
+    db = get_services().db
+    await ensure_entry_exists(db, uid, entry_id)
+    entries = await db.entries.get_entries_by_ids(uid, [entry_id], dek)
+    if not entries:
+        abort(404, description="Entry not found.")
+    entry = entries[0]
+    if entry.get("role") != "user":
+        abort(403, description="Only user entries can be edited.")
+    day = entry.get("created_date") or local_date().isoformat()
+    if day != local_date().isoformat():
+        abort(403, description="Editing is available on the current day only.")
+    entry_payload = {
+        "id": entry_id,
+        "role": entry.get("role"),
+        "text": entry.get("text", ""),
+        "text_html": entry.get("text_html"),
+        "meta": entry.get("meta", {}),
+        "created_at": entry.get("created_at"),
+    }
+    return await render_template(
+        "partials/entry_edit_main_only.html",
+        entry=entry_payload,
+        day=day,
+        is_today=True,
+    )
+
+
+@entries_bp.get("/e/entry/<entry_id>/main")
+@login_required
+async def entry_main(entry_id: str):
+    _, user, dek = await require_user_and_dek()
+    uid = user["id"]
+    db = get_services().db
+    await ensure_entry_exists(db, uid, entry_id)
+    entries = await db.entries.get_entries_by_ids(uid, [entry_id], dek)
+    if not entries:
+        abort(404, description="Entry not found.")
+    entry = entries[0]
+    tags = []
+    if entry.get("role") == "user":
+        tags = await db.tags.get_tags_for_entry(uid, entry_id, dek)
+    entry_payload = {
+        "id": entry_id,
+        "role": entry.get("role"),
+        "text": entry.get("text", ""),
+        "text_html": entry.get("text_html"),
+        "meta": entry.get("meta", {}),
+        "tags": tags,
+        "created_at": entry.get("created_at"),
+    }
+    day = entry.get("created_date") or local_date().isoformat()
+    return await render_template(
+        "partials/entry_main_only.html",
+        entry=entry_payload,
+        day=day,
         is_today=day == local_date().isoformat(),
     )
 
