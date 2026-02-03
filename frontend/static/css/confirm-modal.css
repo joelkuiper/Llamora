@@ -1,0 +1,95 @@
+.confirm-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  transition: opacity 180ms ease;
+}
+
+.confirm-modal[hidden] {
+  display: none;
+}
+
+.confirm-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(12, 12, 14, 0.32);
+  backdrop-filter: blur(2px);
+}
+
+.confirm-modal__panel {
+  position: relative;
+  width: min(420px, 92vw);
+  padding: 20px 22px 18px;
+  border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(12, 12, 14, 0.16);
+}
+
+.confirm-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.confirm-modal__title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.confirm-modal__message {
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+  margin-bottom: 18px;
+}
+
+.confirm-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.confirm-modal__button {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.86rem;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.confirm-modal__button:hover,
+.confirm-modal__button:focus-visible {
+  background: var(--color-surface-elevated);
+  border-color: var(--color-border-strong);
+}
+
+.confirm-modal__confirm {
+  border-color: var(--color-border);
+  box-shadow: var(--raised-shadow);
+}
+
+.confirm-modal[data-confirm-variant="danger"] .confirm-modal__confirm {
+  border-color: var(--danger-25);
+  box-shadow:
+    var(--raised-shadow),
+    0 0 0 2px var(--danger-15);
+}
+
+.confirm-modal[data-confirm-variant="danger"] .confirm-modal__confirm:hover,
+.confirm-modal[data-confirm-variant="danger"] .confirm-modal__confirm:focus-visible {
+  border-color: var(--color-danger);
+  background: linear-gradient(0deg, rgba(208,0,48,0.16), rgba(208,0,48,0.12)) var(--color-danger);
+  color: var(--color-bg);
+  box-shadow:
+    var(--raised-shadow),
+    0 0 0 3px var(--danger-25),
+    0 12px 28px var(--danger-20);
+}

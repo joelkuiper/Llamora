@@ -48,7 +48,11 @@
       <button
         class="btn dangerous"
         hx-delete="{{ url_for('auth.delete_profile') }}"
-        hx-confirm="Are you sure you want to delete your profile? This cannot be undone.">
+        hx-confirm="Are you sure you want to delete your profile? This cannot be undone."
+        data-confirm-title="Delete profile?"
+        data-confirm-confirm="Delete profile"
+        data-confirm-cancel="Keep profile"
+        data-confirm-variant="danger">
         Delete Profile
       </button>
     </section>

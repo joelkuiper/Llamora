@@ -224,6 +224,9 @@ def _snapshot_outputs() -> Dict[str, float]:
             continue
         for path in directory.glob("*." + ("js" if directory.name == "js" else "css")):
             snapshot[str(path)] = path.stat().st_mtime
+    for meta_path in (META_JS, META_CSS):
+        if meta_path.exists():
+            snapshot[str(meta_path)] = meta_path.stat().st_mtime
     return snapshot
 
 

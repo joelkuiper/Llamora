@@ -46,6 +46,11 @@
     <button class="entry-action entry-delete"
             type="button"
             disabled
+            hx-confirm="Delete this entry?"
+            data-confirm-title="Delete entry?"
+            data-confirm-confirm="Delete"
+            data-confirm-cancel="Keep"
+            data-confirm-variant="danger"
             aria-label="Delete entry"
             data-tooltip-title="Delete entry"
             data-ready="false"
