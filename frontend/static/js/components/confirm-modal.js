@@ -32,9 +32,7 @@ function getConfig(trigger, question) {
 export function initConfirmModal(options = {}) {
   const modal = document.getElementById("confirm-modal");
   if (!modal || modal.dataset.confirmInit === "true") {
-    if (!modal || !options.force) {
-      return;
-    }
+    return;
   }
 
   const titleEl = modal.querySelector("#confirm-modal-title");
@@ -46,9 +44,6 @@ export function initConfirmModal(options = {}) {
   }
 
   const state = (globalThis.__confirmModalState ??= { bound: false });
-  if (options.force) {
-    state.bound = false;
-  }
   let activeRequest = state.activeRequest || null;
   let lastFocused = state.lastFocused || null;
   let closeTimer = null;
@@ -99,12 +94,6 @@ export function initConfirmModal(options = {}) {
   };
 
   if (!state.bound) {
-    if (state.controller) {
-      state.controller.abort();
-    }
-    state.controller = new AbortController();
-    const { signal } = state.controller;
-
     modal.addEventListener("click", (event) => {
       const action = event.target?.closest?.("[data-confirm-action]");
       if (!action) {
@@ -112,7 +101,7 @@ export function initConfirmModal(options = {}) {
       }
       const value = action.getAttribute("data-confirm-action");
       closeModal(value === "confirm");
-    }, { signal });
+    });
 
     document.addEventListener("keydown", (event) => {
       if (!modal.classList.contains("is-open")) {
@@ -122,7 +111,7 @@ export function initConfirmModal(options = {}) {
         event.preventDefault();
         closeModal(false);
       }
-    }, { signal });
+    });
 
     document.body.addEventListener("htmx:confirm", (event) => {
       if (!modal) {
@@ -144,7 +133,7 @@ export function initConfirmModal(options = {}) {
       const config = getConfig(trigger, detail.question);
       event.preventDefault();
       openModal(config, () => detail.issueRequest(true));
-    }, { signal });
+    });
 
     state.bound = true;
   }
@@ -157,9 +146,3 @@ if (document.readyState === "loading") {
 } else {
   initConfirmModal();
 }
-
-window.addEventListener("pageshow", (event) => {
-  if (event.persisted) {
-    initConfirmModal({ force: true });
-  }
-});
