@@ -85,14 +85,10 @@ export function renderMarkdownInElement(el, text) {
   }
 
   const markdownHtml = renderMarkdown(src);
-  const prevDisplay = el.style.display;
-  const prevVisibility = el.style.visibility;
-  el.style.visibility = "hidden";
-  el.innerHTML = markdownHtml;
+  const template = document.createElement("template");
+  template.innerHTML = markdownHtml;
+  el.replaceChildren(template.content);
   el.dataset.rendered = "true";
-  void el.offsetHeight;
-  el.style.visibility = prevVisibility;
-  el.style.display = prevDisplay;
 }
 
 const MARKDOWN_SELECTOR = ".entry .markdown-body";

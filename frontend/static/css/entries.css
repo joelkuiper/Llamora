@@ -611,9 +611,10 @@ body {
     cursor: pointer;
   }
 
-  .entry-main--animating {
-    transition: height 180ms ease;
+  .entry--animating {
+    transition: height 200ms ease;
   }
+
 
 
   .entry.is-editing .entry-actions-row,

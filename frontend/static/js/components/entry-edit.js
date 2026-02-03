@@ -1,7 +1,7 @@
-const editState = new WeakMap();
-let htmxListenersBound = false;
 import { renderAllMarkdown } from "../markdown.js";
 
+const editState = new WeakMap();
+let htmxListenersBound = false;
 function getEntryText(entry, body) {
   if (body?.dataset?.markdownSource) return body.dataset.markdownSource;
   const raw = body?.innerText || body?.textContent || "";
@@ -99,12 +99,12 @@ function requestSave(entry) {
   if (window.htmx?.ajax) {
     const main = entry.querySelector(".entry-main");
     if (main) {
-      entry.dataset.animateHeight = String(main.getBoundingClientRect().height);
+      entry.dataset.fromHeight = String(entry.getBoundingClientRect().height);
     }
     window.htmx.ajax("PUT", `/e/entry/${entry.dataset.entryId}`, {
       target: `#entry-${entry.dataset.entryId} .entry-main`,
       swap: "innerHTML",
-      select: ".entry-main",
+      select: ".entry-main > *",
       values: { text: value },
     });
   } else {
@@ -218,13 +218,18 @@ function initEntryEdit() {
       if (!(target instanceof Element)) return;
       if (!target.classList.contains("entry-main")) return;
       const entry = target.closest(".entry");
-      const from = parseFloat(entry?.dataset.animateHeight || "");
+      const from = parseFloat(entry?.dataset.fromHeight || "");
       if (entry) {
-        delete entry.dataset.animateHeight;
+        delete entry.dataset.fromHeight;
+        delete entry.dataset.editSwap;
+        delete entry.dataset.pendingHeight;
+        entry.classList.remove("entry--pending-render");
       }
       renderAllMarkdown(target);
-      const to = target.getBoundingClientRect().height;
-      if (Number.isFinite(from) && from > 0 && Number.isFinite(to) && to > 0) {
+      if (!Number.isFinite(from) || from <= 0) return;
+      requestAnimationFrame(() => {
+        const to = target.getBoundingClientRect().height;
+        if (!Number.isFinite(to) || to <= 0) return;
         target.style.height = `${from}px`;
         target.style.overflow = "hidden";
         target.classList.add("entry-main--animating");
@@ -238,7 +243,7 @@ function initEntryEdit() {
           target.removeEventListener("transitionend", onEnd);
         };
         target.addEventListener("transitionend", onEnd);
-      }
+      });
     });
   }
   if (document.body) {
