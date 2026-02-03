@@ -25,6 +25,10 @@ function bindTextarea(textarea) {
     const form = textarea.closest("form[data-entry-edit-form]");
     if (!form) return;
     if (form.classList.contains("htmx-request")) return;
+    if (form.dataset.skipBlurSave === "true") {
+      delete form.dataset.skipBlurSave;
+      return;
+    }
     setTimeout(() => {
       const active = document.activeElement;
       if (active && form.contains(active)) {
@@ -65,6 +69,17 @@ function initEntryEditAutosize(root = document) {
     bindTextarea(el);
   });
 }
+
+document.addEventListener("mousedown", (event) => {
+  const editButton = event.target?.closest?.(".entry-edit");
+  if (!editButton) return;
+  const entry = editButton.closest(".entry");
+  if (!entry) return;
+  const editForm = entry.querySelector("form[data-entry-edit-form]");
+  if (!editForm) return;
+  if (!entry.querySelector(".entry-main--editing")) return;
+  editForm.dataset.skipBlurSave = "true";
+});
 
 document.addEventListener("htmx:load", (event) => {
   const target = event.detail?.elt || document;

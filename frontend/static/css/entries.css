@@ -617,6 +617,35 @@ body {
     background: var(--action-edit-save-bg);
   }
 
+  .entry-edit-form.htmx-request .entry-edit-save {
+    color: color-mix(in srgb, var(--action-edit-save) 80%, var(--color-text-muted));
+    background: color-mix(in srgb, var(--action-edit-save-bg) 60%, transparent);
+    box-shadow: none;
+  }
+
+  .entry-edit-form.htmx-request .entry-edit-save .entry-edit-label {
+    font-size: 0;
+  }
+
+  .entry-edit-form.htmx-request .entry-edit-save .entry-edit-label::after {
+    content: "Saving…";
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+  }
+
+  .entry-edit-form.htmx-request .entry-edit-save span[aria-hidden="true"] {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .entry-edit-form.htmx-request .entry-edit-save span[aria-hidden="true"]::after {
+    content: "···";
+    font-size: 0.9em;
+    margin-left: 4px;
+    animation: entry-edit-dots 1s infinite steps(3);
+  }
+
   .entry-edit-save:hover,
   .entry-edit-save:focus-visible {
     color: var(--color-success-text);
@@ -648,6 +677,12 @@ body {
   .entry-edit-cancel:active {
     background: color-mix(in srgb, var(--color-danger) 22%, transparent);
     box-shadow: 0 0 0 2px var(--action-edit-cancel-glow);
+  }
+
+  @keyframes entry-edit-dots {
+    0% { opacity: 0.2; }
+    50% { opacity: 0.7; }
+    100% { opacity: 0.2; }
   }
 
   .entry-edit-label {
