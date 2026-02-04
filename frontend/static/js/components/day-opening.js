@@ -71,10 +71,11 @@ function handleToggle(event) {
 }
 
 function registerOpeningToggle() {
-  if (listenerRegistered) return;
   syncInitialState();
-  document.addEventListener("click", handleToggle);
-  listenerRegistered = true;
+  if (!listenerRegistered) {
+    document.addEventListener("click", handleToggle);
+    listenerRegistered = true;
+  }
 }
 
 registerOpeningToggle();
