@@ -7,7 +7,7 @@ import logging
 from typing import Any
 
 from llamora.llm.client import LLMClient
-from llamora.llm.process_manager import LlamafileProcessManager
+from llamora.llm.upstream_manager import UpstreamProcessManager
 
 from .response_stream import ResponseStreamManager
 from .llm_stream_config import LLMStreamConfig
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class LLMService:
-    """Own the LLM process, client, and response streaming manager."""
+    """Own the OpenAI-compatible client and optional local upstream."""
 
     def __init__(
         self,
@@ -28,7 +28,7 @@ class LLMService:
         service_pulse: ServicePulse | None = None,
     ) -> None:
         self._db = db
-        self._process_manager: LlamafileProcessManager | None = None
+        self._upstream_manager: UpstreamProcessManager | None = None
         self._llm: LLMClient | None = None
         self._response_stream_manager: ResponseStreamManager | None = None
         self._lock = asyncio.Lock()
@@ -57,15 +57,15 @@ class LLMService:
 
             logger.debug("Initialising LLM service stack")
 
-            process_manager: LlamafileProcessManager | None = None
+            upstream_manager: UpstreamProcessManager | None = None
             llm_client: LLMClient | None = None
             response_stream_manager: ResponseStreamManager | None = None
 
             try:
-                process_manager = LlamafileProcessManager()
-                await asyncio.to_thread(process_manager.ensure_server_running)
+                upstream_manager = UpstreamProcessManager()
+                await asyncio.to_thread(upstream_manager.ensure_upstream_ready)
                 llm_client = LLMClient(
-                    process_manager, service_pulse=self._service_pulse
+                    upstream_manager, service_pulse=self._service_pulse
                 )
 
                 response_stream_manager = ResponseStreamManager(
@@ -91,17 +91,17 @@ class LLMService:
                     except Exception:
                         logger.exception("Error closing LLM client after failed start")
 
-                if process_manager is not None:
+                if upstream_manager is not None:
                     try:
-                        await asyncio.to_thread(process_manager.shutdown)
+                        await asyncio.to_thread(upstream_manager.shutdown)
                     except Exception:
                         logger.exception(
-                            "Error shutting down process manager after failed start"
+                            "Error shutting down upstream manager after failed start"
                         )
 
                 raise
 
-            self._process_manager = process_manager
+            self._upstream_manager = upstream_manager
             self._llm = llm_client
             self._response_stream_manager = response_stream_manager
 
@@ -111,18 +111,18 @@ class LLMService:
         """Ensure that the LLM stack has been stopped."""
 
         async with self._lock:
-            if self._llm is None and self._process_manager is None:
+            if self._llm is None and self._upstream_manager is None:
                 return
 
             logger.debug("Tearing down LLM service stack")
 
             response_stream_manager = self._response_stream_manager
             llm_client = self._llm
-            process_manager = self._process_manager
+            upstream_manager = self._upstream_manager
 
             self._response_stream_manager = None
             self._llm = None
-            self._process_manager = None
+            self._upstream_manager = None
 
         errors: list[Exception] = []
 
@@ -140,12 +140,12 @@ class LLMService:
                 errors.append(exc)
                 logger.exception("Error closing LLM client")
 
-        if process_manager is not None:
+        if upstream_manager is not None:
             try:
-                await asyncio.to_thread(process_manager.shutdown)
+                await asyncio.to_thread(upstream_manager.shutdown)
             except Exception as exc:
                 errors.append(exc)
-                logger.exception("Error shutting down process manager")
+                logger.exception("Error shutting down upstream manager")
 
         if errors:
             if len(errors) == 1:
@@ -155,10 +155,10 @@ class LLMService:
         logger.info("LLM service stack stopped")
 
     @property
-    def process_manager(self) -> LlamafileProcessManager:
-        if self._process_manager is None:
+    def upstream_manager(self) -> UpstreamProcessManager:
+        if self._upstream_manager is None:
             raise RuntimeError("LLM service has not been started")
-        return self._process_manager
+        return self._upstream_manager
 
     @property
     def llm(self) -> LLMClient:

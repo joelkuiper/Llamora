@@ -45,7 +45,7 @@ def _cpu_count(default: int = 4) -> int:
     return max(count, 1)
 
 
-DEFAULT_LLM_ARGS: dict[str, Any] = {
+DEFAULT_UPSTREAM_ARGS: dict[str, Any] = {
     "server": True,
     "nobrowser": True,
     "threads": _cpu_count(),
@@ -54,7 +54,7 @@ DEFAULT_LLM_ARGS: dict[str, Any] = {
     "ctx_size": 8192,
 }
 
-DEFAULT_LLM_REQUEST: dict[str, Any] = {
+DEFAULT_LLM_GENERATION: dict[str, Any] = {
     "n_predict": 1024,
     "stream": True,
     "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>", "<|end|>"],
@@ -122,12 +122,12 @@ DEFAULTS: dict[str, Any] = {
         "concurrency": _cpu_count(),
     },
     "LLM": {
-        "server": {
+        "upstream": {
             "llamafile_path": "",
             "host": None,
-            "args": DEFAULT_LLM_ARGS,
+            "args": DEFAULT_UPSTREAM_ARGS,
         },
-        "request": DEFAULT_LLM_REQUEST,
+        "generation": DEFAULT_LLM_GENERATION,
         "stream": {
             "pending_ttl": 300,
             "queue_limit": 4,
@@ -299,31 +299,31 @@ _normalise_secret_key()
 _normalise_cookie_secret()
 
 
-server_args = _normalise_mapping_keys(
-    _coerce_mapping(settings.get("LLM.server.args", {}))
+upstream_args = _normalise_mapping_keys(
+    _coerce_mapping(settings.get("LLM.upstream.args", {}))
 )
 settings.set(
-    "LLM.server.args",
+    "LLM.upstream.args",
     {
-        **DEFAULT_LLM_ARGS,
-        **server_args,
+        **DEFAULT_UPSTREAM_ARGS,
+        **upstream_args,
     },
 )
 
-request_overrides = _normalise_mapping_keys(
-    _coerce_mapping(settings.get("LLM.request", {}))
+generation_overrides = _normalise_mapping_keys(
+    _coerce_mapping(settings.get("LLM.generation", {}))
 )
 settings.set(
-    "LLM.request",
+    "LLM.generation",
     {
-        **DEFAULT_LLM_REQUEST,
-        **request_overrides,
+        **DEFAULT_LLM_GENERATION,
+        **generation_overrides,
     },
 )
 
-threads = int(settings.get("LLM.server.args.threads", 0))
+threads = int(settings.get("LLM.upstream.args.threads", 0))
 if threads <= 0:
-    settings.set("LLM.server.args.threads", _cpu_count())
+    settings.set("LLM.upstream.args.threads", _cpu_count())
 
 # Normalise a few derived values that are used by the Quart application.
 settings.set(

@@ -54,7 +54,7 @@ You can write freely, think aloud, or stay in silence.
 ### Requirements
 
 - [uv](https://docs.astral.sh/uv/)
-- A local [llama.cpp](https://github.com/ggerganov/llama.cpp) build (or prebuilt release) so you can run `llama-server -hf Qwen/Qwen3-4B-Instruct-2507`. Qwen3-4B-Instruct has become the baseline for Llamora because it follows instructions reliably while still fitting on consumer hardware.
+- A local [llama.cpp](https://github.com/ggerganov/llama.cpp) build (or prebuilt release) so you can run `llama-server -hf Qwen/Qwen3-4B-Instruct-2507 --jinja`. Qwen3-4B-Instruct has become the baseline for Llamora because it follows instructions reliably while still fitting on consumer hardware.
 - Optionally, a [llamafile](https://github.com/Mozilla-Ocho/llamafile) binary if you prefer an all-in-one executable instead of running llama.cpp yourself.
 - A relatively fast computer (ideally with a strong GPU).
 - A relatively modern browser.
@@ -62,7 +62,8 @@ You can write freely, think aloud, or stay in silence.
 
 ### Set up a local model
 
-   Llamora connects to a running instance of [**llama.cpp**](https://github.com/ggerganov/llama.cpp) or [**llamafile**](https://github.com/Mozilla-Ocho/llamafile).
+   Llamora connects to an OpenAI-compatible API, typically provided by a local
+   [**llama.cpp**](https://github.com/ggerganov/llama.cpp) or [**llamafile**](https://github.com/Mozilla-Ocho/llamafile) upstream.
    For example, if you have llama-cpp installed:
 
    ```bash
@@ -87,14 +88,16 @@ You can write freely, think aloud, or stay in silence.
 Development (Quart with live reload):
 
 ```bash
-export LLAMORA_LLM__SERVER__HOST=http://127.0.0.1:8081
+export LLAMORA_LLM__UPSTREAM__HOST=http://127.0.0.1:8081
+export LLAMORA_LLM__CHAT__MODEL=local
 uv run llamora-server dev
 ```
 
 Production (Hypercorn with worker management):
 
 ```bash
-export LLAMORA_LLM__SERVER__HOST=http://127.0.0.1:8081
+export LLAMORA_LLM__UPSTREAM__HOST=http://127.0.0.1:8081
+export LLAMORA_LLM__CHAT__MODEL=local
 uv run llamora-server --workers 4 --graceful-timeout 30 --keep-alive 5
 ```
 
@@ -131,8 +134,8 @@ Values are read in layers: defaults → `settings.local.toml` → `.env` → env
 Keys use double underscores to represent sections, for example:
 
 ```
-LLAMORA_LLM__REQUEST__TEMPERATURE=0.7
-LLAMORA_LLM__SERVER__HOST=http://127.0.0.1:8081
+LLAMORA_LLM__GENERATION__TEMPERATURE=0.7
+LLAMORA_LLM__UPSTREAM__HOST=http://127.0.0.1:8081
 LLAMORA_APP__PORT=5050
 ```
 
@@ -146,9 +149,9 @@ A simplified version of the structure:
 | `FEATURES`    | Toggle optional functionality such as registration |
 | `AUTH`        | Login attempt limits and timeouts                  |
 | `DATABASE`    | SQLite path and pool configuration                 |
-| `LLM.server`  | llama.cpp or llamafile connection details          |
 | `LLM.chat`    | OpenAI-compatible chat client settings             |
-| `LLM.request` | Default generation parameters                      |
+| `LLM.upstream`  | Local upstream connection details (llama.cpp/llamafile) |
+| `LLM.generation` | Default generation parameters                      |
 | `SEARCH`      | Semantic search behavior and ANN limits            |
 | `CRYPTO`      | DEK storage method (cookie or session)             |
 | `COOKIES`     | Cookie name and encryption secret                  |
@@ -156,7 +159,7 @@ A simplified version of the structure:
 Local overrides can go into `config/settings.local.toml`, e.g.:
 
 ```toml
-[default.LLM.server]
+[default.LLM.upstream]
 host = "http://127.0.0.1:8081"
 parallel = 2
 
@@ -165,14 +168,14 @@ model = "local"
 parameter_allowlist = ["top_k", "mirostat", "mirostat_tau"]
 parameters = { top_k = 40, mirostat = 2, mirostat_tau = 4.5 }
 
-[default.LLM.request]
+[default.LLM.generation]
 temperature = 0.7
 top_p = 0.8
+```
 
 You can also pass llama.cpp-specific parameters through the OpenAI client by
 adding them to `LLM.chat.parameters`, but only keys listed in
 `LLM.chat.parameter_allowlist` will be forwarded.
-```
 
 Restart the app after changing settings.
 
@@ -203,10 +206,10 @@ Swap prompt variants by editing or replacing those files—changes take effect o
 * **Embeddings:** FlagEmbedding + HNSWlib
 * **Configuration:** Dynaconf
 * **Package Manager:** uv
-* **LLM Client:** OpenAI Python SDK (pointed at a local server)
+* **LLM Client:** OpenAI Python SDK (pointed at a local upstream)
 
 All code runs locally, and dependencies are minimal.
-The system supports OpenAI-compatible llama.cpp servers and llamafile binaries through the same interface.
+The system supports OpenAI-compatible llama.cpp endpoints and llamafile binaries through the same interface.
 
 ---
 
@@ -241,7 +244,7 @@ export LLAMORA_SECRET_KEY=$(openssl rand -hex 32)
 export LLAMORA_COOKIES__SECRET=$(openssl rand -base64 32)
 
 # Backend and runtime
-export LLAMORA_LLM__SERVER__HOST=http://127.0.0.1:8081
+export LLAMORA_LLM__UPSTREAM__HOST=http://127.0.0.1:8081
 export LLAMORA_DATABASE__PATH=data/llamora.sqlite3
 export LLAMORA_CRYPTO__DEK_STORAGE=session
 export LLAMORA_SESSION__TTL=604800

@@ -28,16 +28,16 @@ def _get_value(mapping: object, name: str) -> object | None:
     return None
 
 
-def _validate_llm_server() -> Iterable[str]:
-    server = settings.get("LLM.server")
-    host = _normalise_text(_get_value(server, "host"))
-    llamafile_path = _normalise_text(_get_value(server, "llamafile_path"))
+def _validate_llm_upstream() -> Iterable[str]:
+    upstream = settings.get("LLM.upstream")
+    host = _normalise_text(_get_value(upstream, "host"))
+    llamafile_path = _normalise_text(_get_value(upstream, "llamafile_path"))
 
     if not host and not llamafile_path:
         yield (
-            "Configure the LLM server by setting either LLAMORA_LLM__SERVER__HOST "
-            "for an OpenAI-compatible server or LLAMORA_LLM__SERVER__LLAMAFILE_PATH "
-            "for a local llamafile."
+            "Configure an OpenAI-compatible upstream by setting either "
+            "LLAMORA_LLM__UPSTREAM__HOST for a remote endpoint or "
+            "LLAMORA_LLM__UPSTREAM__LLAMAFILE_PATH for a local llamafile."
         )
 
 
@@ -65,7 +65,7 @@ def validate_settings() -> list[str]:
     """Return a list of configuration validation error messages."""
 
     errors: list[str] = []
-    errors.extend(_validate_llm_server())
+    errors.extend(_validate_llm_upstream())
     errors.extend(_validate_secrets())
     return errors
 

@@ -36,7 +36,7 @@ def _normalise_arg_keys(args: dict[str, Any]) -> dict[str, Any]:
     return normalised
 
 
-def _server_args_to_cli(args: dict[str, Any]) -> list[str]:
+def _upstream_args_to_cli(args: dict[str, Any]) -> list[str]:
     cli_args: list[str] = []
     for k, v in args.items():
         if v is None or v is False:
@@ -66,30 +66,30 @@ def _find_free_port() -> int:
         return s.getsockname()[1]
 
 
-class LlamafileProcessManager:
-    """Manage lifecycle of a local LLM server subprocess."""
+class UpstreamProcessManager:
+    """Manage lifecycle of a local OpenAI-compatible upstream subprocess."""
 
-    def __init__(self, server_args: dict | None = None) -> None:
+    def __init__(self, upstream_args: dict | None = None) -> None:
         self.logger = logging.getLogger(__name__)
 
         self.port = _find_free_port()
         self.restart_attempts = 0
         self.max_restarts = 3
 
-        raw_server_cfg = settings.get("LLM.server") or settings.LLM.server
-        server_cfg = _normalise_arg_keys(_to_plain_dict(raw_server_cfg))
-        host = server_cfg.get("host")
-        llamafile_path = server_cfg.get("llamafile_path")
-        cfg_server_args = _normalise_arg_keys(
-            _to_plain_dict(server_cfg.get("args", {}))
+        raw_upstream_cfg = settings.get("LLM.upstream") or settings.LLM.upstream
+        upstream_cfg = _normalise_arg_keys(_to_plain_dict(raw_upstream_cfg))
+        host = upstream_cfg.get("host")
+        llamafile_path = upstream_cfg.get("llamafile_path")
+        cfg_upstream_args = _normalise_arg_keys(
+            _to_plain_dict(upstream_cfg.get("args", {}))
         )
-        cfg_server_args.update(_normalise_arg_keys(_to_plain_dict(server_args)))
+        cfg_upstream_args.update(_normalise_arg_keys(_to_plain_dict(upstream_args)))
 
-        self._ctx_size = cfg_server_args.get("ctx_size")
-        self._server_props: dict[str, Any] | None = None
-        args_parallel = cfg_server_args.get("parallel")
+        self._ctx_size = cfg_upstream_args.get("ctx_size")
+        self._upstream_props: dict[str, Any] | None = None
+        args_parallel = cfg_upstream_args.get("parallel")
         default_parallel = _coerce_parallel(args_parallel)
-        configured_parallel = server_cfg.get("parallel")
+        configured_parallel = upstream_cfg.get("parallel")
         self._parallel_slots = _coerce_parallel(
             configured_parallel, default=default_parallel
         )
@@ -98,30 +98,30 @@ class LlamafileProcessManager:
 
         if host:
             self.proc: subprocess.Popen[str] | None = None
-            self.server_url = host
+            self.upstream_url = host
             self.cmd: list[str] | None = None
-            self.logger.info("Using external llama server at %s", host)
-            self._refresh_server_metadata()
+            self.logger.info("Using external upstream at %s", host)
+            self._refresh_upstream_metadata()
         else:
             if not llamafile_path:
                 raise ValueError(
-                    "Configure settings.LLM.server.llamafile_path or set "
-                    "LLAMORA_LLM__SERVER__LLAMAFILE_PATH"
+                    "Configure settings.LLM.upstream.llamafile_path or set "
+                    "LLAMORA_LLM__UPSTREAM__LLAMAFILE_PATH"
                 )
 
             self._cleanup_stale_process()
 
-            command_args = {**cfg_server_args, "port": self.port}
+            command_args = {**cfg_upstream_args, "port": self.port}
             self.cmd = [
                 "sh",
                 llamafile_path,
-                *_server_args_to_cli(command_args),
+                *_upstream_args_to_cli(command_args),
             ]
 
-            self.server_url = f"http://127.0.0.1:{self.port}"
+            self.upstream_url = f"http://127.0.0.1:{self.port}"
 
             self.proc = None
-            self._launch_server()
+            self._launch_upstream()
             atexit.register(self.shutdown)
             self._orig_signals: dict[int, object] = {}
             for sig in (signal.SIGINT, signal.SIGTERM):
@@ -133,37 +133,37 @@ class LlamafileProcessManager:
         return self._ctx_size
 
     @property
-    def server_props(self) -> dict[str, Any] | None:
-        return self._server_props
+    def upstream_props(self) -> dict[str, Any] | None:
+        return self._upstream_props
 
     def base_url(self) -> str:
-        return self.server_url
+        return self.upstream_url
 
     @property
     def parallel_slots(self) -> int:
         return self._parallel_slots
 
-    def ensure_server_running(self) -> None:
+    def ensure_upstream_ready(self) -> None:
         if getattr(self, "cmd", None) is None:
-            if not self._is_server_healthy():
-                raise RuntimeError("LLM service is unavailable")
-            if self._server_props is None or self._ctx_size is None:
-                self._refresh_server_metadata()
+            if not self._is_upstream_healthy():
+                raise RuntimeError("LLM upstream is unavailable")
+            if self._upstream_props is None or self._ctx_size is None:
+                self._refresh_upstream_metadata()
             return
 
         if self.proc is None:
-            raise RuntimeError("LLM service process not started")
+            raise RuntimeError("LLM upstream process not started")
 
-        if self.proc.poll() is not None or not self._is_server_healthy():
-            self._restart_server()
-        elif self._server_props is None or self._ctx_size is None:
-            self._refresh_server_metadata()
+        if self.proc.poll() is not None or not self._is_upstream_healthy():
+            self._restart_upstream()
+        elif self._upstream_props is None or self._ctx_size is None:
+            self._refresh_upstream_metadata()
 
     def shutdown(self) -> None:
         self.logger.info("Shutting called")
         proc = getattr(self, "proc", None)
         if proc and proc.poll() is None:
-            self.logger.info("Stopping llamafile server")
+            self.logger.info("Stopping upstream process")
             terminated = False
             if hasattr(os, "killpg"):
                 try:
@@ -176,7 +176,7 @@ class LlamafileProcessManager:
             try:
                 proc.wait(timeout=10)
             except subprocess.TimeoutExpired:  # pragma: no cover - unlikely
-                self.logger.warning("Forcing llamafile server kill")
+                self.logger.warning("Forcing upstream process kill")
                 if hasattr(os, "killpg"):
                     try:
                         os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
@@ -190,7 +190,7 @@ class LlamafileProcessManager:
                     proc.wait(timeout=5)
                 except subprocess.TimeoutExpired:
                     pass
-            self.logger.info("Llamafile server stopped")
+            self.logger.info("Upstream process stopped")
         self._clear_state()
         self.proc = None
 
@@ -226,7 +226,7 @@ class LlamafileProcessManager:
         try:
             state_path.write_bytes(orjson.dumps(state))
         except Exception:
-            self.logger.debug("Failed to persist llamafile state", exc_info=True)
+            self.logger.debug("Failed to persist upstream state", exc_info=True)
 
     def _clear_state(self) -> None:
         state_path = self._state_path()
@@ -278,7 +278,7 @@ class LlamafileProcessManager:
             return
         if self._process_alive(pid):
             self.logger.info(
-                "Found existing llamafile process (pid %s), terminating before restart",
+                "Found existing upstream process (pid %s), terminating before restart",
                 pid,
             )
             self._terminate_process(pid, pgid, force=False)
@@ -288,7 +288,7 @@ class LlamafileProcessManager:
                 time.sleep(0.1)
             if self._process_alive(pid):
                 self.logger.warning(
-                    "Existing llamafile process %s did not exit, forcing kill",
+                    "Existing upstream process %s did not exit, forcing kill",
                     pid,
                 )
                 self._terminate_process(pid, pgid, force=True)
@@ -297,26 +297,26 @@ class LlamafileProcessManager:
     def _wait_until_ready(self) -> None:
         for _ in range(100):
             try:
-                resp = httpx.get(f"{self.server_url}/health", timeout=1.0)
+                resp = httpx.get(f"{self.upstream_url}/health", timeout=1.0)
                 if resp.json().get("status") == "ok":
-                    self.logger.info("Llamafile server responded with ok status")
+                    self.logger.info("Upstream responded with ok status")
                     return
             except Exception:
                 pass
             time.sleep(0.1)
-        raise RuntimeError("LLM service failed to start")
+        raise RuntimeError("Upstream failed to start")
 
     def _log_stream(self, stream, level: int) -> None:
         for line in iter(stream.readline, ""):
             if line:
                 self.logger.log(level, line.rstrip())
 
-    def _launch_server(self) -> None:
+    def _launch_upstream(self) -> None:
         cmd = getattr(self, "cmd", None)
         if not cmd:
             return
         pretty_cmd = shlex.join(cmd)
-        self.logger.info("Starting llamafile with: %s", pretty_cmd)
+        self.logger.info("Starting upstream with: %s", pretty_cmd)
         self.proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -338,34 +338,34 @@ class LlamafileProcessManager:
             ).start()
         self._wait_until_ready()
         self._write_state()
-        self._refresh_server_metadata()
+        self._refresh_upstream_metadata()
         self.restart_attempts = 0
 
-    def _is_server_healthy(self) -> bool:
+    def _is_upstream_healthy(self) -> bool:
         try:
-            resp = httpx.get(f"{self.server_url}/health", timeout=1.0)
+            resp = httpx.get(f"{self.upstream_url}/health", timeout=1.0)
             return resp.json().get("status") == "ok"
         except Exception:
             return False
 
-    def _refresh_server_metadata(self) -> None:
+    def _refresh_upstream_metadata(self) -> None:
         try:
-            resp = httpx.get(f"{self.server_url}/props", timeout=2.0)
+            resp = httpx.get(f"{self.upstream_url}/props", timeout=2.0)
             resp.raise_for_status()
         except Exception:
-            self.logger.debug("Failed to fetch llama server props", exc_info=True)
+            self.logger.debug("Failed to fetch upstream props", exc_info=True)
             return
 
         try:
             data = resp.json()
         except Exception:
-            self.logger.debug("Failed to parse llama server props", exc_info=True)
+            self.logger.debug("Failed to parse upstream props", exc_info=True)
             return
 
         if not isinstance(data, Mapping):
             return
 
-        self._server_props = dict(data)
+        self._upstream_props = dict(data)
 
         ctx_size = None
         default_settings = data.get("default_generation_settings")
@@ -383,7 +383,7 @@ class LlamafileProcessManager:
                     self._ctx_size = ctx_value
         except (TypeError, ValueError):
             self.logger.debug(
-                "Ignoring invalid ctx size from server props", exc_info=True
+                "Ignoring invalid ctx size from upstream props", exc_info=True
             )
 
         total_slots = data.get("total_slots")
@@ -394,20 +394,20 @@ class LlamafileProcessManager:
                     self._parallel_slots = slots_value
         except (TypeError, ValueError):
             self.logger.debug(
-                "Ignoring invalid total_slots from server props", exc_info=True
+                "Ignoring invalid total_slots from upstream props", exc_info=True
             )
 
-    def _restart_server(self) -> None:
+    def _restart_upstream(self) -> None:
         if not getattr(self, "cmd", None):
-            raise RuntimeError("Cannot restart external server")
+            raise RuntimeError("Cannot restart external upstream")
         if self.restart_attempts >= self.max_restarts:
             raise RuntimeError("LLM service repeatedly crashed")
         self.restart_attempts += 1
         self.logger.warning(
-            "Restarting llamafile server (attempt %d)", self.restart_attempts
+            "Restarting upstream process (attempt %d)", self.restart_attempts
         )
         self.shutdown()
-        self._launch_server()
+        self._launch_upstream()
 
     def _handle_exit(self, signum, frame) -> None:  # pragma: no cover - signal handler
         try:

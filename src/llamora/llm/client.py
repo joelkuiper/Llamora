@@ -17,11 +17,11 @@ if TYPE_CHECKING:
     from llamora.app.services.service_pulse import ServicePulse
 from llamora.app.util import canonicalize
 from llamora.settings import settings
-from .process_manager import LlamafileProcessManager
+from .upstream_manager import UpstreamProcessManager
 from .entry_template import build_entry_messages, estimate_entry_messages_tokens
 from .tokenizers.tokenizer import history_suffix_token_totals
 
-DEFAULT_LLM_REQUEST = dict(settings.LLM.request)
+DEFAULT_LLM_GENERATION = dict(settings.LLM.generation)
 HISTORY_TOKEN_CACHE_SIZE = 32
 
 
@@ -68,7 +68,7 @@ class PromptBudget:
             return None
         ctx_size = self._apply_safety_margin(ctx_size)
 
-        cfg: dict[str, Any] = dict(self._client.default_request)
+        cfg: dict[str, Any] = dict(self._client.default_generation)
         if params:
             for key, value in params.items():
                 if value is not None:
@@ -226,15 +226,15 @@ class _ChatStream:
                 if content:
                     await self._emit(content)
         except APIStatusError as exc:
-            self._client.process_manager.ensure_server_running()
+            self._client.upstream.ensure_upstream_ready()
             detail = f"{exc.status_code} {exc.message}".strip()
             self._client.logger.error("Completion request failed: %s", detail)
             await self._emit({"type": "error", "data": detail})
         except APITimeoutError as exc:
-            self._client.process_manager.ensure_server_running()
+            self._client.upstream.ensure_upstream_ready()
             await self._emit({"type": "error", "data": f"Timeout: {exc}"})
         except APIError as exc:
-            self._client.process_manager.ensure_server_running()
+            self._client.upstream.ensure_upstream_ready()
             await self._emit({"type": "error", "data": f"API error: {exc}"})
         except asyncio.CancelledError:
             raise
@@ -264,35 +264,32 @@ class LLMClient:
 
     def __init__(
         self,
-        process_manager: LlamafileProcessManager,
-        default_request: dict | None = None,
+        upstream: UpstreamProcessManager,
+        default_generation: dict | None = None,
         *,
         service_pulse: ServicePulse | None = None,
     ) -> None:
         self.logger = logging.getLogger(__name__)
-        self.process_manager = process_manager
-        self.default_request = {**DEFAULT_LLM_REQUEST, **(default_request or {})}
-        self.ctx_size = process_manager.ctx_size
-        self.server_props = process_manager.server_props
+        self.upstream = upstream
+        self.default_generation = {**DEFAULT_LLM_GENERATION, **(default_generation or {})}
+        self.ctx_size = upstream.ctx_size
+        self.upstream_props = upstream.upstream_props
         self._chat_endpoint = self._normalize_chat_endpoint(
             settings.get("LLM.chat.endpoint", "/v1/chat/completions")
         )
         base_url = settings.get("LLM.chat.base_url")
         if not base_url:
-            base_url = self._chat_base_url(self.server_url, self._chat_endpoint)
+            base_url = self._chat_base_url(self.upstream_url, self._chat_endpoint)
         self._openai = AsyncOpenAI(
             api_key=settings.get("LLM.chat.api_key") or "local",
             base_url=str(base_url),
             max_retries=0,
         )
-        self._chat_endpoint = str(
-            settings.get("LLM.chat.endpoint", "/v1/chat/completions")
-        )
         self._active_streams: dict[str, asyncio.Task[None]] = {}
         self._streams_lock = asyncio.Lock()
         self._active_slots: dict[str, int] = {}
         self._slots_released_by_abort: set[str] = set()
-        self.parallel_slots = max(1, getattr(process_manager, "parallel_slots", 1))
+        self.parallel_slots = max(1, getattr(upstream, "parallel_slots", 1))
         self._slot_semaphore = asyncio.Semaphore(self.parallel_slots)
         self._slot_queue: asyncio.LifoQueue[int] = asyncio.LifoQueue()
         for slot_id in range(self.parallel_slots):
@@ -313,14 +310,14 @@ class LLMClient:
         return endpoint
 
     @staticmethod
-    def _chat_base_url(server_url: str, endpoint: str) -> str:
+    def _chat_base_url(upstream_url: str, endpoint: str) -> str:
         normalized = endpoint.strip()
         suffix = "/chat/completions"
         base_path = normalized
         if normalized.endswith(suffix):
             base_path = normalized[: -len(suffix)] or "/v1"
-        server = server_url.rstrip("/")
-        return f"{server}{base_path}"
+        upstream = upstream_url.rstrip("/")
+        return f"{upstream}{base_path}"
 
     def _extract_stream_delta(self, chunk: Any) -> str | None:
         choices = getattr(chunk, "choices", None)
@@ -351,11 +348,11 @@ class LLMClient:
         return str(text).strip() if text else ""
 
     @property
-    def server_url(self) -> str:
-        return self.process_manager.base_url()
+    def upstream_url(self) -> str:
+        return self.upstream.base_url()
 
     def shutdown(self) -> None:
-        self.process_manager.shutdown()
+        self.upstream.shutdown()
 
     async def aclose(self) -> None:
         async with self._streams_lock:
@@ -623,8 +620,8 @@ class LLMClient:
         context: dict[str, Any] | None = None,
         messages: list[dict[str, Any]] | None = None,
     ) -> AsyncGenerator[Any, None]:
-        self.process_manager.ensure_server_running()
-        cfg = {**self.default_request, **(params or {})}
+        self.upstream.ensure_upstream_ready()
+        cfg = {**self.default_generation, **(params or {})}
         cfg["stream"] = True
 
         if messages is None:
@@ -673,9 +670,9 @@ class LLMClient:
     ) -> str:
         """Request a non-streamed chat completion for ``messages``."""
 
-        self.process_manager.ensure_server_running()
+        self.upstream.ensure_upstream_ready()
 
-        cfg = {**self.default_request, **(params or {})}
+        cfg = {**self.default_generation, **(params or {})}
         cfg["stream"] = False
 
         message_list = list(messages)
@@ -694,15 +691,15 @@ class LLMClient:
         try:
             response = await self._openai.chat.completions.create(**payload)
         except APIStatusError as exc:
-            self.process_manager.ensure_server_running()
+            self.upstream.ensure_upstream_ready()
             detail = f"{exc.status_code} {exc.message}".strip()
             self.logger.error("Completion request failed: %s", detail)
             raise RuntimeError(detail) from exc
         except APITimeoutError as exc:
-            self.process_manager.ensure_server_running()
+            self.upstream.ensure_upstream_ready()
             raise RuntimeError(f"Timeout: {exc}") from exc
         except APIError as exc:
-            self.process_manager.ensure_server_running()
+            self.upstream.ensure_upstream_ready()
             raise RuntimeError(f"API error: {exc}") from exc
         except Exception as exc:  # pragma: no cover - defensive
             raise RuntimeError(f"Unexpected error: {exc}") from exc
