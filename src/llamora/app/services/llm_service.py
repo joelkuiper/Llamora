@@ -1,4 +1,4 @@
-"""LLM service wrapper managing the llamafile client stack."""
+"""LLM service wrapper managing the OpenAI-compatible client stack."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class LLMService:
-    """Own the llamafile process, client, and response streaming manager."""
+    """Own the LLM process, client, and response streaming manager."""
 
     def __init__(
         self,
@@ -36,17 +36,17 @@ class LLMService:
         self._service_pulse = service_pulse
 
     async def start(self) -> None:
-        """Initialise the llamafile stack if it is not already running."""
+        """Initialise the LLM stack if it is not already running."""
 
         await self.ensure_started()
 
     async def stop(self) -> None:
-        """Tear down the llamafile stack."""
+        """Tear down the LLM stack."""
 
         await self.ensure_stopped()
 
     async def ensure_started(self) -> None:
-        """Ensure that the llamafile stack has been started."""
+        """Ensure that the LLM stack has been started."""
 
         if self._llm is not None:
             return
@@ -108,7 +108,7 @@ class LLMService:
             logger.info("LLM service stack started")
 
     async def ensure_stopped(self) -> None:
-        """Ensure that the llamafile stack has been stopped."""
+        """Ensure that the LLM stack has been stopped."""
 
         async with self._lock:
             if self._llm is None and self._process_manager is None:

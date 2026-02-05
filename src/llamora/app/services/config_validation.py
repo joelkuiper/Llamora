@@ -36,8 +36,8 @@ def _validate_llm_server() -> Iterable[str]:
     if not host and not llamafile_path:
         yield (
             "Configure the LLM server by setting either LLAMORA_LLM__SERVER__HOST "
-            "for a remote server or LLAMORA_LLM__SERVER__LLAMAFILE_PATH for a local"
-            " llamafile."
+            "for an OpenAI-compatible server or LLAMORA_LLM__SERVER__LLAMAFILE_PATH "
+            "for a local llamafile."
         )
 
 

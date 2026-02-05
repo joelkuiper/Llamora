@@ -27,7 +27,7 @@ You can write freely, think aloud, or stay in silence.
   A new entry starts automatically each day, carrying a soft reflection from the previous one.
 
 * **Streaming responses**
-  Watch the model’s reply unfold word by word through Server-Sent Events (SSE).
+  Watch the model’s reply unfold word by word through the OpenAI-compatible streaming API.
 
 * **HTMX-based UI**
   The interface updates dynamically without JavaScript frameworks. The backend renders HTML snippets directly, keeping the frontend light and responsive.
@@ -72,6 +72,8 @@ You can write freely, think aloud, or stay in silence.
    This downloads the model weights once and starts an HTTP endpoint at `http://127.0.0.1:8081`.
    The `--jinja` flag enables llama.cpp's internal chat-template rendering for
    OpenAI-compatible `messages` requests.
+   Llamora connects through the OpenAI Python SDK using `LLM.chat.endpoint`
+   (default `/v1/chat/completions`) and an optional `LLM.chat.base_url`.
 
 ### Create and activate a virtual environment
 
@@ -145,6 +147,7 @@ A simplified version of the structure:
 | `AUTH`        | Login attempt limits and timeouts                  |
 | `DATABASE`    | SQLite path and pool configuration                 |
 | `LLM.server`  | llama.cpp or llamafile connection details          |
+| `LLM.chat`    | OpenAI-compatible chat client settings             |
 | `LLM.request` | Default generation parameters                      |
 | `SEARCH`      | Semantic search behavior and ANN limits            |
 | `CRYPTO`      | DEK storage method (cookie or session)             |
@@ -157,9 +160,18 @@ Local overrides can go into `config/settings.local.toml`, e.g.:
 host = "http://127.0.0.1:8081"
 parallel = 2
 
+[default.LLM.chat]
+model = "local"
+parameter_allowlist = ["top_k", "mirostat", "mirostat_tau"]
+parameters = { top_k = 40, mirostat = 2, mirostat_tau = 4.5 }
+
 [default.LLM.request]
 temperature = 0.7
 top_p = 0.8
+
+You can also pass llama.cpp-specific parameters through the OpenAI client by
+adding them to `LLM.chat.parameters`, but only keys listed in
+`LLM.chat.parameter_allowlist` will be forwarded.
 ```
 
 Restart the app after changing settings.
@@ -185,15 +197,16 @@ Swap prompt variants by editing or replacing those files—changes take effect o
 
 * **Backend:** Quart (async Python)
 * **Frontend:** HTMX with server-rendered templates
-* **Streaming:** Server-Sent Events (SSE)
+* **Streaming:** OpenAI-compatible streaming responses
 * **Database:** SQLite
 * **Encryption:** libsodium / NaCl
 * **Embeddings:** FlagEmbedding + HNSWlib
 * **Configuration:** Dynaconf
 * **Package Manager:** uv
+* **LLM Client:** OpenAI Python SDK (pointed at a local server)
 
 All code runs locally, and dependencies are minimal.
-The system supports both llama.cpp servers and llamafile binaries through the same interface.
+The system supports OpenAI-compatible llama.cpp servers and llamafile binaries through the same interface.
 
 ---
 

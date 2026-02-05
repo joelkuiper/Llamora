@@ -67,7 +67,7 @@ def _find_free_port() -> int:
 
 
 class LlamafileProcessManager:
-    """Manage lifecycle of a llamafile subprocess."""
+    """Manage lifecycle of a local LLM server subprocess."""
 
     def __init__(self, server_args: dict | None = None) -> None:
         self.logger = logging.getLogger(__name__)

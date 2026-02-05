@@ -195,8 +195,8 @@ class PromptBudget:
         return snapshot
 
 
-class _CompletionStream:
-    """Manage the background SSE completion stream and expose an iterator."""
+class _ChatStream:
+    """Manage a background chat completion stream and expose an iterator."""
 
     def __init__(
         self,
@@ -243,7 +243,7 @@ class _CompletionStream:
         finally:
             self._emit_nowait(self._sentinel)
 
-    def __aiter__(self) -> "_CompletionStream":
+    def __aiter__(self) -> "_ChatStream":
         return self
 
     async def __anext__(self) -> Any:
@@ -260,7 +260,7 @@ class _CompletionStream:
 
 
 class LLMClient:
-    """Client responsible for interacting with the llamafile HTTP API."""
+    """Client responsible for interacting with an OpenAI-compatible chat API."""
 
     def __init__(
         self,
@@ -656,7 +656,7 @@ class LLMClient:
         )
         payload = self._build_chat_payload(messages, cfg)
         async with self._acquire_slot(entry_id) as slot_id:
-            stream = _CompletionStream(self, payload)
+            stream = _ChatStream(self, payload)
 
             try:
                 async with self._track_stream(entry_id, stream.task):
@@ -671,7 +671,7 @@ class LLMClient:
         *,
         params: Mapping[str, Any] | None = None,
     ) -> str:
-        """Request a non-streamed completion for ``messages``."""
+        """Request a non-streamed chat completion for ``messages``."""
 
         self.process_manager.ensure_server_running()
 
