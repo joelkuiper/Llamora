@@ -16,7 +16,10 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from werkzeug.exceptions import HTTPException
 
-from llamora.llm.entry_template import build_opening_messages, render_entry_prompt
+from llamora.llm.entry_template import (
+    build_opening_messages,
+    estimate_entry_messages_tokens,
+)
 
 from llamora.app.services.container import get_services
 from llamora.app.services.auth_helpers import login_required
@@ -400,9 +403,9 @@ async def sse_opening(date: str):
         recall_index = augmentation.recall_index
 
         budget = llm_client.prompt_budget
-        prompt_render = render_entry_prompt(opening_messages)
+        prompt_tokens = estimate_entry_messages_tokens(opening_messages)
         snapshot = budget.diagnostics(
-            prompt_tokens=prompt_render.token_count,
+            prompt_tokens=prompt_tokens,
             label="entry:opening",
             extra={
                 "phase": "initial",
@@ -411,19 +414,19 @@ async def sse_opening(date: str):
             },
         )
         max_tokens = snapshot.max_tokens
-        if max_tokens is not None and prompt_render.token_count > max_tokens:
+        if max_tokens is not None and prompt_tokens > max_tokens:
             if recall_inserted:
                 logger.info(
                     "Dropping tag recall context from opening prompt due to budget (%s > %s)",
-                    prompt_render.token_count,
+                    prompt_tokens,
                     max_tokens,
                 )
                 drop_index = recall_index if recall_index is not None else 1
                 if 0 <= drop_index < len(opening_messages):
                     opening_messages.pop(drop_index)
-                prompt_render = render_entry_prompt(opening_messages)
+                prompt_tokens = estimate_entry_messages_tokens(opening_messages)
                 budget.diagnostics(
-                    prompt_tokens=prompt_render.token_count,
+                    prompt_tokens=prompt_tokens,
                     label="entry:opening",
                     extra={
                         "phase": "after-recall-drop",
@@ -431,9 +434,9 @@ async def sse_opening(date: str):
                         "recall_inserted": False,
                     },
                 )
-            if prompt_render.token_count > max_tokens:
+            if prompt_tokens > max_tokens:
                 budget.diagnostics(
-                    prompt_tokens=prompt_render.token_count,
+                    prompt_tokens=prompt_tokens,
                     label="entry:opening",
                     extra={
                         "phase": "overflow-after-trim",

@@ -1,89 +1,82 @@
-"""Tokenizer helpers backed by Hugging Face transformers."""
+"""Token estimation helpers."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from pathlib import Path
-from threading import Lock
 from typing import Any
-
-
-from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
 from llamora.settings import settings
 
 __all__ = [
     "count_tokens",
-    "get_tokenizer",
+    "estimate_tokens",
     "format_message_fragment",
     "count_message_tokens",
     "history_suffix_token_totals",
 ]
 
-_TOKENIZER: PreTrainedTokenizerBase | None = None
-_TOKENIZER_LOCK = Lock()
+
+def _heuristic_token_estimate(prompt: str) -> int:
+    cfg = settings.get("LLM.tokenizer.estimate") or {}
+    chars_per_token = float(cfg.get("chars_per_token", 3.8))
+    non_ascii_per_token = float(cfg.get("non_ascii_chars_per_token", 1.0))
+
+    if not prompt:
+        return 0
+
+    ascii_count = sum(1 for ch in prompt if ord(ch) <= 0x7F)
+    non_ascii_count = len(prompt) - ascii_count
+
+    ascii_tokens = ascii_count / max(chars_per_token, 0.25)
+    non_ascii_tokens = non_ascii_count / max(non_ascii_per_token, 0.25)
+    estimate = int(ascii_tokens + non_ascii_tokens)
+    if ascii_tokens + non_ascii_tokens > estimate:
+        estimate += 1
+    return max(estimate, 1)
 
 
-def _normalise_model_identifier(raw: Any) -> str:
-    """Return a string path or identifier for the tokenizer model."""
+def _apply_estimate_multiplier(tokens: int) -> int:
+    cfg = settings.get("LLM.tokenizer.estimate") or {}
+    try:
+        multiplier = float(cfg.get("multiplier", 1.0))
+    except (TypeError, ValueError):
+        multiplier = 1.0
+    if multiplier <= 0:
+        multiplier = 1.0
+    boosted = tokens * multiplier
+    adjusted = int(boosted)
+    if boosted > adjusted:
+        adjusted += 1
+    return max(adjusted, 1)
 
-    if isinstance(raw, Path):
-        return str(raw)
-    return str(raw)
+
+def _skimtoken_estimate(prompt: str) -> int:
+    if not prompt:
+        return 0
+    try:
+        from skimtoken.multilingual_simple import estimate_tokens as skim_estimate
+    except Exception:
+        return _heuristic_token_estimate(prompt)
+
+    try:
+        skim_count = int(skim_estimate(prompt))
+    except Exception:
+        return _heuristic_token_estimate(prompt)
+
+    base = max(skim_count, _heuristic_token_estimate(prompt))
+    return _apply_estimate_multiplier(base)
 
 
-def get_tokenizer() -> PreTrainedTokenizerBase:
-    """Load and cache the Hugging Face tokenizer defined in the settings."""
+def estimate_tokens(prompt: str) -> int:
+    """Return a conservative token estimate for ``prompt``."""
 
-    global _TOKENIZER
-    if _TOKENIZER is not None:
-        return _TOKENIZER
-
-    with _TOKENIZER_LOCK:
-        if _TOKENIZER is not None:
-            return _TOKENIZER
-
-        config = settings.get("LLM.tokenizer")
-        if isinstance(config, str):
-            model_id = config
-            kwargs: dict[str, Any] = {}
-        elif isinstance(config, Mapping):
-            cfg_dict = dict(config)
-            model_id: Any | None = None
-            for key in (
-                "model",
-                "path",
-                "model_path",
-                "name",
-                "pretrained_model_name_or_path",
-            ):
-                model_id = cfg_dict.pop(key, None)
-                if model_id is not None:
-                    break
-            if model_id is None:
-                raise ValueError(
-                    "LLM.tokenizer configuration must define a model identifier"
-                )
-            kwargs = {
-                str(k): _normalise_model_identifier(v) if isinstance(v, Path) else v
-                for k, v in cfg_dict.items()
-            }
-            kwargs.setdefault("trust_remote_code", True)
-        else:
-            raise ValueError("LLM.tokenizer must be a string or mapping")
-
-        model_name = _normalise_model_identifier(model_id)
-        tokenizer = AutoTokenizer.from_pretrained(model_name, **kwargs)
-        _TOKENIZER = tokenizer
-        return tokenizer
+    return _skimtoken_estimate(prompt)
 
 
 def count_tokens(prompt: str) -> int:
-    """Return the number of tokens produced by the configured tokenizer."""
+    """Return the configured estimate for the number of tokens in ``prompt``."""
 
-    tokenizer = get_tokenizer()
-    encoded = tokenizer.encode(prompt, add_special_tokens=False)
-    return len(encoded)
+    return estimate_tokens(prompt)
 
 
 def format_message_fragment(role: str, message: str) -> str:

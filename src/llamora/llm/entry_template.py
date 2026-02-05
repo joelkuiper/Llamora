@@ -1,80 +1,35 @@
-"""Entry prompt assembly helpers backed by the tokenizer's chat template."""
+"""Entry prompt assembly helpers."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from itertools import groupby
-from typing import Any, Iterable, Mapping, Sequence, cast
+from typing import Any, Iterable, Mapping, Sequence
 
 from llamora.app.services.time import humanize
 
 from .prompt_templates import render_prompt_template
-from .tokenizers.tokenizer import get_tokenizer
-
-
-@dataclass(frozen=True, slots=True)
-class EntryPromptRender:
-    """Container for a rendered prompt and its tokenisation."""
-
-    prompt: str
-    tokens: tuple[int, ...]
-
-    @property
-    def token_count(self) -> int:
-        return len(self.tokens)
+from .tokenizers.tokenizer import estimate_tokens
 
 
 @dataclass(frozen=True, slots=True)
 class EntryPromptSeries:
-    """Collection of rendered prompts for the base and history suffixes."""
+    """Collection of token estimates for the base and history suffixes."""
 
-    base: EntryPromptRender
-    suffixes: tuple[EntryPromptRender, ...]
+    base_tokens: int
+    suffix_tokens: tuple[int, ...]
 
     @property
     def base_token_count(self) -> int:
-        return self.base.token_count
+        return self.base_tokens
 
     @property
     def suffix_token_counts(self) -> tuple[int, ...]:
-        return tuple(render.token_count for render in self.suffixes)
+        return self.suffix_tokens
 
 
-def _normalise_tokens(raw: Any) -> tuple[int, ...]:
-    sequence: Any
-    if isinstance(raw, (list, tuple)):
-        sequence = raw
-    elif isinstance(raw, Mapping):
-        if "input_ids" in raw:
-            sequence = raw["input_ids"]
-        elif "ids" in raw:
-            sequence = raw["ids"]
-        else:  # pragma: no cover - defensive
-            raise TypeError(
-                "Tokenizer.apply_chat_template returned unsupported token data"
-            )
-    elif hasattr(raw, "input_ids"):
-        sequence = getattr(raw, "input_ids")
-    elif hasattr(raw, "tolist"):
-        sequence = cast(Any, raw).tolist()
-    else:  # pragma: no cover - defensive
-        raise TypeError("Tokenizer.apply_chat_template returned unsupported token data")
-
-    if isinstance(sequence, (list, tuple)) and sequence:
-        first = sequence[0]
-        if isinstance(first, (list, tuple)):
-            if len(sequence) != 1:  # pragma: no cover - defensive
-                raise TypeError(
-                    "Tokenizer tokens must be a single sequence of integers"
-                )
-            sequence = first
-    elif hasattr(sequence, "tolist"):
-        sequence = cast(Any, sequence).tolist()
-
-    try:
-        return tuple(int(token) for token in sequence)
-    except (TypeError, ValueError) as exc:  # pragma: no cover - defensive
-        raise TypeError("Tokenizer tokens must be integers") from exc
+def _normalise_text(value: Any) -> str:
+    return str(value or "").strip()
 
 
 def _coerce_entry_messages(
@@ -82,48 +37,47 @@ def _coerce_entry_messages(
 ) -> list[dict[str, str]]:
     normalised: list[dict[str, str]] = []
     for raw in messages:
-        data = cast(Mapping[str, Any], raw)
-        role = _normalise_text(data.get("role"))
-        content_source = data.get("content")
+        role = _normalise_text(raw.get("role")) or "user"
+        content_source = raw.get("content")
         if content_source is None:
-            content_source = data.get("text")
+            content_source = raw.get("text")
         content = _normalise_text(content_source)
         normalised.append(
             {
-                "role": role or "user",
+                "role": role,
                 "content": content,
             }
         )
     return normalised
 
 
-def _render_entry_prompt(
+def _serialize_messages_for_estimate(
     messages: Sequence[Mapping[str, Any] | dict[str, Any]],
     *,
     add_generation_prompt: bool = True,
-) -> EntryPromptRender:
-    tokenizer = get_tokenizer()
-    message_list = _coerce_entry_messages(messages)
+) -> str:
+    parts: list[str] = []
+    for message in _coerce_entry_messages(messages):
+        role = _normalise_text(message.get("role")) or "user"
+        content = _normalise_text(message.get("content"))
+        if content:
+            parts.append(f"{role}:\n{content}")
+        else:
+            parts.append(f"{role}:")
+    if add_generation_prompt:
+        parts.append("assistant:")
+    return "\n\n".join(parts).strip()
 
-    prompt = tokenizer.apply_chat_template(
-        message_list,
-        tokenize=False,
-        add_generation_prompt=add_generation_prompt,
+
+def estimate_entry_messages_tokens(
+    messages: Sequence[Mapping[str, Any] | dict[str, Any]],
+    *,
+    add_generation_prompt: bool = True,
+) -> int:
+    serialized = _serialize_messages_for_estimate(
+        messages, add_generation_prompt=add_generation_prompt
     )
-    if not isinstance(prompt, str):  # pragma: no cover - defensive
-        raise TypeError("Tokenizer.apply_chat_template returned unexpected output")
-
-    token_data = tokenizer.apply_chat_template(
-        message_list,
-        tokenize=True,
-        add_generation_prompt=add_generation_prompt,
-    )
-    tokens = _normalise_tokens(token_data)
-    return EntryPromptRender(prompt=prompt, tokens=tokens)
-
-
-def _normalise_text(value: Any) -> str:
-    return str(value or "").strip()
+    return estimate_tokens(serialized)
 
 
 def _context_lines(date: str | None, part_of_day: str | None) -> list[str]:
@@ -252,28 +206,20 @@ def build_opening_messages(
     ]
 
 
-def render_entry_prompt(
-    messages: Sequence[Mapping[str, Any] | dict[str, Any]],
-) -> EntryPromptRender:
-    """Render ``messages`` to a prompt using the tokenizer's chat template."""
-
-    return _render_entry_prompt(messages)
-
-
 def render_entry_prompt_series(
     history: Sequence[Mapping[str, Any] | dict[str, Any]],
     **context: Any,
 ) -> EntryPromptSeries:
-    """Render prompts for the base system message and each history suffix."""
+    """Return token estimates for the base system message and each suffix."""
 
     ctx_history = list(history)
     base_messages = build_entry_messages((), **context)
-    base_render = _render_entry_prompt(base_messages)
+    base_tokens = estimate_entry_messages_tokens(base_messages)
 
-    suffix_renders: list[EntryPromptRender] = []
+    suffix_tokens: list[int] = []
     for idx in range(len(ctx_history)):
         suffix_history = ctx_history[idx:]
         messages = build_entry_messages(suffix_history, **context)
-        suffix_renders.append(_render_entry_prompt(messages))
+        suffix_tokens.append(estimate_entry_messages_tokens(messages))
 
-    return EntryPromptSeries(base=base_render, suffixes=tuple(suffix_renders))
+    return EntryPromptSeries(base_tokens=base_tokens, suffix_tokens=tuple(suffix_tokens))

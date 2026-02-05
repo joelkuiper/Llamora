@@ -66,10 +66,12 @@ You can write freely, think aloud, or stay in silence.
    For example, if you have llama-cpp installed:
 
    ```bash
-   llama-server -hf Qwen/Qwen3-4B-Instruct-2507 --port 8081
+   llama-server -hf Qwen/Qwen3-4B-Instruct-2507 --port 8081 --jinja
    ```
 
    This downloads the model weights once and starts an HTTP endpoint at `http://127.0.0.1:8081`.
+   The `--jinja` flag enables llama.cpp's internal chat-template rendering for
+   OpenAI-compatible `messages` requests.
 
 ### Create and activate a virtual environment
 

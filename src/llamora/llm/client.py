@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 from llamora.app.util import canonicalize
 from llamora.settings import settings
 from .process_manager import LlamafileProcessManager
-from .entry_template import build_entry_messages, render_entry_prompt
+from .entry_template import build_entry_messages, estimate_entry_messages_tokens
 from .tokenizers.tokenizer import count_tokens, history_suffix_token_totals
 
 DEFAULT_LLM_REQUEST = dict(settings.LLM.request)
@@ -67,6 +67,7 @@ class PromptBudget:
         ctx_size = self._client.ctx_size
         if ctx_size is None:
             return None
+        ctx_size = self._apply_safety_margin(ctx_size)
 
         cfg: dict[str, Any] = dict(self._client.default_request)
         if params:
@@ -84,6 +85,32 @@ class PromptBudget:
             return ctx_size
 
         return max(ctx_size - predict_tokens, 0)
+
+    @staticmethod
+    def _apply_safety_margin(ctx_size: int) -> int:
+        cfg = settings.get("LLM.tokenizer.safety_margin") or {}
+        try:
+            ratio = float(cfg.get("ratio", 0.0))
+        except (TypeError, ValueError):
+            ratio = 0.0
+        try:
+            min_tokens = int(cfg.get("min_tokens", 0))
+        except (TypeError, ValueError):
+            min_tokens = 0
+        try:
+            max_tokens = int(cfg.get("max_tokens", 0))
+        except (TypeError, ValueError):
+            max_tokens = 0
+
+        margin = int(ctx_size * ratio) if ratio > 0 else 0
+        if min_tokens > 0:
+            margin = max(margin, min_tokens)
+        if max_tokens > 0:
+            margin = min(margin, max_tokens)
+
+        if margin <= 0:
+            return ctx_size
+        return max(ctx_size - margin, 0)
 
     async def trim_history(
         self,
@@ -190,7 +217,11 @@ class SSEStreamParser:
         if line is None or line.startswith(":"):
             return []
         if line.startswith("data:"):
-            self._event_buf.append(line[5:].lstrip())
+            data = line[5:].lstrip()
+            if data == "[DONE]":
+                self.saw_stop = True
+                return [SSEEvent("stop")]
+            self._event_buf.append(data)
             return []
         if line == "":
             event = self._flush_event()
@@ -217,19 +248,40 @@ class SSEStreamParser:
         if payload.get("stop"):
             self.saw_stop = True
             return SSEEvent("stop")
+
         content = payload.get("content")
+        if not content and isinstance(payload.get("choices"), list):
+            choice = payload["choices"][0] if payload["choices"] else None
+            if isinstance(choice, Mapping):
+                finish_reason = choice.get("finish_reason")
+                if finish_reason:
+                    self.saw_stop = True
+                    return SSEEvent("stop")
+                delta = choice.get("delta")
+                if isinstance(delta, Mapping):
+                    content = delta.get("content") or delta.get("text")
+                if not content and "text" in choice:
+                    content = choice.get("text")
+
         if content:
             self.saw_content = True
-            return SSEEvent("content", content)
+            return SSEEvent("content", str(content))
         return None
 
 
 class _CompletionStream:
     """Manage the background SSE completion stream and expose an iterator."""
 
-    def __init__(self, client: "LLMClient", payload: dict[str, Any]) -> None:
+    def __init__(
+        self,
+        client: "LLMClient",
+        payload: dict[str, Any],
+        *,
+        endpoint: str,
+    ) -> None:
         self._client = client
         self._payload = payload
+        self._endpoint = endpoint
         self._queue: asyncio.Queue[Any] = asyncio.Queue()
         self._sentinel = object()
         self.task: asyncio.Task[None] = asyncio.create_task(self._run())
@@ -249,7 +301,7 @@ class _CompletionStream:
         try:
             async with self._client._client.stream(
                 "POST",
-                f"{self._client.server_url}/completion",
+                f"{self._client.server_url}{self._endpoint}",
                 json=self._payload,
                 headers=self._client._sse_headers,
             ) as resp:
@@ -341,6 +393,9 @@ class LLMClient:
         self.server_props = process_manager.server_props
         self._client = httpx.AsyncClient(
             timeout=None, transport=httpx.AsyncHTTPTransport(retries=0)
+        )
+        self._chat_endpoint = str(
+            settings.get("LLM.chat.endpoint", "/v1/chat/completions")
         )
         self._active_streams: dict[str, asyncio.Task[None]] = {}
         self._streams_lock = asyncio.Lock()
@@ -711,8 +766,6 @@ class LLMClient:
         self.process_manager.ensure_server_running()
         cfg = {**self.default_request, **(params or {})}
 
-        prompt_text: str | None = None
-
         if messages is None:
             history = history or []
             ctx = context or {}
@@ -730,15 +783,9 @@ class LLMClient:
                 self.logger.exception("Failed to build prompt messages")
                 yield {"type": "error", "data": f"Prompt error: {e}"}
                 return
-        try:
-            prompt_render = render_entry_prompt(messages)
-        except Exception as e:
-            self.logger.exception("Failed to render entry prompt")
-            yield {"type": "error", "data": f"Prompt error: {e}"}
-            return
-
+        prompt_tokens = estimate_entry_messages_tokens(messages)
         self.prompt_budget.diagnostics(
-            prompt_tokens=prompt_render.token_count,
+            prompt_tokens=prompt_tokens,
             params=cfg,
             label="entry:stream",
             extra={
@@ -746,16 +793,13 @@ class LLMClient:
                 "prompt_messages": len(messages or []),
             },
         )
-
-        prompt_text = prompt_render.prompt
-
-        payload = {"prompt": prompt_text, **cfg}
+        payload = self._build_chat_payload(messages, cfg)
         if entry_id:
             payload.setdefault("id", str(entry_id))
 
         async with self._acquire_slot(entry_id) as slot_id:
             payload.setdefault("slot_id", slot_id)
-            stream = _CompletionStream(self, payload)
+            stream = _CompletionStream(self, payload, endpoint=self._chat_endpoint)
 
             try:
                 async with self._track_stream(entry_id, stream.task):
@@ -778,29 +822,21 @@ class LLMClient:
         cfg["stream"] = False
 
         message_list = list(messages)
-
-        try:
-            prompt_render = render_entry_prompt(message_list)
-        except Exception as exc:
-            self.logger.exception("Failed to render completion prompt")
-            raise RuntimeError("Prompt rendering failed") from exc
-
+        prompt_tokens = estimate_entry_messages_tokens(message_list)
         self.prompt_budget.diagnostics(
-            prompt_tokens=prompt_render.token_count,
+            prompt_tokens=prompt_tokens,
             params=cfg,
             label="entry:complete",
             extra={"prompt_messages": len(message_list)},
         )
 
-        prompt_text = prompt_render.prompt
-
-        payload = {"prompt": prompt_text, **cfg}
+        payload = self._build_chat_payload(message_list, cfg)
         payload.pop("slot_id", None)
         payload.pop("id", None)
 
         try:
             response = await self._client.post(
-                f"{self.server_url}/completion",
+                f"{self.server_url}{self._chat_endpoint}",
                 json=payload,
             )
             response.raise_for_status()
@@ -833,6 +869,40 @@ class LLMClient:
 
         text = self._extract_completion_text(payload)
         return text.strip()
+
+    def _build_chat_payload(
+        self,
+        messages: Sequence[Mapping[str, Any] | dict[str, Any]],
+        params: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        normalized: list[dict[str, Any]] = []
+        for message in messages:
+            entry = dict(message)
+            if "content" not in entry and "text" in entry:
+                entry["content"] = entry.pop("text")
+            normalized.append(entry)
+
+        payload: dict[str, Any] = {
+            "messages": normalized,
+            "stream": bool(params.get("stream", True)),
+        }
+
+        if "n_predict" in params and params["n_predict"] is not None:
+            payload["max_tokens"] = params["n_predict"]
+        for key in (
+            "temperature",
+            "top_p",
+            "top_k",
+            "presence_penalty",
+            "frequency_penalty",
+            "stop",
+            "seed",
+            "model",
+        ):
+            if key in params and params[key] is not None:
+                payload[key] = params[key]
+
+        return payload
 
     def _extract_completion_text(self, payload: Any) -> str:
         """Normalise completion responses into a string."""
