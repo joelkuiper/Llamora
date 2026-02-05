@@ -133,7 +133,20 @@ min_tokens = 128
 [default.LLM.chat]
 endpoint = "/v1/chat/completions"
 model = "local"
+# base_url = "http://127.0.0.1:8081/v1"
 # api_key = ""
+parameter_allowlist = [
+  "top_k",
+  "n_keep",
+  "cache_prompt",
+  "mirostat",
+  "mirostat_tau",
+  "mirostat_eta",
+  "repeat_penalty",
+  "repeat_last_n",
+  "penalize_nl",
+]
+parameters = {}
 
 [default.PROMPTS]
 template_dir = "../src/llamora/llm/templates"

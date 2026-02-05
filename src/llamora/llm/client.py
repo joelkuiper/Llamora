@@ -277,15 +277,12 @@ class LLMClient:
         self._chat_endpoint = self._normalize_chat_endpoint(
             settings.get("LLM.chat.endpoint", "/v1/chat/completions")
         )
-        if not self._chat_endpoint.endswith("/chat/completions"):
-            self.logger.warning(
-                "LLM.chat.endpoint=%s does not end with /chat/completions; "
-                "OpenAI client will still target chat.completions against base_url",
-                self._chat_endpoint,
-            )
+        base_url = settings.get("LLM.chat.base_url")
+        if not base_url:
+            base_url = self._chat_base_url(self.server_url, self._chat_endpoint)
         self._openai = AsyncOpenAI(
             api_key=settings.get("LLM.chat.api_key") or "local",
-            base_url=self._chat_base_url(self.server_url, self._chat_endpoint),
+            base_url=str(base_url),
             max_retries=0,
         )
         self._chat_endpoint = str(
@@ -731,19 +728,23 @@ class LLMClient:
 
         if "n_predict" in params and params["n_predict"] is not None:
             payload["max_tokens"] = params["n_predict"]
-        for key in (
-            "temperature",
-            "top_p",
-            "presence_penalty",
-            "frequency_penalty",
-            "stop",
-            "seed",
-            "model",
-        ):
+        for key in ("temperature", "top_p", "stop", "seed", "model"):
+            if key in params and params[key] is not None:
+                payload[key] = params[key]
+        for key in ("presence_penalty", "frequency_penalty"):
             if key in params and params[key] is not None:
                 payload[key] = params[key]
         if "model" not in payload:
             payload["model"] = settings.get("LLM.chat.model", "local")
+        allowlist = set(settings.get("LLM.chat.parameter_allowlist") or [])
+        config_params = settings.get("LLM.chat.parameters") or {}
+        if isinstance(config_params, Mapping):
+            for key, value in config_params.items():
+                if key in allowlist:
+                    payload.setdefault("extra_body", {})[key] = value
+        for key, value in params.items():
+            if key in allowlist and value is not None:
+                payload.setdefault("extra_body", {})[key] = value
 
         return payload
 
