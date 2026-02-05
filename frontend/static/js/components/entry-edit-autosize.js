@@ -4,6 +4,7 @@ const ENTRY_HEIGHT_ATTR = "data-entry-main-height";
 const EMPTY_EDIT_CLASS = "entry-edit-empty";
 const SAVE_DISABLED_ATTR = "aria-disabled";
 const SAVE_DISABLED_DATA = "data-save-disabled";
+const CARET_PLACED_ATTR = "data-caret-placed";
 
 const EDIT_FLOW = {
   blur: "save",
@@ -76,6 +77,27 @@ function resizeTextarea(textarea) {
   }
 }
 
+function placeCaretAtEnd(textarea, force = false) {
+  if (!(textarea instanceof HTMLTextAreaElement)) return;
+  if (!force && textarea.getAttribute(CARET_PLACED_ATTR) === "true") return;
+  const length = textarea.value.length;
+  try {
+    textarea.setSelectionRange(length, length);
+  } catch (err) {
+    return;
+  }
+  textarea.setAttribute(CARET_PLACED_ATTR, "true");
+}
+
+function scheduleCaretPlacement(textarea, force = false) {
+  if (!(textarea instanceof HTMLTextAreaElement)) return;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      placeCaretAtEnd(textarea, force);
+    });
+  });
+}
+
 function submitEdit(form) {
   if (!form || form.classList.contains("htmx-request")) return;
   const textarea = form.querySelector(".entry-edit-area");
@@ -118,6 +140,10 @@ function bindTextarea(textarea) {
   };
   updateSaveState();
   resizeTextarea(textarea);
+  scheduleCaretPlacement(textarea);
+  textarea.addEventListener("focus", () => {
+    scheduleCaretPlacement(textarea);
+  });
   textarea.addEventListener("input", () => {
     resizeTextarea(textarea);
     updateSaveState();
@@ -244,6 +270,7 @@ document.body?.addEventListener("htmx:afterSwap", (event) => {
   const textarea = entryMain.querySelector(".entry-edit-area");
   if (textarea instanceof HTMLTextAreaElement) {
     resizeTextarea(textarea);
+    scheduleCaretPlacement(textarea, true);
   }
 });
 
