@@ -8,8 +8,26 @@ const EDIT_FLOW = {
   saveShortcut: "save",
 };
 
+function getScrollContainer(node) {
+  let current = node?.parentElement || null;
+  while (current && current !== document.body) {
+    const styles = window.getComputedStyle(current);
+    if (
+      (styles.overflowY === "auto" || styles.overflowY === "scroll") &&
+      current.scrollHeight > current.clientHeight
+    ) {
+      return current;
+    }
+    current = current.parentElement;
+  }
+  return document.scrollingElement || document.documentElement;
+}
+
 function resizeTextarea(textarea) {
   if (!(textarea instanceof HTMLTextAreaElement)) return;
+  const scrollContainer = getScrollContainer(textarea);
+  const prevScrollTop =
+    scrollContainer instanceof Element ? scrollContainer.scrollTop : null;
   textarea.style.height = "auto";
   const styles = window.getComputedStyle(textarea);
   const max = parseFloat(styles.maxHeight || "");
@@ -20,6 +38,13 @@ function resizeTextarea(textarea) {
   } else {
     textarea.style.height = `${height}px`;
     textarea.style.overflowY = "hidden";
+  }
+  if (
+    scrollContainer instanceof Element &&
+    prevScrollTop !== null &&
+    scrollContainer.scrollTop !== prevScrollTop
+  ) {
+    scrollContainer.scrollTop = prevScrollTop;
   }
 }
 
