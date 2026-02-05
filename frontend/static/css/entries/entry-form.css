@@ -107,7 +107,7 @@
     display: flex;
     gap: var(--spacing-xs);
     margin-top: var(--spacing-sm);
-    align-items: flex-end;
+    align-items: center;
 
     textarea {
       flex: 1;
@@ -188,16 +188,16 @@
     display: inline-flex;
     flex-direction: column;
     align-items: center;
-    align-self: flex-end;
     gap: 0;
     position: relative;
   }
 
   .entry-submit-stack .entry-char-counter {
     font-size: 0.65rem;
-    position: static;
-    margin-top: 6px;
-    width: 100%;
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    left: 0;
     text-align: center;
     pointer-events: none;
   }
