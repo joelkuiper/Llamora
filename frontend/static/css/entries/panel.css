@@ -582,6 +582,13 @@
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--action-edit-save) 18%, transparent);
   }
 
+  .entry-edit-save[aria-disabled="true"],
+  .entry-edit-save:disabled {
+    opacity: 0.5;
+    cursor: default;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-text-muted) 20%, transparent);
+  }
+
   .entry-edit-save .entry-edit-label {
     display: inline-flex;
     align-items: center;

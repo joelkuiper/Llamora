@@ -1,6 +1,9 @@
 const AUTOBOUND_ATTR = "data-autosize-bound";
 const SKIP_BLUR_CANCEL_ATTR = "data-skip-blur-cancel";
 const ENTRY_HEIGHT_ATTR = "data-entry-main-height";
+const EMPTY_EDIT_CLASS = "entry-edit-empty";
+const SAVE_DISABLED_ATTR = "aria-disabled";
+const SAVE_DISABLED_DATA = "data-save-disabled";
 
 const EDIT_FLOW = {
   blur: "save",
@@ -75,6 +78,12 @@ function resizeTextarea(textarea) {
 
 function submitEdit(form) {
   if (!form || form.classList.contains("htmx-request")) return;
+  const textarea = form.querySelector(".entry-edit-area");
+  if (textarea instanceof HTMLTextAreaElement) {
+    if (!textarea.value.trim()) {
+      return;
+    }
+  }
   if (typeof form.requestSubmit === "function") {
     form.requestSubmit();
   } else {
@@ -94,14 +103,34 @@ function bindTextarea(textarea) {
   if (!(textarea instanceof HTMLTextAreaElement)) return;
   if (textarea.getAttribute(AUTOBOUND_ATTR) === "true") return;
   textarea.setAttribute(AUTOBOUND_ATTR, "true");
+  const form = textarea.closest("form[data-entry-edit-form]");
+  const saveButton = form?.querySelector(".entry-edit-save");
+  const updateSaveState = () => {
+    const isEmpty = !textarea.value.trim();
+    if (form) {
+      form.classList.toggle(EMPTY_EDIT_CLASS, isEmpty);
+    }
+    if (saveButton instanceof HTMLButtonElement) {
+      saveButton.disabled = isEmpty;
+      saveButton.setAttribute(SAVE_DISABLED_ATTR, isEmpty ? "true" : "false");
+      saveButton.toggleAttribute(SAVE_DISABLED_DATA, isEmpty);
+    }
+  };
+  updateSaveState();
   resizeTextarea(textarea);
-  textarea.addEventListener("input", () => resizeTextarea(textarea));
+  textarea.addEventListener("input", () => {
+    resizeTextarea(textarea);
+    updateSaveState();
+  });
   textarea.addEventListener("blur", () => {
-    const form = textarea.closest("form[data-entry-edit-form]");
     if (!form) return;
     if (form.classList.contains("htmx-request")) return;
     if (form.getAttribute(SKIP_BLUR_CANCEL_ATTR) === "true") {
       form.removeAttribute(SKIP_BLUR_CANCEL_ATTR);
+      return;
+    }
+    if (!textarea.value.trim()) {
+      updateSaveState();
       return;
     }
     setTimeout(() => {
@@ -120,7 +149,6 @@ function bindTextarea(textarea) {
   textarea.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
     event.preventDefault();
-    const form = textarea.closest("form[data-entry-edit-form]");
     if (EDIT_FLOW.escape === "cancel") {
       cancelEdit(form);
     } else {
@@ -132,11 +160,23 @@ function bindTextarea(textarea) {
     if (event.key !== "Enter") return;
     if (!(event.metaKey || event.ctrlKey)) return;
     event.preventDefault();
-    const form = textarea.closest("form[data-entry-edit-form]");
+    if (!textarea.value.trim()) {
+      updateSaveState();
+      return;
+    }
     if (EDIT_FLOW.saveShortcut === "save") {
       submitEdit(form);
     }
   });
+
+  if (form) {
+    form.addEventListener("submit", (event) => {
+      if (!textarea.value.trim()) {
+        event.preventDefault();
+        updateSaveState();
+      }
+    });
+  }
 }
 
 function bindInNode(node) {
