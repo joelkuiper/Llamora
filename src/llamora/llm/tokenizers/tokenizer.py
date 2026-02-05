@@ -1,9 +1,11 @@
-"""Token estimation helpers."""
+"""Token counting helpers backed by tiktoken."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from typing import Any
+
+import tiktoken
 
 from llamora.settings import settings
 
@@ -16,61 +18,14 @@ __all__ = [
 ]
 
 
-def _heuristic_token_estimate(prompt: str) -> int:
-    cfg = settings.get("LLM.tokenizer.estimate") or {}
-    chars_per_token = float(cfg.get("chars_per_token", 3.8))
-    non_ascii_per_token = float(cfg.get("non_ascii_chars_per_token", 1.0))
-
-    if not prompt:
-        return 0
-
-    ascii_count = sum(1 for ch in prompt if ord(ch) <= 0x7F)
-    non_ascii_count = len(prompt) - ascii_count
-
-    ascii_tokens = ascii_count / max(chars_per_token, 0.25)
-    non_ascii_tokens = non_ascii_count / max(non_ascii_per_token, 0.25)
-    estimate = int(ascii_tokens + non_ascii_tokens)
-    if ascii_tokens + non_ascii_tokens > estimate:
-        estimate += 1
-    return max(estimate, 1)
-
-
-def _apply_estimate_multiplier(tokens: int) -> int:
-    cfg = settings.get("LLM.tokenizer.estimate") or {}
-    try:
-        multiplier = float(cfg.get("multiplier", 1.0))
-    except (TypeError, ValueError):
-        multiplier = 1.0
-    if multiplier <= 0:
-        multiplier = 1.0
-    boosted = tokens * multiplier
-    adjusted = int(boosted)
-    if boosted > adjusted:
-        adjusted += 1
-    return max(adjusted, 1)
-
-
-def _skimtoken_estimate(prompt: str) -> int:
-    if not prompt:
-        return 0
-    try:
-        from skimtoken.multilingual_simple import estimate_tokens as skim_estimate
-    except Exception:
-        return _heuristic_token_estimate(prompt)
-
-    try:
-        skim_count = int(skim_estimate(prompt))
-    except Exception:
-        return _heuristic_token_estimate(prompt)
-
-    base = max(skim_count, _heuristic_token_estimate(prompt))
-    return _apply_estimate_multiplier(base)
-
-
 def estimate_tokens(prompt: str) -> int:
-    """Return a conservative token estimate for ``prompt``."""
+    """Return token count for ``prompt`` using tiktoken."""
 
-    return _skimtoken_estimate(prompt)
+    if not prompt:
+        return 0
+    encoding_name = settings.get("LLM.tokenizer.encoding", "cl100k_base")
+    encoding = tiktoken.get_encoding(str(encoding_name))
+    return len(encoding.encode(prompt))
 
 
 def count_tokens(prompt: str) -> int:

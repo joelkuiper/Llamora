@@ -153,11 +153,7 @@ DEFAULTS: dict[str, Any] = {
             },
         ],
         "tokenizer": {
-            "estimate": {
-                "chars_per_token": 3.8,
-                "non_ascii_chars_per_token": 1.0,
-                "multiplier": 1.1,
-            },
+            "encoding": "cl100k_base",
             "safety_margin": {
                 "ratio": 0.1,
                 "min_tokens": 128,

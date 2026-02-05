@@ -121,10 +121,8 @@ response_kinds = [
 [default.UI]
 clock_format = "24h"
 
-[default.LLM.tokenizer.estimate]
-chars_per_token = 3.8
-non_ascii_chars_per_token = 1.0
-multiplier = 1.1
+[default.LLM.tokenizer]
+encoding = "cl100k_base"
 
 [default.LLM.tokenizer.safety_margin]
 ratio = 0.1

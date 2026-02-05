@@ -1,7 +1,9 @@
 # TODO
 - [x] Limits for message size with indicator
-- [ ] README
+- [ ] What to do with tags
 - [ ] Profile page design
-- [ ] Design of recovery token page
 - [ ] Keyboard accessibility rethink
+- [ ] README
+Later
 - [ ] Image support?
+- [ ] Generic attachment support?

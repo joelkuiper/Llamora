@@ -152,6 +152,7 @@ A simplified version of the structure:
 | `LLM.chat`    | OpenAI-compatible chat client settings             |
 | `LLM.upstream`  | Local upstream connection details (llama.cpp/llamafile) |
 | `LLM.generation` | Default generation parameters                      |
+| `LLM.tokenizer` | Token counting settings (tiktoken encoding + safety margin) |
 | `SEARCH`      | Semantic search behavior and ANN limits            |
 | `CRYPTO`      | DEK storage method (cookie or session)             |
 | `COOKIES`     | Cookie name and encryption secret                  |
@@ -171,6 +172,13 @@ parameters = { top_k = 40, mirostat = 2, mirostat_tau = 4.5 }
 [default.LLM.generation]
 temperature = 0.7
 top_p = 0.8
+
+[default.LLM.tokenizer]
+encoding = "cl100k_base"
+
+[default.LLM.tokenizer.safety_margin]
+ratio = 0.1
+min_tokens = 128
 ```
 
 You can also pass llama.cpp-specific parameters through the OpenAI client by
