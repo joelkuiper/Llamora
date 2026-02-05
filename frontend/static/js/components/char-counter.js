@@ -29,8 +29,13 @@ function updateCounter(counter, target) {
   }
   const remaining = max - target.value.length;
   const threshold = parseThreshold(counter);
-  counter.textContent = `${remaining} left`;
-  counter.classList.toggle("is-visible", remaining <= threshold);
+  if (remaining > threshold) {
+    counter.textContent = "";
+    counter.classList.remove("is-visible");
+  } else {
+    counter.textContent = `${remaining} left`;
+    counter.classList.add("is-visible");
+  }
   counter.classList.toggle("is-limit", remaining <= 0);
 }
 
