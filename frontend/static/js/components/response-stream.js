@@ -406,7 +406,6 @@ class ResponseStreamElement extends HTMLElement {
 
     const html = renderMarkdown(this.#text || "");
     const changed = this.#renderer.update(html);
-
     if ("markdownSource" in this.#markdown.dataset) {
       delete this.#markdown.dataset.markdownSource;
     }

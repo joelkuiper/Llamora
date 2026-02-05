@@ -780,6 +780,7 @@
     white-space: normal; /* don't inherit pre spacing */
   }
 
+
   .typing-indicator.stopped {
     color: var(--color-text-muted);
   }
