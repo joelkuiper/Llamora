@@ -176,7 +176,11 @@ class EntryFormElement extends ReactiveElement {
   #restoreDraft() {
     if (!this.#textarea || !this.#draftKey) return;
     this.#textarea.value = sessionStorage.getItem(this.#draftKey) || "";
-    this.#resizeTextarea();
+    if (this.#textarea.value) {
+      this.#resizeTextarea();
+    } else {
+      this.#textarea.style.height = "";
+    }
   }
 
   #configureForm() {
@@ -200,7 +204,11 @@ class EntryFormElement extends ReactiveElement {
       requestAnimationFrame(() => {
         if (!this.#draftKey) return;
         sessionStorage.removeItem(this.#draftKey);
-        this.#resizeTextarea({ forceScroll: true });
+        if (this.#textarea && this.#textarea.value) {
+          this.#resizeTextarea({ forceScroll: true });
+        } else if (this.#textarea) {
+          this.#textarea.style.height = "";
+        }
       });
     };
     bag.add(this.#form, "htmx:afterRequest", onAfterRequest);
@@ -286,6 +294,10 @@ class EntryFormElement extends ReactiveElement {
 
   #resizeTextarea({ forceScroll = false } = {}) {
     if (!this.#textarea) return;
+    if (!this.#textarea.value) {
+      this.#textarea.style.height = "";
+      return;
+    }
     const wasNearBottom = this.#container
       ? isNearBottom(this.#container, 16)
       : false;
