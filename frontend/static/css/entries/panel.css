@@ -780,6 +780,16 @@
     white-space: normal; /* don't inherit pre spacing */
   }
 
+  .typing-indicator-placeholder {
+    display: inline-block;
+    font-weight: bold;
+    padding-left: 4px;
+    line-height: 1;
+    vertical-align: baseline;
+    white-space: normal;
+    animation: blink var(--motion-blink) step-start infinite;
+  }
+
 
   .typing-indicator.stopped {
     color: var(--color-text-muted);

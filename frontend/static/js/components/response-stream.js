@@ -50,7 +50,6 @@ class ResponseStreamElement extends HTMLElement {
   #renderFrame = null;
   #renderCooldownTimer = null;
   #pendingRenderOptions = null;
-  #pendingTyping = null;
   #completed = false;
   #text = "";
   #sink = null;
@@ -171,17 +170,10 @@ class ResponseStreamElement extends HTMLElement {
 
   handleMarkdownRendered(el) {
     if (!el || el !== this.#markdown) return;
-    const pending = this.#pendingTyping;
-    if (!pending) return;
-
-    this.#pendingTyping = null;
-    const { typing, shouldScroll } = pending;
+    const typing = this.#typingIndicator;
     if (typing) {
       positionTypingIndicator(el, typing);
       this.#typingIndicator = typing;
-    }
-    if (shouldScroll) {
-      requestScrollToBottom({ reason: "markdown", element: this });
     }
   }
 
@@ -392,16 +384,14 @@ class ResponseStreamElement extends HTMLElement {
     if (!this.#markdown || !this.#renderer) return false;
 
     const typing = this.#typingIndicator;
-    let reposition = null;
+    let placeholder = null;
 
-    if (typing?.parentNode) {
+    if (typing?.parentNode && repositionTyping) {
+      placeholder = document.createElement("span");
+      placeholder.className = "typing-indicator-placeholder";
+      placeholder.textContent = "❚";
+      typing.parentNode.insertBefore(placeholder, typing);
       typing.parentNode.removeChild(typing);
-      if (repositionTyping) {
-        reposition = { typing, shouldScroll };
-      } else {
-        typing.remove();
-        this.#typingIndicator = null;
-      }
     }
 
     const html = renderMarkdown(this.#text || "");
@@ -411,9 +401,16 @@ class ResponseStreamElement extends HTMLElement {
     }
     this.#markdown.dataset.rendered = "true";
 
-    if (reposition) {
-      this.#pendingTyping = reposition;
-      this.handleMarkdownRendered(this.#markdown);
+    if (placeholder?.parentNode) {
+      placeholder.parentNode.removeChild(placeholder);
+    }
+
+    if (typing && repositionTyping) {
+      positionTypingIndicator(this.#markdown, typing);
+      this.#typingIndicator = typing;
+      if (shouldScroll) {
+        requestScrollToBottom({ reason: "render", element: this });
+      }
     } else if (shouldScroll && changed) {
       requestScrollToBottom({ reason: "render", element: this });
     }
@@ -462,7 +459,6 @@ class ResponseStreamElement extends HTMLElement {
 
     this.#cancelRender();
     this.#closeEventSource();
-    this.#pendingTyping = null;
 
     const typing = this.#typingIndicator;
     if (typing) {
