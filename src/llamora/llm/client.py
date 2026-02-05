@@ -6,11 +6,10 @@ import logging
 from dataclasses import dataclass
 from contextlib import asynccontextmanager, suppress
 from types import MappingProxyType
-from typing import Any, AsyncGenerator, Mapping, NamedTuple, Sequence, TYPE_CHECKING
+from typing import Any, AsyncGenerator, Mapping, Sequence, TYPE_CHECKING
 
-import httpx
 import orjson
-from httpx import HTTPError
+from openai import APIError, APIStatusError, APITimeoutError, AsyncOpenAI
 
 from cachetools import LRUCache
 
@@ -20,7 +19,7 @@ from llamora.app.util import canonicalize
 from llamora.settings import settings
 from .process_manager import LlamafileProcessManager
 from .entry_template import build_entry_messages, estimate_entry_messages_tokens
-from .tokenizers.tokenizer import count_tokens, history_suffix_token_totals
+from .tokenizers.tokenizer import history_suffix_token_totals
 
 DEFAULT_LLM_REQUEST = dict(settings.LLM.request)
 HISTORY_TOKEN_CACHE_SIZE = 32
@@ -196,79 +195,6 @@ class PromptBudget:
         return snapshot
 
 
-class SSEEvent(NamedTuple):
-    """Represents a parsed server-sent event from the LLM stream."""
-
-    type: str
-    data: str | None = None
-
-
-class SSEStreamParser:
-    """Parse Server-Sent Events emitted by the LLM completion endpoint."""
-
-    def __init__(self) -> None:
-        self._event_buf: list[str] = []
-        self.saw_stop = False
-        self.saw_content = False
-
-    def feed_line(self, line: str | None) -> list[SSEEvent]:
-        """Consume a single line from the SSE stream and emit parsed events."""
-
-        if line is None or line.startswith(":"):
-            return []
-        if line.startswith("data:"):
-            data = line[5:].lstrip()
-            if data == "[DONE]":
-                self.saw_stop = True
-                return [SSEEvent("stop")]
-            self._event_buf.append(data)
-            return []
-        if line == "":
-            event = self._flush_event()
-            return [event] if event else []
-        return []
-
-    def finalize(self) -> list[SSEEvent]:
-        """Flush any buffered event when the HTTP stream closes."""
-
-        event = self._flush_event()
-        return [event] if event else []
-
-    def _flush_event(self) -> SSEEvent | None:
-        if not self._event_buf:
-            return None
-        data_str = "\n".join(self._event_buf).strip()
-        self._event_buf.clear()
-        if not data_str:
-            return None
-        try:
-            payload = orjson.loads(data_str)
-        except Exception:
-            return None
-        if payload.get("stop"):
-            self.saw_stop = True
-            return SSEEvent("stop")
-
-        content = payload.get("content")
-        if not content and isinstance(payload.get("choices"), list):
-            choice = payload["choices"][0] if payload["choices"] else None
-            if isinstance(choice, Mapping):
-                finish_reason = choice.get("finish_reason")
-                if finish_reason:
-                    self.saw_stop = True
-                    return SSEEvent("stop")
-                delta = choice.get("delta")
-                if isinstance(delta, Mapping):
-                    content = delta.get("content") or delta.get("text")
-                if not content and "text" in choice:
-                    content = choice.get("text")
-
-        if content:
-            self.saw_content = True
-            return SSEEvent("content", str(content))
-        return None
-
-
 class _CompletionStream:
     """Manage the background SSE completion stream and expose an iterator."""
 
@@ -276,12 +202,9 @@ class _CompletionStream:
         self,
         client: "LLMClient",
         payload: dict[str, Any],
-        *,
-        endpoint: str,
     ) -> None:
         self._client = client
         self._payload = payload
-        self._endpoint = endpoint
         self._queue: asyncio.Queue[Any] = asyncio.Queue()
         self._sentinel = object()
         self.task: asyncio.Task[None] = asyncio.create_task(self._run())
@@ -296,63 +219,23 @@ class _CompletionStream:
             pass
 
     async def _run(self) -> None:
-        parser = SSEStreamParser()
-        stopped = False
         try:
-            async with self._client._client.stream(
-                "POST",
-                f"{self._client.server_url}{self._endpoint}",
-                json=self._payload,
-                headers=self._client._sse_headers,
-            ) as resp:
-                resp.raise_for_status()
-
-                async for line in resp.aiter_lines():
-                    events = parser.feed_line(line)
-                    for event in events:
-                        if event.type == "content" and event.data is not None:
-                            await self._emit(event.data)
-                        elif event.type == "stop":
-                            stopped = True
-                            break
-                    if stopped:
-                        break
-
-                if not stopped:
-                    for event in parser.finalize():
-                        if event.type == "content" and event.data is not None:
-                            await self._emit(event.data)
-                        elif event.type == "stop":
-                            stopped = True
-
-                if not parser.saw_stop:
-                    msg = (
-                        "Stream ended unexpectedly"
-                        if parser.saw_content
-                        else "LLM server disconnected"
-                    )
-                    await self._emit({"type": "error", "data": msg})
-        except httpx.HTTPStatusError as e:
-            response = e.response
-            status_line = str(e)
-            body: bytes | None = None
-            if response is not None:
-                status_line = (
-                    f"{response.status_code} {response.reason_phrase or ''}".strip()
-                )
-                try:
-                    body = await response.aread()
-                except Exception:
-                    body = None
-            detail = self._client._normalize_response_detail(body, status_line)
-            self._client.logger.error(
-                "Completion request failed (%s): %s", status_line, detail
-            )
+            stream = await self._client._openai.chat.completions.create(**self._payload)
+            async for chunk in stream:
+                content = self._client._extract_stream_delta(chunk)
+                if content:
+                    await self._emit(content)
+        except APIStatusError as exc:
             self._client.process_manager.ensure_server_running()
+            detail = f"{exc.status_code} {exc.message}".strip()
+            self._client.logger.error("Completion request failed: %s", detail)
             await self._emit({"type": "error", "data": detail})
-        except HTTPError as e:
+        except APITimeoutError as exc:
             self._client.process_manager.ensure_server_running()
-            await self._emit({"type": "error", "data": f"HTTP error: {e}"})
+            await self._emit({"type": "error", "data": f"Timeout: {exc}"})
+        except APIError as exc:
+            self._client.process_manager.ensure_server_running()
+            await self._emit({"type": "error", "data": f"API error: {exc}"})
         except asyncio.CancelledError:
             raise
         except Exception as e:
@@ -391,8 +274,19 @@ class LLMClient:
         self.default_request = {**DEFAULT_LLM_REQUEST, **(default_request or {})}
         self.ctx_size = process_manager.ctx_size
         self.server_props = process_manager.server_props
-        self._client = httpx.AsyncClient(
-            timeout=None, transport=httpx.AsyncHTTPTransport(retries=0)
+        self._chat_endpoint = self._normalize_chat_endpoint(
+            settings.get("LLM.chat.endpoint", "/v1/chat/completions")
+        )
+        if not self._chat_endpoint.endswith("/chat/completions"):
+            self.logger.warning(
+                "LLM.chat.endpoint=%s does not end with /chat/completions; "
+                "OpenAI client will still target chat.completions against base_url",
+                self._chat_endpoint,
+            )
+        self._openai = AsyncOpenAI(
+            api_key=settings.get("LLM.chat.api_key") or "local",
+            base_url=self._chat_base_url(self.server_url, self._chat_endpoint),
+            max_retries=0,
         )
         self._chat_endpoint = str(
             settings.get("LLM.chat.endpoint", "/v1/chat/completions")
@@ -406,12 +300,6 @@ class LLMClient:
         self._slot_queue: asyncio.LifoQueue[int] = asyncio.LifoQueue()
         for slot_id in range(self.parallel_slots):
             self._slot_queue.put_nowait(slot_id)
-        self._sse_headers = {
-            "Accept": "text/event-stream",
-            "Connection": "keep-alive",
-            "Accept-Encoding": "identity",
-            "Cache-Control": "no-cache",
-        }
         self.prompt_budget = PromptBudget(self, service_pulse=service_pulse)
         # Cached cumulative token counts keyed by (history_hash, context_hash).
         # The cache lets adjacent requests within the same stream reuse
@@ -421,71 +309,49 @@ class LLMClient:
         )
 
     @staticmethod
-    def _normalize_response_detail(
-        body: bytes | str | None,
-        fallback: str,
-    ) -> str:
-        """Derive a human-readable error message from an HTTP response body."""
-
-        fallback = fallback.strip() or "HTTP error"
-        if body is None:
-            return fallback
-
-        if isinstance(body, (bytes, bytearray)):
-            text = body.decode("utf-8", "replace")
-        else:
-            text = str(body)
-
-        text = text.strip()
-        if not text:
-            return fallback
-
-        try:
-            payload = orjson.loads(text)
-        except Exception:
-            return text
-
-        if isinstance(payload, dict):
-            for key in ("detail", "message", "error"):
-                if key in payload:
-                    detail = LLMClient._stringify_detail(payload[key])
-                    if detail:
-                        return detail
-            detail = LLMClient._stringify_detail(payload)
-            if detail:
-                return detail
-            return fallback
-
-        detail = LLMClient._stringify_detail(payload)
-        return detail or fallback
+    def _normalize_chat_endpoint(raw: Any) -> str:
+        endpoint = str(raw or "/v1/chat/completions").strip()
+        if not endpoint.startswith("/"):
+            endpoint = f"/{endpoint}"
+        return endpoint
 
     @staticmethod
-    def _stringify_detail(value: Any) -> str | None:
-        """Convert nested JSON detail values into a readable string."""
+    def _chat_base_url(server_url: str, endpoint: str) -> str:
+        normalized = endpoint.strip()
+        suffix = "/chat/completions"
+        base_path = normalized
+        if normalized.endswith(suffix):
+            base_path = normalized[: -len(suffix)] or "/v1"
+        server = server_url.rstrip("/")
+        return f"{server}{base_path}"
 
-        if value is None:
+    def _extract_stream_delta(self, chunk: Any) -> str | None:
+        choices = getattr(chunk, "choices", None)
+        if not choices:
             return None
-        if isinstance(value, str):
-            value = value.strip()
-            return value or None
-        if isinstance(value, (bytes, bytearray)):
-            decoded = value.decode("utf-8", "replace").strip()
-            return decoded or None
-        if isinstance(value, (list, tuple, set)):
-            parts = [
-                part
-                for part in (LLMClient._stringify_detail(item) for item in value)
-                if part
-            ]
-            if parts:
-                return ", ".join(parts)
-            return None
-        if isinstance(value, dict):
-            try:
-                return orjson.dumps(value).decode()
-            except Exception:
-                return str(value)
-        return str(value).strip() or None
+        choice = choices[0]
+        delta = getattr(choice, "delta", None)
+        if delta is not None:
+            content = getattr(delta, "content", None)
+            if content:
+                return str(content)
+        text = getattr(choice, "text", None)
+        if text:
+            return str(text)
+        return None
+
+    def _extract_chat_completion_text(self, response: Any) -> str:
+        choices = getattr(response, "choices", None)
+        if not choices:
+            return ""
+        choice = choices[0]
+        message = getattr(choice, "message", None)
+        if message is not None:
+            content = getattr(message, "content", None)
+            if content:
+                return str(content).strip()
+        text = getattr(choice, "text", None)
+        return str(text).strip() if text else ""
 
     @property
     def server_url(self) -> str:
@@ -503,10 +369,7 @@ class LLMClient:
         for task in tasks:
             with suppress(asyncio.CancelledError):
                 await task
-        await self._client.aclose()
-
-    async def _count_tokens(self, text: str) -> int:
-        return await asyncio.to_thread(count_tokens, text)
+        await self._openai.close()
 
     @staticmethod
     def _fingerprint(data: Any) -> str:
@@ -765,6 +628,7 @@ class LLMClient:
     ) -> AsyncGenerator[Any, None]:
         self.process_manager.ensure_server_running()
         cfg = {**self.default_request, **(params or {})}
+        cfg["stream"] = True
 
         if messages is None:
             history = history or []
@@ -794,12 +658,8 @@ class LLMClient:
             },
         )
         payload = self._build_chat_payload(messages, cfg)
-        if entry_id:
-            payload.setdefault("id", str(entry_id))
-
         async with self._acquire_slot(entry_id) as slot_id:
-            payload.setdefault("slot_id", slot_id)
-            stream = _CompletionStream(self, payload, endpoint=self._chat_endpoint)
+            stream = _CompletionStream(self, payload)
 
             try:
                 async with self._track_stream(entry_id, stream.task):
@@ -835,40 +695,22 @@ class LLMClient:
         payload.pop("id", None)
 
         try:
-            response = await self._client.post(
-                f"{self.server_url}{self._chat_endpoint}",
-                json=payload,
-            )
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            http_response = exc.response
-            status_line = str(exc)
-            body: bytes | None = None
-            if http_response is not None:
-                status_line = (
-                    f"{http_response.status_code} {http_response.reason_phrase or ''}"
-                ).strip()
-                try:
-                    body = await http_response.aread()
-                except Exception:
-                    body = None
-            detail = self._normalize_response_detail(body, status_line)
-            self.logger.error("Completion request failed (%s): %s", status_line, detail)
+            response = await self._openai.chat.completions.create(**payload)
+        except APIStatusError as exc:
             self.process_manager.ensure_server_running()
+            detail = f"{exc.status_code} {exc.message}".strip()
+            self.logger.error("Completion request failed: %s", detail)
             raise RuntimeError(detail) from exc
-        except HTTPError as exc:
+        except APITimeoutError as exc:
             self.process_manager.ensure_server_running()
-            raise RuntimeError(f"HTTP error: {exc}") from exc
+            raise RuntimeError(f"Timeout: {exc}") from exc
+        except APIError as exc:
+            self.process_manager.ensure_server_running()
+            raise RuntimeError(f"API error: {exc}") from exc
         except Exception as exc:  # pragma: no cover - defensive
             raise RuntimeError(f"Unexpected error: {exc}") from exc
 
-        try:
-            payload = response.json()
-        except ValueError:
-            return response.text.strip()
-
-        text = self._extract_completion_text(payload)
-        return text.strip()
+        return self._extract_chat_completion_text(response)
 
     def _build_chat_payload(
         self,
@@ -892,7 +734,6 @@ class LLMClient:
         for key in (
             "temperature",
             "top_p",
-            "top_k",
             "presence_penalty",
             "frequency_penalty",
             "stop",
@@ -901,44 +742,10 @@ class LLMClient:
         ):
             if key in params and params[key] is not None:
                 payload[key] = params[key]
+        if "model" not in payload:
+            payload["model"] = settings.get("LLM.chat.model", "local")
 
         return payload
-
-    def _extract_completion_text(self, payload: Any) -> str:
-        """Normalise completion responses into a string."""
-
-        if isinstance(payload, Mapping):
-            for key in ("content", "completion", "text", "data"):
-                value = payload.get(key)
-                if isinstance(value, str):
-                    return value
-            choices = payload.get("choices")
-            if choices is not None:
-                text = self._extract_completion_text(choices)
-                if text:
-                    return text
-            message = payload.get("message")
-            if message is not None:
-                text = self._extract_completion_text(message)
-                if text:
-                    return text
-            results = payload.get("results")
-            if results is not None:
-                text = self._extract_completion_text(results)
-                if text:
-                    return text
-            return ""
-
-        if isinstance(payload, Sequence) and not isinstance(
-            payload, (str, bytes, bytearray)
-        ):
-            parts = [self._extract_completion_text(item) for item in payload]
-            return "".join(part for part in parts if part)
-
-        if isinstance(payload, (bytes, bytearray)):
-            return payload.decode("utf-8", "replace")
-
-        return str(payload or "")
 
     async def abort(self, entry_id: str) -> bool:
         slot_id: int | None = None

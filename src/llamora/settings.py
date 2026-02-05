@@ -165,6 +165,8 @@ DEFAULTS: dict[str, Any] = {
         },
         "chat": {
             "endpoint": "/v1/chat/completions",
+            "model": "local",
+            "api_key": None,
         },
     },
     "PROMPTS": {

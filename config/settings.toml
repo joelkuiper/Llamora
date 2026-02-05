@@ -132,6 +132,8 @@ min_tokens = 128
 
 [default.LLM.chat]
 endpoint = "/v1/chat/completions"
+model = "local"
+# api_key = ""
 
 [default.PROMPTS]
 template_dir = "../src/llamora/llm/templates"
