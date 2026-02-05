@@ -680,6 +680,14 @@
     cursor: pointer;
   }
 
+  .entry:has(.entry-main--editing) {
+    border-color: color-mix(in srgb, var(--border) 75%, var(--color-text-muted));
+    box-shadow:
+      0 2px 10px rgba(0, 0, 0, 0.06),
+      0 0 0 1px color-mix(in srgb, var(--color-text-muted) 14%, transparent);
+    background: color-mix(in srgb, var(--color-surface) 96%, white);
+  }
+
 
 
 
