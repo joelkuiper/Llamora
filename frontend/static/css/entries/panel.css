@@ -498,8 +498,8 @@
     min-height: 2lh;
     field-sizing: content;
     resize: none;
-    max-height: 48vh;
-    overflow-y: auto;
+    max-height: none;
+    overflow-y: hidden;
     border: none;
     background: transparent;
     color: inherit;
@@ -514,6 +514,7 @@
     margin-bottom: var(--spacing-sm);
     padding-bottom: var(--spacing-sm);
   }
+
 
   .entry-edit-strip {
     display: flex;

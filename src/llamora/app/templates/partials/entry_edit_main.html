@@ -1,5 +1,6 @@
 {% macro render_entry_edit_main(e, day) -%}
-  <div class="entry-main entry-main--editing">
+  <div class="entry-main entry-main--editing"
+       data-entry-edit-container="true">
     <form class="entry-edit-form"
           hx-put="{{ url_for('entries.update_entry', entry_id=e['id']) }}"
           hx-target="closest .entry-main"

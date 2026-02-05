@@ -1,5 +1,6 @@
 const AUTOBOUND_ATTR = "data-autosize-bound";
 const SKIP_BLUR_CANCEL_ATTR = "data-skip-blur-cancel";
+const ENTRY_HEIGHT_ATTR = "data-entry-main-height";
 
 const EDIT_FLOW = {
   blur: "save",
@@ -23,6 +24,23 @@ function getScrollContainer(node) {
   return document.scrollingElement || document.documentElement;
 }
 
+function getEntryMainHeight(entryMain) {
+  if (!(entryMain instanceof Element)) return null;
+  return entryMain.getBoundingClientRect().height || null;
+}
+
+function findEntryMainFromDetail(detail) {
+  const elt = detail?.elt instanceof Element ? detail.elt : null;
+  const target = detail?.target instanceof Element ? detail.target : null;
+  if (elt?.classList?.contains("entry-main")) return elt;
+  if (target?.classList?.contains("entry-main")) return target;
+  const fromElt = elt?.querySelector?.(".entry-main") || null;
+  if (fromElt) return fromElt;
+  const fromTarget = target?.querySelector?.(".entry-main") || null;
+  if (fromTarget) return fromTarget;
+  return null;
+}
+
 function resizeTextarea(textarea) {
   if (!(textarea instanceof HTMLTextAreaElement)) return;
   const scrollContainer = getScrollContainer(textarea);
@@ -31,12 +49,19 @@ function resizeTextarea(textarea) {
   textarea.style.height = "auto";
   const styles = window.getComputedStyle(textarea);
   const max = parseFloat(styles.maxHeight || "");
+  const min = parseFloat(styles.minHeight || "");
   const height = textarea.scrollHeight;
+  let desired = height;
+  if (Number.isFinite(min) && min > 0) {
+    desired = Math.max(desired, min);
+  }
   if (Number.isFinite(max) && max > 0) {
-    textarea.style.height = `${Math.min(height, max)}px`;
-    textarea.style.overflowY = height > max ? "auto" : "hidden";
+    desired = Math.min(desired, max);
+  }
+  textarea.style.height = `${desired}px`;
+  if (Number.isFinite(max) && max > 0) {
+    textarea.style.overflowY = desired >= max ? "auto" : "hidden";
   } else {
-    textarea.style.height = `${height}px`;
     textarea.style.overflowY = "hidden";
   }
   if (
@@ -152,6 +177,33 @@ document.body?.addEventListener("htmx:afterSwap", (event) => {
   const target = event.detail?.target;
   if (target) {
     bindInNode(target);
+  }
+});
+
+document.body?.addEventListener("htmx:beforeSwap", (event) => {
+  const entryMain = findEntryMainFromDetail(event.detail);
+  if (!entryMain) return;
+  const entry = entryMain.closest(".entry");
+  if (!entry) return;
+  const height = getEntryMainHeight(entryMain);
+  if (Number.isFinite(height)) {
+    entry.setAttribute(ENTRY_HEIGHT_ATTR, String(height));
+  }
+});
+
+document.body?.addEventListener("htmx:afterSwap", (event) => {
+  const entryMain = findEntryMainFromDetail(event.detail);
+  if (!entryMain) return;
+  const entry = entryMain.closest(".entry");
+  const prevHeight = entry
+    ? parseFloat(entry.getAttribute(ENTRY_HEIGHT_ATTR) || "")
+    : NaN;
+  if (entry) {
+    entry.removeAttribute(ENTRY_HEIGHT_ATTR);
+  }
+  const textarea = entryMain.querySelector(".entry-edit-area");
+  if (textarea instanceof HTMLTextAreaElement) {
+    resizeTextarea(textarea);
   }
 });
 
