@@ -183,6 +183,41 @@
       cursor: default;
     }
   }
+
+  .entry-submit-stack {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    position: relative;
+  }
+
+  .entry-submit-stack .entry-char-counter {
+    font-size: 0.65rem;
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    left: 0;
+    text-align: center;
+    pointer-events: none;
+  }
+
+  .entry-char-counter {
+    letter-spacing: 0.02em;
+    color: var(--color-text-muted);
+    opacity: 0;
+    transition: opacity var(--motion-gentle) ease, color var(--motion-gentle) ease;
+    white-space: nowrap;
+  }
+
+  .entry-char-counter.is-visible {
+    opacity: 0.75;
+  }
+
+  .entry-char-counter.is-limit {
+    color: var(--color-danger);
+    opacity: 0.9;
+  }
 }
 
 /* animations */

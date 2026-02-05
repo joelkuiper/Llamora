@@ -8,9 +8,11 @@
           hx-on::after-request="if(event.detail.elt!==this){return;}this.classList.remove('is-saving'); const b=this.querySelector('.entry-edit-save'); if(b){b.classList.remove('is-saving'); b.removeAttribute('aria-busy');}"
           data-entry-edit-form="true">
       <textarea class="entry-edit-area"
+                id="entry-edit-{{ e['id'] }}-text"
                 name="text"
                 rows="1"
                 spellcheck="true"
+                maxlength="{{ config.MAX_MESSAGE_LENGTH }}"
                 autofocus>{{- e.get('text', '') | e -}}</textarea>
       <div class="entry-edit-strip">
         <button type="submit"
@@ -34,6 +36,12 @@
           <span aria-hidden="true">×</span>
           <span class="entry-edit-label">Cancel</span>
         </button>
+        <span class="entry-char-counter"
+              data-char-counter
+              data-char-counter-for="entry-edit-{{ e['id'] }}-text"
+              data-char-threshold="40"
+              aria-live="polite"
+              aria-atomic="true"></span>
       </div>
     </form>
   </div>

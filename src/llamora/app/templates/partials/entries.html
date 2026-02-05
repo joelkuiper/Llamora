@@ -22,9 +22,17 @@
                     cols="40"
                     maxlength="{{ config.MAX_MESSAGE_LENGTH }}"></textarea>
           <input type="hidden" name="user_time" id="user-time" />
-          <button id="send-btn" class="btn" type="submit" aria-label="Send"{% if not is_today %} disabled{% endif %}>
-            <span class="icon-mask icon-feather send-icon" aria-hidden="true"></span>
-          </button>
+          <div class="entry-submit-stack">
+            <button id="send-btn" class="btn" type="submit" aria-label="Send"{% if not is_today %} disabled{% endif %}>
+              <span class="icon-mask icon-feather send-icon" aria-hidden="true"></span>
+            </button>
+            <span class="entry-char-counter"
+                  data-char-counter
+                  data-char-counter-for="entry-text"
+                  data-char-threshold="40"
+                  aria-live="polite"
+                  aria-atomic="true"></span>
+          </div>
         </div>
       </form>
     </entry-form>

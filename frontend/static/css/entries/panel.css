@@ -532,6 +532,28 @@
     opacity: 1;
   }
 
+  .entry-edit-strip .entry-char-counter {
+    margin-left: auto;
+  }
+
+  .entry-char-counter {
+    font-size: 0.7rem;
+    letter-spacing: 0.02em;
+    color: var(--color-text-muted);
+    opacity: 0;
+    transition: opacity var(--motion-gentle) ease, color var(--motion-gentle) ease;
+    white-space: nowrap;
+  }
+
+  .entry-char-counter.is-visible {
+    opacity: 0.75;
+  }
+
+  .entry-char-counter.is-limit {
+    color: var(--color-danger);
+    opacity: 0.9;
+  }
+
   .entry-edit-strip button {
     border: none;
     background: transparent;
