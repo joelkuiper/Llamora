@@ -5,7 +5,7 @@
 }
 
 
-.user, .assistant, .response-stream { animation: fade-in-up var(--motion-sigh) ease-out; }
+.entry.motion-animate-entry { animation: fade-in-up var(--motion-sigh) ease-out; }
 
 @keyframes submitting-wave {
   0%, 100% {
