@@ -117,6 +117,9 @@ class ResponseStreamElement extends HTMLElement {
     this.#syncDeleteButton();
 
     if (!this.#completed) {
+      if (this.#suppressOpeningStream()) {
+        return;
+      }
       this.#startStream();
     }
   }
@@ -139,6 +142,23 @@ class ResponseStreamElement extends HTMLElement {
 
   get sseUrl() {
     return this.dataset.sseUrl || this.getAttribute("sse-url") || "";
+  }
+
+  #suppressOpeningStream() {
+    const entryId = this.entryId || "";
+    const isOpeningStream =
+      this.classList.contains("opening-stream") || entryId.startsWith("opening-");
+    if (!isOpeningStream) return false;
+    const entries = this.closest?.("#entries") || document;
+    const hasPersistedOpening = Boolean(
+      entries.querySelector(".entry--opening:not(.opening-stream)")
+    );
+    if (!hasPersistedOpening) return false;
+    this.dataset.streaming = "false";
+    this.removeAttribute("data-sse-url");
+    this.removeAttribute("aria-busy");
+    this.remove();
+    return true;
   }
 
   abort({ reason = "user:abort" } = {}) {

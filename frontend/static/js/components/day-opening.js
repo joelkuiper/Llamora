@@ -59,43 +59,16 @@ function getOpeningNodes() {
   return Array.from(document.querySelectorAll(".entry--opening"));
 }
 
-function isStreamNode(opening) {
-  return opening?.classList?.contains("opening-stream");
-}
-
-function choosePrimary(openings) {
-  if (!openings.length) return null;
-  const nonStream = openings.find((node) => !isStreamNode(node));
-  return nonStream || openings[0];
-}
-
-function dedupeOpenings() {
-  const openings = getOpeningNodes();
-  if (openings.length <= 1) {
-    return openings[0] || null;
-  }
-
-  const primary = choosePrimary(openings);
-  openings.forEach((opening) => {
-    if (opening === primary) return;
-    if (typeof opening.abort === "function") {
-      opening.abort({ reason: "duplicate:opening" });
-    }
-    opening.remove();
-  });
-  return primary;
-}
-
 function syncOpeningState() {
   const day = getEntriesDay();
-  const opening = dedupeOpenings();
-  if (!opening || !day) {
+  const openings = getOpeningNodes();
+  if (!openings.length || !day) {
     setDocumentCollapsed(false);
     return;
   }
 
   const collapsed = readCollapsed(day);
-  applyCollapsed(opening, collapsed);
+  openings.forEach((opening) => applyCollapsed(opening, collapsed));
   setDocumentCollapsed(collapsed);
 }
 
