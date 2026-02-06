@@ -26,34 +26,47 @@ export class ScrollIntent {
     this.#listeners = createListenerBag();
     const bag = this.#listeners;
     const manager = this.#manager;
+    const scrollPolicies = {
+      [FORCE_BOTTOM_EVENT]: (event) => manager.handleForceBottom(event?.detail),
+      [TARGET_EVENT]: (event) => {
+        const detail = event?.detail || {};
+        if (!detail || (!detail.id && !detail.element)) return;
+        manager.scrollToTarget(detail.id ?? detail.element, detail.options);
+      },
+      [REFRESH_EVENT]: () => {
+        manager.ensureElements();
+        scheduleFrame(() => manager.toggleScrollBtn());
+      },
+      [TARGET_CONSUMED_EVENT]: (event) => {
+        manager.handleTargetConsumed(event?.detail || {});
+      },
+    };
+    const documentPolicies = {
+      [MARKDOWN_EVENT]: () => manager.handleMarkdownRendered(),
+    };
+    const windowPolicies = {
+      pageshow: (event) => manager.handlePageShow(event),
+    };
+    const bodyPolicies = {
+      "htmx:beforeSwap": (evt) => manager.handleBeforeSwap(evt),
+      "htmx:load": (evt) => manager.handleLoad(evt),
+      "htmx:historyRestore": (evt) => {
+        manager.emitHistoryRestore(evt);
+        manager.handleLoad(evt);
+      },
+    };
 
-    bag.add(scrollEvents, FORCE_BOTTOM_EVENT, (event) => {
-      manager.handleForceBottom(event?.detail);
+    Object.entries(scrollPolicies).forEach(([eventName, handler]) => {
+      bag.add(scrollEvents, eventName, handler);
     });
-    bag.add(scrollEvents, TARGET_EVENT, (event) => {
-      const detail = event?.detail || {};
-      if (!detail || (!detail.id && !detail.element)) return;
-      manager.scrollToTarget(detail.id ?? detail.element, detail.options);
+    Object.entries(documentPolicies).forEach(([eventName, handler]) => {
+      bag.add(document, eventName, handler);
     });
-    bag.add(scrollEvents, REFRESH_EVENT, () => {
-      manager.ensureElements();
-      scheduleFrame(() => manager.toggleScrollBtn());
+    Object.entries(windowPolicies).forEach(([eventName, handler]) => {
+      bag.add(window, eventName, handler);
     });
-    bag.add(scrollEvents, TARGET_CONSUMED_EVENT, (event) => {
-      manager.handleTargetConsumed(event?.detail || {});
-    });
-
-    bag.add(document, MARKDOWN_EVENT, () => manager.handleMarkdownRendered());
-
-    bag.add(window, "pageshow", (event) => {
-      manager.handlePageShow(event);
-    });
-
-    bag.add(document.body, "htmx:beforeSwap", (evt) => manager.handleBeforeSwap(evt));
-    bag.add(document.body, "htmx:load", (evt) => manager.handleLoad(evt));
-    bag.add(document.body, "htmx:historyRestore", (evt) => {
-      manager.emitHistoryRestore(evt);
-      manager.handleLoad(evt);
+    Object.entries(bodyPolicies).forEach(([eventName, handler]) => {
+      bag.add(document.body, eventName, handler);
     });
 
     manager.ensureElements();
