@@ -14,6 +14,7 @@ from .tag_service import TagEntryPreview
 logger = logging.getLogger(__name__)
 
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
+_MIN_SUMMARY_WORDS = 10
 
 
 def _tag_summary_system_prompt() -> str:
@@ -28,7 +29,11 @@ def _tag_summary_response_format() -> dict[str, Any]:
             "schema": {
                 "type": "object",
                 "properties": {
-                    "summary": {"type": "string"},
+                    "summary": {
+                        "type": "string",
+                        "minLength": 36,
+                        "maxLength": 220,
+                    },
                 },
                 "required": ["summary"],
                 "additionalProperties": False,
@@ -83,6 +88,19 @@ def _extract_summary(raw: str) -> str:
             return _clean_summary(summary)
     return _clean_summary(raw)
 
+def _summary_word_count(text: str) -> int:
+    return len([seg for seg in str(text).split() if seg])
+
+
+def _summary_mentions_tag_once(text: str, tag_name: str) -> bool:
+    if not tag_name:
+        return True
+    normalized = tag_name.strip()
+    if not normalized:
+        return True
+    matches = re.findall(re.escape(normalized), text, flags=re.IGNORECASE)
+    return len(matches) <= 1
+
 
 async def generate_tag_summary(
     llm,
@@ -101,20 +119,45 @@ async def generate_tag_summary(
         {"role": "user", "content": user_prompt},
     ]
 
+    params = {
+        "temperature": 0.3,
+        "n_predict": 120,
+        "response_format": _tag_summary_response_format(),
+    }
+
     try:
-        raw = await llm.complete_messages(
-            messages,
-            params={
-                "temperature": 0.3,
-                "n_predict": 120,
-                "response_format": _tag_summary_response_format(),
-            },
-        )
+        raw = await llm.complete_messages(messages, params=params)
     except Exception:
         logger.exception("Tag summary request failed")
         return ""
 
-    return _extract_summary(raw)
+    summary = _extract_summary(raw)
+    if (
+        _summary_word_count(summary) >= _MIN_SUMMARY_WORDS
+        and _summary_mentions_tag_once(summary, tag_name)
+    ):
+        return summary
+
+    retry_messages = [
+        {
+            "role": "system",
+            "content": (
+                _tag_summary_system_prompt()
+                + "\nMinimum 10 words. Use the tag name once (no repetition)."
+                " Avoid single-word outputs."
+            ),
+        },
+        {"role": "user", "content": user_prompt},
+    ]
+
+    try:
+        raw_retry = await llm.complete_messages(retry_messages, params=params)
+    except Exception:
+        logger.exception("Tag summary retry failed")
+        return summary
+
+    retry_summary = _extract_summary(raw_retry)
+    return retry_summary or summary
 
 
 __all__ = ["generate_tag_summary"]
