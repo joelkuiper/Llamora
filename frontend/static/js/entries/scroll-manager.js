@@ -2,10 +2,6 @@ import { createListenerBag } from "../utils/events.js";
 import { motionSafeBehavior, prefersReducedMotion } from "../utils/motion.js";
 import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
 import { isNearBottom } from "./scroll-utils.js";
-import {
-  ACTIVE_DAY_CHANGED_EVENT,
-  getActiveDay,
-} from "./active-day-store.js";
 import { scheduleFrame, scheduleRafLoop } from "../utils/scheduler.js";
 
 export const scrollEvents = new EventTarget();
@@ -26,12 +22,12 @@ export const scrollEvents = new EventTarget();
  * - `target`: identifier consumed by listeners acknowledging a target request.
  */
 
-const FORCE_BOTTOM_EVENT = "scroll:force-bottom";
-const TARGET_EVENT = "scroll:target";
-const TARGET_CONSUMED_EVENT = "scroll:target-consumed";
-const REFRESH_EVENT = "scroll:refresh";
-const HISTORY_RESTORE_EVENT = "scroll:history-restore";
-const MARKDOWN_COMPLETE_EVENT = "scroll:markdown-complete";
+export const FORCE_BOTTOM_EVENT = "scroll:force-bottom";
+export const TARGET_EVENT = "scroll:target";
+export const TARGET_CONSUMED_EVENT = "scroll:target-consumed";
+export const REFRESH_EVENT = "scroll:refresh";
+export const HISTORY_RESTORE_EVENT = "scroll:history-restore";
+export const MARKDOWN_COMPLETE_EVENT = "scroll:markdown-complete";
 
 const SCROLL_DETAIL_BASE = Object.freeze({
   source: "unspecified",
@@ -170,67 +166,7 @@ export class ScrollManager {
   start() {
     if (this.#started) return;
     this.#started = true;
-
-    this.#listeners = createListenerBag();
-    const bag = this.#listeners;
-
-    bag.add(scrollEvents, FORCE_BOTTOM_EVENT, (event) => {
-      this.#handleForceBottom(event?.detail);
-    });
-    bag.add(scrollEvents, TARGET_EVENT, (event) => {
-      const detail = event?.detail || {};
-      if (!detail || (!detail.id && !detail.element)) return;
-      this.scrollToTarget(detail.id ?? detail.element, detail.options);
-    });
-    bag.add(scrollEvents, REFRESH_EVENT, () => {
-      this.ensureElements();
-      scheduleFrame(() => this.toggleScrollBtn());
-    });
-    bag.add(scrollEvents, TARGET_CONSUMED_EVENT, (event) => {
-      const detail = event?.detail || {};
-      if (detail.target) {
-        this.#skipNextRestore = true;
-      } else {
-        this.restore();
-      }
-    });
-
-    bag.add(document, MARKDOWN_EVENT, () => this.#handleMarkdownRendered());
-
-    bag.add(window, "pageshow", (event) => {
-      if (event.persisted) {
-        this.#skipNextRestore = true;
-        this.ensureElements();
-        if (this.container) {
-          this.updateScrollState(this.container.scrollTop);
-          this.toggleScrollBtn();
-          this.alignScrollButton();
-        }
-      }
-    });
-
-    bag.add(document.body, "htmx:beforeSwap", (evt) => this.#handleBeforeSwap(evt));
-    bag.add(document.body, "htmx:load", (evt) => this.#handleLoad(evt));
-    bag.add(document.body, "htmx:historyRestore", (evt) => {
-      this.#emitHistoryRestore(evt);
-      this.#handleLoad(evt);
-    });
-
     this.ensureElements();
-
-    const hasActiveDay = Boolean(getActiveDay());
-    if (hasActiveDay) {
-      this.restore();
-      return;
-    }
-
-    const resumeRestore = () => {
-      this.restore();
-    };
-
-    bag.add(document, ACTIVE_DAY_CHANGED_EVENT, resumeRestore, {
-      once: true,
-    });
   }
 
   stop() {
@@ -384,7 +320,7 @@ export class ScrollManager {
     }
   }
 
-  #handleForceBottom(detail) {
+  handleForceBottom(detail) {
     const meta = detail || {};
     const force = meta.force === true;
 
@@ -395,6 +331,37 @@ export class ScrollManager {
     }
 
     this.scrollToBottom(force);
+  }
+
+  handleTargetConsumed(detail) {
+    const meta = detail || {};
+    if (meta.target) {
+      this.#skipNextRestore = true;
+    } else {
+      this.restore();
+    }
+  }
+
+  handlePageShow(event) {
+    if (!event?.persisted) return;
+    this.ensureElements();
+    if (!this.container) return;
+
+    const currentTop = this.container.scrollTop || 0;
+    const key = this.#getKey();
+    const saved = this.#safeGet(key);
+    const savedTop = saved != null ? Number.parseInt(saved, 10) : NaN;
+    const shouldRestore =
+      Number.isFinite(savedTop) && (currentTop === 0 || Math.abs(savedTop - currentTop) > 4);
+
+    if (shouldRestore) {
+      this.restore();
+      return;
+    }
+
+    this.updateScrollState(currentTop);
+    this.toggleScrollBtn();
+    this.alignScrollButton();
   }
 
   scrollToTarget(target, options = {}) {
@@ -593,7 +560,7 @@ export class ScrollManager {
     }
   }
 
-  #handleBeforeSwap(event) {
+  handleBeforeSwap(event) {
     const target = event?.detail?.target || event?.target || null;
     if (!target || !this.container) return;
 
@@ -607,12 +574,12 @@ export class ScrollManager {
     }
   }
 
-  #handleLoad(event) {
+  handleLoad(event) {
     const detail = event?.detail || {};
     const possibleSources = [detail.item, detail.target, event?.target];
 
     for (const source of possibleSources) {
-      const wrapper = this.#resolveWrapperFromNode(source);
+      const wrapper = this.resolveWrapperFromNode(source);
       if (wrapper) {
         this.ensureContainer();
         this.maybeRestore();
@@ -621,7 +588,7 @@ export class ScrollManager {
     }
   }
 
-  #resolveWrapperFromNode(node) {
+  resolveWrapperFromNode(node) {
     if (!node) return null;
 
     if (typeof DocumentFragment !== "undefined" && node instanceof DocumentFragment) {
@@ -638,7 +605,7 @@ export class ScrollManager {
     return null;
   }
 
-  #emitHistoryRestore(event) {
+  emitHistoryRestore(event) {
     const detail = {
       event,
       key: this.#getKey(),
@@ -650,7 +617,7 @@ export class ScrollManager {
     );
   }
 
-  #handleMarkdownRendered() {
+  handleMarkdownRendered() {
     const currentKey = this.#getKey();
 
     if (this.#waitingKey && this.#waitingKey !== currentKey) {
@@ -775,9 +742,9 @@ export class ScrollManager {
   }
 
   #getKey() {
-    const activeDay = getActiveDay();
-    if (activeDay) {
-      return `${STORAGE_PREFIX}-day-${activeDay}`;
+    const entryDay = this.entries?.dataset?.date || null;
+    if (entryDay) {
+      return `${STORAGE_PREFIX}-day-${entryDay}`;
     }
     return `${STORAGE_PREFIX}-path-${window.location.pathname}`;
   }

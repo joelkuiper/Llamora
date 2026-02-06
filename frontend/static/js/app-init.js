@@ -1,4 +1,5 @@
 import { ScrollManager } from "./entries/scroll-manager.js";
+import { ScrollIntent } from "./entries/scroll-intent.js";
 import { initGlobalShortcuts } from "./global-shortcuts.js";
 import { getActiveDay } from "./entries/active-day-store.js";
 import {
@@ -16,6 +17,7 @@ import {
 let headersRegistered = false;
 let offlineHandlerRegistered = false;
 let scrollManager = null;
+let scrollIntent = null;
 let resolveAppReady = null;
 
 export const appReady = new Promise((resolve) => {
@@ -73,6 +75,10 @@ function ensureScrollManager() {
   if (!scrollManager) {
     scrollManager = new ScrollManager();
     scrollManager.start();
+  }
+  if (!scrollIntent) {
+    scrollIntent = new ScrollIntent(scrollManager);
+    scrollIntent.start();
   }
   return scrollManager;
 }

@@ -10,6 +10,10 @@ import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 import { setActiveDay, clearActiveDay } from "../entries/active-day-store.js";
 import {
+  armEntryAnimations,
+  armInitialEntryAnimations,
+} from "../entries/entry-animations.js";
+import {
   getClientToday,
   getTimezone,
   scheduleMidnightRollover,
@@ -21,28 +25,8 @@ import "./entry-form.js";
 import "./response-stream.js";
 import "./entry-actions.js";
 
-function activateAnimations(node) {
-  if (!node || node.nodeType !== Node.ELEMENT_NODE) return;
-
-  const entries = [];
-  if (node.classList?.contains("entry")) {
-    entries.push(node);
-  }
-  node.querySelectorAll?.(".entry").forEach((el) => entries.push(el));
-
-  entries.forEach((entry) => {
-    entry.classList.add("motion-animate-entry");
-  });
-}
-
-function activateInitialEntryAnimations(entries) {
-  if (!entries || entries.nodeType !== Node.ELEMENT_NODE) return;
-  if (entries.dataset.animApplied === "true") return;
-  entries.dataset.animApplied = "true";
-  requestAnimationFrame(() => {
-    activateAnimations(entries);
-  });
-}
+const activateAnimations = armEntryAnimations;
+const activateInitialEntryAnimations = armInitialEntryAnimations;
 
 export class EntryView extends ReactiveElement {
   #entryForm = null;
