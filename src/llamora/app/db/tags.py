@@ -194,6 +194,40 @@ class TagsRepository(BaseRepository):
             )
         return mapping
 
+    async def get_tag_info(
+        self, user_id: str, tag_hash: bytes, dek: bytes
+    ) -> dict[str, Any] | None:
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                """
+                SELECT tag_hash, name_ct, name_nonce, alg, seen, last_seen
+                FROM tags
+                WHERE user_id = ? AND tag_hash = ?
+                """,
+                (user_id, tag_hash),
+            )
+            row = await cursor.fetchone()
+
+        if not row:
+            return None
+
+        tag_name = cached_tag_name(
+            user_id,
+            row["tag_hash"],
+            row["name_nonce"],
+            row["name_ct"],
+            row["alg"].encode(),
+            dek,
+            self._decrypt_message,
+        )
+
+        return {
+            "name": tag_name,
+            "hash": row["tag_hash"].hex(),
+            "count": row["seen"],
+            "last_used": row["last_seen"],
+        }
+
     async def get_tag_frecency(
         self, user_id: str, limit: int, lambda_: Any, dek: bytes
     ) -> list[dict]:

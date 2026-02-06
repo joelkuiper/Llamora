@@ -1,0 +1,49 @@
+{% set entry_count = tag.count or 0 %}
+{% set last_used = tag.last_used %}
+<div class="tag-detail" data-tag-hash="{{ tag.hash }}">
+  <div class="tag-detail__header">
+    <div class="tag-detail__title">{{ tag.name }}</div>
+    <div class="tag-detail__meta">
+      {{ entry_count }} {{ "entry" if entry_count == 1 else "entries" }}
+      · last used
+      <span class="tag-detail__meta-time" {% if last_used %}title="{{ last_used }}"{% endif %}>
+        {{ last_used|humanize if last_used else "unknown" }}
+      </span>
+    </div>
+  </div>
+  <div class="tag-detail__summary"
+       hx-get="{{ url_for('tags.tag_detail_summary', tag_hash=tag.hash) }}"
+       hx-trigger="tag-detail:summary"
+       hx-target="this"
+       data-tag-hash="{{ tag.hash }}"
+       hx-disinherit="hx-target"
+       hx-swap="innerHTML swap:120ms">
+    <div class="tag-detail-skeleton" aria-hidden="true">
+      <span class="tag-detail-skeleton__line"></span>
+      <span class="tag-detail-skeleton__line"></span>
+    </div>
+  </div>
+  <div class="tag-detail__entries">
+    {% if entries %}
+      {% for entry in entries %}
+        {% set item_date = entry.created_date or entry.created_at[:10] %}
+        <a class="tag-detail__item"
+           href="{{ url_for('days.day', date=item_date) }}?target=entry-{{ entry.entry_id }}"
+           hx-get="{{ url_for('entries.entries_htmx', date=item_date) }}?target=entry-{{ entry.entry_id }}"
+           hx-target="#content-wrapper"
+           hx-swap="outerHTML"
+           data-date="{{ item_date }}"
+           data-target="entry-{{ entry.entry_id }}"
+          hx-trigger="click[!document.getElementById('entries') || document.getElementById('entries').dataset.date !== this.dataset.date]">
+          <div class="tag-detail__timestamp">
+            <time class="entry-time tag-detail__time" datetime="{{ entry.created_at }}" data-time-raw="{{ entry.created_at }}"></time>
+            <span class="tag-detail__ago">{{ entry.created_at|humanize }}</span>
+          </div>
+          <span class="tag-detail__preview">{{ entry.preview }}</span>
+        </a>
+      {% endfor %}
+    {% else %}
+      <p class="tag-detail__empty">No entries yet.</p>
+    {% endif %}
+  </div>
+</div>

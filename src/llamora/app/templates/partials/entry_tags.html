@@ -1,12 +1,11 @@
 {% macro entry_tag_item(label, tag_hash, entry_id=None) -%}
   {% set canonical_value = display(label) %}
-  <span class="entry-tag">
-    <a class="tag-label"
-       href="{{ url_for('search.search') }}?q={{ canonical_value | urlencode }}"
-       hx-get="{{ url_for('search.search') }}?q={{ canonical_value | urlencode }}"
-       hx-target="#search-results"
-       hx-indicator="#search-spinner"
-       hx-swap="innerHTML">{{ canonical_value }}</a>
+  <span class="entry-tag" data-tag-hash="{{ tag_hash }}" data-tag-name="{{ canonical_value }}">
+    <button class="tag-label"
+            type="button"
+            aria-haspopup="dialog"
+            data-tag-hash="{{ tag_hash }}"
+            data-tag-name="{{ canonical_value }}">{{ canonical_value }}</button>
     {% if entry_id %}
     <button class="tag-remove"
             aria-label="Remove tag {{ canonical_value }}"
@@ -21,7 +20,9 @@
   <entry-tags class="entry-tags"
               data-entry-id="{{ entry_id }}"
               data-suggestions-url="{{ url_for('tags.get_tag_suggestions', entry_id=entry_id) }}"
+              data-tag-detail-url="{{ url_for('tags.tag_detail', tag_hash='__TAG_HASH__') }}"
               data-autocomplete-limit="12"
+              hx-trigger="restored"
               {% if hidden %}hidden{% endif %}>
     <button
       data-tooltip-title="Add traces"
@@ -58,6 +59,23 @@
           {% for _ in range(6) %}
           <span class="tag-suggestion tag-suggestion--skeleton" aria-hidden="true"></span>
           {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="tag-popover tag-detail-popover glass-panel" role="dialog" aria-modal="true" hidden>
+      <div class="tp-content tag-detail-panel">
+        <button type="button" class="overlay-close" aria-label="Close">×</button>
+        <div class="tag-detail-body"
+             hx-trigger="tag-detail:show">
+          <div class="tag-detail-skeleton" aria-hidden="true">
+            <span class="tag-detail-skeleton__title"></span>
+            <span class="tag-detail-skeleton__meta"></span>
+            <span class="tag-detail-skeleton__line"></span>
+            <span class="tag-detail-skeleton__line"></span>
+            <span class="tag-detail-skeleton__item"></span>
+            <span class="tag-detail-skeleton__item"></span>
+          </div>
         </div>
       </div>
     </div>

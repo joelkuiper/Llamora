@@ -3,6 +3,7 @@ from quart import Blueprint, request, abort, render_template, jsonify
 from llamora.app.services.container import get_services, get_tag_service
 from llamora.app.services.auth_helpers import login_required
 from llamora.app.services.session_context import get_session_context
+from llamora.app.services.tag_summary import generate_tag_summary
 from llamora.settings import settings
 from llamora.app.util.frecency import (
     DEFAULT_FRECENCY_DECAY,
@@ -107,5 +108,68 @@ async def get_tag_suggestions(entry_id: str):
         "partials/tag_suggestions.html",
         suggestions=suggestions,
         entry_id=entry_id,
+    )
+    return html
+
+
+@tags_bp.get("/t/detail/<tag_hash>")
+@login_required
+async def tag_detail(tag_hash: str):
+    _, user, dek = await require_user_and_dek()
+    try:
+        tag_hash_bytes = bytes.fromhex(tag_hash)
+    except ValueError as exc:
+        abort(400, description="invalid tag hash")
+        raise AssertionError("unreachable") from exc
+
+    overview = await _tags().get_tag_overview(
+        user["id"],
+        dek,
+        tag_hash_bytes,
+        limit=24,
+    )
+    if overview is None:
+        abort(404, description="tag not found")
+        raise AssertionError("unreachable")
+
+    html = await render_template(
+        "partials/tag_detail_body.html",
+        tag=overview,
+        entries=overview.entries,
+    )
+    return html
+
+
+@tags_bp.get("/t/detail/<tag_hash>/summary")
+@login_required
+async def tag_detail_summary(tag_hash: str):
+    _, user, dek = await require_user_and_dek()
+    try:
+        tag_hash_bytes = bytes.fromhex(tag_hash)
+    except ValueError as exc:
+        abort(400, description="invalid tag hash")
+        raise AssertionError("unreachable") from exc
+
+    overview = await _tags().get_tag_overview(
+        user["id"],
+        dek,
+        tag_hash_bytes,
+        limit=12,
+    )
+    if overview is None:
+        abort(404, description="tag not found")
+        raise AssertionError("unreachable")
+
+    llm = get_services().llm_service.llm
+    summary = await generate_tag_summary(
+        llm,
+        overview.name,
+        overview.count,
+        overview.last_used,
+        overview.entries,
+    )
+    html = await render_template(
+        "partials/tag_detail_summary.html",
+        summary=summary,
     )
     return html

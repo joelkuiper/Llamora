@@ -4,6 +4,8 @@ import { AutocompleteOverlayMixin } from "./base/autocomplete-overlay.js";
 import { AutocompleteHistory } from "../utils/autocomplete-history.js";
 import { parsePositiveInteger } from "../utils/number.js";
 import { animateMotion } from "../services/motion.js";
+import { scrollToHighlight } from "../ui.js";
+import { formatTimeElements } from "../services/time.js";
 
 const canonicalizeTag = (value, limit = null) => {
   const text = `${value ?? ""}`.replace(/^#/, "").trim();
@@ -20,6 +22,12 @@ const prepareTagAutocompleteValue = (value) =>
   `${value ?? ""}`.replace(/^#/, "").trim();
 
 const TAG_HISTORY_MAX = 50;
+const TAG_SUMMARY_CACHE_PREFIX = "llamora:tag-summary:";
+const TAG_SUMMARY_CACHE_TTL = 1000 * 60 * 60 * 6;
+const debugTagDetail = (...args) => {
+  // HACK: always-on debug tracing for tag popover behavior.
+  console.debug("[tag-detail]", ...args);
+};
 
 export const mergeTagCandidateValues = (
   remoteCandidates = [],
@@ -54,11 +62,29 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   #panel = null;
   #suggestions = null;
   #closeButton = null;
+  #detailPopover = null;
+  #detailPopoverEl = null;
+  #detailPanel = null;
+  #detailCloseButton = null;
+  #detailBody = null;
+  #detailSkeleton = "";
+  #activeTagEl = null;
+  #activeTagLabel = null;
+  #activeTagHash = "";
+  #detailOutsideListeners = null;
   #tagContainer = null;
   #listeners = null;
   #inputListeners = null;
   #buttonClickHandler;
   #closeClickHandler;
+  #detailCloseClickHandler;
+  #detailClickHandler;
+  #detailAfterSwapHandler;
+  #pageShowHandler;
+  #pageHideHandler;
+  #beforeHistorySaveHandler;
+  #restoredHandler;
+  #visibilityHandler;
   #inputHandler;
   #inputFocusHandler;
   #configRequestHandler;
@@ -73,6 +99,15 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     super();
     this.#buttonClickHandler = () => this.#togglePopover();
     this.#closeClickHandler = (event) => this.#handleCloseClick(event);
+    this.#detailCloseClickHandler = (event) => this.#handleDetailCloseClick(event);
+    this.#detailClickHandler = (event) => this.#handleDetailClick(event);
+    this.#detailAfterSwapHandler = (event) => this.#handleDetailAfterSwap(event);
+    this.#pageShowHandler = () => this.#resetDetailPopoverState();
+    this.#pageHideHandler = () => this.#forceHideDetailPopover("pagehide");
+    this.#beforeHistorySaveHandler = () =>
+      this.#forceHideDetailPopover("htmx:beforeHistorySave");
+    this.#restoredHandler = () => this.#resetDetailPopoverState("htmx:restored");
+    this.#visibilityHandler = () => this.#handleVisibility();
     this.#inputHandler = () => {
       this.#updateSubmitState();
       this.scheduleAutocompleteFetch();
@@ -120,6 +155,10 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       return;
     }
 
+    debugTagDetail("connected", {
+      entryId: this.dataset?.entryId ?? null,
+      tagDetailUrl: this.dataset?.tagDetailUrl ?? null,
+    });
     listeners.add(
       this.#form,
       "htmx:configRequest",
@@ -127,8 +166,12 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     );
     listeners.add(this.#form, "htmx:afterRequest", this.#afterRequestHandler);
     listeners.add(this, "htmx:afterSwap", this.#afterSwapHandler);
+    listeners.add(this, "htmx:restored", this.#restoredHandler);
     listeners.add(this.#button, "click", this.#buttonClickHandler);
     listeners.add(this.#closeButton, "click", this.#closeClickHandler);
+    listeners.add(this.#detailCloseButton, "click", this.#detailCloseClickHandler);
+    listeners.add(this.#detailPopoverEl, "click", this.#detailClickHandler);
+    listeners.add(this.#detailBody, "htmx:afterSwap", this.#detailAfterSwapHandler);
     listeners.add(
       this.#suggestions,
       "htmx:afterSwap",
@@ -136,13 +179,20 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     );
     listeners.add(this.#tagContainer, "click", this.#tagActivationHandler);
     listeners.add(this.#tagContainer, "keydown", this.#tagKeydownHandler);
+    listeners.add(window, "pageshow", this.#pageShowHandler);
+    listeners.add(window, "pagehide", this.#pageHideHandler);
+    listeners.add(document, "htmx:beforeHistorySave", this.#beforeHistorySaveHandler);
+    listeners.add(document, "htmx:restored", this.#restoredHandler);
+    listeners.add(document, "visibilitychange", this.#visibilityHandler);
 
     this.#initPopover();
     this.#updateSubmitState();
   }
 
   disconnectedCallback() {
+    debugTagDetail("disconnected");
     this.#destroyPopover();
+    this.#destroyDetailPopover();
     this.#teardownListeners();
     this.#inputListeners = this.disposeListenerBag(this.#inputListeners);
     super.disconnectedCallback();
@@ -157,6 +207,13 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#panel = this.#popoverEl?.querySelector(".tp-content") ?? null;
     this.#suggestions = this.#popoverEl?.querySelector(".tag-suggestions") ?? null;
     this.#closeButton = this.#popoverEl?.querySelector(".overlay-close") ?? null;
+    this.#detailPopoverEl = this.querySelector(".tag-detail-popover");
+    this.#detailPanel = this.#detailPopoverEl?.querySelector(".tag-detail-panel") ?? null;
+    this.#detailCloseButton = this.#detailPopoverEl?.querySelector(".overlay-close") ?? null;
+    this.#detailBody = this.#detailPopoverEl?.querySelector(".tag-detail-body") ?? null;
+    if (this.#detailBody && !this.#detailSkeleton) {
+      this.#detailSkeleton = this.#detailBody.innerHTML;
+    }
     this.#tagContainer = this.querySelector(".entry-tags-list");
 
     this.#button?.setAttribute("aria-expanded", "false");
@@ -216,11 +273,23 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.classList.remove("popover-open");
   }
 
+  #destroyDetailPopover() {
+    if (this.#detailPopover) {
+      this.#detailPopover.destroy();
+      this.#detailPopover = null;
+    }
+    this.#detailOutsideListeners = this.disposeListenerBag(
+      this.#detailOutsideListeners
+    );
+    this.#clearActiveTag();
+  }
+
   #togglePopover() {
     if (!this.#popover) return;
     if (this.#popover.isOpen) {
       this.#popover.hide();
     } else {
+      this.#detailPopover?.hide();
       this.#popover.show();
     }
   }
@@ -228,6 +297,18 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   #handleCloseClick(event) {
     event.preventDefault();
     this.#popover?.hide();
+  }
+
+  #handleDetailCloseClick(event) {
+    event.preventDefault();
+    debugTagDetail("close button");
+    this.#detailPopover?.hide();
+  }
+
+  #handleVisibility() {
+    if (document.visibilityState === "visible") {
+      this.#resetDetailPopoverState();
+    }
   }
 
   #getExistingTags() {
@@ -611,20 +692,13 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     const label = event.target.closest?.(".tag-label");
     if (!label || !(label instanceof HTMLElement)) return;
 
-    const searchInput = document.getElementById("search-input");
-    if (!searchInput) return;
-
-    const value = label.textContent?.trim();
-    if (!value) return;
-
-    searchInput.value = value;
-    if (typeof searchInput.focus === "function") {
-      try {
-        searchInput.focus({ preventScroll: true });
-      } catch (error) {
-        searchInput.focus();
-      }
+    if (event.target?.closest?.(".tag-remove")) {
+      return;
     }
+
+    event.preventDefault();
+    debugTagDetail("tag activation", label.textContent?.trim());
+    void this.#openTagDetail(label);
   }
 
   #handleTagKeydown(event) {
@@ -635,7 +709,284 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     event.preventDefault();
     label.click();
   }
+
+  async #openTagDetail(label) {
+    if (!this.#detailPopoverEl || !this.#detailBody) {
+      return;
+    }
+    const tagEl = label.closest(".entry-tag");
+    const tagHash =
+      label.dataset.tagHash || tagEl?.dataset?.tagHash || "";
+    if (!tagHash) {
+      return;
+    }
+
+    if (this.#detailPopover?.isOpen && this.#activeTagHash === tagHash) {
+      debugTagDetail("toggle off", tagHash);
+      this.#detailPopover.hide();
+      return;
+    }
+
+    if (this.#detailPopover) {
+      debugTagDetail("destroy existing popover before open", tagHash);
+      this.#destroyDetailPopover();
+    }
+
+    this.#popover?.hide();
+    this.#initDetailPopover(label);
+    this.#loadTagDetail(tagHash);
+    this.#detailPopover?.show();
+    debugTagDetail("opened", tagHash);
+  }
+
+  #initDetailPopover(trigger) {
+    this.#destroyDetailPopover();
+    if (!this.#detailPopoverEl) {
+      return;
+    }
+    const labelEl = trigger instanceof HTMLElement ? trigger : null;
+
+    this.#detailPopover = createPopover(labelEl, this.#detailPopoverEl, {
+      placement: "bottom-start",
+      getPanel: () => this.#detailPanel,
+      closeOnOutside: false,
+      onShow: () => {
+        this.classList.add("popover-open");
+        if (labelEl) {
+          labelEl.setAttribute("aria-expanded", "true");
+          labelEl.classList.add("is-active");
+          this.#activeTagLabel = labelEl;
+          const tagEl = labelEl.closest(".entry-tag");
+          if (tagEl) {
+            tagEl.classList.add("is-active");
+            this.#activeTagEl = tagEl;
+          }
+        }
+        debugTagDetail("popover show", this.#activeTagHash);
+        this.#registerDetailOutsideClose();
+      },
+      onHide: () => {
+        this.#detailOutsideListeners = this.disposeListenerBag(
+          this.#detailOutsideListeners
+        );
+        this.#clearActiveTag();
+        debugTagDetail("popover hide", this.#activeTagHash);
+      },
+      onHidden: () => {
+        this.classList.remove("popover-open");
+        debugTagDetail("popover hidden", this.#activeTagHash);
+      },
+    });
+  }
+
+  #clearActiveTag() {
+    if (this.#activeTagEl) {
+      this.#activeTagEl.classList.remove("is-active");
+    }
+    if (this.#activeTagLabel) {
+      this.#activeTagLabel.classList.remove("is-active");
+      this.#activeTagLabel.setAttribute("aria-expanded", "false");
+    }
+    this.#activeTagEl = null;
+    this.#activeTagLabel = null;
+    this.#activeTagHash = "";
+  }
+
+  #loadTagDetail(tagHash) {
+    if (!this.#detailBody) return;
+    const template = this.dataset?.tagDetailUrl ?? "";
+    if (!template) {
+      return;
+    }
+    const url = template.replace("__TAG_HASH__", tagHash);
+    if (!url) {
+      return;
+    }
+    this.#activeTagHash = tagHash;
+    this.#detailBody.innerHTML =
+      this.#detailSkeleton || DEFAULT_TAG_DETAIL_SKELETON;
+    this.#detailBody.setAttribute("hx-get", url);
+    if (typeof htmx !== "undefined" && htmx?.ajax) {
+      debugTagDetail("loading detail", url);
+      htmx.ajax("GET", url, {
+        target: this.#detailBody,
+        swap: "innerHTML",
+        source: this.#detailBody,
+      });
+    } else if (typeof htmx !== "undefined") {
+      htmx.process(this.#detailBody);
+      htmx.trigger(this.#detailBody, "tag-detail:show");
+    }
+  }
+
+  #handleDetailClick(event) {
+    const target = event.target;
+    const item = target?.closest?.(".tag-detail__item");
+    if (!item) return;
+    const currentId = document.getElementById("entries")?.dataset?.date ?? "";
+    const itemDate = item.dataset?.date ?? "";
+    const targetId = item.dataset?.target ?? "";
+    debugTagDetail("detail item click", item.getAttribute("href"));
+    if (itemDate && currentId && itemDate === currentId && targetId) {
+      event.preventDefault();
+      this.#forceHideDetailPopover("detail item click same-day");
+      scrollToHighlight(null, {
+        targetId,
+        pushHistory: true,
+      });
+      return;
+    }
+    this.#forceHideDetailPopover("detail item click navigate");
+  }
+
+  #handleDetailAfterSwap(event) {
+    this.#detailPopover?.update();
+    const target = event?.target;
+    if (target?.classList?.contains("tag-detail__summary")) {
+      this.#cacheTagSummary(target);
+      debugTagDetail("detail summary swap");
+      return;
+    }
+    if (this.#detailBody) {
+      formatTimeElements(this.#detailBody);
+      this.#hydrateSummaryFromCache();
+    }
+    debugTagDetail("detail after swap");
+  }
+
+  #registerDetailOutsideClose() {
+    if (!this.#detailPopover) return;
+    this.#detailOutsideListeners = this.resetListenerBag(
+      this.#detailOutsideListeners
+    );
+    const listeners = this.#detailOutsideListeners;
+    listeners.add(
+      document,
+      "click",
+      (event) => {
+        const target = event?.target;
+        if (!(target instanceof Node)) {
+          return;
+        }
+        if (this.contains(target)) {
+          return;
+        }
+        debugTagDetail("outside click -> hide");
+        this.#detailPopover?.hide();
+      },
+      true
+    );
+  }
+
+  #forceHideDetailPopover(reason = "force") {
+    debugTagDetail("force hide", reason);
+    if (this.#detailPopover) {
+      this.#detailPopover.destroy();
+      this.#detailPopover = null;
+    }
+    if (this.#detailPopoverEl) {
+      this.#detailPopoverEl.hidden = true;
+      this.#detailPopoverEl.classList.remove("fade-enter", "fade-exit");
+    }
+    if (this.#detailPanel) {
+      this.#detailPanel.classList.remove("pop-enter", "pop-exit");
+    }
+    this.#detailOutsideListeners = this.disposeListenerBag(
+      this.#detailOutsideListeners
+    );
+    this.#clearActiveTag();
+  }
+
+  #resetDetailPopoverState(reason = "reset") {
+    debugTagDetail("reset detail popover", reason);
+    this.#forceHideDetailPopover(reason);
+  }
+
+  #getSummaryCacheKey(tagHash) {
+    return `${TAG_SUMMARY_CACHE_PREFIX}${tagHash}`;
+  }
+
+  #getCachedTagSummary(tagHash) {
+    if (!tagHash) return null;
+    try {
+      const raw = window.sessionStorage.getItem(this.#getSummaryCacheKey(tagHash));
+      if (!raw) return null;
+      const payload = JSON.parse(raw);
+      if (!payload || typeof payload.html !== "string") return null;
+      if (
+        typeof payload.timestamp === "number" &&
+        Date.now() - payload.timestamp > TAG_SUMMARY_CACHE_TTL
+      ) {
+        window.sessionStorage.removeItem(this.#getSummaryCacheKey(tagHash));
+        return null;
+      }
+      return payload.html;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  #setCachedTagSummary(tagHash, html) {
+    if (!tagHash || !html) return;
+    try {
+      const payload = JSON.stringify({
+        html,
+        timestamp: Date.now(),
+      });
+      window.sessionStorage.setItem(this.#getSummaryCacheKey(tagHash), payload);
+    } catch (error) {
+      return;
+    }
+  }
+
+  #cacheTagSummary(summaryEl) {
+    if (!(summaryEl instanceof HTMLElement)) return;
+    const tagHash =
+      summaryEl.dataset?.tagHash || this.#activeTagHash || "";
+    const html = summaryEl.innerHTML?.trim();
+    if (!tagHash || !html) return;
+    if (html.includes("Summary unavailable")) {
+      return;
+    }
+    this.#setCachedTagSummary(tagHash, html);
+  }
+
+  #hydrateSummaryFromCache() {
+    if (!this.#detailBody) return;
+    const summaryEl = this.#detailBody.querySelector(".tag-detail__summary");
+    if (!summaryEl) return;
+    const tagHash =
+      summaryEl.dataset?.tagHash || this.#activeTagHash || "";
+    if (!tagHash) return;
+    const cached = this.#getCachedTagSummary(tagHash);
+    if (cached) {
+      summaryEl.innerHTML = cached;
+      summaryEl.removeAttribute("hx-get");
+      summaryEl.removeAttribute("hx-trigger");
+      summaryEl.removeAttribute("hx-swap");
+      summaryEl.removeAttribute("hx-disinherit");
+      debugTagDetail("summary cache hit", tagHash);
+      return;
+    }
+    if (typeof htmx !== "undefined") {
+      debugTagDetail("summary cache miss -> load", tagHash);
+      window.setTimeout(() => {
+        htmx.trigger(summaryEl, "tag-detail:summary");
+      }, 60);
+    }
+  }
 }
+
+const DEFAULT_TAG_DETAIL_SKELETON = `
+  <div class="tag-detail-skeleton" aria-hidden="true">
+    <span class="tag-detail-skeleton__title"></span>
+    <span class="tag-detail-skeleton__meta"></span>
+    <span class="tag-detail-skeleton__line"></span>
+    <span class="tag-detail-skeleton__line"></span>
+    <span class="tag-detail-skeleton__item"></span>
+    <span class="tag-detail-skeleton__item"></span>
+  </div>
+`;
 
 if (typeof customElements !== "undefined" && !customElements.get("entry-tags")) {
   customElements.define("entry-tags", EntryTags);

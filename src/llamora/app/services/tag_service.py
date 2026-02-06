@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import logging
 import time
+import re
+import textwrap
+from dataclasses import dataclass
 from typing import Any, Iterable, Sequence
 
 from llamora.app.util.tags import canonicalize as _canonicalize, display as _display
@@ -12,6 +15,27 @@ from llamora.app.services.entry_metadata import generate_metadata
 
 
 logger = logging.getLogger(__name__)
+
+
+_SENTENCE_END = re.compile(r"[.!?](?:\s|$)")
+_MARKDOWN_PREFIX = re.compile(r"^(?:#{1,6}\s+|>+\s+|[-*+]\s+|\d+\.\s+)")
+
+
+@dataclass(slots=True)
+class TagEntryPreview:
+    entry_id: str
+    created_at: str
+    created_date: str | None
+    preview: str
+
+
+@dataclass(slots=True)
+class TagOverview:
+    name: str
+    hash: str
+    count: int
+    last_used: str | None
+    entries: tuple[TagEntryPreview, ...]
 
 
 class TagService:
@@ -31,6 +55,56 @@ class TagService:
         """Return the display-ready form for ``canonical``."""
 
         return _display(canonical)
+
+    async def get_tag_overview(
+        self,
+        user_id: str,
+        dek: bytes,
+        tag_hash: bytes,
+        *,
+        limit: int = 24,
+    ) -> TagOverview | None:
+        """Return tag metadata and recent entry previews."""
+
+        info = await self._db.tags.get_tag_info(user_id, tag_hash, dek)
+        if not info:
+            return None
+
+        entry_ids = await self._db.tags.get_recent_entries_for_tag_hashes(
+            user_id,
+            [tag_hash],
+            limit=limit,
+        )
+        entries = await self._db.entries.get_entries_by_ids(user_id, entry_ids, dek)
+        entry_map = {entry.get("id"): entry for entry in entries}
+
+        previews: list[TagEntryPreview] = []
+        for entry_id in entry_ids:
+            entry = entry_map.get(entry_id)
+            if not entry:
+                continue
+            created_at = str(entry.get("created_at") or "").strip()
+            if not created_at:
+                continue
+            preview = _extract_preview_line(entry.get("text", ""))
+            if not preview:
+                preview = "..."
+            previews.append(
+                TagEntryPreview(
+                    entry_id=entry_id,
+                    created_at=created_at,
+                    created_date=entry.get("created_date"),
+                    preview=preview,
+                )
+            )
+
+        return TagOverview(
+            name=self.display(info["name"]),
+            hash=info["hash"],
+            count=int(info.get("count", 0) or 0),
+            last_used=info.get("last_used"),
+            entries=tuple(previews),
+        )
 
     async def hydrate_search_results(
         self,
@@ -251,3 +325,51 @@ class TagService:
         selected.sort()
         visible = [tags[idx] for idx in selected]
         return list(visible), len(tags) > len(visible)
+
+
+def _extract_preview_line(
+    text: str,
+    max_chars: int = 140,
+    *,
+    min_chars: int = 36,
+    min_words: int = 4,
+) -> str:
+    if not text:
+        return ""
+
+    cleaned_lines: list[str] = []
+    for line in str(text).splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        cleaned = _MARKDOWN_PREFIX.sub("", stripped).strip()
+        if cleaned:
+            cleaned_lines.append(cleaned)
+
+    if not cleaned_lines:
+        return ""
+
+    parts: list[str] = []
+    for line in cleaned_lines:
+        parts.append(line)
+        combined = " ".join(parts)
+        words = combined.split()
+        if len(combined) >= min_chars or len(words) >= min_words:
+            break
+
+    candidate = " ".join(parts)
+    candidate = " ".join(candidate.split())
+    full_text = " ".join(cleaned_lines)
+    full_text = " ".join(full_text.split())
+
+    match = _SENTENCE_END.search(full_text)
+    sentence = full_text[: match.end()].strip() if match else full_text.strip()
+
+    if len(candidate.split()) < min_words and len(sentence) > len(candidate):
+        clean = sentence
+    else:
+        clean = candidate or sentence
+
+    if len(clean) > max_chars:
+        clean = textwrap.shorten(clean, width=max_chars, placeholder="...")
+    return clean.strip()
