@@ -1,42 +1,18 @@
-import { renderMarkdown } from "../markdown.js";
-import {
-  positionTypingIndicator,
-  TYPING_INDICATOR_SELECTOR,
-} from "../typing-indicator.js";
-import { IncrementalMarkdownRenderer } from "../entries/incremental-markdown-renderer.js";
+import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
+import { StreamTransport } from "./stream-transport.js";
+import { StreamRenderer } from "./stream-renderer.js";
 import { requestScrollForceBottom } from "../entries/scroll-manager.js";
 import { animateMotion, isMotionReduced } from "../services/motion.js";
 import { applyTimezoneQuery, formatLocalTime, formatLocalTimestamp } from "../services/time.js";
-import { scheduleFrame } from "../utils/scheduler.js";
 
-const NEWLINE_REGEX = /\[newline\]/g;
-const RENDER_COOLDOWN_MS = 16;
 const FALLBACK_ERROR_MESSAGE = "The assistant ran into an error. Please try again.";
 const REPEAT_GUARD_BADGE = "response trimmed";
 const REPEAT_GUARD_DESCRIPTION = "Response paused after repeating itself.";
 const REPEAT_GUARD_HIDE_DELAY_MS = 5000;
+const NEWLINE_REGEX = /\[newline\]/g;
+
 function decodeChunk(data) {
   return typeof data === "string" ? data.replace(NEWLINE_REGEX, "\n") : "";
-}
-
-function parseDonePayload(data) {
-  if (!data) return {};
-  try {
-    return JSON.parse(data);
-  } catch (err) {
-    console.error("Failed to parse completion payload", err);
-    return {};
-  }
-}
-
-function parseMetaPayload(data) {
-  if (!data) return null;
-  try {
-    return JSON.parse(data);
-  } catch (err) {
-    console.error("Failed to parse meta payload", err);
-    return null;
-  }
 }
 
 function requestScrollToBottom(detail = {}) {
@@ -45,11 +21,7 @@ function requestScrollToBottom(detail = {}) {
 
 
 class ResponseStreamElement extends HTMLElement {
-  #eventSource = null;
   #renderer = null;
-  #renderFrame = null;
-  #renderCooldownTimer = null;
-  #pendingRenderOptions = null;
   #completed = false;
   #text = "";
   #sink = null;
@@ -60,19 +32,12 @@ class ResponseStreamElement extends HTMLElement {
   #repeatGuardIndicator = null;
   #repeatGuardHideTimer = null;
   #repeatGuardWavesDismissed = false;
-  #boundHandleChunk;
-  #boundHandleDone;
-  #boundHandleError;
-  #boundHandleMeta;
+  #transport = null;
   #controller = null;
   #deleteButton = null;
 
   constructor() {
     super();
-    this.#boundHandleChunk = (event) => this.#handleChunk(event);
-    this.#boundHandleDone = (event) => this.#handleDone(event);
-    this.#boundHandleError = (event) => this.#handleError(event);
-    this.#boundHandleMeta = (event) => this.#handleMeta(event);
   }
 
   #getStreamController() {
@@ -110,7 +75,14 @@ class ResponseStreamElement extends HTMLElement {
     }
 
     if (this.#markdown && !this.#renderer) {
-      this.#renderer = new IncrementalMarkdownRenderer(this.#markdown);
+      this.#renderer = new StreamRenderer({
+        markdown: this.#markdown,
+        typingIndicator: this.#typingIndicator,
+        requestScroll: (detail) =>
+          requestScrollToBottom({ ...detail, element: this }),
+      });
+    } else if (this.#renderer) {
+      this.#renderer.setTypingIndicator(this.#typingIndicator);
     }
 
     this.#syncController();
@@ -125,8 +97,8 @@ class ResponseStreamElement extends HTMLElement {
   }
 
   disconnectedCallback() {
-    this.#cancelRender();
-    this.#closeEventSource();
+    this.#renderer?.cancelRender();
+    this.#closeTransport();
     if (this.#repeatGuardHideTimer) {
       clearTimeout(this.#repeatGuardHideTimer);
       this.#repeatGuardHideTimer = null;
@@ -176,7 +148,7 @@ class ResponseStreamElement extends HTMLElement {
   }
 
   isStreamDormant() {
-    return this.isStreaming && !this.#eventSource && !this.#completed;
+    return this.isStreaming && !this.#transport?.active && !this.#completed;
   }
 
   resume() {
@@ -190,15 +162,11 @@ class ResponseStreamElement extends HTMLElement {
 
   handleMarkdownRendered(el) {
     if (!el || el !== this.#markdown) return;
-    const typing = this.#typingIndicator;
-    if (typing) {
-      positionTypingIndicator(el, typing);
-      this.#typingIndicator = typing;
-    }
+    this.#renderer?.handleMarkdownRendered(el);
   }
 
   #startStream() {
-    if (this.#eventSource || !this.sseUrl) return;
+    if (this.#transport?.active || !this.sseUrl) return;
 
     const url = applyTimezoneQuery(this.sseUrl);
 
@@ -221,77 +189,64 @@ class ResponseStreamElement extends HTMLElement {
       })
     );
 
+    this.#transport = new StreamTransport({
+      url,
+      onChunk: (chunk) => this.#handleChunk(chunk),
+      onDone: (payload) => this.#handleDone(payload),
+      onError: (data) => this.#handleError(data),
+      onMeta: (meta) => this.#handleMeta(meta),
+    });
+
     try {
-      this.#eventSource = new EventSource(url, { withCredentials: true });
+      this.#transport.start();
     } catch (err) {
       console.error("Unable to open stream", err);
       this.#text = "Connection failed";
       if (this.#sink) {
         this.#sink.textContent = this.#text;
       }
-      this.#renderNow({ repositionTyping: false, shouldScroll: true });
-    this.#finalize({ status: "error", text: "Connection failed", reason: "stream:error" });
+      this.#renderer?.renderNow(this.#text, {
+        repositionTyping: false,
+        shouldScroll: true,
+      });
+      this.#finalize({ status: "error", text: "Connection failed", reason: "stream:error" });
       return;
     }
-
-    this.#eventSource.addEventListener("message", this.#boundHandleChunk);
-    this.#eventSource.addEventListener("done", this.#boundHandleDone);
-    this.#eventSource.addEventListener("error", this.#boundHandleError);
-    this.#eventSource.addEventListener("meta", this.#boundHandleMeta);
   }
 
-  #closeEventSource() {
-    if (!this.#eventSource) return;
-    this.#eventSource.removeEventListener("message", this.#boundHandleChunk);
-    this.#eventSource.removeEventListener("done", this.#boundHandleDone);
-    this.#eventSource.removeEventListener("error", this.#boundHandleError);
-    this.#eventSource.removeEventListener("meta", this.#boundHandleMeta);
-    this.#eventSource.close();
-    this.#eventSource = null;
+  #closeTransport() {
+    if (!this.#transport) return;
+    this.#transport.close();
+    this.#transport = null;
   }
 
-  #cancelRender({ clearPending = true } = {}) {
-    if (this.#renderCooldownTimer) {
-      clearTimeout(this.#renderCooldownTimer);
-      this.#renderCooldownTimer = null;
-    }
-
-    if (this.#renderFrame) {
-      this.#renderFrame.cancel?.();
-      this.#renderFrame = null;
-    }
-
-    if (clearPending) {
-      this.#pendingRenderOptions = null;
-    }
-  }
-
-  #handleChunk(event) {
+  #handleChunk(chunk) {
     if (this.#completed) return;
-    const chunk = decodeChunk(event?.data || "");
-    if (!chunk) return;
 
     this.#text += chunk;
     if (this.#sink) {
       this.#sink.textContent = this.#text;
     }
     const shouldEagerRender =
-      this.#markdown?.dataset.rendered !== "true" &&
-      !this.#renderCooldownTimer &&
-      !this.#renderFrame;
+      this.#markdown?.dataset.rendered !== "true" && !this.#renderer?.isBusy;
 
     if (shouldEagerRender) {
-      this.#renderNow({ repositionTyping: true, shouldScroll: true });
+      this.#renderer?.renderNow(this.#text, {
+        repositionTyping: true,
+        shouldScroll: true,
+      });
       return;
     }
 
-    this.#scheduleRender({ repositionTyping: true, shouldScroll: true });
+    this.#renderer?.scheduleRender(this.#text, {
+      repositionTyping: true,
+      shouldScroll: true,
+    });
   }
 
-  #handleDone(event) {
+  #handleDone(payload) {
     if (this.#completed) return;
 
-    const payload = parseDonePayload(event?.data || "");
     const assistantEntryId =
       payload?.assistant_entry_id || payload?.assistantEntryId;
 
@@ -300,7 +255,10 @@ class ResponseStreamElement extends HTMLElement {
       this.#syncDeleteButton();
     }
 
-    this.#renderNow({ repositionTyping: false, shouldScroll: true });
+    this.#renderer?.renderNow(this.#text, {
+      repositionTyping: false,
+      shouldScroll: true,
+    });
     this.#finalize({
       status: "done",
       assistantEntryId,
@@ -309,10 +267,9 @@ class ResponseStreamElement extends HTMLElement {
     this.#ensureInlineTimestamp();
   }
 
-  #handleError(event) {
+  #handleError(data) {
     if (this.#completed) return;
 
-    const data = decodeChunk(event?.data || "");
     const trimmed = data.trim();
     const hasExistingText = Boolean(this.#text && this.#text.trim());
     const errorText = trimmed
@@ -328,19 +285,16 @@ class ResponseStreamElement extends HTMLElement {
       }
     }
 
-    this.#renderNow({ repositionTyping: false, shouldScroll: true });
+    this.#renderer?.renderNow(this.#text, {
+      repositionTyping: false,
+      shouldScroll: true,
+    });
     this.#markAsError();
     this.#finalize({ status: "error", text: errorText, reason: "stream:error" });
     this.#ensureInlineTimestamp();
   }
 
-  #handleMeta(event) {
-    const raw = decodeChunk(event?.data || "");
-    if (!raw) return;
-
-    const meta = parseMetaPayload(raw);
-    if (!meta) return;
-
+  #handleMeta(meta) {
     this.#meta = meta;
     if (meta.partial) {
       this.#wasPartial = true;
@@ -363,79 +317,6 @@ class ResponseStreamElement extends HTMLElement {
         },
       })
     );
-  }
-
-  #scheduleRender({ repositionTyping = false, shouldScroll = false } = {}) {
-    const pending = this.#pendingRenderOptions || {
-      repositionTyping: false,
-      shouldScroll: false,
-    };
-
-    this.#pendingRenderOptions = {
-      repositionTyping: pending.repositionTyping || repositionTyping,
-      shouldScroll: pending.shouldScroll || shouldScroll,
-    };
-
-    if (this.#renderCooldownTimer) {
-      return;
-    }
-
-    this.#renderCooldownTimer = window.setTimeout(() => {
-      this.#renderCooldownTimer = null;
-      this.#cancelRender({ clearPending: false });
-
-      const frame = scheduleFrame(() => {
-        if (this.#renderFrame !== frame) {
-          return;
-        }
-        this.#renderFrame = null;
-        const options = this.#pendingRenderOptions || {
-          repositionTyping: false,
-          shouldScroll: false,
-        };
-        this.#pendingRenderOptions = null;
-        this.#renderNow(options);
-      });
-      this.#renderFrame = frame;
-    }, RENDER_COOLDOWN_MS);
-  }
-
-  #renderNow({ repositionTyping = false, shouldScroll = false } = {}) {
-    if (!this.#markdown || !this.#renderer) return false;
-
-    const typing = this.#typingIndicator;
-    let placeholder = null;
-
-    if (typing?.parentNode && repositionTyping) {
-      placeholder = document.createElement("span");
-      placeholder.className = "typing-indicator-placeholder";
-      placeholder.textContent = "❚";
-      typing.parentNode.insertBefore(placeholder, typing);
-      typing.parentNode.removeChild(typing);
-    }
-
-    const html = renderMarkdown(this.#text || "");
-    const changed = this.#renderer.update(html);
-    if ("markdownSource" in this.#markdown.dataset) {
-      delete this.#markdown.dataset.markdownSource;
-    }
-    this.#markdown.dataset.rendered = "true";
-
-    if (placeholder?.parentNode) {
-      placeholder.parentNode.removeChild(placeholder);
-    }
-
-    if (typing && repositionTyping) {
-      positionTypingIndicator(this.#markdown, typing);
-      this.#typingIndicator = typing;
-      if (shouldScroll) {
-        requestScrollToBottom({ reason: "render", element: this });
-      }
-    } else if (shouldScroll && changed) {
-      requestScrollToBottom({ reason: "render", element: this });
-    }
-
-    return changed;
   }
 
   #ensureInlineTimestamp() {
@@ -477,8 +358,8 @@ class ResponseStreamElement extends HTMLElement {
     this.removeAttribute("data-sse-url");
     this.removeAttribute("aria-busy");
 
-    this.#cancelRender();
-    this.#closeEventSource();
+    this.#renderer?.cancelRender();
+    this.#closeTransport();
 
     const typing = this.#typingIndicator;
     if (typing) {
