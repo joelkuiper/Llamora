@@ -20,6 +20,24 @@ def _metadata_system_prompt() -> str:
 
     return render_prompt_template("metadata_system.txt.j2")
 
+def _metadata_response_format() -> dict[str, Any]:
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "entry_metadata",
+            "strict": True,
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "emoji": {"type": "string"},
+                    "tags": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["emoji", "tags"],
+                "additionalProperties": False,
+            },
+        },
+    }
+
 
 def _extract_json_object(raw: str) -> dict[str, Any] | None:
     if not raw:
@@ -81,7 +99,14 @@ async def generate_metadata(llm, text: str) -> dict[str, Any]:
     ]
 
     try:
-        raw = await llm.complete_messages(messages)
+        raw = await llm.complete_messages(
+            messages,
+            params={
+                "temperature": 0.2,
+                "n_predict": 140,
+                "response_format": _metadata_response_format(),
+            },
+        )
     except Exception:
         logger.exception("Metadata generation request failed")
         return {"emoji": DEFAULT_METADATA_EMOJI, "tags": []}

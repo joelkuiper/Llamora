@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Sequence
+from typing import Any, Sequence
+
+import orjson
 
 from llamora.llm.prompt_templates import render_prompt_template
 
@@ -16,6 +18,23 @@ _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
 
 def _tag_summary_system_prompt() -> str:
     return render_prompt_template("tag_summary_system.txt.j2")
+
+def _tag_summary_response_format() -> dict[str, Any]:
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "tag_summary",
+            "strict": True,
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "summary": {"type": "string"},
+                },
+                "required": ["summary"],
+                "additionalProperties": False,
+            },
+        },
+    }
 
 
 def _build_user_prompt(
@@ -51,6 +70,19 @@ def _clean_summary(raw: str) -> str:
             text += "..."
     return text
 
+def _extract_summary(raw: str) -> str:
+    if not raw:
+        return ""
+    try:
+        parsed = orjson.loads(raw)
+    except Exception:
+        return _clean_summary(raw)
+    if isinstance(parsed, dict):
+        summary = parsed.get("summary")
+        if isinstance(summary, str):
+            return _clean_summary(summary)
+    return _clean_summary(raw)
+
 
 async def generate_tag_summary(
     llm,
@@ -72,13 +104,17 @@ async def generate_tag_summary(
     try:
         raw = await llm.complete_messages(
             messages,
-            params={"temperature": 0.3, "max_tokens": 120},
+            params={
+                "temperature": 0.3,
+                "n_predict": 120,
+                "response_format": _tag_summary_response_format(),
+            },
         )
     except Exception:
         logger.exception("Tag summary request failed")
         return ""
 
-    return _clean_summary(raw)
+    return _extract_summary(raw)
 
 
 __all__ = ["generate_tag_summary"]

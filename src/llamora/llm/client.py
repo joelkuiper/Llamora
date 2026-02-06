@@ -731,6 +731,8 @@ class LLMClient:
         for key in ("presence_penalty", "frequency_penalty"):
             if key in params and params[key] is not None:
                 payload[key] = params[key]
+        if "response_format" in params and params["response_format"] is not None:
+            payload["response_format"] = params["response_format"]
         if "model" not in payload:
             payload["model"] = settings.get("LLM.chat.model", "local")
         allowlist = set(settings.get("LLM.chat.parameter_allowlist") or [])
