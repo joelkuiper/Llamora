@@ -199,8 +199,13 @@ export class ScrollManager {
 
     bag.add(window, "pageshow", (event) => {
       if (event.persisted) {
-        this.#skipNextRestore = false;
-        this.restore();
+        this.#skipNextRestore = true;
+        this.ensureElements();
+        if (this.container) {
+          this.updateScrollState(this.container.scrollTop);
+          this.toggleScrollBtn();
+          this.alignScrollButton();
+        }
       }
     });
 
