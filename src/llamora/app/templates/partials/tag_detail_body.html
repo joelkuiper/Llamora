@@ -27,19 +27,21 @@
     {% if entries %}
       {% for entry in entries %}
         {% set item_date = entry.created_date or entry.created_at[:10] %}
-        <a class="tag-detail__item"
+        <a class="tag-detail__item tag-row"
            href="{{ url_for('days.day', date=item_date) }}?target=entry-{{ entry.entry_id }}"
            hx-get="{{ url_for('entries.entries_htmx', date=item_date) }}?target=entry-{{ entry.entry_id }}"
            hx-target="#content-wrapper"
            hx-swap="outerHTML"
            data-date="{{ item_date }}"
            data-target="entry-{{ entry.entry_id }}"
-          hx-trigger="click[!document.getElementById('entries') || document.getElementById('entries').dataset.date !== this.dataset.date]">
-          <div class="tag-detail__timestamp">
-            <time class="entry-time tag-detail__time" datetime="{{ entry.created_at }}" data-time-raw="{{ entry.created_at }}"></time>
+           hx-trigger="click[!document.getElementById('entries') || document.getElementById('entries').dataset.date !== this.dataset.date]">
+          <div class="tag-detail__timestamp tag-row__time">
             <span class="tag-detail__ago">{{ entry.created_at|humanize }}</span>
+            <span class="tag-row__dot" aria-hidden="true">·</span>
+            <time class="entry-time tag-detail__time" datetime="{{ entry.created_at }}" data-time-raw="{{ entry.created_at }}"></time>
           </div>
-          <span class="tag-detail__preview">{{ entry.preview }}</span>
+          <span class="tag-detail__preview tag-row__preview">{{ entry.preview }}</span>
+          <span class="tag-row__chevron icon-mask icon-chevron-right" aria-hidden="true"></span>
         </a>
       {% endfor %}
     {% else %}
