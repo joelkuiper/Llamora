@@ -246,7 +246,9 @@ class EntriesRepository(BaseRepository):
             row = await cursor.fetchone()
         return bool(row)
 
-    async def delete_entry(self, user_id: str, entry_id: str) -> list[str]:
+    async def delete_entry(
+        self, user_id: str, entry_id: str
+    ) -> tuple[list[str], str | None]:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 "SELECT id, role, created_date FROM entries WHERE id = ? AND user_id = ?",
@@ -254,7 +256,7 @@ class EntriesRepository(BaseRepository):
             )
             row = await cursor.fetchone()
             if not row:
-                return []
+                return [], None
 
             delete_ids = [row["id"]]
             created_dates = {row["created_date"]} if row["created_date"] else set()
@@ -311,7 +313,7 @@ class EntriesRepository(BaseRepository):
                     reason="delete",
                 )
 
-        return delete_ids
+        return delete_ids, row["role"]
 
     async def update_entry_text(
         self,
