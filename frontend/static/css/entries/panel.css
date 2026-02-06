@@ -18,7 +18,7 @@
   gap: var(--spacing-xl);
   align-items: stretch;
   position: relative;
-  z-index: 2;
+  z-index: auto;
 
   transition: opacity var(--motion-fade) ease-in-out;
 

@@ -24,10 +24,6 @@ const prepareTagAutocompleteValue = (value) =>
 const TAG_HISTORY_MAX = 50;
 const TAG_SUMMARY_CACHE_PREFIX = "llamora:tag-summary:";
 const TAG_SUMMARY_CACHE_TTL = 1000 * 60 * 60 * 6;
-const debugTagDetail = (...args) => {
-  // HACK: always-on debug tracing for tag popover behavior.
-  console.debug("[tag-detail]", ...args);
-};
 
 export const mergeTagCandidateValues = (
   remoteCandidates = [],
@@ -155,10 +151,6 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       return;
     }
 
-    debugTagDetail("connected", {
-      entryId: this.dataset?.entryId ?? null,
-      tagDetailUrl: this.dataset?.tagDetailUrl ?? null,
-    });
     listeners.add(
       this.#form,
       "htmx:configRequest",
@@ -190,7 +182,6 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   disconnectedCallback() {
-    debugTagDetail("disconnected");
     this.#destroyPopover();
     this.#destroyDetailPopover();
     this.#teardownListeners();
@@ -301,7 +292,6 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
 
   #handleDetailCloseClick(event) {
     event.preventDefault();
-    debugTagDetail("close button");
     this.#detailPopover?.hide();
   }
 
@@ -697,7 +687,6 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     }
 
     event.preventDefault();
-    debugTagDetail("tag activation", label.textContent?.trim());
     void this.#openTagDetail(label);
   }
 
@@ -722,13 +711,11 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     }
 
     if (this.#detailPopover?.isOpen && this.#activeTagHash === tagHash) {
-      debugTagDetail("toggle off", tagHash);
       this.#detailPopover.hide();
       return;
     }
 
     if (this.#detailPopover) {
-      debugTagDetail("destroy existing popover before open", tagHash);
       this.#destroyDetailPopover();
     }
 
@@ -736,7 +723,6 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#initDetailPopover(label);
     this.#loadTagDetail(tagHash);
     this.#detailPopover?.show();
-    debugTagDetail("opened", tagHash);
   }
 
   #initDetailPopover(trigger) {
@@ -762,7 +748,6 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
             this.#activeTagEl = tagEl;
           }
         }
-        debugTagDetail("popover show", this.#activeTagHash);
         this.#registerDetailOutsideClose();
       },
       onHide: () => {
@@ -770,11 +755,9 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
           this.#detailOutsideListeners
         );
         this.#clearActiveTag();
-        debugTagDetail("popover hide", this.#activeTagHash);
       },
       onHidden: () => {
         this.classList.remove("popover-open");
-        debugTagDetail("popover hidden", this.#activeTagHash);
       },
     });
   }
@@ -807,7 +790,6 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       this.#detailSkeleton || DEFAULT_TAG_DETAIL_SKELETON;
     this.#detailBody.setAttribute("hx-get", url);
     if (typeof htmx !== "undefined" && htmx?.ajax) {
-      debugTagDetail("loading detail", url);
       htmx.ajax("GET", url, {
         target: this.#detailBody,
         swap: "innerHTML",
@@ -826,7 +808,6 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     const currentId = document.getElementById("entries")?.dataset?.date ?? "";
     const itemDate = item.dataset?.date ?? "";
     const targetId = item.dataset?.target ?? "";
-    debugTagDetail("detail item click", item.getAttribute("href"));
     if (itemDate && currentId && itemDate === currentId && targetId) {
       event.preventDefault();
       this.#forceHideDetailPopover("detail item click same-day");
@@ -844,14 +825,12 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     const target = event?.target;
     if (target?.classList?.contains("tag-detail__summary")) {
       this.#cacheTagSummary(target);
-      debugTagDetail("detail summary swap");
       return;
     }
     if (this.#detailBody) {
       formatTimeElements(this.#detailBody);
       this.#hydrateSummaryFromCache();
     }
-    debugTagDetail("detail after swap");
   }
 
   #registerDetailOutsideClose() {
@@ -871,7 +850,6 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
         if (this.contains(target)) {
           return;
         }
-        debugTagDetail("outside click -> hide");
         this.#detailPopover?.hide();
       },
       true
@@ -879,7 +857,6 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   #forceHideDetailPopover(reason = "force") {
-    debugTagDetail("force hide", reason);
     if (this.#detailPopover) {
       this.#detailPopover.destroy();
       this.#detailPopover = null;
@@ -898,7 +875,6 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   #resetDetailPopoverState(reason = "reset") {
-    debugTagDetail("reset detail popover", reason);
     this.#forceHideDetailPopover(reason);
   }
 
@@ -965,11 +941,9 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       summaryEl.removeAttribute("hx-trigger");
       summaryEl.removeAttribute("hx-swap");
       summaryEl.removeAttribute("hx-disinherit");
-      debugTagDetail("summary cache hit", tagHash);
       return;
     }
     if (typeof htmx !== "undefined") {
-      debugTagDetail("summary cache miss -> load", tagHash);
       window.setTimeout(() => {
         htmx.trigger(summaryEl, "tag-detail:summary");
       }, 60);
