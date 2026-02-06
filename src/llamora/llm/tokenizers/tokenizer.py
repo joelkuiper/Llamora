@@ -47,7 +47,7 @@ def count_message_tokens(role: str, message: str) -> int:
 
     from llamora.llm.entry_template import render_entry_prompt_series
 
-    history = ({"role": role, "message": message},)
+    history = ({"role": role, "text": message},)
     series = render_entry_prompt_series(history)
     totals = series.suffix_token_counts
     if not totals:
