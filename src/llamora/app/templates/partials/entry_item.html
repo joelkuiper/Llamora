@@ -11,7 +11,7 @@
 {% set is_opening = entry_meta.get('auto_opening') %}
 {% set speaker = 'Your' if e['role'] == 'user' else 'Assistant' %}
 <div id="entry-{{ e['id'] }}"
-     class="entry {{ 'assistant' if e['role'] != 'user' else 'user'}}{% if is_error %} entry--error{% endif %}{% if is_opening %} entry--opening{% if opening_collapsed %} is-collapsed{% endif %}{% endif %}"
+     class="entry {{ 'assistant' if e['role'] != 'user' else 'user'}}{% if is_error %} entry--error{% endif %}{% if is_opening %} entry--opening{% endif %}"
      data-entry-id="{{ e['id'] }}"
      {% if response_kind %}data-response-kind="{{ response_kind }}"{% endif %}
      {% if e['role'] == 'assistant' and e.get('reply_to') %}

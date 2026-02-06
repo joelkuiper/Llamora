@@ -1,8 +1,6 @@
 {% set sse_url = url_for('entries.sse_opening', date=day) %}
-{% set opening_cookie = 'opening_collapsed_' ~ day %}
-{% set opening_collapsed = request.cookies.get(opening_cookie) == '1' %}
 <response-stream id="opening-stream-{{ day }}"
-                 class="entry assistant opening-stream entry--opening{% if opening_collapsed %} is-collapsed{% endif %}"
+                 class="entry assistant opening-stream entry--opening"
                  data-entry-id="opening-{{ day }}"
                  data-controller="off"
                  data-sse-url="{{ sse_url }}"
@@ -16,8 +14,8 @@
       <button type="button"
               class="opening-toggle"
               data-opening-toggle
-              aria-expanded="{{ 'false' if opening_collapsed else 'true' }}"
-              aria-label="{{ 'Expand day opening' if opening_collapsed else 'Collapse day opening' }}">
+              aria-expanded="true"
+              aria-label="Collapse day opening">
         <span class="icon-mask icon-chevron-up" aria-hidden="true" data-opening-icon-open></span>
         <span class="icon-mask icon-chevron-down" aria-hidden="true" data-opening-icon-closed></span>
       </button>

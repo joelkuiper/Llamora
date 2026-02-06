@@ -2,8 +2,6 @@
 {% macro render_entry_main(e, day) -%}
 {% set entry_meta = e.get('meta', {}) %}
 {% set is_opening = entry_meta.get('auto_opening') %}
-{% set opening_cookie = 'opening_collapsed_' ~ day %}
-{% set opening_collapsed = is_opening and request.cookies.get(opening_cookie) == '1' %}
 {% set rendered = e.get('text_html') %}
   <div class="entry-main">
     {% if is_opening %}
@@ -12,8 +10,8 @@
       <button type="button"
               class="opening-toggle"
               data-opening-toggle
-              aria-expanded="{{ 'false' if opening_collapsed else 'true' }}"
-              aria-label="{{ 'Expand day opening' if opening_collapsed else 'Collapse day opening' }}">
+              aria-expanded="true"
+              aria-label="Collapse day opening">
         <span class="icon-mask icon-chevron-up" aria-hidden="true" data-opening-icon-open></span>
         <span class="icon-mask icon-chevron-down" aria-hidden="true" data-opening-icon-closed></span>
       </button>
