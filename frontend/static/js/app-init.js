@@ -159,22 +159,7 @@ function ensureScrollManager() {
   return scrollManager;
 }
 
-function initProfileClick() {
-  const profileBtn = document.getElementById("profile-btn");
-  if (!profileBtn || profileBtn.dataset.profileInit === "true") {
-    return;
-  }
-
-  profileBtn.addEventListener("click", () => {
-    const { pathname, search, hash } = window.location;
-    sessionStorage.setItem("profile-return", `${pathname}${search}${hash}`);
-  });
-
-  profileBtn.dataset.profileInit = "true";
-}
-
 export function initGlobalShell() {
-  initProfileClick();
   ensureScrollManager();
 }
 
@@ -188,6 +173,22 @@ function init() {
   initGlobalShortcuts();
 
   updateClientToday();
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("profile") === "1" && window.htmx) {
+    const tab = params.get("profile_tab");
+    params.delete("profile");
+    params.delete("profile_tab");
+    const query = params.toString();
+    const nextUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
+    window.history.replaceState(history.state, "", nextUrl);
+    const url = tab ? `/profile?tab=${encodeURIComponent(tab)}` : "/profile";
+    window.htmx.ajax("GET", url, {
+      target: "#profile-modal-root",
+      swap: "innerHTML",
+      source: document.body,
+    });
+  }
 
   window.appInit = {
     ...(window.appInit || {}),

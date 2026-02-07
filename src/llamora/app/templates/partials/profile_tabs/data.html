@@ -1,0 +1,7 @@
+<div class="profile-section">
+  <h3>Download My Data</h3>
+  <p class="profile-note">Export your journal entries and account metadata.</p>
+  <form method="get" action="{{ url_for('auth.download_user_data') }}" data-download>
+    <button class="btn" type="submit" data-loading="Preparing">Download My Data</button>
+  </form>
+</div>

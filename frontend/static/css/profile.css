@@ -1,120 +1,198 @@
 @import url("./tokens/base.css");
 
-#profile-page {
-  max-width: 40rem;
-  margin: 0 auto;
+.profile-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+  animation: profile-modal-fade 180ms ease;
+}
+
+.profile-modal__scrim {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--color-bg) 70%, transparent);
+  backdrop-filter: blur(4px) saturate(120%);
+  -webkit-backdrop-filter: blur(4px) saturate(120%);
+}
+
+.profile-modal__panel {
+  position: relative;
+  width: min(42rem, 92vw);
+  max-height: min(80vh, 48rem);
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xl);
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+  animation: profile-modal-rise 180ms ease;
+}
 
-  /* ------- Header ------- */
-  .profile-header {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
+.profile-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: var(--spacing-xl);
+}
 
-    h1 {
-      margin: 0;
-    }
+.profile-modal__header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.profile-modal__tabs {
+  display: flex;
+  gap: var(--spacing-md);
+  padding-bottom: var(--spacing-xs);
+}
+
+.profile-modal__tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0.35rem 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  position: relative;
+  transition: color var(--motion-gentle) ease;
+}
+
+.profile-modal__tab::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.35rem;
+  height: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 60%, transparent);
+  opacity: 0;
+  transition: opacity var(--motion-gentle) ease;
+}
+
+.profile-modal__tab.is-active,
+.profile-modal__tab[aria-selected="true"] {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.profile-modal__tab.is-active::after,
+.profile-modal__tab[aria-selected="true"]::after {
+  opacity: 1;
+}
+
+.profile-modal__content {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  padding-right: var(--spacing-xs);
+}
+
+.profile-section {
+  background: var(--color-bg);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-lg);
+  box-shadow: var(--subtle-raised-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.profile-section h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-assistant-text);
+}
+
+.profile-section.danger {
+  background: color-mix(in srgb, var(--color-danger-bg) 70%, transparent);
+  border-color: color-mix(in srgb, var(--color-danger-mix) 18%, var(--border));
+}
+
+.profile-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.profile-row__label {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.profile-row__value {
+  font-weight: 600;
+}
+
+.profile-note {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.profile-recovery {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.profile-recovery__code {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.profile-modal form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.profile-modal form input[type="text"],
+.profile-modal form input[type="password"] {
+  height: 42px;
+}
+
+.profile-modal .btn {
+  border-radius: var(--radius-md);
+}
+
+.profile-modal .btn.dangerous {
+  border-color: var(--danger-25);
+  box-shadow: var(--raised-shadow);
+}
+
+body.modal-open {
+  overflow: hidden;
+}
+
+body.modal-open #content-wrapper {
+  overflow: hidden;
+}
+
+@keyframes profile-modal-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes profile-modal-rise {
+  from {
+    opacity: 0.8;
+    transform: translateY(6px);
   }
-
-  /* Back button: keep circular & visible */
-  .back-btn {
-    background: var(--color-bg);
-    border: 1px solid var(--border);
-    box-shadow: var(--raised-shadow);
-    border-radius: 50%;
-    width: 36px;
-    height: 36px;
-    padding: 0;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: background var(--motion-fade) ease, box-shadow var(--motion-fade) ease, transform var(--motion-tap) ease;
-
-    svg {
-      width: 16px;
-      height: 16px;
-      display: block;
-    }
-
-    &:hover {
-      background: var(--accent-05);
-      box-shadow: var(--raised-shadow), 0 0 0 2px var(--accent-05);
-    }
-
-    &:active {
-      box-shadow: var(--inset-shadow);
-      transform: translateY(1px);
-    }
-
-    &:focus-visible {
-      outline: none;
-      box-shadow:
-        var(--raised-shadow),
-        0 0 0 2px var(--accent-20),
-        0 8px 20px var(--accent-10);
-    }
-  }
-
-  /* ------- Sections (cards) ------- */
-  .profile-section {
-    background: var(--color-bg);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-lg);
-    box-shadow: var(--raised-shadow);
-
-    h2 {
-      margin: 0 0 var(--spacing-md);
-      font-size: 1.1rem;
-      color: var(--color-assistant-text);
-    }
-
-    /* single-action rows */
-    .section-actions {
-      display: flex;
-      justify-content: center;
-      gap: var(--spacing-sm);
-      margin-top: var(--spacing-md);
-    }
-  }
-
-  .profile-section + .profile-section {
-    margin-top: calc(var(--spacing-xl) * -0.15); /* subtle tighter stack */
-  }
-
-  .profile-section.danger {
-    background: var(--color-danger-bg);
-    border-color: color-mix(in srgb, var(--color-danger-mix) 20%, var(--border));
-  }
-
-  /* ------- Forms ------- */
-  form {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-md);
-
-    input[type="text"],
-    input[type="password"] {
-      height: 42px;
-    }
-
-    /* keep your app-wide .btn look, just unify radius locally */
-    .btn {
-      border-radius: var(--radius-md);
-    }
-
-    /* danger button palette inside danger section */
-    .btn.dangerous {
-      border-color: var(--danger-25);
-      box-shadow: var(--raised-shadow);
-    }
-  }
-
-  /* ------- Messages ------- */
-  .alert {
-    margin-bottom: var(--spacing-sm);
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

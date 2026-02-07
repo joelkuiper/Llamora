@@ -1,0 +1,55 @@
+{% set active_tab = active_tab|default("account") %}
+<div class="profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title" data-profile-modal data-active-tab="{{ active_tab }}">
+  <div class="profile-modal__scrim" data-profile-close></div>
+  <div class="profile-modal__panel glass-panel" role="document">
+    <button type="button" class="overlay-close" aria-label="Close" data-profile-close>×</button>
+    <header class="profile-modal__header">
+      <h2 id="profile-modal-title">Profile &amp; Settings</h2>
+    </header>
+    <nav class="profile-modal__tabs" role="tablist">
+      <button
+        class="profile-modal__tab{% if active_tab == 'account' %} is-active{% endif %}"
+        role="tab"
+        aria-selected="{{ 'true' if active_tab == 'account' else 'false' }}"
+        data-profile-tab="account"
+        hx-get="{{ url_for('auth.profile_tab', tab='account') }}"
+        hx-target="#profile-modal-content"
+        hx-swap="innerHTML">
+        Account
+      </button>
+      <button
+        class="profile-modal__tab{% if active_tab == 'security' %} is-active{% endif %}"
+        role="tab"
+        aria-selected="{{ 'true' if active_tab == 'security' else 'false' }}"
+        data-profile-tab="security"
+        hx-get="{{ url_for('auth.profile_tab', tab='security') }}"
+        hx-target="#profile-modal-content"
+        hx-swap="innerHTML">
+        Security
+      </button>
+      <button
+        class="profile-modal__tab{% if active_tab == 'data' %} is-active{% endif %}"
+        role="tab"
+        aria-selected="{{ 'true' if active_tab == 'data' else 'false' }}"
+        data-profile-tab="data"
+        hx-get="{{ url_for('auth.profile_tab', tab='data') }}"
+        hx-target="#profile-modal-content"
+        hx-swap="innerHTML">
+        Data
+      </button>
+      <button
+        class="profile-modal__tab{% if active_tab == 'privacy' %} is-active{% endif %}"
+        role="tab"
+        aria-selected="{{ 'true' if active_tab == 'privacy' else 'false' }}"
+        data-profile-tab="privacy"
+        hx-get="{{ url_for('auth.profile_tab', tab='privacy') }}"
+        hx-target="#profile-modal-content"
+        hx-swap="innerHTML">
+        Privacy
+      </button>
+    </nav>
+    <section id="profile-modal-content" class="profile-modal__content" role="tabpanel">
+      {% include 'partials/profile_tabs/' ~ active_tab ~ '.html' %}
+    </section>
+  </div>
+</div>

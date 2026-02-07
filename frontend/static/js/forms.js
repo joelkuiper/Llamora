@@ -2,7 +2,7 @@ import { startButtonSpinner, stopButtonSpinner } from "./ui.js";
 import { getTimezone } from "./services/datetime.js";
 import { runWhenDocumentReady } from "./utils/dom-ready.js";
 
-const FORM_SELECTOR = ".form-container form, #profile-page form";
+const FORM_SELECTOR = ".form-container form, .profile-modal form";
 
 function collectForms(root = document) {
   const forms = [];

@@ -100,17 +100,34 @@ def _get_client_ip() -> str:
     return request.remote_addr or "unknown"
 
 
-async def _render_profile_page(user: Mapping[str, Any], **context):
+PROFILE_TABS: dict[str, str] = {
+    "account": "partials/profile_tabs/account.html",
+    "security": "partials/profile_tabs/security.html",
+    "data": "partials/profile_tabs/data.html",
+    "privacy": "partials/profile_tabs/privacy.html",
+}
+
+
+def _resolve_profile_tab(tab: str | None) -> str:
+    tab_id = (tab or "account").strip().lower()
+    return tab_id if tab_id in PROFILE_TABS else "account"
+
+
+async def _render_profile_tab(
+    user: Mapping[str, Any], tab: str, **context
+):
     context["user"] = user
-    state = await get_services().db.users.get_state(user["id"])
-    context["day"] = state.get("active_date", local_date().isoformat())
-    if request.headers.get("HX-Request"):
-        return await render_template("partials/profile.html", **context)
-    return await render_template(
-        "index.html",
-        content_template="partials/profile.html",
-        **context,
-    )
+    template = PROFILE_TABS[_resolve_profile_tab(tab)]
+    return await render_template(template, **context)
+
+
+async def _render_profile_modal(
+    user: Mapping[str, Any], tab: str, **context
+):
+    context["user"] = user
+    active_tab = _resolve_profile_tab(tab)
+    context["active_tab"] = active_tab
+    return await render_template("partials/profile_modal.html", **context)
 
 
 @auth_bp.route("/password_strength", methods=["POST"])
@@ -428,8 +445,18 @@ async def reset_password():
 async def profile():
     session = get_session_context()
     user = await session.require_user()
-    await get_services().db.users.update_state(user["id"], active_date=None)
-    return await _render_profile_page(user)
+    tab = request.args.get("tab", "account")
+    if request.headers.get("HX-Request"):
+        return await _render_profile_modal(user, tab=tab)
+    return redirect(url_for("days.day_today", profile="1", profile_tab=tab))
+
+
+@auth_bp.route("/profile/tab/<tab>")
+@login_required
+async def profile_tab(tab: str):
+    session = get_session_context()
+    user = await session.require_user()
+    return await _render_profile_tab(user, tab)
 
 
 @auth_bp.route("/profile/data")
@@ -477,10 +504,10 @@ async def change_password():
 
     max_pass = int(settings.LIMITS.max_password_length)
     if not current:
-        return await _render_profile_page(user, pw_error="All fields are required")
+        return await _render_profile_tab(user, "security", pw_error="All fields are required")
 
     if len(current) > max_pass:
-        return await _render_profile_page(user, pw_error="Input exceeds max length")
+        return await _render_profile_tab(user, "security", pw_error="Input exceeds max length")
 
     password_error = await validate_password(
         new,
@@ -491,18 +518,18 @@ async def change_password():
     )
     if password_error:
         message = _password_error_message(password_error)
-        return await _render_profile_page(user, pw_error=message)
+        return await _render_profile_tab(user, "security", pw_error=message)
 
     try:
         await _verify_password(
             user["password_hash"].encode("utf-8"), current.encode("utf-8")
         )
     except Exception:
-        return await _render_profile_page(user, pw_error="Invalid current password")
+        return await _render_profile_tab(user, "security", pw_error="Invalid current password")
 
     dek = await session.dek()
     if dek is None:
-        return await _render_profile_page(user, pw_error="Missing encryption key")
+        return await _render_profile_tab(user, "security", pw_error="Missing encryption key")
 
     password_bytes = new.encode("utf-8")
     hash_bytes = await _hash_password(password_bytes)
@@ -512,7 +539,7 @@ async def change_password():
         user["id"], password_hash, pw_salt, pw_nonce, pw_cipher
     )
 
-    return await _render_profile_page(user, pw_success=True)
+    return await _render_profile_tab(user, "security", pw_success=True)
 
 
 @auth_bp.route("/profile/recovery", methods=["POST"])
@@ -522,7 +549,7 @@ async def regen_recovery():
     user = await session.require_user()
     dek = await session.dek()
     if dek is None:
-        return await _render_profile_page(user, rc_error="Missing encryption key")
+        return await _render_profile_tab(user, "security", rc_error="Missing encryption key")
 
     recovery_code = generate_recovery_code()
     rc_salt, rc_nonce, rc_cipher = wrap_key(dek, recovery_code)
@@ -530,10 +557,10 @@ async def regen_recovery():
         user["id"], rc_salt, rc_nonce, rc_cipher
     )
 
-    return await render_template(
-        "recovery.html",
-        code=format_recovery_code(recovery_code),
-        next_url=url_for("auth.profile"),
+    return await _render_profile_tab(
+        user,
+        "security",
+        recovery_code=format_recovery_code(recovery_code),
     )
 
 

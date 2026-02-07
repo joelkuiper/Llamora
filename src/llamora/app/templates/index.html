@@ -62,9 +62,8 @@
       <a id="profile-btn"
          href="{{ url_for('auth.profile') }}"
          hx-get="{{ url_for('auth.profile') }}"
-         hx-target="#content-wrapper"
-         hx-swap="outerHTML"
-         hx-push-url="true"
+         hx-target="#profile-modal-root"
+         hx-swap="innerHTML"
          class="icon-btn"
          aria-label="Profile" data-tooltip-title="Profile">
         <span class="icon-mask icon-user-round" aria-hidden="true"></span>

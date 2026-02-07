@@ -72,12 +72,12 @@ const FEATURE_IMPORTS = {
     loader: () => import("../components/search-overlay.js"),
   },
   profile: {
-    selector: "#profile-page",
+    selector: "[data-profile-modal]",
     loader: () =>
       Promise.all([
         import("../forms.js"),
         import("../password-strength.js"),
-        import("../profile-page.js"),
+        import("../components/profile-modal.js"),
       ]),
   },
 };
