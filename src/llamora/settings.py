@@ -166,6 +166,8 @@ DEFAULTS: dict[str, Any] = {
             "model": "local",
             "api_key": None,
             "base_url": None,
+            "timeout_seconds": 30.0,
+            "max_retries": 2,
             "parameter_allowlist": [
                 "top_k",
                 "n_keep",

@@ -280,10 +280,14 @@ class LLMClient:
         base_url = settings.get("LLM.chat.base_url")
         if not base_url:
             base_url = self._chat_base_url(self.upstream_url, self._chat_endpoint)
+        from llamora.app.util.number import parse_positive_int, parse_positive_float
+        timeout = parse_positive_float(settings.get("LLM.chat.timeout_seconds"))
+        max_retries = parse_positive_int(settings.get("LLM.chat.max_retries"))
         self._openai = AsyncOpenAI(
             api_key=settings.get("LLM.chat.api_key") or "local",
             base_url=str(base_url),
-            max_retries=0,
+            max_retries=max_retries if max_retries is not None else 0,
+            timeout=timeout,
         )
         self._active_streams: dict[str, asyncio.Task[None]] = {}
         self._streams_lock = asyncio.Lock()

@@ -133,6 +133,8 @@ endpoint = "/v1/chat/completions"
 model = "local"
 # base_url = "http://127.0.0.1:8081/v1"
 # api_key = ""
+timeout_seconds = 30.0
+max_retries = 2
 parameter_allowlist = [
   "top_k",
   "n_keep",
