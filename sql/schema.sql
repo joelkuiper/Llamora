@@ -72,6 +72,8 @@ CREATE TABLE IF NOT EXISTS search_history (
 );
 
 CREATE INDEX IF NOT EXISTS idx_entries_user_date ON entries(user_id, created_date);
+CREATE INDEX IF NOT EXISTS idx_entries_user_created_at
+    ON entries(user_id, created_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_entries_reply_to ON entries(reply_to);
 CREATE INDEX IF NOT EXISTS idx_vectors_user_id ON vectors(user_id);
 

@@ -20,7 +20,7 @@
 {% endfor %}
 {% if has_more and next_cursor %}
   <div class="load-more tag-detail-load"
-       hx-get="{{ url_for('tags.tag_detail_entries', tag_hash=tag_hash) }}?cursor={{ next_cursor }}&limit={{ page_size|default(12) }}"
+       hx-get="{{ url_for('tags.tag_detail_entries', tag_hash=tag_hash) }}?cursor={{ next_cursor|urlencode }}&limit={{ page_size|default(12) }}"
        hx-trigger="intersect once delay:160ms"
        hx-swap="outerHTML"
        hx-sync="this:replace"

@@ -21,6 +21,19 @@ _SENTENCE_END = re.compile(r"[.!?](?:\s|$)")
 _MARKDOWN_PREFIX = re.compile(r"^(?:#{1,6}\s+|>+\s+|[-*+]\s+|\d+\.\s+)")
 
 
+def _parse_tag_cursor(cursor: str | None) -> tuple[str | None, str | None]:
+    if not cursor:
+        return None, None
+    if "|" not in cursor:
+        return None, None
+    created_at, _, entry_id = cursor.partition("|")
+    created_at = created_at.strip()
+    entry_id = entry_id.strip()
+    if not created_at or not entry_id:
+        return None, None
+    return created_at, entry_id
+
+
 @dataclass(slots=True)
 class TagEntryPreview:
     entry_id: str
@@ -100,12 +113,14 @@ class TagService:
         limit: int = 24,
         cursor: str | None = None,
     ) -> tuple[list[TagEntryPreview], str | None, bool]:
+        before_created_at, before_entry_id = _parse_tag_cursor(cursor)
         entry_ids, next_cursor, has_more = (
             await self._db.tags.get_recent_entries_page_for_tag_hashes(
                 user_id,
                 [tag_hash],
                 limit=limit,
-                before_ulid=cursor,
+                before_created_at=before_created_at,
+                before_entry_id=before_entry_id,
             )
         )
         if not entry_ids:
