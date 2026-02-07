@@ -25,6 +25,24 @@ const TAG_HISTORY_MAX = 50;
 const TAG_SUMMARY_CACHE_PREFIX = "llamora:tag-summary:";
 const TAG_SUMMARY_CACHE_TTL = 1000 * 60 * 60 * 6;
 
+let sharedTagPopoverEl = null;
+let sharedTagDetailPopoverEl = null;
+let activeTagOwner = null;
+
+const getSharedTagPopoverEl = () => {
+  if (!sharedTagPopoverEl || !sharedTagPopoverEl.isConnected) {
+    sharedTagPopoverEl = document.getElementById("tag-popover-global");
+  }
+  return sharedTagPopoverEl;
+};
+
+const getSharedTagDetailPopoverEl = () => {
+  if (!sharedTagDetailPopoverEl || !sharedTagDetailPopoverEl.isConnected) {
+    sharedTagDetailPopoverEl = document.getElementById("tag-detail-popover-global");
+  }
+  return sharedTagDetailPopoverEl;
+};
+
 export const mergeTagCandidateValues = (
   remoteCandidates = [],
   localCandidates = [],
@@ -64,12 +82,15 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   #detailCloseButton = null;
   #detailBody = null;
   #detailSkeleton = "";
+  #suggestionsSkeleton = "";
   #activeTagEl = null;
   #activeTagLabel = null;
   #activeTagHash = "";
   #detailOutsideListeners = null;
   #tagContainer = null;
   #listeners = null;
+  #sharedListeners = null;
+  #pendingDetailOpen = false;
   #inputListeners = null;
   #buttonClickHandler;
   #closeClickHandler;
@@ -147,36 +168,13 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#listeners = this.resetListenerBag(this.#listeners);
     const listeners = this.#listeners;
 
-    if (!this.#button || !this.#popoverEl || !this.#form || !this.#input || !this.#submit || !this.#tagContainer) {
+    if (!this.#button || !this.#tagContainer) {
       return;
     }
 
-    listeners.add(
-      this.#form,
-      "htmx:configRequest",
-      this.#configRequestHandler,
-    );
-    listeners.add(this.#form, "htmx:afterRequest", this.#afterRequestHandler);
     listeners.add(this, "htmx:afterSwap", this.#afterSwapHandler);
     listeners.add(this, "htmx:restored", this.#restoredHandler);
     listeners.add(this.#button, "click", this.#buttonClickHandler);
-    listeners.add(this.#closeButton, "click", this.#closeClickHandler);
-    listeners.add(this.#detailCloseButton, "click", this.#detailCloseClickHandler);
-    listeners.add(this.#detailPopoverEl, "click", this.#detailClickHandler);
-    listeners.add(this.#detailBody, "htmx:afterSwap", this.#detailAfterSwapHandler);
-    listeners.add(this.#detailPopoverEl, "htmx:afterRequest", (event) => {
-      const trigger = event?.detail?.elt;
-      if (!trigger?.classList?.contains("tag-detail__remove")) return;
-      const status = event?.detail?.xhr?.status ?? 0;
-      if (status >= 200 && status < 300) {
-        this.#forceHideDetailPopover("detail remove");
-      }
-    });
-    listeners.add(
-      this.#suggestions,
-      "htmx:afterSwap",
-      this.#suggestionsSwapHandler,
-    );
     listeners.add(this.#tagContainer, "click", this.#tagActivationHandler);
     listeners.add(this.#tagContainer, "keydown", this.#tagKeydownHandler);
     listeners.add(window, "pageshow", this.#pageShowHandler);
@@ -184,14 +182,17 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     listeners.add(document, "htmx:beforeHistorySave", this.#beforeHistorySaveHandler);
     listeners.add(document, "htmx:restored", this.#restoredHandler);
     listeners.add(document, "visibilitychange", this.#visibilityHandler);
-
-    this.#initPopover();
     this.#updateSubmitState();
   }
 
   disconnectedCallback() {
-    this.#destroyPopover();
-    this.#destroyDetailPopover();
+    if (this.#isActiveOwner()) {
+      this.#deactivateSharedOwner("disconnect");
+    } else {
+      this.#destroyPopover();
+      this.#destroyDetailPopover();
+      this.#detachSharedListeners();
+    }
     this.#teardownListeners();
     this.#inputListeners = this.disposeListenerBag(this.#inputListeners);
     super.disconnectedCallback();
@@ -199,19 +200,22 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
 
   #cacheElements() {
     this.#button = this.querySelector(".add-tag-btn");
-    this.#popoverEl = this.querySelector(".tag-popover");
+    this.#popoverEl = getSharedTagPopoverEl();
     this.#form = this.#popoverEl?.querySelector("form") ?? null;
     this.#input = this.#form?.querySelector('input[name="tag"]') ?? null;
     this.#submit = this.#form?.querySelector('button[type="submit"]') ?? null;
     this.#panel = this.#popoverEl?.querySelector(".tp-content") ?? null;
     this.#suggestions = this.#popoverEl?.querySelector(".tag-suggestions") ?? null;
     this.#closeButton = this.#popoverEl?.querySelector(".overlay-close") ?? null;
-    this.#detailPopoverEl = this.querySelector(".tag-detail-popover");
+    this.#detailPopoverEl = getSharedTagDetailPopoverEl();
     this.#detailPanel = this.#detailPopoverEl?.querySelector(".tag-detail-panel") ?? null;
     this.#detailCloseButton = this.#detailPopoverEl?.querySelector(".overlay-close") ?? null;
     this.#detailBody = this.#detailPopoverEl?.querySelector(".tag-detail-body") ?? null;
     if (this.#detailBody && !this.#detailSkeleton) {
       this.#detailSkeleton = this.#detailBody.innerHTML;
+    }
+    if (this.#suggestions && !this.#suggestionsSkeleton) {
+      this.#suggestionsSkeleton = this.#suggestions.innerHTML;
     }
     this.#tagContainer = this.querySelector(".entry-tags-list");
 
@@ -222,21 +226,153 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#listeners = this.disposeListenerBag(this.#listeners);
   }
 
+  #isActiveOwner() {
+    return activeTagOwner === this;
+  }
+
+  #activateSharedOwner() {
+    if (activeTagOwner && activeTagOwner !== this) {
+      activeTagOwner.#deactivateSharedOwner("switch");
+    }
+    activeTagOwner = this;
+    this.#attachSharedListeners();
+  }
+
+  #deactivateSharedOwner(reason = "deactivate") {
+    if (this.#popover) {
+      this.#popover.hide();
+    }
+    this.#forceHideDetailPopover(reason);
+    this.#destroyPopover();
+    this.#detachSharedListeners();
+    this.refreshAutocompleteController({
+      force: true,
+      reason: "shared-release",
+    });
+    if (activeTagOwner === this) {
+      activeTagOwner = null;
+    }
+  }
+
+  #maybeReleaseSharedOwner() {
+    if (!this.#isActiveOwner()) {
+      return;
+    }
+    if (this.#pendingDetailOpen) {
+      return;
+    }
+    const popoverOpen = this.#popover?.isOpen;
+    const detailOpen = this.#detailPopover?.isOpen;
+    if (popoverOpen || detailOpen) {
+      return;
+    }
+    this.#detachSharedListeners();
+    this.refreshAutocompleteController({
+      force: true,
+      reason: "shared-release",
+    });
+    if (activeTagOwner === this) {
+      activeTagOwner = null;
+    }
+  }
+
+  #attachSharedListeners() {
+    if (!this.#form || !this.#popoverEl) {
+      return;
+    }
+    this.#sharedListeners = this.resetListenerBag(this.#sharedListeners);
+    const listeners = this.#sharedListeners;
+    listeners.add(
+      this.#form,
+      "htmx:configRequest",
+      this.#configRequestHandler,
+    );
+    listeners.add(this.#form, "htmx:afterRequest", this.#afterRequestHandler);
+    if (this.#closeButton) {
+      listeners.add(this.#closeButton, "click", this.#closeClickHandler);
+    }
+    if (this.#detailCloseButton) {
+      listeners.add(this.#detailCloseButton, "click", this.#detailCloseClickHandler);
+    }
+    if (this.#detailPopoverEl) {
+      listeners.add(this.#detailPopoverEl, "click", this.#detailClickHandler);
+      listeners.add(this.#detailPopoverEl, "htmx:afterRequest", (event) => {
+        const trigger = event?.detail?.elt;
+        if (!trigger?.classList?.contains("tag-detail__remove")) return;
+        const status = event?.detail?.xhr?.status ?? 0;
+        if (status >= 200 && status < 300) {
+          this.#forceHideDetailPopover("detail remove");
+        }
+      });
+    }
+    if (this.#detailBody) {
+      listeners.add(this.#detailBody, "htmx:afterSwap", this.#detailAfterSwapHandler);
+    }
+    if (this.#suggestions) {
+      listeners.add(
+        this.#suggestions,
+        "htmx:afterSwap",
+        this.#suggestionsSwapHandler,
+      );
+    }
+  }
+
+  #detachSharedListeners() {
+    this.#sharedListeners = this.disposeListenerBag(this.#sharedListeners);
+  }
+
+  #prepareSharedPopover() {
+    if (!this.#form || !this.#suggestions || !this.#input) return;
+    const entryId = this.dataset?.entryId ?? "";
+    const addUrl = this.dataset?.addTagUrl ?? "";
+    if (addUrl) {
+      this.#form.setAttribute("hx-post", addUrl);
+    }
+    if (entryId) {
+      this.#form.setAttribute("hx-target", `#entry-tags-${entryId}`);
+    }
+    this.#form.setAttribute("hx-swap", "beforeend");
+    this.#form.reset();
+    this.#input.disabled = false;
+    if (this.#suggestions) {
+      const suggestionUrl = this.dataset?.suggestionsUrl ?? "";
+      if (suggestionUrl) {
+        this.#suggestions.setAttribute("hx-get", suggestionUrl);
+      }
+      if (this.#suggestions.dataset.entryId !== entryId) {
+        this.#suggestions.innerHTML =
+          this.#suggestionsSkeleton || this.#suggestions.innerHTML;
+        delete this.#suggestions.dataset.loaded;
+        this.#suggestions.dataset.entryId = entryId;
+      }
+    }
+    this.#updateSubmitState();
+    if (typeof htmx !== "undefined") {
+      htmx.process(this.#popoverEl);
+    }
+  }
+
   #initPopover() {
     this.#destroyPopover();
+    this.#cacheElements();
     if (!this.#button || !this.#popoverEl) {
       return;
     }
 
     this.#popover = createPopover(this.#button, this.#popoverEl, {
       getPanel: () => this.#panel,
+      onBeforeShow: () => {
+        this.#activateSharedOwner();
+        this.#prepareSharedPopover();
+        this.refreshAutocompleteController({
+          force: true,
+          reason: "tag-popover-show",
+        });
+      },
       onShow: () => {
         this.#button.classList.add("active");
         this.#button?.setAttribute("aria-expanded", "true");
         this.classList.add("popover-open");
-        if (this.#suggestions && this.dataset?.suggestionsUrl) {
-          this.#suggestions.setAttribute("hx-get", this.dataset.suggestionsUrl);
-        }
         if (this.#suggestions && !this.#suggestions.dataset.loaded) {
           htmx.trigger(this.#suggestions, "tag-popover:show");
         }
@@ -259,6 +395,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
         this.classList.remove("popover-open");
         this.cancelAutocompleteFetch();
         this.resetAutocompleteStore({ clearLocal: true });
+        this.#maybeReleaseSharedOwner();
       },
     });
   }
@@ -284,13 +421,15 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   #togglePopover() {
-    if (!this.#popover) return;
-    if (this.#popover.isOpen) {
+    if (this.#popover?.isOpen) {
       this.#popover.hide();
-    } else {
-      this.#detailPopover?.hide();
-      this.#popover.show();
+      return;
     }
+    this.#destroyPopover();
+    this.#initPopover();
+    if (!this.#popover) return;
+    this.#detailPopover?.hide();
+    this.#popover.show();
   }
 
   #handleCloseClick(event) {
@@ -322,6 +461,9 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   #shouldFetchAutocomplete() {
+    if (!this.#isActiveOwner()) {
+      return false;
+    }
     if (!this.#input) {
       return false;
     }
@@ -338,11 +480,17 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   #handleInputFocus() {
+    if (!this.#isActiveOwner()) {
+      return;
+    }
     this.scheduleAutocompleteFetch({ immediate: true });
     this.#updateAutocompleteCandidates();
   }
 
   #updateSubmitState() {
+    if (!this.#isActiveOwner()) {
+      return;
+    }
     if (!this.#input || !this.#submit) return;
     const raw = this.#input.value.trim();
     if (!raw) {
@@ -360,6 +508,9 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   #handleConfigRequest(event) {
+    if (!this.#isActiveOwner()) {
+      return;
+    }
     if (!this.#input) return;
     const raw = this.#input.value.trim();
     if (!raw) {
@@ -383,6 +534,9 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   #handleAfterRequest() {
+    if (!this.#isActiveOwner()) {
+      return;
+    }
     this.#form?.reset();
     this.#updateSubmitState();
     this.#popover?.hide();
@@ -432,6 +586,9 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   #handleSuggestionsSwap() {
+    if (!this.#isActiveOwner()) {
+      return;
+    }
     if (!this.#suggestions) return;
     if (this.#suggestions.innerHTML.trim()) {
       this.#suggestions.dataset.loaded = "1";
@@ -450,10 +607,12 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   getAutocompleteInputConfig() {
+    if (!this.#isActiveOwner()) {
+      return null;
+    }
     return {
-      selector: 'form input[name="tag"]',
-      observe: true,
-      root: () => this.querySelector(".tag-popover") ?? this,
+      resolve: () => this.#input ?? null,
+      observe: false,
     };
   }
 
@@ -553,6 +712,9 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   #updateAutocompleteCandidates() {
+    if (!this.#isActiveOwner()) {
+      return;
+    }
     const domValues = [];
     if (this.#suggestions) {
       this.#suggestions.querySelectorAll(".tag-suggestion").forEach((btn) => {
@@ -574,6 +736,9 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   #invalidateAutocompleteCache({ immediate = false } = {}) {
+    if (!this.#isActiveOwner()) {
+      return;
+    }
     this.clearAutocompleteCache();
     if (this.#shouldFetchAutocomplete()) {
       this.scheduleAutocompleteFetch({ immediate });
@@ -708,9 +873,11 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   async #openTagDetail(label) {
+    this.#cacheElements();
     if (!this.#detailPopoverEl || !this.#detailBody) {
       return;
     }
+    this.#activateSharedOwner();
     const tagEl = label.closest(".entry-tag");
     const tagHash =
       label.dataset.tagHash || tagEl?.dataset?.tagHash || "";
@@ -727,6 +894,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       this.#destroyDetailPopover();
     }
 
+    this.#pendingDetailOpen = true;
     this.#popover?.hide();
     this.#initDetailPopover(label);
     this.#loadTagDetail(tagHash);
@@ -735,6 +903,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
 
   #initDetailPopover(trigger) {
     this.#destroyDetailPopover();
+    this.#cacheElements();
     if (!this.#detailPopoverEl) {
       return;
     }
@@ -744,8 +913,12 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       placement: "bottom-start",
       getPanel: () => this.#detailPanel,
       closeOnOutside: false,
+      onBeforeShow: () => {
+        this.#activateSharedOwner();
+      },
       onShow: () => {
         this.classList.add("popover-open");
+        this.#pendingDetailOpen = false;
         if (labelEl) {
           labelEl.setAttribute("aria-expanded", "true");
           labelEl.classList.add("is-active");
@@ -766,6 +939,8 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       },
       onHidden: () => {
         this.classList.remove("popover-open");
+        this.#pendingDetailOpen = false;
+        this.#maybeReleaseSharedOwner();
       },
     });
   }
@@ -815,6 +990,9 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   #handleDetailClick(event) {
+    if (!this.#isActiveOwner()) {
+      return;
+    }
     const target = event.target;
     const item = target?.closest?.(".tag-detail__item");
     if (!item) return;
@@ -834,6 +1012,9 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   #handleDetailAfterSwap(event) {
+    if (!this.#isActiveOwner()) {
+      return;
+    }
     this.#detailPopover?.update();
     const target = event?.target;
     if (target?.classList?.contains("tag-detail__summary")) {
@@ -863,6 +1044,9 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
         if (this.contains(target)) {
           return;
         }
+        if (this.#detailPopoverEl?.contains(target)) {
+          return;
+        }
         this.#detailPopover?.hide();
       },
       true
@@ -870,6 +1054,9 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   #forceHideDetailPopover(reason = "force") {
+    if (!this.#isActiveOwner()) {
+      return;
+    }
     if (this.#detailPopover) {
       this.#detailPopover.destroy();
       this.#detailPopover = null;
@@ -885,6 +1072,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       this.#detailOutsideListeners
     );
     this.#clearActiveTag();
+    this.#pendingDetailOpen = false;
   }
 
   #resetDetailPopoverState(reason = "reset") {

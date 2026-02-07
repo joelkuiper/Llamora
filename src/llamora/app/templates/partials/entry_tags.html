@@ -19,6 +19,7 @@
 {% macro render_entry_tags(entry_id, tags=[], hidden=False) -%}
   <entry-tags class="entry-tags"
               data-entry-id="{{ entry_id }}"
+              data-add-tag-url="{{ url_for('tags.add_tag', entry_id=entry_id) }}"
               data-suggestions-url="{{ url_for('tags.get_tag_suggestions', entry_id=entry_id) }}"
               data-tag-detail-url="{{ url_for('tags.tag_detail', tag_hash='__TAG_HASH__') }}"
               data-autocomplete-limit="12"
@@ -36,48 +37,6 @@
       {% for tag in tags %}
       {{ entry_tag_item(tag.name, tag.hash, entry_id) }}
       {% endfor %}
-    </div>
-
-    <div class="tag-popover glass-panel" role="dialog" aria-modal="true" hidden>
-      <div class="tp-content">
-        <button type="button" class="overlay-close" aria-label="Close">×</button>
-        <form hx-post="{{ url_for('tags.add_tag', entry_id=entry_id) }}"
-              hx-target="#entry-tags-{{ entry_id }}"
-              hx-swap="beforeend">
-          <input type="text"
-                 name="tag"
-                 placeholder="Something memorable…"
-                 maxlength="{{ config.MAX_TAG_LENGTH }}"
-                 autocomplete="off">
-          <button type="submit" disabled>Add</button>
-        </form>
-        <div class="tag-suggestions"
-             hx-get="{{ url_for('tags.get_tag_suggestions', entry_id=entry_id) }}"
-             hx-trigger="tag-popover:show"
-             hx-indicator="closest .tag-suggestions"
-             hx-swap="innerHTML swap:120ms">
-          {% for _ in range(6) %}
-          <span class="tag-suggestion tag-suggestion--skeleton" aria-hidden="true"></span>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-
-    <div class="tag-popover tag-detail-popover glass-panel" role="dialog" aria-modal="true" hidden>
-      <div class="tp-content tag-detail-panel">
-        <button type="button" class="overlay-close" aria-label="Close">×</button>
-        <div class="tag-detail-body"
-             hx-trigger="tag-detail:show">
-          <div class="tag-detail-skeleton" aria-hidden="true">
-            <span class="tag-detail-skeleton__title"></span>
-            <span class="tag-detail-skeleton__meta"></span>
-            <span class="tag-detail-skeleton__line"></span>
-            <span class="tag-detail-skeleton__line"></span>
-            <span class="tag-detail-skeleton__item"></span>
-            <span class="tag-detail-skeleton__item"></span>
-          </div>
-        </div>
-      </div>
     </div>
   </entry-tags>
 {%- endmacro %}

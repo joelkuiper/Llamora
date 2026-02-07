@@ -24,29 +24,5 @@
     <span class="icon-mask icon-entry-actions entry-action__icon" aria-hidden="true"></span>
     {% endif %}
   </button>
-  {% if is_today %}
-  <div class="tag-popover action-popover glass-panel" role="dialog" aria-modal="true" hidden>
-    <div class="tp-content action-panel">
-      <button type="button" class="overlay-close" aria-label="Close">×</button>
-      <div class="action-list" role="menu" aria-label="Response actions">
-        {% for kind in response_kinds %}
-        <button class="action-item"
-                type="button"
-                role="menuitem"
-                hx-post="{{ url_for('entries.request_response', date=day, entry_id=entry_id) }}"
-                hx-target="#entry-responses-{{ entry_id }}"
-                hx-swap="beforeend"
-                hx-include="#user-time"
-                hx-vals='{"response_kind":"{{ kind.id }}"}'
-                data-action-kind="{{ kind.id }}"
-                hx-on::config-request="const t=document.getElementById('user-time'); if(t){t.value=new Date().toISOString();}">
-          {{ response_kind_icon(kind.id, "action-item__icon") }}
-          <span class="action-item__label">{{ kind.label }}</span>
-        </button>
-        {% endfor %}
-      </div>
-    </div>
-  </div>
-  {% endif %}
 </entry-actions>
 {%- endmacro %}
