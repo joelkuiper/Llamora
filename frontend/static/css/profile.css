@@ -8,6 +8,7 @@
   align-items: center;
   justify-content: center;
   padding: var(--spacing-xl);
+  transition: opacity 200ms ease;
   animation: profile-modal-fade 180ms ease;
 }
 
@@ -17,17 +18,25 @@
   background: color-mix(in srgb, var(--color-bg) 70%, transparent);
   backdrop-filter: blur(4px) saturate(120%);
   -webkit-backdrop-filter: blur(4px) saturate(120%);
+  transition: opacity 200ms ease;
 }
 
 .profile-modal__panel {
   position: relative;
-  width: min(42rem, 92vw);
-  max-height: min(80vh, 48rem);
+  width: min(34rem, 92vw);
+  max-height: min(86vh, 52rem);
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
-  padding: var(--spacing-lg);
-  animation: profile-modal-rise 180ms ease;
+  gap: var(--spacing-sm);
+  padding: calc(var(--spacing-xl) + 0.1rem);
+  padding-top: calc(var(--spacing-xl) + 0.5rem);
+  transition: transform 220ms ease, opacity 220ms ease;
+  animation: profile-modal-rise 220ms ease;
+}
+
+.profile-modal .overlay-close {
+  top: var(--spacing-sm);
+  right: var(--spacing-sm);
 }
 
 .profile-modal__header {
@@ -35,6 +44,7 @@
   align-items: center;
   justify-content: space-between;
   padding-right: var(--spacing-xl);
+  margin-bottom: var(--spacing-xs);
 }
 
 .profile-modal__header h2 {
@@ -47,30 +57,39 @@
   display: flex;
   gap: var(--spacing-md);
   padding-bottom: var(--spacing-xs);
+  margin-bottom: var(--spacing-sm);
 }
 
 .profile-modal__tab {
   appearance: none;
   border: none;
   background: transparent;
-  padding: 0.35rem 0;
+  padding: 0;
   font-size: 0.9rem;
-  color: var(--color-text-muted);
+  color: color-mix(in srgb, var(--color-text-muted) 65%, transparent);
   cursor: pointer;
   position: relative;
   transition: color var(--motion-gentle) ease;
 }
 
-.profile-modal__tab::after {
+.profile-modal__tab-label {
+  position: relative;
+  display: inline-block;
+  padding-bottom: 0.35rem;
+}
+
+.profile-modal__tab-label::after {
   content: "";
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -0.35rem;
-  height: 2px;
+  bottom: 0;
+  height: 1.5px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 60%, transparent);
   opacity: 0;
+  transform: scaleX(0.75);
+  transform-origin: center;
   transition: opacity var(--motion-gentle) ease;
 }
 
@@ -80,8 +99,8 @@
   font-weight: 600;
 }
 
-.profile-modal__tab.is-active::after,
-.profile-modal__tab[aria-selected="true"]::after {
+.profile-modal__tab.is-active .profile-modal__tab-label::after,
+.profile-modal__tab[aria-selected="true"] .profile-modal__tab-label::after {
   opacity: 1;
 }
 
@@ -90,16 +109,25 @@
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
+  gap: calc(var(--spacing-xl) + 0.1rem);
   padding-right: var(--spacing-xs);
 }
 
+.profile-modal__content.htmx-swapping {
+  opacity: 0;
+}
+
+.profile-modal__content.htmx-settling {
+  opacity: 1;
+  transition: opacity 180ms ease;
+}
+
 .profile-section {
-  background: var(--color-bg);
-  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: color-mix(in srgb, var(--color-surface) 99%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 12%, transparent);
   border-radius: var(--radius-md);
-  padding: var(--spacing-lg);
-  box-shadow: var(--subtle-raised-shadow);
+  padding: calc(var(--spacing-lg) - 0.15rem);
+  box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.02);
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
@@ -112,8 +140,9 @@
 }
 
 .profile-section.danger {
-  background: color-mix(in srgb, var(--color-danger-bg) 70%, transparent);
-  border-color: color-mix(in srgb, var(--color-danger-mix) 18%, var(--border));
+  background: color-mix(in srgb, var(--color-danger-bg) 18%, transparent);
+  border-color: color-mix(in srgb, var(--color-danger-mix) 9%, var(--border));
+  padding: calc(var(--spacing-xl) + 0.3rem);
 }
 
 .profile-row {
@@ -136,6 +165,7 @@
   margin: 0;
   color: var(--color-text-muted);
   font-size: 0.85rem;
+  margin-bottom: calc(var(--spacing-xs) - 0.1rem);
 }
 
 .profile-recovery {
@@ -160,7 +190,7 @@
 .profile-modal form {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
+  gap: calc(var(--spacing-lg) + 0.2rem);
 }
 
 .profile-modal form input[type="text"],
@@ -170,11 +200,45 @@
 
 .profile-modal .btn {
   border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface) 96%, transparent);
+  border-color: color-mix(in srgb, var(--border) 55%, transparent);
+  box-shadow: none;
 }
 
 .profile-modal .btn.dangerous {
-  border-color: var(--danger-25);
-  box-shadow: var(--raised-shadow);
+  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--border));
+  background: transparent;
+  color: var(--color-danger);
+  box-shadow: none;
+}
+
+.profile-modal .btn:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 8%, var(--color-surface));
+  box-shadow: 0 0 0 2px var(--accent-10);
+}
+
+.profile-modal .btn:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-20);
+  outline: none;
+}
+
+.profile-modal .btn:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+.profile-modal .btn.dangerous:hover {
+  border-color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-danger) 20%, transparent);
+}
+
+.profile-modal .btn.dangerous:focus-visible {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-danger) 25%, transparent);
+  outline: none;
 }
 
 body.modal-open {
@@ -185,6 +249,20 @@ body.modal-open #content-wrapper {
   overflow: hidden;
 }
 
+.profile-modal.is-closing {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.profile-modal.is-closing .profile-modal__panel {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.profile-modal.is-closing .profile-modal__scrim {
+  opacity: 0;
+}
+
 @keyframes profile-modal-fade {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -193,7 +271,7 @@ body.modal-open #content-wrapper {
 @keyframes profile-modal-rise {
   from {
     opacity: 0.8;
-    transform: translateY(6px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;

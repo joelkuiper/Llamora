@@ -541,19 +541,27 @@ input[type="checkbox"]:focus {
   position: absolute;
   top: var(--spacing-xs);
   right: var(--spacing-xs);
-  width: 1.5rem;
-  height: 1.5rem;
-  border: none;
+  width: 1.4rem;
+  height: 1.4rem;
+  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
   border-radius: 50%;
-  background: var(--overlay-close-bg);
+  background: color-mix(in srgb, var(--overlay-close-bg) 70%, transparent);
+  color: var(--color-text-muted);
+  font-size: 1rem;
+  line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   z-index: 1;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
 }
 
-.overlay-close:hover { background: var(--overlay-close-hover-bg); }
+.overlay-close:hover {
+  background: color-mix(in srgb, var(--overlay-close-hover-bg) 65%, transparent);
+  color: var(--color-text);
+  border-color: color-mix(in srgb, var(--border) 70%, transparent);
+}
 
 .overlay-close:focus-visible {
   outline: 2px solid var(--accent-active);

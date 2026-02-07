@@ -15,7 +15,7 @@
         hx-get="{{ url_for('auth.profile_tab', tab='account') }}"
         hx-target="#profile-modal-content"
         hx-swap="innerHTML">
-        Account
+        <span class="profile-modal__tab-label">Account</span>
       </button>
       <button
         class="profile-modal__tab{% if active_tab == 'security' %} is-active{% endif %}"
@@ -25,7 +25,7 @@
         hx-get="{{ url_for('auth.profile_tab', tab='security') }}"
         hx-target="#profile-modal-content"
         hx-swap="innerHTML">
-        Security
+        <span class="profile-modal__tab-label">Security</span>
       </button>
       <button
         class="profile-modal__tab{% if active_tab == 'data' %} is-active{% endif %}"
@@ -35,7 +35,7 @@
         hx-get="{{ url_for('auth.profile_tab', tab='data') }}"
         hx-target="#profile-modal-content"
         hx-swap="innerHTML">
-        Data
+        <span class="profile-modal__tab-label">Data</span>
       </button>
       <button
         class="profile-modal__tab{% if active_tab == 'privacy' %} is-active{% endif %}"
@@ -45,7 +45,7 @@
         hx-get="{{ url_for('auth.profile_tab', tab='privacy') }}"
         hx-target="#profile-modal-content"
         hx-swap="innerHTML">
-        Privacy
+        <span class="profile-modal__tab-label">Privacy</span>
       </button>
     </nav>
     <section id="profile-modal-content" class="profile-modal__content" role="tabpanel">

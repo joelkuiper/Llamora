@@ -2,7 +2,7 @@
 - [x] Limits for message size with indicator
 - [-] What to do with tags
   - [ ] Dedicated tags page with analyses?
-- [ ] Profile page design
+- [x] Profile page design
 - [ ] Recovery code generation page rethink (add QR code?)
 - [ ] Keyboard accessibility rethink
 - [ ] Migrations
