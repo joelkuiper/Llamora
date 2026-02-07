@@ -50,6 +50,8 @@ function applyExitAnimation(popover, panel, animation) {
   ]);
 }
 
+let popoverInstanceCounter = 0;
+
 export function createPopover(trigger, popover, options = {}) {
   const {
     placement = "bottom",
@@ -75,6 +77,10 @@ export function createPopover(trigger, popover, options = {}) {
   let popperInstance = null;
   let open = false;
   let globalListeners = null;
+  const instanceId = `popover-${++popoverInstanceCounter}`;
+
+  const isCurrentInstance = () =>
+    popover?.dataset?.popoverInstance === instanceId;
 
   const ensurePopper = () => {
     if (!popperInstance) {
@@ -127,6 +133,7 @@ export function createPopover(trigger, popover, options = {}) {
   const show = () => {
     if (open) return;
     onBeforeShow?.();
+    popover.dataset.popoverInstance = instanceId;
     popover.hidden = false;
     ensurePopper();
     open = true;
@@ -142,17 +149,22 @@ export function createPopover(trigger, popover, options = {}) {
     onHide?.();
     const result = animateClose();
     const finalize = () => {
-      popover.hidden = true;
-      onHidden?.();
+      if (isCurrentInstance()) {
+        popover.hidden = true;
+        onHidden?.();
+      }
     };
     return Promise.resolve(result).then(finalize);
   };
 
   const destroy = () => {
     removeGlobalListeners();
-    if (open) {
+    if (open && isCurrentInstance()) {
       popover.hidden = true;
       open = false;
+    }
+    if (isCurrentInstance()) {
+      delete popover.dataset.popoverInstance;
     }
     if (popperInstance) {
       popperInstance.destroy();
