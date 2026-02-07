@@ -381,6 +381,10 @@
       overflow: hidden;
     }
 
+    html.opening-syncing &.entry--opening .opening-content {
+      transition: none;
+    }
+
     &.entry--opening.is-collapsed .opening-content,
     html[data-opening-collapsed="1"] &.entry--opening .opening-content {
       max-height: 0;

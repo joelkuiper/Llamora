@@ -59,7 +59,7 @@ function getOpeningNodes() {
   return Array.from(document.querySelectorAll(".entry--opening"));
 }
 
-function syncOpeningState() {
+function syncOpeningState(options = {}) {
   const day = getEntriesDay();
   const openings = getOpeningNodes();
   if (!openings.length || !day) {
@@ -67,9 +67,20 @@ function syncOpeningState() {
     return;
   }
 
+  const animate = options.animate === true;
+  if (!animate) {
+    document.documentElement.classList.add("opening-syncing");
+  }
+
   const collapsed = readCollapsed(day);
   openings.forEach((opening) => applyCollapsed(opening, collapsed));
   setDocumentCollapsed(collapsed);
+
+  if (!animate) {
+    requestAnimationFrame(() => {
+      document.documentElement.classList.remove("opening-syncing");
+    });
+  }
 }
 
 function handleToggle(event) {
@@ -102,8 +113,8 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 window.addEventListener("pageshow", () => {
-  requestAnimationFrame(syncOpeningState);
+  requestAnimationFrame(() => syncOpeningState());
 });
 document.body?.addEventListener("htmx:afterSwap", () => {
-  syncOpeningState();
+  syncOpeningState({ animate: false });
 });
