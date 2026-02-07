@@ -86,6 +86,7 @@ DEFAULTS: dict[str, Any] = {
         "recent_limit": 50,
         "recent_suggestion_limit": 8,
         "entry_index_max_elements": 100_000,
+        "entry_index_allow_growth": False,
         "progressive": {
             "k1": 128,
             "k2": 10,

@@ -29,6 +29,7 @@ class SearchLimits:
     recent_limit: int
     recent_suggestion_limit: int
     entry_index_max_elements: int
+    entry_index_allow_growth: bool
     max_search_query_length: int
 
     def as_dict(self) -> dict[str, Any]:
@@ -54,6 +55,9 @@ class SearchConfig:
             recent_limit=int(search_settings.recent_limit),
             recent_suggestion_limit=int(search_settings.recent_suggestion_limit),
             entry_index_max_elements=int(search_settings.entry_index_max_elements),
+            entry_index_allow_growth=bool(
+                getattr(search_settings, "entry_index_allow_growth", False)
+            ),
             max_search_query_length=int(settings.LIMITS.max_search_query_length),
         )
         progressive = ProgressiveSearchConfig(

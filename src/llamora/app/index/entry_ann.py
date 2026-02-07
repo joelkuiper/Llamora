@@ -15,12 +15,26 @@ logger = logging.getLogger(__name__)
 class EntryIndex:
     """In-memory ANN index for a single user's entries."""
 
-    def __init__(self, dim: int, max_elements: int = 100000):
+    def __init__(
+        self,
+        dim: int,
+        max_elements: int = 100000,
+        *,
+        allow_growth: bool = False,
+    ):
         self.index = hnswlib.Index(space="cosine", dim=dim)
-        self.index.init_index(max_elements=max_elements, ef_construction=200, M=32)
+        self.allow_growth = bool(allow_growth)
+        self.index.init_index(
+            max_elements=max_elements,
+            ef_construction=200,
+            M=32,
+            allow_replace_deleted=not self.allow_growth,
+        )
         self.index.set_ef(64)
         self.id_to_idx: Dict[str, int] = {}
         self.idx_to_id: Dict[int, str] = {}
+        self._free_idxs: list[int] = []
+        self._free_set: set[int] = set()
         self.next_idx = 0
         self.last_used = time.monotonic()
         self.max_elements = max_elements
@@ -51,26 +65,81 @@ class EntryIndex:
 
         self.touch()
 
-        required = self.next_idx + len(ids)
-        current_capacity = self.max_elements
-        if required > current_capacity:
-            new_capacity = max(current_capacity * 2, required)
-            logger.warning(
-                "Resizing entry index from %d to %d to accommodate %d new items",
-                current_capacity,
-                new_capacity,
-                len(ids),
-            )
-            self.index.resize_index(new_capacity)
-            self.max_elements = new_capacity
+        if self.allow_growth:
+            required = self.next_idx + len(ids)
+            current_capacity = self.max_elements
+            if required > current_capacity:
+                new_capacity = max(current_capacity * 2, required)
+                logger.warning(
+                    "Resizing entry index from %d to %d to accommodate %d new items",
+                    current_capacity,
+                    new_capacity,
+                    len(ids),
+                )
+                self.index.resize_index(new_capacity)
+                self.max_elements = new_capacity
 
-        idxs = np.arange(self.next_idx, self.next_idx + len(ids))
-        logger.debug("Adding %d vectors starting at index %d", len(ids), self.next_idx)
-        self.index.add_items(vecs, idxs)
+            idxs = np.arange(self.next_idx, self.next_idx + len(ids))
+            logger.debug(
+                "Adding %d vectors starting at index %d", len(ids), self.next_idx
+            )
+            self.index.add_items(vecs, idxs)
+            for entry_id, idx in zip(ids, idxs):
+                self.id_to_idx[entry_id] = int(idx)
+                self.idx_to_id[int(idx)] = entry_id
+            self.next_idx += len(ids)
+            return
+
+        if self.max_elements <= 0:
+            logger.warning("Entry index capacity is zero; skipping %d items", len(ids))
+            return
+
+        incoming = len(ids)
+        if incoming > self.max_elements:
+            ids = ids[: self.max_elements]
+            vecs = vecs[: self.max_elements]
+            incoming = len(ids)
+
+        active = len(self.id_to_idx)
+        room = self.max_elements - active
+        if incoming > room:
+            to_evict = incoming - room
+            self._evict_oldest(to_evict)
+            active = len(self.id_to_idx)
+            room = self.max_elements - active
+            if room <= 0:
+                logger.warning(
+                    "Entry index at capacity after eviction; dropping %d items",
+                    incoming,
+                )
+                return
+            if incoming > room:
+                ids = ids[:room]
+                vecs = vecs[:room]
+                incoming = len(ids)
+
+        idxs: list[int] = []
+        while self._free_idxs and len(idxs) < incoming:
+            idx = self._free_idxs.pop()
+            self._free_set.discard(idx)
+            idxs.append(idx)
+
+        if len(idxs) < incoming:
+            needed = incoming - len(idxs)
+            start = self.next_idx
+            end = min(self.next_idx + needed, self.max_elements)
+            idxs.extend(range(start, end))
+            self.next_idx = end
+            if len(idxs) < incoming:
+                ids = ids[: len(idxs)]
+                vecs = vecs[: len(idxs)]
+                incoming = len(ids)
+
+        logger.debug("Adding %d vectors with cap=%d", incoming, self.max_elements)
+        self.index.add_items(vecs, idxs, replace_deleted=True)
         for entry_id, idx in zip(ids, idxs):
             self.id_to_idx[entry_id] = int(idx)
             self.idx_to_id[int(idx)] = entry_id
-        self.next_idx += len(ids)
 
     def search(self, query_vec: np.ndarray, k: int) -> tuple[list[str], np.ndarray]:
         self.touch()
@@ -105,9 +174,27 @@ class EntryIndex:
             self.idx_to_id.pop(idx, None)
             if hasattr(self.index, "mark_deleted"):
                 self.index.mark_deleted(idx)
+            if idx not in self._free_set:
+                self._free_idxs.append(idx)
+                self._free_set.add(idx)
             removed = True
         if removed:
             self.touch()
+
+    def _evict_oldest(self, count: int) -> None:
+        remaining = max(int(count), 0)
+        if remaining <= 0:
+            return
+        for entry_id in sorted(self.id_to_idx.keys())[:remaining]:
+            idx = self.id_to_idx.pop(entry_id, None)
+            if idx is None:
+                continue
+            self.idx_to_id.pop(idx, None)
+            if hasattr(self.index, "mark_deleted"):
+                self.index.mark_deleted(idx)
+            if idx not in self._free_set:
+                self._free_idxs.append(idx)
+                self._free_set.add(idx)
 
 
 class EntryIndexStore:
@@ -120,12 +207,14 @@ class EntryIndexStore:
         warm_limit: int = 1000,
         maintenance_interval: float = 60.0,
         max_elements: int = 100_000,
+        allow_growth: bool = False,
     ):
         self.db = db
         self.ttl = ttl
         self.warm_limit = warm_limit
         self.maintenance_interval = maintenance_interval
         self.max_elements = max_elements
+        self.allow_growth = bool(allow_growth)
         self.indexes: Dict[str, EntryIndex] = {}
         self.cursors: Dict[str, Optional[str]] = {}
         self.locks: Dict[str, asyncio.Lock] = {}
@@ -161,7 +250,7 @@ class EntryIndexStore:
             if idx is not None:
                 return idx
             dim = await self._get_default_dim()
-            fresh = EntryIndex(dim, self.max_elements)
+            fresh = EntryIndex(dim, self.max_elements, allow_growth=self.allow_growth)
             self.indexes[user_id] = fresh
             return fresh
 
@@ -170,7 +259,7 @@ class EntryIndexStore:
         vecs = await async_embed_texts(texts)
         if idx is None:
             dim = vecs.shape[1]
-            idx = EntryIndex(dim, self.max_elements)
+            idx = EntryIndex(dim, self.max_elements, allow_growth=self.allow_growth)
         idx.add_batch(ids, vecs)
         await self.db.vectors.store_vectors_batch(
             user_id,
@@ -203,7 +292,7 @@ class EntryIndexStore:
                     "Warming index for user %s with %d vectors", user_id, len(rows)
                 )
                 dim = rows[0]["vec"].shape[0]
-                idx = EntryIndex(dim, self.max_elements)
+                idx = EntryIndex(dim, self.max_elements, allow_growth=self.allow_growth)
                 ids = [r["id"] for r in rows]
                 vecs = np.array([r["vec"] for r in rows], dtype=np.float32)
                 if vecs.ndim == 1:
@@ -240,7 +329,7 @@ class EntryIndexStore:
 
             logger.debug("No existing data for user %s, creating empty index", user_id)
             dim = await self._get_default_dim()
-            idx = EntryIndex(dim, self.max_elements)
+            idx = EntryIndex(dim, self.max_elements, allow_growth=self.allow_growth)
             latest = await self.db.entries.get_user_latest_entry_id(user_id)
             self.cursors[user_id] = latest
             self.indexes[user_id] = idx

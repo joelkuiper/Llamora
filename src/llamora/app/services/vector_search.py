@@ -21,7 +21,12 @@ class VectorSearchService:
     def __init__(self, db, config: SearchConfig, index_max_elements: int | None = None):
         self._config = config
         max_elements = index_max_elements or config.limits.entry_index_max_elements
-        self.index_store = EntryIndexStore(db, max_elements=max_elements)
+        allow_growth = bool(config.limits.entry_index_allow_growth)
+        self.index_store = EntryIndexStore(
+            db,
+            max_elements=max_elements,
+            allow_growth=allow_growth,
+        )
 
     def _quality_satisfied(self, ids: List[str], cosines: List[float], k2: int) -> bool:
         if len(ids) < k2:
