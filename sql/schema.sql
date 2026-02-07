@@ -77,6 +77,8 @@ CREATE INDEX IF NOT EXISTS idx_vectors_user_id ON vectors(user_id);
 
 CREATE INDEX IF NOT EXISTS idx_tag_entry_hash ON tag_entry_xref(user_id, tag_hash);
 CREATE INDEX IF NOT EXISTS idx_tag_entry_entry ON tag_entry_xref(user_id, entry_id);
+CREATE INDEX IF NOT EXISTS idx_tag_entry_ulid
+    ON tag_entry_xref(user_id, tag_hash, ulid DESC);
 CREATE INDEX IF NOT EXISTS idx_search_history_user_last_used
     ON search_history(user_id, last_used DESC);
 
