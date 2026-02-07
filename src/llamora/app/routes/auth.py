@@ -92,9 +92,11 @@ async def _verify_password(hash_bytes: bytes, password: bytes) -> bool:
 
 
 def _get_client_ip() -> str:
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return forwarded.split(",", 1)[0].strip()
+    trusted_hops = int(settings.get("PROXY.trusted_hops") or 0)
+    if trusted_hops > 0:
+        access_route = getattr(request, "access_route", None)
+        if access_route:
+            return str(access_route[0]).strip()
     return request.remote_addr or "unknown"
 
 

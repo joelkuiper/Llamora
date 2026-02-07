@@ -4,6 +4,7 @@ import logging
 import json
 import secrets
 import os
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -32,6 +33,38 @@ def create_app():
 
     services = AppServices.create()
 
+    from .util.number import parse_positive_int
+
+    def _detect_worker_count() -> int:
+        env_keys = (
+            "WEB_CONCURRENCY",
+            "HYPERCORN_WORKERS",
+            "UVICORN_WORKERS",
+            "GUNICORN_WORKERS",
+        )
+        for key in env_keys:
+            parsed = parse_positive_int(os.getenv(key))
+            if parsed:
+                return parsed
+        cmd_args = os.getenv("GUNICORN_CMD_ARGS", "")
+        if cmd_args:
+            match = re.search(r"(?:--workers|-w)\\s+(\\d+)", cmd_args)
+            if match:
+                parsed = parse_positive_int(match.group(1))
+                if parsed:
+                    return parsed
+        parsed = parse_positive_int(settings.get("APP.workers"))
+        return parsed or 1
+
+    worker_count = _detect_worker_count()
+    dek_storage = str(settings.CRYPTO.dek_storage or "cookie").lower()
+    if worker_count > 1 and dek_storage == "session":
+        logger.warning(
+            "Multi-worker (%d) detected; forcing CRYPTO.dek_storage=cookie",
+            worker_count,
+        )
+        dek_storage = "cookie"
+
     from .services.auth_helpers import (
         SecureCookieManager,
         SECURE_COOKIE_MANAGER_KEY,
@@ -40,7 +73,7 @@ def create_app():
     cookie_manager = SecureCookieManager(
         cookie_name=str(settings.COOKIES.name),
         cookie_secret=str(settings.COOKIES.secret or ""),
-        dek_storage=str(settings.CRYPTO.dek_storage),
+        dek_storage=dek_storage,
         session_ttl=int(settings.SESSION.ttl),
     )
 
@@ -99,6 +132,21 @@ def create_app():
         "true",
         "True",
     )
+    proxy_hops = parse_positive_int(settings.get("PROXY.trusted_hops")) or 0
+    if proxy_hops > 0:
+        try:
+            from quart.middleware.proxy_fix import ProxyFix  # type: ignore
+        except Exception:  # pragma: no cover - fallback for older Quart
+            from werkzeug.middleware.proxy_fix import ProxyFix  # type: ignore
+        app.asgi_app = ProxyFix(
+            app.asgi_app,
+            x_for=proxy_hops,
+            x_proto=proxy_hops,
+            x_host=proxy_hops,
+            x_port=proxy_hops,
+            x_prefix=proxy_hops,
+        )
+        logger.info("ProxyFix enabled with trusted_hops=%d", proxy_hops)
 
     app.config.update(
         APP_NAME=settings.APP_NAME,

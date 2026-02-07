@@ -69,6 +69,7 @@ DEFAULTS: dict[str, Any] = {
     "APP": {
         "host": "127.0.0.1",
         "port": 5000,
+        "workers": 1,
     },
     "FEATURES": {
         "disable_registration": False,
@@ -187,6 +188,9 @@ DEFAULTS: dict[str, Any] = {
     "COOKIES": {
         "name": "llamora",
         "secret": None,
+    },
+    "PROXY": {
+        "trusted_hops": 0,
     },
     "CRYPTO": {
         "dek_storage": "cookie",
