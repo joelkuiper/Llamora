@@ -119,6 +119,10 @@ DEFAULTS: dict[str, Any] = {
         "busy_timeout": 5000,
         "mmap_size": 10 * 1024 * 1024,
     },
+    "MIGRATIONS": {
+        "path": "migrations",
+        "baseline_version": 1,
+    },
     "EMBEDDING": {
         "model": "BAAI/bge-small-en-v1.5",
         "concurrency": _cpu_count(),

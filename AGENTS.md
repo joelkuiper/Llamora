@@ -14,7 +14,7 @@
 
 * `src/llamora/`: app, services, crypto, db logic.
 * `config/`: Dynaconf (`LLAMORA__FOO__BAR`).
-* `sql/schema.sql`: schema (encrypt-safe).
+* `migrations/`: schema + migrations (encrypt-safe).
 * `scripts/`: CLI helpers.
 * `frontend/static/`: JS/CSS/assets.
 * `templates/partials/`: server-rendered HTML.

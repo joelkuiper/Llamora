@@ -14,7 +14,6 @@ from aiosqlitepool import SQLiteConnectionPool
 from aiosqlitepool.protocols import Connection as SQLitePoolConnection
 
 from llamora.settings import settings
-from llamora.util import resolve_data_path
 
 from llamora.app.services.crypto import (
     encrypt_message,
@@ -22,7 +21,7 @@ from llamora.app.services.crypto import (
     encrypt_vector,
     decrypt_vector,
 )
-from llamora.app.db.base import run_in_transaction
+from llamora.app.services.migrations import run_db_migrations
 from llamora.app.db.events import RepositoryEventBus
 from llamora.app.services.history_cache import HistoryCache, HistoryCacheSynchronizer
 from llamora.app.db.users import UsersRepository
@@ -35,12 +34,6 @@ from llamora.app.db.search_history import SearchHistoryRepository
 RepositoryT = TypeVar("RepositoryT")
 
 logger = logging.getLogger(__name__)
-
-
-SCHEMA_PATH = resolve_data_path(
-    "sql/schema.sql",
-    fallback_dir=Path(__file__).resolve().parents[3] / "sql",
-)
 
 
 class LocalDB:
@@ -168,18 +161,8 @@ class LocalDB:
 
     async def _ensure_schema(self, is_new: bool) -> None:
         if is_new:
-            logger.info("Creating new database at %s", self.db_path)
-        if not self.pool:
-            raise RuntimeError("Connection pool not initialized")
-        schema_sql = SCHEMA_PATH.read_text().format(
-            max_username_length=int(settings.LIMITS.max_username_length)
-        )
-        async with self.pool.connection() as conn:
-            await run_in_transaction(
-                conn,
-                conn.executescript,
-                schema_sql,
-            )
+            logger.info("Preparing database at %s", self.db_path)
+        await run_db_migrations(self.db_path, verbose=False)
 
     def _configure_repositories(self) -> None:
         if not self.pool:

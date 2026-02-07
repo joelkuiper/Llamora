@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
-    username TEXT UNIQUE NOT NULL CHECK(length(username) <= {max_username_length}),
+    username TEXT UNIQUE NOT NULL CHECK(length(username) <= 30),
     password_hash TEXT NOT NULL,
     dek_pw_salt BLOB NOT NULL,
     dek_pw_nonce BLOB NOT NULL,

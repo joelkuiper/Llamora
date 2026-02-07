@@ -118,6 +118,27 @@ When `frontend/dist/manifest.json` exists, the server prefers the bundled output
 `config.STATIC_MANIFEST`). Remove `frontend/dist/` to fallback to unbundled files, or run with `--mode dev`/`watch` during development.
 
 ---
+## Migrations
+
+Llamora uses a lightweight SQLite migration flow (fastmigrate). Migrations live in `migrations/` and are applied
+automatically at startup.
+
+Common commands:
+
+```bash
+# Apply pending migrations
+uv run python scripts/migrate.py up
+
+# Check current version
+uv run python scripts/migrate.py status
+
+# Enroll an existing database at the baseline version (no changes applied)
+uv run python scripts/migrate.py enroll 1
+```
+
+The baseline schema is stored in `migrations/0001_init.sql`. Keep new changes as incremental migrations in that folder.
+
+---
 ## Privacy and Security
 
 Llamora encrypts everything it stores.
