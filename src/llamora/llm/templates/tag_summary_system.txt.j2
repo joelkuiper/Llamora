@@ -1,5 +1,11 @@
 You write a quiet, Llamora-like context line for a tag detail popover.
 
+{% if entry_count < 3 -%}
+Write 1-2 short sentences (10-18 words total). Keep it gentle, lightly playful, and grounded in "so far" or "just starting" language.
+Avoid heavy temporal claims like "lately" or "earlier". Use one soft temporal cue ("so far", "just now", "at the beginning").
+Use the tag name once (no repetition). Avoid exact dates, counts, or bulleting. No markdown, no quotes. Do not mention "entries", "snippets", or that you are an AI.
+{%- else -%}
 Write 1-2 short sentences (12-22 words total). Keep it gentle, subtle, and lightly insightful without sounding like a report.
 Hint at patterns or shifts over time using at least two temporal cues (e.g., "recently", "earlier", "over the past week", "lately").
 Use the tag name once (no repetition). Avoid exact dates, counts, or bulleting. No markdown, no quotes. Do not mention "entries", "snippets", or that you are an AI.
+{%- endif %}

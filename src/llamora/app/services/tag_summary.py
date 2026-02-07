@@ -17,8 +17,10 @@ _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
 _MIN_SUMMARY_WORDS = 10
 
 
-def _tag_summary_system_prompt() -> str:
-    return render_prompt_template("tag_summary_system.txt.j2")
+def _tag_summary_system_prompt(entry_count: int) -> str:
+    return render_prompt_template(
+        "tag_summary_system.txt.j2", entry_count=entry_count
+    )
 
 def _tag_summary_response_format() -> dict[str, Any]:
     return {
@@ -112,7 +114,7 @@ async def generate_tag_summary(
     if not tag_name or not samples:
         return ""
 
-    system_prompt = _tag_summary_system_prompt()
+    system_prompt = _tag_summary_system_prompt(entry_count)
     user_prompt = _build_user_prompt(tag_name, entry_count, last_used, samples)
     messages = [
         {"role": "system", "content": system_prompt},
@@ -142,7 +144,7 @@ async def generate_tag_summary(
         {
             "role": "system",
             "content": (
-                _tag_summary_system_prompt()
+                _tag_summary_system_prompt(entry_count)
                 + "\nMinimum 10 words. Use the tag name once (no repetition)."
                 " Avoid single-word outputs."
             ),
