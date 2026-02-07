@@ -87,6 +87,7 @@
 
 .profile-modal__content {
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
@@ -151,6 +152,9 @@
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--color-surface) 94%, transparent);
   border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .profile-modal form {

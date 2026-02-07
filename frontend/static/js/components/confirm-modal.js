@@ -1,3 +1,5 @@
+import { nextModalZ } from "../utils/modal-stack.js";
+
 const DEFAULTS = {
   title: "Confirm",
   message: "Are you sure?",
@@ -62,6 +64,7 @@ export function initConfirmModal(options = {}) {
     if (modal.parentElement !== document.body) {
       document.body.appendChild(modal);
     }
+    modal.style.zIndex = String(nextModalZ());
     modal.hidden = false;
     modal.removeAttribute("hidden");
     modal.setAttribute("aria-hidden", "false");

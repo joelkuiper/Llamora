@@ -104,7 +104,7 @@
      id="entry-responses-{{ e['id'] }}"
      data-responses-for="{{ e['id'] }}">
   {% for response in responses or [] %}
-  {{ render_entry(response, day, response_kinds, is_today) }}
+  {{ render_entry(response, day, response_kinds, is_today, animate_entries=animate_entries) }}
   {% endfor %}
 </div>
 {% endif %}

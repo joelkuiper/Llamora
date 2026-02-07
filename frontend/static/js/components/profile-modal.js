@@ -1,4 +1,5 @@
 import { createListenerBag } from "../utils/events.js";
+import { nextModalZ } from "../utils/modal-stack.js";
 
 const MODAL_SELECTOR = "[data-profile-modal]";
 const CLOSE_SELECTOR = "[data-profile-close]";
@@ -18,6 +19,7 @@ function initProfileModal(modal) {
   modal.dataset.profileInit = "true";
 
   document.body.classList.add("modal-open");
+  modal.style.zIndex = String(nextModalZ());
 
   const listeners = createListenerBag();
   modal._profileListeners = listeners;
