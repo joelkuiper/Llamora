@@ -35,7 +35,9 @@ dependencies = [
 ]
 
 [project.scripts]
-llamora-server = "llamora.__main__:prod"
+# Use the unified CLI that supports subcommands (dev/prod).
+llamora-server = "llamora.__main__:main"
+# Keep a convenience alias for direct dev mode if desired.
 llamora-server-dev = "llamora.__main__:dev"
 
 [dependency-groups]
