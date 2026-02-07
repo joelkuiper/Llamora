@@ -5,9 +5,9 @@
   inset: 0;
   z-index: 1200;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: var(--spacing-xl);
+  padding: var(--spacing-xl) var(--spacing-xl) calc(var(--spacing-xl) + 1rem);
   transition: opacity 200ms ease;
   animation: profile-modal-fade 180ms ease;
 }
@@ -30,6 +30,7 @@
   gap: var(--spacing-sm);
   padding: calc(var(--spacing-xl) + 0.1rem);
   padding-top: calc(var(--spacing-xl) + 0.5rem);
+  margin-top: min(10vh, 4.5rem);
   transition: transform 220ms ease, opacity 220ms ease;
   animation: profile-modal-rise 220ms ease;
 }
@@ -111,6 +112,12 @@
   flex-direction: column;
   gap: calc(var(--spacing-xl) + 0.1rem);
   padding-right: var(--spacing-xs);
+  transition: opacity var(--motion-gentle) ease, transform var(--motion-gentle) ease;
+}
+
+.profile-modal__content.htmx-request {
+  opacity: 0.4;
+  transform: translateY(6px);
 }
 
 .profile-modal__content.htmx-swapping {
@@ -119,7 +126,8 @@
 
 .profile-modal__content.htmx-settling {
   opacity: 1;
-  transition: opacity 180ms ease;
+  transform: translateY(0);
+  transition: opacity 180ms ease, transform 180ms ease;
 }
 
 .profile-section {

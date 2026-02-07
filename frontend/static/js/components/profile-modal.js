@@ -5,12 +5,14 @@ const MODAL_SELECTOR = "[data-profile-modal]";
 const CLOSE_SELECTOR = "[data-profile-close]";
 const TAB_SELECTOR = ".profile-modal__tab";
 const PROFILE_BUTTON_ID = "profile-btn";
+const CONTENT_ID = "profile-modal-content";
 
 function setProfileButtonActive(isActive) {
   const button = document.getElementById(PROFILE_BUTTON_ID);
   if (!button) return;
   button.classList.toggle("active", isActive);
 }
+
 
 function setActiveTab(modal, targetTab) {
   const tabs = modal.querySelectorAll(TAB_SELECTOR);
