@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone, date
 from zoneinfo import ZoneInfo
+from urllib.parse import unquote
 
 from quart import request
 import humanize as _humanize
@@ -11,27 +12,41 @@ import humanize as _humanize
 logger = logging.getLogger(__name__)
 
 
+def _normalize_timezone(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    value = raw.strip()
+    if not value:
+        return None
+    if "%" in value:
+        try:
+            value = unquote(value)
+        except Exception:
+            pass
+    return value
+
+
 def get_timezone() -> str:
     """Return client timezone as an IANA string.
 
     Prefers the ``tz`` query parameter, then the ``X-Timezone`` header, followed by
     a ``tz`` cookie. Defaults to ``UTC`` if unavailable.
     """
-    tz = request.args.get("tz")
+    tz = _normalize_timezone(request.args.get("tz"))
     if tz:
         try:
             ZoneInfo(tz)
             return tz
         except Exception:  # pragma: no cover - ZoneInfo raises various errors
             logger.debug("Invalid timezone '%s' from query parameter", tz)
-    tz_header = request.headers.get("X-Timezone")
+    tz_header = _normalize_timezone(request.headers.get("X-Timezone"))
     if tz_header:
         try:
             ZoneInfo(tz_header)
             return tz_header
         except Exception:  # pragma: no cover - ZoneInfo raises various errors
             logger.debug("Invalid timezone '%s' from header", tz_header)
-    tz_cookie = request.cookies.get("tz")
+    tz_cookie = _normalize_timezone(request.cookies.get("tz"))
     if tz_cookie:
         try:
             ZoneInfo(tz_cookie)
@@ -104,7 +119,8 @@ def date_and_part(user_time: str, tz: str) -> tuple[str, str]:
     except Exception:
         dt = datetime.now(timezone.utc)
     try:
-        dt_local = dt.astimezone(ZoneInfo(tz))
+        tz_value = _normalize_timezone(tz) or "UTC"
+        dt_local = dt.astimezone(ZoneInfo(tz_value))
     except Exception:
         dt_local = dt.astimezone(timezone.utc)
     return format_date(dt_local), part_of_day(dt_local)
