@@ -5,7 +5,7 @@
 - [x] Profile page design
 - [ ] Recovery code generation page rethink (add QR code?)
 - [ ] Keyboard accessibility rethink
-- [ ] Migrations
+- [x] Migrations
 - [ ] README
 Later
 - [ ] DB backups?
