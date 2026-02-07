@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import sys
+from pathlib import Path
 from logging import getLogger
 from typing import Sequence
 
@@ -14,6 +15,7 @@ from hypercorn.config import Config
 from llamora.settings import settings
 
 from . import create_app
+from .app.services.migrations import run_db_migrations
 
 logger = getLogger(__name__)
 
@@ -42,6 +44,11 @@ async def _run_prod(
     keep_alive: float | None,
     graceful_timeout: float | None,
 ) -> None:
+    # Ensure the database exists and all migrations are applied before serving.
+    db_path = Path(str(settings.DATABASE.path)).expanduser().resolve()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    logger.info("Applying database migrations at %s", db_path)
+    await run_db_migrations(db_path, verbose=False)
     config = Config()
     config.bind = [f"{host}:{port}"]
 
@@ -65,6 +72,12 @@ async def _run_prod(
 
 
 def _run_dev(host: str, port: int, *, reload: bool) -> None:
+    # Ensure the database exists and all migrations are applied before serving.
+    db_path = Path(str(settings.DATABASE.path)).expanduser().resolve()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    logger.info("Applying database migrations at %s", db_path)
+    asyncio.run(run_db_migrations(db_path, verbose=False))
+
     logger.info(
         "Starting Quart development server on %s:%s (reload=%s)", host, port, reload
     )
