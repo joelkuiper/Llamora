@@ -601,7 +601,7 @@
 }
 
 .tag-detail__meta-time {
-  color: var(--glass-text-muted);
+  color: inherit;
 }
 
 .tag-detail__remove {
@@ -739,13 +739,15 @@
   gap: 0.3rem;
   font-size: 0.72rem;
   color: var(--glass-text-muted);
+  opacity: 0.776;
   letter-spacing: 0.02em;
   line-height: 1.2;
   min-width: 0;
 }
 
 .tag-detail__item .entry-time {
-  opacity: 1 !important;
+  color: inherit;
+  opacity: 0.868;
   margin-top: 0;
   transform: translateY(0);
   pointer-events: none;
@@ -762,7 +764,7 @@
 }
 
 .tag-detail__ago {
-  opacity: 0.7;
+  opacity: 1;
 }
 
 .tag-row__dot {
