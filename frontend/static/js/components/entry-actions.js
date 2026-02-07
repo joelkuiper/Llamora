@@ -198,7 +198,11 @@ class EntryActions extends ReactiveElement {
     if (!action) {
       return;
     }
-    this.#popover?.hide();
+    // Hide immediately so it can't linger in a default position after HTMX request.
+    if (this.#popover) {
+      this.#popover.hide();
+      this.#popoverEl.hidden = true;
+    }
   }
 
   #isResponseActive() {

@@ -50,8 +50,6 @@ function applyExitAnimation(popover, panel, animation) {
   ]);
 }
 
-let popoverInstanceCounter = 0;
-
 export function createPopover(trigger, popover, options = {}) {
   const {
     placement = "bottom",
@@ -77,10 +75,7 @@ export function createPopover(trigger, popover, options = {}) {
   let popperInstance = null;
   let open = false;
   let globalListeners = null;
-  const instanceId = `popover-${++popoverInstanceCounter}`;
-
-  const isCurrentInstance = () =>
-    popover?.dataset?.popoverInstance === instanceId;
+  let version = 0;
 
   const ensurePopper = () => {
     if (!popperInstance) {
@@ -132,8 +127,9 @@ export function createPopover(trigger, popover, options = {}) {
 
   const show = () => {
     if (open) return;
+    version += 1;
+    const currentVersion = version;
     onBeforeShow?.();
-    popover.dataset.popoverInstance = instanceId;
     popover.hidden = false;
     ensurePopper();
     open = true;
@@ -144,12 +140,13 @@ export function createPopover(trigger, popover, options = {}) {
 
   const hide = () => {
     if (!open) return Promise.resolve();
+    const hideVersion = version;
     open = false;
     removeGlobalListeners();
     onHide?.();
     const result = animateClose();
     const finalize = () => {
-      if (isCurrentInstance()) {
+      if (hideVersion === version) {
         popover.hidden = true;
         onHidden?.();
       }
@@ -159,13 +156,11 @@ export function createPopover(trigger, popover, options = {}) {
 
   const destroy = () => {
     removeGlobalListeners();
-    if (open && isCurrentInstance()) {
+    if (open) {
       popover.hidden = true;
       open = false;
     }
-    if (isCurrentInstance()) {
-      delete popover.dataset.popoverInstance;
-    }
+    version += 1;
     if (popperInstance) {
       popperInstance.destroy();
       popperInstance = null;
