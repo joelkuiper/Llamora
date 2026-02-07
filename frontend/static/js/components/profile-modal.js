@@ -4,6 +4,13 @@ import { nextModalZ } from "../utils/modal-stack.js";
 const MODAL_SELECTOR = "[data-profile-modal]";
 const CLOSE_SELECTOR = "[data-profile-close]";
 const TAB_SELECTOR = ".profile-modal__tab";
+const PROFILE_BUTTON_ID = "profile-btn";
+
+function setProfileButtonActive(isActive) {
+  const button = document.getElementById(PROFILE_BUTTON_ID);
+  if (!button) return;
+  button.classList.toggle("active", isActive);
+}
 
 function setActiveTab(modal, targetTab) {
   const tabs = modal.querySelectorAll(TAB_SELECTOR);
@@ -20,6 +27,7 @@ function initProfileModal(modal) {
 
   document.body.classList.add("modal-open");
   modal.style.zIndex = String(nextModalZ());
+  setProfileButtonActive(true);
 
   const listeners = createListenerBag();
   modal._profileListeners = listeners;
@@ -32,6 +40,7 @@ function initProfileModal(modal) {
       listeners.abort();
       modal.remove();
       document.body.classList.remove("modal-open");
+      setProfileButtonActive(false);
     }, 160);
   };
 
@@ -81,6 +90,8 @@ function boot(context = document) {
   const modal = scope.querySelector(MODAL_SELECTOR);
   if (modal) {
     initProfileModal(modal);
+  } else {
+    setProfileButtonActive(false);
   }
 }
 
