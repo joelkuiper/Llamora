@@ -75,22 +75,28 @@ function initAlertCenter() {
 
 function registerEntriesLoader() {
   if (entriesLoaderRegistered) return;
-  const loader = document.getElementById("entries-loading");
+  let loader = document.getElementById("entries-loading");
   if (!loader) return;
 
-  const spinnerEl = loader.querySelector(".entries-loading__spinner");
-  const spinner = spinnerEl ? createInlineSpinner(spinnerEl) : null;
+  const getSpinner = (el) => {
+    const spinnerEl = el?.querySelector(".entries-loading__spinner");
+    return spinnerEl ? createInlineSpinner(spinnerEl) : null;
+  };
+
+  let spinner = getSpinner(loader);
 
   let pending = 0;
   let timerId = null;
 
   const show = () => {
+    if (!loader) return;
     loader.hidden = false;
     loader.dataset.active = "true";
     spinner?.start();
   };
 
   const hide = () => {
+    if (!loader) return;
     loader.hidden = true;
     loader.dataset.active = "false";
     spinner?.stop();
@@ -103,6 +109,16 @@ function registerEntriesLoader() {
     }
   };
 
+  const refreshLoader = () => {
+    const next = document.getElementById("entries-loading");
+    if (!next || next === loader) {
+      return;
+    }
+    spinner?.stop();
+    loader = next;
+    spinner = getSpinner(loader);
+  };
+
   const isContentWrapperTarget = (event) => {
     const target = event?.detail?.target;
     return target instanceof Element && target.id === "content-wrapper";
@@ -112,6 +128,7 @@ function registerEntriesLoader() {
     if (!isContentWrapperTarget(event)) {
       return;
     }
+    refreshLoader();
     pending += 1;
     if (timerId || loader.dataset.active === "true") {
       return;
@@ -128,6 +145,7 @@ function registerEntriesLoader() {
     if (!isContentWrapperTarget(event)) {
       return;
     }
+    refreshLoader();
     if (pending > 0) {
       pending -= 1;
     }
@@ -137,11 +155,18 @@ function registerEntriesLoader() {
     }
   };
 
+  const reset = () => {
+    pending = 0;
+    clearTimer();
+    hide();
+  };
+
   document.body.addEventListener("htmx:beforeRequest", start);
   document.body.addEventListener("htmx:afterRequest", end);
   document.body.addEventListener("htmx:sendError", end);
   document.body.addEventListener("htmx:responseError", end);
   document.body.addEventListener("htmx:afterSwap", (event) => {
+    refreshLoader();
     if (isContentWrapperTarget(event)) {
       pending = 0;
       clearTimer();
@@ -150,6 +175,25 @@ function registerEntriesLoader() {
     }
     if (pending === 0) {
       hide();
+    }
+  });
+
+  document.body.addEventListener("htmx:historyRestore", () => {
+    refreshLoader();
+    reset();
+  });
+  window.addEventListener("popstate", () => {
+    refreshLoader();
+    reset();
+  });
+  window.addEventListener("pageshow", () => {
+    refreshLoader();
+    reset();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      refreshLoader();
+      reset();
     }
   });
 
