@@ -133,6 +133,7 @@ async def tag_detail(tag_hash: str):
         abort(404, description="tag not found")
         raise AssertionError("unreachable")
 
+    entry_id = (request.args.get("entry_id") or "").strip() or None
     html = await render_template(
         "partials/tag_detail_body.html",
         tag=overview,
@@ -140,6 +141,7 @@ async def tag_detail(tag_hash: str):
         has_more=overview.has_more,
         next_cursor=overview.next_cursor,
         page_size=page_size,
+        entry_id=entry_id,
     )
     return html
 

@@ -6,7 +6,20 @@
 {% set page_size = page_size|default(12) %}
 <div class="tag-detail" data-tag-hash="{{ tag.hash }}">
   <div class="tag-detail__header">
-    <div class="tag-detail__title">{{ tag.name }}</div>
+    <div class="tag-detail__header-row">
+      <div class="tag-detail__title">{{ tag.name }}</div>
+      {% if entry_id %}
+      <button
+        class="tag-detail__remove"
+        type="button"
+        aria-label="Remove tag {{ tag.name }}"
+        hx-delete="{{ url_for('tags.remove_tag', entry_id=entry_id, tag_hash=tag_hash) }}"
+        hx-target="entry-tags[data-entry-id='{{ entry_id }}'] .entry-tag[data-tag-hash='{{ tag_hash }}']"
+        hx-swap="outerHTML swap:0.15s">
+        <span class="icon-mask icon-bookmark-x" aria-hidden="true"></span>
+      </button>
+      {% endif %}
+    </div>
     <div class="tag-detail__meta">
       {{ entry_count }} {{ "entry" if entry_count == 1 else "entries" }}
       · last used

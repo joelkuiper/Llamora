@@ -488,6 +488,7 @@ input[type="checkbox"]:focus {
 .icon-user-round { --icon: url("../icons/user-round.svg"); }
 .icon-log-out { --icon: url("../icons/log-out.svg"); }
 .icon-bookmark { --icon: url("../icons/bookmark.svg"); }
+.icon-bookmark-x { --icon: url("../icons/bookmark-x.svg"); }
 .icon-tag { --icon: url("../icons/tag.svg"); }
 .icon-trash { --icon: url("../icons/trash.svg"); }
 .icon-reply { --icon: url("../icons/reply.svg"); }

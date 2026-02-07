@@ -164,6 +164,14 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     listeners.add(this.#detailCloseButton, "click", this.#detailCloseClickHandler);
     listeners.add(this.#detailPopoverEl, "click", this.#detailClickHandler);
     listeners.add(this.#detailBody, "htmx:afterSwap", this.#detailAfterSwapHandler);
+    listeners.add(this.#detailPopoverEl, "htmx:afterRequest", (event) => {
+      const trigger = event?.detail?.elt;
+      if (!trigger?.classList?.contains("tag-detail__remove")) return;
+      const status = event?.detail?.xhr?.status ?? 0;
+      if (status >= 200 && status < 300) {
+        this.#forceHideDetailPopover("detail remove");
+      }
+    });
     listeners.add(
       this.#suggestions,
       "htmx:afterSwap",
@@ -781,7 +789,12 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     if (!template) {
       return;
     }
-    const url = template.replace("__TAG_HASH__", tagHash);
+    let url = template.replace("__TAG_HASH__", tagHash);
+    const entryId = this.dataset?.entryId ?? "";
+    if (entryId) {
+      const separator = url.includes("?") ? "&" : "?";
+      url = `${url}${separator}entry_id=${encodeURIComponent(entryId)}`;
+    }
     if (!url) {
       return;
     }
