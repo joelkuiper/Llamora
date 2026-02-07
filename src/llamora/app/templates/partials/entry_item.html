@@ -3,7 +3,7 @@
 {% from 'partials/entry_edit_button.html' import entry_edit_button %}
 {% from 'partials/entry_main.html' import render_entry_main %}
 {% from 'partials/response_kind.html' import response_kind_icon, response_kind_label %}
-{% macro render_entry(e, day, response_kinds=(), is_today=True, responses=None, include_responses=True) -%}
+{% macro render_entry(e, day, response_kinds=(), is_today=True, responses=None, include_responses=True, animate_entries=False) -%}
 {% set entry_meta = e.get('meta', {}) %}
 {% set is_error = entry_meta.get('error') %}
 {% set repeat_guard = entry_meta.get('repeat_guard') %}
@@ -11,7 +11,7 @@
 {% set is_opening = entry_meta.get('auto_opening') %}
 {% set speaker = 'Your' if e['role'] == 'user' else 'Assistant' %}
 <div id="entry-{{ e['id'] }}"
-     class="entry {{ 'assistant' if e['role'] != 'user' else 'user'}}{% if is_error %} entry--error{% endif %}{% if is_opening %} entry--opening{% endif %}"
+     class="entry {{ 'assistant' if e['role'] != 'user' else 'user'}}{% if is_error %} entry--error{% endif %}{% if is_opening %} entry--opening{% endif %}{% if animate_entries %} motion-animate-entry{% endif %}"
      data-entry-id="{{ e['id'] }}"
      {% if response_kind %}data-response-kind="{{ response_kind }}"{% endif %}
      {% if e['role'] == 'assistant' and e.get('reply_to') %}

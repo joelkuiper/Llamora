@@ -1,6 +1,7 @@
 <div id="entries"
      data-date="{{ day }}"
      data-long-date="{{ day|long_date }}"
+     {% if animate_entries %}data-anim-applied="true"{% endif %}
      role="log"
      aria-live="polite"
      aria-relevant="additions"

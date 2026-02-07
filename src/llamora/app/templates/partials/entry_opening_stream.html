@@ -1,6 +1,6 @@
 {% set sse_url = url_for('entries.sse_opening', date=day) %}
 <response-stream id="opening-stream-{{ day }}"
-                 class="entry assistant opening-stream entry--opening"
+                 class="entry assistant opening-stream entry--opening{% if animate_entries %} motion-animate-entry{% endif %}"
                  data-entry-id="opening-{{ day }}"
                  data-controller="off"
                  data-sse-url="{{ sse_url }}"
