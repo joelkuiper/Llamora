@@ -24,6 +24,7 @@ const prepareTagAutocompleteValue = (value) =>
 const TAG_HISTORY_MAX = 50;
 const TAG_SUMMARY_CACHE_PREFIX = "llamora:tag-summary:";
 const TAG_SUMMARY_CACHE_TTL = 1000 * 60 * 60 * 6;
+const TAG_SKELETON_COUNT = 6;
 
 let sharedTagPopoverEl = null;
 let sharedTagDetailPopoverEl = null;
@@ -214,9 +215,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     if (this.#detailBody && !this.#detailSkeleton) {
       this.#detailSkeleton = this.#detailBody.innerHTML;
     }
-    if (this.#suggestions && !this.#suggestionsSkeleton) {
-      this.#suggestionsSkeleton = this.#suggestions.innerHTML;
-    }
+    this.#ensureSkeleton();
     this.#tagContainer = this.querySelector(".entry-tags-list");
 
     this.#button?.setAttribute("aria-expanded", "false");
@@ -339,17 +338,66 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       if (suggestionUrl) {
         this.#suggestions.setAttribute("hx-get", suggestionUrl);
       }
-      if (this.#suggestions.dataset.entryId !== entryId) {
-        this.#suggestions.innerHTML =
-          this.#suggestionsSkeleton || this.#suggestions.innerHTML;
-        delete this.#suggestions.dataset.loaded;
-        this.#suggestions.dataset.entryId = entryId;
-      }
+      // Hard reset to skeleton before each open to avoid stale content on bfcache restore
+      this.#suggestions.dataset.entryId = entryId;
+      this.#suggestions.removeAttribute("data-loaded");
+      this.#suggestions.innerHTML = this.#suggestionsSkeleton;
+      this.#suggestions.classList.remove(
+        "htmx-swapping",
+        "htmx-settling",
+        "htmx-request"
+      );
+      this.#suggestions
+        .querySelectorAll(".tag-suggestion")
+        .forEach((el) =>
+          el.classList.remove("htmx-added", "htmx-settling", "htmx-swapping")
+        );
     }
     this.#updateSubmitState();
     if (typeof htmx !== "undefined") {
       htmx.process(this.#popoverEl);
     }
+  }
+
+  #resetSuggestions({ force = false, clearEntry = false } = {}) {
+    if (!this.#suggestions) return;
+    if (!force && this.#suggestions.dataset.entryId === undefined) return;
+    this.#ensureSkeleton();
+    this.#suggestions.innerHTML = this.#suggestionsSkeleton;
+    this.#suggestions.classList.remove(
+      "htmx-swapping",
+      "htmx-settling",
+      "htmx-request"
+    );
+    this.#suggestions
+      .querySelectorAll(".tag-suggestion")
+      .forEach((el) =>
+        el.classList.remove("htmx-added", "htmx-settling", "htmx-swapping")
+      );
+    delete this.#suggestions.dataset.loaded;
+    delete this.#suggestions.dataset.requestEntryId;
+    if (clearEntry) {
+      delete this.#suggestions.dataset.entryId;
+    }
+  }
+
+  #ensureSkeleton() {
+    if (!this.#suggestions) return;
+    const containsSkeleton = this.#suggestions.innerHTML.includes(
+      "tag-suggestion--skeleton"
+    );
+    if (!this.#suggestionsSkeleton || !containsSkeleton) {
+      this.#suggestionsSkeleton = this.#buildSkeletonMarkup();
+    }
+  }
+
+  #buildSkeletonMarkup() {
+    return Array.from({ length: TAG_SKELETON_COUNT })
+      .map(
+        () =>
+          '<span class="tag-suggestion tag-suggestion--skeleton" aria-hidden="true"></span>'
+      )
+      .join("");
   }
 
   #initPopover() {
@@ -373,7 +421,8 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
         this.#button.classList.add("active");
         this.#button?.setAttribute("aria-expanded", "true");
         this.classList.add("popover-open");
-        if (this.#suggestions && !this.#suggestions.dataset.loaded) {
+        if (this.#suggestions) {
+          this.#resetSuggestions({ force: true });
           htmx.trigger(this.#suggestions, "tag-popover:show");
         }
         if (this.#input && typeof this.#input.focus === "function") {
