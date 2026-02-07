@@ -103,9 +103,13 @@ function registerEntriesLoader() {
     }
   };
 
-  const start = (event) => {
+  const isContentWrapperTarget = (event) => {
     const target = event?.detail?.target;
-    if (!(target instanceof Element) || target.id !== "content-wrapper") {
+    return target instanceof Element && target.id === "content-wrapper";
+  };
+
+  const start = (event) => {
+    if (!isContentWrapperTarget(event)) {
       return;
     }
     pending += 1;
@@ -121,8 +125,7 @@ function registerEntriesLoader() {
   };
 
   const end = (event) => {
-    const target = event?.detail?.target;
-    if (!(target instanceof Element) || target.id !== "content-wrapper") {
+    if (!isContentWrapperTarget(event)) {
       return;
     }
     if (pending > 0) {
@@ -138,7 +141,13 @@ function registerEntriesLoader() {
   document.body.addEventListener("htmx:afterRequest", end);
   document.body.addEventListener("htmx:sendError", end);
   document.body.addEventListener("htmx:responseError", end);
-  document.body.addEventListener("htmx:afterSwap", () => {
+  document.body.addEventListener("htmx:afterSwap", (event) => {
+    if (isContentWrapperTarget(event)) {
+      pending = 0;
+      clearTimer();
+      hide();
+      return;
+    }
     if (pending === 0) {
       hide();
     }
