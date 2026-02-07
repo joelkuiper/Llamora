@@ -101,10 +101,6 @@ class TagsRepository(BaseRepository):
                 )
                 if cursor.rowcount:
                     changed = True
-                    await conn.execute(
-                        "UPDATE tags SET seen = CASE WHEN seen > 0 THEN seen - 1 ELSE 0 END WHERE user_id = ? AND tag_hash = ?",
-                        (user_id, tag_hash),
-                    )
 
             await self._run_in_transaction(conn, _tx)
 
@@ -200,9 +196,32 @@ class TagsRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT tag_hash, name_ct, name_nonce, alg, seen, last_seen
-                FROM tags
-                WHERE user_id = ? AND tag_hash = ?
+                SELECT t.tag_hash,
+                       t.name_ct,
+                       t.name_nonce,
+                       t.alg,
+                        (
+                           SELECT COUNT(*)
+                           FROM tag_entry_xref x
+                           JOIN entries e
+                             ON e.user_id = x.user_id AND e.id = x.entry_id
+                           WHERE x.user_id = t.user_id
+                             AND x.tag_hash = t.tag_hash
+                             AND e.created_at IS NOT NULL
+                             AND e.created_at != ''
+                        ) AS seen_count,
+                        (
+                            SELECT MAX(e.created_at)
+                            FROM tag_entry_xref x
+                            JOIN entries e
+                              ON e.user_id = x.user_id AND e.id = x.entry_id
+                            WHERE x.user_id = t.user_id
+                              AND x.tag_hash = t.tag_hash
+                              AND e.created_at IS NOT NULL
+                              AND e.created_at != ''
+                        ) AS last_used
+                FROM tags t
+                WHERE t.user_id = ? AND t.tag_hash = ?
                 """,
                 (user_id, tag_hash),
             )
@@ -224,8 +243,8 @@ class TagsRepository(BaseRepository):
         return {
             "name": tag_name,
             "hash": row["tag_hash"].hex(),
-            "count": row["seen"],
-            "last_used": row["last_seen"],
+            "count": row["seen_count"],
+            "last_used": row["last_used"],
         }
 
     async def get_tag_frecency(
@@ -424,12 +443,15 @@ class TagsRepository(BaseRepository):
             return []
 
         tag_placeholders = ",".join("?" * len(tag_hashes))
-        joins = ""
-        conditions = [f"x.user_id = ? AND x.tag_hash IN ({tag_placeholders})"]
+        joins = "JOIN entries m ON m.user_id = x.user_id AND m.id = x.entry_id"
+        conditions = [
+            f"x.user_id = ? AND x.tag_hash IN ({tag_placeholders})",
+            "m.created_at IS NOT NULL",
+            "m.created_at != ''",
+        ]
         params: list[object] = [user_id, *tag_hashes]
 
         if max_entry_id or max_created_at:
-            joins = "JOIN entries m ON m.user_id = x.user_id AND m.id = x.entry_id"
             if max_entry_id:
                 conditions.append("m.id <= ?")
                 params.append(max_entry_id)
