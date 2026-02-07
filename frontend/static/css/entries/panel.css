@@ -10,6 +10,55 @@
   overscroll-behavior: contain;
 }
 
+.entries-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.entries-loading[hidden] {
+  display: none;
+}
+
+.entries-loading__backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--color-bg) 70%, transparent);
+  backdrop-filter: blur(6px) saturate(120%);
+  -webkit-backdrop-filter: blur(6px) saturate(120%);
+}
+
+.entries-loading__panel {
+  position: relative;
+  z-index: 1;
+  min-width: 12rem;
+  padding: 1rem 1.4rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  box-shadow: var(--raised-shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.entries-loading__spinner {
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--color-text);
+}
+
+.entries-loading__label {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  animation: tag-skeleton-breathe 2.6s ease-in-out infinite;
+}
+
 #entries {
   max-width: 60rem;
   margin: 0 auto var(--spacing-xl) auto;

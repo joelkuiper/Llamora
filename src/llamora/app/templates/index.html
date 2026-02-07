@@ -81,6 +81,13 @@
 
 {% block content %}
   <div id="content">
+    <div id="entries-loading" class="entries-loading" hidden aria-hidden="true">
+      <div class="entries-loading__backdrop" aria-hidden="true"></div>
+      <div class="entries-loading__panel" role="status" aria-live="polite">
+        <span class="entries-loading__spinner spinner" aria-hidden="true"></span>
+        <span class="entries-loading__label">Retrieving…</span>
+      </div>
+    </div>
     {% if entries_html is defined %}
       {{ entries_html|safe }}
     {% else %}
