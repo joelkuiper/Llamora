@@ -36,6 +36,8 @@ class TagOverview:
     count: int
     last_used: str | None
     entries: tuple[TagEntryPreview, ...]
+    has_more: bool = False
+    next_cursor: str | None = None
 
 
 class TagService:
@@ -63,6 +65,7 @@ class TagService:
         tag_hash: bytes,
         *,
         limit: int = 24,
+        cursor: str | None = None,
     ) -> TagOverview | None:
         """Return tag metadata and recent entry previews."""
 
@@ -70,11 +73,44 @@ class TagService:
         if not info:
             return None
 
-        entry_ids = await self._db.tags.get_recent_entries_for_tag_hashes(
+        previews, next_cursor, has_more = await self.get_tag_entries_page(
             user_id,
-            [tag_hash],
+            dek,
+            tag_hash,
             limit=limit,
+            cursor=cursor,
         )
+
+        return TagOverview(
+            name=self.display(info["name"]),
+            hash=info["hash"],
+            count=int(info.get("count", 0) or 0),
+            last_used=info.get("last_used"),
+            entries=tuple(previews),
+            has_more=has_more,
+            next_cursor=next_cursor,
+        )
+
+    async def get_tag_entries_page(
+        self,
+        user_id: str,
+        dek: bytes,
+        tag_hash: bytes,
+        *,
+        limit: int = 24,
+        cursor: str | None = None,
+    ) -> tuple[list[TagEntryPreview], str | None, bool]:
+        entry_ids, next_cursor, has_more = (
+            await self._db.tags.get_recent_entries_page_for_tag_hashes(
+                user_id,
+                [tag_hash],
+                limit=limit,
+                before_ulid=cursor,
+            )
+        )
+        if not entry_ids:
+            return [], None, False
+
         entries = await self._db.entries.get_entries_by_ids(user_id, entry_ids, dek)
         entry_map = {entry.get("id"): entry for entry in entries}
 
@@ -98,13 +134,7 @@ class TagService:
                 )
             )
 
-        return TagOverview(
-            name=self.display(info["name"]),
-            hash=info["hash"],
-            count=int(info.get("count", 0) or 0),
-            last_used=info.get("last_used"),
-            entries=tuple(previews),
-        )
+        return previews, next_cursor, has_more
 
     async def hydrate_search_results(
         self,

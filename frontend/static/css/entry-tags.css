@@ -667,6 +667,36 @@
   transform: translateY(-50%) translateX(0);
 }
 
+.tag-detail-load {
+  height: 1.5rem;
+  margin-left: 0.15rem;
+  position: relative;
+}
+
+.tag-detail-load-indicator {
+  position: absolute;
+  left: 0.6rem;
+  right: 0.6rem;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--border) 55%, transparent),
+    transparent
+  );
+  background-size: 200% 100%;
+  animation: tag-load-shimmer 1.6s ease-in-out infinite;
+  opacity: 0.7;
+}
+
+@keyframes tag-load-shimmer {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
 .tag-detail__empty {
   font-size: 0.75rem;
   color: var(--glass-text-muted);

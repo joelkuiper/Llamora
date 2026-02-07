@@ -122,11 +122,12 @@ async def tag_detail(tag_hash: str):
         abort(400, description="invalid tag hash")
         raise AssertionError("unreachable") from exc
 
+    page_size = 12
     overview = await _tags().get_tag_overview(
         user["id"],
         dek,
         tag_hash_bytes,
-        limit=24,
+        limit=page_size,
     )
     if overview is None:
         abort(404, description="tag not found")
@@ -136,8 +137,49 @@ async def tag_detail(tag_hash: str):
         "partials/tag_detail_body.html",
         tag=overview,
         entries=overview.entries,
+        has_more=overview.has_more,
+        next_cursor=overview.next_cursor,
+        page_size=page_size,
     )
     return html
+
+
+@tags_bp.get("/t/detail/<tag_hash>/entries")
+@login_required
+async def tag_detail_entries(tag_hash: str):
+    _, user, dek = await require_user_and_dek()
+    try:
+        tag_hash_bytes = bytes.fromhex(tag_hash)
+    except ValueError as exc:
+        abort(400, description="invalid tag hash")
+        raise AssertionError("unreachable") from exc
+
+    cursor = (request.args.get("cursor") or "").strip() or None
+    try:
+        page_size = int(request.args.get("limit") or 12)
+    except (TypeError, ValueError):
+        page_size = 12
+    page_size = max(1, min(page_size, 50))
+
+    entries, next_cursor, has_more = await _tags().get_tag_entries_page(
+        user["id"],
+        dek,
+        tag_hash_bytes,
+        limit=page_size,
+        cursor=cursor,
+    )
+
+    if not entries:
+        return ""
+
+    return await render_template(
+        "partials/tag_detail_entries_chunk.html",
+        entries=entries,
+        has_more=has_more,
+        next_cursor=next_cursor,
+        tag_hash=tag_hash,
+        page_size=page_size,
+    )
 
 
 @tags_bp.get("/t/detail/<tag_hash>/summary")

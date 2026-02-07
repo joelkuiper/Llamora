@@ -477,3 +477,64 @@ class TagsRepository(BaseRepository):
             rows = await cursor.fetchall()
 
         return [row["entry_id"] for row in rows]
+
+    async def get_recent_entries_page_for_tag_hashes(
+        self,
+        user_id: str,
+        tag_hashes: list[bytes],
+        *,
+        limit: int,
+        before_ulid: str | None = None,
+        max_entry_id: str | None = None,
+        max_created_at: str | None = None,
+    ) -> tuple[list[str], str | None, bool]:
+        if not tag_hashes:
+            return [], None, False
+        if limit <= 0:
+            return [], None, False
+
+        tag_placeholders = ",".join("?" * len(tag_hashes))
+        params: list[object] = [user_id, *tag_hashes]
+        conditions = [
+            f"x.user_id = ? AND x.tag_hash IN ({tag_placeholders})",
+            "m.created_at IS NOT NULL",
+            "m.created_at != ''",
+        ]
+        if max_entry_id:
+            conditions.append("m.id <= ?")
+            params.append(max_entry_id)
+        if max_created_at:
+            conditions.append("m.created_at <= ?")
+            params.append(max_created_at)
+
+        where_clause = " AND ".join(conditions)
+        params.append(before_ulid)
+        params.append(before_ulid)
+        fetch_limit = limit + 1
+        params.append(fetch_limit)
+
+        sql = f"""
+            WITH ranked AS (
+                SELECT x.entry_id, MAX(x.ulid) AS latest_ulid
+                FROM tag_entry_xref x
+                JOIN entries m
+                  ON m.user_id = x.user_id AND m.id = x.entry_id
+                WHERE {where_clause}
+                GROUP BY x.entry_id
+            )
+            SELECT entry_id, latest_ulid
+            FROM ranked
+            WHERE (? IS NULL OR latest_ulid < ?)
+            ORDER BY latest_ulid DESC
+            LIMIT ?
+        """
+
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(sql, params)
+            rows = await cursor.fetchall()
+
+        has_more = len(rows) > limit
+        page_rows = rows[:limit]
+        entry_ids = [row["entry_id"] for row in page_rows]
+        next_cursor = page_rows[-1]["latest_ulid"] if has_more else None
+        return entry_ids, next_cursor, has_more
