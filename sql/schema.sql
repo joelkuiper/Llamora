@@ -89,14 +89,6 @@ BEGIN
             SELECT COUNT(*)
             FROM tag_entry_xref x
             WHERE x.user_id = OLD.user_id AND x.tag_hash = OLD.tag_hash
-              AND EXISTS (
-                  SELECT 1
-                  FROM entries e
-                  WHERE e.user_id = x.user_id
-                    AND e.id = x.entry_id
-                    AND e.created_at IS NOT NULL
-                    AND e.created_at != ''
-              )
         ),
         last_seen = (
             SELECT MAX(e.created_at)
@@ -104,8 +96,6 @@ BEGIN
             JOIN entries e
               ON e.user_id = x.user_id AND e.id = x.entry_id
             WHERE x.user_id = OLD.user_id AND x.tag_hash = OLD.tag_hash
-              AND e.created_at IS NOT NULL
-              AND e.created_at != ''
         )
     WHERE user_id = OLD.user_id AND tag_hash = OLD.tag_hash;
 END;

@@ -200,26 +200,22 @@ class TagsRepository(BaseRepository):
                        t.name_ct,
                        t.name_nonce,
                        t.alg,
-                        (
+                       (
                            SELECT COUNT(*)
                            FROM tag_entry_xref x
                            JOIN entries e
                              ON e.user_id = x.user_id AND e.id = x.entry_id
                            WHERE x.user_id = t.user_id
                              AND x.tag_hash = t.tag_hash
-                             AND e.created_at IS NOT NULL
-                             AND e.created_at != ''
-                        ) AS seen_count,
-                        (
-                            SELECT MAX(e.created_at)
-                            FROM tag_entry_xref x
-                            JOIN entries e
-                              ON e.user_id = x.user_id AND e.id = x.entry_id
+                       ) AS seen_count,
+                       (
+                           SELECT MAX(e.created_at)
+                           FROM tag_entry_xref x
+                           JOIN entries e
+                             ON e.user_id = x.user_id AND e.id = x.entry_id
                             WHERE x.user_id = t.user_id
                               AND x.tag_hash = t.tag_hash
-                              AND e.created_at IS NOT NULL
-                              AND e.created_at != ''
-                        ) AS last_used
+                       ) AS last_used
                 FROM tags t
                 WHERE t.user_id = ? AND t.tag_hash = ?
                 """,
@@ -444,11 +440,7 @@ class TagsRepository(BaseRepository):
 
         tag_placeholders = ",".join("?" * len(tag_hashes))
         joins = "JOIN entries m ON m.user_id = x.user_id AND m.id = x.entry_id"
-        conditions = [
-            f"x.user_id = ? AND x.tag_hash IN ({tag_placeholders})",
-            "m.created_at IS NOT NULL",
-            "m.created_at != ''",
-        ]
+        conditions = [f"x.user_id = ? AND x.tag_hash IN ({tag_placeholders})"]
         params: list[object] = [user_id, *tag_hashes]
 
         if max_entry_id or max_created_at:
