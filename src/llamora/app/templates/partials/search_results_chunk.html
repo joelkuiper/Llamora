@@ -10,14 +10,14 @@
 {% include 'partials/search_result_item.html' %}
 {% endfor %}
 {% if has_more %}
-<li class="search-result-load"
+<li class="load-more"
     hx-get="{{ url_for('search.search') }}?offset={{ next_offset }}"
-    hx-trigger="intersect once"
+    hx-trigger="intersect once delay:160ms"
     hx-swap="outerHTML"
     hx-include="#search-form"
     hx-sync="this:replace"
     aria-hidden="true">
-  <span class="search-load-indicator" aria-hidden="true"></span>
+  <span class="load-indicator" aria-hidden="true"></span>
   <span class="visually-hidden">Loading more results...</span>
 </li>
 {% endif %}

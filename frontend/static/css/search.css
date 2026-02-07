@@ -79,30 +79,6 @@
   }
 }
 
-.search-result-load {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  color: var(--color-text);
-  opacity: 0.6;
-}
-
-.search-load-indicator {
-  width: 0.9rem;
-  height: 0.9rem;
-  border-radius: 50%;
-  border: 2px solid color-mix(in srgb, var(--border), transparent 35%);
-  border-top-color: var(--accent);
-  opacity: 0;
-  transition: opacity var(--motion-gentle) ease;
-}
-
-.search-result-load.htmx-request .search-load-indicator {
-  opacity: 1;
-  animation: search-load-spin 0.9s linear infinite;
-}
 
 /* Search spinner */
 #search-spinner {

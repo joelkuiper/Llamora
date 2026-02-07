@@ -71,10 +71,6 @@ def _parse_offset(value: Any, default: int = 0) -> int:
 async def search():
     context = resolve_search_context(request)
     logger.debug("Route search raw query='%s'", context.query)
-    debug_delay_ms = float(getattr(settings.SEARCH, "stream_debug_delay_ms", 0))
-    if debug_delay_ms > 0:
-        # HACK: slow down search responses for visual inspection.
-        await asyncio.sleep(debug_delay_ms / 1000.0)
     offset = _parse_offset(request.args.get("offset", 0))
     page_limit = context.page_size if offset > 0 else context.initial_page_size
     session_id = request.args.get("sid") or ""
