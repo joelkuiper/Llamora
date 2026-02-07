@@ -529,24 +529,24 @@
 }
 
 .tag-detail__entries {
-  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
-  padding-top: 0.15rem;
-  padding-bottom: 0.15rem;
+  padding-top: 0.2rem;
+  padding-bottom: 0.2rem;
   max-height: 15.5rem;
   overflow-y: auto;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 0.2rem;
   scrollbar-gutter: stable;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--border) 30%, transparent);
 }
 
 .tag-detail__item {
   text-decoration: none;
   display: flex;
   flex-direction: column;
-  gap: 0.16rem;
-  padding: 0.45rem 1.4rem 0.45rem 0.6rem;
+  gap: 0.14rem;
+  padding: 0.4rem 1.3rem 0.4rem 0.55rem;
   border-radius: 0;
   border: 1px solid transparent;
   color: inherit;
@@ -622,11 +622,12 @@
 
 .tag-detail__preview {
   font-size: 0.88rem;
-  color: var(--glass-text-stronger);
+  color: var(--color-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+  transition: color var(--motion-gentle) ease;
 }
 
 .tag-detail__ago {
@@ -642,8 +643,9 @@
   color: var(--glass-text);
 }
 
-.tag-detail__item + .tag-detail__item {
-  border-top: 1px solid color-mix(in srgb, var(--border) 35%, transparent);
+.tag-detail__item:hover .tag-detail__preview,
+.tag-detail__item:focus .tag-detail__preview {
+  color: var(--color-text);
 }
 
 .tag-row__chevron {
