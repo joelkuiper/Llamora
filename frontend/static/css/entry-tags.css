@@ -534,6 +534,8 @@
   max-height: 15.5rem;
   overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
