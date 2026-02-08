@@ -1,6 +1,7 @@
 # TODO
 - [-] What to do with tags
   - [ ] Dedicated tags page with analyses?
+- [ ] Redo the tag summarize logic, make it use the llm (beware of n_ctx)
 - [ ] Recovery code generation page rethink (add QR code?)
 - [ ] README
 Later
