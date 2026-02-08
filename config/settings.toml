@@ -69,6 +69,7 @@ mmap_size = 10485760
 [default.MIGRATIONS]
 path = "migrations"
 baseline_version = 1
+allow_enroll_existing = false
 
 [default.EMBEDDING]
 model = "BAAI/bge-small-en-v1.5"
@@ -159,6 +160,7 @@ template_dir = "../src/llamora/llm/templates"
 name = "llamora"
 # Development default; replace with your own value in production.
 secret = "K3aRvB6X6lXe9iWvL99XQqSlqSkJ3YTaxqz81uB_ihw="
+force_secure = false
 
 [default.CRYPTO]
 dek_storage = "cookie"

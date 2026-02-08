@@ -74,6 +74,7 @@ def create_app():
         cookie_name=str(settings.COOKIES.name),
         cookie_secret=str(settings.COOKIES.secret or ""),
         dek_storage=dek_storage,
+        force_secure=bool(settings.COOKIES.force_secure),
         session_ttl=int(settings.SESSION.ttl),
     )
 

@@ -28,6 +28,7 @@ class SecureCookieManager:
         cookie_name: str,
         cookie_secret: str,
         dek_storage: str,
+        force_secure: bool = False,
         session_ttl: int,
         user_cache_ttl: int = 60,
         user_cache_maxsize: int = 2048,
@@ -36,6 +37,7 @@ class SecureCookieManager:
         self.cookie_name = cookie_name
         self.cookie_box = secret.SecretBox(key)
         self.dek_storage = dek_storage.lower()
+        self.force_secure = bool(force_secure)
         self._session_ttl = max(0, int(session_ttl))
         self.dek_store: TTLCache[str, bytes] = TTLCache(
             maxsize=1024, ttl=self._session_ttl
@@ -106,7 +108,7 @@ class SecureCookieManager:
         current_app.logger.debug(
             "Setting %s cookie (secure=%s) with keys %s",
             self.cookie_name,
-            request.is_secure,
+            request.is_secure or self.force_secure,
             list(data.keys()),
         )
         max_age: int | None = None
@@ -119,7 +121,7 @@ class SecureCookieManager:
             self.cookie_name,
             b64,
             httponly=True,
-            secure=request.is_secure,
+            secure=request.is_secure or self.force_secure,
             samesite="Lax",
             path="/",
             max_age=max_age,

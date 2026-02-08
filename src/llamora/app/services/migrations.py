@@ -75,6 +75,15 @@ def _run_migrations_sync(db_path: Path, *, verbose: bool) -> None:
             get_db_version(db_path)
         except sqlite3.Error:
             if _db_has_tables(db_path):
+                allow_enroll = bool(
+                    getattr(settings, "MIGRATIONS", {}).get("allow_enroll_existing", False)
+                )
+                if not allow_enroll:
+                    raise RuntimeError(
+                        "Existing database is missing migration metadata. "
+                        "Run `uv run python scripts/migrate.py enroll <version>` "
+                        "to explicitly enroll it."
+                    )
                 logger.warning(
                     "Enrolling existing database at version %s: %s",
                     baseline_version,
