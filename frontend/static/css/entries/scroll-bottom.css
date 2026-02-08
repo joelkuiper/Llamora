@@ -13,50 +13,62 @@ scroll-bottom-button.visible {
 }
 
 scroll-bottom-button .scroll-btn {
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2.5rem;
+  height: 2.5rem;
   border-radius: 50%;
-  backdrop-filter: blur(10px) saturate(140%);
-  -webkit-backdrop-filter: blur(10px) saturate(140%);
-  background: var(--glass-bg);
-  border: 1px solid var(--border);
-  box-shadow: var(--raised-shadow);
-  color: var(--scroll-btn-color);
+  backdrop-filter: blur(8px) saturate(120%);
+  -webkit-backdrop-filter: blur(8px) saturate(120%);
+  background: color-mix(in srgb, var(--glass-bg) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  box-shadow: var(--soft-shadow);
+  color: color-mix(in srgb, var(--color-text) 70%, var(--color-text-muted));
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--motion-sigh) ease, transform var(--motion-gentle) ease, background var(--motion-gentle) ease;
+  transition: opacity var(--motion-sigh) ease, transform var(--motion-gentle) ease, background var(--motion-gentle) ease, color var(--motion-gentle) ease, border-color var(--motion-gentle) ease;
   z-index: 4501;
   cursor: pointer;
 
   scroll-bottom-button.visible & {
-    opacity: 0.9;
+    opacity: 0.95;
     pointer-events: auto;
   }
 
   &:hover {
-    transform: scale(.96);
-    color: var(--accent);
-
-    svg {
-      filter: drop-shadow(0 0 4px var(--accent-drop-shadow));
-    }
+    transform: translateY(-1px) scale(.97);
+    color: color-mix(in srgb, var(--accent) 70%, var(--color-text));
+    background:
+      linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--accent-10) 22%, transparent),
+        transparent 55%
+      ),
+      color-mix(in srgb, var(--glass-bg) 90%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
   }
 
   &:focus-visible {
-    outline: 3px solid var(--accent);
+    outline: 2px solid color-mix(in srgb, var(--accent) 75%, transparent);
     outline-offset: 3px;
-    background: var(--accent-20);
-    color: var(--accent-active);
+    background:
+      linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--accent-10) 28%, transparent),
+        transparent 55%
+      ),
+      color-mix(in srgb, var(--glass-bg) 92%, transparent);
+    color: color-mix(in srgb, var(--accent) 75%, var(--color-text));
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent-20) 35%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
     opacity: 1;
   }
 
   &:active {
     box-shadow: var(--inset-shadow);
     transform: none scale(0.95);
-    color: var(--accent-hover);
+    color: var(--color-text);
   }
 
 }
