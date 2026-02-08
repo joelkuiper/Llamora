@@ -1,6 +1,12 @@
 {% from 'partials/entry_item.html' import render_entry %}
 {% if not entries|length and not is_today %}
-<div class="no-content">Nothing was written this day.</div>
+<div class="no-content">
+  {% if is_future %}
+  The future has yet to come.
+  {% else %}
+  Nothing was written this day.
+  {% endif %}
+</div>
 {% endif %}
 {% for item in entries or [] %}
 {{ render_entry(item.entry, day, response_kinds, is_today, responses=item.responses, animate_entries=animate_entries) }}

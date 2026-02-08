@@ -11,6 +11,7 @@ from llamora.app.services.container import get_services
 from llamora.app.services.markdown import render_markdown_to_html
 from llamora.app.services.session_context import get_session_context
 from llamora.app.services.time import local_date, date_and_part
+from datetime import date as date_cls
 
 
 logger = logging.getLogger(__name__)
@@ -106,9 +107,15 @@ async def get_entries_context(
     entries = await services.db.entries.get_entries_for_date(user["id"], date, dek)
     _render_entries_markdown(entries)
 
-    today = local_date().isoformat()
+    today_date = local_date()
+    today = today_date.isoformat()
     min_date = await services.db.entries.get_first_entry_date(user["id"]) or today
     is_today = date == today
+    is_future = False
+    try:
+        is_future = date_cls.fromisoformat(date) > today_date
+    except ValueError:
+        is_future = False
     pending_entry_id = None
 
     opening_entries: list[dict[str, Any]] = []
@@ -130,6 +137,7 @@ async def get_entries_context(
         "is_today": is_today,
         "opening_stream": opening_stream,
         "min_date": min_date,
+        "is_future": is_future,
     }
 
 
