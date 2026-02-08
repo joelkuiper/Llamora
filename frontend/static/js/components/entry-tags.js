@@ -120,11 +120,19 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#detailCloseClickHandler = (event) => this.#handleDetailCloseClick(event);
     this.#detailClickHandler = (event) => this.#handleDetailClick(event);
     this.#detailAfterSwapHandler = (event) => this.#handleDetailAfterSwap(event);
-    this.#pageShowHandler = () => this.#resetDetailPopoverState();
+    this.#pageShowHandler = () => {
+      this.#resetDetailPopoverState();
+      this.#hideTagPopover("pageshow");
+      this.#resetSharedPopoverElement();
+    };
     this.#pageHideHandler = () => this.#forceHideDetailPopover("pagehide");
     this.#beforeHistorySaveHandler = () =>
       this.#forceHideDetailPopover("htmx:beforeHistorySave");
-    this.#restoredHandler = () => this.#resetDetailPopoverState("htmx:restored");
+    this.#restoredHandler = () => {
+      this.#resetDetailPopoverState("htmx:restored");
+      this.#hideTagPopover("htmx:restored");
+      this.#resetSharedPopoverElement();
+    };
     this.#visibilityHandler = () => this.#handleVisibility();
     this.#inputHandler = () => {
       this.#updateSubmitState();
@@ -338,20 +346,8 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       if (suggestionUrl) {
         this.#suggestions.setAttribute("hx-get", suggestionUrl);
       }
-      // Hard reset to skeleton before each open to avoid stale content on bfcache restore
+      this.#resetSuggestions({ force: true, clearEntry: false });
       this.#suggestions.dataset.entryId = entryId;
-      this.#suggestions.removeAttribute("data-loaded");
-      this.#suggestions.innerHTML = this.#suggestionsSkeleton;
-      this.#suggestions.classList.remove(
-        "htmx-swapping",
-        "htmx-settling",
-        "htmx-request"
-      );
-      this.#suggestions
-        .querySelectorAll(".tag-suggestion")
-        .forEach((el) =>
-          el.classList.remove("htmx-added", "htmx-settling", "htmx-swapping")
-        );
     }
     this.#updateSubmitState();
     if (typeof htmx !== "undefined") {
@@ -381,18 +377,43 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     }
   }
 
-  #ensureSkeleton() {
-    if (!this.#suggestions) return;
-    const containsSkeleton = this.#suggestions.innerHTML.includes(
-      "tag-suggestion--skeleton"
-    );
-    if (!this.#suggestionsSkeleton || !containsSkeleton) {
-      this.#suggestionsSkeleton = this.#buildSkeletonMarkup();
+  #hideTagPopover(reason = "hide") {
+    if (this.#popover) {
+      this.#popover.hide();
+      this.#destroyPopover();
+    }
+    if (this.#isActiveOwner()) {
+      this.#deactivateSharedOwner(reason);
+    }
+    this.#button?.setAttribute("aria-expanded", "false");
+    this.classList.remove("popover-open");
+  }
+
+  #resetSharedPopoverElement() {
+    const pop = getSharedTagPopoverEl();
+    if (!pop) return;
+    pop.hidden = true;
+    pop.removeAttribute("data-popper-placement");
+    pop.style.inset = "";
+    pop.style.transform = "";
+    pop.style.margin = "";
+    pop.classList.remove("htmx-swapping", "htmx-settling", "htmx-request");
+    const panel = pop.querySelector(".tp-content");
+    panel?.classList.remove("fade-enter", "fade-exit", "pop-enter", "pop-exit");
+    if (activeTagOwner === this) {
+      activeTagOwner = null;
     }
   }
 
-  #buildSkeletonMarkup() {
-    return Array.from({ length: TAG_SKELETON_COUNT })
+  #ensureSkeleton() {
+    if (!this.#suggestions) return;
+    // Prefer template to avoid drift between server and client markup.
+    const tpl = document.getElementById("tag-suggestions-skeleton-template");
+    if (tpl?.innerHTML?.trim()) {
+      this.#suggestionsSkeleton = tpl.innerHTML.trim();
+      return;
+    }
+    this.#suggestionsSkeleton = Array.from({ length: TAG_SKELETON_COUNT })
       .map(
         () =>
           '<span class="tag-suggestion tag-suggestion--skeleton" aria-hidden="true"></span>'

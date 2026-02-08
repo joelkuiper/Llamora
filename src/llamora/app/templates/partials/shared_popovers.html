@@ -30,6 +30,12 @@
   </div>
 </div>
 
+<template id="tag-suggestions-skeleton-template">
+  {% for _ in range(6) %}
+  <span class="tag-suggestion tag-suggestion--skeleton" aria-hidden="true"></span>
+  {% endfor %}
+</template>
+
 <div id="tag-detail-popover-global" class="tag-popover tag-detail-popover glass-panel" role="dialog" aria-modal="true" hidden>
   <div class="tp-content tag-detail-panel">
     <button type="button" class="overlay-close" aria-label="Close">×</button>
