@@ -13,7 +13,6 @@ import tiktoken
 from llamora.llm.prompt_templates import render_prompt_template
 from llamora.llm.tokenizers.tokenizer import count_message_tokens
 from llamora.settings import settings
-from llamora.app.db.events import ENTRY_TAGS_CHANGED_EVENT, RepositoryEventBus
 
 @dataclass(slots=True)
 class TagRecallContext:
@@ -212,36 +211,6 @@ class TagRecallSummaryCache:
             key = self._order.popleft()
             if key in self._entries:
                 self._delete_key(key)
-
-
-class TagRecallCacheSynchronizer:
-    """Bridge tag change events with the tag recall summary cache."""
-
-    __slots__ = ("_cache", "_events")
-
-    def __init__(
-        self,
-        *,
-        event_bus: RepositoryEventBus | None,
-        cache: TagRecallSummaryCache,
-    ) -> None:
-        self._cache = cache
-        self._events = event_bus
-        if not self._events:
-            return
-        self._events.subscribe(ENTRY_TAGS_CHANGED_EVENT, self._handle_tags_changed)
-
-    async def _handle_tags_changed(
-        self,
-        *,
-        user_id: str,
-        entry_id: str,
-        tag_hash: bytes | str | None = None,
-    ) -> None:
-        if not tag_hash:
-            return
-        tag_hash_hex = tag_hash.hex() if isinstance(tag_hash, bytes) else str(tag_hash)
-        self._cache.invalidate_tag(user_id, tag_hash_hex)
 
 
 TAG_RECALL_SUMMARY_CACHE = TagRecallSummaryCache()
