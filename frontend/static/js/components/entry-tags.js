@@ -108,6 +108,8 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   #configRequestHandler;
   #afterRequestHandler;
   #afterSwapHandler;
+  #suggestionsConfigHandler;
+  #suggestionsBeforeSwapHandler;
   #suggestionsSwapHandler;
   #tagActivationHandler;
   #tagKeydownHandler;
@@ -142,6 +144,10 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#configRequestHandler = (event) => this.#handleConfigRequest(event);
     this.#afterRequestHandler = () => this.#handleAfterRequest();
     this.#afterSwapHandler = (event) => this.#handleAfterSwap(event);
+    this.#suggestionsConfigHandler = (event) =>
+      this.#handleSuggestionsConfig(event);
+    this.#suggestionsBeforeSwapHandler = (event) =>
+      this.#handleSuggestionsBeforeSwap(event);
     this.#suggestionsSwapHandler = () => this.#handleSuggestionsSwap();
     this.#tagActivationHandler = (event) => this.#handleTagActivation(event);
     this.#tagKeydownHandler = (event) => this.#handleTagKeydown(event);
@@ -320,6 +326,16 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
         this.#suggestions,
         "htmx:afterSwap",
         this.#suggestionsSwapHandler,
+      );
+      listeners.add(
+        this.#suggestions,
+        "htmx:configRequest",
+        this.#suggestionsConfigHandler,
+      );
+      listeners.add(
+        this.#suggestions,
+        "htmx:beforeSwap",
+        this.#suggestionsBeforeSwapHandler,
       );
     }
   }
@@ -660,6 +676,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       return;
     }
     if (!this.#suggestions) return;
+    delete this.#suggestions.dataset.requestEntryId;
     if (this.#suggestions.innerHTML.trim()) {
       this.#suggestions.dataset.loaded = "1";
     } else {
@@ -667,6 +684,24 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     }
     this.#popover?.update();
     this.#updateAutocompleteCandidates();
+  }
+
+  #handleSuggestionsConfig(event) {
+    if (!this.#isActiveOwner() || !this.#suggestions) return;
+    const entryId = this.dataset?.entryId ?? "";
+    this.#suggestions.dataset.requestEntryId = entryId;
+    if (event?.detail?.headers) {
+      event.detail.headers["X-Tag-Entry"] = entryId;
+    }
+  }
+
+  #handleSuggestionsBeforeSwap(event) {
+    if (!this.#isActiveOwner() || !this.#suggestions) return;
+    const reqEntry = this.#suggestions.dataset.requestEntryId ?? "";
+    const currentEntry = this.#suggestions.dataset.entryId ?? "";
+    if (reqEntry && currentEntry && reqEntry !== currentEntry) {
+      event.preventDefault();
+    }
   }
 
   getAutocompleteControllerOptions() {
