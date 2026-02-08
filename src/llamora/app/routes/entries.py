@@ -57,6 +57,8 @@ from llamora.settings import settings
 entries_bp = Blueprint("entries", __name__)
 
 
+
+
 def _entry_stream_manager():
     return get_services().llm_service.response_stream_manager
 
@@ -393,6 +395,7 @@ async def sse_opening(date: str):
             dek,
             history=yesterday_msgs,
             current_date=today_iso,
+            llm=llm_client,
         )
         augmentation = await augment_opening_with_recall(
             opening_messages,
@@ -635,15 +638,16 @@ async def sse_response(entry_id: str, date: str):
     try:
         pending_response = manager.get(entry_id, uid)
         if not pending_response:
+            llm_client = services.llm_service.llm
             recall_context = await build_tag_recall_context(
                 db,
                 uid,
                 dek,
                 history=history,
                 current_date=actual_date or normalized_date,
+                llm=llm_client,
                 max_entry_id=entry_id,
             )
-            llm_client = services.llm_service.llm
             recall_date = actual_date or normalized_date
             recall_tags = tuple(recall_context.tags) if recall_context else ()
             has_existing_guidance = False

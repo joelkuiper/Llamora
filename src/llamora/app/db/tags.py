@@ -85,6 +85,7 @@ class TagsRepository(BaseRepository):
                 ENTRY_TAGS_CHANGED_EVENT,
                 user_id=user_id,
                 entry_id=entry_id,
+                tag_hash=tag_hash,
             )
 
     async def unlink_tag_entry(
@@ -109,6 +110,7 @@ class TagsRepository(BaseRepository):
                 ENTRY_TAGS_CHANGED_EVENT,
                 user_id=user_id,
                 entry_id=entry_id,
+                tag_hash=tag_hash,
             )
 
     async def get_tags_for_entry(

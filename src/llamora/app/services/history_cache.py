@@ -216,7 +216,13 @@ class HistoryCacheSynchronizer:
             return
         await self._cache.invalidate(user_id, created_date)
 
-    async def _handle_tags_changed(self, *, user_id: str, entry_id: str) -> None:
+    async def _handle_tags_changed(
+        self,
+        *,
+        user_id: str,
+        entry_id: str,
+        tag_hash: bytes | str | None = None,
+    ) -> None:
         if not self._events or not self._entries:
             return
         created_date = await self._entries.get_entry_date(user_id, entry_id)

@@ -2,15 +2,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+import hashlib
+import asyncio
+from collections import deque
 from typing import Any, Iterable, Mapping, Sequence
 
-from sumy.nlp.tokenizers import Tokenizer
-from sumy.parsers.plaintext import PlaintextParser
-from sumy.summarizers.lex_rank import LexRankSummarizer
+import orjson
+import tiktoken
 
 from llamora.llm.prompt_templates import render_prompt_template
+from llamora.llm.tokenizers.tokenizer import count_message_tokens
 from llamora.settings import settings
-
+from llamora.app.db.events import ENTRY_TAGS_CHANGED_EVENT, RepositoryEventBus
 
 @dataclass(slots=True)
 class TagRecallContext:
@@ -24,11 +27,17 @@ class TagRecallContext:
 class TagRecallConfig:
     """Runtime configuration for tag-based recall."""
 
-    summary_sentences: int
     summary_max_chars: int
     history_scope: int
     max_tags: int
     max_snippets: int
+    summary_cache_max: int
+
+
+
+CacheKey = tuple[str, str, str, int]
+
+_SUMMARY_CACHE_LIMIT_FALLBACK = 512
 
 
 def _coerce_int(value: Any, default: int, *, minimum: int | None = None) -> int:
@@ -44,11 +53,6 @@ def _coerce_int(value: Any, default: int, *, minimum: int | None = None) -> int:
 def get_tag_recall_config() -> TagRecallConfig:
     """Return the configured limits for tag-based recall."""
 
-    summary_sentences = _coerce_int(
-        settings.get("TAG_RECALL.summary_sentences", 4),
-        4,
-        minimum=1,
-    )
     summary_max_chars = _coerce_int(
         settings.get("TAG_RECALL.summary_max_chars", 640),
         640,
@@ -69,13 +73,18 @@ def get_tag_recall_config() -> TagRecallConfig:
         5,
         minimum=0,
     )
+    summary_cache_max = _coerce_int(
+        settings.get("TAG_RECALL.summary_cache_max", _SUMMARY_CACHE_LIMIT_FALLBACK),
+        _SUMMARY_CACHE_LIMIT_FALLBACK,
+        minimum=0,
+    )
 
     return TagRecallConfig(
-        summary_sentences=summary_sentences,
         summary_max_chars=summary_max_chars,
         history_scope=history_scope,
         max_tags=max_tags,
         max_snippets=max_snippets,
+        summary_cache_max=summary_cache_max,
     )
 
 
@@ -91,23 +100,237 @@ def _truncate_text(text: str, max_chars: int) -> str:
     return f"{trimmed}…"
 
 
-def _summarize(text: str, *, sentences: int, max_chars: int) -> str:
-    """Return a compact summary of ``text`` using LexRank."""
+def _summary_response_format() -> dict[str, Any]:
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "tag_recall_summary",
+            "strict": True,
+            "schema": {
+                "type": "object",
+                "properties": {"summary": {"type": "string"}},
+                "required": ["summary"],
+                "additionalProperties": False,
+            },
+        },
+    }
 
+
+def _summary_system_prompt(max_chars: int) -> str:
+    return render_prompt_template(
+        "tag_recall_summary_system.txt.j2",
+        max_chars=max_chars,
+    )
+
+
+def _extract_summary_payload(raw: str) -> str:
+    if not raw:
+        return ""
+    try:
+        parsed = orjson.loads(raw)
+    except Exception:
+        return ""
+    if isinstance(parsed, dict):
+        summary = parsed.get("summary")
+        if isinstance(summary, str):
+            return summary.strip()
+    return ""
+
+
+def _truncate_to_tokens(text: str, max_tokens: int) -> str:
+    if max_tokens <= 0:
+        return ""
+    clean = (text or "").strip()
+    if not clean:
+        return ""
+    encoding_name = settings.get("LLM.tokenizer.encoding", "cl100k_base")
+    encoding = tiktoken.get_encoding(str(encoding_name))
+    encoded = encoding.encode(clean)
+    if len(encoded) <= max_tokens:
+        return clean
+    trimmed = encoding.decode(encoded[:max_tokens]).strip()
+    return trimmed
+
+
+def _build_summary_cache_key(
+    user_id: str,
+    tag_hash_hex: str,
+    text: str,
+    max_chars: int,
+) -> CacheKey:
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    return (user_id, tag_hash_hex, digest, max_chars)
+
+
+class TagRecallSummaryCache:
+    """Cache LLM-generated summaries keyed by tag hash."""
+
+    __slots__ = ("_entries", "_by_tag", "_order")
+
+    def __init__(self) -> None:
+        self._entries: dict[CacheKey, str] = {}
+        self._by_tag: dict[tuple[str, str], set[CacheKey]] = {}
+        self._order: deque[CacheKey] = deque()
+
+    def get(self, key: CacheKey) -> str | None:
+        return self._entries.get(key)
+
+    def set(self, key: CacheKey, summary: str, *, max_entries: int) -> None:
+        if max_entries <= 0:
+            return
+        if key in self._entries:
+            self._entries[key] = summary
+            return
+        self._entries[key] = summary
+        user_id, tag_hash_hex, *_ = key
+        self._by_tag.setdefault((user_id, tag_hash_hex), set()).add(key)
+        self._order.append(key)
+        self._evict_overflow(max_entries)
+
+    def invalidate_tag(self, user_id: str, tag_hash_hex: str) -> None:
+        tag_key = (user_id, tag_hash_hex)
+        keys = self._by_tag.pop(tag_key, set())
+        for key in keys:
+            self._delete_key(key)
+
+    def _delete_key(self, key: CacheKey) -> None:
+        if key not in self._entries:
+            return
+        self._entries.pop(key, None)
+        user_id, tag_hash_hex, *_ = key
+        tag_key = (user_id, tag_hash_hex)
+        tag_keys = self._by_tag.get(tag_key)
+        if tag_keys:
+            tag_keys.discard(key)
+            if not tag_keys:
+                self._by_tag.pop(tag_key, None)
+
+    def _evict_overflow(self, max_entries: int) -> None:
+        if max_entries <= 0:
+            return
+        while len(self._entries) > max_entries and self._order:
+            key = self._order.popleft()
+            if key in self._entries:
+                self._delete_key(key)
+
+
+class TagRecallCacheSynchronizer:
+    """Bridge tag change events with the tag recall summary cache."""
+
+    __slots__ = ("_cache", "_events")
+
+    def __init__(
+        self,
+        *,
+        event_bus: RepositoryEventBus | None,
+        cache: TagRecallSummaryCache,
+    ) -> None:
+        self._cache = cache
+        self._events = event_bus
+        if not self._events:
+            return
+        self._events.subscribe(ENTRY_TAGS_CHANGED_EVENT, self._handle_tags_changed)
+
+    async def _handle_tags_changed(
+        self,
+        *,
+        user_id: str,
+        entry_id: str,
+        tag_hash: bytes | str | None = None,
+    ) -> None:
+        if not tag_hash:
+            return
+        tag_hash_hex = tag_hash.hex() if isinstance(tag_hash, bytes) else str(tag_hash)
+        self._cache.invalidate_tag(user_id, tag_hash_hex)
+
+
+TAG_RECALL_SUMMARY_CACHE = TagRecallSummaryCache()
+
+
+async def _summarize_with_llm(
+    llm,
+    text: str,
+    *,
+    max_chars: int,
+    user_id: str,
+    tag_hash_hex: str,
+    cache_limit: int,
+) -> str:
     clean = (text or "").strip()
     if not clean:
         return ""
 
-    parser = PlaintextParser.from_string(clean, Tokenizer("english"))
-    summarizer = LexRankSummarizer()
-    summary = summarizer(parser.document, sentences)
+    cache_key = _build_summary_cache_key(user_id, tag_hash_hex, clean, max_chars)
+    cached = TAG_RECALL_SUMMARY_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
 
-    parts = [str(sentence).strip() for sentence in summary if str(sentence).strip()]
-    if parts:
-        joined = " ".join(parts)
-        return _truncate_text(joined, max_chars)
+    system_prompt = _summary_system_prompt(max_chars)
+    user_prompt = clean
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]
 
-    return _truncate_text(clean, max_chars)
+    params = {
+        "temperature": 0.2,
+        "n_predict": 512,
+        "response_format": _summary_response_format(),
+    }
+
+    try:
+        prompt_tokens = sum(
+            count_message_tokens(msg["role"], msg["content"]) for msg in messages
+        )
+        max_prompt = llm.prompt_budget.max_prompt_tokens(params)
+        if max_prompt is not None and prompt_tokens > max_prompt:
+            # Trim user content to fit within the available prompt budget.
+            system_tokens = count_message_tokens("system", system_prompt)
+            budget_for_user = max(max_prompt - system_tokens, 0)
+            if budget_for_user > 0:
+                user_prompt = _truncate_to_tokens(user_prompt, budget_for_user)
+                messages[1]["content"] = user_prompt
+            else:
+                user_prompt = ""
+                messages[1]["content"] = ""
+    except Exception:  # pragma: no cover - defensive
+        pass
+
+    if not user_prompt:
+        return ""
+
+    try:
+        raw = await llm.complete_messages(messages, params=params)
+    except Exception:
+        return ""
+
+    summary = _extract_summary_payload(raw)
+    if not summary:
+        retry_messages = [
+            {
+                "role": "system",
+                "content": system_prompt
+                + "\nReturn ONLY strict JSON matching {\"summary\":\"...\"}.",
+            },
+            {"role": "user", "content": user_prompt},
+        ]
+        try:
+            raw_retry = await llm.complete_messages(
+                retry_messages,
+                params={
+                    **params,
+                    "temperature": 0.0,
+                },
+            )
+        except Exception:
+            return ""
+        summary = _extract_summary_payload(raw_retry)
+        if not summary:
+            return ""
+    summary = _truncate_text(summary, max_chars)
+    if summary:
+        TAG_RECALL_SUMMARY_CACHE.set(cache_key, summary, max_entries=cache_limit)
+    return summary
 
 
 def _extract_focus_tags(
@@ -167,6 +390,7 @@ async def build_tag_recall_context(
     *,
     history: Sequence[Mapping[str, Any] | dict[str, Any]],
     current_date: str | None,
+    llm,
     max_entry_id: str | None = None,
     max_created_at: str | None = None,
     config: TagRecallConfig | None = None,
@@ -185,7 +409,7 @@ async def build_tag_recall_context(
         cfg.max_tags <= 0
         or cfg.max_snippets <= 0
         or cfg.summary_max_chars <= 0
-        or cfg.summary_sentences <= 0
+        or llm is None
     ):
         return None
 
@@ -197,15 +421,26 @@ async def build_tag_recall_context(
     if not focus_tags:
         return None
 
-    candidate_ids = await db.tags.get_recent_entries_for_tag_hashes(
-        user_id,
-        focus_tags,
-        limit=cfg.max_snippets * 4,
-        max_entry_id=max_entry_id,
-        max_created_at=max_created_at,
-    )
+    tag_entry_ids: dict[bytes, list[str]] = {}
+    all_ids: list[str] = []
+    seen_ids: set[str] = set()
+    for tag_hash in focus_tags:
+        ids = await db.tags.get_recent_entries_for_tag_hashes(
+            user_id,
+            [tag_hash],
+            limit=cfg.max_snippets,
+            max_entry_id=max_entry_id,
+            max_created_at=max_created_at,
+        )
+        if not ids:
+            continue
+        tag_entry_ids[tag_hash] = ids
+        for entry_id in ids:
+            if entry_id not in seen_ids:
+                seen_ids.add(entry_id)
+                all_ids.append(entry_id)
 
-    if not candidate_ids:
+    if not all_ids:
         return None
 
     history_ids: set[str] = set()
@@ -220,77 +455,73 @@ async def build_tag_recall_context(
         history_ids.add(key)
         history_map[key] = entry
 
-    candidate_entries = await db.entries.get_entries_by_ids(user_id, candidate_ids, dek)
+    candidate_entries = await db.entries.get_entries_by_ids(user_id, all_ids, dek)
 
     if not candidate_entries:
         return None
 
     by_id = {str(item.get("id")): item for item in candidate_entries if item.get("id")}
 
-    reply_to_ids: list[str] = []
-    for entry in candidate_entries:
-        reply_to = entry.get("reply_to")
-        if not reply_to:
-            continue
-        reply_key = str(reply_to)
-        if reply_key in history_map:
-            continue
-        if reply_key not in by_id and reply_key not in reply_to_ids:
-            reply_to_ids.append(reply_key)
+    # Aggregate by tag; replies are handled implicitly via tagged entries.
 
-    reply_entries: list[Mapping[str, Any]] = []
-    if reply_to_ids:
-        reply_entries = await db.entries.get_entries_by_ids(user_id, reply_to_ids, dek)
+    async def _build_tag_snippet(tag_digest: bytes) -> str | None:
+        ids_for_tag = tag_entry_ids.get(tag_digest, [])
+        if not ids_for_tag:
+            return None
+        tag_hash = tag_digest.hex()
+        tag_items: list[tuple[str, str, str]] = []
+        for entry_id in ids_for_tag:
+            if len(tag_items) >= cfg.max_snippets:
+                break
+            entry = by_id.get(str(entry_id))
+            if not entry:
+                continue
+            if str(entry_id) in history_ids:
+                continue
+            created_at = entry.get("created_at")
+            if current_date and _extract_date(created_at) == current_date:
+                continue
+            text = str(entry.get("text") or "").strip()
+            if not text:
+                continue
+            when = _extract_date(created_at) or "Previous day"
+            role = str(entry.get("role") or "assistant").strip().title()
+            tag_items.append((when, role, text))
 
-    reply_lookup: dict[str, Mapping[str, Any]] = {
-        **{str(item.get("id")): item for item in reply_entries if item.get("id")},
-        **history_map,
-    }
+        if not tag_items:
+            return None
 
-    snippets: list[str] = []
-    per_summary_max_chars = max(cfg.summary_max_chars // 2, 1)
-    for entry_id in candidate_ids:
-        if len(snippets) >= cfg.max_snippets:
-            break
-        entry = by_id.get(str(entry_id))
-        if not entry:
-            continue
-        if str(entry_id) in history_ids:
-            continue
-        created_at = entry.get("created_at")
-        if current_date and _extract_date(created_at) == current_date:
-            continue
-        text = str(entry.get("text") or "").strip()
-        if not text:
-            continue
-        summary_assistant = _summarize(
-            text,
-            sentences=cfg.summary_sentences,
-            max_chars=per_summary_max_chars,
+        lines = [f"{when} {role}: {text}" for when, role, text in tag_items]
+        aggregate = "\n".join(lines)
+        summary = await _summarize_with_llm(
+            llm,
+            aggregate,
+            max_chars=cfg.summary_max_chars,
+            user_id=user_id,
+            tag_hash_hex=tag_hash,
+            cache_limit=cfg.summary_cache_max,
         )
-        if not summary_assistant:
-            continue
-        reply_summary = ""
-        reply_to = entry.get("reply_to")
-        if reply_to:
-            reply_entry = reply_lookup.get(str(reply_to))
-            if isinstance(reply_entry, Mapping):
-                reply_text = str(reply_entry.get("text") or "").strip()
-                if reply_text:
-                    reply_summary = _summarize(
-                        reply_text,
-                        sentences=cfg.summary_sentences,
-                        max_chars=per_summary_max_chars,
-                    )
-        parts: list[str] = []
-        if reply_summary:
-            parts.append(f"User: {reply_summary}")
-        parts.append(f"Assistant: {summary_assistant}")
-        combined = _truncate_text(" ".join(parts), cfg.summary_max_chars)
-        if not combined:
-            continue
-        when = _extract_date(created_at) or "Previous day"
-        snippets.append(f"{when}: {combined}")
+        if not summary:
+            return None
+        tag_label = tag_names.get(tag_digest, "") or tag_hash[:8]
+        return f"{tag_label}: {summary}"
+
+    async def _run_tag_snippet(tag_digest: bytes, sem: asyncio.Semaphore) -> str | None:
+        async with sem:
+            return await _build_tag_snippet(tag_digest)
+
+    focus_slice = focus_tags[: cfg.max_tags]
+    sem = asyncio.Semaphore(min(3, max(len(focus_slice), 1)))
+    tasks = [
+        _run_tag_snippet(tag_digest, sem)
+        for tag_digest in focus_slice
+    ]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    snippets = [
+        result
+        for result in results
+        if isinstance(result, str) and result.strip()
+    ]
 
     if not snippets:
         return None
