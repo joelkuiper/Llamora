@@ -88,7 +88,6 @@ class SearchStreamManager:
         dek: bytes,
         query: str,
         session_id: str | None,
-        offset: int,
         page_limit: int,
         result_window: int,
         k1: int | None = None,
@@ -100,9 +99,6 @@ class SearchStreamManager:
         normalized = self._components.normalizer.normalize(user_id, query)
         normalized_query = normalized.text
         truncated = normalized.truncated
-
-        if offset == 0:
-            session_id = None
 
         session: SearchStreamSession | None = None
         if session_id:
@@ -127,7 +123,8 @@ class SearchStreamManager:
         session.last_access = time.monotonic()
 
         cfg = self._config.progressive
-        desired_limit = min(result_window, offset + page_limit)
+        delivered = len(session.delivered_ids)
+        desired_limit = min(result_window, delivered + page_limit)
         desired_k2 = max(int(cfg.k2), int(k2) if k2 is not None else 0, desired_limit)
         desired_k1 = max(int(cfg.k1), int(k1) if k1 is not None else 0, desired_k2)
 
@@ -171,11 +168,6 @@ class SearchStreamManager:
             limit=len(ordered_candidates),
             boosts=enrichment.boosts,
         )
-
-        if offset > 0 and len(session.delivered_ids) != offset:
-            session.delivered_ids.clear()
-            for item in reranked[:offset]:
-                session.delivered_ids.add(item["id"])
 
         page_results: list[dict] = []
         for item in reranked:

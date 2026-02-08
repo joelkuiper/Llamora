@@ -57,6 +57,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
   #afterRequestHandler;
   #afterSwapHandler;
   #inputHandler;
+  #submitHandler;
   #keydownHandler;
   #documentClickHandler;
   #focusHandler;
@@ -74,6 +75,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#afterRequestHandler = () => this.#handleAfterRequest();
     this.#afterSwapHandler = (event) => this.#handleAfterSwap(event);
     this.#inputHandler = () => this.#handleInput();
+    this.#submitHandler = () => this.#handleSubmit();
     this.#keydownHandler = (event) => this.#handleKeydown(event);
     this.#documentClickHandler = (event) => this.#handleDocumentClick(event);
     this.#focusHandler = () => this.#handleInputFocus();
@@ -119,6 +121,10 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       onEnd: this.#afterRequestHandler,
     });
     listeners.add(this, "htmx:afterSwap", this.#afterSwapHandler);
+    const form = this.querySelector("#search-form");
+    if (form) {
+      listeners.add(form, "submit", this.#submitHandler);
+    }
 
     if (this.#historyRestoreRemover) {
       this.#historyRestoreRemover();
@@ -261,8 +267,19 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   #handleInput() {
+    const cursorEl = this.ownerDocument?.getElementById("search-session-id");
+    if (cursorEl) {
+      cursorEl.value = "";
+    }
     if (!this.#inputEl || this.#inputEl.value.trim()) return;
     this.#closeResults();
+  }
+
+  #handleSubmit() {
+    const cursorEl = this.ownerDocument?.getElementById("search-session-id");
+    if (cursorEl) {
+      cursorEl.value = "";
+    }
   }
 
   #handleInputFocus() {

@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Any
 
 from quart import Blueprint, Request, jsonify, render_template, request
 from llamora.app.api.search import InvalidSearchQuery
@@ -57,28 +56,22 @@ def resolve_search_context(req: Request) -> SearchContext:
         result_window=result_window,
     )
 
-
-def _parse_offset(value: Any, default: int = 0) -> int:
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError):
-        return default
-    return max(0, parsed)
-
-
 @search_bp.get("/search")
 @login_required
 async def search():
     context = resolve_search_context(request)
     logger.debug("Route search raw query='%s'", context.query)
-    offset = _parse_offset(request.args.get("offset", 0))
-    page_limit = context.page_size if offset > 0 else context.initial_page_size
-    session_id = request.args.get("sid") or ""
+    if request.args.get("offset"):
+        abort(400, description="offset is not supported; use cursor")
+    search_mode = (request.args.get("search_mode") or "").strip()
+    cursor = (request.args.get("cursor") or "").strip()
+    use_cursor = bool(cursor) and search_mode == "chunk"
+    page_limit = context.page_size if use_cursor else context.initial_page_size
+    session_id = cursor if use_cursor else ""
     results: list = []
     truncation_notice: str | None = None
     sanitized_query = ""
     has_more = False
-    next_offset = 0
     total_known = False
     showing_count = 0
     returned_session_id: str | None = None
@@ -93,11 +86,12 @@ async def search():
                 dek,
                 context.query,
                 session_id=session_id or None,
-                offset=offset,
                 page_limit=page_limit,
                 result_window=context.result_window,
             )
             returned_session_id = stream_result.session_id
+            if use_cursor and returned_session_id != cursor:
+                return ""
             sanitized_query = stream_result.normalized_query
             results = stream_result.results
             truncated = stream_result.truncated
@@ -110,7 +104,7 @@ async def search():
             results = []
             truncated = False
 
-        if sanitized_query and offset == 0:
+        if sanitized_query and not use_cursor:
             await get_services().db.search_history.record_search(
                 user["id"], sanitized_query, dek
             )
@@ -122,23 +116,19 @@ async def search():
             )
 
     page_results = results
-    next_offset = offset + len(page_results)
-
     logger.debug(
-        "Route returning %d results (offset=%d, has_more=%s)",
+        "Route returning %d results (has_more=%s)",
         len(page_results),
-        offset,
         has_more,
     )
 
-    if offset > 0:
+    if use_cursor:
         if not page_results:
             return ""
         return await render_template(
             "partials/search_results_chunk.html",
             results=page_results,
             has_more=has_more,
-            next_offset=next_offset,
             session_id=returned_session_id,
         )
 
@@ -148,9 +138,8 @@ async def search():
         has_query=bool(sanitized_query),
         truncation_notice=truncation_notice,
         total_known=total_known,
-        showing_count=showing_count or next_offset,
+        showing_count=showing_count,
         has_more=has_more,
-        next_offset=next_offset,
         session_id=returned_session_id,
     )
 
