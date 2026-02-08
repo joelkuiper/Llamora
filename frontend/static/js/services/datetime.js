@@ -74,7 +74,7 @@ function dispatchTimezoneChange(nextTimezone, previousTimezone) {
     window.dispatchEvent(
       new CustomEvent(TIMEZONE_CHANGE_EVENT, {
         detail: { timezone: nextTimezone, previousTimezone },
-      })
+      }),
     );
     return;
   }
@@ -84,7 +84,7 @@ function dispatchTimezoneChange(nextTimezone, previousTimezone) {
       TIMEZONE_CHANGE_EVENT,
       false,
       false,
-      { timezone: nextTimezone, previousTimezone }
+      { timezone: nextTimezone, previousTimezone },
     );
     window.dispatchEvent(event);
   }
@@ -149,9 +149,9 @@ export function parseDateFromSource(value) {
   }
   date.setHours(0, 0, 0, 0);
   if (
-    date.getFullYear() !== y ||
-    date.getMonth() !== m - 1 ||
-    date.getDate() !== d
+    date.getFullYear() !== y
+    || date.getMonth() !== m - 1
+    || date.getDate() !== d
   ) {
     return null;
   }

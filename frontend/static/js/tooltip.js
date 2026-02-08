@@ -14,10 +14,10 @@ function parseOffset(value, fallback) {
 
 function ensureEl() {
   if (tooltipEl && tooltipEl.isConnected) return;
-  tooltipEl = document.createElement('div');
-  tooltipEl.className = 'tooltip';
-  tooltipEl.innerHTML = '<div class="tooltip-inner"></div>';
-  innerEl = tooltipEl.querySelector('.tooltip-inner');
+  tooltipEl = document.createElement("div");
+  tooltipEl.className = "tooltip";
+  tooltipEl.innerHTML = "<div class=\"tooltip-inner\"></div>";
+  innerEl = tooltipEl.querySelector(".tooltip-inner");
   document.body.appendChild(tooltipEl);
   tooltipEl.hidden = true;
 }
@@ -25,11 +25,11 @@ function ensureEl() {
 function show(el) {
   ensureEl();
   hide();
-  innerEl.textContent = el.dataset.tooltipTitle || '';
+  innerEl.textContent = el.dataset.tooltipTitle || "";
   Object.assign(tooltipEl.style, {
-    top: '',
-    left: '',
-    position: '',
+    top: "",
+    left: "",
+    position: "",
   });
   const placement = el.dataset.tooltipPlacement || "bottom";
   const offsetX = parseOffset(el.dataset.tooltipOffsetX, 0);
@@ -39,10 +39,10 @@ function show(el) {
     placement,
     offset: [offsetX, offsetY],
     onShow: () => {
-      tooltipEl.classList.add('visible');
+      tooltipEl.classList.add("visible");
     },
     onHide: () => {
-      tooltipEl.classList.remove('visible');
+      tooltipEl.classList.remove("visible");
       const rect = tooltipEl.getBoundingClientRect();
       lastRect = { top: rect.top, left: rect.left };
     },
@@ -52,7 +52,7 @@ function show(el) {
         Object.assign(tooltipEl.style, {
           top: `${lastRect.top}px`,
           left: `${lastRect.left}px`,
-          position: 'fixed',
+          position: "fixed",
         });
         lastRect = null;
       }
@@ -65,7 +65,7 @@ function show(el) {
 function hide() {
   if (!tooltipPopover) {
     if (tooltipEl) {
-      tooltipEl.classList.remove('visible');
+      tooltipEl.classList.remove("visible");
       tooltipEl.hidden = true;
     }
     currentTarget = null;
@@ -83,35 +83,35 @@ export function initTooltips() {
   initialized = true;
 
   const getTrigger = (el) => {
-    const trigger = el.closest('[data-tooltip-title]');
-    return trigger && !trigger.classList.contains('active') ? trigger : null;
+    const trigger = el.closest("[data-tooltip-title]");
+    return trigger && !trigger.classList.contains("active") ? trigger : null;
   };
 
-  document.addEventListener('mouseover', (e) => {
+  document.addEventListener("mouseover", (e) => {
     const trigger = getTrigger(e.target);
     if (!trigger || trigger === currentTarget) return;
     show(trigger);
   });
 
-  document.addEventListener('mouseout', (e) => {
+  document.addEventListener("mouseout", (e) => {
     if (!currentTarget) return;
     if (e.relatedTarget && currentTarget.contains(e.relatedTarget)) return;
     if (getTrigger(e.target) !== currentTarget) return;
     hide();
   });
 
-  document.addEventListener('focusin', (e) => {
+  document.addEventListener("focusin", (e) => {
     const trigger = getTrigger(e.target);
     if (trigger) show(trigger);
   });
 
-  document.addEventListener('focusout', (e) => {
+  document.addEventListener("focusout", (e) => {
     if (currentTarget && getTrigger(e.target) === currentTarget) hide();
   });
 
-  document.addEventListener('click', hide);
-  document.addEventListener('htmx:beforeSwap', hide);
-  document.addEventListener('htmx:afterSwap', hide);
+  document.addEventListener("click", hide);
+  document.addEventListener("htmx:beforeSwap", hide);
+  document.addEventListener("htmx:afterSwap", hide);
 }
 
 initTooltips();

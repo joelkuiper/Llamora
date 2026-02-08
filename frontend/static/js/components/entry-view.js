@@ -1,25 +1,22 @@
-import { scrollEvents } from "../entries/scroll-manager.js";
 import { appReady } from "../app-init.js";
+import { initDayNav, navigateToDate } from "../day.js";
+import { clearActiveDay, setActiveDay } from "../entries/active-day-store.js";
+import { armEntryAnimations, armInitialEntryAnimations } from "../entries/entry-animations.js";
 import { MarkdownObserver } from "../entries/markdown-observer.js";
+import { scrollEvents } from "../entries/scroll-manager.js";
 import { StreamController } from "../entries/stream-controller.js";
 import { renderMarkdownInElement } from "../markdown.js";
-import { initDayNav, navigateToDate } from "../day.js";
-import { scrollToHighlight } from "../ui.js";
-import { createListenerBag } from "../utils/events.js";
-import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
-import { ReactiveElement } from "../utils/reactive-element.js";
-import { setActiveDay, clearActiveDay } from "../entries/active-day-store.js";
 import {
-  armEntryAnimations,
-  armInitialEntryAnimations,
-} from "../entries/entry-animations.js";
-import {
+  formatTimeElements,
   getClientToday,
   getTimezone,
   scheduleMidnightRollover,
   updateClientToday,
-  formatTimeElements,
 } from "../services/time.js";
+import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
+import { scrollToHighlight } from "../ui.js";
+import { createListenerBag } from "../utils/events.js";
+import { ReactiveElement } from "../utils/reactive-element.js";
 import { afterNextFrame, scheduleFrame } from "../utils/scheduler.js";
 import "./entry-form.js";
 import "./response-stream.js";
@@ -160,7 +157,7 @@ export class EntryView extends ReactiveElement {
     this.#connectionListeners.add(
       document.body,
       "htmx:historyRestore",
-      this.#historyRestoreHandler
+      this.#historyRestoreHandler,
     );
 
     this.#observeAppReady();
@@ -191,7 +188,7 @@ export class EntryView extends ReactiveElement {
 
   #initialize(
     entries = this.querySelector("#entries"),
-    entriesDate = entries?.dataset?.date ?? null
+    entriesDate = entries?.dataset?.date ?? null,
   ) {
     this.#initialized = false;
     this.#teardown();
@@ -413,7 +410,6 @@ export class EntryView extends ReactiveElement {
     this.#syncToEntryDate();
   }
 
-
   #collectSwapTargets(event) {
     const nodes = new Set();
 
@@ -515,5 +511,4 @@ export class EntryView extends ReactiveElement {
 
     this.#entries.querySelectorAll?.("response-stream").forEach((stream) => resume(stream));
   }
-
 }

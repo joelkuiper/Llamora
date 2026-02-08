@@ -66,7 +66,8 @@
   box-shadow:
     var(--raised-shadow),
     0 0 0 2px var(--accent-10);
-  background: linear-gradient(0deg, var(--accent-15), var(--accent-05)) var(--glass-bg-alt);
+  background: linear-gradient(0deg, var(--accent-15), var(--accent-05))
+    var(--glass-bg-alt);
 }
 
 .entry-tag.is-active {
@@ -74,7 +75,8 @@
   box-shadow:
     var(--raised-shadow),
     0 0 0 2px var(--accent-15);
-  background: linear-gradient(0deg, var(--accent-15), var(--accent-05)) var(--glass-bg-alt);
+  background: linear-gradient(0deg, var(--accent-15), var(--accent-05))
+    var(--glass-bg-alt);
   color: var(--glass-text-stronger);
 }
 
@@ -133,7 +135,10 @@
   font-size: 0.75rem;
   cursor: pointer;
   opacity: 0;
-  transition: transform var(--motion-gentle) ease, opacity var(--motion-gentle) ease, background-color var(--motion-gentle) ease;
+  transition:
+    transform var(--motion-gentle) ease,
+    opacity var(--motion-gentle) ease,
+    background-color var(--motion-gentle) ease;
 }
 
 .tag-remove:hover {
@@ -251,7 +256,10 @@
     box-shadow:
       inset 2px 2px 6px var(--shadow-dark-02),
       inset -2px -2px 6px var(--shadow-light-60);
-    transition: border-color var(--motion-fade) ease, box-shadow var(--motion-lilt) ease, background var(--motion-fade) ease;
+    transition:
+      border-color var(--motion-fade) ease,
+      box-shadow var(--motion-lilt) ease,
+      background var(--motion-fade) ease;
 
     &:hover {
       background: var(--glass-bg-alt-hover);
@@ -280,8 +288,12 @@
       line-height: calc(var(--tp-h) - 2px);
       font-family: var(--font-base);
 
-      &::placeholder { opacity: .6; }
-      &:focus { outline: none; }
+      &::placeholder {
+        opacity: 0.6;
+      }
+      &:focus {
+        outline: none;
+      }
     }
 
     /* Button half (attached) */
@@ -289,12 +301,19 @@
       flex: 0 0 auto;
       padding: 0 14px;
       border: 0;
-      background: linear-gradient(0deg, var(--glass-bg-alt), var(--glass-bg-strong));
+      background: linear-gradient(
+        0deg,
+        var(--glass-bg-alt),
+        var(--glass-bg-strong)
+      );
       color: var(--glass-text-stronger);
       font-weight: 600;
       font-size: 14px;
       cursor: pointer;
-      transition: background var(--motion-fade) ease, transform var(--motion-press) ease, color var(--motion-fade) ease;
+      transition:
+        background var(--motion-fade) ease,
+        transform var(--motion-press) ease,
+        color var(--motion-fade) ease;
 
       &:hover {
         border-color: var(--accent);
@@ -302,12 +321,17 @@
           var(--raised-shadow),
           0 0 0 3px var(--accent-20),
           0 12px 28px var(--accent-10);
-        background: linear-gradient(0deg, var(--accent-10), transparent) var(--glass-bg-alt);
+        background: linear-gradient(0deg, var(--accent-10), transparent)
+          var(--glass-bg-alt);
       }
 
-
-      &:active { transform: translateY(1px); }
-      &:disabled { opacity: .6; cursor: not-allowed; }
+      &:active {
+        transform: translateY(1px);
+      }
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
     }
   }
 
@@ -382,10 +406,15 @@
 
     &:hover {
       border-color: var(--accent);
-      box-shadow: var(--raised-shadow), 0 0 0 2px var(--accent-10);
-      background: linear-gradient(0deg, var(--accent-15), var(--accent-05)) var(--glass-bg-alt);
+      box-shadow:
+        var(--raised-shadow),
+        0 0 0 2px var(--accent-10);
+      background: linear-gradient(0deg, var(--accent-15), var(--accent-05))
+        var(--glass-bg-alt);
     }
-    &:active { transform: translateY(1px); }
+    &:active {
+      transform: translateY(1px);
+    }
   }
 
   .tag-suggestion--skeleton {
@@ -396,7 +425,11 @@
     height: 1.4rem;
     display: inline-flex;
     align-items: center;
-    border-color: color-mix(in srgb, var(--border) 85%, var(--color-text-muted));
+    border-color: color-mix(
+      in srgb,
+      var(--border) 85%,
+      var(--color-text-muted)
+    );
     background: color-mix(in srgb, var(--glass-bg-alt) 88%, var(--color-bg));
     box-shadow: var(--inset-shadow);
     cursor: default;
@@ -447,7 +480,6 @@
   }
 }
 
-
 .action-popover {
   width: 13rem;
   padding: 8px;
@@ -486,7 +518,11 @@
   box-shadow: var(--subtle-raised-shadow);
   --action-color: var(--accent);
   --action-border: color-mix(in srgb, var(--action-color) 35%, var(--border));
-  --action-bg: color-mix(in srgb, var(--action-color) var(--action-tint), var(--glass-bg-alt));
+  --action-bg: color-mix(
+    in srgb,
+    var(--action-color) var(--action-tint),
+    var(--glass-bg-alt)
+  );
   --action-icon: color-mix(in srgb, var(--action-color) 65%, var(--color-text));
 }
 

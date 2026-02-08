@@ -1,12 +1,8 @@
-import { registerShortcut } from "./utils/global-shortcuts.js";
-import {
-  formatIsoDate,
-  parseDateFromSource,
-  navigateToDate,
-} from "./day.js";
-import { requestScrollForceBottom } from "./entries/scroll-manager.js";
-import { motionSafeBehavior } from "./utils/motion.js";
+import { formatIsoDate, navigateToDate, parseDateFromSource } from "./day.js";
 import { getActiveDay } from "./entries/active-day-store.js";
+import { requestScrollForceBottom } from "./entries/scroll-manager.js";
+import { registerShortcut } from "./utils/global-shortcuts.js";
+import { motionSafeBehavior } from "./utils/motion.js";
 
 let registered = false;
 

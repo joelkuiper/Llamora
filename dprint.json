@@ -1,0 +1,16 @@
+{
+  "includes": [
+    "frontend/static/js/**/*.js",
+    "frontend/static/css/**/*.css"
+  ],
+  "excludes": [
+    "frontend/static/js/vendor/**",
+    "**/*.min.js",
+    "**/*.umd.js",
+    "**/*.jsm.js"
+  ],
+  "plugins": [
+    "https://plugins.dprint.dev/typescript-0.95.15.wasm",
+    "https://plugins.dprint.dev/g-plane/malva-v0.15.2.wasm"
+  ]
+}

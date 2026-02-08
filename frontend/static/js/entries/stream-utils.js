@@ -23,7 +23,7 @@ export function findStreamByEntryId(root, entryId) {
 
   const searchRoot = getSearchRoot(root);
   return searchRoot.querySelector(
-    `response-stream[data-entry-id="${escapeAttributeValue(normalized)}"]`
+    `response-stream[data-entry-id="${escapeAttributeValue(normalized)}"]`,
   );
 }
 
@@ -39,7 +39,7 @@ export function findTypingIndicator(root, entryId) {
     }
 
     const typed = Array.from(
-      searchRoot.querySelectorAll(TYPING_INDICATOR_SELECTOR)
+      searchRoot.querySelectorAll(TYPING_INDICATOR_SELECTOR),
     ).find((node) => node?.dataset?.entryId === normalized);
     if (typed) {
       return typed;

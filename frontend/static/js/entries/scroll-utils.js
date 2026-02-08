@@ -3,8 +3,7 @@ export function isNearBottom(element, threshold = 0) {
     return true;
   }
 
-  const distance =
-    element.scrollHeight - element.clientHeight - element.scrollTop;
+  const distance = element.scrollHeight - element.clientHeight - element.scrollTop;
 
   return distance < threshold;
 }

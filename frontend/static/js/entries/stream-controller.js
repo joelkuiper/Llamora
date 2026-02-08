@@ -84,7 +84,7 @@ export class StreamController {
         previousMsgId: previous.currentMsgId,
         currentMsgId: id,
         entryId: id,
-      })
+      }),
     );
     requestScrollForceBottom({ source: "stream:start" });
   }
@@ -107,7 +107,7 @@ export class StreamController {
         previousMsgId: previous.currentMsgId,
         currentMsgId: null,
         entryId: targetId,
-      })
+      }),
     );
   }
 
@@ -127,7 +127,7 @@ export class StreamController {
         currentMsgId: null,
         entryId: id ?? previous.currentMsgId,
         result: status || "done",
-      })
+      }),
     );
     if (status !== "aborted") {
       requestScrollForceBottom({ source: "stream:complete" });
@@ -160,5 +160,4 @@ export class StreamController {
       delete this.#entries.dataset.currentStream;
     }
   }
-
 }

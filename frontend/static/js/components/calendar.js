@@ -1,5 +1,5 @@
-import { createPopover } from "../popover.js";
 import { getActiveDayParts } from "../entries/active-day-store.js";
+import { createPopover } from "../popover.js";
 
 export class CalendarControl extends HTMLElement {
   #state = null;
@@ -37,7 +37,7 @@ export class CalendarControl extends HTMLElement {
     document.body.addEventListener(
       "htmx:beforeHistorySave",
       handleBeforeCache,
-      { signal }
+      { signal },
     );
     window.addEventListener(
       "pageshow",
@@ -46,7 +46,7 @@ export class CalendarControl extends HTMLElement {
           this.#initCalendarPopover();
         }
       },
-      { signal }
+      { signal },
     );
     window.addEventListener("pagehide", handleBeforeCache, { signal });
   }
@@ -74,10 +74,10 @@ export class CalendarControl extends HTMLElement {
     this.#pop = pop;
 
     if (
-      this.#state &&
-      this.#state.btn === btn &&
-      this.#state.pop === pop &&
-      !this.#state.signal.aborted
+      this.#state
+      && this.#state.btn === btn
+      && this.#state.pop === pop
+      && !this.#state.signal.aborted
     ) {
       return;
     }
@@ -95,8 +95,7 @@ export class CalendarControl extends HTMLElement {
   #setupCalendar(btn, pop) {
     const controller = new AbortController();
     const { signal } = controller;
-    const calendarUrl =
-      pop.dataset.calendarUrl || pop.getAttribute("hx-get") || null;
+    const calendarUrl = pop.dataset.calendarUrl || pop.getAttribute("hx-get") || null;
 
     const getActiveDateParts = () => {
       const parts = getActiveDayParts();
@@ -155,7 +154,7 @@ export class CalendarControl extends HTMLElement {
         popover.show();
         loadCalendarContent();
       },
-      { signal }
+      { signal },
     );
 
     pop.addEventListener(
@@ -171,7 +170,7 @@ export class CalendarControl extends HTMLElement {
           popover.hide();
         }
       },
-      { signal }
+      { signal },
     );
 
     pop.addEventListener(
@@ -197,7 +196,7 @@ export class CalendarControl extends HTMLElement {
         this.#configureCalendarGrid(calendar, popover, pop, signal);
         initCalendarPicker(calendar);
       },
-      { signal }
+      { signal },
     );
 
     pop.addEventListener(
@@ -217,7 +216,7 @@ export class CalendarControl extends HTMLElement {
         event.detail.parameters = event.detail.parameters || {};
         event.detail.parameters.mode = isPicker ? "calendar" : "picker";
       },
-      { signal }
+      { signal },
     );
 
     const initialCalendar = pop.querySelector("#calendar");
@@ -249,8 +248,7 @@ export class CalendarControl extends HTMLElement {
     }
     grid.dataset.enhanced = "true";
 
-    const getInteractiveCells = () =>
-      Array.from(grid.querySelectorAll("[data-calendar-cell]"));
+    const getInteractiveCells = () => Array.from(grid.querySelectorAll("[data-calendar-cell]"));
 
     const updateCellState = (target, { focus = false } = {}) => {
       if (!target) return;
@@ -266,9 +264,9 @@ export class CalendarControl extends HTMLElement {
     };
 
     const resolveInitialCell = () =>
-      grid.querySelector('[data-calendar-cell][tabindex="0"]') ??
-      grid.querySelector('[data-calendar-cell][data-calendar-active="true"]') ??
-      getInteractiveCells()[0] ?? null;
+      grid.querySelector("[data-calendar-cell][tabindex=\"0\"]")
+        ?? grid.querySelector("[data-calendar-cell][data-calendar-active=\"true\"]")
+        ?? getInteractiveCells()[0] ?? null;
 
     const initialCell = resolveInitialCell();
     if (initialCell) {
@@ -277,9 +275,8 @@ export class CalendarControl extends HTMLElement {
 
     const ensureFocus = () => {
       if (!popover.isOpen) return;
-      const active =
-        grid.querySelector('[data-calendar-cell][tabindex="0"]') ??
-        resolveInitialCell();
+      const active = grid.querySelector("[data-calendar-cell][tabindex=\"0\"]")
+        ?? resolveInitialCell();
       if (active) {
         requestAnimationFrame(() => {
           updateCellState(active, { focus: true });
@@ -296,7 +293,7 @@ export class CalendarControl extends HTMLElement {
         if (!cell) return;
         updateCellState(cell);
       },
-      { signal }
+      { signal },
     );
 
     const focusCell = (cell) => {
@@ -310,23 +307,19 @@ export class CalendarControl extends HTMLElement {
       if (!(row instanceof HTMLTableRowElement)) {
         return null;
       }
-      let sibling =
-        direction > 0 ? origin.nextElementSibling : origin.previousElementSibling;
+      let sibling = direction > 0 ? origin.nextElementSibling : origin.previousElementSibling;
       while (row) {
         while (sibling) {
           if (sibling.hasAttribute("data-calendar-cell")) {
             return sibling;
           }
-          sibling =
-            direction > 0
-              ? sibling.nextElementSibling
-              : sibling.previousElementSibling;
+          sibling = direction > 0
+            ? sibling.nextElementSibling
+            : sibling.previousElementSibling;
         }
-        row =
-          direction > 0 ? row.nextElementSibling : row.previousElementSibling;
+        row = direction > 0 ? row.nextElementSibling : row.previousElementSibling;
         if (!row) break;
-        sibling =
-          direction > 0 ? row.firstElementChild : row.lastElementChild;
+        sibling = direction > 0 ? row.firstElementChild : row.lastElementChild;
       }
       return null;
     };
@@ -366,20 +359,19 @@ export class CalendarControl extends HTMLElement {
       "keydown",
       (event) => {
         if (!popover.isOpen) return;
-        const activeCell =
-          document.activeElement?.closest?.("[data-calendar-cell]") ??
-          grid.querySelector('[data-calendar-cell][tabindex="0"]');
+        const activeCell = document.activeElement?.closest?.("[data-calendar-cell]")
+          ?? grid.querySelector("[data-calendar-cell][tabindex=\"0\"]");
         if (!activeCell) return;
 
         if (
-          event.key === "ArrowLeft" ||
-          event.key === "ArrowRight" ||
-          event.key === "ArrowUp" ||
-          event.key === "ArrowDown" ||
-          event.key === "Home" ||
-          event.key === "End" ||
-          event.key === "Enter" ||
-          event.key === " "
+          event.key === "ArrowLeft"
+          || event.key === "ArrowRight"
+          || event.key === "ArrowUp"
+          || event.key === "ArrowDown"
+          || event.key === "Home"
+          || event.key === "End"
+          || event.key === "Enter"
+          || event.key === " "
         ) {
           event.preventDefault();
         }
@@ -418,7 +410,7 @@ export class CalendarControl extends HTMLElement {
           case "Enter":
           case " ": {
             const actionable = activeCell.querySelector(
-              "a[href], button:not([disabled])"
+              "a[href], button:not([disabled])",
             );
             if (actionable) {
               actionable.click();
@@ -429,7 +421,7 @@ export class CalendarControl extends HTMLElement {
             break;
         }
       },
-      { signal }
+      { signal },
     );
   }
 
@@ -458,7 +450,7 @@ export class CalendarControl extends HTMLElement {
           first.focus({ preventScroll: true });
         }
       },
-      { signal }
+      { signal },
     );
 
     document.addEventListener(
@@ -472,18 +464,17 @@ export class CalendarControl extends HTMLElement {
         if (!focusables.length) {
           return;
         }
-        const preferred =
-          pop.querySelector('[data-calendar-cell][tabindex="0"]') ??
-          focusables[0];
+        const preferred = pop.querySelector("[data-calendar-cell][tabindex=\"0\"]")
+          ?? focusables[0];
         preferred?.focus({ preventScroll: true });
       },
-      { signal }
+      { signal },
     );
   }
 
   static #getFocusableElements(root) {
     const selectors = [
-      '[data-calendar-cell][tabindex="0"]',
+      "[data-calendar-cell][tabindex=\"0\"]",
       "button:not([disabled])",
       "a[href]:not([tabindex='-1'])",
       "input:not([disabled])",
@@ -591,9 +582,8 @@ function initCalendarPicker(calendar) {
 
   const scrollOptionIntoView = (button) => {
     if (!button || typeof button.scrollIntoView !== "function") return;
-    const prefersReduced =
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    const prefersReduced = typeof window !== "undefined"
+      && window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
     button.scrollIntoView({
       block: "center",
       inline: "nearest",
@@ -611,8 +601,6 @@ function initCalendarPicker(calendar) {
       }
     }
   };
-
-
 
   const getMonthBounds = () => {
     const minAllowed = selectedYear === minYear ? minMonth : 1;
@@ -654,7 +642,7 @@ function initCalendarPicker(calendar) {
     updateFooterText();
     scrollOptionIntoView(target);
     const activeMonth = monthButtons.find(
-      (button) => button.getAttribute("aria-pressed") === "true"
+      (button) => button.getAttribute("aria-pressed") === "true",
     );
     if (activeMonth) {
       scrollOptionIntoView(activeMonth);
@@ -763,10 +751,10 @@ function initCalendarPicker(calendar) {
   refreshMonths();
   updateFooterText();
   const activeYear = yearButtons.find(
-    (button) => button.getAttribute("aria-pressed") === "true"
+    (button) => button.getAttribute("aria-pressed") === "true",
   );
   const activeMonth = monthButtons.find(
-    (button) => button.getAttribute("aria-pressed") === "true"
+    (button) => button.getAttribute("aria-pressed") === "true",
   );
   if (activeYear) {
     scrollOptionIntoView(activeYear);

@@ -54,7 +54,7 @@ const dispatchChange = (previousDay, previousLabel, detail = {}) => {
   doc.dispatchEvent(
     new CustomEvent(ACTIVE_DAY_CHANGED_EVENT, {
       detail: eventDetail,
-    })
+    }),
   );
 };
 
@@ -80,8 +80,7 @@ export function setActiveDay(day, label, { force = false, detail = {} } = {}) {
   const previousDay = currentDay;
   const previousLabel = currentLabel;
 
-  const changed =
-    force || nextDay !== previousDay || nextLabel !== previousLabel;
+  const changed = force || nextDay !== previousDay || nextLabel !== previousLabel;
 
   currentDay = nextDay;
   currentLabel = nextLabel;

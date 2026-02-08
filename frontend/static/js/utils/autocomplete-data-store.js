@@ -382,4 +382,3 @@ export class AutocompleteDataStore {
     this.#mergedDirty = true;
   }
 }
-

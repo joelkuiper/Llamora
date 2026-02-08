@@ -1,8 +1,5 @@
-import {
-  DOMPurify as DOMPurifyGlobal,
-  marked as markedGlobal,
-} from "./vendor/setup-globals.js";
 import { TYPING_INDICATOR_SELECTOR } from "./typing-indicator.js";
+import { DOMPurify as DOMPurifyGlobal, marked as markedGlobal } from "./vendor/setup-globals.js";
 
 const escapeHtml = (value) =>
   String(value)
@@ -12,12 +9,11 @@ const escapeHtml = (value) =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
-const globalScope =
-  typeof globalThis !== "undefined"
-    ? globalThis
-    : typeof window !== "undefined"
-      ? window
-      : {};
+const globalScope = typeof globalThis !== "undefined"
+  ? globalThis
+  : typeof window !== "undefined"
+  ? window
+  : {};
 
 const marked = markedGlobal ?? globalScope.marked;
 const DOMPurify = DOMPurifyGlobal ?? globalScope.DOMPurify;
@@ -54,8 +50,9 @@ function normalizeMarkdownSource(value) {
   );
   const stripped = lines.map((line) => line.slice(indent));
   while (stripped.length && stripped[0].trim() === "") stripped.shift();
-  while (stripped.length && stripped[stripped.length - 1].trim() === "")
+  while (stripped.length && stripped[stripped.length - 1].trim() === "") {
     stripped.pop();
+  }
   return stripped.join("\n");
 }
 
@@ -65,10 +62,9 @@ export function renderMarkdownInElement(el, text) {
     return;
   }
 
-  const hasPreRenderedHtml =
-    el.dataset.rendered === "true" &&
-    el.dataset.markdownSource === undefined &&
-    (text === undefined || text === null);
+  const hasPreRenderedHtml = el.dataset.rendered === "true"
+    && el.dataset.markdownSource === undefined
+    && (text === undefined || text === null);
 
   if (hasPreRenderedHtml) {
     return;
@@ -139,8 +135,8 @@ function collectMarkdownBodies(root, nodes) {
     if (!node || node.nodeType !== Node.ELEMENT_NODE) return;
 
     if (
-      node.matches?.(MARKDOWN_SELECTOR) ||
-      (node.matches?.(".markdown-body") && node.closest?.(".entry"))
+      node.matches?.(MARKDOWN_SELECTOR)
+      || (node.matches?.(".markdown-body") && node.closest?.(".entry"))
     ) {
       markdownNodes.add(node);
     }
@@ -181,15 +177,14 @@ export function renderAllMarkdown(root, nodes = null, options = {}) {
     if (el?.dataset?.editing === "true" || el?.closest?.(".entry.is-editing")) {
       return;
     }
-    const isStreaming =
-      el.closest("response-stream")?.dataset.streaming === "true";
+    const isStreaming = el.closest("response-stream")?.dataset.streaming === "true";
     if (isStreaming) {
       // Streaming responses manage their own incremental rendering to avoid deleting the typing indicator mid-update.
       return;
     }
     if (
-      el.dataset.rendered !== "true" &&
-      !el.querySelector(TYPING_INDICATOR_SELECTOR)
+      el.dataset.rendered !== "true"
+      && !el.querySelector(TYPING_INDICATOR_SELECTOR)
     ) {
       renderMarkdownInElement(el);
       if (typeof options.onRender === "function") {

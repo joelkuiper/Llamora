@@ -9,10 +9,10 @@ const isEditableTarget = (target) => {
   }
   const tagName = target.tagName;
   return (
-    tagName === "INPUT" ||
-    tagName === "TEXTAREA" ||
-    target.isContentEditable ||
-    target.closest?.("[contenteditable='true']")
+    tagName === "INPUT"
+    || tagName === "TEXTAREA"
+    || target.isContentEditable
+    || target.closest?.("[contenteditable='true']")
   );
 };
 
@@ -171,8 +171,7 @@ const createEntry = (options = {}) => {
     } else {
       const onAbort = () => entry.abort();
       signal.addEventListener("abort", onAbort, { once: true });
-      signalSubscription = () =>
-        signal.removeEventListener("abort", onAbort, { once: true });
+      signalSubscription = () => signal.removeEventListener("abort", onAbort, { once: true });
     }
   }
 

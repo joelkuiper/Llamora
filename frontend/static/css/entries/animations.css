@@ -1,11 +1,18 @@
 /* Animations */
 @keyframes fade-in-up {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-
-.entry.motion-animate-entry { animation: fade-in-up var(--motion-sigh) ease-out; }
+.entry.motion-animate-entry {
+  animation: fade-in-up var(--motion-sigh) ease-out;
+}
 
 @keyframes submitting-wave {
   0%, 100% {
@@ -29,24 +36,40 @@
 
   scroll-bottom-button .scroll-btn {
     scroll-bottom-button.visible & {
-      animation: appear var(--motion-fade) ease-out,
-                 breathe var(--motion-breathe) ease-in-out var(--motion-delay-short) infinite;
+      animation:
+        appear var(--motion-fade) ease-out,
+        breathe var(--motion-breathe) ease-in-out var(--motion-delay-short)
+        infinite;
     }
   }
 
   @keyframes blink {
-    0%, 49% { opacity: 1; }
-    50%, 100% { opacity: 0; }
+    0%, 49% {
+      opacity: 1;
+    }
+    50%, 100% {
+      opacity: 0;
+    }
   }
 
   @keyframes appear {
-    from { transform: none scale(0.92); opacity: 0; }
-    to   { transform: none scale(1);     opacity: 0.9; }
+    from {
+      transform: none scale(0.92);
+      opacity: 0;
+    }
+    to {
+      transform: none scale(1);
+      opacity: 0.9;
+    }
   }
 
   @keyframes breathe {
-    0%,100% { transform: none scale(1); }
-    50%     { transform: none scale(1.015); }
+    0%, 100% {
+      transform: none scale(1);
+    }
+    50% {
+      transform: none scale(1.015);
+    }
   }
 
   @keyframes pop-fade {
@@ -114,18 +137,30 @@
 }
 
 @keyframes tag-skeleton-pulse {
-  0% { opacity: 0.2; }
-  50% { opacity: 1; }
-  100% { opacity: 0.2; }
+  0% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.2;
+  }
 }
 .entry-edit-form.is-saving .entry-edit-dot {
   animation: entry-edit-pulse 0.7s infinite ease-in-out;
 }
 
 @keyframes entry-edit-pulse {
-  0% { opacity: 0.2; }
-  50% { opacity: 1; }
-  100% { opacity: 0.2; }
+  0% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.2;
+  }
 }
 
 @keyframes repeat-guard-wave {

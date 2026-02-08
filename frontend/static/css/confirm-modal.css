@@ -103,9 +103,14 @@
 }
 
 .confirm-modal[data-confirm-variant="danger"] .confirm-modal__confirm:hover,
-.confirm-modal[data-confirm-variant="danger"] .confirm-modal__confirm:focus-visible {
+.confirm-modal[data-confirm-variant="danger"]
+  .confirm-modal__confirm:focus-visible {
   border-color: var(--color-danger);
-  background: linear-gradient(0deg, rgba(208,0,48,0.16), rgba(208,0,48,0.12)) var(--color-danger);
+  background: linear-gradient(
+    0deg,
+    rgba(208, 0, 48, 0.16),
+    rgba(208, 0, 48, 0.12)
+  ) var(--color-danger);
   color: var(--color-bg);
   box-shadow:
     var(--raised-shadow),

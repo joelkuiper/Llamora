@@ -1,5 +1,5 @@
 scroll-bottom-button {
-  left: var(--entries-center, 50%);  /* pixel value set by JS */
+  left: var(--entries-center, 50%); /* pixel value set by JS */
   transform: translateX(-50%);
   position: fixed;
   bottom: 7.5rem;
@@ -27,7 +27,12 @@ scroll-bottom-button .scroll-btn {
   justify-content: center;
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--motion-sigh) ease, transform var(--motion-gentle) ease, background var(--motion-gentle) ease, color var(--motion-gentle) ease, border-color var(--motion-gentle) ease;
+  transition:
+    opacity var(--motion-sigh) ease,
+    transform var(--motion-gentle) ease,
+    background var(--motion-gentle) ease,
+    color var(--motion-gentle) ease,
+    border-color var(--motion-gentle) ease;
   z-index: 4501;
   cursor: pointer;
 
@@ -37,7 +42,7 @@ scroll-bottom-button .scroll-btn {
   }
 
   &:hover {
-    transform: translateY(-1px) scale(.97);
+    transform: translateY(-1px) scale(0.97);
     color: color-mix(in srgb, var(--accent) 70%, var(--color-text));
     background:
       linear-gradient(
@@ -70,5 +75,4 @@ scroll-bottom-button .scroll-btn {
     transform: none scale(0.95);
     color: var(--color-text);
   }
-
 }

@@ -141,7 +141,6 @@ export class InlineAutocompleteController {
     const processed = [];
     const map = new Map();
 
-
     for (const entry of items) {
       let value;
       let tokens;
@@ -400,10 +399,9 @@ export class InlineAutocompleteController {
         const tokenIndex = haystack.indexOf(token);
         const comparableIndex = tokenIndex >= 0 ? tokenIndex : Infinity;
         const bestTokenLength = bestMatch?.token?.length ?? Infinity;
-        const bestComparableIndex =
-          bestMatch?.tokenIndex != null && bestMatch.tokenIndex >= 0
-            ? bestMatch.tokenIndex
-            : Infinity;
+        const bestComparableIndex = bestMatch?.tokenIndex != null && bestMatch.tokenIndex >= 0
+          ? bestMatch.tokenIndex
+          : Infinity;
         const matchLength = Math.min(normalizedQuery.length, token.length);
         const match = {
           candidate,
@@ -414,9 +412,9 @@ export class InlineAutocompleteController {
         };
 
         if (
-          !bestMatch ||
-          token.length < bestTokenLength ||
-          (token.length === bestTokenLength && comparableIndex < bestComparableIndex)
+          !bestMatch
+          || token.length < bestTokenLength
+          || (token.length === bestTokenLength && comparableIndex < bestComparableIndex)
         ) {
           bestMatch = match;
         }
@@ -439,9 +437,9 @@ export class InlineAutocompleteController {
     } else if (event.key === "ArrowRight") {
       const { selectionStart, selectionEnd, value } = this.#input;
       if (
-        typeof selectionEnd === "number" &&
-        selectionEnd === value.length &&
-        typeof selectionStart === "number"
+        typeof selectionEnd === "number"
+        && selectionEnd === value.length
+        && typeof selectionStart === "number"
       ) {
         this.#applySuggestion("arrow");
       }

@@ -1,8 +1,7 @@
-import { InlineAutocompleteController } from "../../utils/inline-autocomplete.js";
 import { AutocompleteDataStore } from "../../utils/autocomplete-data-store.js";
+import { InlineAutocompleteController } from "../../utils/inline-autocomplete.js";
 
-const identityCandidates = (candidates) =>
-  Array.isArray(candidates) ? candidates.filter((item) => item != null) : [];
+const identityCandidates = (candidates) => Array.isArray(candidates) ? candidates.filter((item) => item != null) : [];
 
 const defaultNormalizeCandidate = (candidate) => {
   if (typeof candidate === "string") {
@@ -63,18 +62,16 @@ export const AutocompleteOverlayMixin = (BaseClass) => {
 
       const storeOptions = { ...options };
       if (storeOptions.getCandidateKey == null) {
-        storeOptions.getCandidateKey = (candidate, context) =>
-          this.normalizeAutocompleteCandidate(candidate, context);
+        storeOptions.getCandidateKey = (candidate, context) => this.normalizeAutocompleteCandidate(candidate, context);
       }
       if (storeOptions.onError == null) {
-        storeOptions.onError = (error, meta) =>
-          this.onAutocompleteError(error, meta);
+        storeOptions.onError = (error, meta) => this.onAutocompleteError(error, meta);
       }
 
       this._autocompleteStore = new AutocompleteDataStore(storeOptions);
       this._unsubscribeAutocomplete = this._autocompleteStore.subscribe(
         (candidates) => this.applyAutocompleteCandidates(candidates),
-        { immediate: false }
+        { immediate: false },
       );
     }
 
@@ -93,9 +90,9 @@ export const AutocompleteOverlayMixin = (BaseClass) => {
           this._unsubscribeAutocomplete();
         } catch (error) {
           if (
-            error &&
-            typeof console !== "undefined" &&
-            typeof console.debug === "function"
+            error
+            && typeof console !== "undefined"
+            && typeof console.debug === "function"
           ) {
             console.debug("Failed to unsubscribe autocomplete listener", error);
           }
@@ -113,12 +110,11 @@ export const AutocompleteOverlayMixin = (BaseClass) => {
       const input = this._resolveAutocompleteInput(config);
       const current = this._autocompleteInput;
       const controller = this._autocompleteController;
-      const needsReinit =
-        force ||
-        !controller ||
-        !current ||
-        !current.isConnected ||
-        current !== input;
+      const needsReinit = force
+        || !controller
+        || !current
+        || !current.isConnected
+        || current !== input;
       const hasForce = force === true;
       let reinitialized = false;
 
@@ -154,10 +150,9 @@ export const AutocompleteOverlayMixin = (BaseClass) => {
         controller.destroy();
       }
 
-      const controllerOptions =
-        typeof this.getAutocompleteControllerOptions === "function"
-          ? { ...this.getAutocompleteControllerOptions() }
-          : {};
+      const controllerOptions = typeof this.getAutocompleteControllerOptions === "function"
+        ? { ...this.getAutocompleteControllerOptions() }
+        : {};
       const originalCommit = controllerOptions.onCommit ?? noop;
       controllerOptions.onCommit = (...args) => {
         try {
@@ -173,7 +168,7 @@ export const AutocompleteOverlayMixin = (BaseClass) => {
 
       this._autocompleteController = new InlineAutocompleteController(
         input,
-        controllerOptions
+        controllerOptions,
       );
       this._autocompleteInput = input;
       this.applyAutocompleteCandidates();
@@ -203,10 +198,9 @@ export const AutocompleteOverlayMixin = (BaseClass) => {
       if (!store) {
         return null;
       }
-      const params =
-        typeof this.buildAutocompleteFetchParams === "function"
-          ? this.buildAutocompleteFetchParams(options)
-          : { query: "", context: {} };
+      const params = typeof this.buildAutocompleteFetchParams === "function"
+        ? this.buildAutocompleteFetchParams(options)
+        : { query: "", context: {} };
       if (!params) {
         store.cancel();
         return null;
@@ -243,10 +237,9 @@ export const AutocompleteOverlayMixin = (BaseClass) => {
       const source = Array.isArray(candidates)
         ? candidates
         : this._autocompleteStore?.getCandidates() ?? [];
-      const entries =
-        typeof this.transformAutocompleteCandidates === "function"
-          ? this.transformAutocompleteCandidates(source)
-          : identityCandidates(source);
+      const entries = typeof this.transformAutocompleteCandidates === "function"
+        ? this.transformAutocompleteCandidates(source)
+        : identityCandidates(source);
       if (!entries || entries.length === 0) {
         controller.clearCandidates();
         return;
@@ -298,17 +291,14 @@ export const AutocompleteOverlayMixin = (BaseClass) => {
       }
 
       const config = { ...raw };
-      config.selector =
-        typeof config.selector === "string" && config.selector.trim()
-          ? config.selector.trim()
-          : null;
-      config.resolve =
-        typeof config.resolve === "function" ? config.resolve : null;
+      config.selector = typeof config.selector === "string" && config.selector.trim()
+        ? config.selector.trim()
+        : null;
+      config.resolve = typeof config.resolve === "function" ? config.resolve : null;
       config.observe = config.observe ?? !!config.selector;
-      config.mutationOptions =
-        typeof config.mutationOptions === "object" && config.mutationOptions
-          ? { ...config.mutationOptions }
-          : null;
+      config.mutationOptions = typeof config.mutationOptions === "object" && config.mutationOptions
+        ? { ...config.mutationOptions }
+        : null;
       config.rootResolver = this._createAutocompleteRootResolver(config.root);
       return config;
     }
@@ -333,10 +323,10 @@ export const AutocompleteOverlayMixin = (BaseClass) => {
       }
 
       if (
-        rootOption &&
-        (typeof rootOption.querySelector === "function" ||
-          rootOption instanceof Document ||
-          rootOption instanceof DocumentFragment)
+        rootOption
+        && (typeof rootOption.querySelector === "function"
+          || rootOption instanceof Document
+          || rootOption instanceof DocumentFragment)
       ) {
         return () => rootOption;
       }
@@ -354,10 +344,9 @@ export const AutocompleteOverlayMixin = (BaseClass) => {
       if (selector === "document") {
         return this.ownerDocument ?? document;
       }
-      const local =
-        typeof this.querySelector === "function"
-          ? this.querySelector(selector)
-          : null;
+      const local = typeof this.querySelector === "function"
+        ? this.querySelector(selector)
+        : null;
       if (local) {
         return local;
       }
@@ -394,8 +383,8 @@ export const AutocompleteOverlayMixin = (BaseClass) => {
       }
 
       if (
-        !(input instanceof HTMLInputElement) &&
-        typeof this.resolveAutocompleteInput === "function"
+        !(input instanceof HTMLInputElement)
+        && typeof this.resolveAutocompleteInput === "function"
       ) {
         input = this.resolveAutocompleteInput();
       }
@@ -450,8 +439,8 @@ export const AutocompleteOverlayMixin = (BaseClass) => {
       }
 
       if (
-        this._autocompleteInputObserver &&
-        this._autocompleteInputObserverRoot === root
+        this._autocompleteInputObserver
+        && this._autocompleteInputObserverRoot === root
       ) {
         return;
       }
@@ -493,9 +482,9 @@ export const AutocompleteOverlayMixin = (BaseClass) => {
 
     onAutocompleteError(error) {
       if (
-        error &&
-        typeof console !== "undefined" &&
-        typeof console.debug === "function"
+        error
+        && typeof console !== "undefined"
+        && typeof console.debug === "function"
       ) {
         console.debug("Autocomplete request failed", error);
       }

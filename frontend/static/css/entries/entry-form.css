@@ -150,7 +150,8 @@
         var(--glass-bg-alt) 100%
       );
       background-size: 180% 180%;
-      animation: button-wave calc(var(--motion-wave, 1.6s) * 1.05) ease-in-out infinite;
+      animation: button-wave calc(var(--motion-wave, 1.6s) * 1.05) ease-in-out
+        infinite;
       box-shadow:
         inset 0 0 0 1px var(--accent-20),
         0 0 8px var(--accent-drop-shadow);
@@ -208,7 +209,9 @@
     letter-spacing: 0.02em;
     color: var(--color-text-muted);
     opacity: 0;
-    transition: opacity var(--motion-gentle) ease, color var(--motion-gentle) ease;
+    transition:
+      opacity var(--motion-gentle) ease,
+      color var(--motion-gentle) ease;
     white-space: nowrap;
   }
 
@@ -224,19 +227,36 @@
 
 /* animations */
 @keyframes form-breathe {
-  0%   { opacity: 0.55; transform: scale(1); }
-  50%  { opacity: 0.85; transform: scale(1.01); }
-  100% { opacity: 0.55; transform: scale(1); }
+  0% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.01);
+  }
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
 }
 
 @keyframes button-wave {
-  0%   { background-position: 0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* respect reduced motion */

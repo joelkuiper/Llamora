@@ -1,19 +1,11 @@
-import { ScrollManager } from "./entries/scroll-manager.js";
-import { ScrollIntent } from "./entries/scroll-intent.js";
-import { initGlobalShortcuts } from "./global-shortcuts.js";
 import { getActiveDay } from "./entries/active-day-store.js";
+import { ScrollIntent } from "./entries/scroll-intent.js";
+import { ScrollManager } from "./entries/scroll-manager.js";
+import { initGlobalShortcuts } from "./global-shortcuts.js";
+import { applyRequestTimeHeaders, updateClientToday as syncClientToday } from "./services/time.js";
 import { createInlineSpinner } from "./ui.js";
-import {
-  getAlertContainer,
-  onAlertDismiss,
-  pushAlert,
-  registerAlertContainer,
-} from "./utils/alert-center.js";
+import { getAlertContainer, onAlertDismiss, pushAlert, registerAlertContainer } from "./utils/alert-center.js";
 import { runWhenDocumentReady } from "./utils/dom-ready.js";
-import {
-  applyRequestTimeHeaders,
-  updateClientToday as syncClientToday,
-} from "./services/time.js";
 
 let headersRegistered = false;
 let offlineHandlerRegistered = false;

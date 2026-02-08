@@ -107,10 +107,9 @@ class EntryActions extends ReactiveElement {
       return;
     }
     const entryId = this.dataset.entryId ?? "";
-    const day =
-      document.getElementById("entries")?.dataset?.date ??
-      document.body?.dataset?.activeDay ??
-      "";
+    const day = document.getElementById("entries")?.dataset?.date
+      ?? document.body?.dataset?.activeDay
+      ?? "";
     if (!entryId || !day) {
       return;
     }

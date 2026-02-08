@@ -138,5 +138,4 @@ export class AutocompleteHistory {
   }
 }
 
-export const createAutocompleteHistory = (options) =>
-  new AutocompleteHistory(options);
+export const createAutocompleteHistory = (options) => new AutocompleteHistory(options);

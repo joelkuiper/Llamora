@@ -1,11 +1,11 @@
 import { createPopover } from "../popover.js";
-import { ReactiveElement } from "../utils/reactive-element.js";
-import { AutocompleteOverlayMixin } from "./base/autocomplete-overlay.js";
+import { animateMotion } from "../services/motion.js";
+import { formatTimeElements } from "../services/time.js";
+import { scrollToHighlight } from "../ui.js";
 import { AutocompleteHistory } from "../utils/autocomplete-history.js";
 import { parsePositiveInteger } from "../utils/number.js";
-import { animateMotion } from "../services/motion.js";
-import { scrollToHighlight } from "../ui.js";
-import { formatTimeElements } from "../services/time.js";
+import { ReactiveElement } from "../utils/reactive-element.js";
+import { AutocompleteOverlayMixin } from "./base/autocomplete-overlay.js";
 
 const canonicalizeTag = (value, limit = null) => {
   const text = `${value ?? ""}`.replace(/^#/, "").trim();
@@ -18,8 +18,7 @@ const canonicalizeTag = (value, limit = null) => {
 
 const displayTag = (canonical) => `${canonical ?? ""}`.trim();
 
-const prepareTagAutocompleteValue = (value) =>
-  `${value ?? ""}`.replace(/^#/, "").trim();
+const prepareTagAutocompleteValue = (value) => `${value ?? ""}`.replace(/^#/, "").trim();
 
 const TAG_HISTORY_MAX = 50;
 const TAG_SUMMARY_CACHE_PREFIX = "llamora:tag-summary:";
@@ -47,7 +46,7 @@ const getSharedTagDetailPopoverEl = () => {
 export const mergeTagCandidateValues = (
   remoteCandidates = [],
   localCandidates = [],
-  limit = null
+  limit = null,
 ) => {
   const merged = [];
   const seen = new Set();
@@ -114,7 +113,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   #tagActivationHandler;
   #tagKeydownHandler;
   #tagHistory;
-  
+
   constructor() {
     super();
     this.#buttonClickHandler = () => this.#togglePopover();
@@ -128,8 +127,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       this.#resetSharedPopoverElement();
     };
     this.#pageHideHandler = () => this.#forceHideDetailPopover("pagehide");
-    this.#beforeHistorySaveHandler = () =>
-      this.#forceHideDetailPopover("htmx:beforeHistorySave");
+    this.#beforeHistorySaveHandler = () => this.#forceHideDetailPopover("htmx:beforeHistorySave");
     this.#restoredHandler = () => {
       this.#resetDetailPopoverState("htmx:restored");
       this.#hideTagPopover("htmx:restored");
@@ -144,10 +142,8 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#configRequestHandler = (event) => this.#handleConfigRequest(event);
     this.#afterRequestHandler = () => this.#handleAfterRequest();
     this.#afterSwapHandler = (event) => this.#handleAfterSwap(event);
-    this.#suggestionsConfigHandler = (event) =>
-      this.#handleSuggestionsConfig(event);
-    this.#suggestionsBeforeSwapHandler = (event) =>
-      this.#handleSuggestionsBeforeSwap(event);
+    this.#suggestionsConfigHandler = (event) => this.#handleSuggestionsConfig(event);
+    this.#suggestionsBeforeSwapHandler = (event) => this.#handleSuggestionsBeforeSwap(event);
     this.#suggestionsSwapHandler = () => this.#handleSuggestionsSwap();
     this.#tagActivationHandler = (event) => this.#handleTagActivation(event);
     this.#tagKeydownHandler = (event) => this.#handleTagKeydown(event);
@@ -217,8 +213,8 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#button = this.querySelector(".add-tag-btn");
     this.#popoverEl = getSharedTagPopoverEl();
     this.#form = this.#popoverEl?.querySelector("form") ?? null;
-    this.#input = this.#form?.querySelector('input[name="tag"]') ?? null;
-    this.#submit = this.#form?.querySelector('button[type="submit"]') ?? null;
+    this.#input = this.#form?.querySelector("input[name=\"tag\"]") ?? null;
+    this.#submit = this.#form?.querySelector("button[type=\"submit\"]") ?? null;
     this.#panel = this.#popoverEl?.querySelector(".tp-content") ?? null;
     this.#suggestions = this.#popoverEl?.querySelector(".tag-suggestions") ?? null;
     this.#closeButton = this.#popoverEl?.querySelector(".overlay-close") ?? null;
@@ -379,13 +375,11 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#suggestions.classList.remove(
       "htmx-swapping",
       "htmx-settling",
-      "htmx-request"
+      "htmx-request",
     );
     this.#suggestions
       .querySelectorAll(".tag-suggestion")
-      .forEach((el) =>
-        el.classList.remove("htmx-added", "htmx-settling", "htmx-swapping")
-      );
+      .forEach((el) => el.classList.remove("htmx-added", "htmx-settling", "htmx-swapping"));
     delete this.#suggestions.dataset.loaded;
     delete this.#suggestions.dataset.requestEntryId;
     if (clearEntry) {
@@ -431,8 +425,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     }
     this.#suggestionsSkeleton = Array.from({ length: TAG_SKELETON_COUNT })
       .map(
-        () =>
-          '<span class="tag-suggestion tag-suggestion--skeleton" aria-hidden="true"></span>'
+        () => "<span class=\"tag-suggestion tag-suggestion--skeleton\" aria-hidden=\"true\"></span>",
       )
       .join("");
   }
@@ -501,7 +494,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       this.#detailPopover = null;
     }
     this.#detailOutsideListeners = this.disposeListenerBag(
-      this.#detailOutsideListeners
+      this.#detailOutsideListeners,
     );
     this.#clearActiveTag();
   }
@@ -557,8 +550,8 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       return true;
     }
     if (
-      typeof document !== "undefined" &&
-      document.activeElement === this.#input
+      typeof document !== "undefined"
+      && document.activeElement === this.#input
     ) {
       return true;
     }
@@ -646,7 +639,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
           this.#suggestions.querySelectorAll(".tag-suggestion").forEach((btn) => {
             const btnCanonical = canonicalizeTag(
               btn.dataset.tag ?? btn.textContent ?? "",
-              limit
+              limit,
             )?.toLowerCase();
             if (btnCanonical === canonicalKey) {
               btn.remove();
@@ -657,7 +650,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
           this.#tagHistory.add(canonicalValue);
           this.setAutocompleteLocalEntries(
             "history",
-            this.#tagHistory.values()
+            this.#tagHistory.values(),
           );
           this.applyAutocompleteCandidates();
         }
@@ -724,13 +717,10 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   getAutocompleteStoreOptions() {
     return {
       debounceMs: 200,
-      fetchCandidates: (query, context = {}) =>
-        this.#fetchTagAutocompleteCandidates(query, context),
-      buildCacheKey: (query, context = {}) =>
-        this.#buildAutocompleteCacheKey(query, context),
+      fetchCandidates: (query, context = {}) => this.#fetchTagAutocompleteCandidates(query, context),
+      buildCacheKey: (query, context = {}) => this.#buildAutocompleteCacheKey(query, context),
       getCandidateKey: (candidate) => this.#normalizeTagCandidate(candidate),
-      mergeCandidates: (remote, localSets, helpers) =>
-        this.#mergeAutocompleteCandidates(remote, localSets, helpers),
+      mergeCandidates: (remote, localSets, helpers) => this.#mergeAutocompleteCandidates(remote, localSets, helpers),
       onError: (error) => {
         if (typeof console !== "undefined" && typeof console.debug === "function") {
           console.debug("Failed to fetch tag autocomplete suggestions", error);
@@ -829,7 +819,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
         }
         const canonical = canonicalizeTag(
           btn.dataset.tag ?? text,
-          this.#getCanonicalMaxLength()
+          this.#getCanonicalMaxLength(),
         );
         if (!canonical) return;
         domValues.push(canonical);
@@ -984,8 +974,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     }
     this.#activateSharedOwner();
     const tagEl = label.closest(".entry-tag");
-    const tagHash =
-      label.dataset.tagHash || tagEl?.dataset?.tagHash || "";
+    const tagHash = label.dataset.tagHash || tagEl?.dataset?.tagHash || "";
     if (!tagHash) {
       return;
     }
@@ -1038,7 +1027,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       },
       onHide: () => {
         this.#detailOutsideListeners = this.disposeListenerBag(
-          this.#detailOutsideListeners
+          this.#detailOutsideListeners,
         );
         this.#clearActiveTag();
       },
@@ -1079,8 +1068,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       return;
     }
     this.#activeTagHash = tagHash;
-    this.#detailBody.innerHTML =
-      this.#detailSkeleton || DEFAULT_TAG_DETAIL_SKELETON;
+    this.#detailBody.innerHTML = this.#detailSkeleton || DEFAULT_TAG_DETAIL_SKELETON;
     this.#detailBody.dataset.resetScroll = "1";
     this.#detailBody.setAttribute("hx-get", url);
     if (typeof htmx !== "undefined" && htmx?.ajax) {
@@ -1141,7 +1129,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   #registerDetailOutsideClose() {
     if (!this.#detailPopover) return;
     this.#detailOutsideListeners = this.resetListenerBag(
-      this.#detailOutsideListeners
+      this.#detailOutsideListeners,
     );
     const listeners = this.#detailOutsideListeners;
     listeners.add(
@@ -1160,7 +1148,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
         }
         this.#detailPopover?.hide();
       },
-      true
+      true,
     );
   }
 
@@ -1180,7 +1168,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       this.#detailPanel.classList.remove("pop-enter", "pop-exit");
     }
     this.#detailOutsideListeners = this.disposeListenerBag(
-      this.#detailOutsideListeners
+      this.#detailOutsideListeners,
     );
     this.#clearActiveTag();
     this.#pendingDetailOpen = false;
@@ -1202,8 +1190,8 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       const payload = JSON.parse(raw);
       if (!payload || typeof payload.html !== "string") return null;
       if (
-        typeof payload.timestamp === "number" &&
-        Date.now() - payload.timestamp > TAG_SUMMARY_CACHE_TTL
+        typeof payload.timestamp === "number"
+        && Date.now() - payload.timestamp > TAG_SUMMARY_CACHE_TTL
       ) {
         window.sessionStorage.removeItem(this.#getSummaryCacheKey(tagHash));
         return null;
@@ -1229,8 +1217,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
 
   #cacheTagSummary(summaryEl) {
     if (!(summaryEl instanceof HTMLElement)) return;
-    const tagHash =
-      summaryEl.dataset?.tagHash || this.#activeTagHash || "";
+    const tagHash = summaryEl.dataset?.tagHash || this.#activeTagHash || "";
     const html = summaryEl.innerHTML?.trim();
     if (!tagHash || !html) return;
     if (html.includes("Summary unavailable")) {
@@ -1243,8 +1230,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     if (!this.#detailBody) return;
     const summaryEl = this.#detailBody.querySelector(".tag-detail__summary");
     if (!summaryEl) return;
-    const tagHash =
-      summaryEl.dataset?.tagHash || this.#activeTagHash || "";
+    const tagHash = summaryEl.dataset?.tagHash || this.#activeTagHash || "";
     if (!tagHash) return;
     const cached = this.#getCachedTagSummary(tagHash);
     if (cached) {

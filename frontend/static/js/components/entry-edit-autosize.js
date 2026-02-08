@@ -18,8 +18,8 @@ function getScrollContainer(node) {
   while (current && current !== document.body) {
     const styles = window.getComputedStyle(current);
     if (
-      (styles.overflowY === "auto" || styles.overflowY === "scroll") &&
-      current.scrollHeight > current.clientHeight
+      (styles.overflowY === "auto" || styles.overflowY === "scroll")
+      && current.scrollHeight > current.clientHeight
     ) {
       return current;
     }
@@ -48,8 +48,7 @@ function findEntryMainFromDetail(detail) {
 function resizeTextarea(textarea) {
   if (!(textarea instanceof HTMLTextAreaElement)) return;
   const scrollContainer = getScrollContainer(textarea);
-  const prevScrollTop =
-    scrollContainer instanceof Element ? scrollContainer.scrollTop : null;
+  const prevScrollTop = scrollContainer instanceof Element ? scrollContainer.scrollTop : null;
   textarea.style.height = "auto";
   const styles = window.getComputedStyle(textarea);
   const max = parseFloat(styles.maxHeight || "");
@@ -69,9 +68,9 @@ function resizeTextarea(textarea) {
     textarea.style.overflowY = "hidden";
   }
   if (
-    scrollContainer instanceof Element &&
-    prevScrollTop !== null &&
-    scrollContainer.scrollTop !== prevScrollTop
+    scrollContainer instanceof Element
+    && prevScrollTop !== null
+    && scrollContainer.scrollTop !== prevScrollTop
   ) {
     scrollContainer.scrollTop = prevScrollTop;
   }

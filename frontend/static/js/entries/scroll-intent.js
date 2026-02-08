@@ -1,11 +1,11 @@
 import { createListenerBag } from "../utils/events.js";
 import { scheduleFrame } from "../utils/scheduler.js";
 import {
-  scrollEvents,
   FORCE_BOTTOM_EVENT,
-  TARGET_EVENT,
-  TARGET_CONSUMED_EVENT,
   REFRESH_EVENT,
+  scrollEvents,
+  TARGET_CONSUMED_EVENT,
+  TARGET_EVENT,
 } from "./scroll-manager.js";
 
 const MARKDOWN_EVENT = "markdown:rendered";

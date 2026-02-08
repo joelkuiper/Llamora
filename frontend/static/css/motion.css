@@ -3,21 +3,24 @@
 @layer tokens.motion {
   :root {
     --motion-highlight-duration: var(--motion-blink, 1s);
-    --motion-highlight-animation:
-      motion-highlight-flash var(--motion-highlight-duration) ease-in-out;
+    --motion-highlight-animation: motion-highlight-flash var(
+      --motion-highlight-duration
+    ) ease-in-out;
 
     --motion-tag-enter-duration: var(--motion-gentle);
     --motion-tag-exit-duration: var(--motion-hover);
-    --motion-tag-enter-animation:
-      motion-tag-enter var(--motion-tag-enter-duration) ease both;
-    --motion-tag-exit-animation:
-      motion-tag-exit var(--motion-tag-exit-duration) ease forwards;
+    --motion-tag-enter-animation: motion-tag-enter var(
+      --motion-tag-enter-duration
+    ) ease both;
+    --motion-tag-exit-animation: motion-tag-exit var(--motion-tag-exit-duration)
+      ease forwards;
 
     --motion-tactile-animation: motion-tactile-pulse var(--motion-pulse) ease;
 
     --motion-entry-delete-duration: var(--motion-gentle);
-    --motion-entry-delete-animation:
-      motion-entry-delete var(--motion-entry-delete-duration) ease forwards;
+    --motion-entry-delete-animation: motion-entry-delete var(
+      --motion-entry-delete-duration
+    ) ease forwards;
   }
 }
 

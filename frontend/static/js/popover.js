@@ -61,9 +61,9 @@ export function createPopover(trigger, popover, options = {}) {
     isEventOutside = (event) => {
       const target = event.target;
       return (
-        isNode(target) &&
-        !popover.contains(target) &&
-        (trigger ? !trigger.contains(target) : true)
+        isNode(target)
+        && !popover.contains(target)
+        && (trigger ? !trigger.contains(target) : true)
       );
     },
     onBeforeShow,

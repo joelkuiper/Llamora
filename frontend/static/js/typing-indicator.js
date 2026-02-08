@@ -1,7 +1,20 @@
 export const TYPING_INDICATOR_SELECTOR = "[data-typing-indicator]";
 
 const VOID_TAGS = new Set([
-  'AREA','BASE','BR','COL','EMBED','HR','IMG','INPUT','LINK','META','PARAM','SOURCE','TRACK','WBR'
+  "AREA",
+  "BASE",
+  "BR",
+  "COL",
+  "EMBED",
+  "HR",
+  "IMG",
+  "INPUT",
+  "LINK",
+  "META",
+  "PARAM",
+  "SOURCE",
+  "TRACK",
+  "WBR",
 ]);
 
 function isVoidElement(el) {
@@ -10,15 +23,15 @@ function isVoidElement(el) {
 
 function isInlineElement(el) {
   if (!(el instanceof Element)) return false;
-  const disp = getComputedStyle(el).display || '';
-  return disp.startsWith('inline');
+  const disp = getComputedStyle(el).display || "";
+  return disp.startsWith("inline");
 }
 
 function getLastNonWhitespaceTextNode(root) {
   const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
-      return /\S/.test(node.nodeValue || '') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
-    }
+      return /\S/.test(node.nodeValue || "") ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+    },
   });
   let last = null, n;
   while ((n = tw.nextNode())) last = n;
@@ -54,12 +67,11 @@ export function positionTypingIndicator(root, typingEl) {
   const lastText = getLastNonWhitespaceTextNode(root);
   if (lastText) {
     const parentEl = lastText.parentElement;
-    const inPre =
-      parentEl &&
-      (parentEl.closest('pre') || (getComputedStyle(parentEl).whiteSpace || '').includes('pre'));
+    const inPre = parentEl
+      && (parentEl.closest("pre") || (getComputedStyle(parentEl).whiteSpace || "").includes("pre"));
 
     if (inPre) {
-      const v = lastText.nodeValue || '';
+      const v = lastText.nodeValue || "";
       const m = v.match(/[\r\n]+$/);
       if (m) {
         const tail = lastText.splitText(v.length - m[0].length);
@@ -85,7 +97,7 @@ export function positionTypingIndicator(root, typingEl) {
   while ((n = tw.nextNode())) lastEl = n;
   const target = (lastEl && !isVoidElement(lastEl)) ? lastEl : root;
 
-  const zwsp = document.createTextNode('\u200B');
+  const zwsp = document.createTextNode("\u200B");
   target.appendChild(zwsp);
   insertAfterNode(zwsp, typingEl);
 }

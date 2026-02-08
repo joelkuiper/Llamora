@@ -13,7 +13,6 @@ function setProfileButtonActive(isActive) {
   button.classList.toggle("active", isActive);
 }
 
-
 function setActiveTab(modal, targetTab) {
   const tabs = modal.querySelectorAll(TAB_SELECTOR);
   tabs.forEach((tab) => {
@@ -85,10 +84,9 @@ function initProfileModal(modal) {
 }
 
 function boot(context = document) {
-  const scope =
-    context instanceof Element || context instanceof DocumentFragment
-      ? context
-      : document;
+  const scope = context instanceof Element || context instanceof DocumentFragment
+    ? context
+    : document;
   const modal = scope.querySelector(MODAL_SELECTOR);
   if (modal) {
     initProfileModal(modal);

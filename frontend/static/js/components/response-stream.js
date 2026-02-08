@@ -1,9 +1,9 @@
-import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
-import { StreamTransport } from "./stream-transport.js";
-import { StreamRenderer } from "./stream-renderer.js";
 import { requestScrollForceBottom } from "../entries/scroll-manager.js";
 import { animateMotion, isMotionReduced } from "../services/motion.js";
 import { applyTimezoneQuery, formatLocalTime, formatLocalTimestamp } from "../services/time.js";
+import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
+import { StreamRenderer } from "./stream-renderer.js";
+import { StreamTransport } from "./stream-transport.js";
 
 const FALLBACK_ERROR_MESSAGE = "The assistant ran into an error. Please try again.";
 const REPEAT_GUARD_BADGE = "response trimmed";
@@ -18,7 +18,6 @@ function decodeChunk(data) {
 function requestScrollToBottom(detail = {}) {
   requestScrollForceBottom({ source: "response-stream", ...detail });
 }
-
 
 class ResponseStreamElement extends HTMLElement {
   #renderer = null;
@@ -63,11 +62,10 @@ class ResponseStreamElement extends HTMLElement {
     this.#sink = this.querySelector(".raw-response");
     this.#markdown = this.querySelector(".markdown-body");
     this.#typingIndicator = this.querySelector(TYPING_INDICATOR_SELECTOR) || null;
-    this.#repeatGuardIndicator =
-      this.querySelector(".repeat-guard-indicator") || null;
+    this.#repeatGuardIndicator = this.querySelector(".repeat-guard-indicator") || null;
     this.#deleteButton = this.querySelector(".entry-delete") || null;
     this.#repeatGuardWavesDismissed = Boolean(
-      this.#repeatGuardIndicator?.classList.contains("repeat-guard-indicator--calm")
+      this.#repeatGuardIndicator?.classList.contains("repeat-guard-indicator--calm"),
     );
 
     if (this.#sink) {
@@ -78,8 +76,7 @@ class ResponseStreamElement extends HTMLElement {
       this.#renderer = new StreamRenderer({
         markdown: this.#markdown,
         typingIndicator: this.#typingIndicator,
-        requestScroll: (detail) =>
-          requestScrollToBottom({ ...detail, element: this }),
+        requestScroll: (detail) => requestScrollToBottom({ ...detail, element: this }),
       });
     } else if (this.#renderer) {
       this.#renderer.setTypingIndicator(this.#typingIndicator);
@@ -118,12 +115,11 @@ class ResponseStreamElement extends HTMLElement {
 
   #suppressOpeningStream() {
     const entryId = this.entryId || "";
-    const isOpeningStream =
-      this.classList.contains("opening-stream") || entryId.startsWith("opening-");
+    const isOpeningStream = this.classList.contains("opening-stream") || entryId.startsWith("opening-");
     if (!isOpeningStream) return false;
     const entries = this.closest?.("#entries") || document;
     const hasPersistedOpening = Boolean(
-      entries.querySelector(".entry--opening:not(.opening-stream)")
+      entries.querySelector(".entry--opening:not(.opening-stream)"),
     );
     if (!hasPersistedOpening) return false;
     this.dataset.streaming = "false";
@@ -186,7 +182,7 @@ class ResponseStreamElement extends HTMLElement {
         bubbles: true,
         composed: true,
         detail: { element: this, entryId: this.entryId },
-      })
+      }),
     );
 
     this.#transport = new StreamTransport({
@@ -227,8 +223,7 @@ class ResponseStreamElement extends HTMLElement {
     if (this.#sink) {
       this.#sink.textContent = this.#text;
     }
-    const shouldEagerRender =
-      this.#markdown?.dataset.rendered !== "true" && !this.#renderer?.isBusy;
+    const shouldEagerRender = this.#markdown?.dataset.rendered !== "true" && !this.#renderer?.isBusy;
 
     if (shouldEagerRender) {
       this.#renderer?.renderNow(this.#text, {
@@ -247,8 +242,7 @@ class ResponseStreamElement extends HTMLElement {
   #handleDone(payload) {
     if (this.#completed) return;
 
-    const assistantEntryId =
-      payload?.assistant_entry_id || payload?.assistantEntryId;
+    const assistantEntryId = payload?.assistant_entry_id || payload?.assistantEntryId;
 
     if (assistantEntryId) {
       this.dataset.assistantEntryId = assistantEntryId;
@@ -275,8 +269,8 @@ class ResponseStreamElement extends HTMLElement {
     const errorText = trimmed
       ? trimmed
       : hasExistingText
-        ? this.#text
-        : FALLBACK_ERROR_MESSAGE;
+      ? this.#text
+      : FALLBACK_ERROR_MESSAGE;
 
     if (!hasExistingText || errorText !== this.#text) {
       this.#text = errorText;
@@ -315,7 +309,7 @@ class ResponseStreamElement extends HTMLElement {
           meta,
           entryId: this.entryId,
         },
-      })
+      }),
     );
   }
 
@@ -401,7 +395,7 @@ class ResponseStreamElement extends HTMLElement {
           meta: this.#meta,
           entryId: this.entryId,
         },
-      })
+      }),
     );
 
     const htmxRef = (typeof window !== "undefined" && window.htmx) || null;
@@ -533,7 +527,7 @@ class ResponseStreamElement extends HTMLElement {
     indicator.addEventListener(
       "transitionend",
       () => indicator.remove(),
-      { once: true }
+      { once: true },
     );
   }
 
@@ -542,8 +536,7 @@ class ResponseStreamElement extends HTMLElement {
       return this.#repeatGuardIndicator;
     }
 
-    const indicator =
-      this.#repeatGuardIndicator || this.#createRepeatGuardIndicator();
+    const indicator = this.#repeatGuardIndicator || this.#createRepeatGuardIndicator();
 
     if (!indicator) {
       return null;
@@ -572,12 +565,10 @@ class ResponseStreamElement extends HTMLElement {
     primaryDot.className = "repeat-guard-indicator__dot";
 
     const delayedDot = document.createElement("span");
-    delayedDot.className =
-      "repeat-guard-indicator__dot repeat-guard-indicator__dot--delay";
+    delayedDot.className = "repeat-guard-indicator__dot repeat-guard-indicator__dot--delay";
 
     const lateDot = document.createElement("span");
-    lateDot.className =
-      "repeat-guard-indicator__dot repeat-guard-indicator__dot--late";
+    lateDot.className = "repeat-guard-indicator__dot repeat-guard-indicator__dot--late";
 
     waves.append(primaryDot, delayedDot, lateDot);
 
@@ -592,7 +583,6 @@ class ResponseStreamElement extends HTMLElement {
     indicator.append(waves, label, srOnly);
     return indicator;
   }
-
 
   #markAsError() {
     this.dataset.error = "true";

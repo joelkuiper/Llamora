@@ -42,7 +42,7 @@ function applyCollapsed(opening, collapsed) {
     toggle.setAttribute("aria-expanded", String(!collapsed));
     toggle.setAttribute(
       "aria-label",
-      collapsed ? "Expand day opening" : "Collapse day opening"
+      collapsed ? "Expand day opening" : "Collapse day opening",
     );
   }
 }

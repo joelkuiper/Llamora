@@ -86,7 +86,6 @@ class EntryFormElement extends ReactiveElement {
     }
   }
 
-
   set streamController(value) {
     if (this.#streamController === value) {
       return;
@@ -98,7 +97,6 @@ class EntryFormElement extends ReactiveElement {
     this.#streamController = value || null;
     this.#ensureControllerRegistration();
   }
-
 
   get streamingMsgId() {
     return this.#streamingMsgId;
@@ -124,9 +122,11 @@ class EntryFormElement extends ReactiveElement {
 
     const now = new Date();
     const pad = (n) => String(n).padStart(2, "0");
-    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
-      now.getDate()
-    )}`;
+    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${
+      pad(
+        now.getDate(),
+      )
+    }`;
     this.#isToday = this.#date === today;
     this.#draftKey = `entry-draft-${this.#date}`;
 
@@ -164,7 +164,7 @@ class EntryFormElement extends ReactiveElement {
     this.#setSubmitting(false);
     this.#listeners = this.disposeListenerBag(this.#listeners);
     this.#streamFocusListeners = this.disposeListenerBag(
-      this.#streamFocusListeners
+      this.#streamFocusListeners,
     );
     this.#shouldRestoreFocus = false;
     this.#initialized = false;
@@ -224,8 +224,8 @@ class EntryFormElement extends ReactiveElement {
       },
       onEnd: (event) => {
         if (
-          event?.type === "htmx:responseError" ||
-          event?.type === "htmx:sendError"
+          event?.type === "htmx:responseError"
+          || event?.type === "htmx:sendError"
         ) {
           this.#setSubmitting(false);
           this.setStreaming(false);
@@ -266,10 +266,10 @@ class EntryFormElement extends ReactiveElement {
         return;
       }
       if (
-        e.key === "Enter" &&
-        !e.shiftKey &&
-        !this.#isSubmitting &&
-        !this.#isStreaming
+        e.key === "Enter"
+        && !e.shiftKey
+        && !this.#isSubmitting
+        && !this.#isStreaming
       ) {
         e.preventDefault();
         if (this.#textarea.value.trim()) {
@@ -327,13 +327,13 @@ class EntryFormElement extends ReactiveElement {
 
     if (streaming) {
       this.#streamFocusListeners = this.disposeListenerBag(
-        this.#streamFocusListeners
+        this.#streamFocusListeners,
       );
       const active = document.activeElement;
       this.#shouldRestoreFocus = !!(
-        !active ||
-        active === document.body ||
-        this.#form?.contains(active)
+        !active
+        || active === document.body
+        || this.#form?.contains(active)
       );
       if (this.#shouldRestoreFocus) {
         const bag = this.resetListenerBag(this.#streamFocusListeners);
@@ -341,7 +341,7 @@ class EntryFormElement extends ReactiveElement {
         const cancelRestore = () => {
           this.#shouldRestoreFocus = false;
           this.#streamFocusListeners = this.disposeListenerBag(
-            this.#streamFocusListeners
+            this.#streamFocusListeners,
           );
         };
         bag.add(document, "pointerdown", (event) => {
@@ -351,9 +351,9 @@ class EntryFormElement extends ReactiveElement {
         });
         bag.add(document, "focusin", (event) => {
           if (
-            event.target &&
-            event.target !== document.body &&
-            !this.#form?.contains(event.target)
+            event.target
+            && event.target !== document.body
+            && !this.#form?.contains(event.target)
           ) {
             cancelRestore();
           }
@@ -363,16 +363,16 @@ class EntryFormElement extends ReactiveElement {
       this.#button.disabled = true;
     } else {
       this.#streamFocusListeners = this.disposeListenerBag(
-        this.#streamFocusListeners
+        this.#streamFocusListeners,
       );
       this.#textarea.disabled = false;
       this.#button.disabled = !this.#textarea.value.trim();
       const active = document.activeElement;
       if (
-        this.#shouldRestoreFocus &&
-        (!active ||
-          active === document.body ||
-          this.#form?.contains(active))
+        this.#shouldRestoreFocus
+        && (!active
+          || active === document.body
+          || this.#form?.contains(active))
       ) {
         this.#textarea.focus({ preventScroll: true });
       }

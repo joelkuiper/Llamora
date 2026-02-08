@@ -1,3 +1,4 @@
+import { createListenerBag } from "../utils/events.js";
 import {
   applyTimezoneHeader,
   applyTimezoneSearchParam,
@@ -6,7 +7,6 @@ import {
   getTimezone,
   TIMEZONE_QUERY_PARAM,
 } from "./datetime.js";
-import { createListenerBag } from "../utils/events.js";
 export { getTimezone } from "./datetime.js";
 
 const ESCAPED_TIMEZONE_PARAM = TIMEZONE_QUERY_PARAM.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

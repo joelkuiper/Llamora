@@ -47,9 +47,15 @@
     letter-spacing: 0.01em;
   }
 
-  h1 { font-size: 1.35em; }
-  h2 { font-size: 1.18em; }
-  h3 { font-size: 1.05em; }
+  h1 {
+    font-size: 1.35em;
+  }
+  h2 {
+    font-size: 1.18em;
+  }
+  h3 {
+    font-size: 1.05em;
+  }
 
   p {
     line-height: 1.62;
@@ -111,7 +117,8 @@
     font-weight: 600;
     letter-spacing: 0.01em;
     text-transform: uppercase;
-    border-bottom: 1px solid color-mix(in srgb, var(--brand-accent), transparent 65%);
+    border-bottom: 1px solid
+      color-mix(in srgb, var(--brand-accent), transparent 65%);
   }
 
   table th,
@@ -145,5 +152,4 @@
     background: var(--brand-accent-08);
     border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   }
-
 }

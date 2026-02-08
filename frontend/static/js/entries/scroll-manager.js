@@ -1,8 +1,8 @@
+import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
 import { createListenerBag } from "../utils/events.js";
 import { motionSafeBehavior, prefersReducedMotion } from "../utils/motion.js";
-import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
-import { isNearBottom } from "./scroll-utils.js";
 import { scheduleFrame, scheduleRafLoop } from "../utils/scheduler.js";
+import { isNearBottom } from "./scroll-utils.js";
 
 export const scrollEvents = new EventTarget();
 
@@ -65,7 +65,7 @@ const emitScrollEvent = (eventName, baseDetail, detail = {}) => {
   scrollEvents.dispatchEvent(
     new CustomEvent(eventName, {
       detail: normalized,
-    })
+    }),
   );
   return normalized;
 };
@@ -77,7 +77,7 @@ export function requestScrollForceBottom(detail = {}) {
     {
       ...detail,
       force: detail?.force === true,
-    }
+    },
   );
 }
 
@@ -104,7 +104,7 @@ export function requestScrollTargetConsumed(target, detail = {}) {
     {
       ...detail,
       target: target ?? null,
-    }
+    },
   );
 }
 
@@ -158,7 +158,7 @@ export class ScrollManager {
     // the animation is in progress. When either marker is present we should
     // treat the highlight as active and avoid clobbering the scroll position.
     const highlight = this.container.querySelector?.(
-      "[data-flash-timer-id], .entry.highlight"
+      "[data-flash-timer-id], .entry.highlight",
     );
     return highlight instanceof HTMLElement;
   }
@@ -351,8 +351,7 @@ export class ScrollManager {
     const key = this.#getKey();
     const saved = this.#safeGet(key);
     const savedTop = saved != null ? Number.parseInt(saved, 10) : NaN;
-    const shouldRestore =
-      Number.isFinite(savedTop) && (currentTop === 0 || Math.abs(savedTop - currentTop) > 4);
+    const shouldRestore = Number.isFinite(savedTop) && (currentTop === 0 || Math.abs(savedTop - currentTop) > 4);
 
     if (shouldRestore) {
       this.restore();
@@ -485,7 +484,7 @@ export class ScrollManager {
         this.scrollBtn.classList.add("clicked");
         window.setTimeout(
           () => this.scrollBtn?.classList.remove("clicked"),
-          300
+          300,
         );
       }
     }
@@ -619,7 +618,7 @@ export class ScrollManager {
     scrollEvents.dispatchEvent(
       new CustomEvent(HISTORY_RESTORE_EVENT, {
         detail,
-      })
+      }),
     );
   }
 
@@ -639,7 +638,7 @@ export class ScrollManager {
       scrollEvents.dispatchEvent(
         new CustomEvent(MARKDOWN_COMPLETE_EVENT, {
           detail: { key: currentKey, restored: false },
-        })
+        }),
       );
       return;
     }
@@ -652,13 +651,13 @@ export class ScrollManager {
       scrollEvents.dispatchEvent(
         new CustomEvent(MARKDOWN_COMPLETE_EVENT, {
           detail: { key: currentKey, restored: true },
-        })
+        }),
       );
     } else {
       scrollEvents.dispatchEvent(
         new CustomEvent(MARKDOWN_COMPLETE_EVENT, {
           detail: { key: currentKey, restored: false },
-        })
+        }),
       );
     }
   }
@@ -691,9 +690,8 @@ export class ScrollManager {
 
     const key = this.#getKey();
     const params = new URLSearchParams(window.location.search);
-    const hasTarget =
-      params.has("target") ||
-      (window.location.hash && window.location.hash.startsWith("#entry-"));
+    const hasTarget = params.has("target")
+      || (window.location.hash && window.location.hash.startsWith("#entry-"));
 
     if (hasTarget) {
       return;
@@ -710,13 +708,13 @@ export class ScrollManager {
       scrollEvents.dispatchEvent(
         new CustomEvent(MARKDOWN_COMPLETE_EVENT, {
           detail: { key, restored: true },
-        })
+        }),
       );
     } else {
       scrollEvents.dispatchEvent(
         new CustomEvent(MARKDOWN_COMPLETE_EVENT, {
           detail: { key, restored: false },
-        })
+        }),
       );
     }
   }

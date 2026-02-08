@@ -1,12 +1,5 @@
-import {
-  requestScrollTarget,
-  requestScrollTargetConsumed,
-  scrollEvents,
-} from "./entries/scroll-manager.js";
-import {
-  animateMotion,
-  motionSafeBehavior,
-} from "./services/motion.js";
+import { requestScrollTarget, requestScrollTargetConsumed, scrollEvents } from "./entries/scroll-manager.js";
+import { animateMotion, motionSafeBehavior } from "./services/motion.js";
 import { scheduleRafLoop } from "./utils/scheduler.js";
 
 export const SPINNER = {
@@ -29,7 +22,7 @@ function spin(el, text = "") {
 
 export function createInlineSpinner(
   element,
-  { text = "" } = {}
+  { text = "" } = {},
 ) {
   let spinnerEl = element || null;
   let intervalId = null;
@@ -148,8 +141,7 @@ export function clearScrollTarget(target, options = {}) {
   }
 
   const highlightHash = target ? `#${target}` : "";
-  const shouldClearHash =
-    Boolean(highlightHash) && window.location.hash === highlightHash;
+  const shouldClearHash = Boolean(highlightHash) && window.location.hash === highlightHash;
 
   if (hadTargetParam || shouldClearHash) {
     const query = params.toString();

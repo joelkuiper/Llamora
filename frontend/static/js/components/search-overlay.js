@@ -1,9 +1,9 @@
-import { scrollToHighlight, createInlineSpinner } from "../ui.js";
+import { createInlineSpinner, scrollToHighlight } from "../ui.js";
+import { AutocompleteHistory } from "../utils/autocomplete-history.js";
+import { createShortcutBag } from "../utils/global-shortcuts.js";
 import { prefersReducedMotion } from "../utils/motion.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
-import { createShortcutBag } from "../utils/global-shortcuts.js";
 import { AutocompleteOverlayMixin } from "./base/autocomplete-overlay.js";
-import { AutocompleteHistory } from "../utils/autocomplete-history.js";
 
 const getEventTarget = (evt) => {
   const target = evt.target;
@@ -232,7 +232,6 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     const swapTarget = evt.detail?.target;
     if (swapTarget !== wrap) return;
 
-
     const panel = wrap.querySelector(".sr-panel");
     if (!panel) {
       wrap.classList.remove("is-open");
@@ -387,10 +386,9 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
 
     const doc = this.ownerDocument ?? document;
     const activeElement = doc.activeElement;
-    const activeLink =
-      activeElement instanceof Element
-        ? activeElement.closest("#search-results a[data-target]")
-        : null;
+    const activeLink = activeElement instanceof Element
+      ? activeElement.closest("#search-results a[data-target]")
+      : null;
 
     if (isArrowDown) {
       evt.preventDefault();
@@ -444,7 +442,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
   #getResultLinks() {
     if (!this.#resultsEl) return [];
     return Array.from(
-      this.#resultsEl.querySelectorAll(".search-results-list a[data-target]")
+      this.#resultsEl.querySelectorAll(".search-results-list a[data-target]"),
     );
   }
 
@@ -464,7 +462,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     const target = getEventTarget(evt);
     if (!target) return;
 
-    const closeTrigger = target.closest('[data-action="close-search-overlay"]');
+    const closeTrigger = target.closest("[data-action=\"close-search-overlay\"]");
     if (closeTrigger) {
       wrap.querySelector(".sr-panel")?.classList.add("pop-exit");
       this.#closeResults(true);
@@ -479,10 +477,10 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
 
     const panel = wrap.querySelector(".sr-panel");
     if (
-      panel &&
-      !panel.contains(target) &&
-      target !== this.#inputEl &&
-      !target.closest(".entry-tag")
+      panel
+      && !panel.contains(target)
+      && target !== this.#inputEl
+      && !target.closest(".entry-tag")
     ) {
       this.#closeResults(true);
     }
@@ -523,7 +521,6 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       finish();
       return;
     }
-
 
     const { immediate = false } = options;
     if (clearInput && this.#inputEl) this.#inputEl.value = "";
@@ -632,8 +629,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       debounceMs: 0,
       maxResults: RECENT_CANDIDATE_MAX,
       cacheTimeMs: RECENT_REFRESH_MIN_MS,
-      fetchCandidates: (_, context = {}) =>
-        this.#fetchRecentAutocompleteCandidates(context?.signal),
+      fetchCandidates: (_, context = {}) => this.#fetchRecentAutocompleteCandidates(context?.signal),
       buildCacheKey: () => "recent",
       getCandidateKey: (candidate) => this.#normalizeCandidateValue(candidate),
     };
@@ -681,8 +677,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
   #refreshInputState(options = {}) {
     if (!this.isConnected) return;
 
-    const { forceAutocomplete = false, forceRecent = false, reason = null } =
-      options ?? {};
+    const { forceAutocomplete = false, forceRecent = false, reason = null } = options ?? {};
 
     const reinitialized = this.refreshAutocompleteController({
       force: forceAutocomplete,
@@ -718,12 +713,11 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
 
   #normalizeCandidateValue(entry) {
     if (!entry) return "";
-    const value =
-      typeof entry === "string"
-        ? entry
-        : typeof entry.value === "string"
-          ? entry.value
-          : "";
+    const value = typeof entry === "string"
+      ? entry
+      : typeof entry.value === "string"
+      ? entry.value
+      : "";
     if (!value) return "";
     return normalizeSearchValue(value).toLowerCase();
   }

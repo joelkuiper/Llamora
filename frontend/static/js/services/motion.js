@@ -106,4 +106,3 @@ export function withMotionPreference({ safe, reduced }) {
   }
   return true;
 }
-
