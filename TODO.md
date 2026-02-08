@@ -5,6 +5,8 @@
 - [x] Profile page design
 - [ ] Recovery code generation page rethink (add QR code?)
 - [ ] Keyboard accessibility rethink
+- [ ] Better model than Qwen4B, find something that's a bit more chatty
+  - [ ] "Prompt engineering"
 - [x] Migrations
 - [ ] README
 Later
@@ -16,5 +18,6 @@ Later
 - [ ] Better deploy/devops story
 - [ ] Generic attachment support?
 - [ ] Summaries for days as "tooltip" in calendar nav?
+- [ ] User settings (font, theme, prompts?, llm settings, etc?)
 Maybe
 - [ ] Desktop app (Electron/Tauri)
