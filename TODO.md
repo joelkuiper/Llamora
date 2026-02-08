@@ -11,6 +11,7 @@ Later
 - [ ] DB backups?
 - [ ] Image support?
 - [ ] Tests
+- [ ] Help / introduction flow
 - [ ] Better deploy/devops story
 - [ ] Generic attachment support?
 - [ ] Summaries for days as "tooltip" in calendar nav?
