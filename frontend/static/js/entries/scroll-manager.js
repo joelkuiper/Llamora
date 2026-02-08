@@ -103,7 +103,7 @@ export function requestScrollTargetConsumed(target, detail = {}) {
 const DEFAULT_CONTAINER_SELECTOR = "#content-wrapper";
 const DEFAULT_BUTTON_SELECTOR = "scroll-bottom-button, #scroll-bottom";
 const STORAGE_PREFIX = "scroll-pos";
-const MARKDOWN_EVENT = "markdown:rendered";
+const _MARKDOWN_EVENT = "markdown:rendered";
 
 export class ScrollManager {
   #initSuppressed = false;
@@ -678,8 +678,7 @@ export class ScrollManager {
 
     const key = this.#getKey();
     const params = new URLSearchParams(window.location.search);
-    const hasTarget =
-      params.has("target") || (window.location.hash && window.location.hash.startsWith("#entry-"));
+    const hasTarget = params.has("target") || window.location.hash?.startsWith("#entry-");
 
     if (hasTarget) {
       return;

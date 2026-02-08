@@ -1,5 +1,5 @@
 import { requestScrollForceBottom } from "../entries/scroll-manager.js";
-import { animateMotion, isMotionReduced } from "../services/motion.js";
+import { isMotionReduced } from "../services/motion.js";
 import { applyTimezoneQuery, formatLocalTime, formatLocalTimestamp } from "../services/time.js";
 import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
 import { StreamRenderer } from "./stream-renderer.js";
@@ -34,10 +34,6 @@ class ResponseStreamElement extends HTMLElement {
   #transport = null;
   #controller = null;
   #deleteButton = null;
-
-  constructor() {
-    super();
-  }
 
   #getStreamController() {
     if (this.dataset?.controller === "off") {
@@ -267,7 +263,7 @@ class ResponseStreamElement extends HTMLElement {
     if (this.#completed) return;
 
     const trimmed = data.trim();
-    const hasExistingText = Boolean(this.#text && this.#text.trim());
+    const hasExistingText = Boolean(this.#text?.trim());
     const errorText = trimmed ? trimmed : hasExistingText ? this.#text : FALLBACK_ERROR_MESSAGE;
 
     if (!hasExistingText || errorText !== this.#text) {

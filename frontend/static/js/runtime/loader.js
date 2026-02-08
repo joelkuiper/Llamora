@@ -1,7 +1,10 @@
-const globalState = (globalThis.__appRuntime ??= {
-  imports: new Map(),
-  lastContext: null,
-});
+if (!globalThis.__appRuntime) {
+  globalThis.__appRuntime = {
+    imports: new Map(),
+    lastContext: null,
+  };
+}
+const globalState = globalThis.__appRuntime;
 
 function importOnce(key, loader) {
   if (!globalState.imports.has(key)) {
@@ -82,8 +85,7 @@ const FEATURE_IMPORTS = {
 async function ensureFeatureModules(scope) {
   const loaders = [];
   const resolver = (selector) =>
-    (scope && scope.querySelector && scope.querySelector(selector)) ||
-    document.querySelector(selector);
+    scope?.querySelector?.(selector) || document.querySelector(selector);
 
   Object.entries(FEATURE_IMPORTS).forEach(([key, { selector, loader }]) => {
     if (resolver(selector)) {

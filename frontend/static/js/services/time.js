@@ -114,7 +114,7 @@ function normalizeTimeValue(value) {
       return new Date("");
     }
     if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/.test(raw)) {
-      return new Date(raw.replace(" ", "T") + "Z");
+      return new Date(`${raw.replace(" ", "T")}Z`);
     }
     return new Date(raw);
   }
@@ -137,7 +137,7 @@ export function applyTimezoneQuery(url, zone = getTimezone()) {
     const parsed = new URL(url, base);
     applyTimezoneSearchParam(parsed.searchParams, zone);
     resolvedUrl = `${parsed.pathname}${parsed.search}`;
-  } catch (err) {
+  } catch (_err) {
     if (!TIMEZONE_QUERY_PARAM_PATTERN.test(resolvedUrl)) {
       const separator = resolvedUrl.includes("?") ? "&" : "?";
       resolvedUrl = `${resolvedUrl}${separator}${buildTimezoneQueryParam(zone)}`;
@@ -156,7 +156,7 @@ export function navigateToToday(zone = getTimezone()) {
       url.searchParams.set("client_today", today);
     }
     window.location.href = `${url.pathname}${url.search}`;
-  } catch (err) {
+  } catch (_err) {
     const today = updateClientToday(document?.body, new Date());
     const params = new URLSearchParams(buildTimezoneQueryParam(zone));
     if (today) {

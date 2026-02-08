@@ -46,7 +46,9 @@ function refreshCounter(counter) {
 }
 
 function refreshCounters(root = document) {
-  root.querySelectorAll(COUNTER_SELECTOR).forEach((counter) => refreshCounter(counter));
+  root.querySelectorAll(COUNTER_SELECTOR).forEach((counter) => {
+    refreshCounter(counter);
+  });
 }
 
 document.addEventListener("input", (event) => {
@@ -56,11 +58,15 @@ document.addEventListener("input", (event) => {
   if (id) {
     document
       .querySelectorAll(`${COUNTER_SELECTOR}[data-char-counter-for="${id}"]`)
-      .forEach((counter) => updateCounter(counter, target));
+      .forEach((counter) => {
+        updateCounter(counter, target);
+      });
     return;
   }
   const counters = target.closest("form")?.querySelectorAll(COUNTER_SELECTOR);
-  counters?.forEach((counter) => updateCounter(counter, target));
+  counters?.forEach((counter) => {
+    updateCounter(counter, target);
+  });
 });
 
 document.addEventListener("reset", (event) => {

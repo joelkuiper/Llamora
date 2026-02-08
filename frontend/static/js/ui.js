@@ -73,7 +73,7 @@ export function startButtonSpinner(btn, loadingText = "Loading") {
 }
 
 export function stopButtonSpinner(btn) {
-  const id = btn && btn.dataset.spinnerId;
+  const id = btn?.dataset.spinnerId;
   if (id) clearInterval(Number(id));
   if (btn && "originalText" in btn.dataset) {
     btn.textContent = btn.dataset.originalText;

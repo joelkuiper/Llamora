@@ -4,7 +4,9 @@ function collectEntries(node) {
   if (node.classList?.contains("entry")) {
     entries.push(node);
   }
-  node.querySelectorAll?.(".entry").forEach((el) => entries.push(el));
+  node.querySelectorAll?.(".entry").forEach((el) => {
+    entries.push(el);
+  });
   return entries;
 }
 

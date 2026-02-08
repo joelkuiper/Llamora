@@ -13,7 +13,7 @@ function parseOffset(value, fallback) {
 }
 
 function ensureEl() {
-  if (tooltipEl && tooltipEl.isConnected) return;
+  if (tooltipEl?.isConnected) return;
   tooltipEl = document.createElement("div");
   tooltipEl.className = "tooltip";
   tooltipEl.innerHTML = '<div class="tooltip-inner"></div>';

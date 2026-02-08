@@ -357,9 +357,9 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#ensureSkeleton();
     this.#suggestions.innerHTML = this.#suggestionsSkeleton;
     this.#suggestions.classList.remove("htmx-swapping", "htmx-settling", "htmx-request");
-    this.#suggestions
-      .querySelectorAll(".tag-suggestion")
-      .forEach((el) => el.classList.remove("htmx-added", "htmx-settling", "htmx-swapping"));
+    this.#suggestions.querySelectorAll(".tag-suggestion").forEach((el) => {
+      el.classList.remove("htmx-added", "htmx-settling", "htmx-swapping");
+    });
     delete this.#suggestions.dataset.loaded;
     delete this.#suggestions.dataset.requestEntryId;
     if (clearEntry) {
@@ -436,7 +436,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
         if (this.#input && typeof this.#input.focus === "function") {
           try {
             this.#input.focus({ preventScroll: true });
-          } catch (error) {
+          } catch (_error) {
             this.#input.focus();
           }
         }
@@ -739,7 +739,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     return this.#normalizeTagCandidate(candidate);
   }
 
-  onAutocompleteInputChanged(input, previous, meta = {}) {
+  onAutocompleteInputChanged(input, _previous, meta = {}) {
     const next = input instanceof HTMLInputElement ? input : null;
     this.#input = next;
 
@@ -1113,7 +1113,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     );
   }
 
-  #forceHideDetailPopover(reason = "force") {
+  #forceHideDetailPopover(_reason = "force") {
     if (!this.#isActiveOwner()) {
       return;
     }
@@ -1156,7 +1156,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
         return null;
       }
       return payload.html;
-    } catch (error) {
+    } catch (_error) {
       return null;
     }
   }
@@ -1169,7 +1169,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
         timestamp: Date.now(),
       });
       window.sessionStorage.setItem(this.#getSummaryCacheKey(tagHash), payload);
-    } catch (error) {
+    } catch (_error) {
       return;
     }
   }

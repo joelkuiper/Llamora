@@ -198,7 +198,7 @@ class EntryFormElement extends ReactiveElement {
       requestAnimationFrame(() => {
         if (!this.#draftKey) return;
         sessionStorage.removeItem(this.#draftKey);
-        if (this.#textarea && this.#textarea.value) {
+        if (this.#textarea?.value) {
           this.#resizeTextarea({ forceScroll: true });
         } else if (this.#textarea) {
           this.#textarea.style.height = "";
@@ -284,7 +284,7 @@ class EntryFormElement extends ReactiveElement {
     }
     const wasNearBottom = this.#container ? isNearBottom(this.#container, 16) : false;
     this.#textarea.style.height = "auto";
-    this.#textarea.style.height = this.#textarea.scrollHeight + "px";
+    this.#textarea.style.height = `${this.#textarea.scrollHeight}px`;
     if (this.#container && (forceScroll || wasNearBottom)) {
       this.#container.scrollTop = this.#container.scrollHeight;
     }

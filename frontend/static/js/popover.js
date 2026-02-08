@@ -18,7 +18,9 @@ function runAnimation(el, className, remove = []) {
   if (!el) {
     return Promise.resolve();
   }
-  remove.forEach((cls) => el.classList.remove(cls));
+  remove.forEach((cls) => {
+    el.classList.remove(cls);
+  });
   // Force reflow to restart the animation when classes reapply.
   void el.getBoundingClientRect();
   el.classList.add(className);
@@ -127,7 +129,6 @@ export function createPopover(trigger, popover, options = {}) {
   const show = () => {
     if (open) return;
     version += 1;
-    const currentVersion = version;
     onBeforeShow?.();
     popover.hidden = false;
     ensurePopper();

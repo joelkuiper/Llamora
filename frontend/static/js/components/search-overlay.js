@@ -32,7 +32,9 @@ const buildSearchEntry = (value) => {
     collapsed
       .split(/\s+/)
       .filter(Boolean)
-      .forEach((part) => tokens.add(part));
+      .forEach((part) => {
+        tokens.add(part);
+      });
   }
 
   const tokenList = Array.from(tokens).filter(Boolean);
@@ -651,7 +653,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     return this.#normalizeCandidateValue(candidate);
   }
 
-  onAutocompleteInputChanged(input, previous, meta = {}) {
+  onAutocompleteInputChanged(input, _previous, meta = {}) {
     const next = input instanceof HTMLInputElement ? input : null;
     this.#inputEl = next;
 

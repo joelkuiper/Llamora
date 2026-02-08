@@ -15,7 +15,7 @@ function readCollapsed(day) {
   if (!key) return false;
   try {
     return localStorage.getItem(key) === "1";
-  } catch (error) {
+  } catch (_error) {
     return false;
   }
 }
@@ -29,7 +29,7 @@ function writeCollapsed(day, collapsed) {
     } else {
       localStorage.removeItem(key);
     }
-  } catch (error) {
+  } catch (_error) {
     // ignore storage failures
   }
 }
@@ -70,7 +70,9 @@ function syncOpeningState(options = {}) {
   }
 
   const collapsed = readCollapsed(day);
-  openings.forEach((opening) => applyCollapsed(opening, collapsed));
+  openings.forEach((opening) => {
+    applyCollapsed(opening, collapsed);
+  });
   setDocumentCollapsed(collapsed);
 
   if (!animate) {

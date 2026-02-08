@@ -30,8 +30,6 @@ export class StreamController {
     currentMsgId: null,
   };
 
-  constructor() {}
-
   dispose() {
     this.#forms.clear();
     this.#entries = null;
@@ -70,7 +68,7 @@ export class StreamController {
     };
   }
 
-  notifyStreamStart(stream, { reason = "stream:start" } = {}) {
+  notifyStreamStart(stream, { reason: _reason = "stream:start" } = {}) {
     const id = normalizeStreamId(stream?.entryId);
     const previous = { ...this.#state };
     this.#state = {
@@ -89,7 +87,7 @@ export class StreamController {
     requestScrollForceBottom({ source: "stream:start" });
   }
 
-  notifyStreamAbort(stream, { reason = "user:abort" } = {}) {
+  notifyStreamAbort(stream, { reason: _reason = "user:abort" } = {}) {
     const id = normalizeStreamId(stream?.entryId);
     if (!id && !this.#state.currentMsgId) {
       return;
@@ -111,7 +109,7 @@ export class StreamController {
     );
   }
 
-  notifyStreamComplete(stream, { status, reason, entryId } = {}) {
+  notifyStreamComplete(stream, { status, reason: _reason, entryId } = {}) {
     const id = normalizeStreamId(entryId ?? stream?.entryId);
     const previous = { ...this.#state };
     const nextStatus = status === "done" ? STATUS_IDLE : status || STATUS_IDLE;

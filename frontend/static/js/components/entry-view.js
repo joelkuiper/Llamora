@@ -15,7 +15,6 @@ import {
 } from "../services/time.js";
 import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
 import { scrollToHighlight } from "../ui.js";
-import { createListenerBag } from "../utils/events.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 import { afterNextFrame, scheduleFrame } from "../utils/scheduler.js";
 import "./entry-form.js";
@@ -42,7 +41,6 @@ export class EntryView extends ReactiveElement {
   #markdownObserver = null;
   #initialized = false;
   #lastRenderedDay = null;
-  #entryFormReady = Promise.resolve();
   #pendingScrollTarget = null;
   #forceNavFlash = false;
   #appReadyPromise = null;
@@ -208,7 +206,7 @@ export class EntryView extends ReactiveElement {
 
     const container = document.getElementById("content-wrapper");
 
-    const initialStreamMsgId = entries?.dataset?.currentStream || null;
+    const _initialStreamMsgId = entries?.dataset?.currentStream || null;
     this.#streamController?.dispose();
     this.#streamController = new StreamController();
     this.#streamController.setEntries(entries);
@@ -509,6 +507,8 @@ export class EntryView extends ReactiveElement {
       resume(this.#entries);
     }
 
-    this.#entries.querySelectorAll?.("response-stream").forEach((stream) => resume(stream));
+    this.#entries.querySelectorAll?.("response-stream").forEach((stream) => {
+      resume(stream);
+    });
   }
 }

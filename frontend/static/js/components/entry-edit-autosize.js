@@ -82,7 +82,7 @@ function placeCaretAtEnd(textarea, force = false) {
   const length = textarea.value.length;
   try {
     textarea.setSelectionRange(length, length);
-  } catch (err) {
+  } catch (_err) {
     return;
   }
   textarea.setAttribute(CARET_PLACED_ATTR, "true");
@@ -260,7 +260,7 @@ document.body?.addEventListener("htmx:afterSwap", (event) => {
   const entryMain = findEntryMainFromDetail(event.detail);
   if (!entryMain) return;
   const entry = entryMain.closest(".entry");
-  const prevHeight = entry ? parseFloat(entry.getAttribute(ENTRY_HEIGHT_ATTR) || "") : NaN;
+  const _prevHeight = entry ? parseFloat(entry.getAttribute(ENTRY_HEIGHT_ATTR) || "") : NaN;
   if (entry) {
     entry.removeAttribute(ENTRY_HEIGHT_ATTR);
   }

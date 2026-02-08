@@ -29,7 +29,7 @@ function readCookie(name) {
     const rawValue = rest.join("=");
     try {
       return decodeURIComponent(rawValue);
-    } catch (err) {
+    } catch (_err) {
       return rawValue;
     }
   }
@@ -60,7 +60,7 @@ function resolveTimezone() {
     if (typeof tz === "string" && tz.trim()) {
       return tz;
     }
-  } catch (err) {
+  } catch (_err) {
     // ignore and fall back to default
   }
   return DEFAULT_TIMEZONE;

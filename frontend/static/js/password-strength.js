@@ -11,7 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 document.body.addEventListener("htmx:afterSwap", (e) => {
-  if (e.target.classList && e.target.classList.contains("password-strength")) {
+  if (e.target.classList?.contains("password-strength")) {
     updateStrength(e.target);
   }
 });

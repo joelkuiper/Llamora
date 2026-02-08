@@ -586,7 +586,7 @@ function initCalendarPicker(calendar) {
     });
   };
 
-  const updateHeaderAfterConfirm = () => {
+  const _updateHeaderAfterConfirm = () => {
     if (headerLabel) {
       const monthLabel = monthNameMap.get(selectedMonth) ?? "";
       const nextText = `${monthLabel} ${selectedYear}`.trim();

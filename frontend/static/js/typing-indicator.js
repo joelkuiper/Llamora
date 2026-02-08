@@ -33,19 +33,25 @@ function getLastNonWhitespaceTextNode(root) {
       return /\S/.test(node.nodeValue || "") ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
     },
   });
-  let last = null,
-    n;
-  while ((n = tw.nextNode())) last = n;
+  let last = null;
+  let n = tw.nextNode();
+  while (n) {
+    last = n;
+    n = tw.nextNode();
+  }
   return last;
 }
 
 function getDeepestInlineElement(root) {
   const tw = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
-  let lastInline = null,
-    n = root;
-  do {
-    if (isInlineElement(n) && !isVoidElement(n)) lastInline = n;
-  } while ((n = tw.nextNode()));
+  let lastInline = null;
+  let n = root;
+  while (n) {
+    if (isInlineElement(n) && !isVoidElement(n)) {
+      lastInline = n;
+    }
+    n = tw.nextNode();
+  }
   return lastInline;
 }
 
@@ -96,8 +102,11 @@ export function positionTypingIndicator(root, typingEl) {
 
   let lastEl = root;
   const tw = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
-  let n;
-  while ((n = tw.nextNode())) lastEl = n;
+  let n = tw.nextNode();
+  while (n) {
+    lastEl = n;
+    n = tw.nextNode();
+  }
   const target = lastEl && !isVoidElement(lastEl) ? lastEl : root;
 
   const zwsp = document.createTextNode("\u200B");

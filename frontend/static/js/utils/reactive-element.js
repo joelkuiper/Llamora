@@ -75,7 +75,7 @@ export class ReactiveElement extends HTMLElement {
     if (!bag) return null;
     try {
       bag.abort();
-    } catch (err) {
+    } catch (_err) {
       /* no-op */
     }
     this.#bags.delete(bag);
@@ -89,7 +89,7 @@ export class ReactiveElement extends HTMLElement {
     for (const bag of this.#bags) {
       try {
         bag.abort();
-      } catch (err) {
+      } catch (_err) {
         /* no-op */
       }
     }
@@ -202,7 +202,7 @@ export class ReactiveElement extends HTMLElement {
           if (predicate(event)) {
             return true;
           }
-        } catch (err) {
+        } catch (_err) {
           /* no-op */
         }
       }

@@ -52,15 +52,15 @@
   @keyframes motion-tactile-pulse {
     0% {
       transform: scale(1);
-      background: var(--pulse-bg-start);
+      background-color: var(--pulse-bg-start);
     }
     40% {
       transform: scale(0.88);
-      background: var(--pulse-bg-mid);
+      background-color: var(--pulse-bg-mid);
     }
     100% {
       transform: scale(1);
-      background: var(--pulse-bg-end);
+      background-color: var(--pulse-bg-end);
     }
   }
 

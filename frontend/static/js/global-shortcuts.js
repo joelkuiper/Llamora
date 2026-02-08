@@ -17,7 +17,7 @@ const focusEntryComposer = () => {
   const caret = typeof value === "string" ? value.length : 0;
   try {
     textarea.setSelectionRange(caret, caret);
-  } catch (err) {
+  } catch (_err) {
     /* no-op */
   }
 

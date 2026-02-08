@@ -6,12 +6,13 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["frontend/static/js/**/*.js", "frontend/static/css/**/*.css"],
-    "experimentalScannerIgnores": [
-      "frontend/static/js/vendor/**",
-      "**/*.min.js",
-      "**/*.umd.js",
-      "**/*.jsm.js"
+    "includes": [
+      "frontend/static/js/**/*.js",
+      "frontend/static/css/**/*.css",
+      "!!**/frontend/static/js/vendor",
+      "!!/**/*.min.js",
+      "!!/**/*.umd.js",
+      "!!/**/*.jsm.js"
     ]
   },
   "formatter": {
@@ -23,7 +24,13 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "recommended": true,
+      "complexity": {
+        "noImportantStyles": "off"
+      },
+      "suspicious": {
+        "noDocumentCookie": "off"
+      }
     }
   },
   "javascript": {

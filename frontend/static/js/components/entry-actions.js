@@ -1,5 +1,4 @@
 import { createPopover } from "../popover.js";
-import { createListenerBag } from "../utils/events.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 
 let sharedActionPopoverEl = null;
@@ -154,7 +153,7 @@ class EntryActions extends ReactiveElement {
         if (firstAction && typeof firstAction.focus === "function") {
           try {
             firstAction.focus({ preventScroll: true });
-          } catch (error) {
+          } catch (_error) {
             firstAction.focus();
           }
         }

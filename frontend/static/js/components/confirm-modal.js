@@ -31,7 +31,7 @@ function getConfig(trigger, question) {
   };
 }
 
-export function initConfirmModal(options = {}) {
+export function initConfirmModal() {
   const modal = document.getElementById("confirm-modal");
   if (!modal || modal.dataset.confirmInit === "true") {
     return;
@@ -45,7 +45,10 @@ export function initConfirmModal(options = {}) {
     return;
   }
 
-  const state = (globalThis.__confirmModalState ??= { bound: false });
+  if (!globalThis.__confirmModalState) {
+    globalThis.__confirmModalState = { bound: false };
+  }
+  const state = globalThis.__confirmModalState;
   let activeRequest = state.activeRequest || null;
   let lastFocused = state.lastFocused || null;
   let closeTimer = null;

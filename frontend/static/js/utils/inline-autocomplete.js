@@ -284,7 +284,7 @@ export class InlineAutocompleteController {
     if (fromUserInput) {
       this.#typedPrefix = rawValue;
       const inputType = inputEvent?.inputType ?? "";
-      if (inputType && inputType.startsWith("delete")) {
+      if (inputType?.startsWith("delete")) {
         this.#pendingDeletion = true;
         this.#currentSuggestion = null;
         this.#wrapper?.classList.add("inline-autocomplete--empty");
@@ -462,7 +462,7 @@ export class InlineAutocompleteController {
     if (typeof this.#options.onCommit === "function") {
       try {
         this.#options.onCommit(committed, trigger);
-      } catch (error) {
+      } catch (_error) {
         // Ignore errors thrown by external commit handlers.
       }
     }

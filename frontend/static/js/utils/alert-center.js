@@ -27,7 +27,7 @@ function finalizeDismiss(alert, reason = "removed") {
   dismissSubscribers.forEach((listener) => {
     try {
       listener({ alert, reason });
-    } catch (error) {
+    } catch (_error) {
       // Ignore subscriber errors so they do not break dismissal.
     }
   });
@@ -254,7 +254,9 @@ function handleRemovedNode(node) {
     finalizeDismiss(node, "removed");
     return;
   }
-  node.querySelectorAll?.(".alert").forEach((child) => finalizeDismiss(child, "removed"));
+  node.querySelectorAll?.(".alert").forEach((child) => {
+    finalizeDismiss(child, "removed");
+  });
 }
 
 function observeContainer(container) {
@@ -263,15 +265,19 @@ function observeContainer(container) {
   }
   containerObserver = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
-      mutation.addedNodes.forEach((node) => handleAddedNode(node));
-      mutation.removedNodes.forEach((node) => handleRemovedNode(node));
+      mutation.addedNodes.forEach((node) => {
+        handleAddedNode(node);
+      });
+      mutation.removedNodes.forEach((node) => {
+        handleRemovedNode(node);
+      });
     }
   });
   containerObserver.observe(container, { childList: true, subtree: false });
 }
 
 function ensureContainer() {
-  if (alertContainer && alertContainer.isConnected) {
+  if (alertContainer?.isConnected) {
     return alertContainer;
   }
   const fallback = document.getElementById("errors");
