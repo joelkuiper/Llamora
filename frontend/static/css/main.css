@@ -428,6 +428,11 @@ input[type="checkbox"]:focus {
    Interactive Elements
    ========================================================================= */
 
+.is-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .icon-btn {
   background: none;
   border: none;

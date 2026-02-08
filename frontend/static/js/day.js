@@ -85,6 +85,11 @@ function updateNavButton(button, { disabled, tooltip, onClick }) {
   if (!button) return;
   button.disabled = Boolean(disabled);
   if (button.disabled) {
+    button.setAttribute("aria-disabled", "true");
+  } else {
+    button.removeAttribute("aria-disabled");
+  }
+  if (button.disabled) {
     button.removeAttribute("data-tooltip-title");
     button.onclick = null;
     return;
@@ -110,6 +115,23 @@ const resolveNavElements = () => {
   return { prevBtn, nextBtn, labelNode };
 };
 
+const getMinDateFromDom = () => {
+  const source =
+    document?.querySelector?.("#entries")?.dataset?.minDate ||
+    document?.body?.dataset?.minDate ||
+    "";
+  const parsed = parseDateFromSource(source);
+  return parsed?.date ?? null;
+};
+
+const syncNavMinDate = () => {
+  const minDate = getMinDateFromDom();
+  if (minDate) {
+    document.body.dataset.minDate = formatIsoDate(minDate);
+  }
+  return minDate;
+};
+
 const applyDayStateToNav = ({ activeDay, label, forceFlash = false }) => {
   const elements = resolveNavElements();
   if (!elements) return;
@@ -119,6 +141,10 @@ const applyDayStateToNav = ({ activeDay, label, forceFlash = false }) => {
   const activeDaySource = typeof activeDay === "string" ? activeDay : "";
   const parsed = parseDateFromSource(activeDaySource);
   const currentDate = parsed?.date ?? null;
+  const minDate = syncNavMinDate();
+  const isFirstDay = Boolean(
+    currentDate && minDate && currentDate.getTime() === minDate.getTime()
+  );
 
   if (labelNode) {
     const labelText =
@@ -140,6 +166,14 @@ const applyDayStateToNav = ({ activeDay, label, forceFlash = false }) => {
     updateNavButton(prevBtn, { disabled: true });
     updateNavButton(nextBtn, { disabled: true });
     return;
+  }
+
+  if (isFirstDay) {
+    prevBtn.classList.add("is-hidden");
+    prevBtn.setAttribute("aria-hidden", "true");
+  } else {
+    prevBtn.classList.remove("is-hidden");
+    prevBtn.removeAttribute("aria-hidden");
   }
 
   const prevDate = new Date(currentDate);

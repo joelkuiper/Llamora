@@ -12,8 +12,11 @@ from llamora.app.services.time import local_date
 from llamora.app.routes.helpers import require_iso_date
 from llamora.app.services.calendar import get_month_context
 from llamora.app.routes.entries import render_entries
+from llamora.app.services.container import get_services
+from logging import getLogger
 
 days_bp = Blueprint("days", __name__)
+logger = getLogger(__name__)
 
 
 @days_bp.route("/")
@@ -23,7 +26,13 @@ async def index():
 
 
 async def _render_day(date: str, target: str | None, view_kind: str):
+    session = get_session_context()
+    user = await session.require_user()
+    services = get_services()
     today = local_date().isoformat()
+    min_date = await services.db.entries.get_first_entry_date(user["id"]) or today
+    is_first_day = date == min_date
+    logger.debug("Render day=%s min_date=%s is_first_day=%s", date, min_date, is_first_day)
     entries_response = await render_entries(
         date,
         oob=False,
@@ -36,6 +45,8 @@ async def _render_day(date: str, target: str | None, view_kind: str):
         day=date,
         is_today=date == today,
         today=today,
+        min_date=min_date,
+        is_first_day=is_first_day,
         entries_html=entries_html,
         scroll_target=target,
         view_kind=view_kind,

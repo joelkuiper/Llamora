@@ -107,6 +107,7 @@ async def get_entries_context(
     _render_entries_markdown(entries)
 
     today = local_date().isoformat()
+    min_date = await services.db.entries.get_first_entry_date(user["id"]) or today
     is_today = date == today
     pending_entry_id = None
 
@@ -128,6 +129,7 @@ async def get_entries_context(
         "pending_entry_id": pending_entry_id,
         "is_today": is_today,
         "opening_stream": opening_stream,
+        "min_date": min_date,
     }
 
 

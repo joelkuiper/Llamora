@@ -25,7 +25,9 @@
   </div>
 
   <calendar-control id="calendar-control">
-    <button id="prev-day" type="button" class="icon-btn" aria-label="Previous day" data-tooltip-title="Previous day">
+    <button id="prev-day" type="button" class="icon-btn{% if is_first_day %} is-hidden{% endif %}" aria-label="Previous day"
+            {% if is_first_day %}aria-hidden="true" disabled aria-disabled="true"{% endif %}
+            {% if not is_first_day %}data-tooltip-title="Previous day"{% endif %}>
       <span class="icon-mask icon-chevron-left" aria-hidden="true"></span>
     </button>
     <button id="calendar-btn" type="button" class="icon-btn" aria-label="Calendar"

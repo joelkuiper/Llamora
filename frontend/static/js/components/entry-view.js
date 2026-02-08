@@ -224,6 +224,7 @@ export class EntryView extends ReactiveElement {
 
     const activeDay = entriesDate || null;
     const activeDayLabel = entries?.dataset?.longDate ?? null;
+    const minDate = entries?.dataset?.minDate || null;
     const viewKind = this.dataset?.viewKind || null;
     const clientToday = updateClientToday() || getClientToday();
 
@@ -240,6 +241,9 @@ export class EntryView extends ReactiveElement {
     setActiveDay(activeDay, activeDayLabel, {
       detail: { source: "entry-view" },
     });
+    if (minDate && document?.body?.dataset) {
+      document.body.dataset.minDate = minDate;
+    }
 
     entries.querySelectorAll?.(".markdown-body").forEach((el) => {
       if (el?.dataset?.rendered === "true") {
