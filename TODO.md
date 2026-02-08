@@ -16,6 +16,7 @@ Later
 - [ ] Tests
 - [ ] Help / introduction flow
 - [ ] Better deploy/devops story
+  - [ ] Versioning / releases etc
 - [ ] Generic attachment support?
 - [ ] Summaries for days as "tooltip" in calendar nav?
 - [ ] User settings (font, theme, prompts?, llm settings, etc?)
