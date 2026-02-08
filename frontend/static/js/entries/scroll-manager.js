@@ -509,7 +509,13 @@ export class ScrollManager {
 
     if (typeof ResizeObserver === "function" && this.entries) {
       this.#resizeObserver?.disconnect();
-      this.#resizeObserver = new ResizeObserver(() => this.alignScrollButton());
+      this.#resizeObserver = new ResizeObserver(() => {
+        this.alignScrollButton();
+        if (this.container) {
+          this.updateScrollState(this.container.scrollTop);
+          this.toggleScrollBtn();
+        }
+      });
       this.#resizeObserver.observe(this.entries);
     }
   }

@@ -108,6 +108,8 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   #configRequestHandler;
   #afterRequestHandler;
   #afterSwapHandler;
+  #suggestionsConfigHandler;
+  #suggestionsBeforeSwapHandler;
   #suggestionsSwapHandler;
   #tagActivationHandler;
   #tagKeydownHandler;
@@ -120,11 +122,19 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#detailCloseClickHandler = (event) => this.#handleDetailCloseClick(event);
     this.#detailClickHandler = (event) => this.#handleDetailClick(event);
     this.#detailAfterSwapHandler = (event) => this.#handleDetailAfterSwap(event);
-    this.#pageShowHandler = () => this.#resetDetailPopoverState();
+    this.#pageShowHandler = () => {
+      this.#resetDetailPopoverState();
+      this.#hideTagPopover("pageshow");
+      this.#resetSharedPopoverElement();
+    };
     this.#pageHideHandler = () => this.#forceHideDetailPopover("pagehide");
     this.#beforeHistorySaveHandler = () =>
       this.#forceHideDetailPopover("htmx:beforeHistorySave");
-    this.#restoredHandler = () => this.#resetDetailPopoverState("htmx:restored");
+    this.#restoredHandler = () => {
+      this.#resetDetailPopoverState("htmx:restored");
+      this.#hideTagPopover("htmx:restored");
+      this.#resetSharedPopoverElement();
+    };
     this.#visibilityHandler = () => this.#handleVisibility();
     this.#inputHandler = () => {
       this.#updateSubmitState();
@@ -134,6 +144,10 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#configRequestHandler = (event) => this.#handleConfigRequest(event);
     this.#afterRequestHandler = () => this.#handleAfterRequest();
     this.#afterSwapHandler = (event) => this.#handleAfterSwap(event);
+    this.#suggestionsConfigHandler = (event) =>
+      this.#handleSuggestionsConfig(event);
+    this.#suggestionsBeforeSwapHandler = (event) =>
+      this.#handleSuggestionsBeforeSwap(event);
     this.#suggestionsSwapHandler = () => this.#handleSuggestionsSwap();
     this.#tagActivationHandler = (event) => this.#handleTagActivation(event);
     this.#tagKeydownHandler = (event) => this.#handleTagKeydown(event);
@@ -313,6 +327,16 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
         "htmx:afterSwap",
         this.#suggestionsSwapHandler,
       );
+      listeners.add(
+        this.#suggestions,
+        "htmx:configRequest",
+        this.#suggestionsConfigHandler,
+      );
+      listeners.add(
+        this.#suggestions,
+        "htmx:beforeSwap",
+        this.#suggestionsBeforeSwapHandler,
+      );
     }
   }
 
@@ -338,20 +362,8 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       if (suggestionUrl) {
         this.#suggestions.setAttribute("hx-get", suggestionUrl);
       }
-      // Hard reset to skeleton before each open to avoid stale content on bfcache restore
+      this.#resetSuggestions({ force: true, clearEntry: false });
       this.#suggestions.dataset.entryId = entryId;
-      this.#suggestions.removeAttribute("data-loaded");
-      this.#suggestions.innerHTML = this.#suggestionsSkeleton;
-      this.#suggestions.classList.remove(
-        "htmx-swapping",
-        "htmx-settling",
-        "htmx-request"
-      );
-      this.#suggestions
-        .querySelectorAll(".tag-suggestion")
-        .forEach((el) =>
-          el.classList.remove("htmx-added", "htmx-settling", "htmx-swapping")
-        );
     }
     this.#updateSubmitState();
     if (typeof htmx !== "undefined") {
@@ -381,18 +393,43 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     }
   }
 
-  #ensureSkeleton() {
-    if (!this.#suggestions) return;
-    const containsSkeleton = this.#suggestions.innerHTML.includes(
-      "tag-suggestion--skeleton"
-    );
-    if (!this.#suggestionsSkeleton || !containsSkeleton) {
-      this.#suggestionsSkeleton = this.#buildSkeletonMarkup();
+  #hideTagPopover(reason = "hide") {
+    if (this.#popover) {
+      this.#popover.hide();
+      this.#destroyPopover();
+    }
+    if (this.#isActiveOwner()) {
+      this.#deactivateSharedOwner(reason);
+    }
+    this.#button?.setAttribute("aria-expanded", "false");
+    this.classList.remove("popover-open");
+  }
+
+  #resetSharedPopoverElement() {
+    const pop = getSharedTagPopoverEl();
+    if (!pop) return;
+    pop.hidden = true;
+    pop.removeAttribute("data-popper-placement");
+    pop.style.inset = "";
+    pop.style.transform = "";
+    pop.style.margin = "";
+    pop.classList.remove("htmx-swapping", "htmx-settling", "htmx-request");
+    const panel = pop.querySelector(".tp-content");
+    panel?.classList.remove("fade-enter", "fade-exit", "pop-enter", "pop-exit");
+    if (activeTagOwner === this) {
+      activeTagOwner = null;
     }
   }
 
-  #buildSkeletonMarkup() {
-    return Array.from({ length: TAG_SKELETON_COUNT })
+  #ensureSkeleton() {
+    if (!this.#suggestions) return;
+    // Prefer template to avoid drift between server and client markup.
+    const tpl = document.getElementById("tag-suggestions-skeleton-template");
+    if (tpl?.innerHTML?.trim()) {
+      this.#suggestionsSkeleton = tpl.innerHTML.trim();
+      return;
+    }
+    this.#suggestionsSkeleton = Array.from({ length: TAG_SKELETON_COUNT })
       .map(
         () =>
           '<span class="tag-suggestion tag-suggestion--skeleton" aria-hidden="true"></span>'
@@ -639,6 +676,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       return;
     }
     if (!this.#suggestions) return;
+    delete this.#suggestions.dataset.requestEntryId;
     if (this.#suggestions.innerHTML.trim()) {
       this.#suggestions.dataset.loaded = "1";
     } else {
@@ -646,6 +684,24 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     }
     this.#popover?.update();
     this.#updateAutocompleteCandidates();
+  }
+
+  #handleSuggestionsConfig(event) {
+    if (!this.#isActiveOwner() || !this.#suggestions) return;
+    const entryId = this.dataset?.entryId ?? "";
+    this.#suggestions.dataset.requestEntryId = entryId;
+    if (event?.detail?.headers) {
+      event.detail.headers["X-Tag-Entry"] = entryId;
+    }
+  }
+
+  #handleSuggestionsBeforeSwap(event) {
+    if (!this.#isActiveOwner() || !this.#suggestions) return;
+    const reqEntry = this.#suggestions.dataset.requestEntryId ?? "";
+    const currentEntry = this.#suggestions.dataset.entryId ?? "";
+    if (reqEntry && currentEntry && reqEntry !== currentEntry) {
+      event.preventDefault();
+    }
   }
 
   getAutocompleteControllerOptions() {
@@ -1025,6 +1081,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#activeTagHash = tagHash;
     this.#detailBody.innerHTML =
       this.#detailSkeleton || DEFAULT_TAG_DETAIL_SKELETON;
+    this.#detailBody.dataset.resetScroll = "1";
     this.#detailBody.setAttribute("hx-get", url);
     if (typeof htmx !== "undefined" && htmx?.ajax) {
       htmx.ajax("GET", url, {
@@ -1073,6 +1130,11 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     if (this.#detailBody) {
       formatTimeElements(this.#detailBody);
       this.#hydrateSummaryFromCache();
+      const entriesList = this.#detailBody.querySelector(".tag-detail__entries");
+      if (entriesList && this.#detailBody.dataset.resetScroll === "1") {
+        entriesList.scrollTop = 0;
+        delete this.#detailBody.dataset.resetScroll;
+      }
     }
   }
 

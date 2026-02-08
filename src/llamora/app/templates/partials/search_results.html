@@ -7,7 +7,7 @@
 {% if session_id is defined %}
 <input type="hidden"
        id="search-session-id"
-       name="sid"
+       name="cursor"
        value="{{ session_id|default('') }}"
        hx-swap-oob="true">
 {% endif %}

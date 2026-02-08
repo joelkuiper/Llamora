@@ -2,7 +2,7 @@
 {% if session_id is defined %}
 <input type="hidden"
        id="search-session-id"
-       name="sid"
+       name="cursor"
        value="{{ session_id|default('') }}"
        hx-swap-oob="true">
 {% endif %}
@@ -11,10 +11,11 @@
 {% endfor %}
 {% if has_more %}
 <li class="load-more"
-    hx-get="{{ url_for('search.search') }}?offset={{ next_offset }}"
+    hx-get="{{ url_for('search.search') }}?cursor={{ session_id|default('') }}"
     hx-trigger="intersect once delay:160ms"
     hx-swap="outerHTML"
     hx-include="#search-form"
+    hx-vals='{"search_mode":"chunk"}'
     hx-sync="this:replace"
     aria-hidden="true">
   <span class="load-indicator" aria-hidden="true"></span>
