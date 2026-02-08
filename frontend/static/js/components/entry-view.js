@@ -41,6 +41,7 @@ export class EntryView extends ReactiveElement {
   #markdownObserver = null;
   #initialized = false;
   #lastRenderedDay = null;
+  #entryFormReady = Promise.resolve();
   #pendingScrollTarget = null;
   #forceNavFlash = false;
   #appReadyPromise = null;
