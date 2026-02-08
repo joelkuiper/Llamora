@@ -4,7 +4,12 @@ import { ScrollManager } from "./entries/scroll-manager.js";
 import { initGlobalShortcuts } from "./global-shortcuts.js";
 import { applyRequestTimeHeaders, updateClientToday as syncClientToday } from "./services/time.js";
 import { createInlineSpinner } from "./ui.js";
-import { getAlertContainer, onAlertDismiss, pushAlert, registerAlertContainer } from "./utils/alert-center.js";
+import {
+  getAlertContainer,
+  onAlertDismiss,
+  pushAlert,
+  registerAlertContainer,
+} from "./utils/alert-center.js";
 import { runWhenDocumentReady } from "./utils/dom-ready.js";
 
 let headersRegistered = false;
@@ -235,9 +240,11 @@ function init() {
       btn.classList.remove("active");
       btn.setAttribute("aria-expanded", "false");
     });
-    document.querySelectorAll("entry-tags.popover-open, entry-actions.popover-open").forEach((el) => {
-      el.classList.remove("popover-open");
-    });
+    document
+      .querySelectorAll("entry-tags.popover-open, entry-actions.popover-open")
+      .forEach((el) => {
+        el.classList.remove("popover-open");
+      });
   };
 
   document.addEventListener("htmx:beforeHistorySave", resetSharedPopovers);

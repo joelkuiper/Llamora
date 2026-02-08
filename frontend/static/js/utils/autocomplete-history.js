@@ -54,9 +54,7 @@ export class AutocompleteHistory {
     if (!key) {
       return this.values();
     }
-    const entries = this.#entries.filter(
-      (entry) => this.#normalizeValue(entry) !== key,
-    );
+    const entries = this.#entries.filter((entry) => this.#normalizeValue(entry) !== key);
     entries.unshift(prepared);
     this.#entries = this.#applyLimit(entries);
     return this.values();

@@ -9,7 +9,10 @@ function loadScript(url) {
   }
 
   if (typeof document === "undefined") {
-    pendingLoads.set(href, Promise.reject(new Error("No document available to load vendor scripts.")));
+    pendingLoads.set(
+      href,
+      Promise.reject(new Error("No document available to load vendor scripts.")),
+    );
     return pendingLoads.get(href);
   }
 

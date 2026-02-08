@@ -18,8 +18,8 @@ function getScrollContainer(node) {
   while (current && current !== document.body) {
     const styles = window.getComputedStyle(current);
     if (
-      (styles.overflowY === "auto" || styles.overflowY === "scroll")
-      && current.scrollHeight > current.clientHeight
+      (styles.overflowY === "auto" || styles.overflowY === "scroll") &&
+      current.scrollHeight > current.clientHeight
     ) {
       return current;
     }
@@ -68,9 +68,9 @@ function resizeTextarea(textarea) {
     textarea.style.overflowY = "hidden";
   }
   if (
-    scrollContainer instanceof Element
-    && prevScrollTop !== null
-    && scrollContainer.scrollTop !== prevScrollTop
+    scrollContainer instanceof Element &&
+    prevScrollTop !== null &&
+    scrollContainer.scrollTop !== prevScrollTop
   ) {
     scrollContainer.scrollTop = prevScrollTop;
   }
@@ -260,9 +260,7 @@ document.body?.addEventListener("htmx:afterSwap", (event) => {
   const entryMain = findEntryMainFromDetail(event.detail);
   if (!entryMain) return;
   const entry = entryMain.closest(".entry");
-  const prevHeight = entry
-    ? parseFloat(entry.getAttribute(ENTRY_HEIGHT_ATTR) || "")
-    : NaN;
+  const prevHeight = entry ? parseFloat(entry.getAttribute(ENTRY_HEIGHT_ATTR) || "") : NaN;
   if (entry) {
     entry.removeAttribute(ENTRY_HEIGHT_ATTR);
   }

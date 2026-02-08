@@ -31,7 +31,9 @@
   padding: calc(var(--spacing-xl) + 0.1rem);
   padding-top: calc(var(--spacing-xl) + 0.5rem);
   margin-top: min(10vh, 4.5rem);
-  transition: transform 220ms ease, opacity 220ms ease;
+  transition:
+    transform 220ms ease,
+    opacity 220ms ease;
   animation: profile-modal-rise 220ms ease;
 }
 
@@ -129,7 +131,9 @@
 .profile-modal__content.htmx-settling {
   opacity: 1;
   transform: translateY(0);
-  transition: opacity 180ms ease, transform 180ms ease;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
 }
 
 .profile-section {
@@ -242,14 +246,12 @@
 .profile-modal .btn.dangerous:hover {
   border-color: var(--color-danger);
   background: color-mix(in srgb, var(--color-danger) 8%, transparent);
-  box-shadow: 0 0 0 2px
-    color-mix(in srgb, var(--color-danger) 20%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-danger) 20%, transparent);
 }
 
 .profile-modal .btn.dangerous:focus-visible {
   border-color: var(--color-danger);
-  box-shadow: 0 0 0 2px
-    color-mix(in srgb, var(--color-danger) 25%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-danger) 25%, transparent);
   outline: none;
 }
 

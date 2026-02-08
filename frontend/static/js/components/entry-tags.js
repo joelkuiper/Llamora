@@ -213,8 +213,8 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#button = this.querySelector(".add-tag-btn");
     this.#popoverEl = getSharedTagPopoverEl();
     this.#form = this.#popoverEl?.querySelector("form") ?? null;
-    this.#input = this.#form?.querySelector("input[name=\"tag\"]") ?? null;
-    this.#submit = this.#form?.querySelector("button[type=\"submit\"]") ?? null;
+    this.#input = this.#form?.querySelector('input[name="tag"]') ?? null;
+    this.#submit = this.#form?.querySelector('button[type="submit"]') ?? null;
     this.#panel = this.#popoverEl?.querySelector(".tp-content") ?? null;
     this.#suggestions = this.#popoverEl?.querySelector(".tag-suggestions") ?? null;
     this.#closeButton = this.#popoverEl?.querySelector(".overlay-close") ?? null;
@@ -291,11 +291,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     }
     this.#sharedListeners = this.resetListenerBag(this.#sharedListeners);
     const listeners = this.#sharedListeners;
-    listeners.add(
-      this.#form,
-      "htmx:configRequest",
-      this.#configRequestHandler,
-    );
+    listeners.add(this.#form, "htmx:configRequest", this.#configRequestHandler);
     listeners.add(this.#form, "htmx:afterRequest", this.#afterRequestHandler);
     if (this.#closeButton) {
       listeners.add(this.#closeButton, "click", this.#closeClickHandler);
@@ -318,21 +314,9 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       listeners.add(this.#detailBody, "htmx:afterSwap", this.#detailAfterSwapHandler);
     }
     if (this.#suggestions) {
-      listeners.add(
-        this.#suggestions,
-        "htmx:afterSwap",
-        this.#suggestionsSwapHandler,
-      );
-      listeners.add(
-        this.#suggestions,
-        "htmx:configRequest",
-        this.#suggestionsConfigHandler,
-      );
-      listeners.add(
-        this.#suggestions,
-        "htmx:beforeSwap",
-        this.#suggestionsBeforeSwapHandler,
-      );
+      listeners.add(this.#suggestions, "htmx:afterSwap", this.#suggestionsSwapHandler);
+      listeners.add(this.#suggestions, "htmx:configRequest", this.#suggestionsConfigHandler);
+      listeners.add(this.#suggestions, "htmx:beforeSwap", this.#suggestionsBeforeSwapHandler);
     }
   }
 
@@ -372,11 +356,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     if (!force && this.#suggestions.dataset.entryId === undefined) return;
     this.#ensureSkeleton();
     this.#suggestions.innerHTML = this.#suggestionsSkeleton;
-    this.#suggestions.classList.remove(
-      "htmx-swapping",
-      "htmx-settling",
-      "htmx-request",
-    );
+    this.#suggestions.classList.remove("htmx-swapping", "htmx-settling", "htmx-request");
     this.#suggestions
       .querySelectorAll(".tag-suggestion")
       .forEach((el) => el.classList.remove("htmx-added", "htmx-settling", "htmx-swapping"));
@@ -424,9 +404,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       return;
     }
     this.#suggestionsSkeleton = Array.from({ length: TAG_SKELETON_COUNT })
-      .map(
-        () => "<span class=\"tag-suggestion tag-suggestion--skeleton\" aria-hidden=\"true\"></span>",
-      )
+      .map(() => '<span class="tag-suggestion tag-suggestion--skeleton" aria-hidden="true"></span>')
       .join("");
   }
 
@@ -493,9 +471,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       this.#detailPopover.destroy();
       this.#detailPopover = null;
     }
-    this.#detailOutsideListeners = this.disposeListenerBag(
-      this.#detailOutsideListeners,
-    );
+    this.#detailOutsideListeners = this.disposeListenerBag(this.#detailOutsideListeners);
     this.#clearActiveTag();
   }
 
@@ -549,10 +525,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     if (this.#popover?.isOpen) {
       return true;
     }
-    if (
-      typeof document !== "undefined"
-      && document.activeElement === this.#input
-    ) {
+    if (typeof document !== "undefined" && document.activeElement === this.#input) {
       return true;
     }
     return false;
@@ -630,9 +603,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       if (tag?.classList?.contains("entry-tag")) {
         animateMotion(tag, "motion-animate-tag-enter");
         const limit = this.#getCanonicalMaxLength();
-        const label = tag
-          .querySelector(".tag-label")
-          ?.textContent?.trim();
+        const label = tag.querySelector(".tag-label")?.textContent?.trim();
         const canonicalValue = canonicalizeTag(label ?? "", limit);
         const canonicalKey = canonicalValue?.toLowerCase();
         if (canonicalKey && this.#suggestions) {
@@ -648,10 +619,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
         }
         if (canonicalValue) {
           this.#tagHistory.add(canonicalValue);
-          this.setAutocompleteLocalEntries(
-            "history",
-            this.#tagHistory.values(),
-          );
+          this.setAutocompleteLocalEntries("history", this.#tagHistory.values());
           this.applyAutocompleteCandidates();
         }
       }
@@ -717,10 +685,12 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   getAutocompleteStoreOptions() {
     return {
       debounceMs: 200,
-      fetchCandidates: (query, context = {}) => this.#fetchTagAutocompleteCandidates(query, context),
+      fetchCandidates: (query, context = {}) =>
+        this.#fetchTagAutocompleteCandidates(query, context),
       buildCacheKey: (query, context = {}) => this.#buildAutocompleteCacheKey(query, context),
       getCandidateKey: (candidate) => this.#normalizeTagCandidate(candidate),
-      mergeCandidates: (remote, localSets, helpers) => this.#mergeAutocompleteCandidates(remote, localSets, helpers),
+      mergeCandidates: (remote, localSets, helpers) =>
+        this.#mergeAutocompleteCandidates(remote, localSets, helpers),
       onError: (error) => {
         if (typeof console !== "undefined" && typeof console.debug === "function") {
           console.debug("Failed to fetch tag autocomplete suggestions", error);
@@ -734,7 +704,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     const limit = this.#getCanonicalMaxLength();
     const entries = list
       .map((item) => {
-        const raw = typeof item === "string" ? item : item?.value ?? "";
+        const raw = typeof item === "string" ? item : (item?.value ?? "");
         const canonical = canonicalizeTag(raw, limit);
         if (!canonical) {
           return null;
@@ -817,10 +787,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
         if (!text) {
           return;
         }
-        const canonical = canonicalizeTag(
-          btn.dataset.tag ?? text,
-          this.#getCanonicalMaxLength(),
-        );
+        const canonical = canonicalizeTag(btn.dataset.tag ?? text, this.#getCanonicalMaxLength());
         if (!canonical) return;
         domValues.push(canonical);
       });
@@ -892,9 +859,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   #buildAutocompleteCacheKey(query, context = {}) {
     const limit = this.#getCanonicalMaxLength();
     const canonical = canonicalizeTag(query ?? "", limit);
-    const normalized = canonical
-      ? canonical.toLowerCase()
-      : (query ?? "").trim().toLowerCase();
+    const normalized = canonical ? canonical.toLowerCase() : (query ?? "").trim().toLowerCase();
     const url = context.url ?? this.#getSuggestionsUrl() ?? "";
     return `${url}::${normalized}`;
   }
@@ -1026,9 +991,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
         this.#registerDetailOutsideClose();
       },
       onHide: () => {
-        this.#detailOutsideListeners = this.disposeListenerBag(
-          this.#detailOutsideListeners,
-        );
+        this.#detailOutsideListeners = this.disposeListenerBag(this.#detailOutsideListeners);
         this.#clearActiveTag();
       },
       onHidden: () => {
@@ -1128,9 +1091,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
 
   #registerDetailOutsideClose() {
     if (!this.#detailPopover) return;
-    this.#detailOutsideListeners = this.resetListenerBag(
-      this.#detailOutsideListeners,
-    );
+    this.#detailOutsideListeners = this.resetListenerBag(this.#detailOutsideListeners);
     const listeners = this.#detailOutsideListeners;
     listeners.add(
       document,
@@ -1167,9 +1128,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     if (this.#detailPanel) {
       this.#detailPanel.classList.remove("pop-enter", "pop-exit");
     }
-    this.#detailOutsideListeners = this.disposeListenerBag(
-      this.#detailOutsideListeners,
-    );
+    this.#detailOutsideListeners = this.disposeListenerBag(this.#detailOutsideListeners);
     this.#clearActiveTag();
     this.#pendingDetailOpen = false;
   }
@@ -1190,8 +1149,8 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       const payload = JSON.parse(raw);
       if (!payload || typeof payload.html !== "string") return null;
       if (
-        typeof payload.timestamp === "number"
-        && Date.now() - payload.timestamp > TAG_SUMMARY_CACHE_TTL
+        typeof payload.timestamp === "number" &&
+        Date.now() - payload.timestamp > TAG_SUMMARY_CACHE_TTL
       ) {
         window.sessionStorage.removeItem(this.#getSummaryCacheKey(tagHash));
         return null;

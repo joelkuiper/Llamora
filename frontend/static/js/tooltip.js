@@ -16,7 +16,7 @@ function ensureEl() {
   if (tooltipEl && tooltipEl.isConnected) return;
   tooltipEl = document.createElement("div");
   tooltipEl.className = "tooltip";
-  tooltipEl.innerHTML = "<div class=\"tooltip-inner\"></div>";
+  tooltipEl.innerHTML = '<div class="tooltip-inner"></div>';
   innerEl = tooltipEl.querySelector(".tooltip-inner");
   document.body.appendChild(tooltipEl);
   tooltipEl.hidden = true;

@@ -91,9 +91,12 @@ export class AutocompleteDataStore {
 
     this.#fetchCandidates = fetchCandidates;
     this.#debounceMs = Math.max(0, Number(debounceMs) || 0);
-    this.#buildCacheKey = typeof buildCacheKey === "function" ? buildCacheKey : defaultBuildCacheKey;
-    this.#getCandidateKey = typeof getCandidateKey === "function" ? getCandidateKey : defaultGetCandidateKey;
-    this.#mergeCandidates = typeof mergeCandidates === "function" ? mergeCandidates : defaultMergeCandidates;
+    this.#buildCacheKey =
+      typeof buildCacheKey === "function" ? buildCacheKey : defaultBuildCacheKey;
+    this.#getCandidateKey =
+      typeof getCandidateKey === "function" ? getCandidateKey : defaultGetCandidateKey;
+    this.#mergeCandidates =
+      typeof mergeCandidates === "function" ? mergeCandidates : defaultMergeCandidates;
     this.#maxResults = parsePositiveInteger(maxResults, null);
     this.#cacheTimeMs = parsePositiveInteger(cacheTimeMs, null);
     this.#cache = new Map();

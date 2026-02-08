@@ -122,11 +122,7 @@ class EntryFormElement extends ReactiveElement {
 
     const now = new Date();
     const pad = (n) => String(n).padStart(2, "0");
-    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${
-      pad(
-        now.getDate(),
-      )
-    }`;
+    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
     this.#isToday = this.#date === today;
     this.#draftKey = `entry-draft-${this.#date}`;
 
@@ -163,9 +159,7 @@ class EntryFormElement extends ReactiveElement {
   #teardown() {
     this.#setSubmitting(false);
     this.#listeners = this.disposeListenerBag(this.#listeners);
-    this.#streamFocusListeners = this.disposeListenerBag(
-      this.#streamFocusListeners,
-    );
+    this.#streamFocusListeners = this.disposeListenerBag(this.#streamFocusListeners);
     this.#shouldRestoreFocus = false;
     this.#initialized = false;
     this.#isStreaming = false;
@@ -223,10 +217,7 @@ class EntryFormElement extends ReactiveElement {
         this.#setSubmitting(true);
       },
       onEnd: (event) => {
-        if (
-          event?.type === "htmx:responseError"
-          || event?.type === "htmx:sendError"
-        ) {
+        if (event?.type === "htmx:responseError" || event?.type === "htmx:sendError") {
           this.#setSubmitting(false);
           this.setStreaming(false);
           return;
@@ -248,9 +239,7 @@ class EntryFormElement extends ReactiveElement {
     bag.add(this.#form, "htmx:configRequest", onConfigRequest);
 
     const onInput = () => {
-      const shouldForceScroll = this.#container
-        ? isNearBottom(this.#container, 16)
-        : false;
+      const shouldForceScroll = this.#container ? isNearBottom(this.#container, 16) : false;
       this.#resizeTextarea({ forceScroll: shouldForceScroll });
       if (this.#draftKey) {
         sessionStorage.setItem(this.#draftKey, this.#textarea.value);
@@ -265,12 +254,7 @@ class EntryFormElement extends ReactiveElement {
       if (e.isComposing || e.keyCode === 229) {
         return;
       }
-      if (
-        e.key === "Enter"
-        && !e.shiftKey
-        && !this.#isSubmitting
-        && !this.#isStreaming
-      ) {
+      if (e.key === "Enter" && !e.shiftKey && !this.#isSubmitting && !this.#isStreaming) {
         e.preventDefault();
         if (this.#textarea.value.trim()) {
           this.#form.requestSubmit();
@@ -298,9 +282,7 @@ class EntryFormElement extends ReactiveElement {
       this.#textarea.style.height = "";
       return;
     }
-    const wasNearBottom = this.#container
-      ? isNearBottom(this.#container, 16)
-      : false;
+    const wasNearBottom = this.#container ? isNearBottom(this.#container, 16) : false;
     this.#textarea.style.height = "auto";
     this.#textarea.style.height = this.#textarea.scrollHeight + "px";
     if (this.#container && (forceScroll || wasNearBottom)) {
@@ -326,23 +308,19 @@ class EntryFormElement extends ReactiveElement {
     this.#setSubmitting(false);
 
     if (streaming) {
-      this.#streamFocusListeners = this.disposeListenerBag(
-        this.#streamFocusListeners,
-      );
+      this.#streamFocusListeners = this.disposeListenerBag(this.#streamFocusListeners);
       const active = document.activeElement;
       this.#shouldRestoreFocus = !!(
-        !active
-        || active === document.body
-        || this.#form?.contains(active)
+        !active ||
+        active === document.body ||
+        this.#form?.contains(active)
       );
       if (this.#shouldRestoreFocus) {
         const bag = this.resetListenerBag(this.#streamFocusListeners);
         this.#streamFocusListeners = bag;
         const cancelRestore = () => {
           this.#shouldRestoreFocus = false;
-          this.#streamFocusListeners = this.disposeListenerBag(
-            this.#streamFocusListeners,
-          );
+          this.#streamFocusListeners = this.disposeListenerBag(this.#streamFocusListeners);
         };
         bag.add(document, "pointerdown", (event) => {
           if (!this.#form?.contains(event.target)) {
@@ -351,9 +329,9 @@ class EntryFormElement extends ReactiveElement {
         });
         bag.add(document, "focusin", (event) => {
           if (
-            event.target
-            && event.target !== document.body
-            && !this.#form?.contains(event.target)
+            event.target &&
+            event.target !== document.body &&
+            !this.#form?.contains(event.target)
           ) {
             cancelRestore();
           }
@@ -362,17 +340,13 @@ class EntryFormElement extends ReactiveElement {
       this.#textarea.disabled = true;
       this.#button.disabled = true;
     } else {
-      this.#streamFocusListeners = this.disposeListenerBag(
-        this.#streamFocusListeners,
-      );
+      this.#streamFocusListeners = this.disposeListenerBag(this.#streamFocusListeners);
       this.#textarea.disabled = false;
       this.#button.disabled = !this.#textarea.value.trim();
       const active = document.activeElement;
       if (
-        this.#shouldRestoreFocus
-        && (!active
-          || active === document.body
-          || this.#form?.contains(active))
+        this.#shouldRestoreFocus &&
+        (!active || active === document.body || this.#form?.contains(active))
       ) {
         this.#textarea.focus({ preventScroll: true });
       }

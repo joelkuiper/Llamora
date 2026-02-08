@@ -46,9 +46,7 @@ function refreshCounter(counter) {
 }
 
 function refreshCounters(root = document) {
-  root
-    .querySelectorAll(COUNTER_SELECTOR)
-    .forEach((counter) => refreshCounter(counter));
+  root.querySelectorAll(COUNTER_SELECTOR).forEach((counter) => refreshCounter(counter));
 }
 
 document.addEventListener("input", (event) => {
@@ -61,9 +59,7 @@ document.addEventListener("input", (event) => {
       .forEach((counter) => updateCounter(counter, target));
     return;
   }
-  const counters = target
-    .closest("form")
-    ?.querySelectorAll(COUNTER_SELECTOR);
+  const counters = target.closest("form")?.querySelectorAll(COUNTER_SELECTOR);
   counters?.forEach((counter) => updateCounter(counter, target));
 });
 

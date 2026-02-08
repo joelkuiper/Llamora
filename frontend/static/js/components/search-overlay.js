@@ -132,10 +132,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     }
     eventTarget.addEventListener("htmx:historyRestore", this.#historyRestoreHandler);
     this.#historyRestoreRemover = () => {
-      eventTarget.removeEventListener(
-        "htmx:historyRestore",
-        this.#historyRestoreHandler,
-      );
+      eventTarget.removeEventListener("htmx:historyRestore", this.#historyRestoreHandler);
     };
 
     const win = eventTarget.defaultView ?? window;
@@ -386,9 +383,10 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
 
     const doc = this.ownerDocument ?? document;
     const activeElement = doc.activeElement;
-    const activeLink = activeElement instanceof Element
-      ? activeElement.closest("#search-results a[data-target]")
-      : null;
+    const activeLink =
+      activeElement instanceof Element
+        ? activeElement.closest("#search-results a[data-target]")
+        : null;
 
     if (isArrowDown) {
       evt.preventDefault();
@@ -441,9 +439,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
 
   #getResultLinks() {
     if (!this.#resultsEl) return [];
-    return Array.from(
-      this.#resultsEl.querySelectorAll(".search-results-list a[data-target]"),
-    );
+    return Array.from(this.#resultsEl.querySelectorAll(".search-results-list a[data-target]"));
   }
 
   #focusResultAt(index, links = null) {
@@ -462,7 +458,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     const target = getEventTarget(evt);
     if (!target) return;
 
-    const closeTrigger = target.closest("[data-action=\"close-search-overlay\"]");
+    const closeTrigger = target.closest('[data-action="close-search-overlay"]');
     if (closeTrigger) {
       wrap.querySelector(".sr-panel")?.classList.add("pop-exit");
       this.#closeResults(true);
@@ -477,10 +473,10 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
 
     const panel = wrap.querySelector(".sr-panel");
     if (
-      panel
-      && !panel.contains(target)
-      && target !== this.#inputEl
-      && !target.closest(".entry-tag")
+      panel &&
+      !panel.contains(target) &&
+      target !== this.#inputEl &&
+      !target.closest(".entry-tag")
     ) {
       this.#closeResults(true);
     }
@@ -629,7 +625,8 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       debounceMs: 0,
       maxResults: RECENT_CANDIDATE_MAX,
       cacheTimeMs: RECENT_REFRESH_MIN_MS,
-      fetchCandidates: (_, context = {}) => this.#fetchRecentAutocompleteCandidates(context?.signal),
+      fetchCandidates: (_, context = {}) =>
+        this.#fetchRecentAutocompleteCandidates(context?.signal),
       buildCacheKey: () => "recent",
       getCandidateKey: (candidate) => this.#normalizeCandidateValue(candidate),
     };
@@ -713,11 +710,8 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
 
   #normalizeCandidateValue(entry) {
     if (!entry) return "";
-    const value = typeof entry === "string"
-      ? entry
-      : typeof entry.value === "string"
-      ? entry.value
-      : "";
+    const value =
+      typeof entry === "string" ? entry : typeof entry.value === "string" ? entry.value : "";
     if (!value) return "";
     return normalizeSearchValue(value).toLowerCase();
   }

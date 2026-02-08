@@ -138,8 +138,7 @@
     &.user {
       align-self: stretch;
       width: 100%;
-      border: 1px solid
-        color-mix(in srgb, var(--border) 92%, var(--color-text-muted));
+      border: 1px solid color-mix(in srgb, var(--border) 92%, var(--color-text-muted));
       color: var(--color-text);
       background: color-mix(in srgb, var(--color-surface) 92%, white);
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
@@ -180,16 +179,11 @@
     &.assistant,
     &.response-stream {
       --assistant-action-color: var(--accent);
-      --assistant-delete-color: color-mix(
-        in srgb,
-        var(--color-text-muted) 75%,
-        transparent
-      );
+      --assistant-delete-color: color-mix(in srgb, var(--color-text-muted) 75%, transparent);
       align-self: flex-end;
       width: clamp(18rem, 92%, 52rem);
       margin-left: auto;
-      padding: var(--spacing-sm) var(--spacing-lg)
-        calc(var(--spacing-sm) + 2rem);
+      padding: var(--spacing-sm) var(--spacing-lg) calc(var(--spacing-sm) + 2rem);
       border-radius: var(--radius-sm);
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
       color: var(--assistant-bubble-text);
@@ -235,7 +229,9 @@
       cursor: help;
       pointer-events: auto;
       opacity: 0;
-      transition: opacity 0.28s ease, transform 0.28s ease;
+      transition:
+        opacity 0.28s ease,
+        transform 0.28s ease;
     }
 
     .repeat-guard-indicator--visible {
@@ -275,7 +271,9 @@
       align-items: center;
       gap: 0.15rem;
       max-width: 1.2rem;
-      transition: opacity 0.4s ease, max-width 0.4s ease;
+      transition:
+        opacity 0.4s ease,
+        max-width 0.4s ease;
     }
 
     .repeat-guard-indicator__dot {
@@ -400,18 +398,12 @@
     }
 
     &.entry--opening.is-collapsed .opening-toggle [data-opening-icon-open],
-    html[data-opening-collapsed="1"]
-      &.entry--opening
-      .opening-toggle
-      [data-opening-icon-open] {
+    html[data-opening-collapsed="1"] &.entry--opening .opening-toggle [data-opening-icon-open] {
       display: none;
     }
 
     &.entry--opening.is-collapsed .opening-toggle [data-opening-icon-closed],
-    html[data-opening-collapsed="1"]
-      &.entry--opening
-      .opening-toggle
-      [data-opening-icon-closed] {
+    html[data-opening-collapsed="1"] &.entry--opening .opening-toggle [data-opening-icon-closed] {
       display: block;
     }
   }
@@ -579,7 +571,10 @@
     cursor: pointer;
     padding: 4px 10px 4px 8px;
     border-radius: 999px;
-    transition: color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+    transition:
+      color 140ms ease,
+      background 140ms ease,
+      box-shadow 140ms ease;
   }
 
   .entry-edit-strip button:hover,
@@ -592,16 +587,14 @@
     position: relative;
     color: var(--action-edit-save);
     background: var(--action-edit-save-bg);
-    box-shadow: inset 0 0 0 1px
-      color-mix(in srgb, var(--action-edit-save) 18%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--action-edit-save) 18%, transparent);
   }
 
   .entry-edit-save[aria-disabled="true"],
   .entry-edit-save:disabled {
     opacity: 0.5;
     cursor: default;
-    box-shadow: inset 0 0 0 1px
-      color-mix(in srgb, var(--color-text-muted) 20%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-text-muted) 20%, transparent);
   }
 
   .entry-edit-save .entry-edit-label {
@@ -642,11 +635,7 @@
   }
 
   .entry-edit-form.is-saving .entry-edit-save {
-    color: color-mix(
-      in srgb,
-      var(--action-edit-save) 85%,
-      var(--color-text-muted)
-    );
+    color: color-mix(in srgb, var(--action-edit-save) 85%, var(--color-text-muted));
     background: color-mix(in srgb, var(--action-edit-save-bg) 70%, transparent);
     box-shadow: 0 0 0 2px var(--action-edit-save-glow);
   }
@@ -681,8 +670,7 @@
   .entry-edit-cancel {
     color: var(--action-edit-cancel);
     background: var(--action-edit-cancel-bg);
-    box-shadow: inset 0 0 0 1px
-      color-mix(in srgb, var(--action-edit-cancel) 18%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--action-edit-cancel) 18%, transparent);
   }
 
   .entry-edit-cancel:hover,
@@ -712,7 +700,9 @@
 
   .entry:has(.entry-main--editing) {
     border-color: var(--accent);
-    box-shadow: 0 0 0 2px var(--accent-20), 0 8px 22px var(--accent-10);
+    box-shadow:
+      0 0 0 2px var(--accent-20),
+      0 8px 22px var(--accent-10);
     background: color-mix(in srgb, var(--color-surface) 94%, white);
   }
 
@@ -736,11 +726,7 @@
     background: transparent;
     border-color: transparent;
     box-shadow: none;
-    color: color-mix(
-      in srgb,
-      var(--assistant-action-color) 70%,
-      var(--color-text-muted)
-    );
+    color: color-mix(in srgb, var(--assistant-action-color) 70%, var(--color-text-muted));
     cursor: default;
   }
 
@@ -771,8 +757,7 @@
   .entry.response-stream .entry-delete:hover,
   .entry.response-stream .entry-delete:focus-visible {
     border-color: color-mix(in srgb, var(--color-danger) 45%, var(--border));
-    box-shadow: 0 0 0 2px
-      color-mix(in srgb, var(--color-danger) 18%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-danger) 18%, transparent);
     background: color-mix(in srgb, var(--color-danger) 10%, transparent);
     color: color-mix(in srgb, var(--color-danger) 70%, var(--color-text-muted));
   }

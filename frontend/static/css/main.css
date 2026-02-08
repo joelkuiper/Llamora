@@ -13,7 +13,8 @@
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   background: var(--color-bg);
   margin: 0;
   padding: 0;
@@ -121,11 +122,8 @@ html, body {
     var(--raised-shadow),
     0 0 0 3px var(--accent-20),
     0 12px 28px var(--accent-10);
-  background: linear-gradient(
-    0deg,
-    rgba(59, 167, 246, 0.16),
-    rgba(59, 167, 246, 0.12)
-  ) var(--color-bg);
+  background: linear-gradient(0deg, rgba(59, 167, 246, 0.16), rgba(59, 167, 246, 0.12))
+    var(--color-bg);
 }
 
 .btn:focus,
@@ -154,11 +152,8 @@ html, body {
 }
 
 .btn-primary {
-  background: linear-gradient(
-    0deg,
-    rgba(59, 167, 246, 0.12),
-    rgba(59, 167, 246, 0.10)
-  ) var(--color-bg);
+  background: linear-gradient(0deg, rgba(59, 167, 246, 0.12), rgba(59, 167, 246, 0.1))
+    var(--color-bg);
   border-color: var(--accent-20);
   box-shadow:
     var(--raised-shadow),
@@ -196,11 +191,8 @@ html, body {
       var(--raised-shadow),
       0 0 0 3px var(--danger-25),
       0 12px 28px var(--danger-20);
-    background: linear-gradient(
-      0deg,
-      rgba(208, 0, 48, 0.16),
-      rgba(208, 0, 48, 0.12)
-    ) var(--color-danger);
+    background: linear-gradient(0deg, rgba(208, 0, 48, 0.16), rgba(208, 0, 48, 0.12))
+      var(--color-danger);
     color: var(--color-bg);
   }
 
@@ -304,11 +296,14 @@ input[type="checkbox"]:checked::after {
 
 input[type="checkbox"]:focus {
   outline: none;
-  box-shadow: 0 0 0 2px var(--accent-20), var(--inset-shadow);
+  box-shadow:
+    0 0 0 2px var(--accent-20),
+    var(--inset-shadow);
   border-color: var(--accent);
 }
 
-.btn, .input {
+.btn,
+.input {
   transition: all 0.3 ease;
 }
 
@@ -343,8 +338,7 @@ input[type="checkbox"]:focus {
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-lg) var(--spacing-sm)
-    var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-lg) var(--spacing-sm) var(--spacing-md);
   width: 100%;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
@@ -369,11 +363,7 @@ input[type="checkbox"]:focus {
   &.alert--success {
     background: var(--color-success-bg);
     color: var(--color-success-text);
-    border-color: color-mix(
-      in srgb,
-      var(--color-success-text),
-      transparent 70%
-    );
+    border-color: color-mix(in srgb, var(--color-success-text), transparent 70%);
   }
 
   &:hover {
@@ -634,11 +624,7 @@ input[type="checkbox"]:focus {
 }
 
 .overlay-close:hover {
-  background: color-mix(
-    in srgb,
-    var(--overlay-close-hover-bg) 65%,
-    transparent
-  );
+  background: color-mix(in srgb, var(--overlay-close-hover-bg) 65%, transparent);
   color: var(--color-text);
   border-color: color-mix(in srgb, var(--border) 70%, transparent);
 }
@@ -647,8 +633,7 @@ input[type="checkbox"]:focus {
   outline: 2px solid var(--accent-active);
   outline-offset: 2px;
   background: var(--accent-25);
-  box-shadow: 0 0 0 3px
-    color-mix(in srgb, var(--accent-active), transparent 70%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-active), transparent 70%);
 }
 
 .overlay-close::before {
@@ -732,11 +717,8 @@ input[type="checkbox"]:focus {
       box-shadow:
         var(--raised-shadow),
         0 0 0 2px var(--accent-10);
-      background: linear-gradient(
-        0deg,
-        rgba(59, 167, 246, 0.16),
-        rgba(59, 167, 246, 0.12)
-      ) var(--color-bg);
+      background: linear-gradient(0deg, rgba(59, 167, 246, 0.16), rgba(59, 167, 246, 0.12))
+        var(--color-bg);
     }
   }
 
@@ -767,9 +749,7 @@ input[type="checkbox"]:focus {
   .suggestion-wrapper:focus-within .password-suggestions,
   .password-suggestions:hover {
     pointer-events: auto;
-    transition-delay:
-      var(--motion-delay-medium),
-      0s;
+    transition-delay: var(--motion-delay-medium), 0s;
   }
 
   .strength-meter {

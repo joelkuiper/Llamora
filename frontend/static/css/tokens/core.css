@@ -17,11 +17,11 @@
     --accent-hover: #1f97f2;
     --accent-active: #0e85de;
     --accent-05: rgba(54, 166, 244, 0.05);
-    --accent-10: rgba(54, 166, 244, 0.10);
+    --accent-10: rgba(54, 166, 244, 0.1);
     --accent-15: rgba(54, 166, 244, 0.15);
     --accent-20: rgba(54, 166, 244, 0.18);
     --accent-30: rgba(54, 166, 244, 0.28);
-    --accent-60: rgba(59, 167, 246, 0.60);
+    --accent-60: rgba(59, 167, 246, 0.6);
     --accent-drop-shadow: rgba(31, 151, 242, 0.45);
 
     --highlight-color: #fff7a0;
@@ -31,22 +31,15 @@
     --shadow-dark-02: rgba(0, 0, 0, 0.03);
     --shadow-light: rgba(255, 255, 255, 0.92);
     --shadow-light-60: rgba(255, 255, 255, 0.64);
-    --raised-shadow:
-      0 4px 10px var(--shadow-dark),
-      0 1px 2px rgba(0, 0, 0, 0.05);
-    --subtle-raised-shadow:
-      0 2px 4px var(--shadow-dark-02),
-      0 1px 2px rgba(0, 0, 0, 0.04);
+    --raised-shadow: 0 4px 10px var(--shadow-dark), 0 1px 2px rgba(0, 0, 0, 0.05);
+    --subtle-raised-shadow: 0 2px 4px var(--shadow-dark-02), 0 1px 2px rgba(0, 0, 0, 0.04);
 
-    --inset-shadow:
-      inset 1px 1px 3px rgba(0, 0, 0, 0.08),
-      inset -1px -1px 3px var(--shadow-light);
+    --inset-shadow: inset 1px 1px 3px rgba(0, 0, 0, 0.08), inset -1px -1px 3px var(--shadow-light);
     --inset-shadow-disabled:
-      inset 1px 1px 2px rgba(0, 0, 0, 0.04),
-      inset -1px -1px 2px rgba(255, 255, 255, 0.82);
-    --border: rgba(0, 0, 0, 0.10);
-    --border-strong: rgba(0, 0, 0, 0.20);
-    --border-user: rgba(54, 166, 244, 0.30);
+      inset 1px 1px 2px rgba(0, 0, 0, 0.04), inset -1px -1px 2px rgba(255, 255, 255, 0.82);
+    --border: rgba(0, 0, 0, 0.1);
+    --border-strong: rgba(0, 0, 0, 0.2);
+    --border-user: rgba(54, 166, 244, 0.3);
 
     /* Radius & spacing */
     --radius-sm: 0.4rem;
@@ -77,7 +70,7 @@
     --color-danger-bg: #fff7f8;
     --color-danger-mix: #ff4d4f;
     --danger-15: rgba(200, 0, 46, 0.15);
-    --danger-20: rgba(200, 0, 46, 0.20);
+    --danger-20: rgba(200, 0, 46, 0.2);
     --danger-25: rgba(200, 0, 46, 0.25);
 
     /* Misc colors */
@@ -87,7 +80,7 @@
 
     /* Glass backgrounds */
     --glass-bg: rgba(255, 255, 255, 0.72);
-    --glass-bg-hover: rgba(255, 255, 255, 0.60);
+    --glass-bg-hover: rgba(255, 255, 255, 0.6);
     --glass-bg-strong: rgba(255, 255, 255, 0.76);
     --glass-bg-strong-hover: rgba(255, 255, 255, 0.82);
     --glass-bg-alt: rgba(255, 255, 255, 0.92);
@@ -95,45 +88,21 @@
     --glass-fallback-bg: rgba(250, 250, 250, 0.98);
     --glass-bg-opaque: rgba(250, 250, 250, 0.98);
     --glass-text-muted: rgba(0, 0, 0, 0.72);
-    --glass-text-strong: rgba(0, 0, 0, 0.80);
+    --glass-text-strong: rgba(0, 0, 0, 0.8);
     --glass-text-stronger: rgba(0, 0, 0, 0.92);
     --tag-remove-bg: rgba(0, 0, 0, 0.48);
     --tag-remove-bg-hover: #000;
 
     /* Response kinds */
-    --action-reply: color-mix(
-      in srgb,
-      var(--accent) 55%,
-      var(--color-text-muted)
-    );
-    --action-acknowledge: color-mix(
-      in srgb,
-      var(--color-danger-mix) 45%,
-      var(--color-text-muted)
-    );
-    --action-notice: color-mix(
-      in srgb,
-      var(--highlight-color) 55%,
-      var(--color-text-muted)
-    );
+    --action-reply: color-mix(in srgb, var(--accent) 55%, var(--color-text-muted));
+    --action-acknowledge: color-mix(in srgb, var(--color-danger-mix) 45%, var(--color-text-muted));
+    --action-notice: color-mix(in srgb, var(--highlight-color) 55%, var(--color-text-muted));
     --action-edit-save: color-mix(in srgb, #2bd16b 85%, var(--color-text));
     --action-edit-save-bg: color-mix(in srgb, #2bd16b 16%, transparent);
     --action-edit-save-glow: color-mix(in srgb, #2bd16b 26%, transparent);
-    --action-edit-cancel: color-mix(
-      in srgb,
-      var(--color-danger) 75%,
-      var(--color-text)
-    );
-    --action-edit-cancel-bg: color-mix(
-      in srgb,
-      var(--color-danger) 12%,
-      transparent
-    );
-    --action-edit-cancel-glow: color-mix(
-      in srgb,
-      var(--color-danger) 24%,
-      transparent
-    );
+    --action-edit-cancel: color-mix(in srgb, var(--color-danger) 75%, var(--color-text));
+    --action-edit-cancel-bg: color-mix(in srgb, var(--color-danger) 12%, transparent);
+    --action-edit-cancel-glow: color-mix(in srgb, var(--color-danger) 24%, transparent);
     --action-tint: 6%;
 
     --assistant-bubble-bg: #f9fafb;
@@ -149,7 +118,7 @@
 
     /* Animations */
     --pulse-bg-start: rgba(255, 255, 255, 0.86);
-    --pulse-bg-mid: rgba(235, 235, 235, 0.80);
+    --pulse-bg-mid: rgba(235, 235, 235, 0.8);
     --pulse-bg-end: rgba(250, 250, 250, 0.86);
 
     --motion-tap: 50ms;
@@ -173,7 +142,7 @@
     --motion-breathe: 6s;
 
     /* Overlay close */
-    --overlay-close-bg: rgba(0, 0, 0, 0.10);
+    --overlay-close-bg: rgba(0, 0, 0, 0.1);
     --overlay-close-hover-bg: rgba(0, 0, 0, 0.18);
 
     --line-height: 1.6;

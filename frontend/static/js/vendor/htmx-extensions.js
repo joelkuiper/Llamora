@@ -24,7 +24,10 @@ function loadScript(url) {
   }
 
   if (typeof document === "undefined") {
-    pendingLoads.set(href, Promise.reject(new Error("No document available to load htmx extensions.")));
+    pendingLoads.set(
+      href,
+      Promise.reject(new Error("No document available to load htmx extensions.")),
+    );
     return pendingLoads.get(href);
   }
 
@@ -45,10 +48,7 @@ function loadScript(url) {
 
 await vendorReady;
 
-for (const extensionPath of [
-  "./htmx-ext-sse.js",
-  "./htmx-ext-response-targets.js",
-]) {
+for (const extensionPath of ["./htmx-ext-sse.js", "./htmx-ext-response-targets.js"]) {
   const url = resolveExtensionUrl(extensionPath);
   await loadScript(url);
 }

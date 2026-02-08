@@ -122,13 +122,14 @@ export function initConfirmModal(options = {}) {
       }
       const detail = event.detail || {};
       const trigger = resolveTrigger(event);
-      const hasConfirmData = Boolean(detail.question)
-        || Boolean(trigger?.getAttribute?.("hx-confirm"))
-        || Boolean(trigger?.dataset?.confirmTitle)
-        || Boolean(trigger?.dataset?.confirmMessage)
-        || Boolean(trigger?.dataset?.confirmConfirm)
-        || Boolean(trigger?.dataset?.confirmCancel)
-        || Boolean(trigger?.dataset?.confirmVariant);
+      const hasConfirmData =
+        Boolean(detail.question) ||
+        Boolean(trigger?.getAttribute?.("hx-confirm")) ||
+        Boolean(trigger?.dataset?.confirmTitle) ||
+        Boolean(trigger?.dataset?.confirmMessage) ||
+        Boolean(trigger?.dataset?.confirmConfirm) ||
+        Boolean(trigger?.dataset?.confirmCancel) ||
+        Boolean(trigger?.dataset?.confirmVariant);
       if (!hasConfirmData) {
         return;
       }

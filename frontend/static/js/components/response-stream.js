@@ -115,7 +115,8 @@ class ResponseStreamElement extends HTMLElement {
 
   #suppressOpeningStream() {
     const entryId = this.entryId || "";
-    const isOpeningStream = this.classList.contains("opening-stream") || entryId.startsWith("opening-");
+    const isOpeningStream =
+      this.classList.contains("opening-stream") || entryId.startsWith("opening-");
     if (!isOpeningStream) return false;
     const entries = this.closest?.("#entries") || document;
     const hasPersistedOpening = Boolean(
@@ -223,7 +224,8 @@ class ResponseStreamElement extends HTMLElement {
     if (this.#sink) {
       this.#sink.textContent = this.#text;
     }
-    const shouldEagerRender = this.#markdown?.dataset.rendered !== "true" && !this.#renderer?.isBusy;
+    const shouldEagerRender =
+      this.#markdown?.dataset.rendered !== "true" && !this.#renderer?.isBusy;
 
     if (shouldEagerRender) {
       this.#renderer?.renderNow(this.#text, {
@@ -266,11 +268,7 @@ class ResponseStreamElement extends HTMLElement {
 
     const trimmed = data.trim();
     const hasExistingText = Boolean(this.#text && this.#text.trim());
-    const errorText = trimmed
-      ? trimmed
-      : hasExistingText
-      ? this.#text
-      : FALLBACK_ERROR_MESSAGE;
+    const errorText = trimmed ? trimmed : hasExistingText ? this.#text : FALLBACK_ERROR_MESSAGE;
 
     if (!hasExistingText || errorText !== this.#text) {
       this.#text = errorText;
@@ -339,12 +337,7 @@ class ResponseStreamElement extends HTMLElement {
     container.appendChild(timeEl);
   }
 
-  #finalize({
-    status,
-    assistantEntryId = null,
-    text = "",
-    reason = null,
-  }) {
+  #finalize({ status, assistantEntryId = null, text = "", reason = null }) {
     if (this.#completed) return;
     this.#completed = true;
 
@@ -524,11 +517,7 @@ class ResponseStreamElement extends HTMLElement {
 
     indicator.classList.remove("repeat-guard-indicator--visible");
     indicator.classList.add("repeat-guard-indicator--leaving");
-    indicator.addEventListener(
-      "transitionend",
-      () => indicator.remove(),
-      { once: true },
-    );
+    indicator.addEventListener("transitionend", () => indicator.remove(), { once: true });
   }
 
   #ensureRepeatGuardIndicator() {

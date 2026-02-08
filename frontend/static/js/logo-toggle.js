@@ -1,9 +1,8 @@
 import { runWhenDocumentReady } from "./utils/dom-ready.js";
 
 const SCHEME_QUERY = "(prefers-color-scheme: dark)";
-const darkScheme = typeof window !== "undefined" && window.matchMedia
-  ? window.matchMedia(SCHEME_QUERY)
-  : null;
+const darkScheme =
+  typeof window !== "undefined" && window.matchMedia ? window.matchMedia(SCHEME_QUERY) : null;
 
 const DATA_KEYS = {
   light: {
@@ -25,9 +24,7 @@ function isFocusVisible(anchor) {
   if (typeof document === "undefined") {
     return false;
   }
-  return (
-    anchor === document.activeElement && anchor.matches(":focus-visible")
-  );
+  return anchor === document.activeElement && anchor.matches(":focus-visible");
 }
 
 function currentPalette() {
@@ -119,30 +116,46 @@ function initLogo(anchor) {
 
   anchor.addEventListener("pointerenter", toHover, { signal });
   anchor.addEventListener("pointerleave", reset, { signal });
-  anchor.addEventListener("pointerdown", (event) => {
-    if (event.button === 0) {
-      toActive();
-    }
-  }, { signal });
+  anchor.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (event.button === 0) {
+        toActive();
+      }
+    },
+    { signal },
+  );
   anchor.addEventListener("pointerup", reset, { signal });
   anchor.addEventListener("pointercancel", reset, { signal });
   anchor.addEventListener("focus", handleFocus, { signal });
   anchor.addEventListener("blur", toDefault, { signal });
-  anchor.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" || event.key === " ") {
-      toActive();
-    }
-  }, { signal });
-  anchor.addEventListener("keyup", (event) => {
-    if (event.key === "Enter" || event.key === " ") {
-      handleFocus();
-    }
-  }, { signal });
+  anchor.addEventListener(
+    "keydown",
+    (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        toActive();
+      }
+    },
+    { signal },
+  );
+  anchor.addEventListener(
+    "keyup",
+    (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        handleFocus();
+      }
+    },
+    { signal },
+  );
 
-  anchor.addEventListener("htmx:beforeRequest", () => {
-    setPressed();
-    applyState(img, "active");
-  }, { signal });
+  anchor.addEventListener(
+    "htmx:beforeRequest",
+    () => {
+      setPressed();
+      applyState(img, "active");
+    },
+    { signal },
+  );
 
   const clearAfterRequest = () => {
     reset();
@@ -153,9 +166,7 @@ function initLogo(anchor) {
   anchor.addEventListener("htmx:responseError", clearAfterRequest, { signal });
   anchor.addEventListener("htmx:sendError", clearAfterRequest, { signal });
 
-  const startingState = (anchor.matches(":hover") || isFocusVisible(anchor))
-    ? "hover"
-    : "default";
+  const startingState = anchor.matches(":hover") || isFocusVisible(anchor) ? "hover" : "default";
   applyState(img, startingState);
 }
 

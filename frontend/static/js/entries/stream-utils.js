@@ -38,9 +38,9 @@ export function findTypingIndicator(root, entryId) {
       return scoped;
     }
 
-    const typed = Array.from(
-      searchRoot.querySelectorAll(TYPING_INDICATOR_SELECTOR),
-    ).find((node) => node?.dataset?.entryId === normalized);
+    const typed = Array.from(searchRoot.querySelectorAll(TYPING_INDICATOR_SELECTOR)).find(
+      (node) => node?.dataset?.entryId === normalized,
+    );
     if (typed) {
       return typed;
     }

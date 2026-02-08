@@ -9,18 +9,15 @@ const escapeHtml = (value) =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
-const globalScope = typeof globalThis !== "undefined"
-  ? globalThis
-  : typeof window !== "undefined"
-  ? window
-  : {};
+const globalScope =
+  typeof globalThis !== "undefined" ? globalThis : typeof window !== "undefined" ? window : {};
 
 const marked = markedGlobal ?? globalScope.marked;
 const DOMPurify = DOMPurifyGlobal ?? globalScope.DOMPurify;
 
 const renderer = new marked.Renderer();
 renderer.html = (html) => {
-  const raw = typeof html === "string" ? html : html?.text ?? "";
+  const raw = typeof html === "string" ? html : (html?.text ?? "");
   return `<pre class="code-block"><code>${escapeHtml(raw)}</code></pre>`;
 };
 
@@ -62,9 +59,10 @@ export function renderMarkdownInElement(el, text) {
     return;
   }
 
-  const hasPreRenderedHtml = el.dataset.rendered === "true"
-    && el.dataset.markdownSource === undefined
-    && (text === undefined || text === null);
+  const hasPreRenderedHtml =
+    el.dataset.rendered === "true" &&
+    el.dataset.markdownSource === undefined &&
+    (text === undefined || text === null);
 
   if (hasPreRenderedHtml) {
     return;
@@ -135,8 +133,8 @@ function collectMarkdownBodies(root, nodes) {
     if (!node || node.nodeType !== Node.ELEMENT_NODE) return;
 
     if (
-      node.matches?.(MARKDOWN_SELECTOR)
-      || (node.matches?.(".markdown-body") && node.closest?.(".entry"))
+      node.matches?.(MARKDOWN_SELECTOR) ||
+      (node.matches?.(".markdown-body") && node.closest?.(".entry"))
     ) {
       markdownNodes.add(node);
     }
@@ -182,10 +180,7 @@ export function renderAllMarkdown(root, nodes = null, options = {}) {
       // Streaming responses manage their own incremental rendering to avoid deleting the typing indicator mid-update.
       return;
     }
-    if (
-      el.dataset.rendered !== "true"
-      && !el.querySelector(TYPING_INDICATOR_SELECTOR)
-    ) {
+    if (el.dataset.rendered !== "true" && !el.querySelector(TYPING_INDICATOR_SELECTOR)) {
       renderMarkdownInElement(el);
       if (typeof options.onRender === "function") {
         options.onRender(el);

@@ -1,4 +1,8 @@
-import { addMarkdownRenderListener, removeMarkdownRenderListener, renderAllMarkdown } from "../markdown.js";
+import {
+  addMarkdownRenderListener,
+  removeMarkdownRenderListener,
+  renderAllMarkdown,
+} from "../markdown.js";
 
 export class MarkdownObserver {
   #listener = null;
@@ -105,12 +109,11 @@ export class MarkdownObserver {
         if (typeof rootNode.contains === "function") {
           contains = rootNode.contains(element);
         } else if (
-          typeof rootNode.compareDocumentPosition === "function"
-          && element instanceof Node
+          typeof rootNode.compareDocumentPosition === "function" &&
+          element instanceof Node
         ) {
           contains = Boolean(
-            rootNode.compareDocumentPosition(element)
-              & Node.DOCUMENT_POSITION_CONTAINED_BY,
+            rootNode.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_CONTAINED_BY,
           );
         }
         if (!contains) {
@@ -124,9 +127,7 @@ export class MarkdownObserver {
     }
 
     if (typeof document !== "undefined") {
-      document.dispatchEvent(
-        new CustomEvent("markdown:rendered", { detail: { element } }),
-      );
+      document.dispatchEvent(new CustomEvent("markdown:rendered", { detail: { element } }));
     }
   }
 

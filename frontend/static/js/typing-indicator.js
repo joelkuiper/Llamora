@@ -33,14 +33,16 @@ function getLastNonWhitespaceTextNode(root) {
       return /\S/.test(node.nodeValue || "") ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
     },
   });
-  let last = null, n;
+  let last = null,
+    n;
   while ((n = tw.nextNode())) last = n;
   return last;
 }
 
 function getDeepestInlineElement(root) {
   const tw = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
-  let lastInline = null, n = root;
+  let lastInline = null,
+    n = root;
   do {
     if (isInlineElement(n) && !isVoidElement(n)) lastInline = n;
   } while ((n = tw.nextNode()));
@@ -67,8 +69,9 @@ export function positionTypingIndicator(root, typingEl) {
   const lastText = getLastNonWhitespaceTextNode(root);
   if (lastText) {
     const parentEl = lastText.parentElement;
-    const inPre = parentEl
-      && (parentEl.closest("pre") || (getComputedStyle(parentEl).whiteSpace || "").includes("pre"));
+    const inPre =
+      parentEl &&
+      (parentEl.closest("pre") || (getComputedStyle(parentEl).whiteSpace || "").includes("pre"));
 
     if (inPre) {
       const v = lastText.nodeValue || "";
@@ -95,7 +98,7 @@ export function positionTypingIndicator(root, typingEl) {
   const tw = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
   let n;
   while ((n = tw.nextNode())) lastEl = n;
-  const target = (lastEl && !isVoidElement(lastEl)) ? lastEl : root;
+  const target = lastEl && !isVoidElement(lastEl) ? lastEl : root;
 
   const zwsp = document.createTextNode("\u200B");
   target.appendChild(zwsp);

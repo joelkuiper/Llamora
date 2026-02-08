@@ -1,4 +1,8 @@
-import { requestScrollTarget, requestScrollTargetConsumed, scrollEvents } from "./entries/scroll-manager.js";
+import {
+  requestScrollTarget,
+  requestScrollTargetConsumed,
+  scrollEvents,
+} from "./entries/scroll-manager.js";
 import { animateMotion, motionSafeBehavior } from "./services/motion.js";
 import { scheduleRafLoop } from "./utils/scheduler.js";
 
@@ -9,21 +13,14 @@ export const SPINNER = {
 
 function spin(el, text = "") {
   let i = 0;
-  el.textContent = text
-    ? `${SPINNER.frames[i]} ${text}`
-    : SPINNER.frames[i];
+  el.textContent = text ? `${SPINNER.frames[i]} ${text}` : SPINNER.frames[i];
   return setInterval(() => {
     i = (i + 1) % SPINNER.frames.length;
-    el.textContent = text
-      ? `${SPINNER.frames[i]} ${text}`
-      : SPINNER.frames[i];
+    el.textContent = text ? `${SPINNER.frames[i]} ${text}` : SPINNER.frames[i];
   }, SPINNER.interval);
 }
 
-export function createInlineSpinner(
-  element,
-  { text = "" } = {},
-) {
+export function createInlineSpinner(element, { text = "" } = {}) {
   let spinnerEl = element || null;
   let intervalId = null;
 
@@ -145,9 +142,7 @@ export function clearScrollTarget(target, options = {}) {
 
   if (hadTargetParam || shouldClearHash) {
     const query = params.toString();
-    const baseUrl = query
-      ? `${window.location.pathname}?${query}`
-      : window.location.pathname;
+    const baseUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
     const finalUrl = shouldClearHash ? baseUrl : `${baseUrl}${window.location.hash}`;
     const state = historyState ?? history.state;
     history.replaceState(state, "", finalUrl);
@@ -221,9 +216,7 @@ export function scrollToHighlight(fallbackTarget, options = {}) {
     if (!consumedFallback) return;
     if (cleanupTimeoutId !== null) return;
 
-    const delay = Number.isFinite(fallbackCleanupDelay)
-      ? fallbackCleanupDelay
-      : 0;
+    const delay = Number.isFinite(fallbackCleanupDelay) ? fallbackCleanupDelay : 0;
     if (delay < 0) return;
 
     cleanupTimeoutId = window.setTimeout(() => cleanupFallbackTarget(), delay);
@@ -232,9 +225,7 @@ export function scrollToHighlight(fallbackTarget, options = {}) {
   if (target) {
     if (shouldUpdateHistory || window.location.hash) {
       const query = params.toString();
-      const baseUrl = query
-        ? `${window.location.pathname}?${query}`
-        : window.location.pathname;
+      const baseUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
       const hash = initialHash || "";
       const newUrl = hash ? `${baseUrl}${hash}` : baseUrl;
 
@@ -307,9 +298,8 @@ export function scrollToHighlight(fallbackTarget, options = {}) {
     };
 
     const pollForTarget = () => {
-      const timeout = Number.isFinite(targetPollTimeout) && targetPollTimeout > 0
-        ? targetPollTimeout
-        : 0;
+      const timeout =
+        Number.isFinite(targetPollTimeout) && targetPollTimeout > 0 ? targetPollTimeout : 0;
       if (timeout <= 0) return;
 
       poller = scheduleRafLoop({

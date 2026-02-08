@@ -35,10 +35,7 @@ async function ensureVendors() {
     });
 
     await importOnce("htmx-ext-response-targets", async () => {
-      if (
-        htmx.findExtension?.("response-targets")
-        || htmx.extensions?.["response-targets"]
-      ) {
+      if (htmx.findExtension?.("response-targets") || htmx.extensions?.["response-targets"]) {
         return null;
       }
       return import("../vendor/htmx-ext-response-targets.js");
@@ -85,8 +82,8 @@ const FEATURE_IMPORTS = {
 async function ensureFeatureModules(scope) {
   const loaders = [];
   const resolver = (selector) =>
-    (scope && scope.querySelector && scope.querySelector(selector))
-    || document.querySelector(selector);
+    (scope && scope.querySelector && scope.querySelector(selector)) ||
+    document.querySelector(selector);
 
   Object.entries(FEATURE_IMPORTS).forEach(([key, { selector, loader }]) => {
     if (resolver(selector)) {
@@ -104,9 +101,7 @@ async function rehydrate(context) {
   await ensureShell();
   await ensureFeatureModules(scope);
 
-  document.dispatchEvent(
-    new CustomEvent("app:rehydrate", { detail: { context: scope } }),
-  );
+  document.dispatchEvent(new CustomEvent("app:rehydrate", { detail: { context: scope } }));
 
   globalThis.appInit?.initGlobalShell?.();
 }

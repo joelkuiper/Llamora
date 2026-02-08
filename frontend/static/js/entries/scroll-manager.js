@@ -71,14 +71,10 @@ const emitScrollEvent = (eventName, baseDetail, detail = {}) => {
 };
 
 export function requestScrollForceBottom(detail = {}) {
-  return emitScrollEvent(
-    FORCE_BOTTOM_EVENT,
-    FORCE_BOTTOM_DETAIL_BASE,
-    {
-      ...detail,
-      force: detail?.force === true,
-    },
-  );
+  return emitScrollEvent(FORCE_BOTTOM_EVENT, FORCE_BOTTOM_DETAIL_BASE, {
+    ...detail,
+    force: detail?.force === true,
+  });
 }
 
 export function requestScrollTarget(target, options = null, detail = {}) {
@@ -98,14 +94,10 @@ export function requestScrollTarget(target, options = null, detail = {}) {
 }
 
 export function requestScrollTargetConsumed(target, detail = {}) {
-  return emitScrollEvent(
-    TARGET_CONSUMED_EVENT,
-    TARGET_CONSUMED_DETAIL_BASE,
-    {
-      ...detail,
-      target: target ?? null,
-    },
-  );
+  return emitScrollEvent(TARGET_CONSUMED_EVENT, TARGET_CONSUMED_DETAIL_BASE, {
+    ...detail,
+    target: target ?? null,
+  });
 }
 
 const DEFAULT_CONTAINER_SELECTOR = "#content-wrapper";
@@ -157,9 +149,7 @@ export class ScrollManager {
     // `highlight` class or a temporary `data-flash-timer-id` attribute while
     // the animation is in progress. When either marker is present we should
     // treat the highlight as active and avoid clobbering the scroll position.
-    const highlight = this.container.querySelector?.(
-      "[data-flash-timer-id], .entry.highlight",
-    );
+    const highlight = this.container.querySelector?.("[data-flash-timer-id], .entry.highlight");
     return highlight instanceof HTMLElement;
   }
 
@@ -351,7 +341,8 @@ export class ScrollManager {
     const key = this.#getKey();
     const saved = this.#safeGet(key);
     const savedTop = saved != null ? Number.parseInt(saved, 10) : NaN;
-    const shouldRestore = Number.isFinite(savedTop) && (currentTop === 0 || Math.abs(savedTop - currentTop) > 4);
+    const shouldRestore =
+      Number.isFinite(savedTop) && (currentTop === 0 || Math.abs(savedTop - currentTop) > 4);
 
     if (shouldRestore) {
       this.restore();
@@ -482,10 +473,7 @@ export class ScrollManager {
       this.scrollBtnContainer?.pulse?.();
       if (this.scrollBtn && !this.scrollBtnContainer?.pulse) {
         this.scrollBtn.classList.add("clicked");
-        window.setTimeout(
-          () => this.scrollBtn?.classList.remove("clicked"),
-          300,
-        );
+        window.setTimeout(() => this.scrollBtn?.classList.remove("clicked"), 300);
       }
     }
     this.scrollToBottom(true);
@@ -690,8 +678,8 @@ export class ScrollManager {
 
     const key = this.#getKey();
     const params = new URLSearchParams(window.location.search);
-    const hasTarget = params.has("target")
-      || (window.location.hash && window.location.hash.startsWith("#entry-"));
+    const hasTarget =
+      params.has("target") || (window.location.hash && window.location.hash.startsWith("#entry-"));
 
     if (hasTarget) {
       return;

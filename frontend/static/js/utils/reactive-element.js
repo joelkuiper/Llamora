@@ -124,9 +124,7 @@ export class ReactiveElement extends HTMLElement {
       if (!selector || typeof selector !== "string") {
         return null;
       }
-      const local = isFunction(this.querySelector)
-        ? this.querySelector(selector)
-        : null;
+      const local = isFunction(this.querySelector) ? this.querySelector(selector) : null;
       if (local) {
         return local;
       }
@@ -138,9 +136,7 @@ export class ReactiveElement extends HTMLElement {
         }
       }
       const doc = this.ownerDocument ?? document;
-      return typeof doc.querySelector === "function"
-        ? doc.querySelector(selector)
-        : null;
+      return typeof doc.querySelector === "function" ? doc.querySelector(selector) : null;
     };
 
     const createScopeResolver = (value) => {

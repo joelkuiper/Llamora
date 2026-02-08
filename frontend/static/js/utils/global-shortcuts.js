@@ -9,10 +9,10 @@ const isEditableTarget = (target) => {
   }
   const tagName = target.tagName;
   return (
-    tagName === "INPUT"
-    || tagName === "TEXTAREA"
-    || target.isContentEditable
-    || target.closest?.("[contenteditable='true']")
+    tagName === "INPUT" ||
+    tagName === "TEXTAREA" ||
+    target.isContentEditable ||
+    target.closest?.("[contenteditable='true']")
   );
 };
 

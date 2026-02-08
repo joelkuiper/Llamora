@@ -1,6 +1,15 @@
-import { applyTimezoneSearchParam, formatIsoDate, getTimezone, parseDateFromSource } from "./services/datetime.js";
+import {
+  applyTimezoneSearchParam,
+  formatIsoDate,
+  getTimezone,
+  parseDateFromSource,
+} from "./services/datetime.js";
 export { formatIsoDate, parseDateFromSource } from "./services/datetime.js";
-import { ACTIVE_DAY_CHANGED_EVENT, getActiveDay, getActiveDayLabel } from "./entries/active-day-store.js";
+import {
+  ACTIVE_DAY_CHANGED_EVENT,
+  getActiveDay,
+  getActiveDayLabel,
+} from "./entries/active-day-store.js";
 import { updateClientToday } from "./services/time.js";
 
 function ordinalSuffix(day) {
@@ -107,9 +116,10 @@ const resolveNavElements = () => {
 };
 
 const getMinDateFromDom = () => {
-  const source = document?.querySelector?.("#entries")?.dataset?.minDate
-    || document?.body?.dataset?.minDate
-    || "";
+  const source =
+    document?.querySelector?.("#entries")?.dataset?.minDate ||
+    document?.body?.dataset?.minDate ||
+    "";
   const parsed = parseDateFromSource(source);
   return parsed?.date ?? null;
 };
@@ -132,16 +142,15 @@ const applyDayStateToNav = ({ activeDay, label, forceFlash = false }) => {
   const parsed = parseDateFromSource(activeDaySource);
   const currentDate = parsed?.date ?? null;
   const minDate = syncNavMinDate();
-  const isFirstDay = Boolean(
-    currentDate && minDate && currentDate.getTime() === minDate.getTime(),
-  );
+  const isFirstDay = Boolean(currentDate && minDate && currentDate.getTime() === minDate.getTime());
 
   if (labelNode) {
-    const labelText = typeof label === "string" && label
-      ? label
-      : currentDate
-      ? formatLongDate(currentDate)
-      : activeDaySource;
+    const labelText =
+      typeof label === "string" && label
+        ? label
+        : currentDate
+          ? formatLongDate(currentDate)
+          : activeDaySource;
     if (typeof labelText === "string") {
       const previousLabel = labelNode.textContent;
       labelNode.textContent = labelText;
@@ -195,9 +204,8 @@ const applyDayStateToNav = ({ activeDay, label, forceFlash = false }) => {
 const handleActiveDayChange = (event) => {
   const detail = event?.detail || {};
   const activeDay = typeof detail.activeDay === "string" ? detail.activeDay : getActiveDay();
-  const label = typeof detail.activeDayLabel === "string"
-    ? detail.activeDayLabel
-    : getActiveDayLabel();
+  const label =
+    typeof detail.activeDayLabel === "string" ? detail.activeDayLabel : getActiveDayLabel();
   const forceFlash = Boolean(detail.forceFlash);
   applyDayStateToNav({ activeDay, label, forceFlash });
 };
@@ -214,10 +222,7 @@ export function initDayNav(entries, options = {}) {
   });
 
   if (!navListenerRegistered) {
-    document.addEventListener(
-      ACTIVE_DAY_CHANGED_EVENT,
-      handleActiveDayChange,
-    );
+    document.addEventListener(ACTIVE_DAY_CHANGED_EVENT, handleActiveDayChange);
     navListenerRegistered = true;
   }
 }

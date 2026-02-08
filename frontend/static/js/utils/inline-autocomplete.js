@@ -164,12 +164,8 @@ export class InlineAutocompleteController {
       for (const token of tokens) {
         const raw = sanitizeString(token);
         if (!raw) continue;
-        const prepared = this.#options.prepareCandidate
-          ? this.#options.prepareCandidate(raw)
-          : raw;
-        const normalized = this.#options.caseSensitive
-          ? prepared
-          : prepared.toLowerCase();
+        const prepared = this.#options.prepareCandidate ? this.#options.prepareCandidate(raw) : raw;
+        const normalized = this.#options.caseSensitive ? prepared : prepared.toLowerCase();
         if (!normalized) continue;
         if (!normalizedTokens.includes(normalized)) {
           normalizedTokens.push(normalized);
@@ -246,7 +242,8 @@ export class InlineAutocompleteController {
     const input = this.#input;
     if (!input) return;
 
-    this.#inputHandler = (event) => this.#updateSuggestion({ fromUserInput: true, inputEvent: event });
+    this.#inputHandler = (event) =>
+      this.#updateSuggestion({ fromUserInput: true, inputEvent: event });
     this.#keydownHandler = (event) => this.#handleKeydown(event);
     this.#blurHandler = () => {
       this.#clearSuggestion({ restore: true });
@@ -272,9 +269,7 @@ export class InlineAutocompleteController {
   }
 
   #normalizeQuery(raw) {
-    const prepared = this.#options.prepareQuery
-      ? this.#options.prepareQuery(raw)
-      : raw;
+    const prepared = this.#options.prepareQuery ? this.#options.prepareQuery(raw) : raw;
     if (!prepared) {
       return "";
     }
@@ -389,7 +384,7 @@ export class InlineAutocompleteController {
         continue;
       }
       const haystack = this.#options.caseSensitive
-        ? candidate.display ?? candidate.value
+        ? (candidate.display ?? candidate.value)
         : (candidate.display ?? candidate.value).toLowerCase();
       for (const token of candidate.normalizedTokens) {
         if (!token.startsWith(normalizedQuery)) {
@@ -399,9 +394,10 @@ export class InlineAutocompleteController {
         const tokenIndex = haystack.indexOf(token);
         const comparableIndex = tokenIndex >= 0 ? tokenIndex : Infinity;
         const bestTokenLength = bestMatch?.token?.length ?? Infinity;
-        const bestComparableIndex = bestMatch?.tokenIndex != null && bestMatch.tokenIndex >= 0
-          ? bestMatch.tokenIndex
-          : Infinity;
+        const bestComparableIndex =
+          bestMatch?.tokenIndex != null && bestMatch.tokenIndex >= 0
+            ? bestMatch.tokenIndex
+            : Infinity;
         const matchLength = Math.min(normalizedQuery.length, token.length);
         const match = {
           candidate,
@@ -412,9 +408,9 @@ export class InlineAutocompleteController {
         };
 
         if (
-          !bestMatch
-          || token.length < bestTokenLength
-          || (token.length === bestTokenLength && comparableIndex < bestComparableIndex)
+          !bestMatch ||
+          token.length < bestTokenLength ||
+          (token.length === bestTokenLength && comparableIndex < bestComparableIndex)
         ) {
           bestMatch = match;
         }
@@ -437,9 +433,9 @@ export class InlineAutocompleteController {
     } else if (event.key === "ArrowRight") {
       const { selectionStart, selectionEnd, value } = this.#input;
       if (
-        typeof selectionEnd === "number"
-        && selectionEnd === value.length
-        && typeof selectionStart === "number"
+        typeof selectionEnd === "number" &&
+        selectionEnd === value.length &&
+        typeof selectionStart === "number"
       ) {
         this.#applySuggestion("arrow");
       }

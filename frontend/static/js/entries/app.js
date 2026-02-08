@@ -3,11 +3,7 @@ import "../vendor/htmx-extensions.js";
 
 const ENTRY_LOADERS = {
   "app-shell": () => import("../runtime/loader.js"),
-  "auth-forms": () =>
-    Promise.all([
-      import("../forms.js"),
-      import("../password-strength.js"),
-    ]),
+  "auth-forms": () => Promise.all([import("../forms.js"), import("../password-strength.js")]),
   recovery: () => import("../recovery.js"),
 };
 
@@ -47,9 +43,7 @@ function loadEntry(name) {
 
 function loadEntries(entries) {
   const tokens = Array.isArray(entries) ? entries : parseEntries(entries);
-  const promises = tokens
-    .map((token) => loadEntry(token))
-    .filter((promise) => Boolean(promise));
+  const promises = tokens.map((token) => loadEntry(token)).filter((promise) => Boolean(promise));
   return Promise.all(promises);
 }
 
@@ -70,9 +64,7 @@ function observeBodyEntry() {
   let previous = new Set(readBodyEntries());
   const observer = new MutationObserver(() => {
     const currentEntries = new Set(readBodyEntries());
-    const newEntries = Array.from(currentEntries).filter(
-      (entry) => !previous.has(entry),
-    );
+    const newEntries = Array.from(currentEntries).filter((entry) => !previous.has(entry));
     previous = currentEntries;
     if (newEntries.length > 0) {
       loadEntries(newEntries);

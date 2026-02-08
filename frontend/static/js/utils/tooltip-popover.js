@@ -10,12 +10,7 @@ function withOffset(modifiers = [], offset = [0, 8]) {
 }
 
 export function createTooltipPopover(trigger, popover, options = {}) {
-  const {
-    offset = [0, 8],
-    popperOptions = {},
-    onHidden,
-    ...popoverOptions
-  } = options;
+  const { offset = [0, 8], popperOptions = {}, onHidden, ...popoverOptions } = options;
 
   const listeners = createListenerBag();
   let destroyed = false;

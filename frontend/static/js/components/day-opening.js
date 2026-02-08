@@ -40,10 +40,7 @@ function applyCollapsed(opening, collapsed) {
   const toggle = opening.querySelector("[data-opening-toggle]");
   if (toggle) {
     toggle.setAttribute("aria-expanded", String(!collapsed));
-    toggle.setAttribute(
-      "aria-label",
-      collapsed ? "Expand day opening" : "Collapse day opening",
-    );
+    toggle.setAttribute("aria-label", collapsed ? "Expand day opening" : "Collapse day opening");
   }
 }
 

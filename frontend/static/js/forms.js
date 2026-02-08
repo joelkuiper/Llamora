@@ -6,7 +6,7 @@ const FORM_SELECTOR = ".form-container form, .profile-modal form";
 
 function collectForms(root = document) {
   const forms = [];
-  const scope = root instanceof Document ? root : root ?? document;
+  const scope = root instanceof Document ? root : (root ?? document);
 
   if (!scope) {
     return forms;
@@ -33,7 +33,7 @@ export function initForms(root = document) {
     form.dataset.initFormsBound = "1";
 
     form.addEventListener("submit", async (e) => {
-      const btn = form.querySelector("button[type=\"submit\"]");
+      const btn = form.querySelector('button[type="submit"]');
       if (!btn || btn.dataset.spinning === "1") return;
 
       const loadingText = btn.dataset.loading || "Loading";
@@ -98,7 +98,7 @@ function resetSpinningButtons(scope = document) {
   const forms = collectForms(scope);
 
   forms.forEach((form) => {
-    form.querySelectorAll("button[data-spinning=\"1\"]").forEach((btn) => {
+    form.querySelectorAll('button[data-spinning="1"]').forEach((btn) => {
       stopButtonSpinner(btn);
     });
   });

@@ -66,8 +66,7 @@
   box-shadow:
     var(--raised-shadow),
     0 0 0 2px var(--accent-10);
-  background: linear-gradient(0deg, var(--accent-15), var(--accent-05))
-    var(--glass-bg-alt);
+  background: linear-gradient(0deg, var(--accent-15), var(--accent-05)) var(--glass-bg-alt);
 }
 
 .entry-tag.is-active {
@@ -75,8 +74,7 @@
   box-shadow:
     var(--raised-shadow),
     0 0 0 2px var(--accent-15);
-  background: linear-gradient(0deg, var(--accent-15), var(--accent-05))
-    var(--glass-bg-alt);
+  background: linear-gradient(0deg, var(--accent-15), var(--accent-05)) var(--glass-bg-alt);
   color: var(--glass-text-stronger);
 }
 
@@ -301,11 +299,7 @@
       flex: 0 0 auto;
       padding: 0 14px;
       border: 0;
-      background: linear-gradient(
-        0deg,
-        var(--glass-bg-alt),
-        var(--glass-bg-strong)
-      );
+      background: linear-gradient(0deg, var(--glass-bg-alt), var(--glass-bg-strong));
       color: var(--glass-text-stronger);
       font-weight: 600;
       font-size: 14px;
@@ -321,8 +315,7 @@
           var(--raised-shadow),
           0 0 0 3px var(--accent-20),
           0 12px 28px var(--accent-10);
-        background: linear-gradient(0deg, var(--accent-10), transparent)
-          var(--glass-bg-alt);
+        background: linear-gradient(0deg, var(--accent-10), transparent) var(--glass-bg-alt);
       }
 
       &:active {
@@ -409,8 +402,7 @@
       box-shadow:
         var(--raised-shadow),
         0 0 0 2px var(--accent-10);
-      background: linear-gradient(0deg, var(--accent-15), var(--accent-05))
-        var(--glass-bg-alt);
+      background: linear-gradient(0deg, var(--accent-15), var(--accent-05)) var(--glass-bg-alt);
     }
     &:active {
       transform: translateY(1px);
@@ -425,11 +417,7 @@
     height: 1.4rem;
     display: inline-flex;
     align-items: center;
-    border-color: color-mix(
-      in srgb,
-      var(--border) 85%,
-      var(--color-text-muted)
-    );
+    border-color: color-mix(in srgb, var(--border) 85%, var(--color-text-muted));
     background: color-mix(in srgb, var(--glass-bg-alt) 88%, var(--color-bg));
     box-shadow: var(--inset-shadow);
     cursor: default;
@@ -518,11 +506,7 @@
   box-shadow: var(--subtle-raised-shadow);
   --action-color: var(--accent);
   --action-border: color-mix(in srgb, var(--action-color) 35%, var(--border));
-  --action-bg: color-mix(
-    in srgb,
-    var(--action-color) var(--action-tint),
-    var(--glass-bg-alt)
-  );
+  --action-bg: color-mix(in srgb, var(--action-color) var(--action-tint), var(--glass-bg-alt));
   --action-icon: color-mix(in srgb, var(--action-color) 65%, var(--color-text));
 }
 
@@ -718,11 +702,7 @@
   border: 1px solid transparent;
   color: inherit;
   background: transparent;
-  background-image: linear-gradient(
-    90deg,
-    var(--accent-05) 0%,
-    transparent 72%
-  );
+  background-image: linear-gradient(90deg, var(--accent-05) 0%, transparent 72%);
   background-size: 0% 100%;
   background-repeat: no-repeat;
   margin-left: 0.15rem;

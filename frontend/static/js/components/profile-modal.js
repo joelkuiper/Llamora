@@ -84,9 +84,8 @@ function initProfileModal(modal) {
 }
 
 function boot(context = document) {
-  const scope = context instanceof Element || context instanceof DocumentFragment
-    ? context
-    : document;
+  const scope =
+    context instanceof Element || context instanceof DocumentFragment ? context : document;
   const modal = scope.querySelector(MODAL_SELECTOR);
   if (modal) {
     initProfileModal(modal);

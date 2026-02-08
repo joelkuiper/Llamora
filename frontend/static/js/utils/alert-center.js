@@ -82,9 +82,7 @@ function applyDataset(alert, dataset = {}) {
 
 function setAlertVariant(alert, variant) {
   const classes = Array.from(alert.classList);
-  const extras = classes.filter(
-    (name) => !name.startsWith("alert--") && name !== "alert",
-  );
+  const extras = classes.filter((name) => !name.startsWith("alert--") && name !== "alert");
   const nextClasses = ["alert"];
   if (variant) {
     nextClasses.push(`alert--${variant}`);
@@ -313,9 +311,7 @@ function findExistingAlert(container, payload) {
   if (window.CSS?.escape) {
     return container.querySelector(`.alert[data-alert-id="${CSS.escape(id)}"]`);
   }
-  return container.querySelector(
-    `.alert[data-alert-id="${id.replace(/["\\]/g, "\\$&")}"]`,
-  );
+  return container.querySelector(`.alert[data-alert-id="${id.replace(/["\\]/g, "\\$&")}"]`);
 }
 
 export function pushAlert(payload) {

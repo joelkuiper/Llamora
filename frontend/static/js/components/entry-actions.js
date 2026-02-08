@@ -33,7 +33,10 @@ class EntryActions extends ReactiveElement {
       if (this.#isResponseActive()) {
         return;
       }
-      if (this.#button?.hasAttribute("disabled") || this.#button?.getAttribute("aria-disabled") === "true") {
+      if (
+        this.#button?.hasAttribute("disabled") ||
+        this.#button?.getAttribute("aria-disabled") === "true"
+      ) {
         return;
       }
       event.preventDefault();
@@ -107,9 +110,8 @@ class EntryActions extends ReactiveElement {
       return;
     }
     const entryId = this.dataset.entryId ?? "";
-    const day = document.getElementById("entries")?.dataset?.date
-      ?? document.body?.dataset?.activeDay
-      ?? "";
+    const day =
+      document.getElementById("entries")?.dataset?.date ?? document.body?.dataset?.activeDay ?? "";
     if (!entryId || !day) {
       return;
     }

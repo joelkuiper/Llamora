@@ -34,7 +34,9 @@
   box-shadow: 0 18px 50px rgba(12, 12, 14, 0.16);
   opacity: 0;
   transform: translateY(8px) scale(0.98);
-  transition: opacity 200ms ease, transform 220ms ease;
+  transition:
+    opacity 200ms ease,
+    transform 220ms ease;
 }
 
 .confirm-modal.is-open .confirm-modal__backdrop {
@@ -81,7 +83,10 @@
   padding: 6px 14px;
   font-size: 0.86rem;
   cursor: pointer;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
 }
 
 .confirm-modal__button:hover,
@@ -103,14 +108,10 @@
 }
 
 .confirm-modal[data-confirm-variant="danger"] .confirm-modal__confirm:hover,
-.confirm-modal[data-confirm-variant="danger"]
-  .confirm-modal__confirm:focus-visible {
+.confirm-modal[data-confirm-variant="danger"] .confirm-modal__confirm:focus-visible {
   border-color: var(--color-danger);
-  background: linear-gradient(
-    0deg,
-    rgba(208, 0, 48, 0.16),
-    rgba(208, 0, 48, 0.12)
-  ) var(--color-danger);
+  background: linear-gradient(0deg, rgba(208, 0, 48, 0.16), rgba(208, 0, 48, 0.12))
+    var(--color-danger);
   color: var(--color-bg);
   box-shadow:
     var(--raised-shadow),
