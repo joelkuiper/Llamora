@@ -3,6 +3,7 @@
   <div class="tp-content">
     <button type="button" class="overlay-close" aria-label="Close">×</button>
     <form hx-post="" hx-target="" hx-swap="beforeend">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
       <span class="inline-autocomplete inline-autocomplete--empty">
         <input type="text"
                name="tag"
