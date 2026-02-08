@@ -8,6 +8,7 @@
 - [x] Migrations
 - [ ] README
 Later
+- [ ] Generate demo data / test data set
 - [ ] DB backups?
 - [ ] Image support?
 - [ ] Tests
