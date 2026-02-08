@@ -11,7 +11,7 @@ Later
 - [ ] DB backups
 - [ ] Help / introduction flow
 - [ ] Better deploy/devops story
-  - [ ] Versioning / releases etc
+  - [ ] Versioning / CI / releases etc
 - [ ] Summaries for days as "tooltip" in calendar nav
 - [ ] Keyboard accessibility rethink
 - [ ] User settings (font, theme, prompts?, llm settings?, etc)
