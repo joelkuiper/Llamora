@@ -1046,6 +1046,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#activeTagHash = tagHash;
     this.#detailBody.innerHTML =
       this.#detailSkeleton || DEFAULT_TAG_DETAIL_SKELETON;
+    this.#detailBody.dataset.resetScroll = "1";
     this.#detailBody.setAttribute("hx-get", url);
     if (typeof htmx !== "undefined" && htmx?.ajax) {
       htmx.ajax("GET", url, {
@@ -1094,6 +1095,11 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     if (this.#detailBody) {
       formatTimeElements(this.#detailBody);
       this.#hydrateSummaryFromCache();
+      const entriesList = this.#detailBody.querySelector(".tag-detail__entries");
+      if (entriesList && this.#detailBody.dataset.resetScroll === "1") {
+        entriesList.scrollTop = 0;
+        delete this.#detailBody.dataset.resetScroll;
+      }
     }
   }
 
