@@ -23,6 +23,7 @@ def create_app():
     from quart import Quart, render_template, make_response, request, g
     from quart import abort, send_from_directory
     from quart_wtf import CSRFProtect
+    from typing import Any, cast
     from .services.container import AppLifecycle, AppServices
 
     errors = validate_settings()
@@ -139,13 +140,16 @@ def create_app():
             from quart.middleware.proxy_fix import ProxyFix  # type: ignore
         except Exception:  # pragma: no cover - fallback for older Quart
             from werkzeug.middleware.proxy_fix import ProxyFix  # type: ignore
-        app.asgi_app = ProxyFix(
-            app.asgi_app,
-            x_for=proxy_hops,
-            x_proto=proxy_hops,
-            x_host=proxy_hops,
-            x_port=proxy_hops,
-            x_prefix=proxy_hops,
+        app.asgi_app = cast(
+            Any,
+            ProxyFix(
+                cast(Any, app.asgi_app),
+                x_for=proxy_hops,
+                x_proto=proxy_hops,
+                x_host=proxy_hops,
+                x_port=proxy_hops,
+                x_prefix=proxy_hops,
+            ),
         )
         logger.info("ProxyFix enabled with trusted_hops=%d", proxy_hops)
 
@@ -197,7 +201,8 @@ def create_app():
     if debug_flag:
         @app.before_request
         async def _clear_template_cache() -> None:
-            app.jinja_env.cache.clear()
+            if app.jinja_env.cache is not None:
+                app.jinja_env.cache.clear()
 
     from .routes.auth import auth_bp
     from .routes.days import days_bp

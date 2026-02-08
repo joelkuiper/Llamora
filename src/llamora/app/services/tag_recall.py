@@ -5,7 +5,7 @@ from datetime import datetime
 import hashlib
 import asyncio
 from collections import deque
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence, cast
 
 import orjson
 import tiktoken
@@ -13,6 +13,7 @@ import tiktoken
 from llamora.llm.prompt_templates import render_prompt_template
 from llamora.llm.tokenizers.tokenizer import count_message_tokens
 from llamora.settings import settings
+from llamora.app.util.number import coerce_int
 
 @dataclass(slots=True)
 class TagRecallContext:
@@ -39,43 +40,48 @@ CacheKey = tuple[str, str, str, int]
 _SUMMARY_CACHE_LIMIT_FALLBACK = 512
 
 
-def _coerce_int(value: Any, default: int, *, minimum: int | None = None) -> int:
-    try:
-        candidate = int(value)
-    except (TypeError, ValueError):
-        return default
-    if minimum is not None and candidate < minimum:
-        return default
-    return candidate
-
-
 def get_tag_recall_config() -> TagRecallConfig:
     """Return the configured limits for tag-based recall."""
 
-    summary_max_chars = _coerce_int(
-        settings.get("TAG_RECALL.summary_max_chars", 640),
-        640,
-        minimum=0,
+    summary_max_chars = cast(
+        int,
+        coerce_int(
+            settings.get("TAG_RECALL.summary_max_chars", 640),
+            minimum=0,
+            default=640,
+        ),
     )
-    history_scope = _coerce_int(
-        settings.get("TAG_RECALL.history_scope", 20),
-        20,
-        minimum=0,
+    history_scope = cast(
+        int,
+        coerce_int(
+            settings.get("TAG_RECALL.history_scope", 20),
+            minimum=0,
+            default=20,
+        ),
     )
-    max_tags = _coerce_int(
-        settings.get("TAG_RECALL.max_tags", 5),
-        5,
-        minimum=0,
+    max_tags = cast(
+        int,
+        coerce_int(
+            settings.get("TAG_RECALL.max_tags", 5),
+            minimum=0,
+            default=5,
+        ),
     )
-    max_snippets = _coerce_int(
-        settings.get("TAG_RECALL.max_snippets", 5),
-        5,
-        minimum=0,
+    max_snippets = cast(
+        int,
+        coerce_int(
+            settings.get("TAG_RECALL.max_snippets", 5),
+            minimum=0,
+            default=5,
+        ),
     )
-    summary_cache_max = _coerce_int(
-        settings.get("TAG_RECALL.summary_cache_max", _SUMMARY_CACHE_LIMIT_FALLBACK),
-        _SUMMARY_CACHE_LIMIT_FALLBACK,
-        minimum=0,
+    summary_cache_max = cast(
+        int,
+        coerce_int(
+            settings.get("TAG_RECALL.summary_cache_max", _SUMMARY_CACHE_LIMIT_FALLBACK),
+            minimum=0,
+            default=_SUMMARY_CACHE_LIMIT_FALLBACK,
+        ),
     )
 
     return TagRecallConfig(

@@ -79,7 +79,7 @@ class EntryIndex:
                 self.index.resize_index(new_capacity)
                 self.max_elements = new_capacity
 
-            idxs = np.arange(self.next_idx, self.next_idx + len(ids))
+            idxs = list(range(self.next_idx, self.next_idx + len(ids)))
             logger.debug(
                 "Adding %d vectors starting at index %d", len(ids), self.next_idx
             )

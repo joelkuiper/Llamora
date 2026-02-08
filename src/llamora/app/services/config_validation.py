@@ -7,6 +7,7 @@ import binascii
 from collections.abc import Iterable
 
 from llamora.settings import settings
+from llamora.app.util.number import coerce_float, coerce_int
 
 
 def _normalise_text(value: object | None) -> str:
@@ -46,18 +47,16 @@ def _validate_llm_chat_settings() -> Iterable[str]:
     retries = _get_value(settings, "LLM.chat.max_retries")
 
     if timeout is not None:
-        try:
-            timeout_value = float(timeout)
-        except (TypeError, ValueError):
+        timeout_value = coerce_float(timeout)
+        if timeout_value is None:
             yield "LLM.chat.timeout_seconds must be a number."
         else:
             if timeout_value <= 0 or timeout_value > 300:
                 yield "LLM.chat.timeout_seconds must be between 1 and 300 seconds."
 
     if retries is not None:
-        try:
-            retries_value = int(retries)
-        except (TypeError, ValueError):
+        retries_value = coerce_int(retries)
+        if retries_value is None:
             yield "LLM.chat.max_retries must be an integer."
         else:
             if retries_value < 0 or retries_value > 10:

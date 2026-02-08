@@ -1,8 +1,9 @@
 import asyncio
 import logging
 from dataclasses import dataclass
+from typing import Any
 
-from quart import Blueprint, Request, jsonify, render_template, request
+from quart import Blueprint, Request, jsonify, render_template, request, abort
 from llamora.app.api.search import InvalidSearchQuery
 from llamora.app.services.container import get_search_api, get_services
 from llamora.app.services.auth_helpers import login_required
