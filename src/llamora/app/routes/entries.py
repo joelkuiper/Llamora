@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from quart import (
     Blueprint,
     render_template,
@@ -55,8 +54,6 @@ from llamora.settings import settings
 
 
 entries_bp = Blueprint("entries", __name__)
-
-
 
 
 def _entry_stream_manager():
@@ -270,8 +267,6 @@ async def update_entry(entry_id: str):
         "created_at": updated.get("created_at"),
     }
     day = updated.get("created_date") or local_date().isoformat()
-    response_kinds = _load_response_kinds()
-
     return await render_template(
         "partials/entry_main_only.html",
         entry=entry_payload,

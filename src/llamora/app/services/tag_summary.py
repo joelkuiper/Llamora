@@ -18,9 +18,8 @@ _MIN_SUMMARY_WORDS = 10
 
 
 def _tag_summary_system_prompt(entry_count: int) -> str:
-    return render_prompt_template(
-        "tag_summary_system.txt.j2", entry_count=entry_count
-    )
+    return render_prompt_template("tag_summary_system.txt.j2", entry_count=entry_count)
+
 
 def _tag_summary_response_format() -> dict[str, Any]:
     return {
@@ -77,6 +76,7 @@ def _clean_summary(raw: str) -> str:
             text += "..."
     return text
 
+
 def _extract_summary(raw: str) -> str:
     if not raw:
         return ""
@@ -89,6 +89,7 @@ def _extract_summary(raw: str) -> str:
         if isinstance(summary, str):
             return _clean_summary(summary)
     return _clean_summary(raw)
+
 
 def _summary_word_count(text: str) -> int:
     return len([seg for seg in str(text).split() if seg])
@@ -134,10 +135,9 @@ async def generate_tag_summary(
         return ""
 
     summary = _extract_summary(raw)
-    if (
-        _summary_word_count(summary) >= _MIN_SUMMARY_WORDS
-        and _summary_mentions_tag_once(summary, tag_name)
-    ):
+    if _summary_word_count(
+        summary
+    ) >= _MIN_SUMMARY_WORDS and _summary_mentions_tag_once(summary, tag_name):
         return summary
 
     retry_messages = [

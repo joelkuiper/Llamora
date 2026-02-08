@@ -129,7 +129,9 @@ def create_app():
 
     app = Quart(__name__, static_folder=None, static_url_path="/static")
     app.secret_key = settings.SECRET_KEY
-    debug_flag = bool(getattr(settings, "DEBUG", False)) or os.getenv("QUART_DEBUG") in (
+    debug_flag = bool(getattr(settings, "DEBUG", False)) or os.getenv(
+        "QUART_DEBUG"
+    ) in (
         "1",
         "true",
         "True",
@@ -199,6 +201,7 @@ def create_app():
     CSRFProtect(app)
     app.jinja_env.auto_reload = debug_flag
     if debug_flag:
+
         @app.before_request
         async def _clear_template_cache() -> None:
             if app.jinja_env.cache is not None:

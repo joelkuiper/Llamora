@@ -114,14 +114,16 @@ class TagService:
         cursor: str | None = None,
     ) -> tuple[list[TagEntryPreview], str | None, bool]:
         before_created_at, before_entry_id = _parse_tag_cursor(cursor)
-        entry_ids, next_cursor, has_more = (
-            await self._db.tags.get_recent_entries_page_for_tag_hashes(
-                user_id,
-                [tag_hash],
-                limit=limit,
-                before_created_at=before_created_at,
-                before_entry_id=before_entry_id,
-            )
+        (
+            entry_ids,
+            next_cursor,
+            has_more,
+        ) = await self._db.tags.get_recent_entries_page_for_tag_hashes(
+            user_id,
+            [tag_hash],
+            limit=limit,
+            before_created_at=before_created_at,
+            before_entry_id=before_entry_id,
         )
         if not entry_ids:
             return [], None, False

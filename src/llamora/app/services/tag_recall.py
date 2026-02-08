@@ -15,6 +15,7 @@ from llamora.llm.tokenizers.tokenizer import count_message_tokens
 from llamora.settings import settings
 from llamora.app.util.number import coerce_int
 
+
 @dataclass(slots=True)
 class TagRecallContext:
     """Represents summarised cross-day memories for tagged content."""
@@ -32,7 +33,6 @@ class TagRecallConfig:
     max_tags: int
     max_snippets: int
     summary_cache_max: int
-
 
 
 CacheKey = tuple[str, str, str, int]
@@ -285,7 +285,7 @@ async def _summarize_with_llm(
             {
                 "role": "system",
                 "content": system_prompt
-                + "\nReturn ONLY strict JSON matching {\"summary\":\"...\"}.",
+                + '\nReturn ONLY strict JSON matching {"summary":"..."}.',
             },
             {"role": "user", "content": user_prompt},
         ]
@@ -487,15 +487,10 @@ async def build_tag_recall_context(
 
     focus_slice = focus_tags[: cfg.max_tags]
     sem = asyncio.Semaphore(min(3, max(len(focus_slice), 1)))
-    tasks = [
-        _run_tag_snippet(tag_digest, sem)
-        for tag_digest in focus_slice
-    ]
+    tasks = [_run_tag_snippet(tag_digest, sem) for tag_digest in focus_slice]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     snippets = [
-        result
-        for result in results
-        if isinstance(result, str) and result.strip()
+        result for result in results if isinstance(result, str) and result.strip()
     ]
 
     if not snippets:

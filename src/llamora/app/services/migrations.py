@@ -76,7 +76,9 @@ def _run_migrations_sync(db_path: Path, *, verbose: bool) -> None:
         except sqlite3.Error:
             if _db_has_tables(db_path):
                 allow_enroll = bool(
-                    getattr(settings, "MIGRATIONS", {}).get("allow_enroll_existing", False)
+                    getattr(settings, "MIGRATIONS", {}).get(
+                        "allow_enroll_existing", False
+                    )
                 )
                 if not allow_enroll:
                     raise RuntimeError(

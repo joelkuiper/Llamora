@@ -57,6 +57,7 @@ def resolve_search_context(req: Request) -> SearchContext:
         result_window=result_window,
     )
 
+
 @search_bp.get("/search")
 @login_required
 async def search():

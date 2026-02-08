@@ -271,7 +271,10 @@ class LLMClient:
     ) -> None:
         self.logger = logging.getLogger(__name__)
         self.upstream = upstream
-        self.default_generation = {**DEFAULT_LLM_GENERATION, **(default_generation or {})}
+        self.default_generation = {
+            **DEFAULT_LLM_GENERATION,
+            **(default_generation or {}),
+        }
         self.ctx_size = upstream.ctx_size
         self.upstream_props = upstream.upstream_props
         self._chat_endpoint = self._normalize_chat_endpoint(
@@ -281,6 +284,7 @@ class LLMClient:
         if not base_url:
             base_url = self._chat_base_url(self.upstream_url, self._chat_endpoint)
         from llamora.app.util.number import parse_positive_int, parse_positive_float
+
         timeout = parse_positive_float(settings.get("LLM.chat.timeout_seconds"))
         max_retries = parse_positive_int(settings.get("LLM.chat.max_retries"))
         self._openai = AsyncOpenAI(
@@ -656,7 +660,7 @@ class LLMClient:
             },
         )
         payload = self._build_chat_payload(messages, cfg)
-        async with self._acquire_slot(entry_id) as slot_id:
+        async with self._acquire_slot(entry_id) as _slot_id:
             stream = _ChatStream(self, payload)
 
             try:

@@ -32,7 +32,9 @@ async def _render_day(date: str, target: str | None, view_kind: str):
     today = local_date().isoformat()
     min_date = await services.db.entries.get_first_entry_date(user["id"]) or today
     is_first_day = date == min_date
-    logger.debug("Render day=%s min_date=%s is_first_day=%s", date, min_date, is_first_day)
+    logger.debug(
+        "Render day=%s min_date=%s is_first_day=%s", date, min_date, is_first_day
+    )
     entries_response = await render_entries(
         date,
         oob=False,

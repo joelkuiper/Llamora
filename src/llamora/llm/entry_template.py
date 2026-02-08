@@ -222,4 +222,6 @@ def render_entry_prompt_series(
         messages = build_entry_messages(suffix_history, **context)
         suffix_tokens.append(estimate_entry_messages_tokens(messages))
 
-    return EntryPromptSeries(base_tokens=base_tokens, suffix_tokens=tuple(suffix_tokens))
+    return EntryPromptSeries(
+        base_tokens=base_tokens, suffix_tokens=tuple(suffix_tokens)
+    )

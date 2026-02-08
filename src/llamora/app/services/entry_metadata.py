@@ -20,6 +20,7 @@ def _metadata_system_prompt() -> str:
 
     return render_prompt_template("metadata_system.txt.j2")
 
+
 def _metadata_response_format() -> dict[str, Any]:
     return {
         "type": "json_schema",

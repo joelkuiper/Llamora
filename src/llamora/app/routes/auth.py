@@ -32,7 +32,6 @@ from llamora.settings import settings
 import re
 import orjson
 from zxcvbn import zxcvbn
-from llamora.app.services.time import local_date
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -113,17 +112,13 @@ def _resolve_profile_tab(tab: str | None) -> str:
     return tab_id if tab_id in PROFILE_TABS else "account"
 
 
-async def _render_profile_tab(
-    user: Mapping[str, Any], tab: str, **context
-):
+async def _render_profile_tab(user: Mapping[str, Any], tab: str, **context):
     context["user"] = user
     template = PROFILE_TABS[_resolve_profile_tab(tab)]
     return await render_template(template, **context)
 
 
-async def _render_profile_modal(
-    user: Mapping[str, Any], tab: str, **context
-):
+async def _render_profile_modal(user: Mapping[str, Any], tab: str, **context):
     context["user"] = user
     active_tab = _resolve_profile_tab(tab)
     context["active_tab"] = active_tab
@@ -504,10 +499,14 @@ async def change_password():
 
     max_pass = int(settings.LIMITS.max_password_length)
     if not current:
-        return await _render_profile_tab(user, "security", pw_error="All fields are required")
+        return await _render_profile_tab(
+            user, "security", pw_error="All fields are required"
+        )
 
     if len(current) > max_pass:
-        return await _render_profile_tab(user, "security", pw_error="Input exceeds max length")
+        return await _render_profile_tab(
+            user, "security", pw_error="Input exceeds max length"
+        )
 
     password_error = await validate_password(
         new,
@@ -525,11 +524,15 @@ async def change_password():
             user["password_hash"].encode("utf-8"), current.encode("utf-8")
         )
     except Exception:
-        return await _render_profile_tab(user, "security", pw_error="Invalid current password")
+        return await _render_profile_tab(
+            user, "security", pw_error="Invalid current password"
+        )
 
     dek = await session.dek()
     if dek is None:
-        return await _render_profile_tab(user, "security", pw_error="Missing encryption key")
+        return await _render_profile_tab(
+            user, "security", pw_error="Missing encryption key"
+        )
 
     password_bytes = new.encode("utf-8")
     hash_bytes = await _hash_password(password_bytes)
@@ -549,7 +552,9 @@ async def regen_recovery():
     user = await session.require_user()
     dek = await session.dek()
     if dek is None:
-        return await _render_profile_tab(user, "security", rc_error="Missing encryption key")
+        return await _render_profile_tab(
+            user, "security", rc_error="Missing encryption key"
+        )
 
     recovery_code = generate_recovery_code()
     rc_salt, rc_nonce, rc_cipher = wrap_key(dek, recovery_code)
