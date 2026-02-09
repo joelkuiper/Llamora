@@ -41,6 +41,7 @@ export class EntryView extends ReactiveElement {
   #markdownObserver = null;
   #initialized = false;
   #lastRenderedDay = null;
+  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: initialized via events elsewhere
   #entryFormReady = Promise.resolve();
   #pendingScrollTarget = null;
   #forceNavFlash = false;

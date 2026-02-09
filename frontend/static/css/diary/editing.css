@@ -55,7 +55,9 @@
   letter-spacing: 0.02em;
   color: var(--color-text-muted);
   opacity: 0;
-  transition: opacity var(--motion-gentle) ease, color var(--motion-gentle) ease;
+  transition:
+    opacity var(--motion-gentle) ease,
+    color var(--motion-gentle) ease;
   white-space: nowrap;
 }
 
@@ -79,7 +81,10 @@
   cursor: pointer;
   padding: 4px 10px 4px 8px;
   border-radius: 999px;
-  transition: color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+  transition:
+    color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease;
 }
 
 #entries .entry-edit-strip button:hover,

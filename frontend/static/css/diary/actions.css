@@ -2,7 +2,11 @@
   position: absolute;
   right: var(--spacing-sm);
   bottom: var(--spacing-sm);
-  transition: background 200ms ease, border-color 200ms ease, box-shadow 200ms ease, color 200ms ease;
+  transition:
+    background 200ms ease,
+    border-color 200ms ease,
+    box-shadow 200ms ease,
+    color 200ms ease;
 }
 
 #entries .entry.user .entry-delete {

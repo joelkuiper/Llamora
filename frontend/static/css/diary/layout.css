@@ -106,7 +106,10 @@ html[data-opening-collapsed="1"] #entries .entry.entry--opening .entry-opening-h
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: color 180ms ease, border-color 180ms ease, background 180ms ease;
+  transition:
+    color 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease;
 }
 
 #entries .entry.entry--opening .opening-toggle:hover,
@@ -149,7 +152,10 @@ html[data-opening-collapsed="1"] #entries .entry.entry--opening .entry-opening-h
   max-height: 60vh;
   opacity: 1;
   transform: translateY(0);
-  transition: max-height 240ms ease, opacity 200ms ease, transform 200ms ease;
+  transition:
+    max-height 240ms ease,
+    opacity 200ms ease,
+    transform 200ms ease;
   overflow: hidden;
 }
 
@@ -170,12 +176,20 @@ html[data-opening-collapsed="1"] #entries .entry.entry--opening .opening-content
 }
 
 #entries .entry.entry--opening.is-collapsed .opening-toggle [data-opening-icon-open],
-html[data-opening-collapsed="1"] #entries .entry.entry--opening .opening-toggle [data-opening-icon-open] {
+html[data-opening-collapsed="1"]
+  #entries
+  .entry.entry--opening
+  .opening-toggle
+  [data-opening-icon-open] {
   display: none;
 }
 
 #entries .entry.entry--opening.is-collapsed .opening-toggle [data-opening-icon-closed],
-html[data-opening-collapsed="1"] #entries .entry.entry--opening .opening-toggle [data-opening-icon-closed] {
+html[data-opening-collapsed="1"]
+  #entries
+  .entry.entry--opening
+  .opening-toggle
+  [data-opening-icon-closed] {
   display: block;
 }
 
