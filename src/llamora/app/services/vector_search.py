@@ -40,6 +40,12 @@ class VectorSearchService:
             cfg.poor_match_min_hits
         )
 
+    @staticmethod
+    def _entry_id_from_vector_id(vector_id: str) -> str:
+        if "::c" in vector_id:
+            return vector_id.split("::c", 1)[0]
+        return vector_id
+
     def _should_continue(
         self,
         start: float,
@@ -107,7 +113,7 @@ class VectorSearchService:
             "Vector search requested by user %s with k1=%d k2=%d", user_id, k1, k2
         )
         index = await self.index_store.ensure_index(user_id, dek)
-        total_count = index.index.get_current_count()
+        total_count = len(getattr(index, "entry_to_ids", {}))
         if query_vec is None:
             q_vec = (await async_embed_texts([query])).reshape(1, -1)
         else:
@@ -136,9 +142,10 @@ class VectorSearchService:
         seen = set()
         dedup_ids: List[str] = []
         id_cos: dict[str, float] = {}
-        for entry_id, cos in zip(ids, cosines):
-            if entry_id is None:
+        for vector_id, cos in zip(ids, cosines):
+            if vector_id is None:
                 continue
+            entry_id = self._entry_id_from_vector_id(vector_id)
             if entry_id not in seen:
                 seen.add(entry_id)
                 dedup_ids.append(entry_id)

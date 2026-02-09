@@ -7,9 +7,21 @@ import hnswlib
 import numpy as np
 
 from llamora.app.embed.model import async_embed_texts
+from llamora.app.services.chunking import chunk_text
+from llamora.settings import settings
 
 
 logger = logging.getLogger(__name__)
+
+
+def _vector_id(entry_id: str, chunk_index: int) -> str:
+    return f"{entry_id}::c{chunk_index}"
+
+
+def _entry_id_from_vector_id(vector_id: str) -> str:
+    if "::c" in vector_id:
+        return vector_id.split("::c", 1)[0]
+    return vector_id
 
 
 class EntryIndex:
@@ -33,6 +45,7 @@ class EntryIndex:
         self.index.set_ef(64)
         self.id_to_idx: Dict[str, int] = {}
         self.idx_to_id: Dict[int, str] = {}
+        self.entry_to_ids: Dict[str, set[str]] = {}
         self._free_idxs: list[int] = []
         self._free_set: set[int] = set()
         self.next_idx = 0
@@ -42,9 +55,9 @@ class EntryIndex:
     def touch(self) -> None:
         self.last_used = time.monotonic()
 
-    def contains(self, entry_id: str) -> bool:
-        """Return True if entry_id already indexed."""
-        return entry_id in self.id_to_idx
+    def contains_entry(self, entry_id: str) -> bool:
+        """Return True if any vectors for entry_id are indexed."""
+        return entry_id in self.entry_to_ids
 
     def add_batch(self, ids: list[str], vecs: np.ndarray) -> None:
         if not ids:
@@ -87,6 +100,8 @@ class EntryIndex:
             for entry_id, idx in zip(ids, idxs):
                 self.id_to_idx[entry_id] = int(idx)
                 self.idx_to_id[int(idx)] = entry_id
+                parent_id = _entry_id_from_vector_id(entry_id)
+                self.entry_to_ids.setdefault(parent_id, set()).add(entry_id)
             self.next_idx += len(ids)
             return
 
@@ -140,6 +155,8 @@ class EntryIndex:
         for entry_id, idx in zip(ids, idxs):
             self.id_to_idx[entry_id] = int(idx)
             self.idx_to_id[int(idx)] = entry_id
+            parent_id = _entry_id_from_vector_id(entry_id)
+            self.entry_to_ids.setdefault(parent_id, set()).add(entry_id)
 
     def search(self, query_vec: np.ndarray, k: int) -> tuple[list[str], np.ndarray]:
         self.touch()
@@ -160,41 +177,44 @@ class EntryIndex:
         ids: list[str] = []
         for label in labels_arr[0]:
             idx_label = int(label)
-            entry_id = self.idx_to_id.get(idx_label)
-            if entry_id is not None:
-                ids.append(entry_id)
+            vector_id = self.idx_to_id.get(idx_label)
+            if vector_id is not None:
+                ids.append(vector_id)
         return ids, dists[0][: len(ids)]
 
-    def remove_ids(self, ids: Iterable[str]) -> None:
+    def remove_entries(self, entry_ids: Iterable[str]) -> None:
         removed = False
-        for entry_id in ids:
-            idx = self.id_to_idx.pop(entry_id, None)
-            if idx is None:
-                continue
-            self.idx_to_id.pop(idx, None)
-            if hasattr(self.index, "mark_deleted"):
-                self.index.mark_deleted(idx)
-            if idx not in self._free_set:
-                self._free_idxs.append(idx)
-                self._free_set.add(idx)
-            removed = True
+        for entry_id in entry_ids:
+            vector_ids = self.entry_to_ids.pop(entry_id, set())
+            for vector_id in vector_ids:
+                removed |= self._remove_vector_id(vector_id)
         if removed:
             self.touch()
+
+    def _remove_vector_id(self, vector_id: str) -> bool:
+        idx = self.id_to_idx.pop(vector_id, None)
+        if idx is None:
+            return False
+        self.idx_to_id.pop(idx, None)
+        parent_id = _entry_id_from_vector_id(vector_id)
+        vector_set = self.entry_to_ids.get(parent_id)
+        if vector_set is not None:
+            vector_set.discard(vector_id)
+            if not vector_set:
+                self.entry_to_ids.pop(parent_id, None)
+        if hasattr(self.index, "mark_deleted"):
+            self.index.mark_deleted(idx)
+        if idx not in self._free_set:
+            self._free_idxs.append(idx)
+            self._free_set.add(idx)
+        return True
 
     def _evict_oldest(self, count: int) -> None:
         remaining = max(int(count), 0)
         if remaining <= 0:
             return
-        for entry_id in sorted(self.id_to_idx.keys())[:remaining]:
-            idx = self.id_to_idx.pop(entry_id, None)
-            if idx is None:
-                continue
-            self.idx_to_id.pop(idx, None)
-            if hasattr(self.index, "mark_deleted"):
-                self.index.mark_deleted(idx)
-            if idx not in self._free_set:
-                self._free_idxs.append(idx)
-                self._free_set.add(idx)
+        for vector_id in sorted(self.id_to_idx.keys())[:remaining]:
+            self._remove_vector_id(vector_id)
 
 
 class EntryIndexStore:
@@ -208,6 +228,8 @@ class EntryIndexStore:
         maintenance_interval: float = 60.0,
         max_elements: int = 100_000,
         allow_growth: bool = False,
+        chunk_max_chars: int | None = None,
+        chunk_overlap_chars: int | None = None,
     ):
         self.db = db
         self.ttl = ttl
@@ -215,12 +237,30 @@ class EntryIndexStore:
         self.maintenance_interval = maintenance_interval
         self.max_elements = max_elements
         self.allow_growth = bool(allow_growth)
+        chunk_cfg = getattr(settings, "EMBEDDING", {}).get("chunking", {})
+        self.chunk_max_chars = int(
+            chunk_max_chars
+            if chunk_max_chars is not None
+            else chunk_cfg.get("max_chars", 1200)
+        )
+        self.chunk_overlap_chars = int(
+            chunk_overlap_chars
+            if chunk_overlap_chars is not None
+            else chunk_cfg.get("overlap_chars", 200)
+        )
         self.indexes: Dict[str, EntryIndex] = {}
         self.cursors: Dict[str, Optional[str]] = {}
         self.locks: Dict[str, asyncio.Lock] = {}
         self._next_maintenance = time.monotonic() + maintenance_interval
         self._default_dim: Optional[int] = None
         self._default_dim_lock = asyncio.Lock()
+
+    def _chunk_entry(self, text: str) -> list[str]:
+        chunks = chunk_text(text, self.chunk_max_chars, self.chunk_overlap_chars)
+        if chunks:
+            return chunks
+        cleaned = text.strip()
+        return [cleaned] if cleaned else []
 
     def _get_lock(self, user_id: str) -> asyncio.Lock:
         return self.locks.setdefault(user_id, asyncio.Lock())
@@ -254,16 +294,39 @@ class EntryIndexStore:
             self.indexes[user_id] = fresh
             return fresh
 
-        texts = [entry["text"] for entry in entry_list]
-        ids = [entry["id"] for entry in entry_list]
-        vecs = await async_embed_texts(texts)
+        vector_texts: list[str] = []
+        vector_ids: list[str] = []
+        vector_entries: list[str] = []
+        vector_chunks: list[int] = []
+        for entry in entry_list:
+            entry_id = entry["id"]
+            chunks = self._chunk_entry(entry.get("text", ""))
+            for chunk_index, chunk in enumerate(chunks):
+                vector_texts.append(chunk)
+                vector_entries.append(entry_id)
+                vector_chunks.append(chunk_index)
+                vector_ids.append(_vector_id(entry_id, chunk_index))
+
+        if not vector_texts:
+            return idx or EntryIndex(
+                await self._get_default_dim(),
+                self.max_elements,
+                allow_growth=self.allow_growth,
+            )
+
+        vecs = await async_embed_texts(vector_texts)
         if idx is None:
             dim = vecs.shape[1]
             idx = EntryIndex(dim, self.max_elements, allow_growth=self.allow_growth)
-        idx.add_batch(ids, vecs)
+        idx.add_batch(vector_ids, vecs)
         await self.db.vectors.store_vectors_batch(
             user_id,
-            [(mid, vec) for mid, vec in zip(ids, vecs)],
+            [
+                (vector_id, entry_id, chunk_index, vec)
+                for vector_id, entry_id, chunk_index, vec in zip(
+                    vector_ids, vector_entries, vector_chunks, vecs
+                )
+            ],
             dek,
         )
         if entry_list:
@@ -298,14 +361,16 @@ class EntryIndexStore:
                 if vecs.ndim == 1:
                     vecs = vecs.reshape(1, -1)
                 idx.add_batch(ids, vecs)
-                cursor = rows[-1]["id"]
+                cursor = rows[-1]["entry_id"]
                 self.cursors[user_id] = cursor
                 self.indexes[user_id] = idx
 
                 entries = await self.db.entries.get_latest_entries(
                     user_id, self.warm_limit, dek
                 )
-                missing = [entry for entry in entries if not idx.contains(entry["id"])]
+                missing = [
+                    entry for entry in entries if not idx.contains_entry(entry["id"])
+                ]
                 if missing:
                     logger.debug(
                         "Embedding %d entries missing vectors for user %s",
@@ -368,12 +433,14 @@ class EntryIndexStore:
                     vecs = vecs.reshape(1, -1)
                 idx.add_batch(ids, vecs)
                 added += len(ids)
-                new_cursor = rows[-1]["id"]
+                new_cursor = rows[-1]["entry_id"]
 
             entries = await self.db.entries.get_entries_older_than(
                 user_id, cursor, batch, dek
             )
-            missing = [entry for entry in entries if not idx.contains(entry["id"])]
+            missing = [
+                entry for entry in entries if not idx.contains_entry(entry["id"])
+            ]
             if missing:
                 logger.debug(
                     "Embedding %d entries older than %s for user %s",
@@ -412,33 +479,56 @@ class EntryIndexStore:
         if not items:
             return
 
-        texts = [content for _, _, content, _ in items]
+        pending: list[tuple[str, str, str, int, str, bytes]] = []
+        for user_id, entry_id, content, dek in items:
+            chunks = self._chunk_entry(content)
+            for chunk_index, chunk_part in enumerate(chunks):
+                vector_id = _vector_id(entry_id, chunk_index)
+                pending.append(
+                    (user_id, entry_id, vector_id, chunk_index, chunk_part, dek)
+                )
+
+        if not pending:
+            return
+
+        texts = [chunk_text for _, _, _, _, chunk_text, _ in pending]
         vecs = await async_embed_texts(texts)
-        if vecs.shape[0] != len(items):  # pragma: no cover - defensive
+        if vecs.shape[0] != len(pending):  # pragma: no cover - defensive
             raise ValueError("Embedding count does not match input items")
 
-        per_user: Dict[str, list[tuple[str, np.ndarray, bytes]]] = {}
-        for (user_id, entry_id, _, dek), vec in zip(items, vecs):
-            per_user.setdefault(user_id, []).append((entry_id, vec, dek))
+        per_user_vectors: Dict[str, list[tuple[str, str, int, np.ndarray, bytes]]] = {}
+        for (user_id, entry_id, vector_id, chunk_index, _, dek), vec in zip(
+            pending, vecs
+        ):
+            per_user_vectors.setdefault(user_id, []).append(
+                (vector_id, entry_id, chunk_index, vec, dek)
+            )
 
         logger.debug(
-            "Bulk indexing %d entries across %d users", len(items), len(per_user)
+            "Bulk indexing %d entries across %d users",
+            len(items),
+            len(per_user_vectors),
         )
 
-        for user_id, user_entries in per_user.items():
-            dek = user_entries[0][2]
+        for user_id, user_entries in per_user_vectors.items():
+            dek = user_entries[0][4]
             idx = await self.ensure_index(user_id, dek)
             lock = self._get_lock(user_id)
-            ids = [entry_id for entry_id, _, _ in user_entries]
-            vec_arr = np.asarray([vec for _, vec, _ in user_entries], dtype=np.float32)
+            ids = [vector_id for vector_id, _, _, _, _ in user_entries]
+            vec_arr = np.asarray(
+                [vec for _, _, _, vec, _ in user_entries], dtype=np.float32
+            )
             async with lock:
                 await self.db.vectors.store_vectors_batch(
                     user_id,
-                    [(entry_id, vec) for entry_id, vec, _ in user_entries],
+                    [
+                        (vector_id, entry_id, chunk_index, vec)
+                        for vector_id, entry_id, chunk_index, vec, _ in user_entries
+                    ],
                     dek,
                 )
                 idx.add_batch(ids, vec_arr)
-                for entry_id in ids:
+                for entry_id in {entry_id for _, entry_id, _, _, _ in user_entries}:
                     current = self.cursors.get(user_id)
                     if current is None or entry_id < current:
                         self.cursors[user_id] = entry_id
@@ -474,4 +564,4 @@ class EntryIndexStore:
             return
         lock = self._get_lock(user_id)
         async with lock:
-            idx.remove_ids(ids)
+            idx.remove_entries(ids)

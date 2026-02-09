@@ -76,7 +76,7 @@ def decrypt_message(
     return pt.decode("utf-8")
 
 
-def encrypt_vector(dek: bytes, user_id: str, entry_id: str, vec: bytes):
+def encrypt_vector(dek: bytes, user_id: str, entry_id: str, vector_id: str, vec: bytes):
     """Encrypt a vector embedding for storage.
 
     The vector is provided as raw bytes and is encrypted using the same AEAD
@@ -85,7 +85,7 @@ def encrypt_vector(dek: bytes, user_id: str, entry_id: str, vec: bytes):
     """
 
     nonce = utils.random(24)
-    aad = f"{user_id}|{entry_id}|vector|{ALG.decode()}".encode("utf-8")
+    aad = f"{user_id}|{entry_id}|{vector_id}|vector|{ALG.decode()}".encode("utf-8")
     ct = crypto_aead_xchacha20poly1305_ietf_encrypt(vec, aad, nonce, dek)
     return nonce, ct, ALG
 
@@ -94,11 +94,12 @@ def decrypt_vector(
     dek: bytes,
     user_id: str,
     entry_id: str,
+    vector_id: str,
     nonce: bytes,
     ct: bytes,
     alg: bytes,
 ) -> bytes:
     """Decrypt an encrypted vector embedding."""
 
-    aad = f"{user_id}|{entry_id}|vector|{alg.decode()}".encode("utf-8")
+    aad = f"{user_id}|{entry_id}|{vector_id}|vector|{alg.decode()}".encode("utf-8")
     return crypto_aead_xchacha20poly1305_ietf_decrypt(ct, aad, nonce, dek)

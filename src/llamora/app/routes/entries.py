@@ -9,7 +9,6 @@ from quart import (
     abort,
     url_for,
 )
-import orjson
 import logging
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -247,13 +246,8 @@ async def update_entry(entry_id: str):
         abort(404, description="Entry not found.")
 
     try:
-        record_plain = orjson.dumps(
-            {"text": text, "meta": updated.get("meta", {})}
-        ).decode()
         await get_services().search_api.delete_entries(uid, [entry_id])
-        await get_services().search_api.enqueue_index_job(
-            uid, entry_id, record_plain, dek
-        )
+        await get_services().search_api.enqueue_index_job(uid, entry_id, text, dek)
     except Exception:
         logger.exception("Failed to update search index for entry %s", entry_id)
 

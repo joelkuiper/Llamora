@@ -5,7 +5,7 @@ from datetime import datetime
 import hashlib
 import asyncio
 from collections import deque
-from datetime import datetime, timezone
+from datetime import timezone
 from typing import Any, Iterable, Mapping, Sequence, cast
 
 import orjson

@@ -126,6 +126,10 @@ DEFAULTS: dict[str, Any] = {
     "EMBEDDING": {
         "model": "BAAI/bge-small-en-v1.5",
         "concurrency": _cpu_count(),
+        "chunking": {
+            "max_chars": 1200,
+            "overlap_chars": 200,
+        },
     },
     "LLM": {
         "upstream": {

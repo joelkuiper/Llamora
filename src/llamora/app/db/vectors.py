@@ -19,7 +19,7 @@ class VectorsRepository(BaseRepository):
         self._decrypt_vector = decrypt_vector
 
     async def store_vector(
-        self, entry_id: str, user_id: str, vec: np.ndarray, dek: bytes
+        self, vector_id: str, entry_id: str, user_id: str, vec: np.ndarray, dek: bytes
     ) -> None:
         dim, nonce, ct, alg = await asyncio.to_thread(
             self._prepare_encrypted_vector,
@@ -27,22 +27,25 @@ class VectorsRepository(BaseRepository):
             dek,
             user_id,
             entry_id,
+            vector_id,
         )
         async with self.pool.connection() as conn:
             await self._run_in_transaction(
                 conn,
                 conn.execute,
                 """
-                    INSERT OR REPLACE INTO vectors (id, user_id, dim, nonce, ciphertext, alg)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT OR REPLACE INTO vectors (
+                        id, entry_id, user_id, chunk_index, dim, nonce, ciphertext, alg
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                (entry_id, user_id, dim, nonce, ct, alg),
+                (vector_id, entry_id, user_id, 0, dim, nonce, ct, alg),
             )
 
     async def store_vectors_batch(
         self,
         user_id: str,
-        vectors: list[tuple[str, np.ndarray]],
+        vectors: list[tuple[str, str, int, np.ndarray]],
         dek: bytes,
     ) -> None:
         if not vectors:
@@ -60,8 +63,10 @@ class VectorsRepository(BaseRepository):
                 conn,
                 conn.executemany,
                 """
-                    INSERT OR REPLACE INTO vectors (id, user_id, dim, nonce, ciphertext, alg)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT OR REPLACE INTO vectors (
+                        id, entry_id, user_id, chunk_index, dim, nonce, ciphertext, alg
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                 records,
             )
@@ -72,9 +77,9 @@ class VectorsRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT v.id, v.dim, v.nonce, v.ciphertext, v.alg, m.created_at
+                SELECT v.id, v.entry_id, v.dim, v.nonce, v.ciphertext, v.alg, m.created_at
                 FROM vectors v
-                JOIN entries m ON v.id = m.id AND m.user_id = ?
+                JOIN entries m ON v.entry_id = m.id AND m.user_id = ?
                 ORDER BY m.id DESC
                 LIMIT ?
                 """,
@@ -95,9 +100,9 @@ class VectorsRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT v.id, v.dim, v.nonce, v.ciphertext, v.alg, m.created_at
+                SELECT v.id, v.entry_id, v.dim, v.nonce, v.ciphertext, v.alg, m.created_at
                 FROM vectors v
-                JOIN entries m ON v.id = m.id AND m.user_id = ?
+                JOIN entries m ON v.entry_id = m.id AND m.user_id = ?
                 WHERE m.id < ?
                 ORDER BY m.id DESC
                 LIMIT ?
@@ -114,7 +119,12 @@ class VectorsRepository(BaseRepository):
         )
 
     def _prepare_encrypted_vector(
-        self, vec: np.ndarray, dek: bytes, user_id: str, entry_id: str
+        self,
+        vec: np.ndarray,
+        dek: bytes,
+        user_id: str,
+        entry_id: str,
+        vector_id: str,
     ) -> tuple[int, bytes, bytes, bytes]:
         vec_arr = np.asarray(vec, dtype=np.float32)
         dim = int(vec_arr.shape[0])
@@ -122,27 +132,31 @@ class VectorsRepository(BaseRepository):
             dek,
             user_id,
             entry_id,
+            vector_id,
             vec_arr.tobytes(),
         )
         return dim, nonce, ct, alg
 
     def _prepare_batch_records(
         self,
-        vectors: list[tuple[str, np.ndarray]],
+        vectors: list[tuple[str, str, int, np.ndarray]],
         dek: bytes,
         user_id: str,
-    ) -> list[tuple[str, str, int, bytes, bytes, bytes]]:
-        records: list[tuple[str, str, int, bytes, bytes, bytes]] = []
-        for entry_id, vec in vectors:
+    ) -> list[tuple[str, str, str, int, int, bytes, bytes, bytes]]:
+        records: list[tuple[str, str, str, int, int, bytes, bytes, bytes]] = []
+        for vector_id, entry_id, chunk_index, vec in vectors:
             vec_arr = np.asarray(vec, dtype=np.float32).ravel()
             dim = int(vec_arr.shape[0])
             nonce, ct, alg = self._encrypt_vector(
                 dek,
                 user_id,
                 entry_id,
+                vector_id,
                 vec_arr.tobytes(),
             )
-            records.append((entry_id, user_id, dim, nonce, ct, alg))
+            records.append(
+                (vector_id, entry_id, user_id, chunk_index, dim, nonce, ct, alg)
+            )
         return records
 
     def _decrypt_vector_rows(self, rows, dek: bytes, user_id: str) -> list[dict]:
@@ -151,6 +165,7 @@ class VectorsRepository(BaseRepository):
             vec_bytes = self._decrypt_vector(
                 dek,
                 user_id,
+                row["entry_id"],
                 row["id"],
                 row["nonce"],
                 row["ciphertext"],
@@ -160,6 +175,7 @@ class VectorsRepository(BaseRepository):
             vectors.append(
                 {
                     "id": row["id"],
+                    "entry_id": row["entry_id"],
                     "created_at": row["created_at"],
                     "vec": vec,
                 }

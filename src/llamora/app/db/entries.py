@@ -233,7 +233,9 @@ class EntriesRepository(BaseRepository):
             )
 
         if self._on_entry_appended:
-            await self._on_entry_appended(user_id, entry_id, plaintext, dek)
+            await self._on_entry_appended(
+                user_id, entry_id, record.get("text", ""), dek
+            )
 
         return entry_id
 
@@ -289,7 +291,7 @@ class EntriesRepository(BaseRepository):
                 await conn.execute(
                     f"""
                     DELETE FROM vectors
-                    WHERE user_id = ? AND id IN ({placeholders})
+                    WHERE user_id = ? AND entry_id IN ({placeholders})
                     """,
                     (user_id, *delete_ids),
                 )
