@@ -53,6 +53,10 @@ def _clean_summary(raw: str) -> str:
         text = text[:420].rsplit(" ", 1)[0].rstrip()
         if text:
             text += "..."
+    if text and text[-1] not in ".!?":
+        trimmed = text.rsplit(" ", 1)[0].rstrip()
+        if trimmed and trimmed != text:
+            text = f"{trimmed}..."
     return text
 
 
@@ -108,7 +112,7 @@ async def generate_day_summary(
     ]
     params = {
         "temperature": 0.2,
-        "n_predict": 140,
+        "n_predict": 220,
         "response_format": _day_summary_response_format(),
     }
 
