@@ -16,6 +16,10 @@
     --motion-entry-delete-duration: var(--motion-gentle);
     --motion-entry-delete-animation: motion-entry-delete var(--motion-entry-delete-duration) ease
       forwards;
+
+    --motion-calendar-summary-duration: 750ms;
+    --motion-calendar-summary-animation: motion-calendar-summary
+      var(--motion-calendar-summary-duration) ease-in-out infinite;
   }
 }
 
@@ -74,6 +78,18 @@
       transform: translateY(10px) scale(0.98);
     }
   }
+
+  @keyframes motion-calendar-summary {
+    0% {
+      box-shadow: 0 0 0 0 var(--accent-10);
+    }
+    50% {
+      box-shadow: 0 0 0 2px var(--accent-10);
+    }
+    100% {
+      box-shadow: 0 0 0 0 var(--accent-10);
+    }
+  }
 }
 
 @layer motion.utilities {
@@ -118,7 +134,9 @@
     :where(.entry-tag).htmx-swapping,
     :where(.scroll-btn).motion-animate-tactile,
     :where(.motion-animate-entry-delete),
-    :where(.entry.htmx-swapping) {
+    :where(.entry.htmx-swapping),
+    :where(.calendar-table td.is-summarizing a),
+    :where(.calendar-table td.is-summarizing span) {
       animation: none !important;
     }
 

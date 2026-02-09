@@ -337,12 +337,19 @@
         box-shadow var(--motion-tight);
     }
 
+    td.is-summarizing a,
+    td.is-summarizing span {
+      animation: var(--motion-calendar-summary-animation);
+      border-color: var(--accent-15);
+    }
+
     td a:not(.no-entries),
     td span:not(.no-entries) {
       &:hover {
         background: var(--accent-05);
         border-color: var(--accent);
         box-shadow: 0 0 0 2px var(--accent-10);
+        transform: translateY(-1px);
         opacity: 1;
         cursor: pointer;
       }
@@ -567,6 +574,7 @@
     transform: translateY(1px);
   }
 }
+
 
 #calendar[data-calendar-mode="picker"] .calendar-month-year,
 .calendar-month-year[aria-expanded="true"] {

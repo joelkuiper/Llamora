@@ -278,9 +278,16 @@ export class CalendarControl extends HTMLElement {
       clearTimeout(this.#tooltipHideTimer);
       this.#tooltipHideTimer = null;
     }
+    const lastDate = this.#tooltipDate;
     this.#tooltipDate = null;
     const tooltip = this.#tooltip;
     if (!tooltip) return;
+    const activeCell = lastDate
+      ? document.querySelector(`[data-calendar-cell][data-date="${lastDate}"]`)
+      : null;
+    if (activeCell) {
+      activeCell.classList.remove("is-summarizing");
+    }
     tooltip.classList.remove("is-visible");
     if (immediate) {
       tooltip.hidden = true;
@@ -594,17 +601,25 @@ export class CalendarControl extends HTMLElement {
   #scheduleTooltip(cell) {
     const date = cell?.dataset?.date;
     if (!date) return;
+    if (cell.querySelector(".no-entries")) {
+      return;
+    }
     if (this.#tooltipTimer) {
       clearTimeout(this.#tooltipTimer);
     }
+    cell.classList.add("is-summarizing");
     this.#tooltipDate = date;
     this.#tooltipTimer = window.setTimeout(async () => {
       if (this.#tooltipDate !== date) return;
       const summary = await this.#fetchDaySummary(date);
-      if (!summary || this.#tooltipDate !== date) return;
+      if (!summary || this.#tooltipDate !== date) {
+        cell.classList.remove("is-summarizing");
+        return;
+      }
       const tooltip = this.#ensureTooltip();
       tooltip.textContent = summary;
       this.#positionTooltip(tooltip, cell);
+      cell.classList.remove("is-summarizing");
     }, 500);
   }
 
