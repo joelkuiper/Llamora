@@ -71,6 +71,7 @@ function registerEntryDeleteAnimationHook() {
     const { verb, elt } = detail.requestConfig;
     if (verb !== "delete") return;
     if (!(elt instanceof Element)) return;
+    if (!elt.closest(".entry-delete")) return;
     const entry = elt.closest(".entry");
     if (!entry) return;
     entry.classList.remove("motion-animate-entry");
