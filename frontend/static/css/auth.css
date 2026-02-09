@@ -21,7 +21,8 @@
   padding: var(--spacing-xl);
   background: var(--color-bg-alt);
   border-radius: var(--radius-lg);
-  box-shadow: var(--raised-shadow);
+  border: 1px solid color-mix(in srgb, var(--border) 45%, transparent 55%);
+  box-shadow: var(--subtle-raised-shadow);
   font-family: var(--font-base);
 
   h1 {
@@ -117,4 +118,126 @@
   .acknowledge-label span {
     line-height: 1.2;
   }
+}
+
+body[data-entry="auth-forms"] .form-container h1 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-bottom: var(--spacing-md);
+  letter-spacing: 0.01em;
+}
+
+/* Recovery screen refinement */
+body[data-entry="recovery"] .form-container {
+  max-width: 520px;
+  margin: 8vh auto;
+  background: var(--color-bg-alt);
+}
+
+body[data-entry="recovery"] .form-container h1 {
+  text-align: left;
+  margin-bottom: var(--spacing-xs);
+  font-weight: 600;
+}
+
+body[data-entry="recovery"] .form-container .warning {
+  text-align: left;
+  margin: 0 0 var(--spacing-md);
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+body[data-entry="recovery"] .form-container #recovery {
+  font-size: 1.45rem;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  border: 1px solid color-mix(in srgb, var(--border) 85%, transparent 15%);
+  background: color-mix(in srgb, var(--color-bg) 88%, var(--color-bg-alt));
+  box-shadow: var(--soft-outline-shadow);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  width: 100%;
+}
+
+body[data-entry="recovery"] .form-container .recovery-actions {
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-xs);
+  margin-bottom: var(--spacing-md);
+}
+
+body[data-entry="recovery"] .form-container .recovery-actions .btn {
+  font-size: 0.85rem;
+  padding: 0.35rem 0.8rem;
+  opacity: 0.6;
+  background: transparent;
+  border-color: color-mix(in srgb, var(--border) 45%, transparent 55%);
+  box-shadow: none;
+  transition:
+    border-color var(--motion-gentle) ease,
+    color var(--motion-gentle) ease,
+    background-color var(--motion-gentle) ease;
+}
+
+body[data-entry="recovery"] .form-container .recovery-actions .btn:hover,
+body[data-entry="recovery"] .form-container .recovery-actions .btn:focus-visible {
+  opacity: 0.85;
+  border-color: color-mix(in srgb, var(--border) 70%, transparent 30%);
+  background-color: color-mix(in srgb, var(--color-bg) 90%, var(--color-bg-alt));
+}
+
+body[data-entry="recovery"] .form-container .acknowledge {
+  margin-top: var(--spacing-lg);
+  border-top: 1px solid color-mix(in srgb, var(--border) 40%, transparent 60%);
+  padding-top: var(--spacing-md);
+}
+
+body[data-entry="recovery"] .form-container .acknowledge-label {
+  gap: var(--spacing-md);
+  align-items: flex-start;
+}
+
+body[data-entry="recovery"] .form-container .acknowledge-label span {
+  line-height: 1.5;
+  max-width: 34rem;
+  opacity: 0.85;
+  color: var(--color-text);
+}
+
+body[data-entry="recovery"] .form-container .continue {
+  margin-top: var(--spacing-md);
+  border-top: none;
+  padding-top: 0;
+  text-align: center;
+}
+
+body[data-entry="recovery"] .form-container .continue .btn-primary {
+  background: var(--color-bg);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  color: var(--color-text);
+  box-shadow: none;
+  padding: 0.6rem 1.2rem;
+  transition:
+    box-shadow var(--motion-gentle) ease,
+    border-color var(--motion-gentle) ease,
+    background-color var(--motion-gentle) ease,
+    transform var(--motion-tap) ease;
+}
+
+body[data-entry="recovery"] .form-container .continue .btn-primary:disabled {
+  opacity: 0.4;
+  border-color: color-mix(in srgb, var(--border) 55%, transparent 45%);
+}
+
+body[data-entry="recovery"] .form-container .continue .btn-primary:hover {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  box-shadow:
+    var(--soft-outline-shadow),
+    0 0 0 2px color-mix(in srgb, var(--accent-20) 55%, transparent 45%);
+}
+
+body[data-entry="recovery"] .form-container .continue .btn-primary:active {
+  transform: translateY(1px);
+  box-shadow: var(--inset-shadow-disabled);
 }

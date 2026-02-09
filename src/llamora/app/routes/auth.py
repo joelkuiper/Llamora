@@ -82,6 +82,18 @@ async def _issue_auth_response(
     return resp
 
 
+async def _issue_auth_view_response(
+    user_id: str | int, dek: bytes, html: str
+) -> Response:
+    resp = await make_response(html)
+    assert isinstance(resp, Response)
+    session = get_session_context()
+    manager = session.manager
+    manager.set_secure_cookie(resp, "uid", str(user_id))
+    manager.set_dek(resp, dek)
+    return resp
+
+
 async def _hash_password(password: bytes) -> bytes:
     return await asyncio.to_thread(pwhash.argon2id.str, password)
 
@@ -254,7 +266,13 @@ async def register():
         if settings.FEATURES.disable_registration:
             current_app.config["REGISTRATION_TOKEN"] = None
 
-        return await _issue_auth_response(user_id, dek, url_for("days.index"))
+        recovery_display = format_recovery_code(recovery_code)
+        html = await render_template(
+            "recovery.html",
+            code=recovery_display,
+            next_url=url_for("days.index"),
+        )
+        return await _issue_auth_view_response(user_id, dek, html)
 
     return await render_template("register.html")
 
