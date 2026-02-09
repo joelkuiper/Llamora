@@ -3,6 +3,7 @@
   - [ ] Dedicated tags page with analyses?
 - [ ] Recovery code generation page rethink (add QR code?)
 - [ ] Summaries for days as "tooltip" in calendar nav
+- [ ] Check how entries are chunked (are they?) for ANN
 - [ ] README
 Later
 - [ ] Better model than Qwen4B, find something that's a bit more chatty
