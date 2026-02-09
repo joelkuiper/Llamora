@@ -207,9 +207,10 @@ async def delete_entry(entry_id: str):
     deleted_ids, root_role = await db.entries.delete_entry(user["id"], entry_id)
     if deleted_ids:
         await get_services().search_api.delete_entries(user["id"], deleted_ids)
-    oob_targets = [f"entry-{mid}" for mid in deleted_ids]
     if root_role == "user":
-        oob_targets.append(f"entry-responses-{entry_id}")
+        oob_targets = [f"entry-responses-{entry_id}"]
+    else:
+        oob_targets = []
     oob_deletes = "\n".join(
         f'<div id="{target_id}" hx-swap-oob="delete"></div>'
         for target_id in oob_targets

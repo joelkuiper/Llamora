@@ -50,15 +50,17 @@ export function initConfirmModal() {
   }
   const state = globalThis.__confirmModalState;
   let activeRequest = state.activeRequest || null;
+  let activeTrigger = state.activeTrigger || null;
   let lastFocused = state.lastFocused || null;
   let closeTimer = null;
 
-  const openModal = (config, requestCallback) => {
+  const openModal = (config, requestCallback, trigger) => {
     if (closeTimer) {
       clearTimeout(closeTimer);
       closeTimer = null;
     }
     activeRequest = requestCallback;
+    activeTrigger = trigger || null;
     titleEl.textContent = config.title;
     messageEl.textContent = config.message;
     confirmBtn.textContent = config.confirmLabel;
@@ -91,6 +93,12 @@ export function initConfirmModal() {
       modal.hidden = true;
       closeTimer = null;
     }, 200);
+    if (confirmed && activeTrigger instanceof Element) {
+      const entry = activeTrigger.closest(".entry");
+      if (entry) {
+        entry.classList.add("motion-animate-entry-delete");
+      }
+    }
     if (confirmed && typeof callback === "function") {
       callback();
     }
@@ -138,7 +146,7 @@ export function initConfirmModal() {
       }
       const config = getConfig(trigger, detail.question);
       event.preventDefault();
-      openModal(config, () => detail.issueRequest(true));
+      openModal(config, () => detail.issueRequest(true), trigger);
     });
 
     state.bound = true;

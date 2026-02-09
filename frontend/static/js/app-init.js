@@ -64,6 +64,36 @@ function registerOfflineHandler() {
   offlineHandlerRegistered = true;
 }
 
+function registerEntryDeleteAnimationHook() {
+  document.body.addEventListener("htmx:beforeRequest", (event) => {
+    const detail = event.detail;
+    if (!detail?.requestConfig) return;
+    const { verb, elt } = detail.requestConfig;
+    if (verb !== "delete") return;
+    if (!(elt instanceof Element)) return;
+    const entry = elt.closest(".entry");
+    if (!entry) return;
+    entry.classList.remove("motion-animate-entry");
+    entry.classList.add("motion-animate-entry-delete");
+    entry.dataset.deleteAnimating = "true";
+  });
+
+  document.body.addEventListener("htmx:beforeSwap", (event) => {
+    const detail = event.detail;
+    if (!detail) return;
+    const target = detail.target;
+    if (!(target instanceof Element)) return;
+    const swapStyle = detail.swapStyle || detail.swapSpec?.swapStyle;
+    if (swapStyle !== "delete") return;
+    if (!target.classList.contains("entry") && !target.dataset.deleteAnimating) return;
+    target.classList.add("motion-animate-entry-delete");
+    if (typeof detail.swapDelay !== "number" || detail.swapDelay < 180) {
+      detail.swapDelay = 180;
+    }
+    delete target.dataset.deleteAnimating;
+  });
+}
+
 function initAlertCenter() {
   const container = document.getElementById("errors");
   if (!container) return;
@@ -217,6 +247,7 @@ function init() {
   const csrfToken = document.body.dataset.csrfToken || "";
   registerHtmxHeaderHooks(csrfToken);
   registerOfflineHandler();
+  registerEntryDeleteAnimationHook();
   initAlertCenter();
   registerEntriesLoader();
   initGlobalShell();
