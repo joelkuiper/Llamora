@@ -55,7 +55,7 @@
             aria-label="Delete entry"
             data-tooltip-title="Delete entry"
             data-ready="false"
-            hx-swap="outerHTML swap:180ms"
+            hx-swap="none"
             data-delete-template="{{ url_for('entries.delete_entry', entry_id='__ENTRY_ID__') }}"
             data-delete-placeholder="__ENTRY_ID__"
             data-target-template="#entry-__ENTRY_ID__">
