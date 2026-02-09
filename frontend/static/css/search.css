@@ -82,6 +82,14 @@
   color: var(--color-text-muted);
 }
 
+@media (max-width: 960px) {
+  #search-input {
+    height: 2rem;
+    padding: 0.35rem 2rem 0.35rem 0.75rem;
+    font-size: 0.92rem;
+  }
+}
+
 .user-actions {
   display: flex;
   align-items: center;

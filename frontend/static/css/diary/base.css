@@ -51,6 +51,22 @@ body {
   transition: transform var(--motion-tap) ease;
 }
 
+#branding .branding-link .logo-mark {
+  display: none;
+  height: 2.5rem;
+  width: auto;
+}
+
+@media (max-width: 860px) {
+  #branding .branding-link .logo {
+    display: none;
+  }
+
+  #branding .branding-link .logo-mark {
+    display: block;
+  }
+}
+
 #branding .branding-link:focus-visible .logo {
   outline: 2px solid var(--accent);
   outline-offset: 4px;

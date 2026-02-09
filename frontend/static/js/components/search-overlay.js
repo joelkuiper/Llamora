@@ -70,6 +70,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
   #historyRestoreRemover = null;
   #recentHistory;
   #shortcutBag = null;
+  #toggleHandler;
 
   constructor() {
     super();
@@ -85,6 +86,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#pageHideHandler = (event) => this.#handlePageHide(event);
     this.#historyRestoreHandler = () => this.#handleHistoryRestore();
     this.#popStateHandler = () => this.#handlePopState();
+    this.#toggleHandler = (event) => this.#handleToggle(event);
     this.#recentHistory = new AutocompleteHistory({
       maxEntries: RECENT_CANDIDATE_MAX,
       normalize: (entry) => this.#normalizeCandidateValue(entry),
@@ -141,6 +143,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     win.addEventListener("pageshow", this.#pageShowHandler);
     win.addEventListener("pagehide", this.#pageHideHandler);
     win.addEventListener("popstate", this.#popStateHandler);
+    eventTarget.addEventListener("click", this.#toggleHandler);
   }
 
   disconnectedCallback() {
@@ -165,6 +168,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     win.removeEventListener("pageshow", this.#pageShowHandler);
     win.removeEventListener("pagehide", this.#pageHideHandler);
     win.removeEventListener("popstate", this.#popStateHandler);
+    doc.removeEventListener("click", this.#toggleHandler);
 
     if (this.#historyRestoreRemover) {
       this.#historyRestoreRemover();
@@ -350,6 +354,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
   #handleKeydown(evt) {
     if (evt.key === "Escape") {
       this.#closeResults(true);
+      this.#closeCompactSearch();
       return;
     }
 
@@ -464,6 +469,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     if (closeTrigger) {
       wrap.querySelector(".sr-panel")?.classList.add("pop-exit");
       this.#closeResults(true);
+      this.#closeCompactSearch();
       return;
     }
 
@@ -481,6 +487,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       !target.closest(".entry-tag")
     ) {
       this.#closeResults(true);
+      this.#closeCompactSearch();
     }
   }
 
@@ -694,6 +701,51 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       this.#loadRecentSearches(true);
     } else {
       this.#loadRecentSearches();
+    }
+  }
+
+  #handleToggle(event) {
+    const target = getEventTarget(event);
+    if (!target) return;
+    const toggleTrigger = target.closest?.('[data-action="toggle-search-compact"]');
+    if (!toggleTrigger) return;
+    this.#toggleCompactSearch(toggleTrigger);
+  }
+
+  #toggleCompactSearch(toggle) {
+    const body = this.ownerDocument?.body ?? document.body;
+    const isOpen = body?.dataset?.searchCompact === "true";
+    if (isOpen) {
+      this.#closeCompactSearch();
+    } else {
+      this.#openCompactSearch(toggle);
+    }
+  }
+
+  #openCompactSearch(toggle) {
+    const body = this.ownerDocument?.body ?? document.body;
+    if (!body) return;
+    body.dataset.searchCompact = "true";
+    if (toggle instanceof HTMLElement) {
+      toggle.setAttribute("aria-expanded", "true");
+    }
+    this.#refreshInputState({ forceAutocomplete: true, reason: "compact-open" });
+    if (this.#inputEl) {
+      this.#inputEl.focus({ preventScroll: true });
+      this.#inputEl.select?.();
+    }
+  }
+
+  #closeCompactSearch() {
+    const body = this.ownerDocument?.body ?? document.body;
+    if (!body) return;
+    if (body.dataset.searchCompact !== "true") return;
+    body.dataset.searchCompact = "false";
+    const toggle = this.ownerDocument?.querySelector?.(
+      '[data-action="toggle-search-compact"]',
+    );
+    if (toggle) {
+      toggle.setAttribute("aria-expanded", "false");
     }
   }
 

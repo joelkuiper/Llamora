@@ -528,6 +528,9 @@ input[type="checkbox"]:focus {
 .icon-chevron-down {
   --icon: url("../icons/chevron-down.svg");
 }
+.icon-search {
+  --icon: url("../icons/search.svg");
+}
 .icon-calendar-days {
   --icon: url("../icons/calendar-days.svg");
 }

@@ -84,7 +84,7 @@
   pointer-events: none;
 }
 
-@media (max-width: 920px) {
+@media (max-width: 720px) {
   #calendar-label {
     display: none !important;
   }

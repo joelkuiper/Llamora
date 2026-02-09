@@ -64,18 +64,25 @@ function releaseState(anchor, img) {
   }
 }
 
-function initLogo(anchor) {
+function getLogoImages(anchor) {
   if (!(anchor instanceof HTMLElement)) {
-    return;
+    return [];
   }
+  return Array.from(anchor.querySelectorAll("img.logo, img.logo-mark")).filter(
+    (node) => node instanceof HTMLImageElement,
+  );
+}
 
-  const img = anchor.querySelector("img.logo");
-  if (!(img instanceof HTMLImageElement)) {
+function initLogo(anchor) {
+  const imgs = getLogoImages(anchor);
+  if (!imgs.length) {
     return;
   }
 
   anchor.removeAttribute("data-logo-pressed");
-  delete img.dataset.logoState;
+  imgs.forEach((node) => {
+    delete node.dataset.logoState;
+  });
 
   const existingController = logoControllers.get(anchor);
   if (existingController) {
@@ -91,19 +98,19 @@ function initLogo(anchor) {
 
   const toDefault = () => {
     clearPressed();
-    applyState(img, "default");
+    imgs.forEach((node) => applyState(node, "default"));
   };
   const toHover = () => {
     clearPressed();
-    applyState(img, "hover");
+    imgs.forEach((node) => applyState(node, "hover"));
   };
   const toActive = () => {
     setPressed();
-    applyState(img, "active");
+    imgs.forEach((node) => applyState(node, "active"));
   };
   const reset = () => {
     clearPressed();
-    releaseState(anchor, img);
+    imgs.forEach((node) => releaseState(anchor, node));
   };
 
   const handleFocus = () => {
@@ -152,7 +159,7 @@ function initLogo(anchor) {
     "htmx:beforeRequest",
     () => {
       setPressed();
-      applyState(img, "active");
+      imgs.forEach((node) => applyState(node, "active"));
     },
     { signal },
   );
@@ -167,17 +174,19 @@ function initLogo(anchor) {
   anchor.addEventListener("htmx:sendError", clearAfterRequest, { signal });
 
   const startingState = anchor.matches(":hover") || isFocusVisible(anchor) ? "hover" : "default";
-  applyState(img, startingState);
+  imgs.forEach((node) => applyState(node, startingState));
 }
 
 function refreshAll() {
   document.querySelectorAll("[data-logo-toggle]").forEach((anchor) => {
-    const img = anchor.querySelector("img.logo");
-    if (!(img instanceof HTMLImageElement)) {
+    const imgs = getLogoImages(anchor);
+    if (!imgs.length) {
       return;
     }
-    const state = img.dataset.logoState ?? "default";
-    applyState(img, state);
+    imgs.forEach((node) => {
+      const state = node.dataset.logoState ?? "default";
+      applyState(node, state);
+    });
   });
 }
 

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="logoMarkDarkHoverTitle">
+  <title id="logoMarkDarkHoverTitle">Llamora mark dark hover</title>
+  <defs>
+    <linearGradient id="inkDarkNeutral" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c9d0d9" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#8f9cad" stop-opacity="1"/>
+    </linearGradient>
+
+    <linearGradient id="inkDarkBlue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7ae1ff" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#3caeff" stop-opacity="1"/>
+    </linearGradient>
+
+    <filter id="darkLift" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.4" result="blur"/>
+      <feColorMatrix in="blur" type="matrix"
+        values="0 0 0 0 1
+                0 0 0 0 1
+                0 0 0 0 1
+                0 0 0 0.14 0" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="darkArcGlow" x="-55%" y="-55%" width="230%" height="230%">
+      <feGaussianBlur stdDeviation="6" result="soft"/>
+      <feColorMatrix in="soft" type="matrix"
+        values="0 0 0 0 0.35
+                0 0 0 0 0.78
+                0 0 0 0 1.00
+                0 0 0 0.60 0" />
+      <feMerge>
+        <feMergeNode in="soft"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <style>
+      .strand { transition: stroke 0.16s ease, stroke-opacity 0.16s ease; }
+      @media (prefers-reduced-motion: reduce) {
+        .strand { transition: none; }
+      }
+    </style>
+  </defs>
+
+  <g filter="url(#darkLift)">
+    <g stroke="url(#inkDarkNeutral)" stroke-width="10" fill="none" stroke-linecap="round" opacity="0.95">
+      <path class="strand" d="M 276.00 256.00 A 20.00 20.00 0 1 1 271.32 243.14" />
+      <path class="strand" d="M 293.59 269.68 A 40.00 40.00 0 1 1 293.59 242.32" />
+      <path class="strand" d="M 301.96 294.57 A 60.00 60.00 0 1 1 316.00 256.00" />
+      <path class="strand" d="M 296.00 325.28 A 80.00 80.00 0 1 1 331.18 283.36" />
+      <path class="strand" d="M 273.36 354.48 A 100.00 100.00 0 1 1 332.60 320.28" />
+      <path class="strand" d="M 235.16 374.18 A 120.00 120.00 0 1 1 316.00 359.92" />
+      <path class="strand" d="M 186.00 377.24 A 140.00 140.00 0 1 1 280.31 393.87" />
+      <path class="strand" d="M 133.43 358.85 A 160.00 160.00 0 1 1 228.22 413.57" />
+    </g>
+  </g>
+
+  <path d="M 186.00 377.24 A 140.00 140.00 0 1 1 280.31 393.87"
+        stroke="url(#inkDarkBlue)"
+        stroke-width="10"
+        fill="none"
+        stroke-linecap="round"
+        filter="url(#darkArcGlow)" />
+</svg>

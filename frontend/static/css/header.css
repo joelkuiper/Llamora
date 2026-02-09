@@ -59,6 +59,10 @@
     flex-shrink: 0;
   }
 
+  .search-toggle {
+    display: none;
+  }
+
   #calendar-control {
     grid-column: 1 / -1;
     grid-row: 1;
@@ -71,48 +75,48 @@
   }
 
   @media (max-width: 960px) {
-    gap: var(--spacing-sm);
-  }
-
-  @media (max-width: 860px) {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-lg);
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    grid-template-areas:
+      "brand calendar actions"
+      "search search search";
+    row-gap: var(--spacing-sm);
 
     #branding {
-      justify-self: stretch;
+      grid-area: brand;
+      justify-self: start;
     }
 
     #calendar-control {
-      grid-column: 1;
-      grid-row: 2;
+      grid-area: calendar;
       justify-self: center;
     }
 
     .header-right {
-      grid-column: 1;
-      grid-row: 3;
-      justify-content: flex-start;
-      flex-wrap: wrap;
-      align-items: stretch;
-      gap: var(--spacing-sm);
-      width: 100%;
+      display: contents;
     }
 
     .header-right > .search-wrap {
-      flex: 1 1 100%;
-      max-width: none;
+      grid-area: search;
       width: 100%;
+      max-width: none;
+      margin: 0;
+      display: none;
     }
 
     .header-right > .user-actions {
-      flex: 1 1 auto;
+      grid-area: actions;
       justify-content: flex-end;
-      gap: var(--spacing-sm);
-      width: 100%;
+      gap: var(--spacing-xs);
+    }
+
+    .search-toggle {
+      display: inline-flex;
     }
   }
 
-  @media (max-width: 780px) {
+  @media (max-width: 720px) {
     padding: var(--spacing-sm) var(--spacing-lg);
 
     #calendar-label {
@@ -130,5 +134,19 @@
 
   @media (max-width: 520px) {
     padding: var(--spacing-xs) var(--spacing-md);
+  }
+}
+
+@media (max-width: 960px) {
+  body:not([data-search-compact="true"]) #app-header {
+    row-gap: 0;
+  }
+
+  body[data-search-compact="true"] #app-header .header-right > .search-wrap {
+    display: block;
+  }
+
+  #app-header .search-toggle {
+    display: inline-flex;
   }
 }

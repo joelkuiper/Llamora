@@ -21,6 +21,16 @@
            data-dark-default="{{ url_for('static', filename='img/logo-dark.svg') }}"
            data-dark-hover="{{ url_for('static', filename='img/logo-dark-hover.svg') }}"
            data-dark-active="{{ url_for('static', filename='img/logo-dark-hover.svg') }}">
+      <img class="logo-mark"
+           src="{{ url_for('static', filename='img/logo-mark.svg') }}"
+           alt=""
+           aria-hidden="true"
+           data-light-default="{{ url_for('static', filename='img/logo-mark.svg') }}"
+           data-light-hover="{{ url_for('static', filename='img/logo-mark-hover.svg') }}"
+           data-light-active="{{ url_for('static', filename='img/logo-mark-hover.svg') }}"
+           data-dark-default="{{ url_for('static', filename='img/logo-mark-dark.svg') }}"
+           data-dark-hover="{{ url_for('static', filename='img/logo-mark-dark-hover.svg') }}"
+           data-dark-active="{{ url_for('static', filename='img/logo-mark-dark-hover.svg') }}">
     </a>
   </div>
 
@@ -61,6 +71,14 @@
       </search-overlay>
     </div>
     <div class="user-actions">
+      <button type="button"
+              class="icon-btn search-toggle"
+              aria-label="Search"
+              aria-expanded="false"
+              data-tooltip-title="Search"
+              data-action="toggle-search-compact">
+        <span class="icon-mask icon-search" aria-hidden="true"></span>
+      </button>
       <a id="profile-btn"
          href="{{ url_for('auth.profile') }}"
          hx-get="{{ url_for('auth.profile') }}"
