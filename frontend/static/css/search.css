@@ -17,33 +17,32 @@
 
 #search-input {
   width: 100%;
-  height: 2.4rem;
-  padding: 0.5rem 2.25rem 0.5rem 0.9rem;
+  height: 2.2rem;
+  padding: 0.45rem 2.1rem 0.45rem 0.85rem;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: var(--glass-bg-alt);
-  box-shadow: var(--raised-shadow);
+  background: var(--color-bg-alt);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   outline: none;
   font-family: var(--font-base);
   transition:
+    background var(--motion-fade) ease,
     box-shadow var(--motion-fade) ease,
     border-color var(--motion-fade) ease,
     transform var(--motion-tap) ease;
 
   &:hover {
-    border-color: var(--accent-10);
-    box-shadow:
-      var(--raised-shadow),
-      0 0 0 2px var(--accent-05);
+    border-color: color-mix(in srgb, var(--border) 75%, var(--accent-10));
+    background: var(--color-bg-alt);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
   }
 
   &:focus {
-    transform: translateY(-1px);
+    transform: none;
     border-color: var(--accent);
     box-shadow:
-      var(--raised-shadow),
-      0 0 0 2px var(--accent-20),
-      0 10px 26px var(--accent-10);
+      0 0 0 1px var(--accent-15),
+      0 2px 6px rgba(0, 0, 0, 0.08);
   }
 
   &:focus-visible {
