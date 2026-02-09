@@ -24,7 +24,7 @@
     </a>
   </div>
 
-  <calendar-control id="calendar-control">
+  <calendar-control id="calendar-control" hx-sync="this:replace">
     <button id="prev-day" type="button" class="icon-btn{% if is_first_day %} is-hidden{% endif %}" aria-label="Previous day"
             {% if is_first_day %}aria-hidden="true" disabled aria-disabled="true"{% endif %}
             {% if not is_first_day %}data-tooltip-title="Previous day"{% endif %}>

@@ -69,11 +69,17 @@ export function navigateToDate(dateStr) {
 
   const targetId = "#content-wrapper";
   if (window.htmx) {
-    window.htmx.ajax("GET", htmxUrl, {
+    const source =
+      document.getElementById("calendar-control") || document.body || document.documentElement;
+    const request = window.htmx.ajax("GET", htmxUrl, {
       target: targetId,
       swap: "outerHTML",
       pushUrl,
+      source,
     });
+    if (request && typeof request.catch === "function") {
+      request.catch(() => {});
+    }
     return true;
   }
 
