@@ -1,0 +1,16 @@
+{
+  "name": "llamora",
+  "private": true,
+  "scripts": {
+    "vendor": "node scripts/vendor.mjs"
+  },
+  "devDependencies": {
+    "@popperjs/core": "^2.11.8",
+    "dompurify": "^3.2.6",
+    "esbuild": "^0.24.0",
+    "htmx-ext-response-targets": "^2.0.2",
+    "htmx-ext-sse": "^2.2.2",
+    "htmx.org": "^1.9.12",
+    "marked": "^16.1.2"
+  }
+}

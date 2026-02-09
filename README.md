@@ -42,7 +42,7 @@ You can write freely, think aloud, or stay in silence.
   Each reply streams as plain text first, then a lightweight follow-up call adds an emoji and hashtags for search, filtering, and UI accents.
 
 * **Markdown support**
-  The interface renders formatted text safely through Marked + DOMPurify.
+  The interface renders formatted text safely through Marked + DOMPurify (vendored via `pnpm`).
 
 * **Minimal dependencies**
   The app uses Quart, NaCl, HTMX, and a few small Python libraries. Asset bundling relies on a vendored esbuild binary driven by Python.
@@ -116,6 +116,17 @@ uv run python scripts/build_assets.py build --mode prod
 
 When `frontend/dist/manifest.json` exists, the server prefers the bundled outputs (exposed to templates as
 `config.STATIC_MANIFEST`). Remove `frontend/dist/` to fallback to unbundled files, or run with `--mode dev`/`watch` during development.
+
+#### Vendored JS dependencies
+
+Third-party browser libraries are committed under `frontend/static/js/vendor/`. To update them without manually downloading files:
+
+```bash
+pnpm install
+pnpm vendor
+```
+
+This regenerates the vendor bundle files using esbuild and copies HTMX extensions straight from `node_modules`.
 
 ---
 ## Migrations

@@ -60,6 +60,10 @@ if (!globalScope.createPopper && globalScope.Popper?.createPopper) {
   globalScope.createPopper = globalScope.Popper.createPopper;
 }
 
+if (globalScope.DOMPurify && globalScope.DOMPurify.default?.sanitize) {
+  globalScope.DOMPurify = globalScope.DOMPurify.default;
+}
+
 if (globalScope.createPopper) {
   if (!globalScope.Popper || typeof globalScope.Popper !== "object") {
     globalScope.Popper = { createPopper: globalScope.createPopper };
