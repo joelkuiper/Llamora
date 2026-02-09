@@ -16,7 +16,6 @@ from llamora.llm.tokenizers.tokenizer import count_message_tokens
 from llamora.settings import settings
 from llamora.app.util.number import coerce_int
 from llamora.app.db.events import ENTRY_TAGS_CHANGED_EVENT, RepositoryEventBus
-from llamora.app.services.time import local_date
 
 
 @dataclass(slots=True)
@@ -250,17 +249,20 @@ class TagRecallCacheSynchronizer:
         user_id: str,
         entry_id: str,
         tag_hash: bytes | str | None = None,
+        created_date: str | None = None,
+        client_today: str | None = None,
     ) -> None:
         if not tag_hash or not self._entries:
             return
-        created_date = await self._entries.get_entry_date(user_id, entry_id)
-        if not created_date:
+        entry_date = created_date
+        if not entry_date:
+            entry_date = await self._entries.get_entry_date(user_id, entry_id)
+        if not entry_date:
             return
-        try:
-            today_iso = local_date().isoformat()
-        except Exception:
+        today_iso = client_today
+        if not today_iso:
             today_iso = datetime.now(timezone.utc).date().isoformat()
-        if created_date == today_iso:
+        if entry_date == today_iso:
             return
         tag_hash_hex = tag_hash.hex() if isinstance(tag_hash, bytes) else str(tag_hash)
         self._cache.invalidate_tag(user_id, tag_hash_hex)

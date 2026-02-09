@@ -60,7 +60,13 @@ class TagsRepository(BaseRepository):
         return digest
 
     async def xref_tag_entry(
-        self, user_id: str, tag_hash: bytes, entry_id: str
+        self,
+        user_id: str,
+        tag_hash: bytes,
+        entry_id: str,
+        *,
+        created_date: str | None = None,
+        client_today: str | None = None,
     ) -> None:
         async with self.pool.connection() as conn:
             changed = False
@@ -86,10 +92,18 @@ class TagsRepository(BaseRepository):
                 user_id=user_id,
                 entry_id=entry_id,
                 tag_hash=tag_hash,
+                created_date=created_date,
+                client_today=client_today,
             )
 
     async def unlink_tag_entry(
-        self, user_id: str, tag_hash: bytes, entry_id: str
+        self,
+        user_id: str,
+        tag_hash: bytes,
+        entry_id: str,
+        *,
+        created_date: str | None = None,
+        client_today: str | None = None,
     ) -> None:
         async with self.pool.connection() as conn:
             changed = False
@@ -111,6 +125,8 @@ class TagsRepository(BaseRepository):
                 user_id=user_id,
                 entry_id=entry_id,
                 tag_hash=tag_hash,
+                created_date=created_date,
+                client_today=client_today,
             )
 
     async def get_tags_for_entry(

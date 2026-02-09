@@ -3,6 +3,7 @@ from llamora.app.services.container import get_services, get_tag_service
 from llamora.app.services.auth_helpers import login_required
 from llamora.app.services.session_context import get_session_context
 from llamora.app.services.tag_summary import generate_tag_summary
+from llamora.app.services.time import local_date
 from llamora.settings import settings
 from llamora.app.util.frecency import (
     DEFAULT_FRECENCY_DECAY,
@@ -22,12 +23,21 @@ def _tags():
 async def remove_tag(entry_id: str, tag_hash: str):
     session = get_session_context()
     user = await session.require_user()
+    db = get_services().db
     try:
         tag_hash_bytes = bytes.fromhex(tag_hash)
     except ValueError as exc:
         abort(400, description="invalid tag hash")
         raise AssertionError("unreachable") from exc
-    await get_services().db.tags.unlink_tag_entry(user["id"], tag_hash_bytes, entry_id)
+    created_date = await db.entries.get_entry_date(user["id"], entry_id)
+    client_today = local_date().isoformat()
+    await db.tags.unlink_tag_entry(
+        user["id"],
+        tag_hash_bytes,
+        entry_id,
+        created_date=created_date,
+        client_today=client_today,
+    )
     return "<span class='tag-tombstone'></span>"
 
 
@@ -48,7 +58,15 @@ async def add_tag(entry_id: str):
     db = get_services().db
     await ensure_entry_exists(db, user["id"], entry_id)
     tag_hash = await db.tags.resolve_or_create_tag(user["id"], canonical, dek)
-    await db.tags.xref_tag_entry(user["id"], tag_hash, entry_id)
+    created_date = await db.entries.get_entry_date(user["id"], entry_id)
+    client_today = local_date().isoformat()
+    await db.tags.xref_tag_entry(
+        user["id"],
+        tag_hash,
+        entry_id,
+        created_date=created_date,
+        client_today=client_today,
+    )
     html = await render_template(
         "partials/tag_item.html",
         tag=canonical,
