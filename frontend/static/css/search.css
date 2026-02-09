@@ -13,17 +13,20 @@
   align-items: center;
   flex: 1 1 auto;
   min-width: 0;
+  --inline-input-bg: color-mix(in srgb, var(--color-bg-alt) 82%, var(--color-bg));
+  --inline-input-bg-hover: color-mix(in srgb, var(--color-bg-alt) 88%, var(--color-bg));
+  --inline-input-bg-focus: color-mix(in srgb, var(--color-bg-alt) 92%, var(--color-bg));
 }
 
 #search-input {
   width: 100%;
   height: 2.2rem;
   padding: 0.45rem 2.1rem 0.45rem 0.85rem;
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent 45%);
   border-radius: 999px;
-  background: var(--glass-bg-alt);
+  background: var(--inline-input-bg);
   color: var(--color-text);
-  box-shadow: var(--inset-shadow);
+  box-shadow: var(--soft-outline-shadow);
   outline: none;
   font-family: var(--font-base);
   transition:
@@ -33,22 +36,22 @@
     transform var(--motion-tap) ease;
 
   &:hover {
-    border-color: var(--accent-20);
-    background: var(--glass-bg-alt-hover);
+    border-color: color-mix(in srgb, var(--border) 22%, var(--accent-20));
+    background: var(--inline-input-bg-hover);
     box-shadow:
-      var(--inset-shadow),
-      0 0 0 2px var(--accent-30);
+      var(--soft-outline-shadow),
+      0 0 0 2px color-mix(in srgb, var(--accent-20) 60%, transparent 40%);
   }
 
   &:focus,
   &:focus-visible {
     transform: none;
-    border-color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
     box-shadow:
-      var(--inset-shadow),
-      0 0 0 2px var(--accent-20),
-      0 8px 22px var(--accent-10);
-    background: var(--glass-bg-alt-hover);
+      var(--soft-outline-shadow),
+      0 0 0 2px color-mix(in srgb, var(--accent-20) 70%, transparent 30%),
+      0 8px 18px color-mix(in srgb, var(--accent-10) 55%, transparent 45%);
+    background: var(--inline-input-bg-focus);
     outline: none;
   }
 
@@ -59,16 +62,19 @@
 }
 
 #search-input.inline-autocomplete__input {
-  background-color: var(--glass-bg) !important;
+  background: var(--inline-input-bg);
+  background-color: var(--inline-input-bg);
 }
 
 #search-input.inline-autocomplete__input:hover {
-  background-color: var(--glass-bg-alt-hover) !important;
+  background: var(--inline-input-bg-hover);
+  background-color: var(--inline-input-bg-hover);
 }
 
 #search-input.inline-autocomplete__input:focus,
 #search-input.inline-autocomplete__input:focus-visible {
-  background-color: var(--glass-bg-alt-hover) !important;
+  background: var(--inline-input-bg-focus);
+  background-color: var(--inline-input-bg-focus);
 }
 
 #search-input::placeholder {

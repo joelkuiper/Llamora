@@ -28,6 +28,7 @@
     --shadow-light-60-dark: rgba(255, 255, 255, 0.22);
     --raised-shadow-dark: 0 12px 28px rgba(0, 0, 0, 0.55), 0 4px 10px rgba(0, 0, 0, 0.32);
     --subtle-raised-shadow-dark: 0 4px 10px rgba(0, 0, 0, 0.42), 0 2px 6px rgba(0, 0, 0, 0.26);
+    --soft-outline-shadow-dark: 0 0 0 1px rgba(255, 255, 255, 0.08);
     --inset-shadow-dark:
       inset 1px 1px 2px rgba(255, 255, 255, 0.04), inset -1px -1px 2px rgba(0, 0, 0, 0.42);
     --inset-shadow-disabled-dark:

@@ -47,13 +47,28 @@ body {
   display: inline-block;
   width: 100%;
   flex: 1 1 auto;
+  --inline-input-bg: transparent;
+  --inline-input-bg-hover: transparent;
+  --inline-input-bg-focus: transparent;
 }
 
 .inline-autocomplete__input {
   position: relative;
   z-index: 2;
   width: 100%;
-  background-color: transparent !important;
+  background-color: var(--inline-input-bg);
+  background: var(--inline-input-bg);
+}
+
+.inline-autocomplete__input:hover {
+  background-color: var(--inline-input-bg-hover);
+  background: var(--inline-input-bg-hover);
+}
+
+.inline-autocomplete__input:focus,
+.inline-autocomplete__input:focus-visible {
+  background-color: var(--inline-input-bg-focus);
+  background: var(--inline-input-bg-focus);
 }
 .inline-autocomplete__input::selection {
   background-color: color-mix(in srgb, var(--accent), transparent 82%);
