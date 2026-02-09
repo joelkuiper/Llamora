@@ -222,10 +222,14 @@ class HistoryCacheSynchronizer:
         user_id: str,
         entry_id: str,
         tag_hash: bytes | str | None = None,
+        created_date: str | None = None,
+        client_today: str | None = None,
     ) -> None:
         if not self._events or not self._entries:
             return
-        created_date = await self._entries.get_entry_date(user_id, entry_id)
+        created_date = created_date or await self._entries.get_entry_date(
+            user_id, entry_id
+        )
         if not created_date:
             return
         await self._events.emit_for_entry_date(
