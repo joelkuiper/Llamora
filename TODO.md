@@ -2,7 +2,7 @@
 - [-] What to do with tags
   - [ ] Dedicated tags page with analyses?
 - [x] Recovery code generation page rethink
-- [ ] Summaries for days as "tooltip" in calendar nav
+- [x] Summaries for days as "tooltip" in calendar nav
 - [ ] README
 Later
 - [ ] Better model than Qwen4B, find something that's a bit more chatty

@@ -13,7 +13,10 @@ from llamora.app.routes.helpers import require_iso_date
 from llamora.app.services.calendar import get_month_context
 from llamora.app.routes.entries import render_entries
 from llamora.app.services.container import get_services
+from llamora.app.services.day_summary import generate_day_summary
+from llamora.app.routes.helpers import require_user_and_dek
 from logging import getLogger
+import orjson
 
 days_bp = Blueprint("days", __name__)
 logger = getLogger(__name__)
@@ -134,3 +137,23 @@ async def calendar_month(year: int, month: int):
         mode = "calendar"
     html = await _render_calendar(target_year, target_month, mode=mode)
     return await make_response(html)
+
+
+@days_bp.route("/d/<date>/summary")
+@login_required
+async def day_summary(date):
+    normalized_date = require_iso_date(date)
+    _, user, dek = await require_user_and_dek()
+    services = get_services()
+    entries = await services.db.entries.get_flat_entries_for_date(
+        user["id"], normalized_date, dek
+    )
+    summary = await generate_day_summary(
+        services.llm_service.llm,
+        normalized_date,
+        entries,
+    )
+    payload = {"summary": summary or ""}
+    resp = await make_response(orjson.dumps(payload), 200)
+    resp.mimetype = "application/json"
+    return resp

@@ -7,6 +7,12 @@ export class CalendarControl extends HTMLElement {
   #btn = null;
   #pop = null;
   #globalListeners = null;
+  #summaryCache = new Map();
+  #summaryRequests = new Map();
+  #tooltip = null;
+  #tooltipTimer = null;
+  #tooltipHideTimer = null;
+  #tooltipDate = null;
 
   connectedCallback() {
     this.#btn = this.querySelector("#calendar-btn");
@@ -24,6 +30,19 @@ export class CalendarControl extends HTMLElement {
     const handleSwap = () => this.#initCalendarPopover();
     document.body.addEventListener("htmx:afterSwap", handleSwap, { signal });
     document.body.addEventListener("htmx:historyRestore", handleSwap, { signal });
+    document.body.addEventListener(
+      "htmx:afterSwap",
+      (event) => {
+        const target = event?.detail?.target ?? event?.target;
+        if (target?.id === "entries") {
+          const date = target?.dataset?.date;
+          if (date) {
+            this.#summaryCache.delete(date);
+          }
+        }
+      },
+      { signal },
+    );
     const handleBeforeCache = () => {
       this.#teardownState();
       if (this.#btn) {
@@ -238,6 +257,107 @@ export class CalendarControl extends HTMLElement {
     };
   }
 
+  #ensureTooltip() {
+    if (this.#tooltip && document.body.contains(this.#tooltip)) {
+      return this.#tooltip;
+    }
+    const tooltip = document.createElement("div");
+    tooltip.className = "calendar-day-tooltip";
+    tooltip.hidden = true;
+    document.body.appendChild(tooltip);
+    this.#tooltip = tooltip;
+    return tooltip;
+  }
+
+  #hideTooltip({ immediate = false } = {}) {
+    if (this.#tooltipTimer) {
+      clearTimeout(this.#tooltipTimer);
+      this.#tooltipTimer = null;
+    }
+    if (this.#tooltipHideTimer) {
+      clearTimeout(this.#tooltipHideTimer);
+      this.#tooltipHideTimer = null;
+    }
+    this.#tooltipDate = null;
+    const tooltip = this.#tooltip;
+    if (!tooltip) return;
+    tooltip.classList.remove("is-visible");
+    if (immediate) {
+      tooltip.hidden = true;
+      tooltip.textContent = "";
+      return;
+    }
+    this.#tooltipHideTimer = window.setTimeout(() => {
+      tooltip.hidden = true;
+      tooltip.textContent = "";
+    }, 180);
+  }
+
+  #positionTooltip(tooltip, cell) {
+    const row = cell?.parentElement;
+    if (!(row instanceof HTMLTableRowElement)) return;
+    const calendar = cell.closest("#calendar");
+    if (!calendar) return;
+
+    tooltip.hidden = false;
+    tooltip.style.visibility = "hidden";
+
+    const rowRect = row.getBoundingClientRect();
+    const calRect = calendar.getBoundingClientRect();
+    const tipRect = tooltip.getBoundingClientRect();
+    const offset = 14;
+    const margin = 12;
+
+    let left = calRect.right + offset;
+    const maxLeft = window.innerWidth - tipRect.width - margin;
+    if (left > maxLeft) {
+      left = maxLeft;
+    }
+    if (left < margin) {
+      left = margin;
+    }
+
+    let top = rowRect.top + (rowRect.height - tipRect.height) / 2;
+    const maxTop = window.innerHeight - tipRect.height - margin;
+    if (top > maxTop) top = maxTop;
+    if (top < margin) top = margin;
+
+    tooltip.style.left = `${Math.round(left)}px`;
+    tooltip.style.top = `${Math.round(top)}px`;
+    tooltip.style.visibility = "visible";
+    requestAnimationFrame(() => {
+      tooltip.classList.add("is-visible");
+    });
+  }
+
+  async #fetchDaySummary(date) {
+    if (!date) return "";
+    if (this.#summaryCache.has(date)) {
+      return this.#summaryCache.get(date);
+    }
+    if (this.#summaryRequests.has(date)) {
+      return this.#summaryRequests.get(date);
+    }
+    const request = fetch(`/d/${date}/summary`, {
+      headers: { Accept: "application/json" },
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const summary = typeof data?.summary === "string" ? data.summary.trim() : "";
+        if (summary) {
+          this.#summaryCache.set(date, summary);
+        }
+        this.#summaryRequests.delete(date);
+        return summary;
+      })
+      .catch(() => {
+        this.#summaryRequests.delete(date);
+        return "";
+      });
+    this.#summaryRequests.set(date, request);
+    return request;
+  }
+
   #configureCalendarGrid(calendar, popover, pop, signal) {
     const grid = calendar.querySelector(".calendar-table[data-calendar-grid]");
     if (!grid || grid.dataset.enhanced === "true") {
@@ -283,6 +403,12 @@ export class CalendarControl extends HTMLElement {
     };
 
     pop.addEventListener("calendar-popover:show", ensureFocus, { signal });
+    pop.addEventListener(
+      "calendar-popover:hide",
+      () => this.#hideTooltip({ immediate: true }),
+      { signal },
+    );
+    pop.addEventListener("mouseleave", () => this.#hideTooltip(), { signal });
 
     grid.addEventListener(
       "focusin",
@@ -292,6 +418,51 @@ export class CalendarControl extends HTMLElement {
         updateCellState(cell);
       },
       { signal },
+    );
+    grid.addEventListener(
+      "focusin",
+      (event) => {
+        const cell = event.target.closest("[data-calendar-cell]");
+        if (!cell) return;
+        this.#scheduleTooltip(cell);
+      },
+      { signal },
+    );
+    grid.addEventListener(
+      "focusout",
+      () => {
+        this.#hideTooltip();
+      },
+      { signal },
+    );
+    grid.addEventListener(
+      "pointerenter",
+      (event) => {
+        const cell = event.target.closest("[data-calendar-cell]");
+        if (!cell) return;
+        this.#scheduleTooltip(cell);
+      },
+      { signal, capture: true },
+    );
+    grid.addEventListener(
+      "pointerleave",
+      (event) => {
+        if (!event.target.closest("[data-calendar-cell]")) return;
+        this.#hideTooltip();
+      },
+      { signal, capture: true },
+    );
+    grid.addEventListener(
+      "click",
+      () => {
+        this.#hideTooltip({ immediate: true });
+      },
+      { signal },
+    );
+    window.addEventListener(
+      "scroll",
+      () => this.#hideTooltip({ immediate: true }),
+      { signal, passive: true },
     );
 
     const focusCell = (cell) => {
@@ -418,6 +589,23 @@ export class CalendarControl extends HTMLElement {
       },
       { signal },
     );
+  }
+
+  #scheduleTooltip(cell) {
+    const date = cell?.dataset?.date;
+    if (!date) return;
+    if (this.#tooltipTimer) {
+      clearTimeout(this.#tooltipTimer);
+    }
+    this.#tooltipDate = date;
+    this.#tooltipTimer = window.setTimeout(async () => {
+      if (this.#tooltipDate !== date) return;
+      const summary = await this.#fetchDaySummary(date);
+      if (!summary || this.#tooltipDate !== date) return;
+      const tooltip = this.#ensureTooltip();
+      tooltip.textContent = summary;
+      this.#positionTooltip(tooltip, cell);
+    }, 500);
   }
 
   #trapFocus(pop, popover, signal) {

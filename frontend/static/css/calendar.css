@@ -14,12 +14,42 @@
 }
 
 .calendar-popover {
+  position: relative;
   .overlay-close {
     position: absolute;
     top: -0.5rem;
     right: -0.5rem;
     z-index: 9999;
   }
+}
+
+.calendar-day-tooltip {
+  position: fixed;
+  z-index: 6500;
+  max-width: 320px;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+  background: color-mix(in srgb, var(--color-bg-alt) 70%, transparent);
+  color: var(--color-text);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  box-shadow: var(--soft-outline-shadow);
+  backdrop-filter: blur(8px);
+  text-shadow:
+    0 1px 1px color-mix(in srgb, var(--color-text) 16%, transparent),
+    0 0 12px color-mix(in srgb, var(--color-text) 12%, transparent);
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity 160ms ease-out,
+    transform 160ms ease-out;
+  pointer-events: none;
+}
+
+.calendar-day-tooltip.is-visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 #calendar-btn #calendar-label {
