@@ -1,5 +1,5 @@
-{% if snippets -%}
-{{ heading }}{% if tag_labels %} ({{ tag_labels | join(', ') }}){% endif %}:
+{% if snippets %}
+Context for the active entry{% if tag_labels %} ({{ tag_labels | join(', ') }}){% endif %}:
 {%- for snippet in snippets %}
 - {{ snippet }}
 {%- endfor %}

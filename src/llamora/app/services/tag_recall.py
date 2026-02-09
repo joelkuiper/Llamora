@@ -582,7 +582,7 @@ async def build_tag_recall_context(
     ]
     text = render_prompt_template(
         "tag_recall.txt.j2",
-        heading="Cross-day tag recall",
+        heading="Context for the active entry",
         tag_labels=tag_labels,
         snippets=snippets,
     ).strip()

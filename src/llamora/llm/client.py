@@ -659,6 +659,7 @@ class LLMClient:
                 "prompt_messages": len(messages or []),
             },
         )
+        self._log_prompt(entry_id, messages, cfg)
         payload = self._build_chat_payload(messages, cfg)
         async with self._acquire_slot(entry_id) as _slot_id:
             stream = _ChatStream(self, payload)
@@ -693,6 +694,7 @@ class LLMClient:
         )
 
         payload = self._build_chat_payload(message_list, cfg)
+        self._log_prompt("complete", message_list, cfg)
         payload.pop("slot_id", None)
         payload.pop("id", None)
 
@@ -754,6 +756,26 @@ class LLMClient:
                 payload.setdefault("extra_body", {})[key] = value
 
         return payload
+
+    def _log_prompt(
+        self,
+        entry_id: str | None,
+        messages: Sequence[Mapping[str, Any]],
+        params: Mapping[str, Any],
+    ) -> None:
+        logger = logging.getLogger(__name__)
+        logger.debug(
+            "Prompt %s (entry=%s): %s",
+            params.get("model", settings.get("LLM.chat.model", "local")),
+            entry_id,
+            [
+                {
+                    "role": msg.get("role"),
+                    "content": msg.get("content") or msg.get("text"),
+                }
+                for msg in messages
+            ],
+        )
 
     async def abort(self, entry_id: str) -> bool:
         slot_id: int | None = None

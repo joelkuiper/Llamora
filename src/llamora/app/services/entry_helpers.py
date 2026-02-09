@@ -234,6 +234,8 @@ async def augment_history_with_recall(
 ) -> RecallAugmentation:
     """Insert ``recall_context`` into ``history`` and optionally trim it."""
 
+    logger = logging.getLogger(__name__)
+
     augmented: list[dict[str, Any]] = [dict(entry) for entry in history]
     recall_inserted = False
     recall_index: int | None = None
@@ -256,24 +258,32 @@ async def augment_history_with_recall(
             if tag_items:
                 recall_entry["tags"] = tag_items
 
-    if recall_entry is not None:
-        augmented = []
-        for entry in history:
-            entry_dict = dict(entry)
-            if (
-                not recall_inserted
-                and target_entry_id is not None
-                and str(entry_dict.get("id")) == str(target_entry_id)
-            ):
+        if recall_entry is not None:
+            augmented = []
+            for entry in history:
+                entry_dict = dict(entry)
+                if (
+                    not recall_inserted
+                    and target_entry_id is not None
+                    and str(entry_dict.get("id")) == str(target_entry_id)
+                ):
+                    recall_index = len(augmented)
+                    augmented.append(dict(recall_entry))
+                    recall_inserted = True
+                augmented.append(entry_dict)
+
+            if not recall_inserted:
                 recall_index = len(augmented)
                 augmented.append(dict(recall_entry))
                 recall_inserted = True
-            augmented.append(entry_dict)
 
-        if not recall_inserted:
-            recall_index = len(augmented)
-            augmented.append(dict(recall_entry))
-            recall_inserted = True
+        logger.debug(
+            "Inserted tag recall for entry=%s tags=%s inserted=%s text=%s",
+            target_entry_id,
+            recall_context.tags,
+            recall_inserted,
+            recall_context.text[:300],
+        )
 
     trimmed_history = augmented
     if llm_client is not None:

@@ -1,10 +1,7 @@
-You summarize a list of messages for one tag.
-Input lines are in the form "YYYY-MM-DD Role: message".
-Your summary is injected into the assistant's context to gently remind the user of what they wrote.
-Write at least 5 calm sentences in the same language as the input.
-Be concrete: mention specific topics or phrases from the messages. Avoid vague phrasing like "engaged," "discussed," or "asked about time."
-Include short snippets in quotes (1-6 words each) from the user's messages.
-Prefer the user's content; only reference assistant content if it adds essential context.
-Do not list dates or repeat the input structure; synthesize across the messages instead.
-Keep it under {{ max_chars }} characters and avoid meta commentary.
-Return only strict JSON matching {"summary": "..."} with no extra keys.
+You are summarizing the meaning behind the tag attached to the user entry that triggered this request.
+You receive lines formatted as "YYYY-MM-DD Role: message"; they represent the messages that were tagged.
+Explain why those messages belong to that tag and what the assistant should remember before replying to the newest user entry.
+Write at least five calm, conversational sentences in the same language as the input, referencing concrete phrases from the tagged messages.
+Include at least two short snippets (1–6 words) from the user messages, quoted verbatim, to illustrate the theme.
+Avoid repeating dates, restating the input format, or drifting into meta commentary about summarization.
+Keep the response under {{ max_chars }} characters and return only strict JSON: {"summary": "..."}.
