@@ -5,6 +5,7 @@ from datetime import datetime
 import hashlib
 import asyncio
 from collections import deque
+from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping, Sequence, cast
 
 import orjson
@@ -14,6 +15,8 @@ from llamora.llm.prompt_templates import render_prompt_template
 from llamora.llm.tokenizers.tokenizer import count_message_tokens
 from llamora.settings import settings
 from llamora.app.util.number import coerce_int
+from llamora.app.db.events import ENTRY_TAGS_CHANGED_EVENT, RepositoryEventBus
+from llamora.app.services.time import local_date
 
 
 @dataclass(slots=True)
@@ -220,6 +223,47 @@ class TagRecallSummaryCache:
 
 
 TAG_RECALL_SUMMARY_CACHE = TagRecallSummaryCache()
+
+
+class TagRecallCacheSynchronizer:
+    """Invalidate tag recall summaries when tag assignments change."""
+
+    __slots__ = ("_cache", "_events", "_entries")
+
+    def __init__(
+        self,
+        *,
+        event_bus: RepositoryEventBus | None,
+        entries_repository,
+        cache: TagRecallSummaryCache,
+    ) -> None:
+        self._cache = cache
+        self._events = event_bus
+        self._entries = entries_repository
+        if not self._events:
+            return
+        self._events.subscribe(ENTRY_TAGS_CHANGED_EVENT, self._handle_tags_changed)
+
+    async def _handle_tags_changed(
+        self,
+        *,
+        user_id: str,
+        entry_id: str,
+        tag_hash: bytes | str | None = None,
+    ) -> None:
+        if not tag_hash or not self._entries:
+            return
+        created_date = await self._entries.get_entry_date(user_id, entry_id)
+        if not created_date:
+            return
+        try:
+            today_iso = local_date().isoformat()
+        except Exception:
+            today_iso = datetime.now(timezone.utc).date().isoformat()
+        if created_date == today_iso:
+            return
+        tag_hash_hex = tag_hash.hex() if isinstance(tag_hash, bytes) else str(tag_hash)
+        self._cache.invalidate_tag(user_id, tag_hash_hex)
 
 
 async def _summarize_with_llm(
