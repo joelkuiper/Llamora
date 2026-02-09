@@ -1,0 +1,30 @@
+#entries .typing-indicator {
+  display: inline-block;
+  font-weight: bold;
+  padding-left: 4px;
+  line-height: 1;
+  vertical-align: baseline;
+  white-space: normal;
+}
+
+#entries .typing-indicator-placeholder {
+  display: inline-block;
+  font-weight: bold;
+  padding-left: 4px;
+  line-height: 1;
+  vertical-align: baseline;
+  white-space: normal;
+  animation: blink var(--motion-blink) step-start infinite;
+}
+
+#entries .typing-indicator.stopped {
+  color: var(--color-text-muted);
+}
+
+#entries .typing-indicator.stopped::before {
+  content: "\23F9";
+}
+
+#entries .typing-indicator.stopped .cursor {
+  display: none;
+}

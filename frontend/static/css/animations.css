@@ -1,0 +1,311 @@
+/* Shared animations */
+@keyframes entries-loading-float {
+  0% {
+    opacity: 0.4;
+    transform: translateY(6px) scale(0.98);
+  }
+  50% {
+    opacity: 0.7;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0.4;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+
+@keyframes entries-loading-breathe {
+  0% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0.5;
+  }
+}
+
+.entries-loading__panel {
+  animation: entries-loading-float 3.6s ease-in-out infinite;
+  animation-delay: -1.8s;
+}
+
+.entries-loading__spinner,
+.entries-loading__label {
+  animation: entries-loading-breathe 3.6s ease-in-out infinite;
+  animation-delay: -1.8s;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.entry.motion-animate-entry {
+  animation: fade-in-up var(--motion-sigh) ease-out;
+}
+
+@keyframes submitting-wave {
+  0%,
+  100% {
+    background-position: 50% 0%;
+  }
+  50% {
+    background-position: 50% 90%;
+  }
+}
+
+@keyframes button-wave {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes form-breathe {
+  0% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.01);
+  }
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+}
+
+#entry-form {
+  .btn.submitting {
+    animation: button-wave calc(var(--motion-wave, 1.6s) * 1.05) ease-in-out infinite;
+  }
+
+  .btn.submitting::after {
+    animation: spin 620ms linear infinite;
+  }
+}
+
+@keyframes blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes appear {
+  from {
+    transform: none scale(0.92);
+    opacity: 0;
+  }
+  to {
+    transform: none scale(1);
+    opacity: 0.9;
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: none scale(1);
+  }
+  50% {
+    transform: none scale(1.015);
+  }
+}
+
+@keyframes pop-fade {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  20% {
+    transform: scale(1.3);
+  }
+  40% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes tag-skeleton-breathe {
+  0%,
+  100% {
+    opacity: 0.65;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+@keyframes tag-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: 0% 0;
+  }
+}
+
+@keyframes tag-skeleton-pulse {
+  0% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.2;
+  }
+}
+
+@keyframes entry-edit-pulse {
+  0% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.2;
+  }
+}
+
+@keyframes repeat-guard-wave {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 0.85;
+    transform: translateY(-0.15rem);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  #entries {
+    .typing-indicator {
+      animation: blink var(--motion-blink) step-start infinite;
+    }
+
+    .typing-indicator.stopped {
+      animation: pop-fade var(--motion-exhale) ease forwards;
+    }
+  }
+
+  scroll-bottom-button .scroll-btn {
+    scroll-bottom-button.visible & {
+      animation:
+        appear var(--motion-fade) ease-out,
+        breathe var(--motion-breathe) ease-in-out var(--motion-delay-short) infinite;
+    }
+  }
+
+  #entries .typing-indicator-placeholder {
+    animation: blink var(--motion-blink) step-start infinite;
+  }
+
+  .tag-suggestion--skeleton {
+    animation:
+      tag-skeleton-breathe 2.6s ease-in-out infinite,
+      tag-skeleton-shimmer 2.2s ease-in-out infinite;
+  }
+
+  .entry-edit-form.is-saving .entry-edit-dot {
+    animation: entry-edit-pulse 0.7s infinite ease-in-out;
+  }
+
+  #entries .entry-edit-dot:nth-child(2) {
+    animation-delay: 0.12s;
+  }
+
+  #entries .entry-edit-dot:nth-child(3) {
+    animation-delay: 0.24s;
+  }
+
+  .repeat-guard-indicator__dot {
+    animation: repeat-guard-wave 1.6s ease-in-out infinite;
+  }
+
+  .repeat-guard-indicator__dot--delay {
+    animation-delay: 0.24s;
+  }
+
+  .repeat-guard-indicator__dot--late {
+    animation-delay: 0.48s;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #entries {
+    .typing-indicator {
+      animation: none;
+    }
+
+    .typing-indicator.stopped {
+      animation: none;
+      opacity: 0;
+    }
+  }
+
+  scroll-bottom-button .scroll-btn {
+    scroll-bottom-button.visible & {
+      animation: none;
+      opacity: 0.9;
+      transform: none;
+    }
+  }
+
+  .repeat-guard-indicator {
+    transition: none;
+  }
+
+  .repeat-guard-indicator__waves {
+    transition: none;
+  }
+
+  .repeat-guard-indicator__dot {
+    animation: none;
+  }
+
+  #entry-form.is-submitting::after,
+  .input-wrapper .btn.submitting,
+  .input-wrapper .btn.submitting::after {
+    animation: none;
+  }
+}
+
+.scroll-bottom-button .scroll-btn {
+  scroll-bottom-button.visible & {
+    animation:
+      appear var(--motion-fade) ease-out,
+      breathe var(--motion-breathe) ease-in-out var(--motion-delay-short) infinite;
+  }
+}

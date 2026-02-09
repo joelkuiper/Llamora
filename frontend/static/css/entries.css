@@ -1,6 +1,2 @@
 @import url("./tokens/base.css");
-@import url("./entries/base.css");
-@import url("./entries/panel.css");
-@import url("./entries/entry-form.css");
-@import url("./entries/scroll-bottom.css");
-@import url("./entries/animations.css");
+@import url("./diary/index.css");

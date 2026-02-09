@@ -1,0 +1,126 @@
+#entries .entry-delete {
+  position: absolute;
+  right: var(--spacing-sm);
+  bottom: var(--spacing-sm);
+  transition: background 200ms ease, border-color 200ms ease, box-shadow 200ms ease, color 200ms ease;
+}
+
+#entries .entry.user .entry-delete {
+  position: static;
+}
+
+#entries .entry.user .entry-actions-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+  opacity: 0.3;
+  transition: opacity var(--motion-gentle) ease;
+}
+
+#entries .entry.user:hover .entry-actions-row,
+#entries .entry.user:focus-within .entry-actions-row {
+  opacity: 1;
+}
+
+#entries .entry-actions-inline {
+  position: absolute;
+  right: var(--spacing-sm);
+  bottom: var(--spacing-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  opacity: 0.4;
+  transition: opacity var(--motion-gentle) ease;
+}
+
+#entries .entry-actions-inline .entry-delete {
+  position: static;
+}
+
+#entries .entry-time {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.65rem;
+  color: color-mix(in srgb, var(--color-text-muted) 85%, transparent);
+  margin-top: var(--spacing-xs);
+  gap: 0.35rem;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  transform: translateY(0);
+  opacity: 0;
+  transition: opacity var(--motion-gentle) ease;
+  pointer-events: none;
+}
+
+#entries .entry-actions-row .entry-time {
+  transform: translateY(-2px);
+  margin-right: 0.4rem;
+}
+
+#entries .entry-actions-inline .entry-time {
+  transform: translateY(-3px);
+}
+
+#entries .entry:hover .entry-time,
+#entries .entry:focus-within .entry-time {
+  opacity: 1;
+}
+
+#entries .entry:hover .entry-actions-inline,
+#entries .entry:focus-within .entry-actions-inline {
+  opacity: 1;
+}
+
+#entries .entry-actions-row .entry-action__icon,
+#entries .entry-actions-inline .entry-action__icon {
+  opacity: 0.45;
+  transition: opacity var(--motion-gentle) ease;
+}
+
+#entries .entry:hover .entry-actions-row .entry-action__icon,
+#entries .entry:focus-within .entry-actions-row .entry-action__icon,
+#entries .entry:hover .entry-actions-inline .entry-action__icon,
+#entries .entry:focus-within .entry-actions-inline .entry-action__icon {
+  opacity: 0.9;
+}
+
+#entries .entry-kind-indicator {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: color-mix(in srgb, var(--assistant-action-color) 70%, var(--color-text-muted));
+  cursor: default;
+}
+
+#entries .entry-kind-indicator:hover,
+#entries .entry-kind-indicator:focus-visible {
+  border-color: transparent;
+  box-shadow: none;
+  background: transparent;
+}
+
+#entries .entry-kind-indicator .entry-kind-icon {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+#entries .entry.assistant .entry-delete,
+#entries .entry.response-stream .entry-delete {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--assistant-delete-color);
+}
+
+#entries .entry-delete:hover,
+#entries .entry-delete:focus-visible,
+#entries .entry.assistant .entry-delete:hover,
+#entries .entry.assistant .entry-delete:focus-visible,
+#entries .entry.response-stream .entry-delete:hover,
+#entries .entry.response-stream .entry-delete:focus-visible {
+  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-danger) 18%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  color: color-mix(in srgb, var(--color-danger) 70%, var(--color-text-muted));
+}

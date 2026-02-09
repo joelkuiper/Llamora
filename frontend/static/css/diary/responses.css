@@ -1,0 +1,97 @@
+#entries .repeat-guard-indicator {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: var(--color-bg);
+  background: color-mix(in srgb, var(--color-bg) 80%, transparent);
+  color: var(--color-text-muted);
+  font-size: 0.625rem;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  cursor: help;
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+#entries .repeat-guard-indicator--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+#entries .repeat-guard-indicator--leaving {
+  pointer-events: none;
+}
+
+#entries .repeat-guard-indicator--leaving,
+#entries .repeat-guard-indicator--leaving .repeat-guard-indicator__dot {
+  opacity: 0;
+}
+
+#entries .repeat-guard-indicator--leaving .repeat-guard-indicator__dot {
+  animation-play-state: paused;
+}
+
+#entries .repeat-guard-indicator--calm {
+  cursor: default;
+  gap: 0;
+}
+
+#entries .repeat-guard-indicator--calm .repeat-guard-indicator__waves {
+  opacity: 0;
+  max-width: 0;
+}
+
+#entries .repeat-guard-indicator--calm .repeat-guard-indicator__dot {
+  animation-play-state: paused;
+}
+
+#entries .repeat-guard-indicator__waves {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  max-width: 1.2rem;
+  transition: opacity 0.4s ease, max-width 0.4s ease;
+}
+
+#entries .repeat-guard-indicator__dot {
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.35;
+  animation: repeat-guard-wave 1.6s ease-in-out infinite;
+}
+
+#entries .repeat-guard-indicator__dot--delay {
+  animation-delay: 0.24s;
+}
+
+#entries .repeat-guard-indicator__dot--late {
+  animation-delay: 0.48s;
+}
+
+#entries .repeat-guard-indicator__label {
+  white-space: nowrap;
+}
+
+#entries .entry-responses {
+  display: grid;
+  gap: calc(var(--spacing-xs) * 1.2);
+  margin-top: calc(var(--spacing-xs) * 0.6);
+  position: relative;
+  padding-left: 0;
+}
+
+#entries .entry.user + .entry-responses {
+  margin-top: var(--spacing-sm);
+}
+
+#entries .entry--opening + .entry {
+  margin-top: var(--spacing-xs);
+}
