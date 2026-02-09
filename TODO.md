@@ -1,7 +1,7 @@
 # TODO
 - [-] What to do with tags
   - [ ] Dedicated tags page with analyses?
-- [ ] Recovery code generation page rethink (add QR code?)
+- [x] Recovery code generation page rethink
 - [ ] Summaries for days as "tooltip" in calendar nav
 - [ ] Check how entries are chunked (are they?) for ANN
 - [ ] README
