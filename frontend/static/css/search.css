@@ -186,6 +186,18 @@
   }
 }
 
+@media (max-width: 960px) {
+  .search-results-overlay {
+    left: 0;
+    right: 0;
+    inset-inline-start: 0;
+    inset-inline-end: 0;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+  }
+}
+
 .search-results-overlay.is-empty {
   justify-content: center;
   gap: var(--spacing-md);
