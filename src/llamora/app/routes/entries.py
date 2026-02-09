@@ -642,6 +642,7 @@ async def sse_response(entry_id: str, date: str):
                 current_date=actual_date or normalized_date,
                 llm=llm_client,
                 max_entry_id=entry_id,
+                target_entry_id=entry_id,
             )
             recall_date = actual_date or normalized_date
             recall_tags = tuple(recall_context.tags) if recall_context else ()

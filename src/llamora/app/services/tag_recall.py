@@ -395,6 +395,36 @@ def _extract_focus_tags(
     return tag_hashes, tag_names
 
 
+def _extract_raw_tags(
+    tags: Sequence[Mapping[str, Any] | dict[str, Any]],
+    limit: int,
+) -> tuple[list[bytes], dict[bytes, str]]:
+    tag_hashes: list[bytes] = []
+    tag_names: dict[bytes, str] = {}
+    seen: set[bytes] = set()
+
+    for raw_tag in tags:
+        if not isinstance(raw_tag, Mapping):
+            continue
+        hash_hex = str(raw_tag.get("hash") or "").strip()
+        if not hash_hex:
+            continue
+        try:
+            digest = bytes.fromhex(hash_hex)
+        except ValueError:
+            continue
+        if digest in seen:
+            continue
+        seen.add(digest)
+        tag_hashes.append(digest)
+        name = str(raw_tag.get("name") or "").strip()
+        if name:
+            tag_names.setdefault(digest, name)
+        if len(tag_hashes) >= limit:
+            break
+    return tag_hashes, tag_names
+
+
 def _extract_date(created_at: str | None) -> str | None:
     if not created_at:
         return None
@@ -415,6 +445,7 @@ async def build_tag_recall_context(
     max_entry_id: str | None = None,
     max_created_at: str | None = None,
     config: TagRecallConfig | None = None,
+    target_entry_id: str | None = None,
 ) -> TagRecallContext | None:
     """Return summarised memories linked to the user's recent tags.
 
@@ -434,11 +465,15 @@ async def build_tag_recall_context(
     ):
         return None
 
-    focus_tags, tag_names = _extract_focus_tags(
-        history,
-        limit=cfg.max_tags,
-        lookback=cfg.history_scope,
-    )
+    if target_entry_id:
+        entry_tags = await db.tags.get_tags_for_entry(user_id, target_entry_id, dek)
+        focus_tags, tag_names = _extract_raw_tags(entry_tags, cfg.max_tags)
+    else:
+        focus_tags, tag_names = _extract_focus_tags(
+            history,
+            limit=cfg.max_tags,
+            lookback=cfg.history_scope,
+        )
     if not focus_tags:
         return None
 
