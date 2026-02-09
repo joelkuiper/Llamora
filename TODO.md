@@ -1,8 +1,8 @@
 # TODO
 - [-] What to do with tags
   - [ ] Dedicated tags page with analyses?
-- [x] Redo the tag summarize logic, make it use the llm (beware of n_ctx)
 - [ ] Recovery code generation page rethink (add QR code?)
+- [ ] Summaries for days as "tooltip" in calendar nav
 - [ ] README
 Later
 - [ ] Better model than Qwen4B, find something that's a bit more chatty
@@ -12,8 +12,7 @@ Later
 - [ ] DB backups
 - [ ] Help / introduction flow
 - [ ] Better deploy/devops story
-  - [ ] Versioning / CI / releases etc
-- [ ] Summaries for days as "tooltip" in calendar nav
+  - [ ] Versioning / CI / releases, etc
 - [ ] Keyboard accessibility rethink
 - [ ] User settings (font, theme, prompts?, llm settings?, etc)
 - [ ] Image support?
