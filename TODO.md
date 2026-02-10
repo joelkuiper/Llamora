@@ -3,11 +3,13 @@
   - [ ] Dedicated tags page with analyses?
 - [x] Recovery code generation page rethink
 - [x] Summaries for days as "tooltip" in calendar nav
+- [ ] Bugfix for multi token search
 - [ ] README
 Later
 - [ ] Better model than Qwen4B, find something that's a bit more chatty
+  - [ ] https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF seems to work better
   - [ ] "Prompt engineering"
-- [ ] Generate demo data / test data set
+- [x] Generate demo data / test data set
 - [ ] Tests
 - [ ] DB backups
 - [ ] Help / introduction flow
