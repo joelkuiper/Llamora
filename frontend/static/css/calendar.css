@@ -340,7 +340,8 @@
     td.is-summarizing a,
     td.is-summarizing span {
       animation: var(--motion-calendar-summary-animation);
-      border-color: var(--accent-15);
+      border-color: var(--accent-30);
+      background: var(--accent-05);
     }
 
     td a:not(.no-entries),
