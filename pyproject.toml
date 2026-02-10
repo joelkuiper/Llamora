@@ -31,6 +31,7 @@ dependencies = [
     "openai>=1.0.0",
     "tiktoken>=0.12.0",
     "fastmigrate>=0.4.2",
+    "beautifulsoup4>=4.12.3",
 ]
 
 [project.scripts]

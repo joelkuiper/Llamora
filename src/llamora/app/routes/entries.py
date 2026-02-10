@@ -342,15 +342,18 @@ async def sse_opening(date: str):
     _, user, dek = await require_user_and_dek()
     uid = user["id"]
     tz = get_timezone()
+    normalized_date = require_iso_date(date)
+    target_date = datetime.fromisoformat(normalized_date).date()
     now = datetime.now(ZoneInfo(tz))
-    today_iso = now.date().isoformat()
+    target_dt = datetime.combine(target_date, now.timetz())
+    today_iso = target_date.isoformat()
     ctx = build_llm_context(
-        user_time=now.isoformat(),
+        user_time=target_dt.isoformat(),
         tz_cookie=tz,
     )
     date_str = str(ctx.get("date") or "")
     pod = str(ctx.get("part_of_day") or "")
-    yesterday_iso = (now - timedelta(days=1)).date().isoformat()
+    yesterday_iso = (target_date - timedelta(days=1)).isoformat()
     services = get_services()
     db = services.db
     is_new = not await db.entries.user_has_entries(uid)
