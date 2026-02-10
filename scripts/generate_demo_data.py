@@ -18,7 +18,8 @@ import orjson
 import typer
 from bs4 import BeautifulSoup
 from openai import AsyncOpenAI
-from tabulate import tabulate
+from rich.box import ROUNDED
+from rich.table import Table
 
 from llamora.settings import settings
 from demo_data_utils import (
@@ -27,9 +28,12 @@ from demo_data_utils import (
     coerce_int,
     coerce_str,
     iter_days,
+    get_console,
     log_block,
     log_header,
     log_item,
+    log_rich,
+    log_rule,
     log_wrapped,
     parse_date,
     require_value,
@@ -314,11 +318,6 @@ class NarrativeEvent:
     date: date
     title: str
     summary: str
-    what: str
-    where: str
-    who: str
-    obj: str
-    keywords: list[str]
     emoji: str
     followup_days: list[int]
 
@@ -328,50 +327,6 @@ def _parse_event_date(raw: str) -> date | None:
         return date.fromisoformat(raw)
     except Exception:
         return None
-
-
-def _build_keywords_from_slots(
-    what: str,
-    where: str,
-    who: str,
-    obj: str,
-    max_items: int = 6,
-) -> list[str]:
-    seen: set[str] = set()
-    results: list[str] = []
-    base = [
-        what.strip(),
-        where.strip(),
-        who.strip(),
-        obj.strip(),
-    ]
-    combos = [
-        (what, where, " at "),
-        (what, who, " with "),
-    ]
-    for phrase in base:
-        phrase_text = phrase.strip().lower()
-        if not phrase_text:
-            continue
-        if phrase_text in seen:
-            continue
-        seen.add(phrase_text)
-        results.append(phrase_text)
-        if len(results) >= max_items:
-            return results
-    for left, right, joiner in combos:
-        left_text = left.strip()
-        right_text = right.strip()
-        if not left_text or not right_text:
-            continue
-        phrase_text = f"{left_text}{joiner}{right_text}".lower()
-        if phrase_text in seen:
-            continue
-        seen.add(phrase_text)
-        results.append(phrase_text)
-        if len(results) >= max_items:
-            return results
-    return results
 
 
 async def _generate_narrative_timeline(
@@ -389,15 +344,16 @@ async def _generate_narrative_timeline(
     date_lines = "\n".join(f"- {d.isoformat()}" for d in event_days)
     prompt = (
         "Create a realistic life timeline for one person writing a diary. "
+        "Use the persona details to shape the kinds of events, settings, and details. "
         "Return strict JSON array only, no extra text. Each item must include: "
-        "date (YYYY-MM-DD), title, summary (2 sentences describing a concrete event), "
-        "what (short noun phrase), where (short noun phrase), who (role or person), "
-        "object (thing or focus), emoji (single emoji, e.g. 😃), "
+        "date (YYYY-MM-DD), title, summary (3-4 sentences describing a concrete event). "
+        "Include specific details (place, people, objects, actions) inside the summary. "
+        "Avoid generic phrasing; make each event distinct, grounded, and aligned with the persona. "
+        "emoji (single emoji, e.g. 😃; do not use ✨), "
         "followup_days (list of integers like 1,2,3; include 1-3 for most events). "
         "Events must be specific things that happened (not categories). "
         "Vary the kinds of events (work, home, social, health, learning, travel, chores, small wins). "
         "Avoid repeating the same verbs or settings. Include small quirks or concrete sensory details. "
-        "For what/where/who/object: avoid articles/pronouns, keep each 2-4 words if possible. "
         "Keep events plausible and varied. "
         "Use the provided dates exactly and keep the order."
     )
@@ -406,6 +362,8 @@ async def _generate_narrative_timeline(
         f"End date: {config.end_date.isoformat()}\n"
         f"Count: {count}\n"
         f"Followup chance: {config.story_followup_rate}\n"
+        f"Persona: {config.persona_hint}\n"
+        "Make the events feel like they belong to this persona (work, interests, habits, voice).\n"
         f"Event dates (use exactly, keep order):\n{date_lines}\n\n"
         f"{prompt}"
     )
@@ -427,10 +385,6 @@ async def _generate_narrative_timeline(
                         "date": {"type": "string"},
                         "title": {"type": "string"},
                         "summary": {"type": "string"},
-                        "what": {"type": "string"},
-                        "where": {"type": "string"},
-                        "who": {"type": "string"},
-                        "object": {"type": "string"},
                         "emoji": {"type": "string"},
                         "followup_days": {
                             "type": "array",
@@ -441,10 +395,6 @@ async def _generate_narrative_timeline(
                         "date",
                         "title",
                         "summary",
-                        "what",
-                        "where",
-                        "who",
-                        "object",
                         "emoji",
                     ],
                     "additionalProperties": False,
@@ -466,7 +416,7 @@ async def _generate_narrative_timeline(
             {
                 "role": "system",
                 "content": (
-                    "You design personal timelines. Return only JSON, no code, no markdown."
+                    "You design personal timelines for a specific persona. Return only JSON, no code, no markdown."
                 ),
             },
             {"role": "user", "content": user_message},
@@ -506,21 +456,8 @@ async def _generate_narrative_timeline(
             continue
         title = str(item.get("title") or "").strip()
         summary = str(item.get("summary") or "").strip()
-        what = str(item.get("what") or "").strip()
-        where = str(item.get("where") or "").strip()
-        who = str(item.get("who") or "").strip()
-        obj = str(item.get("object") or "").strip()
-        emoji = str(item.get("emoji") or "").strip()
-        keywords = _build_keywords_from_slots(what, where, who, obj)
-        if not keywords:
-            legacy = item.get("keywords") or item.get("details") or []
-            legacy_keywords: list[str] = []
-            if isinstance(legacy, list):
-                for keyword in legacy:
-                    keyword_text = str(keyword or "").strip()
-                    if keyword_text:
-                        legacy_keywords.append(keyword_text)
-            keywords = legacy_keywords[:6]
+        raw_emoji = item.get("emoji")
+        emoji = str(raw_emoji or "").strip()
         followups_raw = item.get("followup_days") or []
         followups: list[int] = []
         if isinstance(followups_raw, list):
@@ -539,19 +476,19 @@ async def _generate_narrative_timeline(
         followups = sorted(followup_set)
         if not title and summary:
             title = summary[:40]
-        if not summary and keywords:
-            summary = keywords[0]
+        if not summary and title:
+            summary = title
         if not emoji:
+            logger.info(
+                "timeline debug: missing emoji for %s (raw=%r)",
+                event_date.isoformat(),
+                raw_emoji,
+            )
             emoji = "✨"
         event = NarrativeEvent(
             date=event_date,
             title=title,
             summary=summary,
-            what=what,
-            where=where,
-            who=who,
-            obj=obj,
-            keywords=keywords,
             emoji=emoji,
             followup_days=followups,
         )
@@ -564,7 +501,11 @@ async def _generate_narrative_timeline(
         for d, events in list(events_by_date.items()):
             if len(events) <= 1:
                 continue
-            events_by_date[d] = [events[0]]
+            primary = [event for event in events if event.date == d]
+            if primary:
+                events_by_date[d] = [primary[0]]
+            else:
+                events_by_date[d] = [events[0]]
     return events_by_date
 
 
@@ -959,7 +900,6 @@ async def _select_tags_with_llm(
     entry_text: str,
     suggestions: list[str],
     max_tags: int,
-    event_keywords: list[str] | None = None,
 ) -> list[str]:
     if not suggestions or max_tags <= 0:
         return []
@@ -986,21 +926,15 @@ async def _select_tags_with_llm(
         },
     }
     tag_lines = "\n".join(f"- {tag}" for tag in suggestions)
-    keyword_lines = ""
-    if event_keywords:
-        keyword_lines = "\n".join(f"- {keyword}" for keyword in event_keywords if keyword)
     user_message = (
         "Pick the most relevant tags for the entry from the suggestions list. "
         "Return a JSON array only (no markdown, no code fences). Choose up to "
         f"{max_tags} tags. If none fit, return an empty list.\n\n"
-        "If event keywords are provided, prefer them when they clearly match the entry.\n\n"
         "Entry:\n"
         f"{entry_text}\n\n"
         "Suggestions:\n"
         f"{tag_lines}"
     )
-    if keyword_lines:
-        user_message += f"\n\nEvent keywords:\n{keyword_lines}"
     response = await llm.chat.completions.create(
         model=model,
         messages=[
@@ -1046,7 +980,6 @@ async def _apply_tags(
     entry_text: str,
     max_tags: int,
     headers: dict[str, str],
-    extra_suggestions: list[str] | None = None,
 ) -> None:
     try:
         resp = await _get(client, f"/t/suggestions/{entry_id}", headers=headers)
@@ -1059,11 +992,6 @@ async def _apply_tags(
         )
         return
     suggestions = _select_tag_suggestions(resp.text)
-    if extra_suggestions:
-        for keyword in extra_suggestions:
-            value = str(keyword or "").strip()
-            if value and value not in suggestions:
-                suggestions.append(value)
     if not suggestions:
         logger.debug("No tag suggestions for %s", entry_id)
         return
@@ -1074,7 +1002,6 @@ async def _apply_tags(
         entry_text,
         suggestions,
         max_tags,
-        event_keywords=extra_suggestions,
     )
     if not selected:
         return
@@ -1104,35 +1031,35 @@ async def generate_dataset(config: DemoConfig) -> None:
     recent_entries: deque[str] = deque(maxlen=max(0, config.entry_context_size))
     narrative_events = await _generate_narrative_timeline(llm, config)
     if narrative_events:
-        logger.info("-" * 72)
-        log_header("Narrative scaffold")
+        log_rule("Narrative scaffold")
         primary_events: list[NarrativeEvent] = []
         for day in sorted(narrative_events.keys()):
             for event in narrative_events[day]:
                 if event.date == day:
                     primary_events.append(event)
 
-        rows: list[list[str]] = []
+        table = Table(
+            box=ROUNDED,
+            show_header=True,
+            show_lines=True,
+            expand=True,
+            padding=(0, 1),
+        )
+        table.add_column("date", no_wrap=True, style="dim")
+        table.add_column("title", style="bold")
+        table.add_column("summary", overflow="fold")
+        table.add_column("followups", no_wrap=True, style="dim")
         for event in primary_events:
             followups = ",".join(f"+{d}d" for d in event.followup_days) or "-"
-            rows.append(
-                [
-                    event.date.isoformat(),
-                    event.emoji,
-                    event.title or event.summary or "event",
-                    event.summary,
-                    ", ".join(event.keywords),
-                    followups,
-                ]
+            title = f"{event.emoji} {event.title or event.summary or 'event'}".strip()
+            table.add_row(
+                event.date.isoformat(),
+                title,
+                event.summary,
+                followups,
             )
-        headers = ["date", "emoji", "title", "summary", "keywords", "followups"]
-        try:
-            table = tabulate(rows, headers=headers, tablefmt="rounded_outline")
-        except Exception:
-            table = tabulate(rows, headers=headers, tablefmt="fancy_grid")
-        for line in table.splitlines():
-            logger.info(line)
-        logger.info("-" * 72)
+        log_rich(table)
+        log_rule("")
 
     async with httpx.AsyncClient(
         base_url=config.base_url,
@@ -1151,8 +1078,7 @@ async def generate_dataset(config: DemoConfig) -> None:
         total_entries = 0
         opened_any_day = False
         for day in iter_days(config.start_date, config.end_date):
-            logger.info("-" * 72)
-            log_header(f"Day {day.isoformat()}")
+            log_rule(f"Day {day.isoformat()}")
             headers = {
                 **base_headers,
                 "X-Client-Today": day.isoformat(),
@@ -1163,26 +1089,21 @@ async def generate_dataset(config: DemoConfig) -> None:
             has_primary_event = False
             if events_today:
                 event = events_today[0]
-                keywords_hint = ", ".join(event.keywords)
-                keywords_clause = f" keywords: {keywords_hint}." if keywords_hint else ""
                 if event.date == day:
                     has_primary_event = True
-                    detail = event.keywords[0] if event.keywords else event.summary
                     if random.random() < config.story_intensity:
                         event_note = (
-                            f"{event.emoji} {event.summary or event.title}. "
-                            f"{detail}.{keywords_clause}"
+                            f"{event.emoji} {event.summary or event.title}."
                         )
                     else:
                         event_note = (
                             f"{event.emoji} {event.summary or event.title}."
-                            f"{keywords_clause}"
                         )
                     log_item(f"event: {event.emoji} {event.title or event.summary}")
                     if event_note:
                         log_wrapped("     note: ", event_note)
                 else:
-                    followup_note = f"{event.emoji} {event.summary or event.title}.{keywords_clause}"
+                    followup_note = f"{event.emoji} {event.summary or event.title}."
                     log_item(f"followup: {followup_note}")
             has_event_context = bool(events_today)
             if random.random() < config.day_empty_rate and not has_event_context:
@@ -1278,9 +1199,6 @@ async def generate_dataset(config: DemoConfig) -> None:
                             response_kind,
                         )
 
-                extra_keywords = None
-                if events_today:
-                    extra_keywords = event.keywords
                 await _apply_tags(
                     llm,
                     config,
@@ -1289,7 +1207,6 @@ async def generate_dataset(config: DemoConfig) -> None:
                     text,
                     config.max_tags,
                     headers,
-                    extra_suggestions=extra_keywords,
                 )
 
         logger.info("Done. Created %d entries.", total_entries)
@@ -1298,9 +1215,7 @@ async def generate_dataset(config: DemoConfig) -> None:
 def _setup_logging(verbose: bool) -> None:
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-        if verbose
-        else "%(message)s",
+        format="%(message)s",
     )
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)

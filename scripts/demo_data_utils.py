@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import logging
 import textwrap
+from shutil import get_terminal_size
 from datetime import date, datetime, timedelta
 from typing import Any, Iterable
 
+from rich.console import Console
+from rich.rule import Rule
+
 
 logger = logging.getLogger(__name__)
+_console = Console(color_system=None, force_terminal=False, no_color=True)
 
 
 def coerce_int(value: Any, default: int) -> int:
@@ -104,7 +109,7 @@ def log_header(text: str) -> None:
 
 
 def log_item(text: str) -> None:
-    logger.info("  -> %s", text)
+    logger.info("  • %s", text)
 
 
 def log_block(title: str, text: str, max_chars: int = 1200) -> None:
@@ -113,4 +118,32 @@ def log_block(title: str, text: str, max_chars: int = 1200) -> None:
         trimmed += "\n… (truncated)"
     log_item(title)
     for line in trimmed.splitlines():
-        logger.info("     | %s", line)
+        logger.info("     │ %s", line)
+
+
+def get_console() -> Console:
+    return _console
+
+
+def log_rule(text: str) -> None:
+    width = get_terminal_size(fallback=(120, 24)).columns
+    if width < 20:
+        logger.info("%s", text)
+        return
+    title = f" {text.strip()} " if text.strip() else ""
+    if title:
+        fill = max(0, width - len(title))
+        left = fill // 2
+        right = fill - left
+        line = ("─" * left) + title + ("─" * right)
+        logger.info("%s", line[:width])
+    else:
+        logger.info("%s", "─" * width)
+
+
+def log_rich(renderable: object) -> None:
+    console = get_console()
+    with console.capture() as capture:
+        console.print(renderable)
+    for line in capture.get().splitlines():
+        logger.info(line)
