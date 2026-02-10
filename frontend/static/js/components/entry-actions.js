@@ -149,6 +149,7 @@ class EntryActions extends ReactiveElement {
         this.#button?.classList.add("active");
         this.#button?.setAttribute("aria-expanded", "true");
         this.classList.add("popover-open");
+        this.closest(".entry")?.classList.add("entry-action-open");
         const firstAction = this.#actionItems[0];
         if (firstAction && typeof firstAction.focus === "function") {
           try {
@@ -161,9 +162,11 @@ class EntryActions extends ReactiveElement {
       onHide: () => {
         this.#button?.classList.remove("active");
         this.#button?.setAttribute("aria-expanded", "false");
+        this.closest(".entry")?.classList.remove("entry-action-open");
       },
       onHidden: () => {
         this.classList.remove("popover-open");
+        this.closest(".entry")?.classList.remove("entry-action-open");
         if (activeActionOwner === this && !this.#popover?.isOpen) {
           this.#detachSharedListeners();
           activeActionOwner = null;
@@ -179,6 +182,7 @@ class EntryActions extends ReactiveElement {
     }
     this.#button?.classList.remove("active");
     this.classList.remove("popover-open");
+    this.closest(".entry")?.classList.remove("entry-action-open");
   }
 
   #togglePopover() {

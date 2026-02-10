@@ -23,7 +23,8 @@
 }
 
 #entries .entry.user:hover .entry-actions-row,
-#entries .entry.user:focus-within .entry-actions-row {
+#entries .entry.user:focus-within .entry-actions-row,
+#entries .entry.entry-action-open .entry-actions-row {
   opacity: 1;
 }
 
@@ -85,7 +86,8 @@
 #entries .entry:hover .entry-actions-row .entry-action__icon,
 #entries .entry:focus-within .entry-actions-row .entry-action__icon,
 #entries .entry:hover .entry-actions-inline .entry-action__icon,
-#entries .entry:focus-within .entry-actions-inline .entry-action__icon {
+#entries .entry:focus-within .entry-actions-inline .entry-action__icon,
+#entries .entry.entry-action-open .entry-actions-row .entry-action__icon {
   opacity: 0.9;
 }
 
