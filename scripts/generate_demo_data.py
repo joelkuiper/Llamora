@@ -336,8 +336,9 @@ async def _generate_narrative_timeline(
     prompt = (
         "Create a realistic life timeline for one person writing a diary. "
         "Return strict JSON array only, no extra text. Each item must include: "
-        "date (YYYY-MM-DD), title, summary (1-2 sentences describing a concrete event), "
-        "details (1-3 short factual fragments), emotional_tone, emoji (single emoji, e.g. 😃), "
+        "date (YYYY-MM-DD), title, summary (2 sentences describing a concrete event), "
+        "details (2-4 short factual fragments that include who/where/what when possible), "
+        "emotional_tone, emoji (single emoji, e.g. 😃), "
         "followup_days (optional list of integers like 1,2,3). "
         "Events must be specific things that happened (not categories). "
         "Keep events plausible and varied. "
@@ -1018,10 +1019,18 @@ async def generate_dataset(config: DemoConfig) -> None:
             for event in narrative_events[day]:
                 when = day.isoformat()
                 title = event.title or event.summary or "event"
-                detail = event.details[0] if event.details else event.summary
-                log_item(f"{when}: {event.emoji} {title}")
-                if detail:
-                    logger.info("     %s", detail)
+                if event.date == day:
+                    label = "event"
+                else:
+                    offset_days = (day - event.date).days
+                    label = f"followup +{max(offset_days, 0)}d"
+                log_item(f"{when} [{label}]: {event.emoji} {title}")
+                if event.summary:
+                    log_wrapped("     summary: ", event.summary)
+                if event.details:
+                    log_wrapped("     details: ", "; ".join(event.details))
+                if event.tone:
+                    log_wrapped("     tone: ", event.tone)
         logger.info("-" * 72)
 
     async with httpx.AsyncClient(
