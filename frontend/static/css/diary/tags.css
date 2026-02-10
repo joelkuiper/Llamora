@@ -354,7 +354,7 @@
 
 
   /* Gentle cross-fade during HTMX swap */
-  .tag-suggestions.htmx-swapping {
+  .tag-suggestions.htmx-swapping:not(:empty) {
     max-height: 12rem;
     opacity: 1;
     transform: translateY(0);
