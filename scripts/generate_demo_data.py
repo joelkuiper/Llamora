@@ -1283,13 +1283,11 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 
-"""
-LLAMORA_LLM__UPSTREAM__HOST=http://localhost:8080   uv run python scripts/generate_demo_data.py  \
-    --config config/demo_data.example.toml \
-    --username demo_user \
-    --password 'demo_user_test_password12345!' \
-    --start-date 2025-06-01 \
-    --end-date 2026-02-10
-
-with: llama-server --model /media/array/Models/GGUF/Meta-Llama-3.1-8B-Instruct-Q6_K.gguf -c 18000 -ngl 999  --parallel 1 -fa on --jinja
-"""
+#  LLAMORA_LLM__UPSTREAM__HOST=http://localhost:8080   uv run python scripts/generate_demo_data.py  \
+#      --config config/demo_data.example.toml \
+#      --username demo_user \
+#      --password 'demo_user_test_password12345!' \
+#      --start-date 2025-06-01 \
+#      --end-date 2026-02-10
+#
+#  with: llama-server --model /media/array/Models/GGUF/Meta-Llama-3.1-8B-Instruct-Q6_K.gguf -c 18000 -ngl 999  --parallel 1 -fa on --jinja
