@@ -318,6 +318,7 @@ class NarrativeEvent:
     date: date
     title: str
     summary: str
+    followup_note: str
     emoji: str
     followup_days: list[int]
 
@@ -350,6 +351,9 @@ async def _generate_narrative_timeline(
         "Include specific details (place, people, objects, actions) inside the summary. "
         "Avoid generic phrasing; make each event distinct, grounded, and aligned with the persona. "
         "emoji (single emoji character, e.g. 😃; never empty, never null; do not use ✨), "
+        "followup_note (1 sentence about the AFTERMATH/echo of the event; "
+        "do not repeat the event details; focus on lingering feelings, "
+        "small consequences, or what changes afterward), "
         "followup_days (list of integers like 1,2,3; include 1-3 for most events). "
         "Events must be specific things that happened (not categories). "
         "Vary the kinds of events (work, home, social, health, learning, travel, chores, small wins). "
@@ -387,6 +391,7 @@ async def _generate_narrative_timeline(
                         "title": {"type": "string"},
                         "summary": {"type": "string"},
                         "emoji": {"type": "string"},
+                        "followup_note": {"type": "string"},
                         "followup_days": {
                             "type": "array",
                             "items": {"type": "integer"},
@@ -396,6 +401,7 @@ async def _generate_narrative_timeline(
                         "date",
                         "title",
                         "summary",
+                        "followup_note",
                         "emoji",
                     ],
                     "additionalProperties": False,
@@ -423,7 +429,7 @@ async def _generate_narrative_timeline(
                     "content": (
                         "You design personal timelines for a specific persona. "
                         "Return only JSON, no code, no markdown. "
-                        "Every item must include a non-empty emoji."
+                        "Every item must include a non-empty emoji and a followup_note."
                     ),
                 },
                 {"role": "user", "content": user_message},
@@ -466,8 +472,9 @@ async def _generate_narrative_timeline(
             logger.warning("Timeline missing emoji; retrying with stricter prompt")
             user_message = (
                 f"{user_message}\n\n"
-                "IMPORTANT: Each item MUST include a non-empty emoji character. "
-                "Do not use null. If unsure, pick a simple emoji like 🙂, 😌, 🤔, 🎉, 📌."
+                "IMPORTANT: Each item MUST include a non-empty emoji character "
+                "AND a followup_note. Do not use null. If unsure, pick a simple emoji like "
+                "🙂, 😌, 🤔, 🎉, 📌."
             )
             continue
         logger.warning("Timeline still missing emoji after retry; keeping blanks")
@@ -484,6 +491,7 @@ async def _generate_narrative_timeline(
             continue
         title = str(item.get("title") or "").strip()
         summary = str(item.get("summary") or "").strip()
+        followup_note = str(item.get("followup_note") or "").strip()
         raw_emoji = item.get("emoji")
         emoji = str(raw_emoji or "").strip()
         followups_raw = item.get("followup_days") or []
@@ -512,10 +520,13 @@ async def _generate_narrative_timeline(
                 event_date.isoformat(),
                 raw_emoji,
             )
+        if not followup_note:
+            followup_note = summary
         event = NarrativeEvent(
             date=event_date,
             title=title,
             summary=summary,
+            followup_note=followup_note,
             emoji=emoji,
             followup_days=followups,
         )
@@ -1131,7 +1142,7 @@ async def generate_dataset(config: DemoConfig) -> None:
                     if event_note:
                         log_wrapped("     note: ", event_note)
                 else:
-                    followup_note = f"{event.emoji} {event.summary or event.title}."
+                    followup_note = f"{event.emoji} {event.followup_note or event.summary or event.title}."
                     log_item(f"followup: {followup_note}")
             has_event_context = bool(events_today)
             if random.random() < config.day_empty_rate and not has_event_context:
