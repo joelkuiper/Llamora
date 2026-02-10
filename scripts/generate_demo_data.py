@@ -349,11 +349,12 @@ async def _generate_narrative_timeline(
         "date (YYYY-MM-DD), title, summary (3-4 sentences describing a concrete event). "
         "Include specific details (place, people, objects, actions) inside the summary. "
         "Avoid generic phrasing; make each event distinct, grounded, and aligned with the persona. "
-        "emoji (single emoji, e.g. 😃; do not use ✨), "
+        "emoji (single emoji character, e.g. 😃; never empty, never null; do not use ✨), "
         "followup_days (list of integers like 1,2,3; include 1-3 for most events). "
         "Events must be specific things that happened (not categories). "
         "Vary the kinds of events (work, home, social, health, learning, travel, chores, small wins). "
         "Avoid repeating the same verbs or settings. Include small quirks or concrete sensory details. "
+        "If any provided dates fall on notable days or holidays (e.g. New Year's), make those events feel weightier. "
         "Keep events plausible and varied. "
         "Use the provided dates exactly and keep the order."
     )
@@ -410,41 +411,68 @@ async def _generate_narrative_timeline(
     if max_tokens is None or max_tokens <= 0:
         max_tokens = max(1200, int(config.llm_max_tokens) * 3)
 
-    response = await llm.chat.completions.create(
-        model=model,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You design personal timelines for a specific persona. Return only JSON, no code, no markdown."
-                ),
-            },
-            {"role": "user", "content": user_message},
-        ],
-        max_tokens=max_tokens,
-        **params,
-    )
-    choice = response.choices[0]
-    finish_reason = getattr(choice, "finish_reason", None)
-    raw = (choice.message.content or "").strip()
-    try:
-        import orjson
-
-        data = orjson.loads(raw)
-    except Exception:
-        logger.warning(
-            "Failed to parse timeline JSON; skipping narrative scaffold (finish_reason=%s, chars=%s)",
-            finish_reason,
-            len(raw),
+    data: list[dict[str, Any]] | None = None
+    finish_reason: str | None = None
+    raw = ""
+    for attempt in range(2):
+        response = await llm.chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You design personal timelines for a specific persona. "
+                        "Return only JSON, no code, no markdown. "
+                        "Every item must include a non-empty emoji."
+                    ),
+                },
+                {"role": "user", "content": user_message},
+            ],
+            max_tokens=max_tokens,
+            **params,
         )
-        if finish_reason == "length":
-            logger.info(
-                "Timeline generation truncated. Try raising --llm-max-tokens or lowering --story-events."
+        choice = response.choices[0]
+        finish_reason = getattr(choice, "finish_reason", None)
+        raw = (choice.message.content or "").strip()
+        try:
+            import orjson
+
+            parsed = orjson.loads(raw)
+        except Exception:
+            logger.warning(
+                "Failed to parse timeline JSON; skipping narrative scaffold (finish_reason=%s, chars=%s)",
+                finish_reason,
+                len(raw),
             )
-        log_block("Timeline raw", raw)
-        return {}
-    if not isinstance(data, list):
-        logger.warning("Timeline JSON is not a list; skipping narrative scaffold")
+            if finish_reason == "length":
+                logger.info(
+                    "Timeline generation truncated. Try raising --llm-max-tokens or lowering --story-events."
+                )
+            log_block("Timeline raw", raw)
+            return {}
+        if not isinstance(parsed, list):
+            logger.warning("Timeline JSON is not a list; skipping narrative scaffold")
+            return {}
+        data = parsed
+        missing = [
+            item
+            for item in data
+            if isinstance(item, dict)
+            and not str(item.get("emoji") or "").strip()
+        ]
+        if not missing:
+            break
+        if attempt == 0:
+            logger.warning("Timeline missing emoji; retrying with stricter prompt")
+            user_message = (
+                f"{user_message}\n\n"
+                "IMPORTANT: Each item MUST include a non-empty emoji character. "
+                "Do not use null. If unsure, pick a simple emoji like 🙂, 😌, 🤔, 🎉, 📌."
+            )
+            continue
+        logger.warning("Timeline still missing emoji after retry; keeping blanks")
+
+    if data is None:
         return {}
 
     events_by_date: dict[date, list[NarrativeEvent]] = {}
@@ -479,12 +507,11 @@ async def _generate_narrative_timeline(
         if not summary and title:
             summary = title
         if not emoji:
-            logger.info(
-                "timeline debug: missing emoji for %s (raw=%r)",
+            logger.warning(
+                "timeline warning: missing emoji for %s (raw=%r)",
                 event_date.isoformat(),
                 raw_emoji,
             )
-            emoji = "✨"
         event = NarrativeEvent(
             date=event_date,
             title=title,

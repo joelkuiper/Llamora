@@ -3,7 +3,7 @@ base_url = "http://127.0.0.1:5000"
 start_date = "2026-01-01"
 end_date = "2026-01-07"
 min_entries = 0
-max_entries = 5
+max_entries = 8
 # Chance of no opening + no entries (ignored on event/followup days).
 day_empty_rate = 0.125
 # Chance of opening-only on non-empty days (ignored on event/followup days).
@@ -12,8 +12,8 @@ response_rate = 0.6
 max_tags = 4
 timezone = "UTC"
 seed = 38
-persona = "An AI app developer with dry humor and a keen eye for detail, focused on everyday specifics, life, the universe, and everything 🫠."
-llm_max_tokens = 1024
+persona = "An AI app developer with a sense of humor and a keen eye for detail, focused on everyday specifics, life, the universe, and everything 🫠."
+llm_max_tokens = 2084
 min_entry_chars = 260
 max_entry_chars = 12000
 entry_retries = 2
