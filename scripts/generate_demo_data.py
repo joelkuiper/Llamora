@@ -980,7 +980,7 @@ async def _apply_tags(
     entry_text: str,
     max_tags: int,
     headers: dict[str, str],
-) -> None:
+) -> list[str]:
     try:
         resp = await _get(client, f"/t/suggestions/{entry_id}", headers=headers)
         resp.raise_for_status()
@@ -990,11 +990,11 @@ async def _apply_tags(
             exc.__class__.__name__,
             entry_id,
         )
-        return
+        return []
     suggestions = _select_tag_suggestions(resp.text)
     if not suggestions:
         logger.debug("No tag suggestions for %s", entry_id)
-        return
+        return []
 
     selected = await _select_tags_with_llm(
         llm,
@@ -1004,9 +1004,9 @@ async def _apply_tags(
         max_tags,
     )
     if not selected:
-        return
-    if selected:
-        logger.info("    tags: %s", ", ".join(selected))
+        logger.info("    tags: (none)")
+        return []
+    logger.info("    tags: %s", ", ".join(selected))
     for tag in selected:
         logger.debug("Adding tag '%s' to %s", tag, entry_id)
         data = {"tag": tag}
@@ -1017,7 +1017,8 @@ async def _apply_tags(
             logger.warning(
                 "Tag apply failed (%s) for %s", exc.__class__.__name__, entry_id
             )
-            return
+            return selected
+    return selected
 
 
 async def generate_dataset(config: DemoConfig) -> None:
@@ -1176,6 +1177,16 @@ async def generate_dataset(config: DemoConfig) -> None:
                     continue
                 total_entries += 1
 
+                tags = await _apply_tags(
+                    llm,
+                    config,
+                    client,
+                    entry_id,
+                    text,
+                    config.max_tags,
+                    headers,
+                )
+
                 if random.random() < config.response_rate:
                     response_count = 1
                     if (
@@ -1198,16 +1209,6 @@ async def generate_dataset(config: DemoConfig) -> None:
                             headers,
                             response_kind,
                         )
-
-                await _apply_tags(
-                    llm,
-                    config,
-                    client,
-                    entry_id,
-                    text,
-                    config.max_tags,
-                    headers,
-                )
 
         logger.info("Done. Created %d entries.", total_entries)
 
