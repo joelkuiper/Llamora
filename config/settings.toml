@@ -88,18 +88,8 @@ dtype = "float16"
 
 
 [default.LLM.upstream]
-llamafile_path = ""
-# When set, connect to an existing OpenAI-compatible endpoint (e.g., http://127.0.0.1:8081 from
-# `llama-server --hf Qwen/Qwen3-4B-Instruct-2507 --jinja`).
 host = ""
 parallel = 1
-
-[default.LLM.upstream.args]
-server = true
-nobrowser = true
-threads = 0
-n_gpu_layers = 999
-gpu = "auto"
 ctx_size = 8192
 
 [default.LLM.generation]

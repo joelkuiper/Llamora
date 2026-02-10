@@ -45,12 +45,9 @@ def _cpu_count(default: int = 4) -> int:
     return max(count, 1)
 
 
-DEFAULT_UPSTREAM_ARGS: dict[str, Any] = {
-    "server": True,
-    "nobrowser": True,
-    "threads": _cpu_count(),
-    "n_gpu_layers": 999,
-    "gpu": "auto",
+DEFAULT_UPSTREAM_CONFIG: dict[str, Any] = {
+    "host": "",
+    "parallel": 1,
     "ctx_size": 8192,
 }
 
@@ -133,9 +130,7 @@ DEFAULTS: dict[str, Any] = {
     },
     "LLM": {
         "upstream": {
-            "llamafile_path": "",
-            "host": None,
-            "args": DEFAULT_UPSTREAM_ARGS,
+            **DEFAULT_UPSTREAM_CONFIG,
         },
         "generation": DEFAULT_LLM_GENERATION,
         "stream": {
@@ -310,17 +305,6 @@ _normalise_secret_key()
 _normalise_cookie_secret()
 
 
-upstream_args = _normalise_mapping_keys(
-    _coerce_mapping(settings.get("LLM.upstream.args", {}))
-)
-settings.set(
-    "LLM.upstream.args",
-    {
-        **DEFAULT_UPSTREAM_ARGS,
-        **upstream_args,
-    },
-)
-
 generation_overrides = _normalise_mapping_keys(
     _coerce_mapping(settings.get("LLM.generation", {}))
 )
@@ -331,10 +315,6 @@ settings.set(
         **generation_overrides,
     },
 )
-
-threads = int(settings.get("LLM.upstream.args.threads", 0))
-if threads <= 0:
-    settings.set("LLM.upstream.args.threads", _cpu_count())
 
 # Normalise a few derived values that are used by the Quart application.
 settings.set(

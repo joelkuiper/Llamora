@@ -55,7 +55,6 @@ You can write freely, think aloud, or stay in silence.
 
 - [uv](https://docs.astral.sh/uv/)
 - A local [llama.cpp](https://github.com/ggerganov/llama.cpp) build (or prebuilt release) so you can run `llama-server -hf Qwen/Qwen3-4B-Instruct-2507 --jinja`. Qwen3-4B-Instruct has become the baseline for Llamora because it follows instructions reliably while still fitting on consumer hardware.
-- Optionally, a [llamafile](https://github.com/Mozilla-Ocho/llamafile) binary if you prefer an all-in-one executable instead of running llama.cpp yourself.
 - A relatively fast computer (ideally with a strong GPU).
 - A relatively modern browser.
 
@@ -63,7 +62,7 @@ You can write freely, think aloud, or stay in silence.
 ### Set up a local model
 
    Llamora connects to an OpenAI-compatible API, typically provided by a local
-   [**llama.cpp**](https://github.com/ggerganov/llama.cpp) or [**llamafile**](https://github.com/Mozilla-Ocho/llamafile) upstream.
+   [**llama.cpp**](https://github.com/ggerganov/llama.cpp) upstream.
    For example, if you have llama-cpp installed:
 
    ```bash
@@ -182,7 +181,7 @@ A simplified version of the structure:
 | `AUTH`        | Login attempt limits and timeouts                  |
 | `DATABASE`    | SQLite path and pool configuration                 |
 | `LLM.chat`    | OpenAI-compatible chat client settings             |
-| `LLM.upstream`  | Local upstream connection details (llama.cpp/llamafile) |
+| `LLM.upstream`  | OpenAI-compatible upstream connection details |
 | `LLM.generation` | Default generation parameters                      |
 | `LLM.tokenizer` | Token counting settings (tiktoken encoding + safety margin) |
 | `SEARCH`      | Semantic search behavior and ANN limits            |
@@ -249,7 +248,7 @@ Swap prompt variants by editing or replacing those files—changes take effect o
 * **LLM Client:** OpenAI Python SDK (pointed at a local upstream)
 
 All code runs locally, and dependencies are minimal.
-The system supports OpenAI-compatible llama.cpp endpoints and llamafile binaries through the same interface.
+The system supports OpenAI-compatible llama.cpp endpoints through the same interface.
 
 ---
 

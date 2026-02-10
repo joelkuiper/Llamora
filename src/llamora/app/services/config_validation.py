@@ -32,13 +32,12 @@ def _get_value(mapping: object, name: str) -> object | None:
 def _validate_llm_upstream() -> Iterable[str]:
     upstream = settings.get("LLM.upstream")
     host = _normalise_text(_get_value(upstream, "host"))
-    llamafile_path = _normalise_text(_get_value(upstream, "llamafile_path"))
+    base_url = _normalise_text(settings.get("LLM.chat.base_url"))
 
-    if not host and not llamafile_path:
+    if not host and not base_url:
         yield (
-            "Configure an OpenAI-compatible upstream by setting either "
-            "LLAMORA_LLM__UPSTREAM__HOST for a remote endpoint or "
-            "LLAMORA_LLM__UPSTREAM__LLAMAFILE_PATH for a local llamafile."
+            "Configure an OpenAI-compatible upstream by setting "
+            "LLAMORA_LLM__UPSTREAM__HOST (or LLM.upstream.host)."
         )
 
 

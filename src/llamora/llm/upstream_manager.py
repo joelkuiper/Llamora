@@ -1,19 +1,10 @@
-import atexit
+from __future__ import annotations
+
 import logging
-import os
-import shlex
-import signal
-import socket
-import subprocess
-import tempfile
-import threading
-import time
 from collections.abc import Mapping
-from pathlib import Path
 from typing import Any
 
 import httpx
-import orjson
 
 from llamora.settings import settings
 
@@ -36,19 +27,6 @@ def _normalise_arg_keys(args: dict[str, Any]) -> dict[str, Any]:
     return normalised
 
 
-def _upstream_args_to_cli(args: dict[str, Any]) -> list[str]:
-    cli_args: list[str] = []
-    for k, v in args.items():
-        if v is None or v is False:
-            continue
-        flag = f"--{k.replace('_', '-')}"
-        if v is True:
-            cli_args.append(flag)
-        else:
-            cli_args.extend([flag, str(v)])
-    return cli_args
-
-
 def _coerce_parallel(value: Any, default: int = 1) -> int:
     try:
         if value is None:
@@ -59,74 +37,43 @@ def _coerce_parallel(value: Any, default: int = 1) -> int:
     return max(slots, 1)
 
 
-def _find_free_port() -> int:
-    """Return an available TCP port on localhost."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
+def _strip_base_url(raw: str) -> str:
+    text = str(raw or "").strip().rstrip("/")
+    for suffix in ("/v1/chat/completions", "/v1"):
+        if text.endswith(suffix):
+            text = text[: -len(suffix)]
+            text = text.rstrip("/")
+    return text
 
 
 class UpstreamProcessManager:
-    """Manage lifecycle of a local OpenAI-compatible upstream subprocess."""
+    """Track a remote OpenAI-compatible upstream endpoint."""
 
     def __init__(self, upstream_args: dict | None = None) -> None:
         self.logger = logging.getLogger(__name__)
 
-        self.port = _find_free_port()
-        self.restart_attempts = 0
-        self.max_restarts = 3
-
-        raw_upstream_cfg = settings.get("LLM.upstream") or settings.LLM.upstream
+        raw_upstream_cfg = settings.get("LLM.upstream") or {}
         upstream_cfg = _normalise_arg_keys(_to_plain_dict(raw_upstream_cfg))
+        upstream_cfg.update(_normalise_arg_keys(_to_plain_dict(upstream_args)))
+
         host = upstream_cfg.get("host")
-        llamafile_path = upstream_cfg.get("llamafile_path")
-        cfg_upstream_args = _normalise_arg_keys(
-            _to_plain_dict(upstream_cfg.get("args", {}))
-        )
-        cfg_upstream_args.update(_normalise_arg_keys(_to_plain_dict(upstream_args)))
+        if not host:
+            base_url = settings.get("LLM.chat.base_url")
+            if base_url:
+                host = _strip_base_url(str(base_url))
 
-        self._ctx_size = cfg_upstream_args.get("ctx_size")
+        if not host:
+            raise ValueError(
+                "Configure settings.LLM.upstream.host or set LLAMORA_LLM__UPSTREAM__HOST"
+            )
+
+        self.upstream_url = str(host).rstrip("/")
+        self._ctx_size = upstream_cfg.get("ctx_size")
         self._upstream_props: dict[str, Any] | None = None
-        args_parallel = cfg_upstream_args.get("parallel")
-        default_parallel = _coerce_parallel(args_parallel)
         configured_parallel = upstream_cfg.get("parallel")
-        self._parallel_slots = _coerce_parallel(
-            configured_parallel, default=default_parallel
-        )
+        self._parallel_slots = _coerce_parallel(configured_parallel, default=1)
 
-        self._state_file = Path(tempfile.gettempdir()) / "llamora_llm_state.json"
-
-        if host:
-            self.proc: subprocess.Popen[str] | None = None
-            self.upstream_url = host
-            self.cmd: list[str] | None = None
-            self.logger.info("Using external upstream at %s", host)
-            self._refresh_upstream_metadata()
-        else:
-            if not llamafile_path:
-                raise ValueError(
-                    "Configure settings.LLM.upstream.llamafile_path or set "
-                    "LLAMORA_LLM__UPSTREAM__LLAMAFILE_PATH"
-                )
-
-            self._cleanup_stale_process()
-
-            command_args = {**cfg_upstream_args, "port": self.port}
-            self.cmd = [
-                "sh",
-                llamafile_path,
-                *_upstream_args_to_cli(command_args),
-            ]
-
-            self.upstream_url = f"http://127.0.0.1:{self.port}"
-
-            self.proc = None
-            self._launch_upstream()
-            atexit.register(self.shutdown)
-            self._orig_signals: dict[int, object] = {}
-            for sig in (signal.SIGINT, signal.SIGTERM):
-                self._orig_signals[sig] = signal.getsignal(sig)
-                signal.signal(sig, self._handle_exit)
+        self._refresh_upstream_metadata()
 
     @property
     def ctx_size(self) -> int | None:
@@ -144,216 +91,32 @@ class UpstreamProcessManager:
         return self._parallel_slots
 
     def ensure_upstream_ready(self) -> None:
-        if getattr(self, "cmd", None) is None:
-            if not self._is_upstream_healthy():
-                raise RuntimeError("LLM upstream is unavailable")
-            if self._upstream_props is None or self._ctx_size is None:
-                self._refresh_upstream_metadata()
-            return
-
-        if self.proc is None:
-            raise RuntimeError("LLM upstream process not started")
-
-        if self.proc.poll() is not None or not self._is_upstream_healthy():
-            self._restart_upstream()
-        elif self._upstream_props is None or self._ctx_size is None:
+        if not self._is_upstream_healthy():
+            raise RuntimeError("LLM upstream is unavailable")
+        if self._upstream_props is None or self._ctx_size is None:
             self._refresh_upstream_metadata()
 
     def shutdown(self) -> None:
-        self.logger.info("Shutting called")
-        proc = getattr(self, "proc", None)
-        if proc and proc.poll() is None:
-            self.logger.info("Stopping upstream process")
-            terminated = False
-            if hasattr(os, "killpg"):
-                try:
-                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-                    terminated = True
-                except ProcessLookupError:
-                    pass
-            if not terminated:
-                proc.terminate()
-            try:
-                proc.wait(timeout=10)
-            except subprocess.TimeoutExpired:  # pragma: no cover - unlikely
-                self.logger.warning("Forcing upstream process kill")
-                if hasattr(os, "killpg"):
-                    try:
-                        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass
-                try:
-                    proc.kill()
-                except ProcessLookupError:
-                    pass
-                try:
-                    proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    pass
-            self.logger.info("Upstream process stopped")
-        self._clear_state()
-        self.proc = None
+        """No-op for remote upstreams."""
 
-    def _state_path(self) -> Path:
-        return self._state_file
-
-    def _read_state(self) -> dict[str, Any] | None:
-        state_path = self._state_path()
-        if not state_path.exists():
-            return None
-        try:
-            data = orjson.loads(state_path.read_bytes())
-            if isinstance(data, dict):
-                return data
-        except Exception:
-            pass
-        try:
-            state_path.unlink()
-        except FileNotFoundError:
-            pass
         return None
-
-    def _write_state(self) -> None:
-        proc = getattr(self, "proc", None)
-        if not proc or proc.poll() is not None:
-            return
-        state = {
-            "pid": proc.pid,
-            "pgid": os.getpgid(proc.pid) if hasattr(os, "getpgid") else None,
-            "port": self.port,
-        }
-        state_path = self._state_path()
-        try:
-            state_path.write_bytes(orjson.dumps(state))
-        except Exception:
-            self.logger.debug("Failed to persist upstream state", exc_info=True)
-
-    def _clear_state(self) -> None:
-        state_path = self._state_path()
-        try:
-            state_path.unlink()
-        except FileNotFoundError:
-            pass
-
-    def _process_alive(self, pid: int) -> bool:
-        try:
-            os.kill(pid, 0)
-            return True
-        except ProcessLookupError:
-            return False
-        except PermissionError:
-            # On some platforms (notably macOS) PIDs can be re-used by
-            # processes that we don't own between runs. In that case the
-            # permission error indicates we no longer control the process,
-            # so treat it as non-existent for our cleanup logic.
-            return False
-
-    def _terminate_process(
-        self, pid: int, pgid: int | None, *, force: bool = False
-    ) -> None:
-        sig = signal.SIGKILL if force else signal.SIGTERM
-        try:
-            if pgid is not None and hasattr(os, "killpg"):
-                os.killpg(pgid, sig)
-            else:
-                os.kill(pid, sig)
-        except ProcessLookupError:
-            pass
-        except PermissionError:
-            self.logger.debug(
-                "Permission denied when attempting to signal process %s (pgid %s)",
-                pid,
-                pgid,
-                exc_info=True,
-            )
-
-    def _cleanup_stale_process(self) -> None:
-        state = self._read_state()
-        if not state:
-            return
-        pid = state.get("pid")
-        pgid = state.get("pgid") or pid
-        if not isinstance(pid, int):
-            self._clear_state()
-            return
-        if self._process_alive(pid):
-            self.logger.info(
-                "Found existing upstream process (pid %s), terminating before restart",
-                pid,
-            )
-            self._terminate_process(pid, pgid, force=False)
-            for _ in range(50):
-                if not self._process_alive(pid):
-                    break
-                time.sleep(0.1)
-            if self._process_alive(pid):
-                self.logger.warning(
-                    "Existing upstream process %s did not exit, forcing kill",
-                    pid,
-                )
-                self._terminate_process(pid, pgid, force=True)
-        self._clear_state()
-
-    def _wait_until_ready(self) -> None:
-        for _ in range(100):
-            try:
-                resp = httpx.get(f"{self.upstream_url}/health", timeout=1.0)
-                if resp.json().get("status") == "ok":
-                    self.logger.info("Upstream responded with ok status")
-                    return
-            except Exception:
-                pass
-            time.sleep(0.1)
-        raise RuntimeError("Upstream failed to start")
-
-    def _log_stream(self, stream, level: int) -> None:
-        for line in iter(stream.readline, ""):
-            if line:
-                self.logger.log(level, line.rstrip())
-
-    def _launch_upstream(self) -> None:
-        cmd = getattr(self, "cmd", None)
-        if not cmd:
-            return
-        pretty_cmd = shlex.join(cmd)
-        self.logger.info("Starting upstream with: %s", pretty_cmd)
-        self.proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            start_new_session=True,
-        )
-        if self.proc.stdout:
-            threading.Thread(
-                target=self._log_stream,
-                args=(self.proc.stdout, logging.INFO),
-                daemon=True,
-            ).start()
-        if self.proc.stderr:
-            threading.Thread(
-                target=self._log_stream,
-                args=(self.proc.stderr, logging.INFO),
-                daemon=True,
-            ).start()
-        self._wait_until_ready()
-        self._write_state()
-        self._refresh_upstream_metadata()
-        self.restart_attempts = 0
 
     def _is_upstream_healthy(self) -> bool:
         try:
             resp = httpx.get(f"{self.upstream_url}/health", timeout=1.0)
-            return resp.json().get("status") == "ok"
         except Exception:
             return False
+        return resp.status_code == 200
 
     def _refresh_upstream_metadata(self) -> None:
         try:
             resp = httpx.get(f"{self.upstream_url}/props", timeout=2.0)
-            resp.raise_for_status()
         except Exception:
             self.logger.debug("Failed to fetch upstream props", exc_info=True)
+            return
+
+        if resp.status_code != 200:
+            self.logger.debug("Failed to fetch upstream props (status %s)", resp.status_code)
             return
 
         try:
@@ -366,64 +129,19 @@ class UpstreamProcessManager:
             return
 
         self._upstream_props = dict(data)
+        ctx_raw = data.get("ctx_size") or data.get("n_ctx")
+        if ctx_raw is not None:
+            try:
+                self._ctx_size = int(ctx_raw)
+            except (TypeError, ValueError):
+                self.logger.debug("Ignoring invalid ctx size from upstream props", exc_info=True)
 
-        ctx_size = None
-        default_settings = data.get("default_generation_settings")
-        if isinstance(default_settings, Mapping):
-            ctx_size = default_settings.get("n_ctx")
-            if ctx_size is None and isinstance(default_settings.get("params"), Mapping):
-                ctx_size = default_settings["params"].get("n_ctx")
-        if ctx_size is None:
-            ctx_size = data.get("n_ctx")
+        slots_raw = data.get("total_slots")
+        if slots_raw is not None:
+            try:
+                self._parallel_slots = _coerce_parallel(slots_raw, default=self._parallel_slots)
+            except Exception:
+                self.logger.debug(
+                    "Ignoring invalid total_slots from upstream props", exc_info=True
+                )
 
-        try:
-            if ctx_size is not None:
-                ctx_value = int(ctx_size)
-                if ctx_value > 0:
-                    self._ctx_size = ctx_value
-        except (TypeError, ValueError):
-            self.logger.debug(
-                "Ignoring invalid ctx size from upstream props", exc_info=True
-            )
-
-        total_slots = data.get("total_slots")
-        try:
-            if total_slots is not None:
-                slots_value = int(total_slots)
-                if slots_value > 0:
-                    self._parallel_slots = slots_value
-        except (TypeError, ValueError):
-            self.logger.debug(
-                "Ignoring invalid total_slots from upstream props", exc_info=True
-            )
-
-    def _restart_upstream(self) -> None:
-        if not getattr(self, "cmd", None):
-            raise RuntimeError("Cannot restart external upstream")
-        if self.restart_attempts >= self.max_restarts:
-            raise RuntimeError("LLM service repeatedly crashed")
-        self.restart_attempts += 1
-        self.logger.warning(
-            "Restarting upstream process (attempt %d)", self.restart_attempts
-        )
-        self.shutdown()
-        self._launch_upstream()
-
-    def _handle_exit(self, signum, frame) -> None:  # pragma: no cover - signal handler
-        try:
-            self.shutdown()
-        finally:
-            handler = getattr(self, "_orig_signals", {}).get(signum, signal.SIG_DFL)
-            if handler in (signal.SIG_IGN, None):
-                return
-            if handler is signal.SIG_DFL:
-                signal.signal(signum, signal.SIG_DFL)
-                os.kill(os.getpid(), signum)
-            elif callable(handler):
-                handler(signum, frame)
-
-    def __del__(self):
-        try:
-            self.shutdown()
-        except Exception:
-            pass
