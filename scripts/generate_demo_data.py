@@ -452,10 +452,7 @@ async def _generate_narrative_timeline(
             },
         },
     }
-    ctx_size = (
-        settings.get("LLM.upstream.args.ctx_size")
-        or settings.get("LLM.upstream.args.n_ctx")
-    )
+    ctx_size = settings.get("LLM.upstream.ctx_size")
     try:
         max_tokens = int(ctx_size) if ctx_size is not None else None
     except (TypeError, ValueError):

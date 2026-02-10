@@ -71,16 +71,21 @@ def strip_outer_quotes(text: str) -> str:
     if not text:
         return text
     stripped = text.strip()
-    pairs = [
-        ('"', '"'),
-        ("'", "'"),
-        ("“", "”"),
-        ("‘", "’"),
-    ]
-    for left, right in pairs:
-        if stripped.startswith(left) and stripped.endswith(right) and len(stripped) > 2:
-            return stripped[1:-1].strip()
-    return text
+    quote_chars = {
+        '"',
+        "'",
+        "“",
+        "”",
+        "‘",
+        "’",
+        "«",
+        "»",
+    }
+    while stripped and stripped[0] in quote_chars:
+        stripped = stripped[1:].lstrip()
+    while stripped and stripped[-1] in quote_chars:
+        stripped = stripped[:-1].rstrip()
+    return stripped
 
 
 def log_wrapped(prefix: str, text: str, width: int = 100) -> None:
