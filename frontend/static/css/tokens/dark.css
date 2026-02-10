@@ -1,13 +1,13 @@
 @layer tokens.dark {
   :root {
-    --color-bg-dark: #101215;
-    --color-bg-alt-dark: #15181d;
-    --color-user-bg-dark: #1a1e24;
-    --color-text-dark: #e6e7ea;
-    --color-heading-dark: #f3f4f6;
-    --color-user-text-dark: #e9eaee;
-    --color-assistant-text-dark: #cfd2d7;
-    --color-surface-dark: #12161b;
+    --color-bg-dark: #0d0f12;
+    --color-bg-alt-dark: #12151a;
+    --color-user-bg-dark: #161a20;
+    --color-text-dark: #f0f1f4;
+    --color-heading-dark: #fafbfc;
+    --color-user-text-dark: #f2f3f6;
+    --color-assistant-text-dark: #d8dbe0;
+    --color-surface-dark: #0f1318;
 
     --accent-dark: #6fb7e6;
     --accent-hover-dark: #86c3ea;
@@ -36,7 +36,7 @@
     --border-dark: rgba(230, 231, 234, 0.14);
     --border-strong-dark: rgba(230, 231, 234, 0.28);
     --border-user-dark: rgba(120, 180, 220, 0.32);
-    --color-text-muted-dark: #a3a8b0;
+    --color-text-muted-dark: #b3b8c0;
 
     /* Status (dark) */
     --color-error-bg-dark: #2a1b1f;
