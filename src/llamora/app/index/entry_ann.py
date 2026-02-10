@@ -164,10 +164,14 @@ class EntryIndex:
         if query_vec.ndim == 1:
             query_vec = query_vec.reshape(1, -1)
         count = self.index.get_current_count()
-        if count == 0:
+        available = len(self.idx_to_id)
+        if count == 0 or available == 0:
             logger.debug("Search invoked on empty index")
             return [], np.array([], dtype=np.float32)
-        k = min(k, count)
+        k = min(k, count, available)
+        if k <= 0:
+            logger.debug("Search invoked with no available vectors")
+            return [], np.array([], dtype=np.float32)
         ef = max(k, 64)
         self.index.set_ef(ef)
         logger.debug("Searching %d vectors with k=%d ef=%d", count, k, ef)
