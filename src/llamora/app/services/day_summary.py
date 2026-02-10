@@ -11,6 +11,10 @@ from llamora.llm.prompt_templates import render_prompt_template
 logger = logging.getLogger(__name__)
 
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
+_FORBIDDEN_RE = re.compile(
+    r"\b(assistant|ai|model|response|today|yesterday|tonight|this morning|this afternoon|this evening)\b",
+    re.IGNORECASE,
+)
 
 
 def _day_summary_system_prompt(entry_count: int) -> str:
@@ -74,6 +78,18 @@ def _extract_summary(raw: str) -> str:
     return _clean_summary(raw)
 
 
+def _contains_forbidden(text: str) -> bool:
+    return bool(_FORBIDDEN_RE.search(text or ""))
+
+
+def _strip_forbidden_sentences(text: str) -> str:
+    if not text:
+        return ""
+    sentences = [seg for seg in _SENTENCE_SPLIT.split(text) if seg]
+    kept = [seg for seg in sentences if not _contains_forbidden(seg)]
+    return _clean_summary(" ".join(kept)) if kept else ""
+
+
 def _normalize_entry_text(text: str) -> str:
     cleaned = " ".join(str(text).split()).strip()
     if len(cleaned) > 280:
@@ -83,15 +99,26 @@ def _normalize_entry_text(text: str) -> str:
     return cleaned
 
 
-def _build_user_prompt(date: str, entries: Iterable[dict]) -> str:
-    lines = [f"Day: {date}", "Entries:"]
+def _build_user_prompt(_date: str, entries: Iterable[dict]) -> str:
+    lines = ["Entries:"]
     for entry in entries:
-        role = str(entry.get("role") or "unknown").strip().title()
+        role = str(entry.get("role") or "").strip().lower()
+        if role and role != "user" and not _is_opening_entry(entry):
+            continue
         text = _normalize_entry_text(entry.get("text", ""))
         if not text:
             continue
-        lines.append(f"- {role}: {text}")
+        lines.append(f"- {text}")
     return "\n".join(lines)
+
+
+def _is_user_entry(entry: dict) -> bool:
+    return str(entry.get("role") or "").strip().lower() == "user"
+
+
+def _is_opening_entry(entry: dict) -> bool:
+    meta = entry.get("meta") or {}
+    return bool(meta.get("auto_opening"))
 
 
 async def generate_day_summary(
@@ -99,9 +126,15 @@ async def generate_day_summary(
     date: str,
     entries: Iterable[dict],
 ) -> str:
-    entry_list = [entry for entry in entries if entry.get("text")]
+    opening_entries = [
+        entry for entry in entries if entry.get("text") and _is_opening_entry(entry)
+    ]
+    user_entries = [
+        entry for entry in entries if entry.get("text") and _is_user_entry(entry)
+    ]
+    entry_list = [*opening_entries, *user_entries]
     if not entry_list:
-        return ""
+        return "No entries recorded for this day."
 
     system_prompt = _day_summary_system_prompt(len(entry_list))
     user_prompt = _build_user_prompt(date, entry_list)
@@ -123,7 +156,7 @@ async def generate_day_summary(
         return ""
 
     summary = _extract_summary(raw)
-    if summary:
+    if summary and not _contains_forbidden(summary):
         return summary
 
     retry_messages = [
@@ -132,6 +165,7 @@ async def generate_day_summary(
             "content": (
                 _day_summary_system_prompt(len(entry_list))
                 + "\nReturn 1-3 plain sentences. Avoid headings or timestamps."
+                " Do not mention the assistant, AI, model, or responses."
             ),
         },
         {"role": "user", "content": user_prompt},
@@ -142,7 +176,11 @@ async def generate_day_summary(
         logger.exception("Day summary retry failed")
         return summary
 
-    return _extract_summary(raw_retry) or summary
+    retry_summary = _extract_summary(raw_retry)
+    if retry_summary and not _contains_forbidden(retry_summary):
+        return retry_summary
+    cleaned = _strip_forbidden_sentences(retry_summary or summary)
+    return cleaned or summary
 
 
 __all__ = ["generate_day_summary"]

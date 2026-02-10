@@ -58,9 +58,11 @@ def get_environment() -> Environment:
 
     template_dir = _resolve_template_dir()
     loader = FileSystemLoader(str(template_dir))
+    debug = bool(getattr(settings, "DEBUG", False))
     return Environment(
         loader=loader,
         autoescape=False,
+        auto_reload=debug,
         keep_trailing_newline=True,
     )
 
