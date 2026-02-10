@@ -13,6 +13,7 @@ export class CalendarControl extends HTMLElement {
   #tooltipTimer = null;
   #tooltipHideTimer = null;
   #tooltipDate = null;
+  #summaryCell = null;
 
   connectedCallback() {
     this.#btn = this.querySelector("#calendar-btn");
@@ -278,15 +279,18 @@ export class CalendarControl extends HTMLElement {
       clearTimeout(this.#tooltipHideTimer);
       this.#tooltipHideTimer = null;
     }
-    const lastDate = this.#tooltipDate;
     this.#tooltipDate = null;
     const tooltip = this.#tooltip;
     if (!tooltip) return;
-    const activeCell = lastDate
-      ? document.querySelector(`[data-calendar-cell][data-date="${lastDate}"]`)
-      : null;
-    if (activeCell) {
-      activeCell.classList.remove("is-summarizing");
+    const calendar = document.querySelector("#calendar");
+    if (calendar) {
+      calendar
+        .querySelectorAll("[data-calendar-cell].is-summarizing")
+        .forEach((cell) => cell.classList.remove("is-summarizing"));
+    }
+    if (this.#summaryCell) {
+      this.#summaryCell.classList.remove("is-summarizing");
+      this.#summaryCell = null;
     }
     tooltip.classList.remove("is-visible");
     if (immediate) {
@@ -607,10 +611,17 @@ export class CalendarControl extends HTMLElement {
     if (this.#tooltipTimer) {
       clearTimeout(this.#tooltipTimer);
     }
+    if (this.#summaryCell && this.#summaryCell !== cell) {
+      this.#summaryCell.classList.remove("is-summarizing");
+    }
+    this.#summaryCell = cell;
     cell.classList.add("is-summarizing");
     this.#tooltipDate = date;
     this.#tooltipTimer = window.setTimeout(async () => {
-      if (this.#tooltipDate !== date) return;
+      if (this.#tooltipDate !== date) {
+        cell.classList.remove("is-summarizing");
+        return;
+      }
       const summary = await this.#fetchDaySummary(date);
       if (!summary || this.#tooltipDate !== date) {
         cell.classList.remove("is-summarizing");
@@ -620,6 +631,9 @@ export class CalendarControl extends HTMLElement {
       tooltip.textContent = summary;
       this.#positionTooltip(tooltip, cell);
       cell.classList.remove("is-summarizing");
+      if (this.#summaryCell === cell) {
+        this.#summaryCell = null;
+      }
     }, 500);
   }
 
