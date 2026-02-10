@@ -225,6 +225,22 @@ class ResponsePipeline:
             ChunkRingGuard(guard_size, guard_min_length) if guard_size > 0 else None
         )
 
+    @staticmethod
+    def _strip_outer_quotes(text: str) -> str:
+        stripped = text.strip()
+        if len(stripped) < 2:
+            return stripped
+        pairs = {
+            ('"', '"'),
+            ("'", "'"),
+            ("“", "”"),
+            ("‘", "’"),
+            ("«", "»"),
+        }
+        if (stripped[0], stripped[-1]) in pairs:
+            return stripped[1:-1].strip()
+        return stripped
+
     async def run(self, callbacks: ResponsePipelineCallbacks) -> PipelineResult:
         """Execute the pipeline and notify callbacks."""
 
@@ -378,7 +394,7 @@ class ResponsePipeline:
         return meta
 
     async def _finalize_success(self, full_response: str) -> PipelineResult:
-        final_text = full_response
+        final_text = self._strip_outer_quotes(full_response)
         meta = await self._build_metadata(
             final_text,
             error=self._error,
@@ -403,7 +419,7 @@ class ResponsePipeline:
         )
 
     async def _finalize_cancelled(self, *, partial: bool) -> PipelineResult:
-        final_text = self._visible_total
+        final_text = self._strip_outer_quotes(self._visible_total)
         if self._error_message:
             final_text = self._append_status_line(
                 final_text, self._error_message, prefix=self._status_prefix
@@ -431,6 +447,7 @@ class ResponsePipeline:
     async def _finalize_with_text(
         self, final_text: str, *, error_meta: bool
     ) -> PipelineResult:
+        final_text = self._strip_outer_quotes(final_text)
         meta = await self._build_metadata(
             final_text,
             error=error_meta or self._error,
