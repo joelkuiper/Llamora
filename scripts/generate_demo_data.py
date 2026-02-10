@@ -1177,7 +1177,7 @@ async def generate_dataset(config: DemoConfig) -> None:
                     continue
                 total_entries += 1
 
-                tags = await _apply_tags(
+                await _apply_tags(
                     llm,
                     config,
                     client,
