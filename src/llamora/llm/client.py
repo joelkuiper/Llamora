@@ -742,7 +742,19 @@ class LLMClient:
             if key in params and params[key] is not None:
                 payload[key] = params[key]
         if "response_format" in params and params["response_format"] is not None:
-            payload["response_format"] = params["response_format"]
+            response_format = params["response_format"]
+            payload["response_format"] = response_format
+            if (
+                isinstance(response_format, Mapping)
+                and response_format.get("type") == "json_schema"
+                and isinstance(response_format.get("json_schema"), Mapping)
+            ):
+                # llama.cpp OpenAI-compat expects top-level json_schema; send via extra_body.
+                json_schema = response_format["json_schema"]
+                if isinstance(json_schema, Mapping) and "schema" in json_schema:
+                    json_schema = json_schema["schema"]
+                payload.setdefault("extra_body", {})["json_schema"] = json_schema
+                payload.pop("response_format", None)
         if "model" not in payload:
             payload["model"] = settings.get("LLM.chat.model", "local")
         allowlist = set(settings.get("LLM.chat.parameter_allowlist") or [])
