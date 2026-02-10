@@ -50,6 +50,10 @@ class DemoConfig:
     entry_context_chars: int
     entry_temperature: float | None
     empty_day_rate: float
+    story_events: int
+    story_followup_rate: float
+    story_intensity: float
+    story_allow_overlap: bool
 
 
 def _parse_date(raw: str) -> date:
@@ -174,6 +178,166 @@ def _log_wrapped(prefix: str, text: str, width: int = 100) -> None:
             logger.info("%s%s", " " * len(prefix), line)
 
 
+@dataclass(slots=True)
+class NarrativeEvent:
+    date: date
+    title: str
+    theme: str
+    beats: list[str]
+    tone: str
+    followup_days: list[int]
+
+
+def _parse_event_date(raw: str) -> date | None:
+    try:
+        return date.fromisoformat(raw)
+    except Exception:
+        return None
+
+
+async def _generate_narrative_timeline(
+    llm: AsyncOpenAI,
+    config: DemoConfig,
+) -> dict[date, list[NarrativeEvent]]:
+    if config.story_events <= 0:
+        return {}
+    rng = random.Random(config.seed)
+    all_days = list(_iter_days(config.start_date, config.end_date))
+    if not all_days:
+        return {}
+    count = min(config.story_events, len(all_days))
+    event_days = sorted(rng.sample(all_days, count))
+    date_lines = "\n".join(f"- {d.isoformat()}" for d in event_days)
+    prompt = (
+        "Create a realistic life timeline for one person writing a diary. "
+        "Return strict JSON array only, no extra text. Each item must include: "
+        "date (YYYY-MM-DD), title, theme (1-3 words), beats (1-3 short items), "
+        "emotional_tone, followup_days (optional list of integers like 1,2,3). "
+        "Keep events plausible and varied; avoid extremes or drama. "
+        "Use the provided dates exactly and keep the order."
+    )
+    user_message = (
+        f"Start date: {config.start_date.isoformat()}\n"
+        f"End date: {config.end_date.isoformat()}\n"
+        f"Count: {count}\n"
+        f"Followup chance: {config.story_followup_rate}\n"
+        f"Event dates (use exactly, keep order):\n{date_lines}\n\n"
+        f"{prompt}"
+    )
+    model = settings.get("LLM.chat.model") or "local"
+    params = dict(settings.get("LLM.chat.parameters") or {})
+    params["temperature"] = min(
+        0.7, max(0.1, float(params.get("temperature", 0.4)))
+    )
+    params["response_format"] = {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "timeline_events",
+            "strict": True,
+            "schema": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "date": {"type": "string"},
+                        "title": {"type": "string"},
+                        "theme": {"type": "string"},
+                        "beats": {"type": "array", "items": {"type": "string"}},
+                        "emotional_tone": {"type": "string"},
+                        "followup_days": {
+                            "type": "array",
+                            "items": {"type": "integer"},
+                        },
+                    },
+                    "required": [
+                        "date",
+                        "title",
+                        "theme",
+                        "beats",
+                        "emotional_tone",
+                    ],
+                    "additionalProperties": False,
+                },
+            },
+        },
+    }
+    response = await llm.chat.completions.create(
+        model=model,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You design personal timelines. Return only JSON, no code, no markdown."
+                ),
+            },
+            {"role": "user", "content": user_message},
+        ],
+        max_tokens=max(600, int(config.llm_max_tokens)),
+        **params,
+    )
+    raw = (response.choices[0].message.content or "").strip()
+    try:
+        import orjson
+
+        data = orjson.loads(raw)
+    except Exception:
+        logger.warning("Failed to parse timeline JSON; skipping narrative scaffold")
+        logger.info("Timeline raw (truncated): %s", raw[:1200])
+        return {}
+    if not isinstance(data, list):
+        logger.warning("Timeline JSON is not a list; skipping narrative scaffold")
+        return {}
+
+    events_by_date: dict[date, list[NarrativeEvent]] = {}
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        d = _parse_event_date(str(item.get("date") or ""))
+        if d is None:
+            continue
+        title = str(item.get("title") or "").strip()
+        theme = str(item.get("theme") or "").strip()
+        tone = str(item.get("emotional_tone") or "").strip()
+        beats_raw = item.get("beats") or []
+        beats: list[str] = []
+        if isinstance(beats_raw, list):
+            for beat in beats_raw:
+                b = str(beat or "").strip()
+                if b:
+                    beats.append(b)
+        followups_raw = item.get("followup_days") or []
+        followups: list[int] = []
+        if isinstance(followups_raw, list):
+            for val in followups_raw:
+                try:
+                    followups.append(int(val))
+                except Exception:
+                    continue
+        if not followups and random.random() < config.story_followup_rate:
+            followups = random.sample([1, 2, 3], k=1)
+        if not title and beats:
+            title = beats[0][:40]
+        event = NarrativeEvent(
+            date=d,
+            title=title,
+            theme=theme,
+            beats=beats,
+            tone=tone,
+            followup_days=followups,
+        )
+        events_by_date.setdefault(d, []).append(event)
+        for offset in followups:
+            follow_date = d + timedelta(days=offset)
+            events_by_date.setdefault(follow_date, []).append(event)
+
+    if not config.story_allow_overlap:
+        for d, events in list(events_by_date.items()):
+            if len(events) <= 1:
+                continue
+            events_by_date[d] = [events[0]]
+    return events_by_date
+
+
 def _resolve_llm_base_url() -> str:
     base_url = settings.get("LLM.chat.base_url")
     if base_url:
@@ -223,6 +387,8 @@ async def _generate_entry_text(
     index: int,
     include_markdown: bool,
     recent_entries: list[str],
+    event_note: str | None,
+    followup_note: str | None,
 ) -> str:
     persona = config.persona_hint.strip()
     time_label = entry_time.strftime("%H:%M")
@@ -254,6 +420,10 @@ async def _generate_entry_text(
         "It is fine to write about only one small thing, or nothing important at all.\n"
         f"{length_hint}"
     )
+    if event_note:
+        user_message += f"\nEvent note (do not quote): {event_note}\n"
+    if followup_note:
+        user_message += f"\nRecent event context (lightly reflect on it): {followup_note}\n"
 
     if include_markdown:
         user_message += (
@@ -535,6 +705,19 @@ async def generate_dataset(config: DemoConfig) -> None:
     logger.info("Persona: %s", config.persona_hint)
     logger.debug("Response kinds: %s", ", ".join(response_kinds))
     recent_entries: deque[str] = deque(maxlen=max(0, config.entry_context_size))
+    narrative_events = await _generate_narrative_timeline(llm, config)
+    if narrative_events:
+        logger.info("-" * 72)
+        logger.info("Narrative scaffold")
+        for day in sorted(narrative_events.keys()):
+            for event in narrative_events[day]:
+                when = day.isoformat()
+                title = event.title or event.theme or "event"
+                detail = event.beats[0] if event.beats else event.tone
+                logger.info("  %s: %s", when, title)
+                if detail:
+                    logger.info("    - %s", detail)
+        logger.info("-" * 72)
 
     async with httpx.AsyncClient(
         base_url=config.base_url,
@@ -562,6 +745,20 @@ async def generate_dataset(config: DemoConfig) -> None:
             if random.random() < config.empty_day_rate:
                 logger.info("  empty day")
                 continue
+            event_note = None
+            followup_note = None
+            events_today = narrative_events.get(day) or []
+            if events_today:
+                event = events_today[0]
+                if event.date == day:
+                    detail = event.beats[0] if event.beats else event.title
+                    if random.random() < config.story_intensity:
+                        event_note = f"{event.title}. {detail}. tone: {event.tone}."
+                    else:
+                        event_note = f"{event.theme} / {event.tone}."
+                    logger.info("  event: %s", event.title or event.theme)
+                else:
+                    followup_note = f"{event.title} ({event.tone})"
             open_day = True
             open_only = random.random() < config.open_only_rate
 
@@ -593,6 +790,8 @@ async def generate_dataset(config: DemoConfig) -> None:
                     idx,
                     include_markdown,
                     list(recent_entries),
+                    event_note,
+                    followup_note,
                 )
                 if text:
                     logger.info("  entry %s/%s @ %s", idx + 1, entries_today, entry_time.strftime("%H:%M"))
@@ -696,6 +895,29 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Override temperature for entry generation.",
     )
     parser.add_argument(
+        "--story-events",
+        type=int,
+        default=6,
+        help="Number of narrative events to scaffold across the date range.",
+    )
+    parser.add_argument(
+        "--story-followup-rate",
+        type=float,
+        default=0.4,
+        help="Probability an event includes follow-up days.",
+    )
+    parser.add_argument(
+        "--story-intensity",
+        type=float,
+        default=0.6,
+        help="How strongly to inject event details into an entry.",
+    )
+    parser.add_argument(
+        "--story-allow-overlap",
+        action="store_true",
+        help="Allow multiple events on the same date.",
+    )
+    parser.add_argument(
         "--markdown-rate",
         type=float,
         default=0.3,
@@ -756,6 +978,10 @@ async def _main_async() -> None:
         entry_context_chars=args.entry_context_chars,
         entry_temperature=args.entry_temperature,
         empty_day_rate=args.empty_day_rate,
+        story_events=args.story_events,
+        story_followup_rate=args.story_followup_rate,
+        story_intensity=args.story_intensity,
+        story_allow_overlap=args.story_allow_overlap,
     )
 
     await generate_dataset(cfg)
