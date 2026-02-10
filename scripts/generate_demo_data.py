@@ -2,26 +2,44 @@
 
 from __future__ import annotations
 
-import argparse
 import asyncio
 import logging
 import random
-import textwrap
-from collections import deque
 import re
+from collections import deque
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
-from typing import Iterable
+from pathlib import Path
+from typing import Any, Mapping
+import tomllib
 
 import httpx
 import orjson
+import typer
 from bs4 import BeautifulSoup
 from openai import AsyncOpenAI
 
 from llamora.settings import settings
+from demo_data_utils import (
+    coerce_bool,
+    coerce_float,
+    coerce_int,
+    coerce_str,
+    iter_days,
+    log_block,
+    log_header,
+    log_item,
+    log_wrapped,
+    parse_date,
+    require_value,
+    strip_outer_quotes,
+)
 
 
 logger = logging.getLogger(__name__)
+
+HTTP_RETRIES_DEFAULT = 3
+HTTP_RETRY_BASE_DELAY = 0.5
 
 
 @dataclass(slots=True)
@@ -57,15 +75,108 @@ class DemoConfig:
     story_allow_overlap: bool
 
 
-def _parse_date(raw: str) -> date:
-    return datetime.strptime(raw, "%Y-%m-%d").date()
+DEFAULTS: dict[str, Any] = {
+    "base_url": "http://127.0.0.1:5000",
+    "min_entries": 0,
+    "max_entries": 3,
+    "open_day_rate": 0.6,
+    "open_only_rate": 0.15,
+    "response_rate": 0.6,
+    "max_tags": 4,
+    "timezone": "UTC",
+    "seed": 1337,
+    "persona": (
+        "A calm, reflective writer who notices small shifts in mood, light, and place. "
+        "Often references nature, memory, and presence."
+    ),
+    "llm_max_tokens": 280,
+    "min_entry_chars": 260,
+    "max_entry_chars": 1200,
+    "entry_retries": 2,
+    "markdown_rate": 0.3,
+    "entry_context_size": 4,
+    "entry_context_chars": 2048,
+    "entry_temperature": None,
+    "empty_day_rate": 0.1,
+    "multi_response_rate": 0.2,
+    "max_responses_per_entry": 2,
+    "story_events": 6,
+    "story_followup_rate": 0.4,
+    "story_intensity": 0.6,
+    "story_allow_overlap": False,
+}
 
 
-def _iter_days(start: date, end: date) -> Iterable[date]:
-    current = start
-    while current <= end:
-        yield current
-        current += timedelta(days=1)
+def _load_demo_config(path: Path | None) -> dict[str, Any]:
+    if path is None:
+        return {}
+    data = tomllib.loads(path.read_text(encoding="utf-8"))
+    if isinstance(data, dict) and "demo" in data and isinstance(data["demo"], dict):
+        return dict(data["demo"])
+    return dict(data) if isinstance(data, dict) else {}
+
+
+def _build_demo_config(
+    raw: Mapping[str, Any],
+    overrides: Mapping[str, Any],
+) -> DemoConfig:
+    merged: dict[str, Any] = {**DEFAULTS, **raw}
+    for key, value in overrides.items():
+        if value is not None:
+            merged[key] = value
+
+    start_date = parse_date(require_value(merged.get("start_date"), "start_date"))
+    end_date = parse_date(require_value(merged.get("end_date"), "end_date"))
+
+    return DemoConfig(
+        base_url=coerce_str(merged.get("base_url"), DEFAULTS["base_url"]) or DEFAULTS["base_url"],
+        username=require_value(merged.get("username"), "username"),
+        password=require_value(merged.get("password"), "password"),
+        start_date=start_date,
+        end_date=end_date,
+        min_entries=coerce_int(merged.get("min_entries"), DEFAULTS["min_entries"]),
+        max_entries=coerce_int(merged.get("max_entries"), DEFAULTS["max_entries"]),
+        open_day_rate=coerce_float(merged.get("open_day_rate"), DEFAULTS["open_day_rate"]),
+        open_only_rate=coerce_float(merged.get("open_only_rate"), DEFAULTS["open_only_rate"]),
+        response_rate=coerce_float(merged.get("response_rate"), DEFAULTS["response_rate"]),
+        max_tags=coerce_int(merged.get("max_tags"), DEFAULTS["max_tags"]),
+        tz=coerce_str(merged.get("timezone"), DEFAULTS["timezone"]) or DEFAULTS["timezone"],
+        seed=coerce_int(merged.get("seed"), DEFAULTS["seed"]),
+        persona_hint=coerce_str(merged.get("persona"), DEFAULTS["persona"]) or DEFAULTS["persona"],
+        llm_max_tokens=coerce_int(merged.get("llm_max_tokens"), DEFAULTS["llm_max_tokens"]),
+        markdown_rate=coerce_float(merged.get("markdown_rate"), DEFAULTS["markdown_rate"]),
+        multi_response_rate=coerce_float(
+            merged.get("multi_response_rate"), DEFAULTS["multi_response_rate"]
+        ),
+        max_responses_per_entry=coerce_int(
+            merged.get("max_responses_per_entry"), DEFAULTS["max_responses_per_entry"]
+        ),
+        min_entry_chars=coerce_int(merged.get("min_entry_chars"), DEFAULTS["min_entry_chars"]),
+        max_entry_chars=coerce_int(merged.get("max_entry_chars"), DEFAULTS["max_entry_chars"]),
+        entry_retries=coerce_int(merged.get("entry_retries"), DEFAULTS["entry_retries"]),
+        entry_context_size=coerce_int(
+            merged.get("entry_context_size"), DEFAULTS["entry_context_size"]
+        ),
+        entry_context_chars=coerce_int(
+            merged.get("entry_context_chars"), DEFAULTS["entry_context_chars"]
+        ),
+        entry_temperature=(
+            None
+            if merged.get("entry_temperature") is None
+            else coerce_float(merged.get("entry_temperature"), 0.0)
+        ),
+        empty_day_rate=coerce_float(merged.get("empty_day_rate"), DEFAULTS["empty_day_rate"]),
+        story_events=coerce_int(merged.get("story_events"), DEFAULTS["story_events"]),
+        story_followup_rate=coerce_float(
+            merged.get("story_followup_rate"), DEFAULTS["story_followup_rate"]
+        ),
+        story_intensity=coerce_float(
+            merged.get("story_intensity"), DEFAULTS["story_intensity"]
+        ),
+        story_allow_overlap=coerce_bool(
+            merged.get("story_allow_overlap"), DEFAULTS["story_allow_overlap"]
+        ),
+    )
 
 
 def _select_csrf_from_html(html: str) -> str | None:
@@ -152,40 +263,53 @@ def _has_session_cookie(client: httpx.AsyncClient) -> bool:
     return client.cookies.get(cookie_name) is not None
 
 
-def _strip_outer_quotes(text: str) -> str:
-    if not text:
-        return text
-    stripped = text.strip()
-    pairs = [
-        ('"', '"'),
-        ("'", "'"),
-        ("“", "”"),
-        ("‘", "’"),
-    ]
-    for left, right in pairs:
-        if stripped.startswith(left) and stripped.endswith(right) and len(stripped) > 2:
-            return stripped[1:-1].strip()
-    return text
+async def _request_with_retry(
+    client: httpx.AsyncClient,
+    method: str,
+    url: str,
+    *,
+    retries: int = HTTP_RETRIES_DEFAULT,
+    base_delay: float = HTTP_RETRY_BASE_DELAY,
+    **kwargs: Any,
+) -> httpx.Response:
+    last_exc: Exception | None = None
+    for attempt in range(1, retries + 1):
+        try:
+            return await client.request(method, url, **kwargs)
+        except httpx.RequestError as exc:
+            last_exc = exc
+            if attempt >= retries:
+                break
+            logger.warning(
+                "Request error (%s) %s %s; retrying %s/%s",
+                exc.__class__.__name__,
+                method,
+                url,
+                attempt,
+                retries,
+            )
+            await asyncio.sleep(base_delay * attempt)
+    if last_exc:
+        raise last_exc
+    raise RuntimeError("Request failed without exception")
 
 
-def _log_wrapped(prefix: str, text: str, width: int = 100) -> None:
-    if not text:
-        return
-    wrapped = textwrap.wrap(text, width=width) or [text]
-    for idx, line in enumerate(wrapped):
-        if idx == 0:
-            logger.info("%s%s", prefix, line)
-        else:
-            logger.info("%s%s", " " * len(prefix), line)
+async def _get(client: httpx.AsyncClient, url: str, **kwargs: Any) -> httpx.Response:
+    return await _request_with_retry(client, "GET", url, **kwargs)
+
+
+async def _post(client: httpx.AsyncClient, url: str, **kwargs: Any) -> httpx.Response:
+    return await _request_with_retry(client, "POST", url, **kwargs)
 
 
 @dataclass(slots=True)
 class NarrativeEvent:
     date: date
     title: str
-    theme: str
-    beats: list[str]
+    summary: str
+    details: list[str]
     tone: str
+    emoji: str
     followup_days: list[int]
 
 
@@ -203,7 +327,7 @@ async def _generate_narrative_timeline(
     if config.story_events <= 0:
         return {}
     rng = random.Random(config.seed)
-    all_days = list(_iter_days(config.start_date, config.end_date))
+    all_days = list(iter_days(config.start_date, config.end_date))
     if not all_days:
         return {}
     count = min(config.story_events, len(all_days))
@@ -212,9 +336,11 @@ async def _generate_narrative_timeline(
     prompt = (
         "Create a realistic life timeline for one person writing a diary. "
         "Return strict JSON array only, no extra text. Each item must include: "
-        "date (YYYY-MM-DD), title, theme (1-3 words), beats (1-3 short items), "
-        "emotional_tone, followup_days (optional list of integers like 1,2,3). "
-        "Keep events plausible and varied; avoid extremes or drama. "
+        "date (YYYY-MM-DD), title, summary (1-2 sentences describing a concrete event), "
+        "details (1-3 short factual fragments), emotional_tone, emoji (single emoji, e.g. 😃), "
+        "followup_days (optional list of integers like 1,2,3). "
+        "Events must be specific things that happened (not categories). "
+        "Keep events plausible and varied. "
         "Use the provided dates exactly and keep the order."
     )
     user_message = (
@@ -242,9 +368,10 @@ async def _generate_narrative_timeline(
                     "properties": {
                         "date": {"type": "string"},
                         "title": {"type": "string"},
-                        "theme": {"type": "string"},
-                        "beats": {"type": "array", "items": {"type": "string"}},
+                        "summary": {"type": "string"},
+                        "details": {"type": "array", "items": {"type": "string"}},
                         "emotional_tone": {"type": "string"},
+                        "emoji": {"type": "string"},
                         "followup_days": {
                             "type": "array",
                             "items": {"type": "integer"},
@@ -253,15 +380,27 @@ async def _generate_narrative_timeline(
                     "required": [
                         "date",
                         "title",
-                        "theme",
-                        "beats",
+                        "summary",
+                        "details",
                         "emotional_tone",
+                        "emoji",
                     ],
                     "additionalProperties": False,
                 },
             },
         },
     }
+    ctx_size = (
+        settings.get("LLM.upstream.args.ctx_size")
+        or settings.get("LLM.upstream.args.n_ctx")
+    )
+    try:
+        max_tokens = int(ctx_size) if ctx_size is not None else None
+    except (TypeError, ValueError):
+        max_tokens = None
+    if max_tokens is None or max_tokens <= 0:
+        max_tokens = max(1200, int(config.llm_max_tokens) * 3)
+
     response = await llm.chat.completions.create(
         model=model,
         messages=[
@@ -273,17 +412,27 @@ async def _generate_narrative_timeline(
             },
             {"role": "user", "content": user_message},
         ],
-        max_tokens=max(600, int(config.llm_max_tokens)),
+        max_tokens=max_tokens,
         **params,
     )
-    raw = (response.choices[0].message.content or "").strip()
+    choice = response.choices[0]
+    finish_reason = getattr(choice, "finish_reason", None)
+    raw = (choice.message.content or "").strip()
     try:
         import orjson
 
         data = orjson.loads(raw)
     except Exception:
-        logger.warning("Failed to parse timeline JSON; skipping narrative scaffold")
-        logger.info("Timeline raw (truncated): %s", raw[:1200])
+        logger.warning(
+            "Failed to parse timeline JSON; skipping narrative scaffold (finish_reason=%s, chars=%s)",
+            finish_reason,
+            len(raw),
+        )
+        if finish_reason == "length":
+            logger.info(
+                "Timeline generation truncated. Try raising --llm-max-tokens or lowering --story-events."
+            )
+        log_block("Timeline raw", raw)
         return {}
     if not isinstance(data, list):
         logger.warning("Timeline JSON is not a list; skipping narrative scaffold")
@@ -293,19 +442,20 @@ async def _generate_narrative_timeline(
     for item in data:
         if not isinstance(item, dict):
             continue
-        d = _parse_event_date(str(item.get("date") or ""))
-        if d is None:
+        event_date = _parse_event_date(str(item.get("date") or ""))
+        if event_date is None:
             continue
         title = str(item.get("title") or "").strip()
-        theme = str(item.get("theme") or "").strip()
+        summary = str(item.get("summary") or "").strip()
         tone = str(item.get("emotional_tone") or "").strip()
-        beats_raw = item.get("beats") or []
-        beats: list[str] = []
-        if isinstance(beats_raw, list):
-            for beat in beats_raw:
-                b = str(beat or "").strip()
-                if b:
-                    beats.append(b)
+        emoji = str(item.get("emoji") or "").strip()
+        details_raw = item.get("details") or []
+        details: list[str] = []
+        if isinstance(details_raw, list):
+            for detail in details_raw:
+                detail_text = str(detail or "").strip()
+                if detail_text:
+                    details.append(detail_text)
         followups_raw = item.get("followup_days") or []
         followups: list[int] = []
         if isinstance(followups_raw, list):
@@ -316,19 +466,24 @@ async def _generate_narrative_timeline(
                     continue
         if not followups and random.random() < config.story_followup_rate:
             followups = random.sample([1, 2, 3], k=1)
-        if not title and beats:
-            title = beats[0][:40]
+        if not title and summary:
+            title = summary[:40]
+        if not summary and details:
+            summary = details[0]
+        if not emoji:
+            emoji = "✨"
         event = NarrativeEvent(
-            date=d,
+            date=event_date,
             title=title,
-            theme=theme,
-            beats=beats,
+            summary=summary,
+            details=details,
             tone=tone,
+            emoji=emoji,
             followup_days=followups,
         )
-        events_by_date.setdefault(d, []).append(event)
+        events_by_date.setdefault(event_date, []).append(event)
         for offset in followups:
-            follow_date = d + timedelta(days=offset)
+            follow_date = event_date + timedelta(days=offset)
             events_by_date.setdefault(follow_date, []).append(event)
 
     if not config.story_allow_overlap:
@@ -417,7 +572,6 @@ async def _generate_entry_text(
         "Use normal, everyday language.\n"
         "Do not add a title.\n"
         "Do not wrap the entry in quotation marks or start with a quote.\n"
-        "Do not try to summarize ongoing worries unless something actually changed.\n"
         "It is fine to write about only one small thing, or nothing important at all.\n"
         f"{length_hint}"
     )
@@ -473,7 +627,7 @@ async def _generate_entry_text(
         text = (response.choices[0].message.content or "").strip()
         if not text:
             continue
-        text = _strip_outer_quotes(text)
+        text = strip_outer_quotes(text)
 
         if len(text) < config.min_entry_chars:
             extra = (
@@ -522,7 +676,7 @@ async def _consume_sse(stream: httpx.Response) -> str:
 
 async def _register_user(client: httpx.AsyncClient, config: DemoConfig) -> bool:
     logger.debug("Registering user %s", config.username)
-    resp = await client.get("/register")
+    resp = await _get(client, "/register")
     resp.raise_for_status()
     csrf = _select_csrf_from_html(resp.text)
     if not csrf:
@@ -534,13 +688,13 @@ async def _register_user(client: httpx.AsyncClient, config: DemoConfig) -> bool:
         "confirm_password": config.password,
         "csrf_token": csrf,
     }
-    resp = await client.post("/register", data=data)
+    resp = await _post(client, "/register", data=data)
     if resp.status_code >= 400:
         logger.warning("Register failed with status %s", resp.status_code)
         return False
 
     if "Recovery Code" in resp.text:
-        logger.info("Recovery screen received; user created")
+        log_item("registration: recovery screen received")
         return True
 
     error = _extract_auth_error(resp.text)
@@ -553,7 +707,7 @@ async def _register_user(client: httpx.AsyncClient, config: DemoConfig) -> bool:
 
 async def _login_user(client: httpx.AsyncClient, config: DemoConfig) -> None:
     logger.debug("Logging in as %s", config.username)
-    resp = await client.get("/login")
+    resp = await _get(client, "/login")
     resp.raise_for_status()
     csrf = _select_csrf_from_html(resp.text)
     if not csrf:
@@ -564,7 +718,7 @@ async def _login_user(client: httpx.AsyncClient, config: DemoConfig) -> None:
         "password": config.password,
         "csrf_token": csrf,
     }
-    resp = await client.post("/login", data=data)
+    resp = await _post(client, "/login", data=data)
     resp.raise_for_status()
     if _is_login_page(resp.text, str(resp.url)):
         error = _extract_auth_error(resp.text)
@@ -584,7 +738,7 @@ async def _login_and_refresh_csrf(client: httpx.AsyncClient, config: DemoConfig)
 async def _refresh_csrf(client: httpx.AsyncClient) -> str:
     candidates = ["/", "/d/today", "/login"]
     for path in candidates:
-        resp = await client.get(path)
+        resp = await _get(client, path)
         if resp.status_code >= 400:
             logger.warning("CSRF refresh failed for %s (status=%s)", path, resp.status_code)
             continue
@@ -598,14 +752,36 @@ async def _refresh_csrf(client: httpx.AsyncClient) -> str:
 
 async def _open_day(client: httpx.AsyncClient, day: date, headers: dict[str, str]) -> None:
     logger.debug("Opening day %s", day)
-    resp = await client.get(f"/e/{day.isoformat()}", headers=headers)
+    resp = await _get(client, f"/e/{day.isoformat()}", headers=headers)
     resp.raise_for_status()
 
 
 async def _open_day_opening(client: httpx.AsyncClient, day: date, headers: dict[str, str]) -> None:
     logger.debug("Opening day opening stream %s", day)
-    async with client.stream("GET", f"/e/opening/{day.isoformat()}", headers=headers) as stream:
-        await _consume_sse(stream)
+    for attempt in range(1, HTTP_RETRIES_DEFAULT + 1):
+        try:
+            async with client.stream(
+                "GET",
+                f"/e/opening/{day.isoformat()}",
+                headers=headers,
+            ) as stream:
+                await _consume_sse(stream)
+            break
+        except httpx.RequestError as exc:
+            if attempt >= HTTP_RETRIES_DEFAULT:
+                logger.warning(
+                    "Day opening stream failed (%s) after %s attempts",
+                    exc.__class__.__name__,
+                    HTTP_RETRIES_DEFAULT,
+                )
+                break
+            logger.warning(
+                "Day opening stream error (%s); retrying %s/%s",
+                exc.__class__.__name__,
+                attempt,
+                HTTP_RETRIES_DEFAULT,
+            )
+            await asyncio.sleep(HTTP_RETRY_BASE_DELAY * attempt)
 
 
 async def _create_entry(
@@ -621,12 +797,12 @@ async def _create_entry(
         "text": text,
         "user_time": user_time.isoformat(),
     }
-    resp = await client.post(f"/e/{day.isoformat()}/entry", data=data, headers=headers)
+    resp = await _post(client, f"/e/{day.isoformat()}/entry", data=data, headers=headers)
     if _is_login_page(resp.text, str(resp.url)):
         logger.warning("Session expired while posting entry; re-authenticating")
         csrf = await _login_and_refresh_csrf(client, config)
         headers["X-CSRFToken"] = csrf
-        resp = await client.post(f"/e/{day.isoformat()}/entry", data=data, headers=headers)
+        resp = await _post(client, f"/e/{day.isoformat()}/entry", data=data, headers=headers)
     resp.raise_for_status()
     entry_id = _select_entry_id(resp.text)
     if not entry_id:
@@ -653,18 +829,51 @@ async def _trigger_response(
         "user_time": user_time.isoformat(),
         "response_kind": response_kind,
     }
-    resp = await client.post(f"/e/{day.isoformat()}/response/{entry_id}", data=data, headers=headers)
-    resp.raise_for_status()
+    try:
+        resp = await _post(
+            client,
+            f"/e/{day.isoformat()}/response/{entry_id}",
+            data=data,
+            headers=headers,
+        )
+        resp.raise_for_status()
+    except httpx.RequestError as exc:
+        logger.warning(
+            "Response trigger failed (%s) for %s",
+            exc.__class__.__name__,
+            entry_id,
+        )
+        return
 
-    async with client.stream(
-        "GET",
-        f"/e/{day.isoformat()}/response/stream/{entry_id}",
-        headers=headers,
-    ) as stream:
-        response_text = await _consume_sse(stream)
+    response_text = ""
+    for attempt in range(1, HTTP_RETRIES_DEFAULT + 1):
+        try:
+            async with client.stream(
+                "GET",
+                f"/e/{day.isoformat()}/response/stream/{entry_id}",
+                headers=headers,
+            ) as stream:
+                response_text = await _consume_sse(stream)
+            break
+        except httpx.RequestError as exc:
+            if attempt >= HTTP_RETRIES_DEFAULT:
+                logger.warning(
+                    "Response stream failed (%s) after %s attempts",
+                    exc.__class__.__name__,
+                    HTTP_RETRIES_DEFAULT,
+                )
+                response_text = ""
+                break
+            logger.warning(
+                "Response stream error (%s); retrying %s/%s",
+                exc.__class__.__name__,
+                attempt,
+                HTTP_RETRIES_DEFAULT,
+            )
+            await asyncio.sleep(HTTP_RETRY_BASE_DELAY * attempt)
     if response_text:
-        response_text = _strip_outer_quotes(response_text)
-        _log_wrapped(
+        response_text = strip_outer_quotes(response_text)
+        log_wrapped(
             f"  assistant ({response_kind}): ",
             response_text.strip(),
         )
@@ -757,8 +966,16 @@ async def _apply_tags(
     max_tags: int,
     headers: dict[str, str],
 ) -> None:
-    resp = await client.get(f"/t/suggestions/{entry_id}", headers=headers)
-    resp.raise_for_status()
+    try:
+        resp = await _get(client, f"/t/suggestions/{entry_id}", headers=headers)
+        resp.raise_for_status()
+    except httpx.RequestError as exc:
+        logger.warning(
+            "Tag suggestions failed (%s) for %s",
+            exc.__class__.__name__,
+            entry_id,
+        )
+        return
     suggestions = _select_tag_suggestions(resp.text)
     if not suggestions:
         logger.debug("No tag suggestions for %s", entry_id)
@@ -774,31 +991,37 @@ async def _apply_tags(
     for tag in selected:
         logger.debug("Adding tag '%s' to %s", tag, entry_id)
         data = {"tag": tag}
-        resp = await client.post(f"/t/{entry_id}", data=data, headers=headers)
-        resp.raise_for_status()
+        try:
+            resp = await _post(client, f"/t/{entry_id}", data=data, headers=headers)
+            resp.raise_for_status()
+        except httpx.RequestError as exc:
+            logger.warning(
+                "Tag apply failed (%s) for %s", exc.__class__.__name__, entry_id
+            )
+            return
 
 
 async def generate_dataset(config: DemoConfig) -> None:
     random.seed(config.seed)
     llm = _build_llm_client()
     response_kinds = _load_response_kinds()
-    logger.info("User: %s", config.username)
-    logger.info("Range: %s to %s (%s)", config.start_date, config.end_date, config.tz)
-    logger.info("Persona: %s", config.persona_hint)
+    log_header(f"User: {config.username}")
+    log_item(f"Range: {config.start_date} to {config.end_date} ({config.tz})")
+    log_item(f"Persona: {config.persona_hint}")
     logger.debug("Response kinds: %s", ", ".join(response_kinds))
     recent_entries: deque[str] = deque(maxlen=max(0, config.entry_context_size))
     narrative_events = await _generate_narrative_timeline(llm, config)
     if narrative_events:
         logger.info("-" * 72)
-        logger.info("Narrative scaffold")
+        log_header("Narrative scaffold")
         for day in sorted(narrative_events.keys()):
             for event in narrative_events[day]:
                 when = day.isoformat()
-                title = event.title or event.theme or "event"
-                detail = event.beats[0] if event.beats else event.tone
-                logger.info("  %s: %s", when, title)
+                title = event.title or event.summary or "event"
+                detail = event.details[0] if event.details else event.summary
+                log_item(f"{when}: {event.emoji} {title}")
                 if detail:
-                    logger.info("    - %s", detail)
+                    logger.info("     %s", detail)
         logger.info("-" * 72)
 
     async with httpx.AsyncClient(
@@ -808,7 +1031,7 @@ async def generate_dataset(config: DemoConfig) -> None:
     ) as client:
         registered = await _register_user(client, config)
         if registered:
-            logger.info("Registration complete; logging in to establish session")
+            log_item("auth: logging in")
         csrf = await _login_and_refresh_csrf(client, config)
         base_headers = {
             "X-CSRFToken": csrf,
@@ -817,15 +1040,15 @@ async def generate_dataset(config: DemoConfig) -> None:
 
         total_entries = 0
         opened_any_day = False
-        for day in _iter_days(config.start_date, config.end_date):
+        for day in iter_days(config.start_date, config.end_date):
             logger.info("-" * 72)
-            logger.info("Day %s", day.isoformat())
+            log_header(f"Day {day.isoformat()}")
             headers = {
                 **base_headers,
                 "X-Client-Today": day.isoformat(),
             }
             if random.random() < config.empty_day_rate:
-                logger.info("  empty day")
+                log_item("empty day")
                 continue
             event_note = None
             followup_note = None
@@ -833,34 +1056,52 @@ async def generate_dataset(config: DemoConfig) -> None:
             if events_today:
                 event = events_today[0]
                 if event.date == day:
-                    detail = event.beats[0] if event.beats else event.title
+                    detail = event.details[0] if event.details else event.summary
                     if random.random() < config.story_intensity:
-                        event_note = f"{event.title}. {detail}. tone: {event.tone}."
+                        event_note = (
+                            f"{event.emoji} {event.summary or event.title}. "
+                            f"{detail}. tone: {event.tone}."
+                        )
                     else:
-                        event_note = f"{event.theme} / {event.tone}."
-                    logger.info("  event: %s", event.title or event.theme)
+                        event_note = (
+                            f"{event.emoji} {event.summary or event.title} ({event.tone})."
+                        )
+                    log_item(f"event: {event.emoji} {event.title or event.summary}")
+                    if event_note:
+                        log_wrapped("     note: ", event_note)
                 else:
-                    followup_note = f"{event.title} ({event.tone})"
+                    followup_note = (
+                        f"{event.emoji} {event.summary or event.title} ({event.tone})"
+                    )
+                    log_item(f"followup: {followup_note}")
             open_day = True
             open_only = random.random() < config.open_only_rate
 
             if open_day:
-                logger.info("  opening: yes")
-                await _open_day(client, day, headers)
-                await _open_day_opening(client, day, headers)
+                log_item("opening: yes")
+                try:
+                    await _open_day(client, day, headers)
+                    await _open_day_opening(client, day, headers)
+                except httpx.RequestError as exc:
+                    logger.warning(
+                        "Day open failed (%s); skipping day %s",
+                        exc.__class__.__name__,
+                        day.isoformat(),
+                    )
+                    continue
                 opened_any_day = True
 
             if open_only:
-                logger.info("  entries: 0 (opening only)")
+                log_item("entries: 0 (opening only)")
                 continue
 
             entries_today = random.randint(config.min_entries, config.max_entries)
             if entries_today == 0:
-                logger.info("  entries: 0")
+                log_item("entries: 0")
                 continue
 
             times = _choose_entry_times(entries_today, day)
-            logger.info("  entries: %s", entries_today)
+            log_item(f"entries: {entries_today}")
             for idx, entry_time in enumerate(times):
                 logger.debug("Generating entry %s/%s for %s", idx + 1, entries_today, day)
                 include_markdown = random.random() < config.markdown_rate
@@ -877,9 +1118,22 @@ async def generate_dataset(config: DemoConfig) -> None:
                 )
                 if text:
                     logger.info("  entry %s/%s @ %s", idx + 1, entries_today, entry_time.strftime("%H:%M"))
-                    _log_wrapped("    ", text.strip())
+                    log_wrapped("     ", text.strip())
                     recent_entries.append(text)
-                entry_id = await _create_entry(client, day, text, entry_time, headers, config)
+                try:
+                    entry_id = await _create_entry(
+                        client, day, text, entry_time, headers, config
+                    )
+                except httpx.RequestError as exc:
+                    logger.warning(
+                        "Entry post failed (%s) for %s; skipping responses/tags",
+                        exc.__class__.__name__,
+                        day.isoformat(),
+                    )
+                    continue
+                except RuntimeError as exc:
+                    logger.warning("Entry post failed for %s: %s", day.isoformat(), exc)
+                    continue
                 total_entries += 1
 
                 if random.random() < config.response_rate:
@@ -910,167 +1164,104 @@ async def generate_dataset(config: DemoConfig) -> None:
         logger.info("Done. Created %d entries.", total_entries)
 
 
-def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Generate Llamora demo data")
-    parser.add_argument("--base-url", default="http://127.0.0.1:5000")
-    parser.add_argument("--username", required=True)
-    parser.add_argument("--password", required=True)
-    parser.add_argument("--start-date", required=True)
-    parser.add_argument("--end-date", required=True)
-    parser.add_argument("--min-entries", type=int, default=0)
-    parser.add_argument("--max-entries", type=int, default=3)
-    parser.add_argument("--open-day-rate", type=float, default=0.6)
-    parser.add_argument("--open-only-rate", type=float, default=0.15)
-    parser.add_argument(
-        "--empty-day-rate",
-        type=float,
-        default=0.1,
-        help="Probability a day has no opening and no entries.",
-    )
-    parser.add_argument("--response-rate", type=float, default=0.6)
-    parser.add_argument("--max-tags", type=int, default=4)
-    parser.add_argument("--timezone", default="UTC")
-    parser.add_argument("--seed", type=int, default=1337)
-    parser.add_argument(
-        "--persona",
-        default=(
-            "A calm, reflective writer who notices small shifts in mood, light, and place. "
-            "Often references nature, memory, and presence. "
-        ),
-        help="Persona hint used to keep entries consistent. Override to change voice.",
-    )
-    parser.add_argument("--llm-max-tokens", type=int, default=280)
-    parser.add_argument(
-        "--min-entry-chars",
-        type=int,
-        default=260,
-        help="Minimum character length for generated entries.",
-    )
-    parser.add_argument(
-        "--max-entry-chars",
-        type=int,
-        default=1200,
-        help="Maximum character length for generated entries.",
-    )
-    parser.add_argument(
-        "--entry-retries",
-        type=int,
-        default=2,
-        help="Retries for entry generation if too short.",
-    )
-    parser.add_argument(
-        "--entry-context-size",
-        type=int,
-        default=4,
-        help="Number of recent entries to include for continuity.",
-    )
-    parser.add_argument(
-        "--entry-context-chars",
-        type=int,
-        default=2048,
-        help="Max characters per recent entry snippet for continuity.",
-    )
-    parser.add_argument(
-        "--entry-temperature",
-        type=float,
-        default=None,
-        help="Override temperature for entry generation.",
-    )
-    parser.add_argument(
-        "--story-events",
-        type=int,
-        default=6,
-        help="Number of narrative events to scaffold across the date range.",
-    )
-    parser.add_argument(
-        "--story-followup-rate",
-        type=float,
-        default=0.4,
-        help="Probability an event includes follow-up days.",
-    )
-    parser.add_argument(
-        "--story-intensity",
-        type=float,
-        default=0.6,
-        help="How strongly to inject event details into an entry.",
-    )
-    parser.add_argument(
-        "--story-allow-overlap",
-        action="store_true",
-        help="Allow multiple events on the same date.",
-    )
-    parser.add_argument(
-        "--markdown-rate",
-        type=float,
-        default=0.3,
-        help="Probability an entry includes a subtle markdown element.",
-    )
-    parser.add_argument(
-        "--multi-response-rate",
-        type=float,
-        default=0.2,
-        help="Probability of generating multiple responses for one entry.",
-    )
-    parser.add_argument(
-        "--max-responses-per-entry",
-        type=int,
-        default=2,
-        help="Upper bound on responses per entry when multi-response triggers.",
-    )
-    parser.add_argument("--verbose", action="store_true")
-    return parser
-
-
-async def _main_async() -> None:
-    parser = build_arg_parser()
-    args = parser.parse_args()
-
+def _setup_logging(verbose: bool) -> None:
     logging.basicConfig(
-        level=logging.DEBUG if args.verbose else logging.INFO,
+        level=logging.DEBUG if verbose else logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-        if args.verbose
+        if verbose
         else "%(message)s",
     )
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
 
-    cfg = DemoConfig(
-        base_url=args.base_url,
-        username=args.username,
-        password=args.password,
-        start_date=_parse_date(args.start_date),
-        end_date=_parse_date(args.end_date),
-        min_entries=args.min_entries,
-        max_entries=args.max_entries,
-        open_day_rate=args.open_day_rate,
-        open_only_rate=args.open_only_rate,
-        response_rate=args.response_rate,
-        max_tags=args.max_tags,
-        tz=args.timezone,
-        seed=args.seed,
-        persona_hint=args.persona,
-        llm_max_tokens=args.llm_max_tokens,
-        markdown_rate=args.markdown_rate,
-        multi_response_rate=args.multi_response_rate,
-        max_responses_per_entry=args.max_responses_per_entry,
-        min_entry_chars=args.min_entry_chars,
-        max_entry_chars=args.max_entry_chars,
-        entry_retries=args.entry_retries,
-        entry_context_size=args.entry_context_size,
-        entry_context_chars=args.entry_context_chars,
-        entry_temperature=args.entry_temperature,
-        empty_day_rate=args.empty_day_rate,
-        story_events=args.story_events,
-        story_followup_rate=args.story_followup_rate,
-        story_intensity=args.story_intensity,
-        story_allow_overlap=args.story_allow_overlap,
-    )
 
-    await generate_dataset(cfg)
+app = typer.Typer(help="Generate realistic demo data via the running Llamora server.")
+
+
+@app.command("run")
+def run_cmd(
+    config: Path | None = typer.Option(
+        None,
+        "--config",
+        help="Path to a TOML config file (e.g. config/demo_data.example.toml).",
+        exists=True,
+        dir_okay=False,
+        file_okay=True,
+        readable=True,
+    ),
+    base_url: str | None = typer.Option(None, help="Base URL for the running server."),
+    username: str | None = typer.Option(None, help="Username for the demo account."),
+    password: str | None = typer.Option(None, help="Password for the demo account."),
+    start_date: str | None = typer.Option(None, help="Start date (YYYY-MM-DD)."),
+    end_date: str | None = typer.Option(None, help="End date (YYYY-MM-DD)."),
+    min_entries: int | None = typer.Option(None, help="Minimum entries per day."),
+    max_entries: int | None = typer.Option(None, help="Maximum entries per day."),
+    open_only_rate: float | None = typer.Option(None, help="Chance of opening only."),
+    response_rate: float | None = typer.Option(None, help="Chance of responses."),
+    max_tags: int | None = typer.Option(None, help="Max tags per entry."),
+    timezone: str | None = typer.Option(None, help="IANA timezone (e.g. Europe/Amsterdam)."),
+    seed: int | None = typer.Option(None, help="Random seed."),
+    persona: str | None = typer.Option(None, help="Persona hint for entries."),
+    llm_max_tokens: int | None = typer.Option(None, help="Max tokens per entry."),
+    entry_temperature: float | None = typer.Option(None, help="Entry temperature override."),
+    markdown_rate: float | None = typer.Option(None, help="Chance of markdown in entries."),
+    entry_context_size: int | None = typer.Option(None, help="Recent entries to include."),
+    entry_context_chars: int | None = typer.Option(None, help="Chars per context snippet."),
+    min_entry_chars: int | None = typer.Option(None, help="Minimum entry length."),
+    max_entry_chars: int | None = typer.Option(None, help="Maximum entry length."),
+    entry_retries: int | None = typer.Option(None, help="Retries for short entries."),
+    empty_day_rate: float | None = typer.Option(None, help="Chance of empty day."),
+    story_events: int | None = typer.Option(None, help="Narrative event count."),
+    story_followup_rate: float | None = typer.Option(None, help="Chance of follow-up days."),
+    story_intensity: float | None = typer.Option(None, help="Event injection strength."),
+    story_allow_overlap: bool | None = typer.Option(None, help="Allow event overlap."),
+    multi_response_rate: float | None = typer.Option(None, help="Chance of multi responses."),
+    max_responses_per_entry: int | None = typer.Option(None, help="Max responses per entry."),
+    verbose: bool = typer.Option(False, "--verbose", help="Verbose logging."),
+) -> None:
+    _setup_logging(verbose)
+    raw_cfg = _load_demo_config(config)
+    overrides = {
+        "base_url": base_url,
+        "username": username,
+        "password": password,
+        "start_date": start_date,
+        "end_date": end_date,
+        "min_entries": min_entries,
+        "max_entries": max_entries,
+        "open_only_rate": open_only_rate,
+        "response_rate": response_rate,
+        "max_tags": max_tags,
+        "timezone": timezone,
+        "seed": seed,
+        "persona": persona,
+        "llm_max_tokens": llm_max_tokens,
+        "entry_temperature": entry_temperature,
+        "markdown_rate": markdown_rate,
+        "entry_context_size": entry_context_size,
+        "entry_context_chars": entry_context_chars,
+        "min_entry_chars": min_entry_chars,
+        "max_entry_chars": max_entry_chars,
+        "entry_retries": entry_retries,
+        "empty_day_rate": empty_day_rate,
+        "story_events": story_events,
+        "story_followup_rate": story_followup_rate,
+        "story_intensity": story_intensity,
+        "story_allow_overlap": story_allow_overlap,
+        "multi_response_rate": multi_response_rate,
+        "max_responses_per_entry": max_responses_per_entry,
+    }
+    try:
+        cfg = _build_demo_config(raw_cfg, overrides)
+    except ValueError as exc:
+        logger.error(str(exc))
+        raise typer.Exit(code=1) from exc
+
+    asyncio.run(generate_dataset(cfg))
 
 
 def main() -> None:
-    asyncio.run(_main_async())
+    app()
 
 
 if __name__ == "__main__":
