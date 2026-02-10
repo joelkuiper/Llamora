@@ -1,0 +1,1 @@
+ALTER TABLE vectors ADD COLUMN dtype TEXT DEFAULT 'float32';

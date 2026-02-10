@@ -77,6 +77,7 @@ async def search():
     total_known = False
     showing_count = 0
     returned_session_id: str | None = None
+    warming = False
 
     if context.query:
         _, user, dek = await require_user_and_dek()
@@ -100,6 +101,7 @@ async def search():
             has_more = stream_result.has_more
             showing_count = stream_result.showing_count
             total_known = stream_result.total_known
+            warming = stream_result.warming
         except InvalidSearchQuery:
             logger.info("Discarding invalid search query for user %s", user["id"])
             sanitized_query = ""
@@ -143,6 +145,7 @@ async def search():
         showing_count=showing_count,
         has_more=has_more,
         session_id=returned_session_id,
+        warming=warming,
     )
 
 

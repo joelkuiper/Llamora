@@ -41,6 +41,7 @@ class SearchStreamResult:
     has_more: bool
     showing_count: int
     total_known: bool
+    warming: bool = False
 
 
 class SearchStreamManager:
@@ -204,6 +205,7 @@ class SearchStreamManager:
             has_more=has_more,
             showing_count=showing_count,
             total_known=total_known,
+            warming=self._vector_search.index_store.is_warming(user_id),
         )
 
 

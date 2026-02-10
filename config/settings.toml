@@ -79,6 +79,14 @@ concurrency = 0
 max_chars = 1200
 overlap_chars = 200
 
+[default.EMBEDDING.index]
+embed_batch_size = 128
+warm_entry_batch = 200
+
+[default.EMBEDDING.vectors]
+dtype = "float16"
+
+
 [default.LLM.upstream]
 llamafile_path = ""
 # When set, connect to an existing OpenAI-compatible endpoint (e.g., http://127.0.0.1:8081 from

@@ -19,7 +19,13 @@ class VectorsRepository(BaseRepository):
         self._decrypt_vector = decrypt_vector
 
     async def store_vector(
-        self, vector_id: str, entry_id: str, user_id: str, vec: np.ndarray, dek: bytes
+        self,
+        vector_id: str,
+        entry_id: str,
+        user_id: str,
+        vec: np.ndarray,
+        dek: bytes,
+        dtype: str = "float32",
     ) -> None:
         dim, nonce, ct, alg = await asyncio.to_thread(
             self._prepare_encrypted_vector,
@@ -28,6 +34,7 @@ class VectorsRepository(BaseRepository):
             user_id,
             entry_id,
             vector_id,
+            dtype,
         )
         async with self.pool.connection() as conn:
             await self._run_in_transaction(
@@ -35,11 +42,11 @@ class VectorsRepository(BaseRepository):
                 conn.execute,
                 """
                     INSERT OR REPLACE INTO vectors (
-                        id, entry_id, user_id, chunk_index, dim, nonce, ciphertext, alg
+                        id, entry_id, user_id, chunk_index, dim, nonce, ciphertext, alg, dtype
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                (vector_id, entry_id, user_id, 0, dim, nonce, ct, alg),
+                (vector_id, entry_id, user_id, 0, dim, nonce, ct, alg, dtype),
             )
 
     async def store_vectors_batch(
@@ -47,6 +54,7 @@ class VectorsRepository(BaseRepository):
         user_id: str,
         vectors: list[tuple[str, str, int, np.ndarray]],
         dek: bytes,
+        dtype: str = "float32",
     ) -> None:
         if not vectors:
             return
@@ -56,6 +64,7 @@ class VectorsRepository(BaseRepository):
             vectors,
             dek,
             user_id,
+            dtype,
         )
 
         async with self.pool.connection() as conn:
@@ -64,9 +73,9 @@ class VectorsRepository(BaseRepository):
                 conn.executemany,
                 """
                     INSERT OR REPLACE INTO vectors (
-                        id, entry_id, user_id, chunk_index, dim, nonce, ciphertext, alg
+                        id, entry_id, user_id, chunk_index, dim, nonce, ciphertext, alg, dtype
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                 records,
             )
@@ -77,7 +86,7 @@ class VectorsRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT v.id, v.entry_id, v.dim, v.nonce, v.ciphertext, v.alg, m.created_at
+                SELECT v.id, v.entry_id, v.dim, v.nonce, v.ciphertext, v.alg, v.dtype, m.created_at
                 FROM vectors v
                 JOIN entries m ON v.entry_id = m.id AND m.user_id = ?
                 ORDER BY m.id DESC
@@ -100,7 +109,7 @@ class VectorsRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT v.id, v.entry_id, v.dim, v.nonce, v.ciphertext, v.alg, m.created_at
+                SELECT v.id, v.entry_id, v.dim, v.nonce, v.ciphertext, v.alg, v.dtype, m.created_at
                 FROM vectors v
                 JOIN entries m ON v.entry_id = m.id AND m.user_id = ?
                 WHERE m.id < ?
@@ -125,8 +134,10 @@ class VectorsRepository(BaseRepository):
         user_id: str,
         entry_id: str,
         vector_id: str,
+        dtype: str,
     ) -> tuple[int, bytes, bytes, bytes]:
-        vec_arr = np.asarray(vec, dtype=np.float32)
+        np_dtype = np.float16 if dtype == "float16" else np.float32
+        vec_arr = np.asarray(vec, dtype=np_dtype)
         dim = int(vec_arr.shape[0])
         nonce, ct, alg = self._encrypt_vector(
             dek,
@@ -142,10 +153,12 @@ class VectorsRepository(BaseRepository):
         vectors: list[tuple[str, str, int, np.ndarray]],
         dek: bytes,
         user_id: str,
-    ) -> list[tuple[str, str, str, int, int, bytes, bytes, bytes]]:
-        records: list[tuple[str, str, str, int, int, bytes, bytes, bytes]] = []
+        dtype: str,
+    ) -> list[tuple[str, str, str, int, int, bytes, bytes, bytes, str]]:
+        records: list[tuple[str, str, str, int, int, bytes, bytes, bytes, str]] = []
+        np_dtype = np.float16 if dtype == "float16" else np.float32
         for vector_id, entry_id, chunk_index, vec in vectors:
-            vec_arr = np.asarray(vec, dtype=np.float32).ravel()
+            vec_arr = np.asarray(vec, dtype=np_dtype).ravel()
             dim = int(vec_arr.shape[0])
             nonce, ct, alg = self._encrypt_vector(
                 dek,
@@ -155,13 +168,21 @@ class VectorsRepository(BaseRepository):
                 vec_arr.tobytes(),
             )
             records.append(
-                (vector_id, entry_id, user_id, chunk_index, dim, nonce, ct, alg)
+                (vector_id, entry_id, user_id, chunk_index, dim, nonce, ct, alg, dtype)
             )
         return records
 
     def _decrypt_vector_rows(self, rows, dek: bytes, user_id: str) -> list[dict]:
         vectors: list[dict] = []
         for row in rows:
+            dtype = None
+            try:
+                if "dtype" in row.keys():
+                    dtype = row["dtype"]
+            except AttributeError:
+                dtype = row.get("dtype") if isinstance(row, dict) else None
+            dtype = (dtype or "float32").lower()
+            np_dtype = np.float16 if dtype == "float16" else np.float32
             vec_bytes = self._decrypt_vector(
                 dek,
                 user_id,
@@ -171,7 +192,9 @@ class VectorsRepository(BaseRepository):
                 row["ciphertext"],
                 row["alg"],
             )
-            vec = np.frombuffer(vec_bytes, dtype=np.float32).reshape(row["dim"])
+            vec = np.frombuffer(vec_bytes, dtype=np_dtype).reshape(row["dim"])
+            if np_dtype == np.float16:
+                vec = vec.astype(np.float32)
             vectors.append(
                 {
                     "id": row["id"],

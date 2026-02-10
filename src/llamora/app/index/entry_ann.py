@@ -237,7 +237,10 @@ class EntryIndexStore:
         self.maintenance_interval = maintenance_interval
         self.max_elements = max_elements
         self.allow_growth = bool(allow_growth)
-        chunk_cfg = getattr(settings, "EMBEDDING", {}).get("chunking", {})
+        embedding_cfg = getattr(settings, "EMBEDDING", {})
+        chunk_cfg = embedding_cfg.get("chunking", {})
+        index_cfg = embedding_cfg.get("index", {})
+        vector_cfg = embedding_cfg.get("vectors", {})
         self.chunk_max_chars = int(
             chunk_max_chars
             if chunk_max_chars is not None
@@ -248,12 +251,30 @@ class EntryIndexStore:
             if chunk_overlap_chars is not None
             else chunk_cfg.get("overlap_chars", 200)
         )
+        self.embed_batch_size = int(index_cfg.get("embed_batch_size", 128))
+        self.warm_entry_batch = int(index_cfg.get("warm_entry_batch", 200))
+        dtype = str(vector_cfg.get("dtype", "float32")).lower()
+        if dtype not in {"float32", "float16"}:
+            logger.warning("Unsupported vector dtype '%s'; defaulting to float32", dtype)
+            dtype = "float32"
+        self.vector_dtype = dtype
+        self._vector_np_dtype = np.float16 if dtype == "float16" else np.float32
         self.indexes: Dict[str, EntryIndex] = {}
         self.cursors: Dict[str, Optional[str]] = {}
         self.locks: Dict[str, asyncio.Lock] = {}
         self._next_maintenance = time.monotonic() + maintenance_interval
         self._default_dim: Optional[int] = None
         self._default_dim_lock = asyncio.Lock()
+        self._warm_tasks: Dict[str, asyncio.Task] = {}
+
+    def _to_storage_vecs(self, vecs: np.ndarray) -> np.ndarray:
+        if self._vector_np_dtype == np.float32:
+            return vecs
+        return np.asarray(vecs, dtype=self._vector_np_dtype)
+
+    def is_warming(self, user_id: str) -> bool:
+        task = self._warm_tasks.get(user_id)
+        return bool(task and not task.done())
 
     def _chunk_entry(self, text: str) -> list[str]:
         chunks = chunk_text(text, self.chunk_max_chars, self.chunk_overlap_chars)
@@ -314,21 +335,31 @@ class EntryIndexStore:
                 allow_growth=self.allow_growth,
             )
 
-        vecs = await async_embed_texts(vector_texts)
-        if idx is None:
-            dim = vecs.shape[1]
-            idx = EntryIndex(dim, self.max_elements, allow_growth=self.allow_growth)
-        idx.add_batch(vector_ids, vecs)
-        await self.db.vectors.store_vectors_batch(
-            user_id,
-            [
-                (vector_id, entry_id, chunk_index, vec)
-                for vector_id, entry_id, chunk_index, vec in zip(
-                    vector_ids, vector_entries, vector_chunks, vecs
-                )
-            ],
-            dek,
-        )
+        batch_size = max(self.embed_batch_size, 1)
+        for start in range(0, len(vector_texts), batch_size):
+            end = start + batch_size
+            batch_texts = vector_texts[start:end]
+            batch_ids = vector_ids[start:end]
+            batch_entries = vector_entries[start:end]
+            batch_chunks = vector_chunks[start:end]
+            vecs = await async_embed_texts(batch_texts)
+            if idx is None:
+                dim = vecs.shape[1]
+                idx = EntryIndex(dim, self.max_elements, allow_growth=self.allow_growth)
+            idx.add_batch(batch_ids, vecs)
+            store_vecs = self._to_storage_vecs(vecs)
+            await self.db.vectors.store_vectors_batch(
+                user_id,
+                [
+                    (vector_id, entry_id, chunk_index, vec)
+                    for vector_id, entry_id, chunk_index, vec in zip(
+                        batch_ids, batch_entries, batch_chunks, store_vecs
+                    )
+                ],
+                dek,
+                self.vector_dtype,
+            )
+            await asyncio.sleep(0)
         if entry_list:
             cursor = entry_list[-1]["id"]
             existing = self.cursors.get(user_id)
@@ -373,11 +404,11 @@ class EntryIndexStore:
                 ]
                 if missing:
                     logger.debug(
-                        "Embedding %d entries missing vectors for user %s",
+                        "Queueing %d entries missing vectors for user %s",
                         len(missing),
                         user_id,
                     )
-                    await self._embed_and_store(user_id, missing, dek, idx)
+                    self._schedule_warm(user_id, dek, missing)
                 return idx
 
             entries = await self.db.entries.get_latest_entries(
@@ -389,7 +420,12 @@ class EntryIndexStore:
                     len(entries),
                     user_id,
                 )
-                idx = await self._embed_and_store(user_id, entries, dek, None)
+                dim = await self._get_default_dim()
+                idx = EntryIndex(dim, self.max_elements, allow_growth=self.allow_growth)
+                self.indexes[user_id] = idx
+                cursor = entries[-1]["id"]
+                self.cursors[user_id] = cursor
+                self._schedule_warm(user_id, dek, entries)
                 return idx
 
             logger.debug("No existing data for user %s, creating empty index", user_id)
@@ -399,6 +435,34 @@ class EntryIndexStore:
             self.cursors[user_id] = latest
             self.indexes[user_id] = idx
             return idx
+
+    def _schedule_warm(
+        self, user_id: str, dek: bytes, entries: list[dict]
+    ) -> None:
+        existing = self._warm_tasks.get(user_id)
+        if existing and not existing.done():
+            return
+
+        async def worker() -> None:
+            try:
+                batch_size = max(self.warm_entry_batch, 1)
+                for start in range(0, len(entries), batch_size):
+                    batch = entries[start : start + batch_size]
+                    if not batch:
+                        break
+                    lock = self._get_lock(user_id)
+                    async with lock:
+                        idx = self.indexes.get(user_id)
+                        await self._embed_and_store(user_id, batch, dek, idx)
+                    await asyncio.sleep(0)
+            except Exception:
+                logger.exception("Warm-up failed for user %s", user_id)
+            finally:
+                task = self._warm_tasks.get(user_id)
+                if task is not None and task.done():
+                    self._warm_tasks.pop(user_id, None)
+
+        self._warm_tasks[user_id] = asyncio.create_task(worker())
 
     async def expand_older(self, user_id: str, dek: bytes, batch: int) -> int:
         await self.ensure_index(user_id, dek)
@@ -519,13 +583,20 @@ class EntryIndexStore:
                 [vec for _, _, _, vec, _ in user_entries], dtype=np.float32
             )
             async with lock:
+                store_vecs = self._to_storage_vecs(vec_arr)
                 await self.db.vectors.store_vectors_batch(
                     user_id,
                     [
                         (vector_id, entry_id, chunk_index, vec)
-                        for vector_id, entry_id, chunk_index, vec, _ in user_entries
+                        for vector_id, entry_id, chunk_index, vec in zip(
+                            ids,
+                            [entry_id for _, entry_id, _, _, _ in user_entries],
+                            [chunk_index for _, _, chunk_index, _, _ in user_entries],
+                            store_vecs,
+                        )
                     ],
                     dek,
+                    self.vector_dtype,
                 )
                 idx.add_batch(ids, vec_arr)
                 for entry_id in {entry_id for _, entry_id, _, _, _ in user_entries}:
