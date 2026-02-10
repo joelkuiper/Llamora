@@ -22,6 +22,7 @@ const prepareTagAutocompleteValue = (value) => `${value ?? ""}`.replace(/^#/, ""
 
 const TAG_HISTORY_MAX = 50;
 const TAG_SUMMARY_CACHE_PREFIX = "llamora:tag-summary:";
+const TAG_SUGGESTION_EMPTY_DELAY_MS = 180;
 const TAG_SUMMARY_CACHE_TTL = 1000 * 60 * 60 * 6;
 const TAG_SKELETON_COUNT = 6;
 
@@ -110,6 +111,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   #suggestionsConfigHandler;
   #suggestionsBeforeSwapHandler;
   #suggestionsSwapHandler;
+  #suggestionsSkeletonTimer = null;
   #tagActivationHandler;
   #tagKeydownHandler;
   #tagHistory;
@@ -355,7 +357,18 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     if (!this.#suggestions) return;
     if (!force && this.#suggestions.dataset.entryId === undefined) return;
     this.#ensureSkeleton();
-    this.#suggestions.innerHTML = this.#suggestionsSkeleton;
+    this.#clearSkeletonTimer();
+    if (this.#shouldUseEmptySuggestions()) {
+      this.#suggestions.innerHTML = "";
+    } else {
+      this.#suggestions.innerHTML = "";
+      this.#suggestionsSkeletonTimer = window.setTimeout(() => {
+        if (!this.#suggestions) return;
+        if (this.#shouldUseEmptySuggestions()) return;
+        if (this.#suggestions.innerHTML.trim()) return;
+        this.#suggestions.innerHTML = this.#suggestionsSkeleton;
+      }, TAG_SUGGESTION_EMPTY_DELAY_MS);
+    }
     this.#suggestions.classList.remove("htmx-swapping", "htmx-settling", "htmx-request");
     this.#suggestions.querySelectorAll(".tag-suggestion").forEach((el) => {
       el.classList.remove("htmx-added", "htmx-settling", "htmx-swapping");
@@ -364,6 +377,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     delete this.#suggestions.dataset.requestEntryId;
     if (clearEntry) {
       delete this.#suggestions.dataset.entryId;
+      this.#clearEmptySuggestionCache();
     }
   }
 
@@ -431,7 +445,9 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
         this.classList.add("popover-open");
         if (this.#suggestions) {
           this.#resetSuggestions({ force: true });
-          htmx.trigger(this.#suggestions, "tag-popover:show");
+          if (!this.#shouldUseEmptySuggestions()) {
+            htmx.trigger(this.#suggestions, "tag-popover:show");
+          }
         }
         if (this.#input && typeof this.#input.focus === "function") {
           try {
@@ -617,34 +633,68 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
             }
           });
         }
-        if (canonicalValue) {
-          this.#tagHistory.add(canonicalValue);
-          this.setAutocompleteLocalEntries("history", this.#tagHistory.values());
-          this.applyAutocompleteCandidates();
-        }
+      if (canonicalValue) {
+        this.#tagHistory.add(canonicalValue);
+        this.setAutocompleteLocalEntries("history", this.#tagHistory.values());
+        this.applyAutocompleteCandidates();
       }
-      this.#updateSubmitState();
-      this.#invalidateAutocompleteCache({ immediate: true });
-    } else if (target.classList?.contains("tag-tombstone")) {
-      target.remove();
-      this.#updateSubmitState();
-      this.#invalidateAutocompleteCache({ immediate: true });
+      this.#clearEmptySuggestionCache();
     }
+    this.#updateSubmitState();
+    this.#invalidateAutocompleteCache({ immediate: true });
+  } else if (target.classList?.contains("tag-tombstone")) {
+    target.remove();
+    this.#updateSubmitState();
+    this.#invalidateAutocompleteCache({ immediate: true });
+    this.#clearEmptySuggestionCache();
   }
+}
 
   #handleSuggestionsSwap() {
     if (!this.#isActiveOwner()) {
       return;
     }
     if (!this.#suggestions) return;
+    this.#clearSkeletonTimer();
     delete this.#suggestions.dataset.requestEntryId;
     if (this.#suggestions.innerHTML.trim()) {
       this.#suggestions.dataset.loaded = "1";
+      this.#clearEmptySuggestionCache();
     } else {
       delete this.#suggestions.dataset.loaded;
+      this.#setEmptySuggestionCache();
+      this.#suggestions.innerHTML = "";
     }
     this.#popover?.update();
     this.#updateAutocompleteCandidates();
+  }
+
+  #shouldUseEmptySuggestions() {
+    if (!this.#suggestions) return false;
+    const entryId = this.dataset?.entryId ?? "";
+    const cachedEntry = this.#suggestions.dataset.emptyEntryId ?? "";
+    return this.#suggestions.dataset.empty === "1" && entryId && entryId === cachedEntry;
+  }
+
+  #setEmptySuggestionCache() {
+    if (!this.#suggestions) return;
+    const entryId = this.dataset?.entryId ?? "";
+    if (!entryId) return;
+    this.#suggestions.dataset.empty = "1";
+    this.#suggestions.dataset.emptyEntryId = entryId;
+  }
+
+  #clearEmptySuggestionCache() {
+    if (!this.#suggestions) return;
+    delete this.#suggestions.dataset.empty;
+    delete this.#suggestions.dataset.emptyEntryId;
+  }
+
+  #clearSkeletonTimer() {
+    if (this.#suggestionsSkeletonTimer) {
+      clearTimeout(this.#suggestionsSkeletonTimer);
+      this.#suggestionsSkeletonTimer = null;
+    }
   }
 
   #handleSuggestionsConfig(event) {

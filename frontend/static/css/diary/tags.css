@@ -352,6 +352,7 @@
     transform: translateY(0);
   }
 
+
   /* Gentle cross-fade during HTMX swap */
   .tag-suggestions.htmx-swapping {
     max-height: 12rem;
