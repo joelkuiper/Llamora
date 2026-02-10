@@ -1047,15 +1047,14 @@ async def generate_dataset(config: DemoConfig) -> None:
                 **base_headers,
                 "X-Client-Today": day.isoformat(),
             }
-            if random.random() < config.empty_day_rate:
-                log_item("empty day")
-                continue
             event_note = None
             followup_note = None
             events_today = narrative_events.get(day) or []
+            has_primary_event = False
             if events_today:
                 event = events_today[0]
                 if event.date == day:
+                    has_primary_event = True
                     detail = event.details[0] if event.details else event.summary
                     if random.random() < config.story_intensity:
                         event_note = (
@@ -1074,8 +1073,14 @@ async def generate_dataset(config: DemoConfig) -> None:
                         f"{event.emoji} {event.summary or event.title} ({event.tone})"
                     )
                     log_item(f"followup: {followup_note}")
+            if random.random() < config.empty_day_rate and not has_primary_event:
+                log_item("empty day")
+                continue
+
             open_day = True
             open_only = random.random() < config.open_only_rate
+            if has_primary_event:
+                open_only = False
 
             if open_day:
                 log_item("opening: yes")
@@ -1096,6 +1101,8 @@ async def generate_dataset(config: DemoConfig) -> None:
                 continue
 
             entries_today = random.randint(config.min_entries, config.max_entries)
+            if has_primary_event and entries_today == 0:
+                entries_today = 1
             if entries_today == 0:
                 log_item("entries: 0")
                 continue
