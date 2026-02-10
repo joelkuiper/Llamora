@@ -18,6 +18,7 @@ import orjson
 import typer
 from bs4 import BeautifulSoup
 from openai import AsyncOpenAI
+from tabulate import tabulate
 
 from llamora.settings import settings
 from demo_data_utils import (
@@ -51,8 +52,8 @@ class DemoConfig:
     end_date: date
     min_entries: int
     max_entries: int
-    open_day_rate: float
-    open_only_rate: float
+    day_open_only_rate: float
+    day_empty_rate: float
     response_rate: float
     max_tags: int
     tz: str
@@ -68,7 +69,6 @@ class DemoConfig:
     entry_context_size: int
     entry_context_chars: int
     entry_temperature: float | None
-    empty_day_rate: float
     story_events: int
     story_followup_rate: float
     story_intensity: float
@@ -79,8 +79,8 @@ DEFAULTS: dict[str, Any] = {
     "base_url": "http://127.0.0.1:5000",
     "min_entries": 0,
     "max_entries": 3,
-    "open_day_rate": 0.6,
-    "open_only_rate": 0.15,
+    "day_open_only_rate": 0.15,
+    "day_empty_rate": 0.1,
     "response_rate": 0.6,
     "max_tags": 4,
     "timezone": "UTC",
@@ -97,7 +97,6 @@ DEFAULTS: dict[str, Any] = {
     "entry_context_size": 4,
     "entry_context_chars": 2048,
     "entry_temperature": None,
-    "empty_day_rate": 0.1,
     "multi_response_rate": 0.2,
     "max_responses_per_entry": 2,
     "story_events": 6,
@@ -128,6 +127,15 @@ def _build_demo_config(
     start_date = parse_date(require_value(merged.get("start_date"), "start_date"))
     end_date = parse_date(require_value(merged.get("end_date"), "end_date"))
 
+    day_open_only_rate = coerce_float(
+        merged.get("day_open_only_rate", merged.get("open_only_rate")),
+        DEFAULTS["day_open_only_rate"],
+    )
+    day_empty_rate = coerce_float(
+        merged.get("day_empty_rate", merged.get("empty_day_rate")),
+        DEFAULTS["day_empty_rate"],
+    )
+
     return DemoConfig(
         base_url=coerce_str(merged.get("base_url"), DEFAULTS["base_url"]) or DEFAULTS["base_url"],
         username=require_value(merged.get("username"), "username"),
@@ -136,8 +144,8 @@ def _build_demo_config(
         end_date=end_date,
         min_entries=coerce_int(merged.get("min_entries"), DEFAULTS["min_entries"]),
         max_entries=coerce_int(merged.get("max_entries"), DEFAULTS["max_entries"]),
-        open_day_rate=coerce_float(merged.get("open_day_rate"), DEFAULTS["open_day_rate"]),
-        open_only_rate=coerce_float(merged.get("open_only_rate"), DEFAULTS["open_only_rate"]),
+        day_open_only_rate=day_open_only_rate,
+        day_empty_rate=day_empty_rate,
         response_rate=coerce_float(merged.get("response_rate"), DEFAULTS["response_rate"]),
         max_tags=coerce_int(merged.get("max_tags"), DEFAULTS["max_tags"]),
         tz=coerce_str(merged.get("timezone"), DEFAULTS["timezone"]) or DEFAULTS["timezone"],
@@ -165,7 +173,6 @@ def _build_demo_config(
             if merged.get("entry_temperature") is None
             else coerce_float(merged.get("entry_temperature"), 0.0)
         ),
-        empty_day_rate=coerce_float(merged.get("empty_day_rate"), DEFAULTS["empty_day_rate"]),
         story_events=coerce_int(merged.get("story_events"), DEFAULTS["story_events"]),
         story_followup_rate=coerce_float(
             merged.get("story_followup_rate"), DEFAULTS["story_followup_rate"]
@@ -307,8 +314,11 @@ class NarrativeEvent:
     date: date
     title: str
     summary: str
-    details: list[str]
-    tone: str
+    what: str
+    where: str
+    who: str
+    obj: str
+    keywords: list[str]
     emoji: str
     followup_days: list[int]
 
@@ -318,6 +328,50 @@ def _parse_event_date(raw: str) -> date | None:
         return date.fromisoformat(raw)
     except Exception:
         return None
+
+
+def _build_keywords_from_slots(
+    what: str,
+    where: str,
+    who: str,
+    obj: str,
+    max_items: int = 6,
+) -> list[str]:
+    seen: set[str] = set()
+    results: list[str] = []
+    base = [
+        what.strip(),
+        where.strip(),
+        who.strip(),
+        obj.strip(),
+    ]
+    combos = [
+        (what, where, " at "),
+        (what, who, " with "),
+    ]
+    for phrase in base:
+        phrase_text = phrase.strip().lower()
+        if not phrase_text:
+            continue
+        if phrase_text in seen:
+            continue
+        seen.add(phrase_text)
+        results.append(phrase_text)
+        if len(results) >= max_items:
+            return results
+    for left, right, joiner in combos:
+        left_text = left.strip()
+        right_text = right.strip()
+        if not left_text or not right_text:
+            continue
+        phrase_text = f"{left_text}{joiner}{right_text}".lower()
+        if phrase_text in seen:
+            continue
+        seen.add(phrase_text)
+        results.append(phrase_text)
+        if len(results) >= max_items:
+            return results
+    return results
 
 
 async def _generate_narrative_timeline(
@@ -337,10 +391,13 @@ async def _generate_narrative_timeline(
         "Create a realistic life timeline for one person writing a diary. "
         "Return strict JSON array only, no extra text. Each item must include: "
         "date (YYYY-MM-DD), title, summary (2 sentences describing a concrete event), "
-        "details (2-4 short factual fragments that include who/where/what when possible), "
-        "emotional_tone, emoji (single emoji, e.g. 😃), "
-        "followup_days (optional list of integers like 1,2,3). "
+        "what (short noun phrase), where (short noun phrase), who (role or person), "
+        "object (thing or focus), emoji (single emoji, e.g. 😃), "
+        "followup_days (list of integers like 1,2,3; include 1-3 for most events). "
         "Events must be specific things that happened (not categories). "
+        "Vary the kinds of events (work, home, social, health, learning, travel, chores, small wins). "
+        "Avoid repeating the same verbs or settings. Include small quirks or concrete sensory details. "
+        "For what/where/who/object: avoid articles/pronouns, keep each 2-4 words if possible. "
         "Keep events plausible and varied. "
         "Use the provided dates exactly and keep the order."
     )
@@ -370,8 +427,10 @@ async def _generate_narrative_timeline(
                         "date": {"type": "string"},
                         "title": {"type": "string"},
                         "summary": {"type": "string"},
-                        "details": {"type": "array", "items": {"type": "string"}},
-                        "emotional_tone": {"type": "string"},
+                        "what": {"type": "string"},
+                        "where": {"type": "string"},
+                        "who": {"type": "string"},
+                        "object": {"type": "string"},
                         "emoji": {"type": "string"},
                         "followup_days": {
                             "type": "array",
@@ -382,8 +441,10 @@ async def _generate_narrative_timeline(
                         "date",
                         "title",
                         "summary",
-                        "details",
-                        "emotional_tone",
+                        "what",
+                        "where",
+                        "who",
+                        "object",
                         "emoji",
                     ],
                     "additionalProperties": False,
@@ -448,15 +509,21 @@ async def _generate_narrative_timeline(
             continue
         title = str(item.get("title") or "").strip()
         summary = str(item.get("summary") or "").strip()
-        tone = str(item.get("emotional_tone") or "").strip()
+        what = str(item.get("what") or "").strip()
+        where = str(item.get("where") or "").strip()
+        who = str(item.get("who") or "").strip()
+        obj = str(item.get("object") or "").strip()
         emoji = str(item.get("emoji") or "").strip()
-        details_raw = item.get("details") or []
-        details: list[str] = []
-        if isinstance(details_raw, list):
-            for detail in details_raw:
-                detail_text = str(detail or "").strip()
-                if detail_text:
-                    details.append(detail_text)
+        keywords = _build_keywords_from_slots(what, where, who, obj)
+        if not keywords:
+            legacy = item.get("keywords") or item.get("details") or []
+            legacy_keywords: list[str] = []
+            if isinstance(legacy, list):
+                for keyword in legacy:
+                    keyword_text = str(keyword or "").strip()
+                    if keyword_text:
+                        legacy_keywords.append(keyword_text)
+            keywords = legacy_keywords[:6]
         followups_raw = item.get("followup_days") or []
         followups: list[int] = []
         if isinstance(followups_raw, list):
@@ -465,20 +532,29 @@ async def _generate_narrative_timeline(
                     followups.append(int(val))
                 except Exception:
                     continue
-        if not followups and random.random() < config.story_followup_rate:
-            followups = random.sample([1, 2, 3], k=1)
+        followup_set = set(followups)
+        if not followup_set and random.random() < config.story_followup_rate:
+            followup_set.add(random.choice([1, 2, 3]))
+        if followup_set and random.random() < config.story_followup_rate:
+            extra_count = random.choice([1, 2])
+            for _ in range(extra_count):
+                followup_set.add(random.choice([1, 2, 3, 5, 7]))
+        followups = sorted(followup_set)
         if not title and summary:
             title = summary[:40]
-        if not summary and details:
-            summary = details[0]
+        if not summary and keywords:
+            summary = keywords[0]
         if not emoji:
             emoji = "✨"
         event = NarrativeEvent(
             date=event_date,
             title=title,
             summary=summary,
-            details=details,
-            tone=tone,
+            what=what,
+            where=where,
+            who=who,
+            obj=obj,
+            keywords=keywords,
             emoji=emoji,
             followup_days=followups,
         )
@@ -886,6 +962,7 @@ async def _select_tags_with_llm(
     entry_text: str,
     suggestions: list[str],
     max_tags: int,
+    event_keywords: list[str] | None = None,
 ) -> list[str]:
     if not suggestions or max_tags <= 0:
         return []
@@ -912,15 +989,21 @@ async def _select_tags_with_llm(
         },
     }
     tag_lines = "\n".join(f"- {tag}" for tag in suggestions)
+    keyword_lines = ""
+    if event_keywords:
+        keyword_lines = "\n".join(f"- {keyword}" for keyword in event_keywords if keyword)
     user_message = (
         "Pick the most relevant tags for the entry from the suggestions list. "
         "Return a JSON array only (no markdown, no code fences). Choose up to "
         f"{max_tags} tags. If none fit, return an empty list.\n\n"
+        "If event keywords are provided, prefer them when they clearly match the entry.\n\n"
         "Entry:\n"
         f"{entry_text}\n\n"
         "Suggestions:\n"
         f"{tag_lines}"
     )
+    if keyword_lines:
+        user_message += f"\n\nEvent keywords:\n{keyword_lines}"
     response = await llm.chat.completions.create(
         model=model,
         messages=[
@@ -966,6 +1049,7 @@ async def _apply_tags(
     entry_text: str,
     max_tags: int,
     headers: dict[str, str],
+    extra_suggestions: list[str] | None = None,
 ) -> None:
     try:
         resp = await _get(client, f"/t/suggestions/{entry_id}", headers=headers)
@@ -978,12 +1062,22 @@ async def _apply_tags(
         )
         return
     suggestions = _select_tag_suggestions(resp.text)
+    if extra_suggestions:
+        for keyword in extra_suggestions:
+            value = str(keyword or "").strip()
+            if value and value not in suggestions:
+                suggestions.append(value)
     if not suggestions:
         logger.debug("No tag suggestions for %s", entry_id)
         return
 
     selected = await _select_tags_with_llm(
-        llm, config, entry_text, suggestions, max_tags
+        llm,
+        config,
+        entry_text,
+        suggestions,
+        max_tags,
+        event_keywords=extra_suggestions,
     )
     if not selected:
         return
@@ -1015,22 +1109,32 @@ async def generate_dataset(config: DemoConfig) -> None:
     if narrative_events:
         logger.info("-" * 72)
         log_header("Narrative scaffold")
+        primary_events: list[NarrativeEvent] = []
         for day in sorted(narrative_events.keys()):
             for event in narrative_events[day]:
-                when = day.isoformat()
-                title = event.title or event.summary or "event"
                 if event.date == day:
-                    label = "event"
-                else:
-                    offset_days = (day - event.date).days
-                    label = f"followup +{max(offset_days, 0)}d"
-                log_item(f"{when} [{label}]: {event.emoji} {title}")
-                if event.summary:
-                    log_wrapped("     summary: ", event.summary)
-                if event.details:
-                    log_wrapped("     details: ", "; ".join(event.details))
-                if event.tone:
-                    log_wrapped("     tone: ", event.tone)
+                    primary_events.append(event)
+
+        rows: list[list[str]] = []
+        for event in primary_events:
+            followups = ",".join(f"+{d}d" for d in event.followup_days) or "-"
+            rows.append(
+                [
+                    event.date.isoformat(),
+                    event.emoji,
+                    event.title or event.summary or "event",
+                    event.summary,
+                    ", ".join(event.keywords),
+                    followups,
+                ]
+            )
+        headers = ["date", "emoji", "title", "summary", "keywords", "followups"]
+        try:
+            table = tabulate(rows, headers=headers, tablefmt="rounded_outline")
+        except Exception:
+            table = tabulate(rows, headers=headers, tablefmt="fancy_grid")
+        for line in table.splitlines():
+            logger.info(line)
         logger.info("-" * 72)
 
     async with httpx.AsyncClient(
@@ -1062,33 +1166,35 @@ async def generate_dataset(config: DemoConfig) -> None:
             has_primary_event = False
             if events_today:
                 event = events_today[0]
+                keywords_hint = ", ".join(event.keywords)
+                keywords_clause = f" keywords: {keywords_hint}." if keywords_hint else ""
                 if event.date == day:
                     has_primary_event = True
-                    detail = event.details[0] if event.details else event.summary
+                    detail = event.keywords[0] if event.keywords else event.summary
                     if random.random() < config.story_intensity:
                         event_note = (
                             f"{event.emoji} {event.summary or event.title}. "
-                            f"{detail}. tone: {event.tone}."
+                            f"{detail}.{keywords_clause}"
                         )
                     else:
                         event_note = (
-                            f"{event.emoji} {event.summary or event.title} ({event.tone})."
+                            f"{event.emoji} {event.summary or event.title}."
+                            f"{keywords_clause}"
                         )
                     log_item(f"event: {event.emoji} {event.title or event.summary}")
                     if event_note:
                         log_wrapped("     note: ", event_note)
                 else:
-                    followup_note = (
-                        f"{event.emoji} {event.summary or event.title} ({event.tone})"
-                    )
+                    followup_note = f"{event.emoji} {event.summary or event.title}.{keywords_clause}"
                     log_item(f"followup: {followup_note}")
-            if random.random() < config.empty_day_rate and not has_primary_event:
+            has_event_context = bool(events_today)
+            if random.random() < config.day_empty_rate and not has_event_context:
                 log_item("empty day")
                 continue
 
             open_day = True
-            open_only = random.random() < config.open_only_rate
-            if has_primary_event:
+            open_only = random.random() < config.day_open_only_rate
+            if has_event_context:
                 open_only = False
 
             if open_day:
@@ -1110,7 +1216,7 @@ async def generate_dataset(config: DemoConfig) -> None:
                 continue
 
             entries_today = random.randint(config.min_entries, config.max_entries)
-            if has_primary_event and entries_today == 0:
+            if has_event_context and entries_today == 0:
                 entries_today = 1
             if entries_today == 0:
                 log_item("entries: 0")
@@ -1175,7 +1281,19 @@ async def generate_dataset(config: DemoConfig) -> None:
                             response_kind,
                         )
 
-                await _apply_tags(llm, config, client, entry_id, text, config.max_tags, headers)
+                extra_keywords = None
+                if events_today:
+                    extra_keywords = event.keywords
+                await _apply_tags(
+                    llm,
+                    config,
+                    client,
+                    entry_id,
+                    text,
+                    config.max_tags,
+                    headers,
+                    extra_suggestions=extra_keywords,
+                )
 
         logger.info("Done. Created %d entries.", total_entries)
 
@@ -1212,7 +1330,10 @@ def run_cmd(
     end_date: str | None = typer.Option(None, help="End date (YYYY-MM-DD)."),
     min_entries: int | None = typer.Option(None, help="Minimum entries per day."),
     max_entries: int | None = typer.Option(None, help="Maximum entries per day."),
-    open_only_rate: float | None = typer.Option(None, help="Chance of opening only."),
+    day_open_only_rate: float | None = typer.Option(
+        None,
+        help="Chance of opening-only on non-empty days (ignored for event days).",
+    ),
     response_rate: float | None = typer.Option(None, help="Chance of responses."),
     max_tags: int | None = typer.Option(None, help="Max tags per entry."),
     timezone: str | None = typer.Option(None, help="IANA timezone (e.g. Europe/Amsterdam)."),
@@ -1226,7 +1347,10 @@ def run_cmd(
     min_entry_chars: int | None = typer.Option(None, help="Minimum entry length."),
     max_entry_chars: int | None = typer.Option(None, help="Maximum entry length."),
     entry_retries: int | None = typer.Option(None, help="Retries for short entries."),
-    empty_day_rate: float | None = typer.Option(None, help="Chance of empty day."),
+    day_empty_rate: float | None = typer.Option(
+        None,
+        help="Chance of no opening and no entries (ignored for event days).",
+    ),
     story_events: int | None = typer.Option(None, help="Narrative event count."),
     story_followup_rate: float | None = typer.Option(None, help="Chance of follow-up days."),
     story_intensity: float | None = typer.Option(None, help="Event injection strength."),
@@ -1245,7 +1369,7 @@ def run_cmd(
         "end_date": end_date,
         "min_entries": min_entries,
         "max_entries": max_entries,
-        "open_only_rate": open_only_rate,
+        "day_open_only_rate": day_open_only_rate,
         "response_rate": response_rate,
         "max_tags": max_tags,
         "timezone": timezone,
@@ -1259,7 +1383,7 @@ def run_cmd(
         "min_entry_chars": min_entry_chars,
         "max_entry_chars": max_entry_chars,
         "entry_retries": entry_retries,
-        "empty_day_rate": empty_day_rate,
+        "day_empty_rate": day_empty_rate,
         "story_events": story_events,
         "story_followup_rate": story_followup_rate,
         "story_intensity": story_intensity,

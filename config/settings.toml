@@ -103,7 +103,7 @@ gpu = "auto"
 ctx_size = 8192
 
 [default.LLM.generation]
-n_predict       = 1024
+n_predict       = 2084
 stream          = true
 stop            = ["<|im_start|>", "<|im_end|>", "<|endoftext|>", "<|end|>"]
 n_keep          = -1
