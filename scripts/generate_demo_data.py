@@ -14,6 +14,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from typing import Iterable
 
 import httpx
+import orjson
 from bs4 import BeautifulSoup
 from openai import AsyncOpenAI
 
@@ -669,9 +670,90 @@ async def _trigger_response(
         )
 
 
+async def _select_tags_with_llm(
+    llm: AsyncOpenAI,
+    config: DemoConfig,
+    entry_text: str,
+    suggestions: list[str],
+    max_tags: int,
+) -> list[str]:
+    if not suggestions or max_tags <= 0:
+        return []
+    # Bias toward fewer tags to keep outputs realistic.
+    if random.random() < 0.25:
+        return []
+    if random.random() < 0.35:
+        max_tags = min(1, max_tags)
+    elif random.random() < 0.35:
+        max_tags = min(2, max_tags)
+    model = settings.get("LLM.chat.model") or "local"
+    params = dict(settings.get("LLM.chat.parameters") or {})
+    params["temperature"] = min(0.4, max(0.1, float(params.get("temperature", 0.2))))
+    params["response_format"] = {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "tag_choice",
+            "strict": True,
+            "schema": {
+                "type": "array",
+                "items": {"type": "string"},
+                "maxItems": max_tags,
+            },
+        },
+    }
+    tag_lines = "\n".join(f"- {tag}" for tag in suggestions)
+    user_message = (
+        "Pick the most relevant tags for the entry from the suggestions list. "
+        "Return a JSON array only (no markdown, no code fences). Choose up to "
+        f"{max_tags} tags. If none fit, return an empty list.\n\n"
+        "Entry:\n"
+        f"{entry_text}\n\n"
+        "Suggestions:\n"
+        f"{tag_lines}"
+    )
+    response = await llm.chat.completions.create(
+        model=model,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You select tags for diary entries. "
+                    "Output a raw JSON array only. No markdown or code fences."
+                ),
+            },
+            {"role": "user", "content": user_message},
+        ],
+        max_tokens=200,
+        **params,
+    )
+    raw = (response.choices[0].message.content or "").strip()
+    try:
+        parsed = orjson.loads(raw)
+    except Exception:
+        logger.info("Tag selection raw (truncated): %s", raw[:1200])
+        logger.warning("Failed to parse tag selection JSON; skipping tags")
+        return []
+    tags = parsed if isinstance(parsed, list) else None
+    if not isinstance(tags, list):
+        return []
+    allowed = {tag.strip() for tag in suggestions}
+    selected: list[str] = []
+    for tag in tags:
+        value = str(tag or "").strip()
+        if not value or value not in allowed or value in selected:
+            continue
+        selected.append(value)
+        if len(selected) >= max_tags:
+            break
+    return selected
+
+
 async def _apply_tags(
+    llm: AsyncOpenAI,
+    config: DemoConfig,
     client: httpx.AsyncClient,
     entry_id: str,
+    entry_text: str,
     max_tags: int,
     headers: dict[str, str],
 ) -> None:
@@ -682,11 +764,11 @@ async def _apply_tags(
         logger.debug("No tag suggestions for %s", entry_id)
         return
 
-    count = random.randint(0, min(max_tags, len(suggestions)))
-    if count == 0:
+    selected = await _select_tags_with_llm(
+        llm, config, entry_text, suggestions, max_tags
+    )
+    if not selected:
         return
-
-    selected = random.sample(suggestions, count)
     if selected:
         logger.info("    tags: %s", ", ".join(selected))
     for tag in selected:
@@ -823,7 +905,7 @@ async def generate_dataset(config: DemoConfig) -> None:
                             response_kind,
                         )
 
-                await _apply_tags(client, entry_id, config.max_tags, headers)
+                await _apply_tags(llm, config, client, entry_id, text, config.max_tags, headers)
 
         logger.info("Done. Created %d entries.", total_entries)
 
