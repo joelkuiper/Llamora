@@ -12,10 +12,6 @@ CREATE TABLE IF NOT EXISTS vectors_new (
     FOREIGN KEY (entry_id) REFERENCES entries(id) ON DELETE CASCADE
 );
 
-INSERT INTO vectors_new (id, entry_id, user_id, chunk_index, dim, nonce, ciphertext, alg, created_at)
-SELECT id, id, user_id, 0, dim, nonce, ciphertext, alg, created_at
-FROM vectors;
-
 DROP TABLE vectors;
 
 ALTER TABLE vectors_new RENAME TO vectors;
