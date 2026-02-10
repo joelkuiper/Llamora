@@ -228,6 +228,7 @@ async def tag_detail_summary(tag_hash: str):
         overview.count,
         overview.last_used,
         overview.entries,
+        cache_key=f"{user['id']}:{tag_hash}",
     )
     html = await render_template(
         "partials/tag_detail_summary.html",
