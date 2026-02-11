@@ -615,10 +615,11 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
 
   getAutocompleteControllerOptions() {
     return {
-      minLength: 1,
+      minLength: 2,
       emitInputEvent: false,
       prepareQuery: normalizeSearchValue,
       prepareCandidate: normalizeSearchValue,
+      prefixOnly: true,
     };
   }
 

@@ -6,6 +6,7 @@ const DEFAULT_OPTIONS = {
   prepareQuery: null,
   prepareCandidate: null,
   onCommit: null,
+  prefixOnly: false,
 };
 
 function isInlineWrapper(node) {
@@ -378,6 +379,7 @@ export class InlineAutocompleteController {
     }
 
     let bestMatch = null;
+    const prefixOnly = !!this.#options.prefixOnly;
 
     for (const candidate of this.#candidates) {
       if (candidate.value.length <= rawValue.length) {
@@ -392,6 +394,9 @@ export class InlineAutocompleteController {
         }
 
         const tokenIndex = haystack.indexOf(token);
+        if (prefixOnly && tokenIndex !== 0) {
+          continue;
+        }
         const comparableIndex = tokenIndex >= 0 ? tokenIndex : Infinity;
         const bestTokenLength = bestMatch?.token?.length ?? Infinity;
         const bestComparableIndex =

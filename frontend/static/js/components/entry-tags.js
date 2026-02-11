@@ -717,8 +717,10 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
 
   getAutocompleteControllerOptions() {
     return {
+      minLength: 2,
       prepareQuery: prepareTagAutocompleteValue,
       prepareCandidate: prepareTagAutocompleteValue,
+      prefixOnly: true,
     };
   }
 
