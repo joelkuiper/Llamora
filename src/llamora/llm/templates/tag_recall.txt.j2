@@ -1,5 +1,6 @@
 {% if snippets %}
 Recall notes for this reply. Use these as background to guide the response; weave in relevant details without quoting or mentioning tags.
+These notes describe the user's past entries. Do not present them as your own experiences; address the user as "you".
 {%- if tag_labels %} Tags: {{ tag_labels | join(', ') }}.{% endif %}
 {%- for snippet in snippets %}
 - {{ snippet.tag }}: {{ snippet.text }}
