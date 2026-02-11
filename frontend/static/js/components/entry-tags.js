@@ -1139,7 +1139,9 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     }
     if (this.#detailBody) {
       formatTimeElements(this.#detailBody);
-      this.#hydrateSummaryFromCache();
+      if (target === this.#detailBody) {
+        this.#hydrateSummaryFromCache();
+      }
       const entriesList = this.#detailBody.querySelector(".tag-detail__entries");
       if (entriesList && this.#detailBody.dataset.resetScroll === "1") {
         entriesList.scrollTop = 0;
