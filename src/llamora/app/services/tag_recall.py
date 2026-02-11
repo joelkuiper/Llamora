@@ -31,9 +31,15 @@ class TagRecallConfig:
     """Runtime configuration for tag-based recall."""
 
     summary_max_chars: int
+    summary_input_max_chars: int
     history_scope: int
     max_tags: int
     max_snippets: int
+    snippet_max_chars: int
+    mode: str
+    llm_max_tokens: int
+    summary_parallel: int
+    background_summarize: bool
     summary_cache_max: int
 
 
@@ -51,6 +57,14 @@ def get_tag_recall_config() -> TagRecallConfig:
             settings.get("TAG_RECALL.summary_max_chars", 640),
             minimum=0,
             default=640,
+        ),
+    )
+    summary_input_max_chars = cast(
+        int,
+        coerce_int(
+            settings.get("TAG_RECALL.summary_input_max_chars", 360),
+            minimum=0,
+            default=360,
         ),
     )
     history_scope = cast(
@@ -77,6 +91,36 @@ def get_tag_recall_config() -> TagRecallConfig:
             default=5,
         ),
     )
+    snippet_max_chars = cast(
+        int,
+        coerce_int(
+            settings.get("TAG_RECALL.snippet_max_chars", 160),
+            minimum=0,
+            default=160,
+        ),
+    )
+    mode = str(settings.get("TAG_RECALL.mode", "hybrid") or "hybrid").strip().lower()
+    if mode not in {"summary", "extractive", "hybrid"}:
+        mode = "hybrid"
+    llm_max_tokens = cast(
+        int,
+        coerce_int(
+            settings.get("TAG_RECALL.llm_max_tokens", 256),
+            minimum=0,
+            default=256,
+        ),
+    )
+    summary_parallel = cast(
+        int,
+        coerce_int(
+            settings.get("TAG_RECALL.summary_parallel", 2),
+            minimum=1,
+            default=2,
+        ),
+    )
+    background_summarize = bool(
+        settings.get("TAG_RECALL.background_summarize", False)
+    )
     summary_cache_max = cast(
         int,
         coerce_int(
@@ -88,9 +132,15 @@ def get_tag_recall_config() -> TagRecallConfig:
 
     return TagRecallConfig(
         summary_max_chars=summary_max_chars,
+        summary_input_max_chars=summary_input_max_chars,
         history_scope=history_scope,
         max_tags=max_tags,
         max_snippets=max_snippets,
+        snippet_max_chars=snippet_max_chars,
+        mode=mode,
+        llm_max_tokens=llm_max_tokens,
+        summary_parallel=summary_parallel,
+        background_summarize=background_summarize,
         summary_cache_max=summary_cache_max,
     )
 
@@ -275,6 +325,7 @@ async def _summarize_with_llm(
     max_chars: int,
     user_id: str,
     tag_hash_hex: str,
+    max_tokens: int,
     cache_limit: int,
 ) -> str:
     clean = (text or "").strip()
@@ -293,9 +344,10 @@ async def _summarize_with_llm(
         {"role": "user", "content": user_prompt},
     ]
 
+    n_predict = max_tokens if max_tokens > 0 else 256
     params = {
         "temperature": 0.2,
-        "n_predict": 512,
+        "n_predict": n_predict,
         "response_format": _summary_response_format(),
     }
 
@@ -434,6 +486,26 @@ def _extract_date(created_at: str | None) -> str | None:
         return created_at[:10]
 
 
+def _build_extractive_snippet(
+    *,
+    tag_label: str,
+    items: list[tuple[str, str, str]],
+    max_chars: int,
+) -> str:
+    if not items:
+        return ""
+    pieces: list[str] = []
+    for when, role, text in items:
+        cleaned = _truncate_text(text, max_chars)
+        if not cleaned:
+            continue
+        pieces.append(f"{when}: {cleaned}")
+    if not pieces:
+        return ""
+    joined = " · ".join(pieces)
+    return f"{tag_label}: {joined}".strip()
+
+
 async def build_tag_recall_context(
     db,
     user_id: str,
@@ -460,9 +532,12 @@ async def build_tag_recall_context(
     if (
         cfg.max_tags <= 0
         or cfg.max_snippets <= 0
-        or cfg.summary_max_chars <= 0
-        or llm is None
+        or (cfg.mode == "summary" and cfg.summary_max_chars <= 0)
     ):
+        return None
+    if cfg.mode == "extractive" and cfg.snippet_max_chars <= 0:
+        return None
+    if cfg.summary_input_max_chars < 0:
         return None
 
     if target_entry_id:
@@ -540,6 +615,10 @@ async def build_tag_recall_context(
             text = str(entry.get("text") or "").strip()
             if not text:
                 continue
+            if cfg.summary_input_max_chars > 0:
+                text = _truncate_text(text, cfg.summary_input_max_chars)
+                if not text:
+                    continue
             when = _extract_date(created_at) or "Previous day"
             role = str(entry.get("role") or "assistant").strip().title()
             tag_items.append((when, role, text))
@@ -547,27 +626,70 @@ async def build_tag_recall_context(
         if not tag_items:
             return None
 
-        lines = [f"{when} {role}: {text}" for when, role, text in tag_items]
-        aggregate = "\n".join(lines)
-        summary = await _summarize_with_llm(
-            llm,
-            aggregate,
-            max_chars=cfg.summary_max_chars,
-            user_id=user_id,
-            tag_hash_hex=tag_hash,
-            cache_limit=cfg.summary_cache_max,
-        )
-        if not summary:
-            return None
         tag_label = tag_names.get(tag_digest, "") or tag_hash[:8]
-        return f"{tag_label}: {summary}"
+        summary_items = [
+            item for item in tag_items if item[1].lower() == "user"
+        ] or tag_items
+        lines = [f"{when} {role}: {text}" for when, role, text in summary_items]
+        aggregate = "\n".join(lines)
+
+        cache_key = _build_summary_cache_key(
+            user_id, tag_hash, aggregate, cfg.summary_max_chars
+        )
+        cached = TAG_RECALL_SUMMARY_CACHE.get(cache_key)
+
+        if cfg.mode == "summary":
+            if llm is None:
+                return None
+            summary = await _summarize_with_llm(
+                llm,
+                aggregate,
+                max_chars=cfg.summary_max_chars,
+                user_id=user_id,
+                tag_hash_hex=tag_hash,
+                max_tokens=cfg.llm_max_tokens,
+                cache_limit=cfg.summary_cache_max,
+            )
+            if not summary:
+                return None
+            return f"{tag_label}: {summary}"
+
+        if cfg.mode == "hybrid" and cached:
+            return f"{tag_label}: {cached}"
+
+        extractive_items = [
+            item for item in tag_items if item[1].lower() == "user"
+        ] or tag_items
+        snippet = _build_extractive_snippet(
+            tag_label=tag_label,
+            items=extractive_items,
+            max_chars=cfg.snippet_max_chars,
+        )
+        if not snippet:
+            return None
+
+        if cfg.mode == "hybrid" and cfg.background_summarize and llm is not None:
+            async def _background() -> None:
+                await _summarize_with_llm(
+                    llm,
+                    aggregate,
+                    max_chars=cfg.summary_max_chars,
+                    user_id=user_id,
+                    tag_hash_hex=tag_hash,
+                    max_tokens=cfg.llm_max_tokens,
+                    cache_limit=cfg.summary_cache_max,
+                )
+
+            asyncio.create_task(_background())
+
+        return snippet
 
     async def _run_tag_snippet(tag_digest: bytes, sem: asyncio.Semaphore) -> str | None:
         async with sem:
             return await _build_tag_snippet(tag_digest)
 
     focus_slice = focus_tags[: cfg.max_tags]
-    sem = asyncio.Semaphore(min(3, max(len(focus_slice), 1)))
+    sem = asyncio.Semaphore(min(cfg.summary_parallel, max(len(focus_slice), 1)))
     tasks = [_run_tag_snippet(tag_digest, sem) for tag_digest in focus_slice]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     snippets = [

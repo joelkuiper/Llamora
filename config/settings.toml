@@ -20,10 +20,16 @@ max_message_length = 12000
 max_search_query_length = 512
 
 [default.TAG_RECALL]
-summary_max_chars = 1200
-history_scope = 20
-max_tags = 6
-max_snippets = 25
+summary_max_chars = 900
+summary_input_max_chars = 600
+history_scope = 12
+max_tags = 4
+max_snippets = 8
+snippet_max_chars = 160
+mode = "hybrid"
+llm_max_tokens = 256
+summary_parallel = 1
+background_summarize = false
 summary_cache_max = 512
 
 [default.SEARCH]
