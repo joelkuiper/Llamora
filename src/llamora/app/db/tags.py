@@ -321,9 +321,10 @@ class TagsRepository(BaseRepository):
             return []
 
         normalized_prefix = (prefix or "").strip()
-        if normalized_prefix.startswith("#"):
-            normalized_prefix = normalized_prefix[1:]
-        prefix_lower = normalized_prefix.lower()
+        try:
+            prefix_lower = canonicalize(normalized_prefix).lower()
+        except ValueError:
+            prefix_lower = ""
 
         excluded: set[str] = set()
         if exclude_names:

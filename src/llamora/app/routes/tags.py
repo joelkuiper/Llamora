@@ -87,8 +87,12 @@ async def get_tag_suggestions(entry_id: str):
 
     max_tag_length = int(settings.LIMITS.max_tag_length)
     raw_query = (request.args.get("q") or "").strip()[:max_tag_length]
-    query_canonical = raw_query.lstrip("#").strip()
-    query_canonical = query_canonical[:max_tag_length].strip()
+    query_canonical = ""
+    if raw_query:
+        try:
+            query_canonical = _tags().canonicalize(raw_query)
+        except ValueError:
+            query_canonical = ""
 
     limit = request.args.get("limit")
     clamped_limit: int | None = None

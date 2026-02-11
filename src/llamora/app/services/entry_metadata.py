@@ -8,6 +8,7 @@ from typing import Any, Mapping
 import orjson
 
 from llamora.llm.prompt_templates import render_prompt_template
+from llamora.app.util.tags import canonicalize
 
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,12 @@ def _metadata_response_format() -> dict[str, Any]:
                 "type": "object",
                 "properties": {
                     "emoji": {"type": "string"},
-                    "tags": {"type": "array", "items": {"type": "string"}},
+                    "tags": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                        },
+                    },
                 },
                 "required": ["emoji", "tags"],
                 "additionalProperties": False,
@@ -82,7 +88,16 @@ def _sanitise_metadata(payload: Mapping[str, Any] | None) -> dict[str, Any]:
     if not isinstance(tags, list):
         tags = []
     else:
-        tags = [str(item).strip() for item in tags if str(item).strip()]
+        cleaned: list[str] = []
+        for item in tags:
+            raw = str(item or "").strip()
+            if not raw:
+                continue
+            try:
+                cleaned.append(canonicalize(raw))
+            except ValueError:
+                continue
+        tags = cleaned
 
     return {"emoji": emoji, "tags": tags}
 

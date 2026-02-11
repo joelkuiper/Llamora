@@ -77,6 +77,7 @@ class DefaultTagEnricher:
     def _tokenize(self, normalized_query: str) -> list[str]:
         seen_tokens: set[str] = set()
         tokens: list[str] = []
+        raw_query = (normalized_query or "").strip()
         for raw_token in _TOKEN_PATTERN.findall(normalized_query):
             token = raw_token.strip()
             if not token:
@@ -90,6 +91,16 @@ class DefaultTagEnricher:
                 continue
             seen_tokens.add(canonical_lower)
             tokens.append(canonical)
+        if raw_query and (any(ch.isspace() for ch in raw_query) or "_" in raw_query):
+            try:
+                canonical = self._tag_service.canonicalize(raw_query)
+            except ValueError:
+                canonical = ""
+            if canonical:
+                canonical_lower = canonical.lower()
+                if canonical_lower not in seen_tokens:
+                    tokens.append(canonical)
+                    seen_tokens.add(canonical_lower)
         return tokens
 
     async def _hydrate_candidates(

@@ -3,20 +3,26 @@
 from __future__ import annotations
 
 import hashlib
+import re
 
 from llamora.settings import settings
 
 
-def canonicalize(raw: str) -> str:
-    """Return the canonical representation of a tag."""
+_NON_TAG_CHARS = re.compile(r"[^a-z0-9-]+")
+_MULTI_DASH = re.compile(r"-{2,}")
 
-    value = str(raw or "").strip()
-    if value.startswith("#"):
-        value = value[1:].strip()
+
+def canonicalize(raw: str) -> str:
+    """Return the canonical representation of a tag (kebab-case)."""
+
+    value = str(raw or "").strip().lower()
     if not value:
         raise ValueError("Empty tag")
+    value = re.sub(r"[\s_]+", "-", value)
+    value = _NON_TAG_CHARS.sub("", value)
+    value = _MULTI_DASH.sub("-", value).strip("-")
     max_length = int(settings.LIMITS.max_tag_length)
-    value = value[:max_length].strip()
+    value = value[:max_length].strip("-")
     if not value:
         raise ValueError("Empty tag")
     return value

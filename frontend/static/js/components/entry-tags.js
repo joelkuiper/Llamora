@@ -8,17 +8,21 @@ import { ReactiveElement } from "../utils/reactive-element.js";
 import { AutocompleteOverlayMixin } from "./base/autocomplete-overlay.js";
 
 const canonicalizeTag = (value, limit = null) => {
-  const text = `${value ?? ""}`.replace(/^#/, "").trim();
+  const raw = `${value ?? ""}`.trim().toLowerCase();
+  if (!raw) return "";
+  let text = raw.replace(/[\s_]+/g, "-");
+  text = text.replace(/[^a-z0-9-]/g, "");
+  text = text.replace(/-{2,}/g, "-").replace(/^-+|-+$/g, "");
   if (!text) return "";
   if (Number.isFinite(limit) && limit > 0) {
-    return text.slice(0, limit).trim();
+    text = text.slice(0, limit).replace(/^-+|-+$/g, "");
   }
-  return text;
+  return text.trim();
 };
 
 const displayTag = (canonical) => `${canonical ?? ""}`.trim();
 
-const prepareTagAutocompleteValue = (value) => `${value ?? ""}`.replace(/^#/, "").trim();
+const prepareTagAutocompleteValue = (value) => `${value ?? ""}`.trim();
 
 const TAG_HISTORY_MAX = 50;
 const TAG_SUMMARY_CACHE_PREFIX = "llamora:tag-summary:";
