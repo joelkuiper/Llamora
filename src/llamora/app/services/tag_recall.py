@@ -4,9 +4,10 @@ from dataclasses import dataclass
 from datetime import datetime
 import hashlib
 import asyncio
-from collections import deque
 from datetime import timezone
-from typing import Any, Iterable, Mapping, Sequence, cast, TypedDict
+from typing import Any, Iterable, Mapping, Sequence, TypedDict
+
+from cachetools import LRUCache
 
 import orjson
 import tiktoken
@@ -31,6 +32,11 @@ class TagRecallSnippet(TypedDict):
     text: str
 
 
+CacheKey = tuple[str, str, str, int]
+
+_SUMMARY_CACHE_LIMIT_FALLBACK = 512
+
+
 @dataclass(frozen=True, slots=True)
 class TagRecallConfig:
     """Runtime configuration for tag-based recall."""
@@ -47,107 +53,36 @@ class TagRecallConfig:
     background_summarize: bool
     summary_cache_max: int
 
+    @classmethod
+    def from_settings(cls) -> "TagRecallConfig":
+        """Construct a TagRecallConfig from application settings."""
 
-CacheKey = tuple[str, str, str, int]
+        def _get_int(key: str, default: int, *, minimum: int = 0) -> int:
+            result = coerce_int(settings.get(key, default), minimum=minimum, default=default)
+            return result if result is not None else default
 
-_SUMMARY_CACHE_LIMIT_FALLBACK = 512
+        mode = str(settings.get("TAG_RECALL.mode", "hybrid") or "hybrid").strip().lower()
+        if mode not in {"summary", "extractive", "hybrid"}:
+            mode = "hybrid"
+
+        return cls(
+            summary_max_chars=_get_int("TAG_RECALL.summary_max_chars", 640),
+            summary_input_max_chars=_get_int("TAG_RECALL.summary_input_max_chars", 360),
+            history_scope=_get_int("TAG_RECALL.history_scope", 20),
+            max_tags=_get_int("TAG_RECALL.max_tags", 5),
+            max_snippets=_get_int("TAG_RECALL.max_snippets", 5),
+            snippet_max_chars=_get_int("TAG_RECALL.snippet_max_chars", 160),
+            mode=mode,
+            llm_max_tokens=_get_int("TAG_RECALL.llm_max_tokens", 256),
+            summary_parallel=_get_int("TAG_RECALL.summary_parallel", 2, minimum=1),
+            background_summarize=bool(settings.get("TAG_RECALL.background_summarize", False)),
+            summary_cache_max=_get_int("TAG_RECALL.summary_cache_max", _SUMMARY_CACHE_LIMIT_FALLBACK),
+        )
 
 
 def get_tag_recall_config() -> TagRecallConfig:
     """Return the configured limits for tag-based recall."""
-
-    summary_max_chars = cast(
-        int,
-        coerce_int(
-            settings.get("TAG_RECALL.summary_max_chars", 640),
-            minimum=0,
-            default=640,
-        ),
-    )
-    summary_input_max_chars = cast(
-        int,
-        coerce_int(
-            settings.get("TAG_RECALL.summary_input_max_chars", 360),
-            minimum=0,
-            default=360,
-        ),
-    )
-    history_scope = cast(
-        int,
-        coerce_int(
-            settings.get("TAG_RECALL.history_scope", 20),
-            minimum=0,
-            default=20,
-        ),
-    )
-    max_tags = cast(
-        int,
-        coerce_int(
-            settings.get("TAG_RECALL.max_tags", 5),
-            minimum=0,
-            default=5,
-        ),
-    )
-    max_snippets = cast(
-        int,
-        coerce_int(
-            settings.get("TAG_RECALL.max_snippets", 5),
-            minimum=0,
-            default=5,
-        ),
-    )
-    snippet_max_chars = cast(
-        int,
-        coerce_int(
-            settings.get("TAG_RECALL.snippet_max_chars", 160),
-            minimum=0,
-            default=160,
-        ),
-    )
-    mode = str(settings.get("TAG_RECALL.mode", "hybrid") or "hybrid").strip().lower()
-    if mode not in {"summary", "extractive", "hybrid"}:
-        mode = "hybrid"
-    llm_max_tokens = cast(
-        int,
-        coerce_int(
-            settings.get("TAG_RECALL.llm_max_tokens", 256),
-            minimum=0,
-            default=256,
-        ),
-    )
-    summary_parallel = cast(
-        int,
-        coerce_int(
-            settings.get("TAG_RECALL.summary_parallel", 2),
-            minimum=1,
-            default=2,
-        ),
-    )
-    background_summarize = bool(
-        settings.get("TAG_RECALL.background_summarize", False)
-    )
-    summary_cache_max = cast(
-        int,
-        coerce_int(
-            settings.get("TAG_RECALL.summary_cache_max", _SUMMARY_CACHE_LIMIT_FALLBACK),
-            minimum=0,
-            default=_SUMMARY_CACHE_LIMIT_FALLBACK,
-        ),
-    )
-
-    return TagRecallConfig(
-        summary_max_chars=summary_max_chars,
-        summary_input_max_chars=summary_input_max_chars,
-        history_scope=history_scope,
-        max_tags=max_tags,
-        max_snippets=max_snippets,
-        snippet_max_chars=snippet_max_chars,
-        mode=mode,
-        llm_max_tokens=llm_max_tokens,
-        summary_parallel=summary_parallel,
-        background_summarize=background_summarize,
-        summary_cache_max=summary_cache_max,
-    )
+    return TagRecallConfig.from_settings()
 
 
 def _truncate_text(text: str, max_chars: int) -> str:
@@ -225,55 +160,42 @@ def _build_summary_cache_key(
 
 
 class TagRecallSummaryCache:
-    """Cache LLM-generated summaries keyed by tag hash."""
+    """Cache LLM-generated summaries keyed by tag hash.
 
-    __slots__ = ("_entries", "_by_tag", "_order")
+    Uses cachetools.LRUCache for automatic eviction while maintaining
+    a secondary index for tag-based invalidation.
+    """
 
-    def __init__(self) -> None:
-        self._entries: dict[CacheKey, str] = {}
+    __slots__ = ("_entries", "_by_tag", "_maxsize")
+
+    def __init__(self, maxsize: int = _SUMMARY_CACHE_LIMIT_FALLBACK) -> None:
+        self._maxsize = max(1, maxsize)
+        self._entries: LRUCache[CacheKey, str] = LRUCache(maxsize=self._maxsize)
         self._by_tag: dict[tuple[str, str], set[CacheKey]] = {}
-        self._order: deque[CacheKey] = deque()
 
     def get(self, key: CacheKey) -> str | None:
         return self._entries.get(key)
 
-    def set(self, key: CacheKey, summary: str, *, max_entries: int) -> None:
-        if max_entries <= 0:
-            return
-        if key in self._entries:
-            self._entries[key] = summary
-            return
+    def set(self, key: CacheKey, summary: str, *, max_entries: int | None = None) -> None:
+        # Resize cache if max_entries differs from current maxsize
+        if max_entries is not None and max_entries > 0 and max_entries != self._maxsize:
+            self._maxsize = max_entries
+            # Create new cache with updated size, preserving recent entries
+            old_entries = list(self._entries.items())
+            self._entries = LRUCache(maxsize=self._maxsize)
+            for k, v in old_entries[-self._maxsize:]:
+                self._entries[k] = v
+
         self._entries[key] = summary
         user_id, tag_hash_hex, *_ = key
         self._by_tag.setdefault((user_id, tag_hash_hex), set()).add(key)
-        self._order.append(key)
-        self._evict_overflow(max_entries)
 
     def invalidate_tag(self, user_id: str, tag_hash_hex: str) -> None:
+        """Remove all cached entries for a specific tag."""
         tag_key = (user_id, tag_hash_hex)
         keys = self._by_tag.pop(tag_key, set())
         for key in keys:
-            self._delete_key(key)
-
-    def _delete_key(self, key: CacheKey) -> None:
-        if key not in self._entries:
-            return
-        self._entries.pop(key, None)
-        user_id, tag_hash_hex, *_ = key
-        tag_key = (user_id, tag_hash_hex)
-        tag_keys = self._by_tag.get(tag_key)
-        if tag_keys:
-            tag_keys.discard(key)
-            if not tag_keys:
-                self._by_tag.pop(tag_key, None)
-
-    def _evict_overflow(self, max_entries: int) -> None:
-        if max_entries <= 0:
-            return
-        while len(self._entries) > max_entries and self._order:
-            key = self._order.popleft()
-            if key in self._entries:
-                self._delete_key(key)
+            self._entries.pop(key, None)
 
 
 TAG_RECALL_SUMMARY_CACHE = TagRecallSummaryCache()

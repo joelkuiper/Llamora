@@ -351,10 +351,12 @@ async def login():
                 )
                 return resp
             except Exception:
-                current_app.logger.debug(
+                # Log at WARNING level so cryptographic failures are visible in production,
+                # but continue to show generic "Invalid credentials" to user to prevent
+                # timing attacks and username enumeration.
+                current_app.logger.warning(
                     "Login verification failed for %s", username, exc_info=True
                 )
-                pass
         current_app.logger.debug("Login failed for %s", username)
         _login_failures[cache_key] = attempts + 1
         return await render_template(

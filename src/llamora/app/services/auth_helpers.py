@@ -221,18 +221,21 @@ class SecureCookieManager:
                 exc_info=True,
             )
             state.pop("dek", None)
+
+            # Clear session-based DEK storage if applicable
             if self.dek_storage == "session":
                 sid = state.get("sid") or ""
-            else:
-                sid = None
-            if sid is not None:
                 state.pop("sid", None)
-            self.clear_session_dek()
+                self.clear_session_dek()
+                cache_key_sid: str | None = sid
+            else:
+                cache_key_sid = None
 
+            # Invalidate user snapshot cache
             uid = state.get("uid")
             if uid:
-                if self.dek_storage == "session":
-                    cache_key = (uid, sid or "")
+                if cache_key_sid is not None:
+                    cache_key = (uid, cache_key_sid)
                 else:
                     cache_key = (uid, data)
                 self._user_snapshot_cache.pop(cache_key, None)

@@ -260,24 +260,24 @@ async def augment_history_with_recall(
             if tag_items:
                 recall_entry["tags"] = tag_items
 
-        if recall_entry is not None:
-            augmented = []
-            for entry in history:
-                entry_dict = dict(entry)
-                if (
-                    not recall_inserted
-                    and target_entry_id is not None
-                    and str(entry_dict.get("id")) == str(target_entry_id)
-                ):
-                    recall_index = len(augmented)
-                    augmented.append(dict(recall_entry))
-                    recall_inserted = True
-                augmented.append(entry_dict)
-
-            if not recall_inserted:
+        # Insert recall_entry into history at appropriate position
+        augmented = []
+        for entry in history:
+            entry_dict = dict(entry)
+            if (
+                not recall_inserted
+                and target_entry_id is not None
+                and str(entry_dict.get("id")) == str(target_entry_id)
+            ):
                 recall_index = len(augmented)
                 augmented.append(dict(recall_entry))
                 recall_inserted = True
+            augmented.append(entry_dict)
+
+        if not recall_inserted:
+            recall_index = len(augmented)
+            augmented.append(dict(recall_entry))
+            recall_inserted = True
 
         logger.debug(
             "Inserted tag recall for entry=%s tags=%s inserted=%s text=%s",

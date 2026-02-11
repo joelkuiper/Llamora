@@ -36,9 +36,9 @@ class VectorSearchService:
         cfg = self._config.progressive
         max_cos = max(cosines)
         hits = sum(c >= float(cfg.poor_match_max_cos) for c in cosines)
-        return max_cos >= float(cfg.poor_match_max_cos) and hits >= int(
-            cfg.poor_match_min_hits
-        )
+        # Ensure at least 1 hit is required to avoid always-true check when min_hits=0
+        min_hits = max(1, int(cfg.poor_match_min_hits))
+        return max_cos >= float(cfg.poor_match_max_cos) and hits >= min_hits
 
     @staticmethod
     def _entry_id_from_vector_id(vector_id: str) -> str:
