@@ -1129,9 +1129,12 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       return;
     }
     this.#detailPopover?.update();
-    const target = event?.target;
-    if (target?.classList?.contains("tag-detail__summary")) {
-      this.#cacheTagSummary(target);
+    const target = event?.detail?.target ?? event?.target;
+    const summaryEl =
+      target?.closest?.(".tag-detail__summary") ||
+      (target?.classList?.contains("tag-detail__summary") ? target : null);
+    if (summaryEl) {
+      this.#cacheTagSummary(summaryEl);
       return;
     }
     if (this.#detailBody) {

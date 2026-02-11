@@ -48,6 +48,7 @@
   align-items: center;
   position: relative;
   overflow: visible;
+  z-index: 0;
   padding: 0;
   max-width: var(--entry-tag-max-width, 24ch);
   min-width: 0;
@@ -67,6 +68,7 @@
     var(--raised-shadow),
     0 0 0 2px var(--accent-10);
   background: linear-gradient(0deg, var(--accent-15), var(--accent-05)) var(--glass-bg-alt);
+  z-index: 1;
 }
 
 .entry-tag.is-active {
@@ -133,6 +135,7 @@
   font-size: 0.75rem;
   cursor: pointer;
   opacity: 0;
+  z-index: 2;
   transition:
     transform var(--motion-gentle) ease,
     opacity var(--motion-gentle) ease,
@@ -663,7 +666,7 @@
   line-height: 1.45;
   color: var(--glass-text-muted);
   min-height: 1.8rem;
-  transition: opacity var(--motion-gentle) ease;
+  transition: opacity calc(var(--motion-gentle) * 1.4) ease;
 }
 
 .tag-detail__summary p {
@@ -672,10 +675,11 @@
 
 .tag-detail-summary {
   margin: 0;
+  animation: tag-summary-fade-in 220ms ease;
 }
 
 .tag-detail__summary.htmx-request {
-  opacity: 1;
+  opacity: 0.82;
 }
 
 .tag-detail__entries {
@@ -846,6 +850,7 @@
   height: 0.6rem;
 }
 
+
 .tag-detail-skeleton span {
   display: block;
   height: 0.75rem;
@@ -859,6 +864,17 @@
   background-size: 220% 100%;
   animation: tag-skeleton-shimmer 2.3s ease-in-out infinite;
   opacity: 1;
+}
+
+@keyframes tag-summary-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .tag-detail-skeleton__title {
