@@ -183,7 +183,7 @@
 }
 
 .entry-action {
-  background: var(--glass-bg-alt);
+  background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 2px 6px;
