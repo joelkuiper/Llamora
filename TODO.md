@@ -3,8 +3,8 @@
   - [ ] Dedicated tags page with analyses?
 - [x] Recovery code generation page rethink
 - [x] Summaries for days as "tooltip" in calendar nav
-- [ ] Bugfix for multi token search
-- [ ] Performance issue tag summarization?
+- [x] Bugfix for multi token search
+- [x] Performance issue tag summarization?
 - [ ] README
 Later
 - [ ] Better model than Qwen4B, find something that's a bit more chatty
