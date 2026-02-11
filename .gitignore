@@ -226,3 +226,4 @@ __marimo__/
 *.sqlite3-wal
 
 frontend/dist/
+scripts/bin/esbuild-*
