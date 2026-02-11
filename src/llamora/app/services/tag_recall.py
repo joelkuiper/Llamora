@@ -1,22 +1,25 @@
 from __future__ import annotations
 
+import asyncio
+import hashlib
 from dataclasses import dataclass
 from datetime import datetime
-import hashlib
-import asyncio
-from datetime import timezone
 from typing import Any, Iterable, Mapping, Sequence, TypedDict
-
-from cachetools import LRUCache
 
 import orjson
 import tiktoken
 
+from llamora.app.db.events import RepositoryEventBus
+from llamora.app.services.tag_recall_cache import (
+    CacheKey,
+    TagRecallCacheSynchronizer,
+    TagRecallSummaryCache,
+    TAG_RECALL_SUMMARY_CACHE,
+)
+from llamora.app.util.number import coerce_int
 from llamora.llm.prompt_templates import render_prompt_template
 from llamora.llm.tokenizers.tokenizer import count_message_tokens
 from llamora.settings import settings
-from llamora.app.util.number import coerce_int
-from llamora.app.db.events import ENTRY_TAGS_CHANGED_EVENT, RepositoryEventBus
 
 
 @dataclass(slots=True)
@@ -31,8 +34,6 @@ class TagRecallSnippet(TypedDict):
     tag: str
     text: str
 
-
-CacheKey = tuple[str, str, str, int]
 
 _SUMMARY_CACHE_LIMIT_FALLBACK = 512
 
@@ -157,92 +158,6 @@ def _build_summary_cache_key(
 ) -> CacheKey:
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
     return (user_id, tag_hash_hex, digest, max_chars)
-
-
-class TagRecallSummaryCache:
-    """Cache LLM-generated summaries keyed by tag hash.
-
-    Uses cachetools.LRUCache for automatic eviction while maintaining
-    a secondary index for tag-based invalidation.
-    """
-
-    __slots__ = ("_entries", "_by_tag", "_maxsize")
-
-    def __init__(self, maxsize: int = _SUMMARY_CACHE_LIMIT_FALLBACK) -> None:
-        self._maxsize = max(1, maxsize)
-        self._entries: LRUCache[CacheKey, str] = LRUCache(maxsize=self._maxsize)
-        self._by_tag: dict[tuple[str, str], set[CacheKey]] = {}
-
-    def get(self, key: CacheKey) -> str | None:
-        return self._entries.get(key)
-
-    def set(self, key: CacheKey, summary: str, *, max_entries: int | None = None) -> None:
-        # Resize cache if max_entries differs from current maxsize
-        if max_entries is not None and max_entries > 0 and max_entries != self._maxsize:
-            self._maxsize = max_entries
-            # Create new cache with updated size, preserving recent entries
-            old_entries = list(self._entries.items())
-            self._entries = LRUCache(maxsize=self._maxsize)
-            for k, v in old_entries[-self._maxsize:]:
-                self._entries[k] = v
-
-        self._entries[key] = summary
-        user_id, tag_hash_hex, *_ = key
-        self._by_tag.setdefault((user_id, tag_hash_hex), set()).add(key)
-
-    def invalidate_tag(self, user_id: str, tag_hash_hex: str) -> None:
-        """Remove all cached entries for a specific tag."""
-        tag_key = (user_id, tag_hash_hex)
-        keys = self._by_tag.pop(tag_key, set())
-        for key in keys:
-            self._entries.pop(key, None)
-
-
-TAG_RECALL_SUMMARY_CACHE = TagRecallSummaryCache()
-
-
-class TagRecallCacheSynchronizer:
-    """Invalidate tag recall summaries when tag assignments change."""
-
-    __slots__ = ("_cache", "_events", "_entries")
-
-    def __init__(
-        self,
-        *,
-        event_bus: RepositoryEventBus | None,
-        entries_repository,
-        cache: TagRecallSummaryCache,
-    ) -> None:
-        self._cache = cache
-        self._events = event_bus
-        self._entries = entries_repository
-        if not self._events:
-            return
-        self._events.subscribe(ENTRY_TAGS_CHANGED_EVENT, self._handle_tags_changed)
-
-    async def _handle_tags_changed(
-        self,
-        *,
-        user_id: str,
-        entry_id: str,
-        tag_hash: bytes | str | None = None,
-        created_date: str | None = None,
-        client_today: str | None = None,
-    ) -> None:
-        if not tag_hash or not self._entries:
-            return
-        entry_date = created_date
-        if not entry_date:
-            entry_date = await self._entries.get_entry_date(user_id, entry_id)
-        if not entry_date:
-            return
-        today_iso = client_today
-        if not today_iso:
-            today_iso = datetime.now(timezone.utc).date().isoformat()
-        if entry_date == today_iso:
-            return
-        tag_hash_hex = tag_hash.hex() if isinstance(tag_hash, bytes) else str(tag_hash)
-        self._cache.invalidate_tag(user_id, tag_hash_hex)
 
 
 async def _summarize_with_llm(

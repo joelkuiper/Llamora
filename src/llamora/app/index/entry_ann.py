@@ -369,6 +369,10 @@ class EntryIndexStore:
             existing = self.cursors.get(user_id)
             if existing is None or cursor < existing:
                 self.cursors[user_id] = cursor
+        # idx is guaranteed non-None here: we only reach this point if vector_texts
+        # was non-empty (otherwise we returned at line 336), and the first loop
+        # iteration assigns idx if it was None (line 352).
+        assert idx is not None
         self.indexes[user_id] = idx
         return idx
 
