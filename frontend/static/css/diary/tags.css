@@ -24,6 +24,13 @@
   }
 }
 
+.entry-tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
 .entry-tags[hidden] {
   display: none;
 }
