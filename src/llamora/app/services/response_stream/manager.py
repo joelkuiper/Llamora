@@ -45,6 +45,7 @@ class PendingResponse(ResponsePipelineCallbacks):
         messages: list[dict[str, str]] | None = None,
         reply_to: str | None = None,
         meta_extra: dict | None = None,
+        created_at: str | None = None,
         *,
         use_default_reply_to: bool = True,
         auto_start: bool = True,
@@ -108,6 +109,7 @@ class PendingResponse(ResponsePipelineCallbacks):
             uid=uid,
             reply_to=self.reply_to,
             date=self.date,
+            created_at=created_at,
             dek=self.dek,
             meta_extra=self.meta_extra,
             config=config,
@@ -385,6 +387,7 @@ class ResponseStreamManager:
         messages: list[dict[str, str]] | None = None,
         reply_to: str | None = None,
         meta_extra: dict | None = None,
+        created_at: str | None = None,
         use_default_reply_to: bool = True,
     ) -> PendingResponse:
         self._prune_stale_pending()
@@ -429,6 +432,7 @@ class ResponseStreamManager:
                 messages,
                 reply_to,
                 meta_extra,
+                created_at,
                 use_default_reply_to=use_default_reply_to,
                 auto_start=False,
             )
@@ -452,6 +456,7 @@ class ResponseStreamManager:
             messages,
             reply_to,
             meta_extra,
+            created_at,
             use_default_reply_to=use_default_reply_to,
             auto_start=False,
         )

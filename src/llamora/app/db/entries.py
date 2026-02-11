@@ -157,6 +157,7 @@ class EntriesRepository(BaseRepository):
         dek: bytes,
         meta: dict | None = None,
         reply_to: str | None = None,
+        created_at: str | None = None,
         created_date: str | None = None,
     ) -> str:
         entry_id = str(ULID())
@@ -188,6 +189,10 @@ class EntriesRepository(BaseRepository):
                 alg,
                 prompt_tokens,
             ]
+
+            if created_at:
+                columns.append("created_at")
+                params.append(created_at)
 
             if created_date:
                 columns.append("created_date")

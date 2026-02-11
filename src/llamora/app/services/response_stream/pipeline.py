@@ -64,6 +64,7 @@ class AssistantEntryWriter:
         meta: dict,
         reply_to: str | None,
         date: str,
+        created_at: str | None = None,
     ) -> str:
         append: Callable[..., Awaitable[str]] | None = getattr(
             self._db, "append_entry", None
@@ -82,6 +83,7 @@ class AssistantEntryWriter:
                 dek,
                 meta,
                 reply_to=reply_to,
+                created_at=created_at,
                 created_date=date,
             )
         except Exception as exc:  # pragma: no cover - defensive
@@ -197,6 +199,7 @@ class ResponsePipeline:
         uid: str,
         reply_to: str | None,
         date: str,
+        created_at: str | None,
         dek: bytes,
         meta_extra: dict | None = None,
         config: LLMStreamConfig,
@@ -208,6 +211,7 @@ class ResponsePipeline:
         self._uid = uid
         self._reply_to = reply_to
         self._date = date
+        self._created_at = created_at
         self._dek = dek
         self._meta_extra = meta_extra or {}
         self._config = config
@@ -365,6 +369,7 @@ class ResponsePipeline:
                 meta,
                 self._reply_to,
                 self._date,
+                self._created_at,
             )
         except AssistantEntryPersistenceError:
             logger.exception("Failed to save %s", label)

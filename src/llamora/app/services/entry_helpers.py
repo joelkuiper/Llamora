@@ -130,6 +130,7 @@ async def start_stream_session(
     context: dict | None = None,
     reply_to: str | None = None,
     meta_extra: dict | None = None,
+    created_at: str | None = None,
     use_default_reply_to: bool = True,
 ):
     pending = manager.get(entry_id, uid)
@@ -145,6 +146,7 @@ async def start_stream_session(
         context,
         reply_to=reply_to,
         meta_extra=meta_extra,
+        created_at=created_at,
         use_default_reply_to=use_default_reply_to,
     )
 

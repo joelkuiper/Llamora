@@ -462,6 +462,7 @@ async def sse_opening(date: str):
             messages=opening_messages,
             reply_to=None,
             meta_extra={"auto_opening": True},
+            created_at=target_dt.isoformat(),
             use_default_reply_to=False,
         )
     except StreamCapacityError as exc:
@@ -488,16 +489,35 @@ async def send_entry(date):
     if not user_text or len(user_text) > max_len:
         abort(400, description="Entry is empty or too long.")
 
+    tz = get_timezone()
+    created_at = None
+    created_date = date
+    if user_time:
+        try:
+            dt = datetime.fromisoformat(user_time.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=ZoneInfo(tz))
+            created_at = dt.isoformat()
+            created_date = dt.astimezone(ZoneInfo(tz)).date().isoformat()
+        except Exception:
+            logger.exception("Failed to parse user_time; falling back to server time")
+            created_at = None
+            created_date = date
     try:
         entry_id = await get_services().db.entries.append_entry(
-            uid, "user", user_text, dek, created_date=date
+            uid,
+            "user",
+            user_text,
+            dek,
+            created_at=created_at,
+            created_date=created_date,
         )
         logger.debug("Saved entry %s", entry_id)
     except Exception:
         logger.exception("Failed to save entry")
         raise
 
-    created_at = user_time or datetime.now(timezone.utc).isoformat()
+    created_at = created_at or user_time or datetime.now(timezone.utc).isoformat()
     entry_payload = {
         "id": entry_id,
         "role": "user",
@@ -510,9 +530,9 @@ async def send_entry(date):
     return await render_template(
         "partials/entries_list.html",
         entries=[{"entry": entry_payload, "responses": []}],
-        day=date,
+        day=created_date,
         response_kinds=response_kinds,
-        is_today=date == local_date().isoformat(),
+        is_today=created_date == local_date().isoformat(),
     )
 
 
@@ -688,6 +708,7 @@ async def sse_response(entry_id: str, date: str):
                         "tag_recall_applied": recall_applied,
                         "response_kind": selected_kind.get("id"),
                     },
+                    created_at=request.args.get("user_time"),
                 )
             except StreamCapacityError as exc:
                 return StreamSession.backpressure(
