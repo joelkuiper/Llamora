@@ -1,6 +1,7 @@
 {% if snippets %}
-Context for the active entry{% if tag_labels %} ({{ tag_labels | join(', ') }}){% endif %}:
+Recall notes for this reply. Use these as background to guide the response; weave in relevant details without quoting or mentioning tags.
+{%- if tag_labels %} Tags: {{ tag_labels | join(', ') }}.{% endif %}
 {%- for snippet in snippets %}
-- {{ snippet }}
+- {{ snippet.tag }}: {{ snippet.text }}
 {%- endfor %}
 {%- endif %}

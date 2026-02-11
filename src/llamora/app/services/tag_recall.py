@@ -6,7 +6,7 @@ import hashlib
 import asyncio
 from collections import deque
 from datetime import timezone
-from typing import Any, Iterable, Mapping, Sequence, cast
+from typing import Any, Iterable, Mapping, Sequence, cast, TypedDict
 
 import orjson
 import tiktoken
@@ -24,6 +24,11 @@ class TagRecallContext:
 
     text: str
     tags: tuple[str, ...]
+
+
+class TagRecallSnippet(TypedDict):
+    tag: str
+    text: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -488,7 +493,6 @@ def _extract_date(created_at: str | None) -> str | None:
 
 def _build_extractive_snippet(
     *,
-    tag_label: str,
     items: list[tuple[str, str, str]],
     max_chars: int,
 ) -> str:
@@ -503,7 +507,7 @@ def _build_extractive_snippet(
     if not pieces:
         return ""
     joined = " · ".join(pieces)
-    return f"{tag_label}: {joined}".strip()
+    return joined.strip()
 
 
 async def build_tag_recall_context(
@@ -595,7 +599,7 @@ async def build_tag_recall_context(
 
     # Aggregate by tag; replies are handled implicitly via tagged entries.
 
-    async def _build_tag_snippet(tag_digest: bytes) -> str | None:
+    async def _build_tag_snippet(tag_digest: bytes) -> TagRecallSnippet | None:
         ids_for_tag = tag_entry_ids.get(tag_digest, [])
         if not ids_for_tag:
             return None
@@ -652,16 +656,15 @@ async def build_tag_recall_context(
             )
             if not summary:
                 return None
-            return f"{tag_label}: {summary}"
+            return {"tag": tag_label, "text": summary}
 
         if cfg.mode == "hybrid" and cached:
-            return f"{tag_label}: {cached}"
+            return {"tag": tag_label, "text": cached}
 
         extractive_items = [
             item for item in tag_items if item[1].lower() == "user"
         ] or tag_items
         snippet = _build_extractive_snippet(
-            tag_label=tag_label,
             items=extractive_items,
             max_chars=cfg.snippet_max_chars,
         )
@@ -682,9 +685,11 @@ async def build_tag_recall_context(
 
             asyncio.create_task(_background())
 
-        return snippet
+        return {"tag": tag_label, "text": snippet}
 
-    async def _run_tag_snippet(tag_digest: bytes, sem: asyncio.Semaphore) -> str | None:
+    async def _run_tag_snippet(
+        tag_digest: bytes, sem: asyncio.Semaphore
+    ) -> TagRecallSnippet | None:
         async with sem:
             return await _build_tag_snippet(tag_digest)
 
@@ -693,15 +698,17 @@ async def build_tag_recall_context(
     tasks = [_run_tag_snippet(tag_digest, sem) for tag_digest in focus_slice]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     snippets = [
-        result for result in results if isinstance(result, str) and result.strip()
+        result
+        for result in results
+        if isinstance(result, Mapping)
+        and str(result.get("text") or "").strip()
+        and str(result.get("tag") or "").strip()
     ]
 
     if not snippets:
         return None
 
-    tag_labels = [
-        tag_names.get(tag, "") for tag in focus_tags if tag_names.get(tag, "")
-    ]
+    tag_labels = [str(snippet["tag"]) for snippet in snippets]
     text = render_prompt_template(
         "tag_recall.txt.j2",
         heading="Context for the active entry",
