@@ -2,7 +2,7 @@
 {% macro entry_response_stream(entry_id, day, user_time=None, sse_url=None, stop_url=None, response_kind=None, response_kinds=()) -%}
 {# Quart's url_for drops params set to None, so we can always include user_time #}
 {%- if sse_url is none -%}
-{%- set sse_url = url_for('entries.sse_response', date=day, entry_id=entry_id, user_time=user_time, response_kind=response_kind) -%}
+{%- set sse_url = url_for('entries_stream.sse_response', date=day, entry_id=entry_id, user_time=user_time, response_kind=response_kind) -%}
 {%- endif -%}
 <response-stream id="response-stream-{{ entry_id }}"
             class="entry response-stream"

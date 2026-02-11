@@ -376,7 +376,7 @@ async def request_response(date, entry_id: str):
         day=actual_date or normalized_date,
         response_kinds=response_kinds,
         is_today=normalized_date == local_date().isoformat(),
-        stop_url=url_for("entries.stop_response", entry_id=entry_id),
+        stop_url=url_for("entries_stream.stop_response", entry_id=entry_id),
         response_active=True,
     )
     return Response(
