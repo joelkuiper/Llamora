@@ -587,6 +587,19 @@ def _choose_entry_times(count: int, day: date) -> list[datetime]:
     return times
 
 
+def _humanize_days_ago(delta_days: int) -> str:
+    if delta_days <= 0:
+        return "today"
+    if delta_days == 1:
+        return "yesterday"
+    if delta_days == 7:
+        return "a week ago"
+    if delta_days % 7 == 0 and delta_days >= 14:
+        weeks = delta_days // 7
+        return f"{weeks} weeks ago"
+    return f"{delta_days} days ago"
+
+
 async def _generate_entry_text(
     llm: AsyncOpenAI,
     config: DemoConfig,
@@ -1159,7 +1172,12 @@ async def generate_dataset(config: DemoConfig) -> None:
                     if event_note:
                         log_wrapped("     note: ", event_note)
                 else:
-                    followup_note = f"{event.emoji} {event.followup_note or event.summary or event.title}."
+                    delta_days = (day - event.date).days
+                    rel = _humanize_days_ago(delta_days)
+                    followup_note = (
+                        f"{event.emoji} Follow-up from {rel}: "
+                        f"{event.followup_note or event.summary or event.title}."
+                    )
                     log_item(f"followup: {followup_note}")
             has_event_context = bool(events_today)
             if random.random() < config.day_empty_rate and not has_event_context:
