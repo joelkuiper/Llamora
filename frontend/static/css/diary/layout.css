@@ -60,18 +60,6 @@
   line-height: 1.7;
 }
 
-#entries .entry[data-response-kind="reply"] {
-  --assistant-action-color: var(--action-reply);
-}
-
-#entries .entry[data-response-kind="acknowledge"] {
-  --assistant-action-color: var(--action-acknowledge);
-}
-
-#entries .entry[data-response-kind="notice"] {
-  --assistant-action-color: var(--action-notice);
-}
-
 #entries .entry[data-repeat-guard="true"] {
   position: relative;
 }

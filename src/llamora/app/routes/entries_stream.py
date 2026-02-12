@@ -25,7 +25,6 @@ from llamora.app.services.container import get_services
 from llamora.app.services.entry_context import build_entry_context, build_llm_context
 from llamora.app.services.entry_helpers import (
     StreamSession,
-    apply_response_kind_prompt,
     augment_history_with_recall,
     augment_opening_with_recall,
     build_entry_history,
@@ -49,32 +48,6 @@ logger = logging.getLogger(__name__)
 
 def _entry_stream_manager():
     return get_services().llm_service.response_stream_manager
-
-
-def _load_response_kinds() -> list[dict[str, str]]:
-    raw = settings.get("LLM.response_kinds", []) or []
-    kinds: list[dict[str, str]] = []
-    for entry in raw:
-        if not isinstance(entry, dict):
-            continue
-        kind_id = str(entry.get("id") or "").strip()
-        label = str(entry.get("label") or "").strip()
-        prompt = str(entry.get("prompt") or "").strip()
-        if not kind_id or not label:
-            continue
-        kinds.append({"id": kind_id, "label": label, "prompt": prompt})
-    if not kinds:
-        kinds = [{"id": "reply", "label": "Reply", "prompt": ""}]
-    return kinds
-
-
-def _select_response_kind(kind_id: str | None) -> dict[str, str]:
-    kinds = _load_response_kinds()
-    if kind_id:
-        match = next((k for k in kinds if k["id"] == kind_id), None)
-        if match:
-            return match
-    return kinds[0]
 
 
 @entries_stream_bp.route("/e/response/stop/<entry_id>", methods=["POST"])
@@ -271,8 +244,6 @@ async def sse_response(entry_id: str, date: str):
     )
     params = dict(params_raw) if params_raw is not None else None
 
-    response_kind = request.args.get("response_kind")
-    selected_kind = _select_response_kind(response_kind)
     services = get_services()
     db = services.db
     manager = services.llm_service.response_stream_manager
@@ -331,9 +302,6 @@ async def sse_response(entry_id: str, date: str):
                 )
             else:
                 recall_applied = False
-            history_for_stream = apply_response_kind_prompt(
-                history_for_stream, selected_kind.get("prompt")
-            )
             try:
                 pending_response = await start_stream_session(
                     manager=manager,
@@ -346,7 +314,6 @@ async def sse_response(entry_id: str, date: str):
                     context=ctx,
                     meta_extra={
                         "tag_recall_applied": recall_applied,
-                        "response_kind": selected_kind.get("id"),
                     },
                     created_at=request.args.get("user_time"),
                 )

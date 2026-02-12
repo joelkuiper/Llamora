@@ -85,20 +85,6 @@ def normalize_llm_config(
     return filtered or None
 
 
-def apply_response_kind_prompt(
-    history: Sequence[Mapping[str, Any]],
-    response_prompt: str | None,
-) -> list[dict[str, Any]]:
-    """Append a response-kind system prompt to history for LLM generation."""
-
-    normalized = [dict(entry) for entry in history]
-    if not response_prompt:
-        return normalized
-
-    normalized.append({"role": "system", "text": str(response_prompt).strip()})
-    return normalized
-
-
 def build_entry_history(
     entries: Sequence[Mapping[str, Any]], entry_id: str
 ) -> list[dict[str, Any]]:

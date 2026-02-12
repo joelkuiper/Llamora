@@ -125,11 +125,6 @@ repeat_guard_min_length = 12
 
 [default.LLM]
 allowed_config_keys = ["temperature"]
-response_kinds = [
-  { id = "reply", label = "Reply", prompt = "Generate a direct continuation of the thread, responding normally to the content." },
-  { id = "acknowledge", label = "Acknowledge", prompt = "Generate a supportive, validating response that focuses on reassurance, empathy, or positive acknowledgment. Do not introduce new analysis or advice unless clearly implied." },
-  { id = "notice", label = "Notice", prompt = "Generate an observational response that points out patterns, themes, or notable aspects of the message, without judgment or encouragement. Keep it descriptive rather than reactive." },
-]
 
 [default.UI]
 clock_format = "24h"

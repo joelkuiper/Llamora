@@ -23,8 +23,7 @@
 }
 
 #entries .entry.user:hover .entry-actions-row,
-#entries .entry.user:focus-within .entry-actions-row,
-#entries .entry.entry-action-open .entry-actions-row {
+#entries .entry.user:focus-within .entry-actions-row {
   opacity: 1;
 }
 
@@ -86,29 +85,8 @@
 #entries .entry:hover .entry-actions-row .entry-action__icon,
 #entries .entry:focus-within .entry-actions-row .entry-action__icon,
 #entries .entry:hover .entry-actions-inline .entry-action__icon,
-#entries .entry:focus-within .entry-actions-inline .entry-action__icon,
-#entries .entry.entry-action-open .entry-actions-row .entry-action__icon {
+#entries .entry:focus-within .entry-actions-inline .entry-action__icon {
   opacity: 0.9;
-}
-
-#entries .entry-kind-indicator {
-  background: transparent;
-  border-color: transparent;
-  box-shadow: none;
-  color: color-mix(in srgb, var(--assistant-action-color) 70%, var(--color-text-muted));
-  cursor: default;
-}
-
-#entries .entry-kind-indicator:hover,
-#entries .entry-kind-indicator:focus-visible {
-  border-color: transparent;
-  box-shadow: none;
-  background: transparent;
-}
-
-#entries .entry-kind-indicator .entry-kind-icon {
-  width: 0.85rem;
-  height: 0.85rem;
 }
 
 #entries .entry.assistant .entry-delete,

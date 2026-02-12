@@ -19,7 +19,6 @@ import { ReactiveElement } from "../utils/reactive-element.js";
 import { afterNextFrame, scheduleFrame } from "../utils/scheduler.js";
 import "./entry-form.js";
 import "./response-stream.js";
-import "./entry-actions.js";
 
 const activateAnimations = armEntryAnimations;
 const activateInitialEntryAnimations = armInitialEntryAnimations;

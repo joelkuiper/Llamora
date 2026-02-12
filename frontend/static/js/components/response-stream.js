@@ -320,11 +320,6 @@ class ResponseStreamElement extends HTMLElement {
     timeEl.title = formatLocalTimestamp(now);
     timeEl.textContent = formatLocalTime(now);
 
-    const kindIndicator = container.querySelector(".entry-kind-indicator");
-    if (kindIndicator) {
-      container.insertBefore(timeEl, kindIndicator);
-      return;
-    }
     const deleteBtn = container.querySelector(".entry-delete");
     if (deleteBtn) {
       container.insertBefore(timeEl, deleteBtn);

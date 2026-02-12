@@ -1,2 +1,2 @@
 {% from 'partials/entry_response_stream.html' import entry_response_stream %}
-{{ entry_response_stream(entry_id, day, user_time, stop_url=url_for('entries_stream.stop_response', entry_id=entry_id), response_kind=response_kind, response_kinds=response_kinds) }}
+{{ entry_response_stream(entry_id, day, user_time, stop_url=url_for('entries_stream.stop_response', entry_id=entry_id)) }}

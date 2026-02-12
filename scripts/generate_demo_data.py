@@ -246,20 +246,6 @@ def _is_login_page(html: str, url: str | None = None) -> bool:
     return False
 
 
-def _load_response_kinds() -> list[str]:
-    raw = settings.get("LLM.response_kinds", []) or []
-    kinds: list[str] = []
-    for entry in raw:
-        if not isinstance(entry, dict):
-            continue
-        kind_id = str(entry.get("id") or "").strip()
-        if kind_id:
-            kinds.append(kind_id)
-    if not kinds:
-        kinds = ["reply"]
-    return kinds
-
-
 def _extract_auth_error(html: str) -> str | None:
     soup = BeautifulSoup(html, "html.parser")
     message = soup.select_one(".alert__message")
@@ -875,12 +861,10 @@ async def _trigger_response(
     entry_id: str,
     user_time: datetime,
     headers: dict[str, str],
-    response_kind: str,
 ) -> None:
     logger.debug("Triggering response for entry %s", entry_id)
     data = {
         "user_time": user_time.isoformat(),
-        "response_kind": response_kind,
     }
     try:
         resp = await _post(
@@ -926,10 +910,7 @@ async def _trigger_response(
             await asyncio.sleep(HTTP_RETRY_BASE_DELAY * attempt)
     if response_text:
         response_text = strip_outer_quotes(response_text)
-        log_wrapped(
-            f"  assistant ({response_kind}): ",
-            response_text.strip(),
-        )
+        log_wrapped("  assistant: ", response_text.strip())
 
 
 async def _select_tags_with_llm(
@@ -1062,11 +1043,9 @@ async def _apply_tags(
 async def generate_dataset(config: DemoConfig) -> None:
     random.seed(config.seed)
     llm = _build_llm_client()
-    response_kinds = _load_response_kinds()
     log_header(f"User: {config.username}")
     log_item(f"Range: {config.start_date} to {config.end_date} ({config.tz})")
     log_item(f"Persona: {config.persona_hint}")
-    logger.debug("Response kinds: %s", ", ".join(response_kinds))
     recent_entries: deque[str] = deque(maxlen=max(0, config.entry_context_size))
     narrative_events = await _generate_narrative_timeline(llm, config)
     if narrative_events:
@@ -1232,20 +1211,13 @@ async def generate_dataset(config: DemoConfig) -> None:
                         and random.random() < config.multi_response_rate
                     ):
                         response_count = random.randint(2, config.max_responses_per_entry)
-                    last_kind = None
                     for _ in range(response_count):
-                        response_kind = random.choice(response_kinds)
-                        if last_kind and len(response_kinds) > 1:
-                            while response_kind == last_kind:
-                                response_kind = random.choice(response_kinds)
-                        last_kind = response_kind
                         await _trigger_response(
                             client,
                             day,
                             entry_id,
                             entry_time,
                             headers,
-                            response_kind,
                         )
 
         logger.info("Done. Created %d entries.", total_entries)

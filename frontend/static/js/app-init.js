@@ -255,7 +255,7 @@ function init() {
   initGlobalShortcuts();
 
   const resetSharedPopovers = () => {
-    const ids = ["tag-popover-global", "action-popover-global", "tag-detail-popover-global"];
+    const ids = ["tag-popover-global", "tag-detail-popover-global"];
     ids.forEach((id) => {
       const pop = document.getElementById(id);
       if (!pop) return;
@@ -268,12 +268,12 @@ function init() {
       const panel = pop.querySelector(".tp-content");
       panel?.classList.remove("fade-enter", "fade-exit", "pop-enter", "pop-exit");
     });
-    document.querySelectorAll(".add-tag-btn.active, .action-trigger.active").forEach((btn) => {
+    document.querySelectorAll(".add-tag-btn.active").forEach((btn) => {
       btn.classList.remove("active");
       btn.setAttribute("aria-expanded", "false");
     });
     document
-      .querySelectorAll("entry-tags.popover-open, entry-actions.popover-open")
+      .querySelectorAll("entry-tags.popover-open")
       .forEach((el) => {
         el.classList.remove("popover-open");
       });

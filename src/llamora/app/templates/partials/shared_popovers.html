@@ -1,4 +1,3 @@
-{% from 'partials/response_kind.html' import response_kind_icon %}
 <div id="tag-popover-global" class="tag-popover glass-panel" role="dialog" aria-modal="true" hidden>
   <div class="tp-content">
     <button type="button" class="overlay-close" aria-label="Close">×</button>
@@ -49,24 +48,6 @@
         <span class="tag-detail-skeleton__item"></span>
         <span class="tag-detail-skeleton__item"></span>
       </div>
-    </div>
-  </div>
-</div>
-
-<div id="action-popover-global" class="tag-popover action-popover glass-panel" role="dialog" aria-modal="true" hidden>
-  <div class="tp-content action-panel">
-    <button type="button" class="overlay-close" aria-label="Close">×</button>
-    <div class="action-list" role="menu" aria-label="Response actions">
-      {% for kind in response_kinds %}
-      <button class="action-item"
-              type="button"
-              role="menuitem"
-              data-action-kind="{{ kind.id }}"
-              hx-on::config-request="const t=document.getElementById('user-time'); if(t){t.value=new Date().toISOString();}">
-        {{ response_kind_icon(kind.id, "action-item__icon") }}
-        <span class="action-item__label">{{ kind.label }}</span>
-      </button>
-      {% endfor %}
     </div>
   </div>
 </div>

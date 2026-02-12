@@ -37,32 +37,6 @@ entries_bp = Blueprint("entries", __name__)
 logger = logging.getLogger(__name__)
 
 
-def _load_response_kinds() -> list[dict[str, str]]:
-    raw = settings.get("LLM.response_kinds", []) or []
-    kinds: list[dict[str, str]] = []
-    for entry in raw:
-        if not isinstance(entry, dict):
-            continue
-        kind_id = str(entry.get("id") or "").strip()
-        label = str(entry.get("label") or "").strip()
-        prompt = str(entry.get("prompt") or "").strip()
-        if not kind_id or not label:
-            continue
-        kinds.append({"id": kind_id, "label": label, "prompt": prompt})
-    if not kinds:
-        kinds = [{"id": "reply", "label": "Reply", "prompt": ""}]
-    return kinds
-
-
-def _select_response_kind(kind_id: str | None) -> dict[str, str]:
-    kinds = _load_response_kinds()
-    if kind_id:
-        match = next((k for k in kinds if k["id"] == kind_id), None)
-        if match:
-            return match
-    return kinds[0]
-
-
 async def render_entries(
     date: str,
     *,
@@ -74,7 +48,6 @@ async def render_entries(
     session = get_session_context()
     user = await session.require_user()
     context = await get_entries_context(user, date)
-    response_kinds = _load_response_kinds()
     html = await render_template(
         "partials/entries.html",
         day=date,
@@ -82,7 +55,6 @@ async def render_entries(
         user=user,
         scroll_target=scroll_target,
         view_kind=view_kind,
-        response_kinds=response_kinds,
         **context,
     )
 
@@ -291,7 +263,6 @@ async def send_entry(date):
     user_time = form.get("user_time")
     _, user, dek = await require_user_and_dek()
     uid = user["id"]
-    response_kinds = _load_response_kinds()
 
     max_len = int(settings.LIMITS.max_message_length)
 
@@ -340,7 +311,6 @@ async def send_entry(date):
         "partials/entries_list.html",
         entries=[{"entry": entry_payload, "responses": []}],
         day=created_date,
-        response_kinds=response_kinds,
         is_today=created_date == local_date().isoformat(),
     )
 
@@ -351,9 +321,6 @@ async def request_response(date, entry_id: str):
     normalized_date = require_iso_date(date)
     form = await request.form
     user_time = form.get("user_time")
-    response_kind = form.get("response_kind") or request.args.get("response_kind")
-    selected_kind = _select_response_kind(response_kind)
-    response_kinds = _load_response_kinds()
     _, user, dek = await require_user_and_dek()
     uid = user["id"]
 
@@ -367,14 +334,11 @@ async def request_response(date, entry_id: str):
         entry_id=entry_id,
         day=actual_date or normalized_date,
         user_time=user_time,
-        response_kind=selected_kind.get("id"),
-        response_kinds=response_kinds,
     )
     actions_html = await render_template(
         "partials/entry_actions_item.html",
         entry_id=entry_id,
         day=actual_date or normalized_date,
-        response_kinds=response_kinds,
         is_today=normalized_date == local_date().isoformat(),
         stop_url=url_for("entries_stream.stop_response", entry_id=entry_id),
         response_active=True,
@@ -395,12 +359,10 @@ async def entry_actions_item(entry_id: str):
     actual_date = await get_services().db.entries.get_entry_date(uid, entry_id)
     if actual_date is None:
         abort(404, description="Entry not found.")
-    response_kinds = _load_response_kinds()
     html = await render_template(
         "partials/entry_actions_item.html",
         entry_id=entry_id,
         day=actual_date,
-        response_kinds=response_kinds,
         is_today=actual_date == local_date().isoformat(),
         stop_url=None,
         response_active=False,

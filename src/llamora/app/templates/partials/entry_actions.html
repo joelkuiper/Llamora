@@ -1,5 +1,4 @@
-{% from 'partials/response_kind.html' import response_kind_icon %}
-{% macro entry_actions(entry_id, day, response_kinds=(), is_today=True, stop_url=None, response_active=False, oob=False) -%}
+{% macro entry_actions(entry_id, day, is_today=True, stop_url=None, response_active=False, oob=False) -%}
 <entry-actions id="entry-actions-{{ entry_id }}"
                  class="entry-actions"
                  data-entry-id="{{ entry_id }}"
@@ -14,14 +13,19 @@
           {% if stop_url %}hx-post="{{ stop_url }}"{% endif %}
           {% if stop_url %}hx-swap="none"{% endif %}
           {% else %}
-          aria-label="Response actions"
-          {% if is_today %}data-tooltip-title="Choose a response"{% endif %}
+          aria-label="Respond"
+          {% if is_today %}data-tooltip-title="Respond"{% endif %}
           {% if not is_today %}disabled aria-disabled="true"{% endif %}
+          hx-post="{{ url_for('entries.request_response', date=day, entry_id=entry_id) }}"
+          hx-target="#entry-responses-{{ entry_id }}"
+          hx-swap="beforeend"
+          hx-include="#user-time"
+          hx-on::config-request="const t=document.getElementById('user-time'); if(t){t.value=new Date().toISOString();}"
           {% endif %}>
     {% if response_active %}
     <span class="icon-mask icon-square entry-action__icon" aria-hidden="true"></span>
     {% else %}
-    <span class="icon-mask icon-entry-actions entry-action__icon" aria-hidden="true"></span>
+    <span class="icon-mask icon-corner-down-left entry-action__icon" aria-hidden="true"></span>
     {% endif %}
   </button>
 </entry-actions>
