@@ -153,6 +153,8 @@ export class CalendarControl extends HTMLElement {
       onHide: () => {
         btn.classList.remove("active");
         btn.setAttribute("aria-expanded", "false");
+        htmx.trigger(pop, "calendar-popover:hide");
+        this.#hideTooltip({ immediate: true });
       },
       onHidden: () => {
         pop.innerHTML = "";
