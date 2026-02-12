@@ -6,6 +6,7 @@ import asyncio
 import logging
 import random
 import re
+import textwrap
 from collections import deque
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
@@ -329,35 +330,44 @@ async def _generate_narrative_timeline(
     count = min(config.story_events, len(all_days))
     event_days = sorted(rng.sample(all_days, count))
     date_lines = "\n".join(f"- {d.isoformat()}" for d in event_days)
-    prompt = (
-        "Create a realistic life timeline for one person writing a diary. "
-        "Use the persona details to shape the kinds of events, settings, and details. "
-        "Return strict JSON array only, no extra text. Each item must include: "
-        "date (YYYY-MM-DD), title, summary (3-4 sentences describing a concrete event). "
-        "Include specific details (place, people, objects, actions) inside the summary. "
-        "Avoid generic phrasing; make each event distinct, grounded, and aligned with the persona. "
-        "emoji (single emoji character, e.g. 😃; never empty, never null; do not use ✨), "
-        "followup_note (1 sentence about the AFTERMATH/echo of the event; "
-        "do not repeat the event details; focus on lingering feelings, "
-        "small consequences, or what changes afterward), "
-        "followup_days (list of integers like 1,2,3; include 1-3 for most events). "
-        "Events must be specific things that happened (not categories). "
-        "Vary the kinds of events (work, home, social, health, learning, travel, chores, small wins). "
-        "Avoid repeating the same verbs or settings. Include small quirks or concrete sensory details. "
-        "If any provided dates fall on notable days or holidays (e.g. New Year's), make those events feel weightier. "
-        "Keep events plausible and varied. "
-        "Use the provided dates exactly and keep the order."
-    )
-    user_message = (
-        f"Start date: {config.start_date.isoformat()}\n"
-        f"End date: {config.end_date.isoformat()}\n"
-        f"Count: {count}\n"
-        f"Followup chance: {config.story_followup_rate}\n"
-        f"Persona: {config.persona_hint}\n"
-        "Make the events feel like they belong to this persona (work, interests, habits, voice).\n"
-        f"Event dates (use exactly, keep order):\n{date_lines}\n\n"
-        f"{prompt}"
-    )
+    prompt = textwrap.dedent(
+        """
+        Create a realistic life timeline for one person writing a diary.
+        Use the persona details to shape the kinds of events, settings, and details.
+        Return strict JSON array only, no extra text. Each item must include:
+        - date (YYYY-MM-DD)
+        - title
+        - summary (3-4 sentences describing a concrete event)
+        - emoji (single emoji character; never empty, never null; do not use ✨)
+        - followup_note (1 sentence about the AFTERMATH/echo of the event; do not repeat the event details;
+          focus on lingering feelings, small consequences, or what changes afterward)
+        - followup_days (list of integers like 1,2,3; include 1-3 for most events)
+
+        Include specific details (place, people, objects, actions) inside the summary.
+        Avoid generic phrasing; make each event distinct, grounded, and aligned with the persona.
+        Events must be specific things that happened (not categories).
+        Vary the kinds of events (work, home, social, health, learning, travel, chores, small wins).
+        Avoid repeating the same verbs or settings. Include small quirks or concrete sensory details.
+        If any provided dates fall on notable days or holidays (e.g. New Year's), make those events feel weightier.
+        Keep events plausible and varied.
+        Use the provided dates exactly and keep the order.
+        """
+    ).strip()
+    user_message = textwrap.dedent(
+        f"""
+        Start date: {config.start_date.isoformat()}
+        End date: {config.end_date.isoformat()}
+        Count: {count}
+        Followup chance: {config.story_followup_rate}
+        Persona: {config.persona_hint}
+
+        Make the events feel like they belong to this persona (work, interests, habits, voice).
+        Event dates (use exactly, keep order):
+        {date_lines}
+
+        {prompt}
+        """
+    ).strip()
     model = settings.get("LLM.chat.model") or "local"
     params = dict(settings.get("LLM.chat.parameters") or {})
     params["temperature"] = min(
@@ -456,12 +466,15 @@ async def _generate_narrative_timeline(
             break
         if attempt == 0:
             logger.warning("Timeline missing emoji; retrying with stricter prompt")
-            user_message = (
-                f"{user_message}\n\n"
-                "IMPORTANT: Each item MUST include a non-empty emoji character "
-                "AND a followup_note. Do not use null. If unsure, pick a simple emoji like "
-                "🙂, 😌, 🤔, 🎉, 📌."
-            )
+            user_message = textwrap.dedent(
+                f"""
+                {user_message}
+
+                IMPORTANT: Each item MUST include a non-empty emoji character
+                AND a followup_note. Do not use null. If unsure, pick a simple emoji like
+                🙂, 😌, 🤔, 🎉, 📌.
+                """
+            ).strip()
             continue
         logger.warning("Timeline still missing emoji after retry; keeping blanks")
 
@@ -600,29 +613,46 @@ async def _generate_entry_text(
     elif length_mode == "long":
         length_hint = "Write a short essay on a topic.\n"
 
-    user_message = (
-        "Context (do NOT include this information in the entry):\n"
-        f"- Date: {entry_date.isoformat()}\n"
-        f"- Time: {time_label}\n"
-        f"- Entry number today: {index + 1}\n"
-        f"- Persona: {persona}\n\n"
-        "You are using a journaling / diary app to write a personal note for yourself.\n"
-        "Write the note directly, without restating the date, time, entry number, or persona.\n"
-        "Use normal, everyday language.\n"
-        "Do not add a title.\n"
-        "Do not wrap the entry in quotation marks or start with a quote.\n"
-        "It is fine to write about only one small thing, or nothing important at all.\n"
-        f"{length_hint}"
-    )
+    user_message = textwrap.dedent(
+        f"""
+        You are using a journaling / diary app to write a personal note for yourself.
+        Write the note directly, without restating the date, time, entry number, or persona.
+        Use normal, everyday language.
+        Do not add a title.
+        Do not wrap the entry in quotation marks or start with a quote.
+        It is fine to write about only one small thing, or nothing important at all.
+
+        Context (do NOT include this information in the entry):
+        - Date: {entry_date.isoformat()}
+        - Time: {time_label}
+        - Entry number today: {index + 1}
+        - Persona: {persona}
+
+        {length_hint}
+        """
+    ).strip()
     if event_note:
-        user_message += f"\nEvent note (do not quote): {event_note}\n"
+        user_message += textwrap.dedent(
+            f"""
+
+            Event note (do not quote): {event_note}
+            """
+        )
     if followup_note:
-        user_message += f"\nRecent event context (lightly reflect on it): {followup_note}\n"
+        user_message += textwrap.dedent(
+            f"""
+
+            Recent event context (lightly reflect on it): {followup_note}
+            """
+        )
 
     if include_markdown:
-        user_message += (
-            "\nYou may use a small amount of markdown if it feels natural "
-            "(for example italics within a sentence)."
+        user_message += textwrap.dedent(
+            """
+
+            You may use markdown if it feels natural
+            (for example tables, formatting, quotes, etc).
+            """
         )
 
     # Context dropout + thinning: not every entry gets continuity, and we only
@@ -637,10 +667,12 @@ async def _generate_entry_text(
             for entry in chosen
             if entry.strip()
         )
-        continuity_message = (
-            "Previous entries (reference only; do not copy wording or structure):\n"
-            f"{snippets}"
-        )
+        continuity_message = textwrap.dedent(
+            f"""
+            Previous entries (reference only; do not copy wording or structure):
+            {snippets}
+            """
+        ).strip()
 
     model = settings.get("LLM.chat.model") or "local"
     params = dict(settings.get("LLM.chat.parameters") or {})
@@ -674,12 +706,14 @@ async def _generate_entry_text(
                 if length_mode != "short"
                 else ""
             )
-            user_message = (
-                f"{user_message}\n\n"
-                f"Write a bit more (at least {config.min_entry_chars} characters).\n"
-                f"{extra}"
-                "Do not add metadata or repeat earlier concerns unless needed."
-            )
+            user_message = textwrap.dedent(
+                f"""
+                {user_message}
+
+                Write a bit more (at least {config.min_entry_chars} characters).
+                {extra}Do not add metadata or repeat earlier concerns unless needed.
+                """
+            ).strip()
             continue
 
         if len(text) > config.max_entry_chars:
@@ -945,15 +979,19 @@ async def _select_tags_with_llm(
         },
     }
     tag_lines = "\n".join(f"- {tag}" for tag in suggestions)
-    user_message = (
-        "Pick the most relevant tags for the entry from the suggestions list. "
-        "Return a JSON array only (no markdown, no code fences). Choose up to "
-        f"{max_tags} tags. If none fit, return an empty list.\n\n"
-        "Entry:\n"
-        f"{entry_text}\n\n"
-        "Suggestions:\n"
-        f"{tag_lines}"
-    )
+    user_message = textwrap.dedent(
+        f"""
+        Pick the most relevant tags for the entry from the suggestions list.
+        Return a JSON array only (no markdown, no code fences). Choose up to {max_tags} tags.
+        If none fit, return an empty list.
+
+        Entry:
+        {entry_text}
+
+        Suggestions:
+        {tag_lines}
+        """
+    ).strip()
     response = await llm.chat.completions.create(
         model=model,
         messages=[
