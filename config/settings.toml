@@ -105,9 +105,9 @@ stop            = ["<|im_start|>", "<|im_end|>", "<|endoftext|>", "<|end|>"]
 n_keep          = -1
 cache_prompt    = true
 
-mirostat        = 2
-mirostat_tau    = 4.5
-mirostat_eta    = 0.12
+# mirostat        = 2
+# mirostat_tau    = 4.5
+# mirostat_eta    = 0.12
 
 repeat_penalty  = 1.25
 repeat_last_n   = 320
