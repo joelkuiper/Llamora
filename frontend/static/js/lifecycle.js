@@ -55,17 +55,20 @@ export function init() {
   });
 
   // htmx swaps targeting major content areas
+  const rehydrateTargets = new Set(["content-wrapper", "main-content", "profile-modal-root"]);
   document.body.addEventListener("htmx:afterSwap", (e) => {
     const target = e.detail?.target;
     if (!target) return;
     const id = target.id;
-    if (id !== "content-wrapper" && id !== "main-content") return;
+    if (!rehydrateTargets.has(id)) return;
 
-    const newView = getView();
-    if (newView !== currentView) {
-      const prev = currentView;
-      currentView = newView;
-      dispatch("app:view-changed", { view: newView, previousView: prev });
+    if (id === "main-content") {
+      const newView = getView();
+      if (newView !== currentView) {
+        const prev = currentView;
+        currentView = newView;
+        dispatch("app:view-changed", { view: newView, previousView: prev });
+      }
     }
 
     dispatch("app:rehydrate", { reason: "swap", target });

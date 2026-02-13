@@ -102,17 +102,21 @@ async function ensureFeatureModules(scope) {
   return Promise.all(loaders);
 }
 
-async function rehydrate(context) {
+async function processContent(context) {
   const scope = resolveScope(context);
   globalState.lastContext = scope;
 
   await ensureShell();
   await ensureFeatureModules(scope);
 
-  const lifecycle = await importOnce("lifecycle", () => import("../lifecycle.js"));
-  lifecycle.rehydrate({ reason: "init", context: scope });
-
   globalThis.appInit?.initGlobalShell?.();
+}
+
+async function rehydrate(context) {
+  await processContent(context);
+
+  const lifecycle = await importOnce("lifecycle", () => import("../lifecycle.js"));
+  lifecycle.rehydrate({ reason: "init", context: resolveScope(context) });
 }
 
 function onReady(fn) {
@@ -129,4 +133,8 @@ if (!globalThis.appRuntime) {
   globalThis.appRuntime = {};
 }
 
-globalThis.appRuntime.rehydrate = rehydrate;
+// hx-on::after-settle calls this for every htmx swap settle.
+// Only ensure modules are loaded — don't dispatch app:rehydrate.
+// Real lifecycle events (bfcache, history, major swaps, visibility)
+// are handled by lifecycle.js directly.
+globalThis.appRuntime.rehydrate = processContent;
