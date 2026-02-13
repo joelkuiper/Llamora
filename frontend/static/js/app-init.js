@@ -206,23 +206,9 @@ function registerEntriesLoader() {
     }
   });
 
-  document.body.addEventListener("htmx:historyRestore", () => {
+  document.addEventListener("app:rehydrate", () => {
     refreshLoader();
     reset();
-  });
-  window.addEventListener("popstate", () => {
-    refreshLoader();
-    reset();
-  });
-  window.addEventListener("pageshow", () => {
-    refreshLoader();
-    reset();
-  });
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") {
-      refreshLoader();
-      reset();
-    }
   });
 
   entriesLoaderRegistered = true;
@@ -279,8 +265,7 @@ function init() {
     });
   };
 
-  document.addEventListener("htmx:beforeHistorySave", resetSharedPopovers);
-  window.addEventListener("pagehide", resetSharedPopovers);
+  document.addEventListener("app:teardown", resetSharedPopovers);
 
   updateClientToday();
 

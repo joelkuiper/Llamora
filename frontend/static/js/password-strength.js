@@ -6,12 +6,9 @@ function updateStrength(container) {
   if (submit) submit.disabled = score < 3;
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+function refreshAll() {
   document.querySelectorAll(".password-strength").forEach(updateStrength);
-});
+}
 
-document.body.addEventListener("htmx:afterSwap", (e) => {
-  if (e.target.classList?.contains("password-strength")) {
-    updateStrength(e.target);
-  }
-});
+document.addEventListener("DOMContentLoaded", refreshAll);
+document.addEventListener("app:rehydrate", refreshAll);

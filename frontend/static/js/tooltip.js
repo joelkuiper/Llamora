@@ -194,21 +194,10 @@ export function initTooltips() {
   document.addEventListener("scroll", dismiss, true);
   window.addEventListener("resize", dismiss, { passive: true });
   window.addEventListener("blur", dismiss, { passive: true });
-  window.addEventListener("popstate", dismiss);
 
-  for (const evt of [
-    "htmx:beforeRequest",
-    "htmx:beforeSwap",
-    "htmx:afterSwap",
-    "htmx:afterSettle",
-    "app:rehydrate",
-  ]) {
-    document.addEventListener(evt, dismiss);
-  }
-
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) dismiss();
-  });
+  document.addEventListener("htmx:beforeRequest", dismiss);
+  document.addEventListener("app:teardown", dismiss);
+  document.addEventListener("app:rehydrate", dismiss);
 }
 
 initTooltips();

@@ -74,22 +74,8 @@ export function initForms(root = document) {
   });
 }
 
-function registerHtmxHandlers() {
-  const body = document.body;
-  if (!body) return;
-
-  const handleHtmxEvent = (event) => {
-    const fragmentRoot = event.target ?? document;
-    initForms(fragmentRoot);
-  };
-
-  body.addEventListener("htmx:load", handleHtmxEvent);
-  body.addEventListener("htmx:afterSwap", handleHtmxEvent);
-}
-
 const onReady = () => {
   initForms(document);
-  registerHtmxHandlers();
 };
 
 function resetSpinningButtons(scope = document) {
@@ -109,10 +95,9 @@ runWhenDocumentReady(onReady);
 if (typeof window !== "undefined") {
   window.appInit = window.appInit || {};
   window.appInit.initForms = initForms;
-
-  window.addEventListener("pageshow", (event) => {
-    // When navigating back to a cached page, make sure any submit buttons are reset.
-    const scope = event.target instanceof Document ? event.target : document;
-    resetSpinningButtons(scope);
-  });
 }
+
+document.addEventListener("app:rehydrate", () => {
+  resetSpinningButtons(document);
+  initForms(document);
+});

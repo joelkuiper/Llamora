@@ -76,12 +76,6 @@ document.addEventListener("reset", (event) => {
   }
 });
 
-document.addEventListener("htmx:afterSwap", (event) => {
-  if (event.target instanceof Element) {
-    refreshCounters(event.target);
-  }
-});
-
 document.addEventListener("app:rehydrate", () => refreshCounters());
 
 if (document.readyState === "loading") {

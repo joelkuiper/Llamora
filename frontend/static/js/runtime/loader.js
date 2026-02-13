@@ -50,6 +50,8 @@ async function ensureVendors() {
 
 async function ensureShell() {
   await ensureVendors();
+  const { init: initLifecycle } = await importOnce("lifecycle", () => import("../lifecycle.js"));
+  initLifecycle();
   await Promise.all([
     importOnce("app-init", () => import("../app-init.js")),
     importOnce("logo-toggle", () => import("../logo-toggle.js")),
@@ -107,7 +109,8 @@ async function rehydrate(context) {
   await ensureShell();
   await ensureFeatureModules(scope);
 
-  document.dispatchEvent(new CustomEvent("app:rehydrate", { detail: { context: scope } }));
+  const lifecycle = await importOnce("lifecycle", () => import("../lifecycle.js"));
+  lifecycle.rehydrate({ reason: "init", context: scope });
 
   globalThis.appInit?.initGlobalShell?.();
 }

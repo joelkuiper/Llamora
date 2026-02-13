@@ -12,6 +12,7 @@ import {
   getActiveDay,
   getActiveDayLabel,
 } from "./entries/active-day-store.js";
+import { getCurrentView } from "./lifecycle.js";
 import { updateClientToday } from "./services/time.js";
 
 function ordinalSuffix(day) {
@@ -34,6 +35,7 @@ function ordinalSuffix(day) {
 
 const LABEL_FLASH_CLASS = "text-glow-flash";
 let navListenerRegistered = false;
+let viewChangeListenerRegistered = false;
 
 function triggerLabelFlash(node) {
   if (!node) return;
@@ -140,7 +142,33 @@ const syncNavMinDate = () => {
   return minDate;
 };
 
+function setNavDisabledForView(isDiary) {
+  const elements = resolveNavElements();
+  if (!elements) return;
+  const { prevBtn, nextBtn } = elements;
+  const calBtn = document.getElementById("calendar-btn");
+
+  if (!isDiary) {
+    updateNavButton(prevBtn, { disabled: true });
+    updateNavButton(nextBtn, { disabled: true });
+    if (calBtn) {
+      calBtn.disabled = true;
+      calBtn.setAttribute("aria-disabled", "true");
+      calBtn.removeAttribute("data-tooltip-title");
+    }
+  } else {
+    if (calBtn) {
+      calBtn.disabled = false;
+      calBtn.removeAttribute("aria-disabled");
+      calBtn.dataset.tooltipTitle = "Change day";
+    }
+    applyDayStateToNav({ activeDay: getActiveDay(), label: getActiveDayLabel() });
+  }
+}
+
 const applyDayStateToNav = ({ activeDay, label, forceFlash = false }) => {
+  if (getCurrentView() !== "diary") return;
+
   const elements = resolveNavElements();
   if (!elements) return;
 
@@ -232,5 +260,12 @@ export function initDayNav(entries, options = {}) {
   if (!navListenerRegistered) {
     document.addEventListener(ACTIVE_DAY_CHANGED_EVENT, handleActiveDayChange);
     navListenerRegistered = true;
+  }
+
+  if (!viewChangeListenerRegistered) {
+    document.addEventListener("app:view-changed", (e) => {
+      setNavDisabledForView(e.detail?.view === "diary");
+    });
+    viewChangeListenerRegistered = true;
   }
 }

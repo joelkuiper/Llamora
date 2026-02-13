@@ -105,15 +105,10 @@ function registerOpeningToggle() {
 }
 
 registerOpeningToggle();
-document.addEventListener("app:rehydrate", registerOpeningToggle);
-document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) {
-    syncOpeningState();
-  }
-});
-window.addEventListener("pageshow", () => {
-  requestAnimationFrame(() => syncOpeningState());
-});
-document.body?.addEventListener("htmx:afterSwap", () => {
+document.addEventListener("app:rehydrate", () => {
   syncOpeningState({ animate: false });
+  if (!listenerRegistered) {
+    document.addEventListener("click", handleToggle);
+    listenerRegistered = true;
+  }
 });

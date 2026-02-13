@@ -31,9 +31,25 @@ export class CalendarControl extends HTMLElement {
     this.#globalListeners = new AbortController();
     const { signal } = this.#globalListeners;
 
-    const handleSwap = () => this.#initCalendarPopover();
-    document.body.addEventListener("htmx:afterSwap", handleSwap, { signal });
-    document.body.addEventListener("htmx:historyRestore", handleSwap, { signal });
+    document.addEventListener("app:rehydrate", () => this.#initCalendarPopover(), { signal });
+
+    document.addEventListener(
+      "app:teardown",
+      () => {
+        this.#teardownState();
+        if (this.#btn) {
+          this.#btn.classList.remove("active");
+          this.#btn.setAttribute("aria-expanded", "false");
+        }
+        if (this.#pop) {
+          this.#pop.hidden = true;
+          this.#pop.innerHTML = "";
+        }
+      },
+      { signal },
+    );
+
+    // Invalidate summary cache when entries are swapped
     document.body.addEventListener(
       "htmx:afterSwap",
       (event) => {
@@ -48,28 +64,6 @@ export class CalendarControl extends HTMLElement {
       },
       { signal },
     );
-    const handleBeforeCache = () => {
-      this.#teardownState();
-      if (this.#btn) {
-        this.#btn.classList.remove("active");
-        this.#btn.setAttribute("aria-expanded", "false");
-      }
-      if (this.#pop) {
-        this.#pop.hidden = true;
-        this.#pop.innerHTML = "";
-      }
-    };
-    document.body.addEventListener("htmx:beforeHistorySave", handleBeforeCache, { signal });
-    window.addEventListener(
-      "pageshow",
-      (event) => {
-        if (event.persisted) {
-          this.#initCalendarPopover();
-        }
-      },
-      { signal },
-    );
-    window.addEventListener("pagehide", handleBeforeCache, { signal });
   }
 
   disconnectedCallback() {

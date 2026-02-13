@@ -83,12 +83,9 @@ const initViewMode = (root = document) => {
     }
   });
 
-  listenerBag.add(document, "htmx:afterSwap", (event) => {
-    const target = event.detail?.target;
-    if (target && target.id === "main-content") {
-      syncFromContent();
-      controller.hide();
-    }
+  listenerBag.add(document, "app:view-changed", () => {
+    syncFromContent();
+    controller.hide();
   });
 
   toggle.addEventListener("click", () => {
@@ -112,12 +109,4 @@ const initViewMode = (root = document) => {
 initViewMode(document);
 document.addEventListener("app:rehydrate", (event) => {
   initViewMode(event?.detail?.context || document);
-});
-document.addEventListener("htmx:historyRestore", () => {
-  initViewMode(document);
-});
-window.addEventListener("pageshow", (event) => {
-  if (event.persisted) {
-    initViewMode(document);
-  }
 });

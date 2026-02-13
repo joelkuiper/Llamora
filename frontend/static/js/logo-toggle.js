@@ -224,25 +224,10 @@ export function refreshLogoToggles() {
   refreshAll();
 }
 
-function setupHtmxHooks() {
-  if (typeof document === "undefined" || !document.body) {
-    return;
-  }
-  document.body.addEventListener("htmx:afterSwap", () => {
-    initLogoToggles();
-  });
-  document.body.addEventListener("htmx:historyRestore", () => {
-    refreshAll();
-  });
-}
-
 runWhenDocumentReady(() => {
   initLogoToggles();
-  setupHtmxHooks();
 });
 
-if (typeof window !== "undefined") {
-  window.addEventListener("pageshow", () => {
-    refreshAll();
-  });
-}
+document.addEventListener("app:rehydrate", () => {
+  initLogoToggles();
+});
