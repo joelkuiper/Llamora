@@ -1,0 +1,6 @@
+{% include 'partials/tags_view_detail.html' %}
+{% if include_list %}
+  <div id="tags-view-list" class="tags-view__list" hx-swap-oob="outerHTML">
+    {% include 'partials/tags_view_list.html' %}
+  </div>
+{% endif %}

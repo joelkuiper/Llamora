@@ -234,6 +234,15 @@ class TagsRepository(BaseRepository):
                             WHERE x.user_id = t.user_id
                               AND x.tag_hash = t.tag_hash
                        ) AS last_used
+                       ,
+                       (
+                           SELECT MIN(e.created_at)
+                           FROM tag_entry_xref x
+                           JOIN entries e
+                             ON e.user_id = x.user_id AND e.id = x.entry_id
+                            WHERE x.user_id = t.user_id
+                              AND x.tag_hash = t.tag_hash
+                       ) AS first_used
                 FROM tags t
                 WHERE t.user_id = ? AND t.tag_hash = ?
                 """,
@@ -259,7 +268,50 @@ class TagsRepository(BaseRepository):
             "hash": row["tag_hash"].hex(),
             "count": row["seen_count"],
             "last_used": row["last_used"],
+            "first_used": row["first_used"],
         }
+
+    async def get_tags_index(self, user_id: str, dek: bytes) -> list[dict[str, Any]]:
+        """Return all tags with usage counts for index-style views."""
+
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                """
+                SELECT t.tag_hash,
+                       t.name_ct,
+                       t.name_nonce,
+                       t.alg,
+                       COUNT(x.entry_id) AS entry_count
+                FROM tags t
+                LEFT JOIN tag_entry_xref x
+                  ON x.user_id = t.user_id AND x.tag_hash = t.tag_hash
+                WHERE t.user_id = ?
+                GROUP BY t.tag_hash, t.name_ct, t.name_nonce, t.alg
+                HAVING entry_count > 0
+                """,
+                (user_id,),
+            )
+            rows = await cursor.fetchall()
+
+        index_rows: list[dict[str, Any]] = []
+        for row in rows:
+            tag_name = cached_tag_name(
+                user_id,
+                row["tag_hash"],
+                row["name_nonce"],
+                row["name_ct"],
+                row["alg"].encode(),
+                dek,
+                self._decrypt_message,
+            )
+            index_rows.append(
+                {
+                    "name": tag_name,
+                    "hash": row["tag_hash"].hex(),
+                    "count": int(row["entry_count"] or 0),
+                }
+            )
+        return index_rows
 
     async def get_tag_frecency(
         self, user_id: str, limit: int, lambda_: Any, dek: bytes

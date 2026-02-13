@@ -1,0 +1,76 @@
+{% set active_tag = selected_tag if selected_tag is defined else (tags_view.selected_tag if tags_view is defined and tags_view else None) %}
+{% set sort_kind = tags_sort_kind if tags_sort_kind is defined else (tags_view.sort_kind if tags_view is defined and tags_view else 'count') %}
+{% set sort_dir = tags_sort_dir if tags_sort_dir is defined else (tags_view.sort_dir if tags_view is defined and tags_view else 'desc') %}
+{% set tag_items = tags_view.tags if tags_view is defined and tags_view else [] %}
+<div class="tags-view__list-head">
+  <label class="tags-view__search search-input-wrap" for="tags-view-filter">
+    <span class="icon-mask icon-search" aria-hidden="true"></span>
+    <input id="tags-view-filter"
+           name="tags_view_filter"
+           type="search"
+           class="input tags-view__search-input"
+           placeholder="Find a trace"
+           autocomplete="off"
+           spellcheck="false"
+           data-tags-view-search>
+  </label>
+  <div class="tags-view__controls">
+    <div class="tags-view__sort" role="group" aria-label="Sort traces">
+      <button type="button"
+              class="icon-btn tags-view__sort-btn{% if sort_kind == 'count' and sort_dir == 'desc' %} is-active{% endif %}"
+              data-tags-sort-kind="count"
+              data-tags-sort-dir="desc"
+              data-tooltip-title="Sort trace count high-low">
+        <span class="icon-mask icon-arrow-down-1-0" aria-hidden="true"></span>
+        <span class="visually-hidden">Sort by trace count descending</span>
+      </button>
+      <button type="button"
+              class="icon-btn tags-view__sort-btn{% if sort_kind == 'count' and sort_dir == 'asc' %} is-active{% endif %}"
+              data-tags-sort-kind="count"
+              data-tags-sort-dir="asc"
+              data-tooltip-title="Sort trace count low-high">
+        <span class="icon-mask icon-arrow-up-1-0" aria-hidden="true"></span>
+        <span class="visually-hidden">Sort by trace count ascending</span>
+      </button>
+      <button type="button"
+              class="icon-btn tags-view__sort-btn{% if sort_kind == 'alpha' and sort_dir == 'asc' %} is-active{% endif %}"
+              data-tags-sort-kind="alpha"
+              data-tags-sort-dir="asc"
+              data-tooltip-title="Sort traces A-Z">
+        <span class="icon-mask icon-arrow-up-a-z" aria-hidden="true"></span>
+        <span class="visually-hidden">Sort traces alphabetically ascending</span>
+      </button>
+      <button type="button"
+              class="icon-btn tags-view__sort-btn{% if sort_kind == 'alpha' and sort_dir == 'desc' %} is-active{% endif %}"
+              data-tags-sort-kind="alpha"
+              data-tags-sort-dir="desc"
+              data-tooltip-title="Sort traces Z-A">
+        <span class="icon-mask icon-arrow-down-a-z" aria-hidden="true"></span>
+        <span class="visually-hidden">Sort traces alphabetically descending</span>
+      </button>
+    </div>
+  </div>
+</div>
+{% if tag_items %}
+  <nav class="tags-view__index" aria-label="Trace index" data-tags-view-index>
+    {% for item in tag_items %}
+      {% set tag_url = url_for('days.day', date=day) ~ '?view=tags&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tag=' ~ (item.name|urlencode) %}
+      <a class="tags-view__index-row{% if item.name == active_tag %} is-active{% endif %}"
+         href="{{ tag_url }}"
+         data-tag-name="{{ item.name }}"
+         data-tags-name="{{ item.name }}"
+         data-tags-count="{{ item.count }}"
+         {% if item.name == active_tag %}aria-current="true"{% endif %}
+         hx-get="{{ url_for('tags.tags_view_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&tag={{ item.name|urlencode }}"
+         hx-target="#tags-view-detail"
+         hx-swap="outerHTML"
+         hx-push-url="{{ tag_url }}">
+        <span class="tags-view__index-name">{{ item.name }}</span>
+        <span class="tags-view__index-count">{{ item.count }}</span>
+      </a>
+    {% endfor %}
+  </nav>
+  <p class="tags-view__search-empty" data-tags-view-empty hidden>No matching traces.</p>
+{% else %}
+  <p class="tags-view__empty-index">No traces yet.</p>
+{% endif %}

@@ -17,7 +17,6 @@ from .tag_service import TagEntryPreview
 logger = logging.getLogger(__name__)
 
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
-_MIN_SUMMARY_WORDS = 10
 _SUMMARY_CACHE_TTL = 6 * 60 * 60
 _SUMMARY_CACHE_MAX = 512
 _SUMMARY_CACHE: TTLCache[str, "TagSummaryState"] = TTLCache(
@@ -33,11 +32,19 @@ class TagSummaryState:
     last_used: str | None
 
 
-def _tag_summary_system_prompt(entry_count: int) -> str:
-    return render_prompt_template("tag_summary_system.txt.j2", entry_count=entry_count)
+def _tag_summary_system_prompt(
+    entry_count: int, *, num_words: int, min_words: int, max_sentences: int
+) -> str:
+    return render_prompt_template(
+        "tag_summary_system.txt.j2",
+        entry_count=entry_count,
+        num_words=num_words,
+        min_words=min_words,
+        max_sentences=max_sentences,
+    )
 
 
-def _tag_summary_response_format() -> dict[str, Any]:
+def _tag_summary_response_format(min_chars: int, max_chars: int) -> dict[str, Any]:
     return {
         "type": "json_schema",
         "json_schema": {
@@ -48,8 +55,8 @@ def _tag_summary_response_format() -> dict[str, Any]:
                 "properties": {
                     "summary": {
                         "type": "string",
-                        "minLength": 36,
-                        "maxLength": 220,
+                        "minLength": min_chars,
+                        "maxLength": max_chars,
                     },
                 },
                 "required": ["summary"],
@@ -88,7 +95,7 @@ def _build_user_prompt(
     return "\n".join(lines)
 
 
-def _clean_summary(raw: str) -> str:
+def _clean_summary(raw: str, *, max_sentences: int, max_chars: int) -> str:
     if not raw:
         return ""
     text = " ".join(str(raw).split()).strip()
@@ -96,27 +103,32 @@ def _clean_summary(raw: str) -> str:
     if not text:
         return ""
     sentences = [seg for seg in _SENTENCE_SPLIT.split(text) if seg]
-    if len(sentences) > 2:
-        text = " ".join(sentences[:2])
-    if len(text) > 260:
-        text = text[:260].rsplit(" ", 1)[0].rstrip()
+    sentence_limit = max(1, max_sentences)
+    if len(sentences) > sentence_limit:
+        text = " ".join(sentences[:sentence_limit])
+    if len(text) > max_chars:
+        text = text[:max_chars].rsplit(" ", 1)[0].rstrip()
         if text:
             text += "..."
     return text
 
 
-def _extract_summary(raw: str) -> str:
+def _extract_summary(raw: str, *, max_sentences: int, max_chars: int) -> str:
     if not raw:
         return ""
     try:
         parsed = orjson.loads(raw)
     except Exception:
-        return _clean_summary(raw)
+        return _clean_summary(raw, max_sentences=max_sentences, max_chars=max_chars)
     if isinstance(parsed, dict):
         summary = parsed.get("summary")
         if isinstance(summary, str):
-            return _clean_summary(summary)
-    return _clean_summary(raw)
+            return _clean_summary(
+                summary,
+                max_sentences=max_sentences,
+                max_chars=max_chars,
+            )
+    return _clean_summary(raw, max_sentences=max_sentences, max_chars=max_chars)
 
 
 def _summary_word_count(text: str) -> int:
@@ -165,11 +177,28 @@ async def generate_tag_summary(
     samples: Sequence[TagEntryPreview],
     *,
     cache_key: str | None = None,
+    num_words: int = 28,
 ) -> str:
     if not tag_name or not samples:
         return ""
-
-    system_prompt = _tag_summary_system_prompt(entry_count)
+    requested_words = max(18, min(int(num_words), 160))
+    if requested_words <= 36:
+        max_sentences = 2
+        min_words = max(12, int(requested_words * 0.6))
+    elif requested_words <= 60:
+        max_sentences = 3
+        min_words = max(24, int(requested_words * 0.7))
+    else:
+        max_sentences = 4
+        min_words = max(40, int(requested_words * 0.8))
+    max_chars = max(180, min(requested_words * 12, 1600))
+    min_chars = max(80, min_words * 4)
+    system_prompt = _tag_summary_system_prompt(
+        entry_count,
+        num_words=requested_words,
+        min_words=min_words,
+        max_sentences=max_sentences,
+    )
     cache_key = _get_cache_key(cache_key)
     cached = _SUMMARY_CACHE.get(cache_key) if cache_key else None
     latest_entry_id = _latest_entry_id(samples)
@@ -201,8 +230,8 @@ async def generate_tag_summary(
 
     params = {
         "temperature": 0.3,
-        "n_predict": 120,
-        "response_format": _tag_summary_response_format(),
+        "n_predict": max(160, requested_words * 6),
+        "response_format": _tag_summary_response_format(min_chars, max_chars),
     }
 
     try:
@@ -211,10 +240,14 @@ async def generate_tag_summary(
         logger.exception("Tag summary request failed")
         return ""
 
-    summary = _extract_summary(raw)
-    if _summary_word_count(
-        summary
-    ) >= _MIN_SUMMARY_WORDS and _summary_mentions_tag_once(summary, tag_name):
+    summary = _extract_summary(
+        raw,
+        max_sentences=max_sentences,
+        max_chars=max_chars,
+    )
+    if _summary_word_count(summary) >= min_words and _summary_mentions_tag_once(
+        summary, tag_name
+    ):
         if cache_key and summary:
             _SUMMARY_CACHE[cache_key] = TagSummaryState(
                 summary=summary,
@@ -228,8 +261,16 @@ async def generate_tag_summary(
         {
             "role": "system",
             "content": (
-                _tag_summary_system_prompt(entry_count)
-                + "\nMinimum 10 words. Use the tag name once (no repetition)."
+                _tag_summary_system_prompt(
+                    entry_count,
+                    num_words=requested_words,
+                    min_words=min_words,
+                    max_sentences=max_sentences,
+                )
+                + f"\nTarget about {requested_words} words."
+                + f" Keep it within {max_sentences} sentence(s)."
+                + f" Minimum {min_words} words."
+                + " Use the tag name once (no repetition)."
                 " Avoid single-word outputs."
             ),
         },
@@ -249,7 +290,11 @@ async def generate_tag_summary(
             )
         return summary
 
-    retry_summary = _extract_summary(raw_retry)
+    retry_summary = _extract_summary(
+        raw_retry,
+        max_sentences=max_sentences,
+        max_chars=max_chars,
+    )
     final = retry_summary or summary
     if cache_key and final:
         _SUMMARY_CACHE[cache_key] = TagSummaryState(

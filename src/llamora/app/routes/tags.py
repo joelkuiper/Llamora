@@ -5,6 +5,7 @@ from llamora.app.services.session_context import get_session_context
 from llamora.app.services.tag_summary import generate_tag_summary
 from llamora.app.services.time import local_date
 from llamora.settings import settings
+from llamora.app.routes.helpers import require_iso_date
 from llamora.app.util.frecency import (
     DEFAULT_FRECENCY_DECAY,
     resolve_frecency_lambda,
@@ -225,6 +226,12 @@ async def tag_detail_summary(tag_hash: str):
         abort(404, description="tag not found")
         raise AssertionError("unreachable")
 
+    try:
+        num_words = int(request.args.get("num_words") or 28)
+    except (TypeError, ValueError):
+        num_words = 28
+    num_words = max(18, min(num_words, 160))
+
     llm = get_services().llm_service.llm
     summary = await generate_tag_summary(
         llm,
@@ -232,10 +239,47 @@ async def tag_detail_summary(tag_hash: str):
         overview.count,
         overview.last_used,
         overview.entries,
-        cache_key=f"{user['id']}:{tag_hash}",
+        cache_key=f"{user['id']}:{tag_hash}:w{num_words}:v2",
+        num_words=num_words,
     )
     html = await render_template(
         "partials/tag_detail_summary.html",
         summary=summary,
     )
     return html
+
+
+@tags_bp.get("/fragments/tags/<date>")
+@login_required
+async def tags_view_fragment(date: str):
+    normalized_date = require_iso_date(date)
+    _, user, dek = await require_user_and_dek()
+    tag_service = _tags()
+    sort_kind = tag_service.normalize_tags_sort_kind(request.args.get("sort_kind"))
+    sort_dir = tag_service.normalize_tags_sort_dir(request.args.get("sort_dir"))
+    legacy_sort = tag_service.normalize_legacy_sort(request.args.get("sort"))
+    if legacy_sort is not None:
+        sort_kind, sort_dir = legacy_sort
+    include_list = str(request.args.get("include_list") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    tags_view = await tag_service.get_tags_view_data(
+        user["id"],
+        dek,
+        request.args.get("tag"),
+        sort_kind=sort_kind,
+        sort_dir=sort_dir,
+    )
+    selected_tag = tags_view.selected_tag
+    return await render_template(
+        "partials/tags_view_fragment.html",
+        day=normalized_date,
+        tags_view=tags_view,
+        selected_tag=selected_tag,
+        tags_sort_kind=sort_kind,
+        tags_sort_dir=sort_dir,
+        include_list=include_list,
+    )

@@ -29,6 +29,10 @@ body {
   min-height: 0;
 }
 
+#main-content[data-view="diary"] {
+  --page-max: 86rem;
+}
+
 #main-content > #content-wrapper {
   flex: 1 1 auto;
   min-height: 0;

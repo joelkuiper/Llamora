@@ -1,0 +1,82 @@
+@import url("./tokens/base.css");
+
+:root {
+  --page-max: 86rem;
+  --page-gutter: clamp(1.2rem, 3vw, 3rem);
+  --grid-gap: clamp(1rem, 2.4vw, 2.2rem);
+}
+
+.page-grid {
+  width: min(100%, var(--page-max));
+  margin-inline: auto;
+  padding-inline: var(--page-gutter);
+}
+
+.grid-12 {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--grid-gap);
+  align-items: start;
+}
+
+.span-1 {
+  grid-column: span 1;
+}
+
+.span-2 {
+  grid-column: span 2;
+}
+
+.span-3 {
+  grid-column: span 3;
+}
+
+.span-4 {
+  grid-column: span 4;
+}
+
+.span-5 {
+  grid-column: span 5;
+}
+
+.span-6 {
+  grid-column: span 6;
+}
+
+.span-7 {
+  grid-column: span 7;
+}
+
+.span-8 {
+  grid-column: span 8;
+}
+
+.span-9 {
+  grid-column: span 9;
+}
+
+.span-10 {
+  grid-column: span 10;
+}
+
+.span-11 {
+  grid-column: span 11;
+}
+
+.span-12 {
+  grid-column: span 12;
+}
+
+@media (max-width: 960px) {
+  :root {
+    --page-max: 80rem;
+    --grid-gap: clamp(0.9rem, 3vw, 1.6rem);
+  }
+}
+
+@media (max-width: 720px) {
+  :root {
+    --page-max: 72rem;
+    --page-gutter: clamp(1rem, 4vw, 1.6rem);
+  }
+}

@@ -1,3 +1,10 @@
-<div class="view-placeholder">
-  <p>Tags view</p>
-</div>
+<section id="tags-view" class="tags-view page-grid grid-12" data-day="{{ day }}">
+  <aside class="tags-view__sidebar span-3">
+    <div class="tags-view__sidebar-fixed">
+      <div id="tags-view-list" class="tags-view__list">
+        {% include 'partials/tags_view_list.html' %}
+      </div>
+    </div>
+  </aside>
+  {% include 'partials/tags_view_detail.html' %}
+</section>

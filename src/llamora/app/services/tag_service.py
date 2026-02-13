@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from collections import Counter
+from datetime import datetime
 import logging
-import time
 import re
+import time
 import textwrap
 from dataclasses import dataclass
-from typing import Any, Iterable, Sequence
+from typing import Any, Iterable, Literal, Sequence
 
 from llamora.app.util.tags import canonicalize as _canonicalize, display as _display
 from llamora.persistence.local_db import LocalDB
@@ -19,6 +21,8 @@ logger = logging.getLogger(__name__)
 
 _SENTENCE_END = re.compile(r"[.!?](?:\s|$)")
 _MARKDOWN_PREFIX = re.compile(r"^(?:#{1,6}\s+|>+\s+|[-*+]\s+|\d+\.\s+)")
+TagsSortKind = Literal["alpha", "count"]
+TagsSortDirection = Literal["asc", "desc"]
 
 
 def _parse_tag_cursor(cursor: str | None) -> tuple[str | None, str | None]:
@@ -53,6 +57,49 @@ class TagOverview:
     next_cursor: str | None = None
 
 
+@dataclass(slots=True)
+class TagIndexItem:
+    name: str
+    hash: str
+    count: int
+
+
+@dataclass(slots=True)
+class TagRelatedItem:
+    name: str
+    count: int
+
+
+@dataclass(slots=True)
+class TagArchiveEntry:
+    entry_id: str
+    created_at: str
+    created_date: str | None
+    date_label: str
+    snippet: str
+    secondary_tags: tuple[str, ...]
+
+
+@dataclass(slots=True)
+class TagArchiveDetail:
+    name: str
+    hash: str
+    count: int
+    first_used: str | None
+    first_used_label: str | None
+    entries: tuple[TagArchiveEntry, ...]
+    related_tags: tuple[TagRelatedItem, ...]
+
+
+@dataclass(slots=True)
+class TagsViewData:
+    tags: tuple[TagIndexItem, ...]
+    selected_tag: str | None
+    detail: TagArchiveDetail | None
+    sort_kind: TagsSortKind
+    sort_dir: TagsSortDirection
+
+
 class TagService:
     """Provide higher level helpers for tag canonicalisation and hydration."""
 
@@ -70,6 +117,54 @@ class TagService:
         """Return the display-ready form for ``canonical``."""
 
         return _display(canonical)
+
+    def normalize_tag_query(self, raw: str | None) -> str | None:
+        """Return canonical tag query value, or ``None`` when invalid/empty."""
+
+        value = str(raw or "").strip()
+        if not value:
+            return None
+        try:
+            return self.canonicalize(value)
+        except ValueError:
+            return None
+
+    def normalize_tags_sort_kind(self, raw: str | None) -> TagsSortKind:
+        """Return the sort kind for the tags index."""
+
+        value = str(raw or "").strip().lower()
+        if not value:
+            return "count"
+        if value == "count":
+            return "count"
+        return "alpha"
+
+    def normalize_tags_sort_dir(self, raw: str | None) -> TagsSortDirection:
+        """Return the sort direction for the tags index."""
+
+        value = str(raw or "").strip().lower()
+        if not value:
+            return "desc"
+        if value == "desc":
+            return "desc"
+        return "asc"
+
+    def normalize_legacy_sort(
+        self,
+        raw: str | None,
+    ) -> tuple[TagsSortKind, TagsSortDirection] | None:
+        """Translate legacy sort values into the current split model."""
+
+        value = str(raw or "").strip().lower()
+        if value == "count_desc":
+            return ("count", "desc")
+        if value == "count_asc":
+            return ("count", "asc")
+        if value == "alpha_desc":
+            return ("alpha", "desc")
+        if value == "alpha":
+            return ("alpha", "asc")
+        return None
 
     async def get_tag_overview(
         self,
@@ -152,6 +247,194 @@ class TagService:
             )
 
         return previews, next_cursor, has_more
+
+    async def get_tags_view_data(
+        self,
+        user_id: str,
+        dek: bytes,
+        selected_tag: str | None,
+        *,
+        sort_kind: TagsSortKind = "alpha",
+        sort_dir: TagsSortDirection = "asc",
+        entry_limit: int = 80,
+        secondary_tag_limit: int = 4,
+        related_tag_limit: int = 2,
+    ) -> TagsViewData:
+        """Return data for the two-column archival tags view."""
+
+        raw_tags = await self._db.tags.get_tags_index(user_id, dek)
+        index_items: list[TagIndexItem] = []
+        for row in raw_tags:
+            raw_name = str(row.get("name") or "").strip()
+            if not raw_name:
+                continue
+            try:
+                canonical = self.canonicalize(raw_name)
+            except ValueError:
+                continue
+            index_items.append(
+                TagIndexItem(
+                    name=self.display(canonical),
+                    hash=str(row.get("hash") or ""),
+                    count=int(row.get("count") or 0),
+                )
+            )
+
+        index_items = self._sort_index_items(
+            index_items,
+            sort_kind=sort_kind,
+            sort_dir=sort_dir,
+        )
+        selected_name = self.normalize_tag_query(selected_tag)
+        selected_index = (
+            next((item for item in index_items if item.name == selected_name), None)
+            if selected_name
+            else None
+        )
+        if not selected_index:
+            return TagsViewData(
+                tags=tuple(index_items),
+                selected_tag=None,
+                detail=None,
+                sort_kind=sort_kind,
+                sort_dir=sort_dir,
+            )
+
+        detail = await self._build_archive_detail(
+            user_id,
+            dek,
+            selected_index,
+            limit=entry_limit,
+            secondary_tag_limit=secondary_tag_limit,
+            related_tag_limit=related_tag_limit,
+        )
+        return TagsViewData(
+            tags=tuple(index_items),
+            selected_tag=selected_index.name if detail else None,
+            detail=detail,
+            sort_kind=sort_kind,
+            sort_dir=sort_dir,
+        )
+
+    def _sort_index_items(
+        self,
+        items: list[TagIndexItem],
+        *,
+        sort_kind: TagsSortKind,
+        sort_dir: TagsSortDirection,
+    ) -> list[TagIndexItem]:
+        if sort_kind == "count":
+            if sort_dir == "desc":
+                items.sort(key=lambda item: (-item.count, item.name))
+            else:
+                items.sort(key=lambda item: (item.count, item.name))
+            return items
+        if sort_dir == "desc":
+            items.sort(key=lambda item: item.name, reverse=True)
+        else:
+            items.sort(key=lambda item: item.name)
+        return items
+
+    async def _build_archive_detail(
+        self,
+        user_id: str,
+        dek: bytes,
+        tag_item: TagIndexItem,
+        *,
+        limit: int,
+        secondary_tag_limit: int,
+        related_tag_limit: int,
+    ) -> TagArchiveDetail | None:
+        try:
+            tag_hash = bytes.fromhex(tag_item.hash)
+        except ValueError:
+            return None
+
+        info = await self._db.tags.get_tag_info(user_id, tag_hash, dek)
+        if not info:
+            return None
+
+        entry_ids, _, _ = await self._db.tags.get_recent_entries_page_for_tag_hashes(
+            user_id,
+            [tag_hash],
+            limit=max(1, limit),
+        )
+        if not entry_ids:
+            return TagArchiveDetail(
+                name=tag_item.name,
+                hash=tag_item.hash,
+                count=int(info.get("count") or 0),
+                first_used=info.get("first_used"),
+                first_used_label=_format_month_year(info.get("first_used")),
+                entries=(),
+                related_tags=(),
+            )
+
+        entries = await self._db.entries.get_entries_by_ids(user_id, entry_ids, dek)
+        entry_map = {entry.get("id"): entry for entry in entries}
+        tags_by_entry = await self._db.tags.get_tags_for_entries(
+            user_id, entry_ids, dek
+        )
+        related_counter: Counter[str] = Counter()
+        archive_entries: list[TagArchiveEntry] = []
+
+        for entry_id in entry_ids:
+            entry = entry_map.get(entry_id)
+            if not entry:
+                continue
+            created_at = str(entry.get("created_at") or "").strip()
+            if not created_at:
+                continue
+
+            secondary_tags: list[str] = []
+            seen_secondary: set[str] = set()
+            for tag in tags_by_entry.get(entry_id, []):
+                raw_name = str(tag.get("name") or "").strip()
+                if not raw_name:
+                    continue
+                try:
+                    canonical = self.canonicalize(raw_name)
+                except ValueError:
+                    continue
+                if canonical == tag_item.name or canonical in seen_secondary:
+                    continue
+                secondary_tags.append(canonical)
+                seen_secondary.add(canonical)
+                related_counter[canonical] += 1
+
+            snippet = _extract_preview_excerpt(str(entry.get("text") or ""))
+            if not snippet:
+                snippet = "..."
+
+            archive_entries.append(
+                TagArchiveEntry(
+                    entry_id=entry_id,
+                    created_at=created_at,
+                    created_date=entry.get("created_date"),
+                    date_label=_format_month_day(
+                        created_at,
+                        entry.get("created_date"),
+                    ),
+                    snippet=snippet,
+                    secondary_tags=tuple(secondary_tags[: max(1, secondary_tag_limit)]),
+                )
+            )
+
+        related = tuple(
+            TagRelatedItem(name=name, count=count)
+            for name, count in sorted(
+                related_counter.items(), key=lambda item: (-item[1], item[0])
+            )[: max(0, related_tag_limit)]
+        )
+        return TagArchiveDetail(
+            name=tag_item.name,
+            hash=tag_item.hash,
+            count=int(info.get("count") or tag_item.count),
+            first_used=info.get("first_used"),
+            first_used_label=_format_month_year(info.get("first_used")),
+            entries=tuple(archive_entries),
+            related_tags=related,
+        )
 
     async def hydrate_search_results(
         self,
@@ -420,3 +703,63 @@ def _extract_preview_line(
     if len(clean) > max_chars:
         clean = textwrap.shorten(clean, width=max_chars, placeholder="...")
     return clean.strip()
+
+
+def _extract_preview_excerpt(
+    text: str, max_lines: int = 4, max_chars: int = 420
+) -> str:
+    if not text:
+        return ""
+
+    lines: list[str] = []
+    for line in str(text).splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        cleaned = _MARKDOWN_PREFIX.sub("", stripped).strip()
+        if not cleaned:
+            continue
+        lines.append(cleaned)
+        if len(lines) >= max_lines:
+            break
+
+    if not lines:
+        return ""
+
+    excerpt = "\n".join(lines).strip()
+    if len(excerpt) <= max_chars:
+        return excerpt
+    return textwrap.shorten(
+        excerpt.replace("\n", " "), width=max_chars, placeholder="..."
+    )
+
+
+def _parse_datetime(raw: str | None) -> datetime | None:
+    value = str(raw or "").strip()
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _format_month_year(raw: str | None) -> str | None:
+    dt = _parse_datetime(raw)
+    if not dt:
+        return None
+    return dt.strftime("%B %Y")
+
+
+def _format_month_day(created_at: str, created_date: str | None) -> str:
+    date_value = str(created_date or "").strip()
+    if date_value:
+        try:
+            date_dt = datetime.fromisoformat(f"{date_value}T00:00:00")
+            return f"{date_dt.strftime('%B')} {date_dt.day}"
+        except ValueError:
+            pass
+    created_dt = _parse_datetime(created_at)
+    if created_dt:
+        return f"{created_dt.strftime('%B')} {created_dt.day}"
+    return "Unknown date"

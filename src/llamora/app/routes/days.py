@@ -42,6 +42,17 @@ async def _render_day(date: str, target: str | None, view_kind: str):
         "Render day=%s min_date=%s is_first_day=%s", date, min_date, is_first_day
     )
     entries_html = None
+    tags_view = None
+    selected_tag = None
+    tags_sort_kind = services.tag_service.normalize_tags_sort_kind(
+        request.args.get("sort_kind")
+    )
+    tags_sort_dir = services.tag_service.normalize_tags_sort_dir(
+        request.args.get("sort_dir")
+    )
+    legacy_sort = services.tag_service.normalize_legacy_sort(request.args.get("sort"))
+    if legacy_sort is not None:
+        tags_sort_kind, tags_sort_dir = legacy_sort
     if view == "diary":
         entries_response = await render_entries(
             date,
@@ -50,6 +61,17 @@ async def _render_day(date: str, target: str | None, view_kind: str):
             view_kind=view_kind,
         )
         entries_html = await entries_response.get_data(as_text=True)
+    elif view == "tags":
+        dek = await session.require_dek()
+        selected_tag = services.tag_service.normalize_tag_query(request.args.get("tag"))
+        tags_view = await services.tag_service.get_tags_view_data(
+            user["id"],
+            dek,
+            selected_tag,
+            sort_kind=tags_sort_kind,
+            sort_dir=tags_sort_dir,
+        )
+        selected_tag = tags_view.selected_tag
     context = {
         "day": date,
         "is_today": date == today,
@@ -60,8 +82,15 @@ async def _render_day(date: str, target: str | None, view_kind: str):
         "scroll_target": target,
         "view_kind": view_kind,
         "view": view,
+        "tags_view": tags_view,
+        "selected_tag": selected_tag,
+        "tags_sort_kind": tags_sort_kind,
+        "tags_sort_dir": tags_sort_dir,
     }
-    if request.headers.get("HX-Request") and request.headers.get("HX-Target") == "main-content":
+    if (
+        request.headers.get("HX-Request")
+        and request.headers.get("HX-Target") == "main-content"
+    ):
         html = await render_template("partials/main_content.html", **context)
         return await make_response(html, 200)
     html = await render_template("index.html", **context)

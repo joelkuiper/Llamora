@@ -1,0 +1,116 @@
+{% set detail = tags_view.detail if tags_view is defined and tags_view else None %}
+{% set sort_kind = tags_sort_kind if tags_sort_kind is defined else (tags_view.sort_kind if tags_view is defined and tags_view else 'alpha') %}
+{% set sort_dir = tags_sort_dir if tags_sort_dir is defined else (tags_view.sort_dir if tags_view is defined and tags_view else 'asc') %}
+{% set selected_tag_name = detail.name if detail else (selected_tag if selected_tag is defined else '') %}
+<section id="tags-view-detail"
+         class="tags-view__detail span-9"
+         data-selected-tag="{{ selected_tag_name }}"
+         data-sort-kind="{{ sort_kind }}"
+         data-sort-dir="{{ sort_dir }}">
+  <div class="tags-view__detail-inner">
+    {% if detail %}
+      <header class="tags-view__detail-header">
+        <h2 class="tags-view__title">{{ detail.name }}</h2>
+        <p class="tags-view__meta">
+          {{ detail.count }} {{ "entries" if detail.count != 1 else "entry" }} · first used {{ detail.first_used_label or "unknown" }}
+        </p>
+        {% if detail.related_tags %}
+          <p class="tags-view__related">
+            <span>Frequently appears with:</span>
+            {% for related in detail.related_tags %}
+              {% if not loop.first %}<span class="tags-view__dot">·</span>{% endif %}
+              {% set related_url = url_for('days.day', date=day) ~ '?view=tags&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tag=' ~ (related.name|urlencode) %}
+              <a href="{{ related_url }}"
+                 class="tags-view__related-link"
+                 hx-get="{{ url_for('tags.tags_view_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&tag={{ related.name|urlencode }}"
+                 hx-target="#tags-view-detail"
+                 hx-swap="outerHTML"
+                 hx-push-url="{{ related_url }}">
+                {{ related.name }}
+              </a>
+            {% endfor %}
+          </p>
+        {% endif %}
+      </header>
+
+      <section class="tags-view__summary"
+               hx-get="{{ url_for('tags.tag_detail_summary', tag_hash=detail.hash) }}?num_words=72"
+               hx-trigger="load"
+               hx-target="this"
+               hx-swap="innerHTML swap:120ms"
+               data-cache-key="tag-summary-{{ detail.hash }}-{{ detail.count }}-{{ detail.first_used }}-72"
+               data-cache-ttl="21600">
+        <div class="tag-detail-skeleton" aria-hidden="true">
+          <span class="tag-detail-skeleton__line"></span>
+          <span class="tag-detail-skeleton__line"></span>
+        </div>
+      </section>
+
+      {% if detail.entries %}
+        <ol class="tags-view__entries">
+          {% for item in detail.entries %}
+            {% set item_date = item.created_date or item.created_at[:10] %}
+            <li class="tags-view__entry-item">
+              <article class="tags-view__entry">
+                <a class="tags-view__entry-date"
+                   href="{{ url_for('days.day', date=item_date) }}?view=diary&target=entry-{{ item.entry_id }}"
+                   hx-get="{{ url_for('days.day', date=item_date) }}?view=diary&target=entry-{{ item.entry_id }}"
+                   hx-target="#main-content"
+                   hx-swap="outerHTML"
+                   hx-push-url="true">
+                  {{ item.date_label }} · {{ item.created_at|humanize }}
+                </a>
+                <p class="tags-view__entry-snippet">{{ item.snippet }}</p>
+                <div class="tags-view__entry-footer">
+                  {% if item.secondary_tags %}
+                    <div class="entry-tags tags-view__entry-tags">
+                      {% for name in item.secondary_tags %}
+                        {% set tag_url = url_for('days.day', date=day) ~ '?view=tags&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tag=' ~ (name|urlencode) %}
+                        <a href="{{ tag_url }}"
+                           class="entry-tag tags-view__entry-tag"
+                           hx-get="{{ url_for('tags.tags_view_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&tag={{ name|urlencode }}"
+                           hx-target="#tags-view-detail"
+                           hx-swap="outerHTML"
+                           hx-push-url="{{ tag_url }}">
+                          <span class="tag-label">{{ name }}</span>
+                        </a>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <div></div>
+                  {% endif %}
+                  <div class="entry-actions-row tags-view__entry-actions">
+                    <button class="entry-action entry-delete"
+                            type="button"
+                            hx-delete="{{ url_for('entries.delete_entry', entry_id=item.entry_id) }}"
+                            hx-target="closest .tags-view__entry-item"
+                            hx-swap="delete swap:180ms"
+                            hx-confirm="Delete this entry?"
+                            data-confirm-title="Delete entry?"
+                            data-confirm-message="This entry will be removed from your diary."
+                            data-confirm-confirm="Delete"
+                            data-confirm-cancel="Keep"
+                            data-confirm-variant="danger"
+                            aria-label="Delete entry"
+                            data-tooltip-title="Delete entry"
+                            data-ready="true">
+                      <span class="icon-mask icon-trash entry-action__icon" aria-hidden="true"></span>
+                    </button>
+                  </div>
+                </div>
+              </article>
+            </li>
+          {% endfor %}
+        </ol>
+      {% else %}
+        <div class="tags-view__placeholder is-empty">
+          <p>No entries linked to this trace yet.</p>
+        </div>
+      {% endif %}
+    {% else %}
+      <div class="tags-view__placeholder">
+        <p>Select a trace to explore related entries.</p>
+      </div>
+    {% endif %}
+  </div>
+</section>

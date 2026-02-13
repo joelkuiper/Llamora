@@ -4,6 +4,7 @@
 
 @import url("./tokens/base.css");
 @import url("./motion.css");
+@import url("./grid.css");
 
 /* ==========================================================================
    Base Elements
@@ -530,6 +531,21 @@ input[type="checkbox"]:focus {
 }
 .icon-calendar-days {
   --icon: url("../icons/calendar-days.svg");
+}
+.icon-arrow-down-a-z {
+  --icon: url("../icons/arrow-down-a-z.svg");
+}
+.icon-arrow-up-a-z {
+  --icon: url("../icons/arrow-up-a-z.svg");
+}
+.icon-arrow-up-0-1 {
+  --icon: url("../icons/arrow-up-0-1.svg");
+}
+.icon-arrow-up-1-0 {
+  --icon: url("../icons/arrow-up-1-0.svg");
+}
+.icon-arrow-down-1-0 {
+  --icon: url("../icons/arrow-down-1-0.svg");
 }
 .icon-chevrons-down-up {
   --icon: url("../icons/chevrons-down-up.svg");

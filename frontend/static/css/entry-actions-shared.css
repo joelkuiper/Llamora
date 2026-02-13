@@ -1,0 +1,11 @@
+.entry-action.entry-delete:hover,
+.entry-action.entry-delete:focus-visible,
+.entry.assistant .entry-action.entry-delete:hover,
+.entry.assistant .entry-action.entry-delete:focus-visible,
+.entry.response-stream .entry-action.entry-delete:hover,
+.entry.response-stream .entry-action.entry-delete:focus-visible {
+  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-danger) 18%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  color: color-mix(in srgb, var(--color-danger) 70%, var(--color-text-muted));
+}
