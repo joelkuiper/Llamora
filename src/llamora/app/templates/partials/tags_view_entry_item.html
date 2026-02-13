@@ -1,6 +1,6 @@
 {% set item_date = item.created_date or item.created_at[:10] %}
 {% set entry_url = url_for('days.day', date=item_date) ~ '?view=diary&target=entry-' ~ item.entry_id %}
-<li class="tags-view__entry-item">
+<li class="tags-view__entry-item" data-entry-id="{{ item.entry_id }}">
   <article class="tags-view__entry entry user">
     <a class="tags-view__entry-date"
        href="{{ entry_url }}"
