@@ -8,6 +8,7 @@ let activeTrigger = null;
 let pendingTrigger = null;
 let delayTimer = null;
 let cleanupAutoUpdate = null;
+let hideTimer = null;
 let initialized = false;
 
 function ensureElement() {
@@ -72,9 +73,21 @@ function dismiss() {
     cleanupAutoUpdate = null;
   }
 
+  if (hideTimer !== null) {
+    clearTimeout(hideTimer);
+    hideTimer = null;
+  }
+
   if (tooltipEl) {
     tooltipEl.classList.remove("visible");
-    tooltipEl.hidden = true;
+    // Delay hidden until the CSS fade-out (180ms) completes;
+    // pointer-events: none keeps it non-interactive in the meantime.
+    hideTimer = setTimeout(() => {
+      hideTimer = null;
+      if (!activeTrigger && tooltipEl) {
+        tooltipEl.hidden = true;
+      }
+    }, 200);
   }
 
   activeTrigger = null;
@@ -88,6 +101,11 @@ function show(trigger) {
   if (!title) return;
 
   dismiss();
+  // Cancel the fade-out hide timer — we're about to show again.
+  if (hideTimer !== null) {
+    clearTimeout(hideTimer);
+    hideTimer = null;
+  }
   ensureElement();
 
   innerEl.textContent = title;
