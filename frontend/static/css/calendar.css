@@ -405,6 +405,11 @@
       pointer-events: none;
     }
 
+    td.has-opening-only a::after {
+      background: color-mix(in srgb, var(--color-text) 35%, transparent);
+      opacity: 0.7;
+    }
+
     td.active .no-entries {
       opacity: 1;
     }
