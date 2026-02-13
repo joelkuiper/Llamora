@@ -83,6 +83,61 @@ export function formatLocalTimestamp(value) {
   }).format(date);
 }
 
+function getRelativeFormatter() {
+  const locale = getLocaleForTime();
+  return new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+}
+
+function resolveRelativeUnit(diffMs) {
+  const absMs = Math.abs(diffMs);
+  const minute = 60_000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  const week = 7 * day;
+  const month = 30 * day;
+  const year = 365 * day;
+
+  if (absMs < minute) return { unit: "second", size: 1_000 };
+  if (absMs < hour) return { unit: "minute", size: minute };
+  if (absMs < day) return { unit: "hour", size: hour };
+  if (absMs < week) return { unit: "day", size: day };
+  if (absMs < month) return { unit: "week", size: week };
+  if (absMs < year) return { unit: "month", size: month };
+  return { unit: "year", size: year };
+}
+
+export function formatRelativeTime(value, now = new Date()) {
+  const date = normalizeTimeValue(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const diffMs = date.getTime() - now.getTime();
+  const { unit, size } = resolveRelativeUnit(diffMs);
+  const amount = Math.round(diffMs / size);
+  return getRelativeFormatter().format(amount, unit);
+}
+
+export function formatLocalDateTimeContext(value, now = new Date()) {
+  const date = normalizeTimeValue(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const relative = formatRelativeTime(date, now);
+  const hour12 = getClockFormat() === "12h";
+  const locale = getLocaleForTime();
+  const absolute = new Intl.DateTimeFormat(locale, {
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12,
+  }).format(date);
+  if (!relative) {
+    return absolute;
+  }
+  return `${relative} · ${absolute}`;
+}
+
 export function formatTimeElements(root = document) {
   if (!root || typeof root.querySelectorAll !== "function") {
     return;
@@ -94,7 +149,11 @@ export function formatTimeElements(root = document) {
   nodes.forEach((el) => {
     const raw = el.dataset?.timeRaw || el.getAttribute("datetime") || "";
     if (!raw) return;
-    const timeText = formatLocalTime(raw);
+    const style = String(el.dataset?.timeStyle || "")
+      .trim()
+      .toLowerCase();
+    const timeText =
+      style === "ago-date-time" ? formatLocalDateTimeContext(raw) : formatLocalTime(raw);
     if (timeText) {
       el.textContent = timeText;
     }

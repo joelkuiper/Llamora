@@ -8,7 +8,10 @@
        hx-target="#main-content"
        hx-swap="outerHTML"
        hx-push-url="true">
-      {{ item.date_label }} · {{ item.created_at|humanize }}
+      <time class="entry-time"
+            datetime="{{ item.created_at }}"
+            data-time-raw="{{ item.created_at }}"
+            data-time-style="ago-date-time"></time>
     </a>
     <p class="tags-view__entry-snippet">{{ item.snippet }}</p>
     <div class="tags-view__entry-footer">

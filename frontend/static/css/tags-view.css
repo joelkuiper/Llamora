@@ -560,7 +560,6 @@
   animation: motion-tag-enter var(--motion-tag-enter-duration) ease both;
 }
 
-.tags-view__index-load-more,
 .tags-view__entries-load-more {
   min-height: 2rem;
 }

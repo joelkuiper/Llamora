@@ -1,5 +1,6 @@
 import * as FuseModule from "fuse.js";
 import { armEntryAnimations, armInitialEntryAnimations } from "../entries/entry-animations.js";
+import { formatTimeElements } from "../services/time.js";
 import { clearScrollTarget, flashHighlight } from "../ui.js";
 
 const FuseCtor = FuseModule.default ?? FuseModule;
@@ -154,11 +155,14 @@ const updateSortButtons = (root = document) => {
   });
 };
 
-const updateUrlWithSort = (rawUrl) => {
+const updateUrlWithSort = (rawUrl, { clearTarget = false } = {}) => {
   const current = new URL(window.location.href);
   const next = new URL(rawUrl, current.origin);
   next.searchParams.set("sort_kind", state.sortKind);
   next.searchParams.set("sort_dir", state.sortDir);
+  if (clearTarget) {
+    next.searchParams.delete("target");
+  }
   return `${next.pathname}${next.search}${next.hash}`;
 };
 
@@ -167,9 +171,10 @@ const ensureSortParams = (element) => {
   const href = element.getAttribute("href");
   const hxGet = element.getAttribute("hx-get");
   const hxPush = element.getAttribute("hx-push-url");
-  if (href) element.setAttribute("href", updateUrlWithSort(href));
-  if (hxGet) element.setAttribute("hx-get", updateUrlWithSort(hxGet));
-  if (hxPush) element.setAttribute("hx-push-url", updateUrlWithSort(hxPush));
+  const clearTarget = element.classList.contains("tags-view__index-row");
+  if (href) element.setAttribute("href", updateUrlWithSort(href, { clearTarget }));
+  if (hxGet) element.setAttribute("hx-get", updateUrlWithSort(hxGet, { clearTarget }));
+  if (hxPush) element.setAttribute("hx-push-url", updateUrlWithSort(hxPush, { clearTarget }));
 };
 
 const syncSortLinks = () => {
@@ -190,6 +195,7 @@ const syncSortLinks = () => {
 const animateDetailEntries = (root = document) => {
   const detail = findDetail(root);
   if (!detail) return;
+  formatTimeElements(detail);
   armEntryAnimations(detail);
   const entries = detail.querySelector(".tags-view__entries");
   if (!(entries instanceof HTMLElement)) return;
@@ -201,18 +207,34 @@ const highlightRequestedTag = (root = document) => {
   const target = String(params.get("target") || "").trim();
   if (!target || !target.startsWith("tag-index-")) return;
   const row = document.getElementById(target);
-  if (!(row instanceof HTMLElement)) return;
-  const tagName = row.dataset.tagName || "";
-  if (tagName) {
-    setActiveTag(tagName, root);
+  if (row instanceof HTMLElement) {
+    const tagName = row.dataset.tagName || "";
+    if (tagName) {
+      setActiveTag(tagName, root);
+    }
+    flashHighlight(row);
   }
-  flashHighlight(row);
   clearScrollTarget(target, { emitEvent: false });
+};
+
+const shouldResetSearchForTargetNavigation = () => {
+  const params = new URLSearchParams(window.location.search);
+  const target = String(params.get("target") || "").trim();
+  return target.startsWith("tag-index-");
+};
+
+const clearSearchForTargetNavigation = () => {
+  if (!shouldResetSearchForTargetNavigation()) return;
+  if (!state.query) return;
+  state.query = "";
+  persistSearchQuery("");
+  if (state.input) {
+    state.input.value = "";
+  }
 };
 
 const sortRows = () => {
   if (!state.list || state.rows.length <= 1) return;
-  const sentinel = state.list.querySelector(".tags-view__index-load-more");
 
   const sorted = [...state.rows].sort((a, b) => {
     const nameA = (a.dataset.tagsName || "").toLowerCase();
@@ -234,9 +256,6 @@ const sortRows = () => {
   sorted.forEach((row) => {
     state.list.appendChild(row);
   });
-  if (sentinel instanceof HTMLElement) {
-    state.list.appendChild(sentinel);
-  }
   state.rows = sorted;
 };
 
@@ -359,14 +378,10 @@ const applySearch = (rawQuery) => {
       });
   }
   if (state.list) {
-    const sentinel = state.list.querySelector(".tags-view__index-load-more");
     const remainder = state.rows.filter((row) => !matches.has(row));
     [...orderedMatches, ...remainder].forEach((row) => {
       state.list.appendChild(row);
     });
-    if (sentinel instanceof HTMLElement) {
-      state.list.appendChild(sentinel);
-    }
   }
   let visibleCount = 0;
   state.rows.forEach((row) => {
@@ -401,6 +416,7 @@ const updateUrlSort = () => {
   } else {
     url.searchParams.delete("tag");
   }
+  url.searchParams.delete("target");
   window.history.replaceState(window.history.state, "", url.toString());
 };
 
@@ -428,6 +444,7 @@ const sync = (root = document) => {
   buildSearchIndex(root);
   syncSortLinks();
   sortRows();
+  clearSearchForTargetNavigation();
   applySearch(state.query);
   syncFromDetail(root);
   animateDetailEntries(root);
@@ -454,6 +471,7 @@ if (!globalThis[BOOT_KEY]) {
       ensureSortParams(row);
       const tagName = row.dataset.tagName || "";
       if (!tagName) return;
+      clearScrollTarget(null, { emitEvent: false });
       setActiveTag(tagName);
       scrollMainContentTop();
       return;

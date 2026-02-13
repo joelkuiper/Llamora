@@ -38,32 +38,6 @@ def _parse_tag_cursor(cursor: str | None) -> tuple[str | None, str | None]:
     return created_at, entry_id
 
 
-def _parse_index_count_cursor(cursor: str | None) -> tuple[int | None, str | None]:
-    if not cursor:
-        return None, None
-    if "|" not in cursor:
-        return None, None
-    count_raw, _, hash_hex = cursor.partition("|")
-    try:
-        count = int(count_raw.strip())
-    except (TypeError, ValueError):
-        return None, None
-    digest = hash_hex.strip().lower()
-    if not digest:
-        return None, None
-    return count, digest
-
-
-def _parse_offset_cursor(cursor: str | None) -> int:
-    if not cursor:
-        return 0
-    try:
-        value = int(str(cursor).strip())
-    except (TypeError, ValueError):
-        return 0
-    return max(0, value)
-
-
 @dataclass(slots=True)
 class TagEntryPreview:
     entry_id: str
@@ -122,8 +96,6 @@ class TagArchiveDetail:
 @dataclass(slots=True)
 class TagsViewData:
     tags: tuple[TagIndexItem, ...]
-    tags_has_more: bool
-    tags_next_cursor: str | None
     selected_tag: str | None
     detail: TagArchiveDetail | None
     sort_kind: TagsSortKind
@@ -286,21 +258,32 @@ class TagService:
         *,
         sort_kind: TagsSortKind = "alpha",
         sort_dir: TagsSortDirection = "asc",
-        tags_limit: int = 50,
-        tags_cursor: str | None = None,
         entry_limit: int = 12,
         secondary_tag_limit: int = 4,
         related_tag_limit: int = 2,
     ) -> TagsViewData:
         """Return data for the two-column archival tags view."""
-
-        index_items, tags_next_cursor, tags_has_more = await self.get_tags_index_page(
-            user_id,
-            dek,
+        raw_tags = await self._db.tags.get_tags_index(user_id, dek)
+        index_items: list[TagIndexItem] = []
+        for row in raw_tags:
+            raw_name = str(row.get("name") or "").strip()
+            if not raw_name:
+                continue
+            try:
+                canonical = self.canonicalize(raw_name)
+            except ValueError:
+                continue
+            index_items.append(
+                TagIndexItem(
+                    name=self.display(canonical),
+                    hash=str(row.get("hash") or ""),
+                    count=int(row.get("count") or 0),
+                )
+            )
+        index_items = self._sort_index_items(
+            index_items,
             sort_kind=sort_kind,
             sort_dir=sort_dir,
-            limit=tags_limit,
-            cursor=tags_cursor,
         )
         selected_name = self.normalize_tag_query(selected_tag)
         selected_index = (
@@ -321,8 +304,6 @@ class TagService:
         if not selected_index:
             return TagsViewData(
                 tags=tuple(index_items),
-                tags_has_more=tags_has_more,
-                tags_next_cursor=tags_next_cursor,
                 selected_tag=None,
                 detail=None,
                 sort_kind=sort_kind,
@@ -339,81 +320,11 @@ class TagService:
         )
         return TagsViewData(
             tags=tuple(index_items),
-            tags_has_more=tags_has_more,
-            tags_next_cursor=tags_next_cursor,
             selected_tag=selected_index.name if detail else None,
             detail=detail,
             sort_kind=sort_kind,
             sort_dir=sort_dir,
         )
-
-    async def get_tags_index_page(
-        self,
-        user_id: str,
-        dek: bytes,
-        *,
-        sort_kind: TagsSortKind,
-        sort_dir: TagsSortDirection,
-        limit: int,
-        cursor: str | None = None,
-    ) -> tuple[list[TagIndexItem], str | None, bool]:
-        page_size = max(1, min(limit, 200))
-        if sort_kind == "count":
-            cursor_count, cursor_hash = _parse_index_count_cursor(cursor)
-            rows, next_cursor, has_more = await self._db.tags.get_tags_index_count_page(
-                user_id,
-                dek,
-                limit=page_size,
-                sort_dir=sort_dir,
-                cursor_count=cursor_count,
-                cursor_hash_hex=cursor_hash,
-            )
-            items: list[TagIndexItem] = []
-            for row in rows:
-                raw_name = str(row.get("name") or "").strip()
-                if not raw_name:
-                    continue
-                try:
-                    canonical = self.canonicalize(raw_name)
-                except ValueError:
-                    continue
-                items.append(
-                    TagIndexItem(
-                        name=self.display(canonical),
-                        hash=str(row.get("hash") or ""),
-                        count=int(row.get("count") or 0),
-                    )
-                )
-            return items, next_cursor, has_more
-
-        raw_tags = await self._db.tags.get_tags_index(user_id, dek)
-        items: list[TagIndexItem] = []
-        for row in raw_tags:
-            raw_name = str(row.get("name") or "").strip()
-            if not raw_name:
-                continue
-            try:
-                canonical = self.canonicalize(raw_name)
-            except ValueError:
-                continue
-            items.append(
-                TagIndexItem(
-                    name=self.display(canonical),
-                    hash=str(row.get("hash") or ""),
-                    count=int(row.get("count") or 0),
-                )
-            )
-        items = self._sort_index_items(
-            items,
-            sort_kind=sort_kind,
-            sort_dir=sort_dir,
-        )
-        offset = _parse_offset_cursor(cursor)
-        page = items[offset : offset + page_size + 1]
-        has_more = len(page) > page_size
-        page = page[:page_size]
-        next_cursor = str(offset + page_size) if has_more else None
-        return page, next_cursor, has_more
 
     async def _resolve_index_item_by_name(
         self,

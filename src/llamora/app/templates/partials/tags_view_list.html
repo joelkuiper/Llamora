@@ -2,8 +2,6 @@
 {% set sort_kind = tags_sort_kind if tags_sort_kind is defined else (tags_view.sort_kind if tags_view is defined and tags_view else 'count') %}
 {% set sort_dir = tags_sort_dir if tags_sort_dir is defined else (tags_view.sort_dir if tags_view is defined and tags_view else 'desc') %}
 {% set tag_items = tags_view.tags if tags_view is defined and tags_view else [] %}
-{% set tags_has_more = tags_has_more if tags_has_more is defined else (tags_view.tags_has_more if tags_view is defined and tags_view else false) %}
-{% set tags_next_cursor = tags_next_cursor if tags_next_cursor is defined else (tags_view.tags_next_cursor if tags_view is defined and tags_view else None) %}
 {% set tags_limit = tags_limit|default(50) %}
 {% set entries_limit = entries_limit|default(12) %}
 {% set target = target|default(None) %}

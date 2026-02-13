@@ -63,7 +63,6 @@ async def _render_day(date: str, target: str | None, view_kind: str):
     except (TypeError, ValueError):
         entries_limit = 12
     entries_limit = max(6, min(entries_limit, 60))
-    tags_cursor = (request.args.get("tags_cursor") or "").strip() or None
     target_param = (request.args.get("target") or "").strip() or None
     if view == "diary":
         entries_response = await render_entries(
@@ -82,8 +81,6 @@ async def _render_day(date: str, target: str | None, view_kind: str):
             selected_tag,
             sort_kind=tags_sort_kind,
             sort_dir=tags_sort_dir,
-            tags_limit=tags_limit,
-            tags_cursor=tags_cursor,
             entry_limit=entries_limit,
         )
         selected_tag = tags_view.selected_tag
