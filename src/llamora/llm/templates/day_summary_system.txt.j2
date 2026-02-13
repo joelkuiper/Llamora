@@ -15,5 +15,8 @@ Requirements:
 - Keep it concise and calm.
 
 Entry count: {{ entry_count }}
+{% if opening_only %}
+If the only entry is the day opening and there are no user entries, say so clearly in a calm, neutral way. Hint that the day opening reflects the prior day and avoid implying it describes this day.
+{% endif %}
 
 Return only strict JSON: {"summary":"..."}

@@ -17,8 +17,12 @@ _FORBIDDEN_RE = re.compile(
 )
 
 
-def _day_summary_system_prompt(entry_count: int) -> str:
-    return render_prompt_template("day_summary_system.txt.j2", entry_count=entry_count)
+def _day_summary_system_prompt(entry_count: int, opening_only: bool) -> str:
+    return render_prompt_template(
+        "day_summary_system.txt.j2",
+        entry_count=entry_count,
+        opening_only=opening_only,
+    )
 
 
 def _day_summary_response_format() -> dict[str, Any]:
@@ -135,8 +139,9 @@ async def generate_day_summary(
     entry_list = [*opening_entries, *user_entries]
     if not entry_list:
         return "No entries recorded for this day."
+    opening_only = bool(opening_entries) and not user_entries
 
-    system_prompt = _day_summary_system_prompt(len(entry_list))
+    system_prompt = _day_summary_system_prompt(len(entry_list), opening_only)
     user_prompt = _build_user_prompt(date, entry_list)
 
     messages = [
@@ -163,7 +168,7 @@ async def generate_day_summary(
         {
             "role": "system",
             "content": (
-                _day_summary_system_prompt(len(entry_list))
+                _day_summary_system_prompt(len(entry_list), opening_only)
                 + "\nReturn 1-3 plain sentences. Avoid headings or timestamps."
                 " Do not mention the assistant, AI, model, or responses."
             ),
