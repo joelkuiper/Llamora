@@ -776,13 +776,13 @@
   border-radius: 999px;
   background: linear-gradient(
     90deg,
-    color-mix(in srgb, var(--glass-bg-alt) 88%, var(--color-bg)),
-    color-mix(in srgb, var(--border) 45%, var(--glass-bg-alt)),
-    color-mix(in srgb, var(--glass-bg-alt) 88%, var(--color-bg))
+    color-mix(in srgb, var(--border) 0%, transparent),
+    color-mix(in srgb, var(--border) 22%, transparent),
+    color-mix(in srgb, var(--border) 0%, transparent)
   );
   background-size: 220% 100%;
   animation: tag-skeleton-shimmer 2.3s ease-in-out infinite;
-  opacity: 1;
+  opacity: 0.92;
 }
 
 @keyframes tag-summary-fade-in {
