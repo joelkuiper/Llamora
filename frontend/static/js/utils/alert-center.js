@@ -1,3 +1,5 @@
+import { playAnimation } from "./transition.js";
+
 const ALERT_AUTO_DISMISS_MS = 6000;
 const MAX_ALERTS = 3;
 
@@ -47,10 +49,7 @@ function dismissAlertElement(alert, reason = "manual") {
     finalizeDismiss(alert, reason);
   };
 
-  alert.classList.add("alert--leaving");
-  alert.addEventListener("animationend", handleRemoval, { once: true });
-
-  window.setTimeout(handleRemoval, 250);
+  playAnimation(alert, "alert--leaving").then(handleRemoval);
 }
 
 function scheduleAutoDismiss(alert, delay = ALERT_AUTO_DISMISS_MS) {
@@ -61,9 +60,7 @@ function scheduleAutoDismiss(alert, delay = ALERT_AUTO_DISMISS_MS) {
 
 function restartEntranceAnimation(alert) {
   alert.style.animation = "none";
-  // Force reflow so the animation restarts reliably across browsers.
-  // eslint-disable-next-line no-unused-expressions
-  alert.offsetHeight;
+  void alert.offsetHeight;
   alert.style.animation = "";
 }
 

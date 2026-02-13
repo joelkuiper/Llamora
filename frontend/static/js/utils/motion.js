@@ -15,11 +15,34 @@ export function prefersReducedMotion() {
   return Boolean(query?.matches);
 }
 
-export function motionSafeBehavior(behavior = "smooth", reduceMotion = prefersReducedMotion()) {
+const cachedReduceMotion = prefersReducedMotion();
+
+export function isMotionReduced() {
+  return cachedReduceMotion;
+}
+
+export function isMotionSafe() {
+  return !cachedReduceMotion;
+}
+
+export function motionSafeBehavior(behavior = "smooth", reduceMotion = cachedReduceMotion) {
   if (!reduceMotion) {
     return behavior;
   }
   return behavior === "smooth" ? "auto" : behavior;
+}
+
+export function withMotionPreference({ safe, reduced }) {
+  if (cachedReduceMotion) {
+    if (typeof reduced === "function") {
+      reduced();
+    }
+    return false;
+  }
+  if (typeof safe === "function") {
+    safe();
+  }
+  return true;
 }
 
 const LABEL_FLASH_CLASS = "text-glow-flash";
@@ -27,6 +50,6 @@ const LABEL_FLASH_CLASS = "text-glow-flash";
 export function triggerLabelFlash(node) {
   if (!node) return;
   node.classList.remove(LABEL_FLASH_CLASS);
-  void node.offsetWidth;
+  void node.offsetHeight;
   node.classList.add(LABEL_FLASH_CLASS);
 }

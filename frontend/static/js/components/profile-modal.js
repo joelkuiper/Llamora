@@ -41,7 +41,7 @@ function initProfileModal(modal) {
       modal.remove();
       document.body.classList.remove("modal-open");
       setProfileButtonActive(false);
-    }, 160);
+    }, 220);
   };
 
   listeners.add(modal, "click", (event) => {

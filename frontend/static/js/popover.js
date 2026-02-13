@@ -1,4 +1,5 @@
 import { createListenerBag } from "./utils/events.js";
+import { playAnimation } from "./utils/transition.js";
 import {
   autoUpdate,
   computePosition,
@@ -6,8 +7,6 @@ import {
   offset as offsetMiddleware,
   shift,
 } from "./vendor/setup-globals.js";
-
-const DEFAULT_TIMEOUT = 250;
 
 const defaultAnimation = {
   popoverEnter: "fade-enter",
@@ -20,42 +19,19 @@ function isNode(target) {
   return typeof Node !== "undefined" ? target instanceof Node : !!target;
 }
 
-function runAnimation(el, className, remove = []) {
-  if (!el) {
-    return Promise.resolve();
-  }
-  remove.forEach((cls) => {
-    el.classList.remove(cls);
-  });
-  // Force reflow to restart the animation when classes reapply.
-  void el.getBoundingClientRect();
-  el.classList.add(className);
-  return new Promise((resolve) => {
-    let done = false;
-    const cleanup = () => {
-      if (done) return;
-      done = true;
-      el.classList.remove(className);
-      resolve();
-    };
-    el.addEventListener("animationend", cleanup, { once: true });
-    setTimeout(cleanup, DEFAULT_TIMEOUT);
-  });
-}
-
 function applyEnterAnimation(popover, panel, animation) {
   if (!animation) return;
   const { popoverEnter, popoverExit, panelEnter, panelExit } = animation;
-  runAnimation(popover, popoverEnter, [popoverEnter, popoverExit]);
-  runAnimation(panel, panelEnter, [panelEnter, panelExit]);
+  playAnimation(popover, popoverEnter, { remove: [popoverEnter, popoverExit] });
+  playAnimation(panel, panelEnter, { remove: [panelEnter, panelExit] });
 }
 
 function applyExitAnimation(popover, panel, animation) {
   if (!animation) return Promise.resolve();
   const { popoverEnter, popoverExit, panelEnter, panelExit } = animation;
   return Promise.all([
-    runAnimation(popover, popoverExit, [popoverEnter, popoverExit]),
-    runAnimation(panel, panelExit, [panelEnter, panelExit]),
+    playAnimation(popover, popoverExit, { remove: [popoverEnter, popoverExit] }),
+    playAnimation(panel, panelExit, { remove: [panelEnter, panelExit] }),
   ]);
 }
 

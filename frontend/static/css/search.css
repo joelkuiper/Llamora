@@ -355,9 +355,3 @@
   opacity: 0;
   transform: translateY(-6px) scale(0.98) rotateX(2deg);
 }
-
-@keyframes search-load-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}

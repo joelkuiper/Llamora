@@ -128,39 +128,3 @@
     animation: var(--motion-entry-delete-animation);
   }
 }
-
-@layer motion.utilities {
-  @media (prefers-reduced-motion: reduce) {
-    :where(.motion-animate-highlight),
-    :where(.entry-tags).motion-animate-tag-enter,
-    :where(.entry-tags).htmx-added,
-    :where(.entry-tag).motion-animate-tag-enter,
-    :where(.entry-tag).htmx-added,
-    :where(.entry-tag).motion-animate-tag-exit,
-    :where(.entry-tag).htmx-swapping,
-    :where(.scroll-btn).motion-animate-tactile,
-    :where(.motion-animate-entry-delete),
-    :where(.entry.htmx-swapping),
-    :where(.calendar-table td.is-summarizing a),
-    :where(.calendar-table td.is-summarizing span) {
-      animation: none !important;
-    }
-
-    :where(.entry-tag).motion-animate-tag-exit,
-    :where(.entry-tag).htmx-swapping {
-      opacity: 0;
-    }
-
-    :where(.entry-tag).motion-animate-tag-enter,
-    :where(.entry-tag).htmx-added,
-    :where(.entry-tags).motion-animate-tag-enter,
-    :where(.entry-tags).htmx-added {
-      opacity: 1;
-    }
-
-    :where(.motion-animate-entry-delete),
-    :where(.entry.htmx-swapping) {
-      opacity: 0;
-    }
-  }
-}

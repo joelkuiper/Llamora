@@ -1,5 +1,5 @@
-import { animateMotion } from "../services/motion.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
+import { animateMotion } from "../utils/transition.js";
 
 class ScrollBottomButtonElement extends ReactiveElement {
   #button = null;

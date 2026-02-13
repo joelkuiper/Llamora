@@ -253,18 +253,3 @@
     background-position: 0% 50%;
   }
 }
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* respect reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  #entry-form.is-submitting::after,
-  .input-wrapper .btn.submitting,
-  .input-wrapper .btn.submitting::after {
-    animation: none;
-  }
-}

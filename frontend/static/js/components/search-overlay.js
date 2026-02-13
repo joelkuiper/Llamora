@@ -1,8 +1,8 @@
 import { createInlineSpinner, scrollToHighlight } from "../ui.js";
 import { AutocompleteHistory } from "../utils/autocomplete-history.js";
 import { createShortcutBag } from "../utils/global-shortcuts.js";
-import { prefersReducedMotion } from "../utils/motion.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
+import { playAnimation } from "../utils/transition.js";
 import { AutocompleteOverlayMixin } from "./base/autocomplete-overlay.js";
 
 const getEventTarget = (evt) => {
@@ -252,18 +252,11 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     }
 
     const completeEnter = () => {
-      panel.classList.remove("pop-enter");
       wrap.classList.add("is-open");
       this.#activateOverlayListeners();
     };
 
-    panel.classList.add("pop-enter");
-
-    if (prefersReducedMotion()) {
-      completeEnter();
-    } else {
-      panel.addEventListener("animationend", completeEnter, { once: true });
-    }
+    playAnimation(panel, "pop-enter").then(completeEnter);
     this.#addCurrentQueryToAutocomplete();
     this.#loadRecentSearches();
   }
@@ -539,18 +532,12 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
 
     panel.classList.remove("pop-enter");
 
-    const completeExit = () => {
-      panel.classList.remove("pop-exit");
+    if (immediate) {
       finish();
-    };
-
-    if (immediate || prefersReducedMotion()) {
-      completeExit();
       return;
     }
 
-    panel.classList.add("pop-exit");
-    panel.addEventListener("animationend", completeExit, { once: true });
+    playAnimation(panel, "pop-exit").then(finish);
   }
 
   #handlePageShow(event) {

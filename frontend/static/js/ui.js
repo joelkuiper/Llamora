@@ -3,8 +3,9 @@ import {
   requestScrollTargetConsumed,
   scrollEvents,
 } from "./entries/scroll-manager.js";
-import { animateMotion, motionSafeBehavior } from "./services/motion.js";
+import { motionSafeBehavior } from "./utils/motion.js";
 import { scheduleRafLoop } from "./utils/scheduler.js";
+import { animateMotion } from "./utils/transition.js";
 
 export const SPINNER = {
   interval: 80,

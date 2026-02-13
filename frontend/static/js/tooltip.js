@@ -1,3 +1,4 @@
+import { transitionHide, transitionShow } from "./utils/transition.js";
 import { autoUpdate, computePosition, flip, offset, shift } from "./vendor/setup-globals.js";
 
 const SHOW_DELAY_MS = 320;
@@ -8,7 +9,7 @@ let activeTrigger = null;
 let pendingTrigger = null;
 let delayTimer = null;
 let cleanupAutoUpdate = null;
-let hideTimer = null;
+let cancelHide = null;
 let initialized = false;
 
 function ensureElement() {
@@ -73,21 +74,11 @@ function dismiss() {
     cleanupAutoUpdate = null;
   }
 
-  if (hideTimer !== null) {
-    clearTimeout(hideTimer);
-    hideTimer = null;
-  }
-
+  if (cancelHide) cancelHide();
   if (tooltipEl) {
-    tooltipEl.classList.remove("visible");
-    // Delay hidden until the CSS fade-out (180ms) completes;
-    // pointer-events: none keeps it non-interactive in the meantime.
-    hideTimer = setTimeout(() => {
-      hideTimer = null;
-      if (!activeTrigger && tooltipEl) {
-        tooltipEl.hidden = true;
-      }
-    }, 200);
+    // transitionHide removes "visible" and sets hidden after 200ms.
+    // pointer-events: none keeps the tooltip non-interactive during fade-out.
+    cancelHide = transitionHide(tooltipEl, "visible", 200);
   }
 
   activeTrigger = null;
@@ -101,26 +92,21 @@ function show(trigger) {
   if (!title) return;
 
   dismiss();
-  // Cancel the fade-out hide timer — we're about to show again.
-  if (hideTimer !== null) {
-    clearTimeout(hideTimer);
-    hideTimer = null;
+  // Cancel the fade-out hide — we're about to show again.
+  if (cancelHide) {
+    cancelHide();
+    cancelHide = null;
   }
   ensureElement();
 
   innerEl.textContent = title;
   tooltipEl.style.position = "fixed";
-  tooltipEl.hidden = false;
   activeTrigger = trigger;
 
   updatePosition(trigger);
   cleanupAutoUpdate = autoUpdate(trigger, tooltipEl, () => updatePosition(trigger));
 
-  requestAnimationFrame(() => {
-    if (activeTrigger === trigger) {
-      tooltipEl.classList.add("visible");
-    }
-  });
+  transitionShow(tooltipEl, "visible");
 }
 
 function scheduleShow(trigger) {

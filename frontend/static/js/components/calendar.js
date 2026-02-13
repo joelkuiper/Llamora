@@ -2,6 +2,7 @@
 import { getActiveDayParts } from "../entries/active-day-store.js";
 import { createPopover } from "../popover.js";
 import { triggerLabelFlash } from "../utils/motion.js";
+import { transitionHide, transitionShow } from "../utils/transition.js";
 
 const DAY_SUMMARY_CACHE_PREFIX = "llamora:day-summary:";
 const DAY_SUMMARY_CACHE_TTL = 1000 * 60 * 60 * 6;
@@ -277,7 +278,7 @@ export class CalendarControl extends HTMLElement {
       this.#tooltipTimer = null;
     }
     if (this.#tooltipHideTimer) {
-      clearTimeout(this.#tooltipHideTimer);
+      this.#tooltipHideTimer();
       this.#tooltipHideTimer = null;
     }
     this.#tooltipDate = null;
@@ -293,16 +294,13 @@ export class CalendarControl extends HTMLElement {
       this.#summaryCell.classList.remove("is-summarizing");
       this.#summaryCell = null;
     }
-    tooltip.classList.remove("is-visible");
     if (immediate) {
+      tooltip.classList.remove("is-visible");
       tooltip.hidden = true;
       tooltip.textContent = "";
       return;
     }
-    this.#tooltipHideTimer = window.setTimeout(() => {
-      tooltip.hidden = true;
-      tooltip.textContent = "";
-    }, 180);
+    this.#tooltipHideTimer = transitionHide(tooltip, "is-visible", 160);
   }
 
   #positionTooltip(tooltip, cell) {
@@ -337,9 +335,7 @@ export class CalendarControl extends HTMLElement {
     tooltip.style.left = `${Math.round(left)}px`;
     tooltip.style.top = `${Math.round(top)}px`;
     tooltip.style.visibility = "visible";
-    requestAnimationFrame(() => {
-      tooltip.classList.add("is-visible");
-    });
+    transitionShow(tooltip, "is-visible");
   }
 
   async #fetchDaySummary(date) {

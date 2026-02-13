@@ -1,7 +1,7 @@
 import { requestScrollForceBottom } from "../entries/scroll-manager.js";
-import { isMotionReduced } from "../services/motion.js";
 import { applyTimezoneQuery, formatLocalTime, formatLocalTimestamp } from "../services/time.js";
 import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
+import { isMotionReduced } from "../utils/motion.js";
 import { StreamRenderer } from "./stream-renderer.js";
 import { StreamTransport } from "./stream-transport.js";
 

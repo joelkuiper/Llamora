@@ -1,10 +1,10 @@
 import { createPopover } from "../popover.js";
-import { animateMotion } from "../services/motion.js";
 import { formatTimeElements } from "../services/time.js";
 import { scrollToHighlight } from "../ui.js";
 import { AutocompleteHistory } from "../utils/autocomplete-history.js";
 import { parsePositiveInteger } from "../utils/number.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
+import { animateMotion } from "../utils/transition.js";
 import { AutocompleteOverlayMixin } from "./base/autocomplete-overlay.js";
 
 const canonicalizeTag = (value, limit = null) => {

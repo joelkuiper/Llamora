@@ -1,4 +1,5 @@
 import { nextModalZ } from "../utils/modal-stack.js";
+import { transitionHide, transitionShow } from "../utils/transition.js";
 
 const DEFAULTS = {
   title: "Confirm",
@@ -52,12 +53,12 @@ export function initConfirmModal() {
   let activeRequest = state.activeRequest || null;
   let activeTrigger = state.activeTrigger || null;
   let lastFocused = state.lastFocused || null;
-  let closeTimer = null;
+  let cancelHide = null;
 
   const openModal = (config, requestCallback, trigger) => {
-    if (closeTimer) {
-      clearTimeout(closeTimer);
-      closeTimer = null;
+    if (cancelHide) {
+      cancelHide();
+      cancelHide = null;
     }
     activeRequest = requestCallback;
     activeTrigger = trigger || null;
@@ -70,33 +71,20 @@ export function initConfirmModal() {
       document.body.appendChild(modal);
     }
     modal.style.zIndex = String(nextModalZ());
-    modal.hidden = false;
     modal.removeAttribute("hidden");
     modal.setAttribute("aria-hidden", "false");
     lastFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    // Force reflow so the browser computes opacity:0 before the transition starts.
-    // Without this, the first open skips the fade because display:none→grid + is-open
-    // can be batched into a single style recalc.
-    void modal.offsetHeight;
-    requestAnimationFrame(() => {
-      modal.classList.add("is-open");
-      confirmBtn.focus();
-    });
+    transitionShow(modal, "is-open");
+    requestAnimationFrame(() => confirmBtn.focus());
   };
 
   const closeModal = (confirmed) => {
-    modal.classList.remove("is-open");
     modal.setAttribute("aria-hidden", "true");
     modal.removeAttribute("data-confirm-variant");
     const callback = activeRequest;
     activeRequest = null;
-    if (closeTimer) {
-      clearTimeout(closeTimer);
-    }
-    closeTimer = setTimeout(() => {
-      modal.hidden = true;
-      closeTimer = null;
-    }, 200);
+    if (cancelHide) cancelHide();
+    cancelHide = transitionHide(modal, "is-open", 220);
     if (confirmed && activeTrigger instanceof Element) {
       const entry = activeTrigger.closest(".entry");
       if (entry) {

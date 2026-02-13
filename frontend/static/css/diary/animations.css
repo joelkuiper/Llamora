@@ -93,27 +93,6 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  #entries {
-    .typing-indicator {
-      animation: none;
-    }
-
-    .typing-indicator.stopped {
-      animation: none;
-      opacity: 0;
-    }
-  }
-
-  scroll-bottom-button .scroll-btn {
-    scroll-bottom-button.visible & {
-      animation: none;
-      opacity: 0.9;
-      transform: none;
-    }
-  }
-}
-
 .tag-suggestion--skeleton {
   animation:
     tag-skeleton-breathe 2.6s ease-in-out infinite,
@@ -176,19 +155,5 @@
   50% {
     opacity: 0.85;
     transform: translateY(-0.15rem);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .repeat-guard-indicator {
-    transition: none;
-  }
-
-  .repeat-guard-indicator__waves {
-    transition: none;
-  }
-
-  .repeat-guard-indicator__dot {
-    animation: none;
   }
 }

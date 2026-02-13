@@ -136,23 +136,6 @@
   }
 }
 
-/* Reduced-motion: just a quick color emphasis, no glow ramp */
-@media (prefers-reduced-motion: reduce) {
-  #calendar-label.text-glow-flash {
-    animation: calTextGlowReduce var(--motion-delay-short) ease-out;
-  }
-  @keyframes calTextGlowReduce {
-    0% {
-      color: var(--calendar-label-highlight-color);
-      text-shadow: none;
-    }
-    100% {
-      color: var(--calendar-label-rest-color);
-      text-shadow: none;
-    }
-  }
-}
-
 .btn-pill {
   border-radius: 999px;
 }

@@ -610,13 +610,10 @@ input[type="checkbox"]:focus {
 
 .load-more.htmx-request .load-indicator {
   opacity: 1;
-  animation: load-spin 0.9s linear infinite;
+  animation: spin 0.9s linear infinite;
 }
 
-@keyframes load-spin {
-  from {
-    transform: rotate(0deg);
-  }
+@keyframes spin {
   to {
     transform: rotate(360deg);
   }
