@@ -1,13 +1,33 @@
 import { createPopover } from "../popover.js";
 import { createListenerBag } from "../utils/events.js";
 
+let currentInstance = null;
+
+const destroyCurrentInstance = () => {
+  if (!currentInstance) return;
+  currentInstance.listenerBag.abort();
+  currentInstance.controller.destroy();
+  currentInstance = null;
+};
+
 const initViewMode = (root = document) => {
-  const toggle = root.querySelector?.("#view-mode-toggle");
-  const popover = root.querySelector?.("#view-mode-popover");
+  const toggle =
+    root.querySelector?.("#view-mode-toggle") || document.querySelector("#view-mode-toggle");
+  const popover =
+    root.querySelector?.("#view-mode-popover") || document.querySelector("#view-mode-popover");
   const panel = popover?.querySelector?.(".view-mode-panel");
   if (!toggle || !popover || !panel) return;
-  if (toggle.dataset.viewReady === "true") return;
-  toggle.dataset.viewReady = "true";
+
+  if (currentInstance?.toggle && !currentInstance.toggle.isConnected) {
+    destroyCurrentInstance();
+  }
+
+  if (currentInstance?.toggle === toggle) {
+    currentInstance.syncFromContent();
+    return;
+  }
+
+  destroyCurrentInstance();
 
   const listenerBag = createListenerBag();
   const controller = createPopover(toggle, popover, {
@@ -80,9 +100,24 @@ const initViewMode = (root = document) => {
   });
 
   syncFromContent();
+
+  currentInstance = {
+    toggle,
+    controller,
+    listenerBag,
+    syncFromContent,
+  };
 };
 
 initViewMode(document);
 document.addEventListener("app:rehydrate", (event) => {
   initViewMode(event?.detail?.context || document);
+});
+document.addEventListener("htmx:historyRestore", () => {
+  initViewMode(document);
+});
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) {
+    initViewMode(document);
+  }
 });
