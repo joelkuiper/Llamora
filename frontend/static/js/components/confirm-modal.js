@@ -74,6 +74,10 @@ export function initConfirmModal() {
     modal.removeAttribute("hidden");
     modal.setAttribute("aria-hidden", "false");
     lastFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    // Force reflow so the browser computes opacity:0 before the transition starts.
+    // Without this, the first open skips the fade because display:none→grid + is-open
+    // can be batched into a single style recalc.
+    void modal.offsetHeight;
     requestAnimationFrame(() => {
       modal.classList.add("is-open");
       confirmBtn.focus();

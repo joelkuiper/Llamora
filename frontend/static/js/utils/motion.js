@@ -21,3 +21,12 @@ export function motionSafeBehavior(behavior = "smooth", reduceMotion = prefersRe
   }
   return behavior === "smooth" ? "auto" : behavior;
 }
+
+const LABEL_FLASH_CLASS = "text-glow-flash";
+
+export function triggerLabelFlash(node) {
+  if (!node) return;
+  node.classList.remove(LABEL_FLASH_CLASS);
+  void node.offsetWidth;
+  node.classList.add(LABEL_FLASH_CLASS);
+}

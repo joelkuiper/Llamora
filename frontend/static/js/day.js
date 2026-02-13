@@ -14,6 +14,7 @@ import {
 } from "./entries/active-day-store.js";
 import { getCurrentView } from "./lifecycle.js";
 import { updateClientToday } from "./services/time.js";
+import { triggerLabelFlash } from "./utils/motion.js";
 
 function ordinalSuffix(day) {
   if (!Number.isFinite(day)) return "";
@@ -33,17 +34,8 @@ function ordinalSuffix(day) {
   }
 }
 
-const LABEL_FLASH_CLASS = "text-glow-flash";
 let navListenerRegistered = false;
 let viewChangeListenerRegistered = false;
-
-function triggerLabelFlash(node) {
-  if (!node) return;
-  node.classList.remove(LABEL_FLASH_CLASS);
-  // Force reflow so the animation can replay when the class is re-added.
-  void node.offsetWidth; // eslint-disable-line no-void
-  node.classList.add(LABEL_FLASH_CLASS);
-}
 
 function formatLongDate(date) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) {

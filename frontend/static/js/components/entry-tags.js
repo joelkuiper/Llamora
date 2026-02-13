@@ -102,11 +102,8 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   #detailCloseClickHandler;
   #detailClickHandler;
   #detailAfterSwapHandler;
-  #pageShowHandler;
-  #pageHideHandler;
-  #beforeHistorySaveHandler;
-  #restoredHandler;
-  #visibilityHandler;
+  #rehydrateHandler;
+  #teardownHandler;
   #inputHandler;
   #inputFocusHandler;
   #configRequestHandler;
@@ -127,19 +124,12 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#detailCloseClickHandler = (event) => this.#handleDetailCloseClick(event);
     this.#detailClickHandler = (event) => this.#handleDetailClick(event);
     this.#detailAfterSwapHandler = (event) => this.#handleDetailAfterSwap(event);
-    this.#pageShowHandler = () => {
+    this.#rehydrateHandler = () => {
       this.#resetDetailPopoverState();
-      this.#hideTagPopover("pageshow");
+      this.#hideTagPopover("rehydrate");
       this.#resetSharedPopoverElement();
     };
-    this.#pageHideHandler = () => this.#forceHideDetailPopover("pagehide");
-    this.#beforeHistorySaveHandler = () => this.#forceHideDetailPopover("htmx:beforeHistorySave");
-    this.#restoredHandler = () => {
-      this.#resetDetailPopoverState("htmx:restored");
-      this.#hideTagPopover("htmx:restored");
-      this.#resetSharedPopoverElement();
-    };
-    this.#visibilityHandler = () => this.#handleVisibility();
+    this.#teardownHandler = () => this.#forceHideDetailPopover("teardown");
     this.#inputHandler = () => {
       this.#updateSubmitState();
       this.scheduleAutocompleteFetch();
@@ -190,15 +180,11 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     }
 
     listeners.add(this, "htmx:afterSwap", this.#afterSwapHandler);
-    listeners.add(this, "htmx:restored", this.#restoredHandler);
     listeners.add(this.#button, "click", this.#buttonClickHandler);
     listeners.add(this.#tagContainer, "click", this.#tagActivationHandler);
     listeners.add(this.#tagContainer, "keydown", this.#tagKeydownHandler);
-    listeners.add(window, "pageshow", this.#pageShowHandler);
-    listeners.add(window, "pagehide", this.#pageHideHandler);
-    listeners.add(document, "htmx:beforeHistorySave", this.#beforeHistorySaveHandler);
-    listeners.add(document, "htmx:restored", this.#restoredHandler);
-    listeners.add(document, "visibilitychange", this.#visibilityHandler);
+    listeners.add(document, "app:rehydrate", this.#rehydrateHandler);
+    listeners.add(document, "app:teardown", this.#teardownHandler);
     this.#updateSubmitState();
   }
 
@@ -517,12 +503,6 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   #handleDetailCloseClick(event) {
     event.preventDefault();
     this.#detailPopover?.hide();
-  }
-
-  #handleVisibility() {
-    if (document.visibilityState === "visible") {
-      this.#resetDetailPopoverState();
-    }
   }
 
   #getExistingTags() {

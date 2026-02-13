@@ -1,6 +1,7 @@
 /* global htmx */
 import { getActiveDayParts } from "../entries/active-day-store.js";
 import { createPopover } from "../popover.js";
+import { triggerLabelFlash } from "../utils/motion.js";
 
 const DAY_SUMMARY_CACHE_PREFIX = "llamora:day-summary:";
 const DAY_SUMMARY_CACHE_TTL = 1000 * 60 * 60 * 6;
@@ -770,15 +771,6 @@ function shiftYearMonth(year, month, delta) {
   const nextYear = Math.floor(shifted / 12);
   const nextMonth = (((shifted % 12) + 12) % 12) + 1;
   return { year: nextYear, month: nextMonth };
-}
-
-const LABEL_FLASH_CLASS = "text-glow-flash";
-
-function triggerLabelFlash(node) {
-  if (!node) return;
-  node.classList.remove(LABEL_FLASH_CLASS);
-  void node.offsetWidth; // eslint-disable-line no-void
-  node.classList.add(LABEL_FLASH_CLASS);
 }
 
 function syncCalendarHeader(calendar) {
