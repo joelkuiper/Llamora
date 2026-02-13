@@ -44,9 +44,26 @@ class VectorsRepository(BaseRepository):
                     INSERT OR REPLACE INTO vectors (
                         id, entry_id, user_id, chunk_index, dim, nonce, ciphertext, alg, dtype
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+                    WHERE EXISTS (
+                        SELECT 1
+                        FROM entries
+                        WHERE id = ? AND user_id = ?
+                    )
                     """,
-                (vector_id, entry_id, user_id, 0, dim, nonce, ct, alg, dtype),
+                (
+                    vector_id,
+                    entry_id,
+                    user_id,
+                    0,
+                    dim,
+                    nonce,
+                    ct,
+                    alg,
+                    dtype,
+                    entry_id,
+                    user_id,
+                ),
             )
 
     async def store_vectors_batch(
@@ -75,9 +92,39 @@ class VectorsRepository(BaseRepository):
                     INSERT OR REPLACE INTO vectors (
                         id, entry_id, user_id, chunk_index, dim, nonce, ciphertext, alg, dtype
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+                    WHERE EXISTS (
+                        SELECT 1
+                        FROM entries
+                        WHERE id = ? AND user_id = ?
+                    )
                     """,
-                records,
+                [
+                    (
+                        vector_id,
+                        entry_id,
+                        record_user_id,
+                        chunk_index,
+                        dim,
+                        nonce,
+                        ct,
+                        alg,
+                        record_dtype,
+                        entry_id,
+                        record_user_id,
+                    )
+                    for (
+                        vector_id,
+                        entry_id,
+                        record_user_id,
+                        chunk_index,
+                        dim,
+                        nonce,
+                        ct,
+                        alg,
+                        record_dtype,
+                    ) in records
+                ],
             )
 
     async def get_latest_vectors(
