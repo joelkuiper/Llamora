@@ -17,7 +17,7 @@
                   type="button"
                   hx-delete="{{ delete_trace_url }}"
                   hx-target="#tags-view-detail"
-                  hx-swap="outerHTML swap:140ms settle:140ms"
+                  hx-swap="outerHTML"
                   hx-confirm="Delete this trace?"
                   data-confirm-title="Delete trace?"
                   data-confirm-message="This trace will be removed from all entries."
@@ -42,7 +42,7 @@
                  class="tags-view__related-link"
                  hx-get="{{ url_for('tags.tags_view_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&tag={{ related.name|urlencode }}"
                  hx-target="#tags-view-detail"
-                 hx-swap="outerHTML swap:140ms settle:140ms"
+                 hx-swap="outerHTML"
                  hx-push-url="{{ related_url }}">
                 {{ related.name }}
               </a>
@@ -55,7 +55,7 @@
                hx-get="{{ url_for('tags.tag_detail_summary', tag_hash=detail.hash) }}?num_words=72"
                hx-trigger="load"
                hx-target="this"
-               hx-swap="innerHTML swap:120ms"
+               hx-swap="innerHTML"
                data-cache-key="tag-summary-{{ detail.hash }}-{{ detail.count }}-{{ detail.first_used }}-72"
                data-cache-ttl="21600">
         <div class="tag-detail-skeleton" aria-hidden="true">
@@ -68,11 +68,12 @@
         <ol class="tags-view__entries">
           {% for item in detail.entries %}
             {% set item_date = item.created_date or item.created_at[:10] %}
+            {% set entry_url = url_for('days.day', date=item_date) ~ '?view=diary&target=entry-' ~ item.entry_id %}
             <li class="tags-view__entry-item">
-              <article class="tags-view__entry">
+              <article class="tags-view__entry entry user">
                 <a class="tags-view__entry-date"
-                   href="{{ url_for('days.day', date=item_date) }}?view=diary&target=entry-{{ item.entry_id }}"
-                   hx-get="{{ url_for('days.day', date=item_date) }}?view=diary&target=entry-{{ item.entry_id }}"
+                   href="{{ entry_url }}"
+                   hx-get="{{ entry_url }}"
                    hx-target="#main-content"
                    hx-swap="outerHTML"
                    hx-push-url="true">
@@ -88,7 +89,7 @@
                            class="entry-tag tags-view__entry-tag"
                            hx-get="{{ url_for('tags.tags_view_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&tag={{ name|urlencode }}"
                            hx-target="#tags-view-detail"
-                           hx-swap="outerHTML swap:140ms settle:140ms"
+                           hx-swap="outerHTML"
                            hx-push-url="{{ tag_url }}">
                           <span class="tag-label">{{ name }}</span>
                         </a>
@@ -98,6 +99,16 @@
                     <div></div>
                   {% endif %}
                   <div class="entry-actions-row tags-view__entry-actions">
+                    <a class="entry-action tags-view__entry-open"
+                       href="{{ entry_url }}"
+                       hx-get="{{ entry_url }}"
+                       hx-target="#main-content"
+                       hx-swap="outerHTML"
+                       hx-push-url="true"
+                       aria-label="Go to entry"
+                       data-tooltip-title="Go to entry">
+                      <span class="icon-mask icon-book-marked entry-action__icon" aria-hidden="true"></span>
+                    </a>
                     <button class="entry-action entry-delete"
                             type="button"
                             hx-delete="{{ url_for('entries.delete_entry', entry_id=item.entry_id) }}"

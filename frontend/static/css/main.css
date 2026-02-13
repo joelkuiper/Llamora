@@ -553,6 +553,9 @@ input[type="checkbox"]:focus {
 .icon-book-open {
   --icon: url("../icons/book-open.svg");
 }
+.icon-book-marked {
+  --icon: url("../icons/book-marked.svg");
+}
 .icon-tags {
   --icon: url("../icons/tags.svg");
 }

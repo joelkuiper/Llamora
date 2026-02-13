@@ -149,7 +149,10 @@ function registerEntriesLoader() {
 
   const isContentWrapperTarget = (event) => {
     const target = event?.detail?.target;
-    return target instanceof Element && target.id === "content-wrapper";
+    return (
+      target instanceof Element &&
+      (target.id === "content-wrapper" || target.id === "tags-view-detail")
+    );
   };
 
   const start = (event) => {

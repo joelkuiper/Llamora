@@ -1,4 +1,5 @@
 import * as FuseModule from "fuse.js";
+import { armEntryAnimations, armInitialEntryAnimations } from "../entries/entry-animations.js";
 
 const FuseCtor = FuseModule.default ?? FuseModule;
 
@@ -46,6 +47,24 @@ const findSidebar = (root = document) =>
   root.querySelector?.(".tags-view__sidebar-fixed") ||
   document.querySelector(".tags-view__sidebar-fixed");
 
+const findListBody = (root = document) =>
+  root.querySelector?.(".tags-view__list-body") || document.querySelector(".tags-view__list-body");
+
+const getMainScrollElement = () =>
+  document.getElementById("main-content") ||
+  window.appInit?.scroll?.container ||
+  document.getElementById("content-wrapper");
+
+const scrollMainContentTop = () => {
+  const el = getMainScrollElement();
+  if (!el) return;
+  try {
+    el.scrollTo({ top: 0, behavior: "auto" });
+  } catch {
+    el.scrollTop = 0;
+  }
+};
+
 const updateHeaderHeight = () => {
   const header = document.getElementById("app-header");
   if (!header) return;
@@ -71,15 +90,30 @@ const setActiveTag = (tagName, root = document) => {
   const list = findList(root);
   if (!list) return;
   const targetName = String(tagName || "").trim();
+  let activeRow = null;
   list.querySelectorAll(".tags-view__index-row").forEach((row) => {
     const isActive = targetName !== "" && row.dataset.tagName === targetName;
     row.classList.toggle("is-active", isActive);
     if (isActive) {
       row.setAttribute("aria-current", "true");
+      activeRow = row;
     } else {
       row.removeAttribute("aria-current");
     }
   });
+  if (!(activeRow instanceof HTMLElement)) return;
+  const listBody = findListBody(root);
+  if (listBody instanceof HTMLElement) {
+    const bodyRect = listBody.getBoundingClientRect();
+    const rowRect = activeRow.getBoundingClientRect();
+    const outsideTop = rowRect.top < bodyRect.top + 6;
+    const outsideBottom = rowRect.bottom > bodyRect.bottom - 6;
+    if (outsideTop || outsideBottom) {
+      activeRow.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+    }
+    return;
+  }
+  activeRow.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
 };
 
 const readSortFromUrl = () => {
@@ -150,6 +184,15 @@ const syncSortLinks = () => {
     if (!(link instanceof HTMLAnchorElement)) return;
     ensureSortParams(link);
   });
+};
+
+const animateDetailEntries = (root = document) => {
+  const detail = findDetail(root);
+  if (!detail) return;
+  armEntryAnimations(detail);
+  const entries = detail.querySelector(".tags-view__entries");
+  if (!(entries instanceof HTMLElement)) return;
+  armInitialEntryAnimations(entries);
 };
 
 const sortRows = () => {
@@ -364,6 +407,7 @@ const sync = (root = document) => {
   sortRows();
   applySearch(state.query);
   syncFromDetail(root);
+  animateDetailEntries(root);
 };
 
 if (!globalThis[BOOT_KEY]) {
@@ -382,11 +426,25 @@ if (!globalThis[BOOT_KEY]) {
     }
 
     const row = target.closest("#tags-view-list .tags-view__index-row");
-    if (!row) return;
-    ensureSortParams(row);
-    const tagName = row.dataset.tagName || "";
-    if (!tagName) return;
-    setActiveTag(tagName);
+    if (row) {
+      ensureSortParams(row);
+      const tagName = row.dataset.tagName || "";
+      if (!tagName) return;
+      setActiveTag(tagName);
+      scrollMainContentTop();
+      return;
+    }
+
+    const detailLink = target.closest(
+      "#tags-view-detail .tags-view__related-link, #tags-view-detail .tags-view__entry-tag",
+    );
+    if (!(detailLink instanceof HTMLAnchorElement)) return;
+    ensureSortParams(detailLink);
+    const tagName = (detailLink.textContent || "").trim();
+    if (tagName) {
+      setActiveTag(tagName);
+    }
+    scrollMainContentTop();
   });
 
   document.addEventListener("input", (event) => {
@@ -420,6 +478,13 @@ if (!globalThis[BOOT_KEY]) {
     ) {
       sync();
     }
+  });
+
+  document.body.addEventListener("htmx:beforeRequest", (event) => {
+    const target = event.detail?.target;
+    if (!(target instanceof Element)) return;
+    if (target.id !== "tags-view-detail") return;
+    scrollMainContentTop();
   });
 
   document.addEventListener("app:rehydrate", (event) => {

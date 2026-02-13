@@ -499,18 +499,6 @@
   animation: motion-tag-enter var(--motion-tag-enter-duration) ease both;
 }
 
-#tags-view-detail.htmx-added .tags-view__detail-inner {
-  animation: lull-in var(--motion-lull) ease both;
-}
-
-#tags-view-detail.htmx-swapping .tags-view__detail-inner {
-  animation: lull-out var(--motion-lull) ease both;
-}
-
-#tags-view-detail.htmx-settling .tags-view__detail-inner {
-  animation: lull-in var(--motion-lull) ease both;
-}
-
 #tags-view-list.htmx-settling .tags-view__index-row.htmx-added {
   animation: motion-tag-enter var(--motion-tag-enter-duration) ease both;
 }
