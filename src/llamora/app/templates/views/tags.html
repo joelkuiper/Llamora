@@ -21,7 +21,7 @@
                     class="icon-btn tags-view__sort-btn{% if sort_kind == 'count' and sort_dir == 'desc' %} is-active{% endif %}"
                     data-tags-sort-kind="count"
                     data-tags-sort-dir="desc"
-                    data-tooltip-title="Sort trace count high-low">
+                    data-tooltip-title="Most used first">
               <span class="icon-mask icon-arrow-down-1-0" aria-hidden="true"></span>
               <span class="visually-hidden">Sort by trace count descending</span>
             </button>
@@ -29,7 +29,7 @@
                     class="icon-btn tags-view__sort-btn{% if sort_kind == 'count' and sort_dir == 'asc' %} is-active{% endif %}"
                     data-tags-sort-kind="count"
                     data-tags-sort-dir="asc"
-                    data-tooltip-title="Sort trace count low-high">
+                    data-tooltip-title="Least used first">
               <span class="icon-mask icon-arrow-up-1-0" aria-hidden="true"></span>
               <span class="visually-hidden">Sort by trace count ascending</span>
             </button>
@@ -37,7 +37,7 @@
                     class="icon-btn tags-view__sort-btn{% if sort_kind == 'alpha' and sort_dir == 'asc' %} is-active{% endif %}"
                     data-tags-sort-kind="alpha"
                     data-tags-sort-dir="asc"
-                    data-tooltip-title="Sort traces A-Z">
+                    data-tooltip-title="A → Z">
               <span class="icon-mask icon-arrow-up-a-z" aria-hidden="true"></span>
               <span class="visually-hidden">Sort traces alphabetically ascending</span>
             </button>
@@ -45,7 +45,7 @@
                     class="icon-btn tags-view__sort-btn{% if sort_kind == 'alpha' and sort_dir == 'desc' %} is-active{% endif %}"
                     data-tags-sort-kind="alpha"
                     data-tags-sort-dir="desc"
-                    data-tooltip-title="Sort traces Z-A">
+                    data-tooltip-title="Z → A">
               <span class="icon-mask icon-arrow-down-a-z" aria-hidden="true"></span>
               <span class="visually-hidden">Sort traces alphabetically descending</span>
             </button>
