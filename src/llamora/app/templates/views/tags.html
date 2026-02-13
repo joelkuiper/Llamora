@@ -1,8 +1,61 @@
+{% set sort_kind = tags_sort_kind if tags_sort_kind is defined else (tags_view.sort_kind if tags_view is defined and tags_view else 'count') %}
+{% set sort_dir = tags_sort_dir if tags_sort_dir is defined else (tags_view.sort_dir if tags_view is defined and tags_view else 'desc') %}
 <section id="tags-view" class="tags-view page-grid grid-12" data-day="{{ day }}">
   <aside class="tags-view__sidebar span-3">
     <div class="tags-view__sidebar-fixed">
-      <div id="tags-view-list" class="tags-view__list">
-        {% include 'partials/tags_view_list.html' %}
+      <div class="tags-view__list-head">
+        <label class="tags-view__search search-input-wrap" for="tags-view-filter">
+          <span class="icon-mask icon-search" aria-hidden="true"></span>
+          <input id="tags-view-filter"
+                 name="tags_view_filter"
+                 type="search"
+                 class="input tags-view__search-input"
+                 placeholder="Find a trace"
+                 autocomplete="off"
+                 spellcheck="false"
+                 data-tags-view-search>
+        </label>
+        <div class="tags-view__controls">
+          <div class="tags-view__sort" role="group" aria-label="Sort traces">
+            <button type="button"
+                    class="icon-btn tags-view__sort-btn{% if sort_kind == 'count' and sort_dir == 'desc' %} is-active{% endif %}"
+                    data-tags-sort-kind="count"
+                    data-tags-sort-dir="desc"
+                    data-tooltip-title="Sort trace count high-low">
+              <span class="icon-mask icon-arrow-down-1-0" aria-hidden="true"></span>
+              <span class="visually-hidden">Sort by trace count descending</span>
+            </button>
+            <button type="button"
+                    class="icon-btn tags-view__sort-btn{% if sort_kind == 'count' and sort_dir == 'asc' %} is-active{% endif %}"
+                    data-tags-sort-kind="count"
+                    data-tags-sort-dir="asc"
+                    data-tooltip-title="Sort trace count low-high">
+              <span class="icon-mask icon-arrow-up-1-0" aria-hidden="true"></span>
+              <span class="visually-hidden">Sort by trace count ascending</span>
+            </button>
+            <button type="button"
+                    class="icon-btn tags-view__sort-btn{% if sort_kind == 'alpha' and sort_dir == 'asc' %} is-active{% endif %}"
+                    data-tags-sort-kind="alpha"
+                    data-tags-sort-dir="asc"
+                    data-tooltip-title="Sort traces A-Z">
+              <span class="icon-mask icon-arrow-up-a-z" aria-hidden="true"></span>
+              <span class="visually-hidden">Sort traces alphabetically ascending</span>
+            </button>
+            <button type="button"
+                    class="icon-btn tags-view__sort-btn{% if sort_kind == 'alpha' and sort_dir == 'desc' %} is-active{% endif %}"
+                    data-tags-sort-kind="alpha"
+                    data-tags-sort-dir="desc"
+                    data-tooltip-title="Sort traces Z-A">
+              <span class="icon-mask icon-arrow-down-a-z" aria-hidden="true"></span>
+              <span class="visually-hidden">Sort traces alphabetically descending</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="tags-view__list-body">
+        <div id="tags-view-list" class="tags-view__list">
+          {% include 'partials/tags_view_list.html' %}
+        </div>
       </div>
     </div>
   </aside>

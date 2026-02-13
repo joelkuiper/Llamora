@@ -1,6 +1,6 @@
 {% set detail = tags_view.detail if tags_view is defined and tags_view else None %}
-{% set sort_kind = tags_sort_kind if tags_sort_kind is defined else (tags_view.sort_kind if tags_view is defined and tags_view else 'alpha') %}
-{% set sort_dir = tags_sort_dir if tags_sort_dir is defined else (tags_view.sort_dir if tags_view is defined and tags_view else 'asc') %}
+{% set sort_kind = tags_sort_kind if tags_sort_kind is defined else (tags_view.sort_kind if tags_view is defined and tags_view else 'count') %}
+{% set sort_dir = tags_sort_dir if tags_sort_dir is defined else (tags_view.sort_dir if tags_view is defined and tags_view else 'desc') %}
 {% set selected_tag_name = detail.name if detail else (selected_tag if selected_tag is defined else '') %}
 <section id="tags-view-detail"
          class="tags-view__detail span-9"

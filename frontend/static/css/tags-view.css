@@ -78,8 +78,13 @@
   z-index: 4;
   padding: 0.12rem 0.12rem 0.62rem;
   margin-bottom: 0.42rem;
-  background: color-mix(in srgb, var(--glass-bg-alt) 92%, transparent);
+  background: color-mix(in srgb, var(--glass-bg-alt) 92%, var(--color-bg));
+  backdrop-filter: blur(8px);
   border-bottom: 1px solid color-mix(in srgb, var(--border) 35%, transparent);
+}
+
+.tags-view__list-body {
+  min-height: 0;
 }
 
 .tags-view__search {
@@ -227,7 +232,7 @@
 .tags-view__detail-inner {
   width: 100%;
   margin-inline: 0;
-  padding: 1.4rem clamp(0.5rem, 1.4vw, 1.2rem) 0.45rem;
+  padding: 1.4rem clamp(0.5rem, 1.4vw, 1.2rem) 2rem;
   border-radius: 0.9rem;
   background: color-mix(in srgb, var(--glass-bg-opaque) 72%, transparent);
   box-shadow:
@@ -312,7 +317,7 @@
 .tags-view__entries {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 0 1rem;
   display: grid;
   gap: 1.8rem;
 }

@@ -21,6 +21,17 @@ const findList = (root = document) =>
 const findDetail = (root = document) =>
   root.querySelector?.("#tags-view-detail") || document.getElementById("tags-view-detail");
 
+const findSidebar = (root = document) =>
+  root.querySelector?.(".tags-view__sidebar-fixed") ||
+  document.querySelector(".tags-view__sidebar-fixed");
+
+const updateHeaderHeight = () => {
+  const header = document.getElementById("app-header");
+  if (!header) return;
+  const height = Math.ceil(header.getBoundingClientRect().height);
+  document.documentElement.style.setProperty("--app-header-height", `${height}px`);
+};
+
 const normalizeSortKind = (value) =>
   String(value || "")
     .trim()
@@ -77,9 +88,9 @@ const syncFromDetail = (root = document) => {
 };
 
 const updateSortButtons = (root = document) => {
-  const list = findList(root);
-  if (!list) return;
-  list.querySelectorAll("[data-tags-sort-kind][data-tags-sort-dir]").forEach((button) => {
+  const sidebar = findSidebar(root);
+  if (!sidebar) return;
+  sidebar.querySelectorAll("[data-tags-sort-kind][data-tags-sort-dir]").forEach((button) => {
     const isActive =
       normalizeSortKind(button.dataset.tagsSortKind) === state.sortKind &&
       normalizeSortDir(button.dataset.tagsSortDir) === state.sortDir;
@@ -148,9 +159,10 @@ const sortRows = () => {
 
 const buildSearchIndex = (root = document) => {
   const list = findList(root) || document.querySelector("#tags-view-list");
+  const sidebar = findSidebar(root);
   state.list = list?.querySelector("[data-tags-view-index]") || null;
   state.rows = Array.from(state.list?.querySelectorAll(".tags-view__index-row") || []);
-  state.input = list?.querySelector("[data-tags-view-search]") || null;
+  state.input = sidebar?.querySelector("[data-tags-view-search]") || null;
   state.empty = list?.querySelector("[data-tags-view-empty]") || null;
 
   const searchable = state.rows.map((row) => ({
@@ -320,6 +332,7 @@ const applySort = (kind, dir) => {
 };
 
 const sync = (root = document) => {
+  updateHeaderHeight();
   syncFromDetail(root);
   buildSearchIndex(root);
   syncSortLinks();
@@ -330,6 +343,7 @@ const sync = (root = document) => {
 
 if (!globalThis[BOOT_KEY]) {
   globalThis[BOOT_KEY] = true;
+  window.addEventListener("resize", updateHeaderHeight);
 
   document.addEventListener("click", (event) => {
     const target = event.target;

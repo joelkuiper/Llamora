@@ -158,6 +158,23 @@ function setNavDisabledForView(isDiary) {
   }
 }
 
+function ensureViewSyncListener() {
+  if (viewChangeListenerRegistered) {
+    return;
+  }
+
+  document.addEventListener("app:view-changed", (event) => {
+    setNavDisabledForView(event.detail?.view === "diary");
+  });
+
+  document.addEventListener("app:rehydrate", () => {
+    const view = document.getElementById("main-content")?.dataset?.view || "diary";
+    setNavDisabledForView(view === "diary");
+  });
+
+  viewChangeListenerRegistered = true;
+}
+
 const applyDayStateToNav = ({ activeDay, label, forceFlash = false }) => {
   if (getCurrentView() !== "diary") return;
 
@@ -254,10 +271,7 @@ export function initDayNav(entries, options = {}) {
     navListenerRegistered = true;
   }
 
-  if (!viewChangeListenerRegistered) {
-    document.addEventListener("app:view-changed", (e) => {
-      setNavDisabledForView(e.detail?.view === "diary");
-    });
-    viewChangeListenerRegistered = true;
-  }
+  ensureViewSyncListener();
 }
+
+ensureViewSyncListener();
