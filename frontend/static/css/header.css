@@ -24,6 +24,8 @@
     justify-self: start;
     grid-column: 1;
     grid-row: 1;
+    gap: var(--spacing-xs);
+    position: relative;
   }
 
   #branding .branding-link {
@@ -135,6 +137,219 @@
   @media (max-width: 520px) {
     padding: var(--spacing-xs) var(--spacing-md);
   }
+}
+
+.view-mode-toggle {
+  margin-left: var(--spacing-xxs);
+  margin-top: 2px;
+  position: relative;
+}
+
+.view-mode-toggle .icon-mask {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+}
+
+.view-mode-toggle.active {
+  background: var(--accent-20);
+  color: var(--accent-active);
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--accent-10);
+  transform: scale(1.02);
+}
+
+.view-mode-toggle .view-icon-eye {
+  opacity: 0;
+  transform: scale(0.95);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.view-mode-toggle .view-icon-mode {
+  opacity: 1;
+  transform: scale(1);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.view-mode-toggle:hover .view-icon-eye,
+.view-mode-toggle:focus-visible .view-icon-eye {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.view-mode-toggle:hover .view-icon-mode,
+.view-mode-toggle:focus-visible .view-icon-mode {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.view-mode-toggle.view-mode-diary:hover .view-icon-diary,
+.view-mode-toggle.view-mode-diary:focus-visible .view-icon-diary,
+.view-mode-toggle.view-mode-tags:hover .view-icon-tags,
+.view-mode-toggle.view-mode-tags:focus-visible .view-icon-tags,
+.view-mode-toggle.view-mode-structure:hover .view-icon-structure,
+.view-mode-toggle.view-mode-structure:focus-visible .view-icon-structure {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.view-mode-toggle.view-mode-diary .view-icon-diary,
+.view-mode-toggle.view-mode-tags .view-icon-tags,
+.view-mode-toggle.view-mode-structure .view-icon-structure {
+  opacity: 1;
+}
+
+.view-mode-toggle.active .view-icon-eye {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.view-mode-toggle.active .view-icon-mode {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.view-mode-toggle.view-mode-diary .view-icon-tags,
+.view-mode-toggle.view-mode-diary .view-icon-structure,
+.view-mode-toggle.view-mode-tags .view-icon-diary,
+.view-mode-toggle.view-mode-tags .view-icon-structure,
+.view-mode-toggle.view-mode-structure .view-icon-diary,
+.view-mode-toggle.view-mode-structure .view-icon-tags {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.view-mode-popover {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  min-width: 10.5rem;
+  padding: 0.4rem;
+  border-radius: 8px;
+  z-index: 6200;
+  background: var(--glass-bg);
+  border: 1px solid var(--border);
+  box-shadow: var(--raised-shadow);
+  opacity: 0;
+  transform: translateY(-2px) scale(0.98);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+  pointer-events: none;
+}
+
+.view-mode-popover[hidden] {
+  display: none !important;
+}
+
+.view-mode-popover.open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.view-mode-panel {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.view-mode-option {
+  display: grid;
+  grid-template-columns: 1.1rem 1fr;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-height: 2.25rem;
+  padding: 0.35rem 0.55rem 0.35rem 0.8rem;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--color-text);
+  font-size: 0.9rem;
+  background: transparent;
+  border: 1px solid transparent;
+  position: relative;
+  cursor: pointer;
+  transition:
+    background var(--motion-tight),
+    border-color var(--motion-tight),
+    color var(--motion-tight),
+    box-shadow var(--motion-tight),
+    transform var(--motion-tight);
+}
+
+.view-mode-option .icon-mask {
+  width: 1rem;
+  height: 1rem;
+  transition:
+    color var(--motion-tight),
+    transform var(--motion-tight);
+}
+
+.view-mode-option:hover,
+.view-mode-option:focus-visible {
+  background: color-mix(in srgb, var(--glass-bg-hover) 88%, transparent);
+  border-color: color-mix(in srgb, var(--border) 72%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--border) 58%, transparent),
+    0 6px 14px color-mix(in srgb, var(--color-text) 10%, transparent);
+  transform: translateY(-0.5px);
+  color: color-mix(in srgb, var(--color-text) 95%, transparent);
+  outline: none;
+}
+
+.view-mode-option:hover .icon-mask,
+.view-mode-option:focus-visible .icon-mask {
+  color: color-mix(in srgb, var(--color-text) 92%, transparent);
+  transform: translateY(-0.5px);
+}
+
+.view-mode-option.is-active {
+  font-weight: 500;
+  color: color-mix(in srgb, var(--accent-active) 68%, var(--color-text));
+  background:
+    linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--accent-10) 68%, transparent),
+      color-mix(in srgb, var(--accent-10) 68%, transparent)
+    ),
+    var(--glass-bg);
+  border-color: color-mix(in srgb, var(--accent-20) 90%, var(--border));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent-20) 72%, transparent),
+    0 6px 14px color-mix(in srgb, var(--accent-10) 46%, transparent);
+}
+
+.view-mode-option.is-active .icon-mask {
+  color: var(--accent-active);
+}
+
+.view-mode-option.is-active:hover,
+.view-mode-option.is-active:focus-visible {
+  background:
+    linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--accent-10) 82%, transparent),
+      color-mix(in srgb, var(--accent-10) 82%, transparent)
+    ),
+    var(--glass-bg);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  box-shadow:
+    0 0 0 2px var(--accent-20),
+    0 8px 18px color-mix(in srgb, var(--accent-10) 58%, transparent);
+}
+
+.view-mode-option.is-active::before {
+  content: "";
+  position: absolute;
+  left: 0.2rem;
+  top: 0.35rem;
+  bottom: 0.35rem;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--accent);
 }
 
 @media (max-width: 960px) {

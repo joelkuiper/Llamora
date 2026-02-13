@@ -1,0 +1,9 @@
+<div id="main-content" data-view="{{ view|default('diary') }}">
+  {% if view == "diary" %}
+    {% include "views/diary.html" %}
+  {% elif view == "tags" %}
+    {% include "views/tags.html" %}
+  {% elif view == "structure" %}
+    {% include "views/structure.html" %}
+  {% endif %}
+</div>

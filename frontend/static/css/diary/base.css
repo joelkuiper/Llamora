@@ -21,6 +21,19 @@ body {
   position: relative;
 }
 
+#main-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+#main-content > #content-wrapper {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .app-container {
   display: flex;
   flex: 1 1 auto;
@@ -81,4 +94,13 @@ body {
   #app-header .search-results-overlay {
     background: var(--glass-fallback-bg);
   }
+}
+
+.view-placeholder {
+  border: 1px dashed color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-lg);
+  text-align: center;
+  color: var(--color-text-muted);
+  background: color-mix(in srgb, var(--color-surface) 85%, transparent);
 }

@@ -531,6 +531,15 @@ input[type="checkbox"]:focus {
 .icon-calendar-days {
   --icon: url("../icons/calendar-days.svg");
 }
+.icon-book-open {
+  --icon: url("../icons/book-open.svg");
+}
+.icon-tags {
+  --icon: url("../icons/tags.svg");
+}
+.icon-chart-column {
+  --icon: url("../icons/chart-column.svg");
+}
 .icon-user-round {
   --icon: url("../icons/user-round.svg");
 }
@@ -678,6 +687,11 @@ input[type="checkbox"]:focus {
   z-index: 9999;
   pointer-events: none;
   padding: var(--spacing-xs) var(--spacing-sm);
+  transform: translateY(4px) scale(0.985);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+  will-change: opacity, transform;
 }
 
 .tooltip.visible,
@@ -688,20 +702,25 @@ input[type="checkbox"]:focus {
   transition-delay: var(--motion-delay-medium);
 }
 
-.tooltip .tooltip-inner,
+.tooltip.visible {
+  transform: translateY(0) scale(1);
+  transition-delay: 40ms;
+}
+
 .password-suggestions {
   transform: translateY(4px);
 }
 
-.tooltip .tooltip-inner {
-  transition: transform var(--motion-toggle) ease;
-}
-
-.tooltip.visible .tooltip-inner,
 .suggestion-wrapper:hover .password-suggestions,
 .suggestion-wrapper:focus-within .password-suggestions,
 .password-suggestions:hover {
   transform: translateY(0);
+}
+
+.tooltip .tooltip-inner,
+.tooltip.visible .tooltip-inner {
+  transform: none;
+  transition: none;
 }
 
 /* Password strength meter */

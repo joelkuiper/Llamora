@@ -9,7 +9,7 @@
 * Logs via `logger = getLogger(__name__)`, not `print`.
 * Lint/format:
   * Frontend: `biome check`, `biome format --write`.
-  * Backend: `uv run ruff check`, `uv run ruff format --check`.
+  * Backend: `uv run ruff check`, `uv run ruff format`.
   * Git hooks live in `.githooks/` (enable with `git config core.hooksPath .githooks`).
 
 ---

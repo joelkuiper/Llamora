@@ -1,0 +1,6 @@
+{% if entries_html is defined and entries_html %}
+  {{ entries_html|safe }}
+{% else %}
+  {% set tpl = content_template if content_template is defined else 'partials/entries.html' %}
+  {% include tpl %}
+{% endif %}

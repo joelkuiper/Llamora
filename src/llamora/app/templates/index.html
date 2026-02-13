@@ -32,17 +32,63 @@
            data-dark-hover="{{ url_for('static', filename='img/logo-mark-dark-hover.svg') }}"
            data-dark-active="{{ url_for('static', filename='img/logo-mark-dark-hover.svg') }}">
     </a>
+    <button id="view-mode-toggle"
+            type="button"
+            class="icon-btn view-mode-toggle view-mode-{{ view|default('diary') }}"
+            aria-haspopup="menu"
+            aria-expanded="false"
+            data-tooltip-title="Change view">
+      <span class="icon-mask icon-eye view-icon-eye" aria-hidden="true"></span>
+      <span class="icon-mask icon-book-open view-icon-mode view-icon-diary" aria-hidden="true"></span>
+      <span class="icon-mask icon-tags view-icon-mode view-icon-tags" aria-hidden="true"></span>
+      <span class="icon-mask icon-chart-column view-icon-mode view-icon-structure" aria-hidden="true"></span>
+    </button>
+    <div id="view-mode-popover"
+         class="view-mode-popover glass-panel"
+         role="menu"
+         hidden>
+      <div class="view-mode-panel">
+        <a class="view-mode-option{% if view == 'diary' %} is-active{% endif %}"
+           role="menuitem"
+           hx-get="{{ url_for('days.day', date=day) }}?view=diary"
+           hx-target="#main-content"
+           hx-swap="outerHTML"
+           hx-push-url="true">
+          <span class="icon-mask icon-book-open" aria-hidden="true"></span>
+          <span>Diary</span>
+        </a>
+        <a class="view-mode-option{% if view == 'tags' %} is-active{% endif %}"
+           role="menuitem"
+           hx-get="{{ url_for('days.day', date=day) }}?view=tags"
+           hx-target="#main-content"
+           hx-swap="outerHTML"
+           hx-push-url="true">
+          <span class="icon-mask icon-tags" aria-hidden="true"></span>
+          <span>Tags</span>
+        </a>
+        <a class="view-mode-option{% if view == 'structure' %} is-active{% endif %}"
+           role="menuitem"
+           hx-get="{{ url_for('days.day', date=day) }}?view=structure"
+           hx-target="#main-content"
+           hx-swap="outerHTML"
+           hx-push-url="true">
+          <span class="icon-mask icon-chart-column" aria-hidden="true"></span>
+          <span>Structure</span>
+        </a>
+      </div>
+    </div>
   </div>
 
   <calendar-control id="calendar-control" hx-sync="this:replace">
     <button id="prev-day" type="button" class="icon-btn{% if is_first_day %} is-hidden{% endif %}" aria-label="Previous day"
-            {% if is_first_day %}aria-hidden="true" disabled aria-disabled="true"{% endif %}
-            {% if not is_first_day %}data-tooltip-title="Previous day"{% endif %}>
+            {% if is_first_day or view != 'diary' %}aria-hidden="true" disabled aria-disabled="true"{% endif %}
+            {% if not is_first_day and view == 'diary' %}data-tooltip-title="Previous day"{% endif %}>
       <span class="icon-mask icon-chevron-left" aria-hidden="true"></span>
     </button>
     <button id="calendar-btn" type="button" class="icon-btn" aria-label="Calendar"
             aria-haspopup="dialog" aria-expanded="false" aria-controls="calendar-popover"
-            data-tooltip-title="Change day">
+            {% if view != 'diary' %}disabled aria-disabled="true"{% endif %}
+            {% if view == 'diary' %}data-tooltip-title="Change day"{% endif %}>
       <span class="icon-mask icon-calendar-days" aria-hidden="true"></span>
       <span id="calendar-label">{{ day|long_date }}</span>
     </button>
@@ -50,8 +96,8 @@
             type="button"
             class="icon-btn"
             aria-label="Next day"
-            {% if is_today %}disabled aria-disabled="true"{% endif %}
-            {% if not is_today %}data-tooltip-title="Next day"{% endif %}>
+            {% if is_today or view != 'diary' %}disabled aria-disabled="true"{% endif %}
+            {% if not is_today and view == 'diary' %}data-tooltip-title="Next day"{% endif %}>
       <span class="icon-mask icon-chevron-right" aria-hidden="true"></span>
     </button>
     <div id="calendar-popover"
@@ -107,11 +153,6 @@
         <span class="entries-loading__label">Retrieving…</span>
       </div>
     </div>
-    {% if entries_html is defined %}
-      {{ entries_html|safe }}
-    {% else %}
-      {% set tpl = content_template if content_template is defined else 'partials/entries.html' %}
-      {% include tpl %}
-    {% endif %}
+    {% include 'partials/main_content.html' %}
   </div>
 {% endblock %}

@@ -141,7 +141,7 @@ Backend (Ruff):
 
 ```bash
 uv run ruff check
-uv run ruff format --check
+uv run ruff format
 ```
 
 Git hooks are stored in `.githooks/`. Enable them with:
@@ -149,6 +149,8 @@ Git hooks are stored in `.githooks/`. Enable them with:
 ```bash
 git config core.hooksPath .githooks
 ```
+
+The pre-commit hook auto-formats staged Python files with Ruff, re-stages them, and then runs Ruff checks.
 
 ---
 ## Migrations

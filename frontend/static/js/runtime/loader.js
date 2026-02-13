@@ -71,6 +71,10 @@ const FEATURE_IMPORTS = {
     selector: "search-overlay",
     loader: () => import("../components/search-overlay.js"),
   },
+  viewMode: {
+    selector: "#view-mode-toggle",
+    loader: () => import("../components/view-mode.js"),
+  },
   profile: {
     selector: "[data-profile-modal]",
     loader: () =>

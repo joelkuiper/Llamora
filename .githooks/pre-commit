@@ -2,5 +2,11 @@
 set -euo pipefail
 
 biome check
-uv run ruff check
-uv run ruff format --check
+
+mapfile -t staged_py_files < <(git diff --cached --name-only --diff-filter=ACMR -- '*.py')
+
+if ((${#staged_py_files[@]} > 0)); then
+  uv run ruff format "${staged_py_files[@]}"
+  uv run ruff check "${staged_py_files[@]}"
+  git add -- "${staged_py_files[@]}"
+fi

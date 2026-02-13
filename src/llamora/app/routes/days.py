@@ -35,29 +35,37 @@ async def _render_day(date: str, target: str | None, view_kind: str):
     today = local_date().isoformat()
     min_date = await services.db.entries.get_first_entry_date(user["id"]) or today
     is_first_day = date == min_date
+    view = request.args.get("view", "diary")
+    if view not in {"diary", "tags", "structure"}:
+        view = "diary"
     logger.debug(
         "Render day=%s min_date=%s is_first_day=%s", date, min_date, is_first_day
     )
-    entries_response = await render_entries(
-        date,
-        oob=False,
-        scroll_target=target,
-        view_kind=view_kind,
-    )
-    entries_html = await entries_response.get_data(as_text=True)
-    html = await render_template(
-        "index.html",
-        day=date,
-        is_today=date == today,
-        today=today,
-        min_date=min_date,
-        is_first_day=is_first_day,
-        entries_html=entries_html,
-        scroll_target=target,
-        view_kind=view_kind,
-    )
-    resp = await make_response(html, 200)
-    return resp
+    entries_html = None
+    if view == "diary":
+        entries_response = await render_entries(
+            date,
+            oob=False,
+            scroll_target=target,
+            view_kind=view_kind,
+        )
+        entries_html = await entries_response.get_data(as_text=True)
+    context = {
+        "day": date,
+        "is_today": date == today,
+        "today": today,
+        "min_date": min_date,
+        "is_first_day": is_first_day,
+        "entries_html": entries_html,
+        "scroll_target": target,
+        "view_kind": view_kind,
+        "view": view,
+    }
+    if request.headers.get("HX-Request") and request.headers.get("HX-Target") == "main-content":
+        html = await render_template("partials/main_content.html", **context)
+        return await make_response(html, 200)
+    html = await render_template("index.html", **context)
+    return await make_response(html, 200)
 
 
 async def _render_calendar(year: int, month: int, *, today=None, mode="calendar"):

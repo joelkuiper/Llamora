@@ -7,6 +7,12 @@
   justify-content: center;
   gap: var(--spacing-xs);
   z-index: 6000; /* above entries */
+  transition: opacity 160ms ease;
+}
+
+#calendar-control:has(#calendar-btn[disabled]) {
+  opacity: 0.45;
+  pointer-events: none;
 }
 
 #next-day[disabled] {
