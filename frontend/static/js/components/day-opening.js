@@ -1,4 +1,5 @@
-const OPENING_STORAGE_PREFIX = "opening_collapsed_";
+import { prefStore } from "../utils/storage.js";
+
 let listenerRegistered = false;
 
 function getEntriesDay() {
@@ -6,31 +7,17 @@ function getEntriesDay() {
   return entries?.dataset?.date || null;
 }
 
-function getStorageKey(day) {
-  return day ? `${OPENING_STORAGE_PREFIX}${day}` : null;
-}
-
 function readCollapsed(day) {
-  const key = getStorageKey(day);
-  if (!key) return false;
-  try {
-    return localStorage.getItem(key) === "1";
-  } catch (_error) {
-    return false;
-  }
+  if (!day) return false;
+  return !!prefStore.get(`opening:${day}`);
 }
 
 function writeCollapsed(day, collapsed) {
-  const key = getStorageKey(day);
-  if (!key) return;
-  try {
-    if (collapsed) {
-      localStorage.setItem(key, "1");
-    } else {
-      localStorage.removeItem(key);
-    }
-  } catch (_error) {
-    // ignore storage failures
+  if (!day) return;
+  if (collapsed) {
+    prefStore.set(`opening:${day}`, true);
+  } else {
+    prefStore.delete(`opening:${day}`);
   }
 }
 

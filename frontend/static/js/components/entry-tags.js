@@ -4,6 +4,7 @@ import { scrollToHighlight } from "../ui.js";
 import { AutocompleteHistory } from "../utils/autocomplete-history.js";
 import { parsePositiveInteger } from "../utils/number.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
+import { summaryCache } from "../utils/storage.js";
 import { animateMotion } from "../utils/transition.js";
 import { AutocompleteOverlayMixin } from "./base/autocomplete-overlay.js";
 
@@ -25,9 +26,7 @@ const displayTag = (canonical) => `${canonical ?? ""}`.trim();
 const prepareTagAutocompleteValue = (value) => `${value ?? ""}`.trim();
 
 const TAG_HISTORY_MAX = 50;
-const TAG_SUMMARY_CACHE_PREFIX = "llamora:tag-summary:";
 const TAG_SUGGESTION_EMPTY_DELAY_MS = 180;
-const TAG_SUMMARY_CACHE_TTL = 1000 * 60 * 60 * 6;
 const TAG_SKELETON_COUNT = 6;
 
 let sharedTagPopoverEl = null;
@@ -1190,43 +1189,6 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#forceHideDetailPopover(reason);
   }
 
-  #getSummaryCacheKey(tagHash) {
-    return `${TAG_SUMMARY_CACHE_PREFIX}${tagHash}`;
-  }
-
-  #getCachedTagSummary(tagHash) {
-    if (!tagHash) return null;
-    try {
-      const raw = window.sessionStorage.getItem(this.#getSummaryCacheKey(tagHash));
-      if (!raw) return null;
-      const payload = JSON.parse(raw);
-      if (!payload || typeof payload.html !== "string") return null;
-      if (
-        typeof payload.timestamp === "number" &&
-        Date.now() - payload.timestamp > TAG_SUMMARY_CACHE_TTL
-      ) {
-        window.sessionStorage.removeItem(this.#getSummaryCacheKey(tagHash));
-        return null;
-      }
-      return payload.html;
-    } catch (_error) {
-      return null;
-    }
-  }
-
-  #setCachedTagSummary(tagHash, html) {
-    if (!tagHash || !html) return;
-    try {
-      const payload = JSON.stringify({
-        html,
-        timestamp: Date.now(),
-      });
-      window.sessionStorage.setItem(this.#getSummaryCacheKey(tagHash), payload);
-    } catch (_error) {
-      return;
-    }
-  }
-
   #cacheTagSummary(summaryEl) {
     if (!(summaryEl instanceof HTMLElement)) return;
     const tagHash = summaryEl.dataset?.tagHash || this.#activeTagHash || "";
@@ -1235,7 +1197,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     if (html.includes("Summary unavailable")) {
       return;
     }
-    this.#setCachedTagSummary(tagHash, html);
+    summaryCache.set(`tag:${tagHash}`, html);
   }
 
   #hydrateSummaryFromCache() {
@@ -1244,7 +1206,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     if (!summaryEl) return;
     const tagHash = summaryEl.dataset?.tagHash || this.#activeTagHash || "";
     if (!tagHash) return;
-    const cached = this.#getCachedTagSummary(tagHash);
+    const cached = summaryCache.get(`tag:${tagHash}`);
     if (cached) {
       summaryEl.innerHTML = cached;
       summaryEl.removeAttribute("hx-get");

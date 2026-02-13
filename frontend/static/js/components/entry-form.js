@@ -1,6 +1,7 @@
 import { isNearBottom } from "../entries/scroll-utils.js";
 import { getAlertContainer } from "../utils/alert-center.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
+import { draftStore } from "../utils/storage.js";
 
 class EntryFormElement extends ReactiveElement {
   #entries = null;
@@ -11,7 +12,6 @@ class EntryFormElement extends ReactiveElement {
   #button = null;
   #errors = null;
   #isToday = false;
-  #draftKey = null;
   #listeners = null;
   #streamFocusListeners = null;
   #connected = false;
@@ -124,7 +124,6 @@ class EntryFormElement extends ReactiveElement {
     const pad = (n) => String(n).padStart(2, "0");
     const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
     this.#isToday = this.#date === today;
-    this.#draftKey = `entry-draft-${this.#date}`;
 
     this.#restoreDraft();
     this.#configureForm();
@@ -168,8 +167,8 @@ class EntryFormElement extends ReactiveElement {
   }
 
   #restoreDraft() {
-    if (!this.#textarea || !this.#draftKey) return;
-    this.#textarea.value = sessionStorage.getItem(this.#draftKey) || "";
+    if (!this.#textarea || !this.#date) return;
+    this.#textarea.value = draftStore.get(this.#date) || "";
     if (this.#textarea.value) {
       this.#resizeTextarea();
     } else {
@@ -194,10 +193,10 @@ class EntryFormElement extends ReactiveElement {
     const bag = this.#listeners;
 
     const onAfterRequest = () => {
-      if (!this.#draftKey) return;
+      if (!this.#date) return;
       requestAnimationFrame(() => {
-        if (!this.#draftKey) return;
-        sessionStorage.removeItem(this.#draftKey);
+        if (!this.#date) return;
+        draftStore.delete(this.#date);
         if (this.#textarea?.value) {
           this.#resizeTextarea({ forceScroll: true });
         } else if (this.#textarea) {
@@ -241,8 +240,8 @@ class EntryFormElement extends ReactiveElement {
     const onInput = () => {
       const shouldForceScroll = this.#container ? isNearBottom(this.#container, 16) : false;
       this.#resizeTextarea({ forceScroll: shouldForceScroll });
-      if (this.#draftKey) {
-        sessionStorage.setItem(this.#draftKey, this.#textarea.value);
+      if (this.#date) {
+        draftStore.set(this.#date, this.#textarea.value);
       }
       if (!this.#isStreaming && !this.#isSubmitting) {
         this.#button.disabled = !this.#textarea.value.trim();

@@ -2,10 +2,8 @@
 import { getActiveDayParts } from "../entries/active-day-store.js";
 import { createPopover } from "../popover.js";
 import { triggerLabelFlash } from "../utils/motion.js";
+import { summaryCache } from "../utils/storage.js";
 import { transitionHide, transitionShow } from "../utils/transition.js";
-
-const DAY_SUMMARY_CACHE_PREFIX = "llamora:day-summary:";
-const DAY_SUMMARY_CACHE_TTL = 1000 * 60 * 60 * 6;
 
 export class CalendarControl extends HTMLElement {
   #state = null;
@@ -60,7 +58,7 @@ export class CalendarControl extends HTMLElement {
           const date = target?.dataset?.date;
           if (date) {
             this.#summaryCache.delete(date);
-            this.#clearCachedSummary(date);
+            summaryCache.delete(`day:${date}`);
           }
         }
       },
@@ -343,7 +341,7 @@ export class CalendarControl extends HTMLElement {
     if (this.#summaryCache.has(date)) {
       return this.#summaryCache.get(date);
     }
-    const cached = this.#getCachedSummary(date);
+    const cached = summaryCache.get(`day:${date}`);
     if (cached) {
       this.#summaryCache.set(date, cached);
       return cached;
@@ -359,7 +357,7 @@ export class CalendarControl extends HTMLElement {
         const summary = typeof data?.summary === "string" ? data.summary.trim() : "";
         if (summary) {
           this.#summaryCache.set(date, summary);
-          this.#setCachedSummary(date, summary);
+          summaryCache.set(`day:${date}`, summary);
         }
         this.#summaryRequests.delete(date);
         return summary;
@@ -370,52 +368,6 @@ export class CalendarControl extends HTMLElement {
       });
     this.#summaryRequests.set(date, request);
     return request;
-  }
-
-  #getSummaryCacheKey(date) {
-    return `${DAY_SUMMARY_CACHE_PREFIX}${date}`;
-  }
-
-  #getCachedSummary(date) {
-    if (!date) return "";
-    try {
-      const raw = window.sessionStorage.getItem(this.#getSummaryCacheKey(date));
-      if (!raw) return "";
-      const payload = JSON.parse(raw);
-      if (!payload || typeof payload.summary !== "string") return "";
-      if (
-        typeof payload.timestamp === "number" &&
-        Date.now() - payload.timestamp > DAY_SUMMARY_CACHE_TTL
-      ) {
-        window.sessionStorage.removeItem(this.#getSummaryCacheKey(date));
-        return "";
-      }
-      return payload.summary.trim();
-    } catch (_error) {
-      return "";
-    }
-  }
-
-  #setCachedSummary(date, summary) {
-    if (!date || !summary) return;
-    try {
-      const payload = JSON.stringify({
-        summary,
-        timestamp: Date.now(),
-      });
-      window.sessionStorage.setItem(this.#getSummaryCacheKey(date), payload);
-    } catch (_error) {
-      return;
-    }
-  }
-
-  #clearCachedSummary(date) {
-    if (!date) return;
-    try {
-      window.sessionStorage.removeItem(this.#getSummaryCacheKey(date));
-    } catch (_error) {
-      return;
-    }
   }
 
   #configureCalendarGrid(calendar, popover, pop, signal) {

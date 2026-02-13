@@ -2,12 +2,11 @@ import * as FuseModule from "fuse.js";
 import { armEntryAnimations, armInitialEntryAnimations } from "../entries/entry-animations.js";
 import { formatTimeElements } from "../services/time.js";
 import { clearScrollTarget, flashHighlight } from "../ui.js";
+import { sessionStore } from "../utils/storage.js";
 
 const FuseCtor = FuseModule.default ?? FuseModule;
 
 const BOOT_KEY = "__llamoraTagsViewBooted";
-const SEARCH_QUERY_STORAGE_KEY = "llamora:tags-view:query";
-const ENTRIES_SCROLL_ANCHOR_STORAGE_KEY = "llamora:tags-view:entries-anchor";
 const ENTRIES_LOAD_RESTORE_LIMIT = 48;
 
 const state = {
@@ -27,23 +26,13 @@ const state = {
   restoreAppliedForLocation: "",
 };
 
-const readStoredSearchQuery = () => {
-  try {
-    return String(window.sessionStorage.getItem(SEARCH_QUERY_STORAGE_KEY) || "").trim();
-  } catch {
-    return "";
-  }
-};
+const readStoredSearchQuery = () => sessionStore.get("tags:query") ?? "";
 
 const persistSearchQuery = (value) => {
-  try {
-    if (value) {
-      window.sessionStorage.setItem(SEARCH_QUERY_STORAGE_KEY, value);
-    } else {
-      window.sessionStorage.removeItem(SEARCH_QUERY_STORAGE_KEY);
-    }
-  } catch {
-    // Ignore storage failures.
+  if (value) {
+    sessionStore.set("tags:query", value);
+  } else {
+    sessionStore.delete("tags:query");
   }
 };
 
@@ -55,35 +44,10 @@ const setClearButtonVisibility = () => {
   state.clearBtn.tabIndex = hasQuery ? 0 : -1;
 };
 
-const getStorage = () => {
-  try {
-    return window.sessionStorage;
-  } catch {
-    return null;
-  }
-};
-
-const readEntriesAnchorMap = () => {
-  const storage = getStorage();
-  if (!storage) return {};
-  try {
-    const raw = storage.getItem(ENTRIES_SCROLL_ANCHOR_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
-};
+const readEntriesAnchorMap = () => sessionStore.get("tags:anchor") ?? {};
 
 const writeEntriesAnchorMap = (map) => {
-  const storage = getStorage();
-  if (!storage) return;
-  try {
-    storage.setItem(ENTRIES_SCROLL_ANCHOR_STORAGE_KEY, JSON.stringify(map));
-  } catch {
-    // Ignore storage failures.
-  }
+  sessionStore.set("tags:anchor", map);
 };
 
 const findList = (root = document) =>
