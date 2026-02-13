@@ -531,6 +531,9 @@ input[type="checkbox"]:focus {
 .icon-calendar-days {
   --icon: url("../icons/calendar-days.svg");
 }
+.icon-chevrons-down-up {
+  --icon: url("../icons/chevrons-down-up.svg");
+}
 .icon-book-open {
   --icon: url("../icons/book-open.svg");
 }
@@ -824,11 +827,16 @@ input[type="checkbox"]:focus {
   transition: none !important;
 }
 
-/* Reduce motion preference */
+/* Reduce motion preference – collapse animations to near-instant so
+   animationend events still fire (JS depends on them), stop infinite
+   loops after one iteration, but preserve transitions (hover, focus,
+   color feedback) so the UI doesn't feel broken. */
 @media (prefers-reduced-motion: reduce) {
-  * {
-    animation: none !important;
-    transition: none !important;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
 
