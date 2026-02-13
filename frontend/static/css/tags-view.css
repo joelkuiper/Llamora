@@ -133,6 +133,48 @@
   font-size: 0.85rem;
   line-height: 1.3;
   padding-left: 1.95rem;
+  padding-right: 2.15rem;
+}
+
+.tags-view__search-clear {
+  position: absolute;
+  right: 0.58rem;
+  top: 50%;
+  transform: translateY(-50%) scale(0.92);
+  width: 1.36rem;
+  height: 1.36rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: color-mix(in srgb, var(--color-text-muted) 76%, transparent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 0.92rem;
+  opacity: 0;
+  pointer-events: none;
+  cursor: pointer;
+  transition:
+    opacity var(--motion-hover) ease,
+    transform var(--motion-hover) ease,
+    color var(--motion-hover) ease,
+    background-color var(--motion-hover) ease,
+    box-shadow var(--motion-hover) ease;
+}
+
+.tags-view__search-clear.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%) scale(1);
+}
+
+.tags-view__search-clear:hover,
+.tags-view__search-clear:focus-visible {
+  color: color-mix(in srgb, var(--color-text) 88%, transparent);
+  background: color-mix(in srgb, var(--accent-10) 20%, var(--color-bg-alt));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 45%, transparent);
+  outline: none;
 }
 
 .tags-view__controls {

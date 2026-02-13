@@ -17,6 +17,7 @@ const state = {
   fuse: null,
   rows: [],
   input: null,
+  clearBtn: null,
   empty: null,
   list: null,
   scrollElement: null,
@@ -44,6 +45,14 @@ const persistSearchQuery = (value) => {
   } catch {
     // Ignore storage failures.
   }
+};
+
+const setClearButtonVisibility = () => {
+  if (!(state.clearBtn instanceof HTMLButtonElement)) return;
+  const hasQuery = Boolean(String(state.query || "").trim());
+  state.clearBtn.classList.toggle("is-visible", hasQuery);
+  state.clearBtn.setAttribute("aria-hidden", hasQuery ? "false" : "true");
+  state.clearBtn.tabIndex = hasQuery ? 0 : -1;
 };
 
 const getStorage = () => {
@@ -529,6 +538,7 @@ const buildSearchIndex = (root = document) => {
   state.list = list?.querySelector("[data-tags-view-index]") || null;
   state.rows = Array.from(state.list?.querySelectorAll(".tags-view__index-row") || []);
   state.input = sidebar?.querySelector("[data-tags-view-search]") || null;
+  state.clearBtn = sidebar?.querySelector("[data-tags-view-search-clear]") || null;
   state.empty = list?.querySelector("[data-tags-view-empty]") || null;
 
   const searchable = state.rows.map((row) => ({
@@ -564,6 +574,7 @@ const buildSearchIndex = (root = document) => {
   if (state.input) {
     state.input.value = state.query;
   }
+  setClearButtonVisibility();
 };
 
 const escapeHtml = (value) =>
@@ -593,6 +604,7 @@ const applySearch = (rawQuery) => {
   const query = String(rawQuery || "").trim();
   state.query = query;
   persistSearchQuery(query);
+  setClearButtonVisibility();
   if (!state.rows.length) return;
 
   if (!query) {
@@ -727,6 +739,17 @@ if (!globalThis[BOOT_KEY]) {
   document.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
+
+    const clearBtn = target.closest("[data-tags-view-search-clear]");
+    if (clearBtn instanceof HTMLButtonElement) {
+      event.preventDefault();
+      applySearch("");
+      if (state.input instanceof HTMLInputElement) {
+        state.input.value = "";
+        state.input.focus();
+      }
+      return;
+    }
 
     const entryLink = target.closest(
       "#tags-view-detail .tags-view__entry-open, #tags-view-detail .tags-view__entry-date",
