@@ -37,10 +37,10 @@
             <span>Frequently appears with:</span>
             {% for related in detail.related_tags %}
               {% if not loop.first %}<span class="tags-view__dot">·</span>{% endif %}
-              {% set related_url = url_for('days.day', date=day) ~ '?view=tags&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tag=' ~ (related.name|urlencode) %}
+              {% set related_url = url_for('days.day', date=day) ~ '?view=tags&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tag=' ~ (related.name|urlencode) ~ '&target=' ~ (('tag-index-' ~ related.name)|urlencode) %}
               <a href="{{ related_url }}"
                  class="tags-view__related-link"
-                 hx-get="{{ url_for('tags.tags_view_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&tag={{ related.name|urlencode }}"
+                 hx-get="{{ url_for('tags.tags_view_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&tag={{ related.name|urlencode }}&target={{ ('tag-index-' ~ related.name)|urlencode }}"
                  hx-target="#tags-view-detail"
                  hx-swap="outerHTML"
                  hx-push-url="{{ related_url }}">
@@ -84,10 +84,10 @@
                   {% if item.secondary_tags %}
                     <div class="entry-tags tags-view__entry-tags">
                       {% for name in item.secondary_tags %}
-                        {% set tag_url = url_for('days.day', date=day) ~ '?view=tags&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tag=' ~ (name|urlencode) %}
+                        {% set tag_url = url_for('days.day', date=day) ~ '?view=tags&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tag=' ~ (name|urlencode) ~ '&target=' ~ (('tag-index-' ~ name)|urlencode) %}
                         <a href="{{ tag_url }}"
                            class="entry-tag tags-view__entry-tag"
-                           hx-get="{{ url_for('tags.tags_view_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&tag={{ name|urlencode }}"
+                           hx-get="{{ url_for('tags.tags_view_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&tag={{ name|urlencode }}&target={{ ('tag-index-' ~ name)|urlencode }}"
                            hx-target="#tags-view-detail"
                            hx-swap="outerHTML"
                            hx-push-url="{{ tag_url }}">

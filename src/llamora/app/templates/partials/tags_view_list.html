@@ -7,6 +7,7 @@
     {% for item in tag_items %}
       {% set tag_url = url_for('days.day', date=day) ~ '?view=tags&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tag=' ~ (item.name|urlencode) %}
       <a class="tags-view__index-row{% if item.name == active_tag %} is-active{% endif %}"
+         id="tag-index-{{ item.name }}"
          href="{{ tag_url }}"
          data-tag-name="{{ item.name }}"
          data-tags-name="{{ item.name }}"

@@ -1,5 +1,6 @@
 import * as FuseModule from "fuse.js";
 import { armEntryAnimations, armInitialEntryAnimations } from "../entries/entry-animations.js";
+import { clearScrollTarget, flashHighlight } from "../ui.js";
 
 const FuseCtor = FuseModule.default ?? FuseModule;
 
@@ -193,6 +194,20 @@ const animateDetailEntries = (root = document) => {
   const entries = detail.querySelector(".tags-view__entries");
   if (!(entries instanceof HTMLElement)) return;
   armInitialEntryAnimations(entries);
+};
+
+const highlightRequestedTag = (root = document) => {
+  const params = new URLSearchParams(window.location.search);
+  const target = String(params.get("target") || "").trim();
+  if (!target || !target.startsWith("tag-index-")) return;
+  const row = document.getElementById(target);
+  if (!(row instanceof HTMLElement)) return;
+  const tagName = row.dataset.tagName || "";
+  if (tagName) {
+    setActiveTag(tagName, root);
+  }
+  flashHighlight(row);
+  clearScrollTarget(target, { emitEvent: false });
 };
 
 const sortRows = () => {
@@ -408,6 +423,7 @@ const sync = (root = document) => {
   applySearch(state.query);
   syncFromDetail(root);
   animateDetailEntries(root);
+  highlightRequestedTag(root);
 };
 
 if (!globalThis[BOOT_KEY]) {
@@ -443,6 +459,10 @@ if (!globalThis[BOOT_KEY]) {
     const tagName = (detailLink.textContent || "").trim();
     if (tagName) {
       setActiveTag(tagName);
+      const linkedRow = document.getElementById(`tag-index-${tagName}`);
+      if (linkedRow instanceof HTMLElement) {
+        flashHighlight(linkedRow);
+      }
     }
     scrollMainContentTop();
   });
