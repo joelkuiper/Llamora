@@ -7,6 +7,10 @@
 * No tests. Manual QA only.
 * No bundler. ES modules + CSS are handcrafted.
 * Logs via `logger = getLogger(__name__)`, not `print`.
+* Lint/format:
+  * Frontend: `scripts/lint_frontend_js.sh` (Biome check), `scripts/format_frontend.sh` (Biome format).
+  * Backend: `scripts/lint_backend.sh` (Ruff check + format --check).
+  * Git hooks live in `.githooks/` (enable with `git config core.hooksPath .githooks`).
 
 ---
 

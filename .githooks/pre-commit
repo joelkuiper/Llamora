@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+scripts/lint_frontend_js.sh
+scripts/lint_backend.sh
