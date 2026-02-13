@@ -9,3 +9,13 @@
   background: color-mix(in srgb, var(--color-danger) 10%, transparent);
   color: color-mix(in srgb, var(--color-danger) 70%, var(--color-text-muted));
 }
+
+#entries .entry.assistant .entry-action.entry-delete:hover,
+#entries .entry.assistant .entry-action.entry-delete:focus-visible,
+#entries .entry.response-stream .entry-action.entry-delete:hover,
+#entries .entry.response-stream .entry-action.entry-delete:focus-visible {
+  border-color: color-mix(in srgb, var(--color-danger) 36%, var(--border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-danger) 14%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+  color: color-mix(in srgb, var(--color-danger) 68%, var(--color-text-muted));
+}

@@ -147,16 +147,15 @@ function registerEntriesLoader() {
     spinner = getSpinner(loader);
   };
 
-  const isContentWrapperTarget = (event) => {
+  const LOADER_TARGET_IDS = new Set(["content-wrapper", "main-content", "tags-view-detail"]);
+
+  const isLoaderTarget = (event) => {
     const target = event?.detail?.target;
-    return (
-      target instanceof Element &&
-      (target.id === "content-wrapper" || target.id === "tags-view-detail")
-    );
+    return target instanceof Element && LOADER_TARGET_IDS.has(target.id);
   };
 
   const start = (event) => {
-    if (!isContentWrapperTarget(event)) {
+    if (!isLoaderTarget(event)) {
       return;
     }
     refreshLoader();
@@ -173,7 +172,7 @@ function registerEntriesLoader() {
   };
 
   const end = (event) => {
-    if (!isContentWrapperTarget(event)) {
+    if (!isLoaderTarget(event)) {
       return;
     }
     refreshLoader();
@@ -198,7 +197,7 @@ function registerEntriesLoader() {
   document.body.addEventListener("htmx:responseError", end);
   document.body.addEventListener("htmx:afterSwap", (event) => {
     refreshLoader();
-    if (isContentWrapperTarget(event)) {
+    if (isLoaderTarget(event)) {
       pending = 0;
       clearTimer();
       hide();

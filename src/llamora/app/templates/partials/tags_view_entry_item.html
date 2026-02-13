@@ -1,0 +1,63 @@
+{% set item_date = item.created_date or item.created_at[:10] %}
+{% set entry_url = url_for('days.day', date=item_date) ~ '?view=diary&target=entry-' ~ item.entry_id %}
+<li class="tags-view__entry-item">
+  <article class="tags-view__entry entry user">
+    <a class="tags-view__entry-date"
+       href="{{ entry_url }}"
+       hx-get="{{ entry_url }}"
+       hx-target="#main-content"
+       hx-swap="outerHTML"
+       hx-push-url="true">
+      {{ item.date_label }} · {{ item.created_at|humanize }}
+    </a>
+    <p class="tags-view__entry-snippet">{{ item.snippet }}</p>
+    <div class="tags-view__entry-footer">
+      {% if item.secondary_tags %}
+        <div class="entry-tags tags-view__entry-tags">
+          {% for name in item.secondary_tags %}
+            {% set tag_target = 'tag-index-' ~ name %}
+            {% set tag_url = url_for('days.day', date=day) ~ '?view=tags&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tags_limit=' ~ tags_limit ~ '&entries_limit=' ~ entries_limit ~ '&tag=' ~ (name|urlencode) ~ '&target=' ~ (tag_target|urlencode) %}
+            <a href="{{ tag_url }}"
+               class="entry-tag tags-view__entry-tag"
+               hx-get="{{ url_for('tags.tags_view_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&tags_limit={{ tags_limit }}&entries_limit={{ entries_limit }}&tag={{ name|urlencode }}&target={{ tag_target|urlencode }}"
+               hx-target="#tags-view-detail"
+               hx-swap="outerHTML"
+               hx-push-url="{{ tag_url }}">
+              <span class="tag-label">{{ name }}</span>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div></div>
+      {% endif %}
+      <div class="entry-actions-row tags-view__entry-actions">
+        <a class="entry-action tags-view__entry-open"
+           href="{{ entry_url }}"
+           hx-get="{{ entry_url }}"
+           hx-target="#main-content"
+           hx-swap="outerHTML"
+           hx-push-url="true"
+           aria-label="Go to entry"
+           data-tooltip-title="Go to entry">
+          <span class="icon-mask icon-book-marked entry-action__icon" aria-hidden="true"></span>
+        </a>
+        <button class="entry-action entry-delete"
+                type="button"
+                hx-delete="{{ url_for('entries.delete_entry', entry_id=item.entry_id) }}"
+                hx-target="closest .tags-view__entry-item"
+                hx-swap="delete swap:180ms"
+                hx-confirm="Delete this entry?"
+                data-confirm-title="Delete entry?"
+                data-confirm-message="This entry will be removed from your diary."
+                data-confirm-confirm="Delete"
+                data-confirm-cancel="Keep"
+                data-confirm-variant="danger"
+                aria-label="Delete entry"
+                data-tooltip-title="Delete entry"
+                data-ready="true">
+          <span class="icon-mask icon-trash entry-action__icon" aria-hidden="true"></span>
+        </button>
+      </div>
+    </div>
+  </article>
+</li>

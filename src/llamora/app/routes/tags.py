@@ -30,6 +30,16 @@ def _resolve_view_day(raw_day: str | None) -> str:
         return fallback
 
 
+def _parse_positive_int(
+    raw: str | None, *, default: int, min_value: int, max_value: int
+) -> int:
+    try:
+        value = int(str(raw or "").strip() or str(default))
+    except (TypeError, ValueError):
+        return default
+    return max(min_value, min(value, max_value))
+
+
 @tags_bp.delete("/t/<entry_id>/<tag_hash>")
 @login_required
 async def remove_tag(entry_id: str, tag_hash: str):
@@ -218,6 +228,13 @@ async def delete_trace(tag_hash: str):
         request.args.get("tag"),
         sort_kind=sort_kind,
         sort_dir=sort_dir,
+        tags_limit=_parse_positive_int(
+            request.args.get("tags_limit"), default=50, min_value=10, max_value=200
+        ),
+        tags_cursor=(request.args.get("tags_cursor") or "").strip() or None,
+        entry_limit=_parse_positive_int(
+            request.args.get("entries_limit"), default=12, min_value=6, max_value=60
+        ),
     )
     selected_tag = tags_view.selected_tag
     return await render_template(
@@ -329,12 +346,21 @@ async def tags_view_fragment(date: str):
         "yes",
         "on",
     }
+    tags_limit = _parse_positive_int(
+        request.args.get("tags_limit"), default=50, min_value=10, max_value=200
+    )
+    entries_limit = _parse_positive_int(
+        request.args.get("entries_limit"), default=12, min_value=6, max_value=60
+    )
     tags_view = await tag_service.get_tags_view_data(
         user["id"],
         dek,
         request.args.get("tag"),
         sort_kind=sort_kind,
         sort_dir=sort_dir,
+        tags_limit=tags_limit,
+        tags_cursor=(request.args.get("tags_cursor") or "").strip() or None,
+        entry_limit=entries_limit,
     )
     selected_tag = tags_view.selected_tag
     return await render_template(
@@ -345,4 +371,90 @@ async def tags_view_fragment(date: str):
         tags_sort_kind=sort_kind,
         tags_sort_dir=sort_dir,
         include_list=include_list,
+        tags_limit=tags_limit,
+        entries_limit=entries_limit,
+        target=(request.args.get("target") or "").strip() or None,
+    )
+
+
+@tags_bp.get("/fragments/tags/<date>/index")
+@login_required
+async def tags_view_index_chunk(date: str):
+    normalized_date = require_iso_date(date)
+    _, user, dek = await require_user_and_dek()
+    tag_service = _tags()
+    sort_kind = tag_service.normalize_tags_sort_kind(request.args.get("sort_kind"))
+    sort_dir = tag_service.normalize_tags_sort_dir(request.args.get("sort_dir"))
+    tags_limit = _parse_positive_int(
+        request.args.get("tags_limit"), default=50, min_value=10, max_value=200
+    )
+    entries_limit = _parse_positive_int(
+        request.args.get("entries_limit"), default=12, min_value=6, max_value=60
+    )
+    rows, next_cursor, has_more = await tag_service.get_tags_index_page(
+        user["id"],
+        dek,
+        sort_kind=sort_kind,
+        sort_dir=sort_dir,
+        limit=tags_limit,
+        cursor=(request.args.get("cursor") or "").strip() or None,
+    )
+    selected_tag = tag_service.normalize_tag_query(request.args.get("tag"))
+    return await render_template(
+        "partials/tags_view_list_chunk.html",
+        day=normalized_date,
+        tag_items=rows,
+        active_tag=selected_tag,
+        sort_kind=sort_kind,
+        sort_dir=sort_dir,
+        tags_has_more=has_more,
+        tags_next_cursor=next_cursor,
+        tags_limit=tags_limit,
+        entries_limit=entries_limit,
+        target=(request.args.get("target") or "").strip() or None,
+    )
+
+
+@tags_bp.get("/fragments/tags/<date>/detail/<tag_hash>/entries")
+@login_required
+async def tags_view_detail_entries_chunk(date: str, tag_hash: str):
+    normalized_date = require_iso_date(date)
+    _, user, dek = await require_user_and_dek()
+    try:
+        tag_hash_bytes = bytes.fromhex(tag_hash)
+    except ValueError as exc:
+        abort(400, description="invalid tag hash")
+        raise AssertionError("unreachable") from exc
+
+    tag_service = _tags()
+    sort_kind = tag_service.normalize_tags_sort_kind(request.args.get("sort_kind"))
+    sort_dir = tag_service.normalize_tags_sort_dir(request.args.get("sort_dir"))
+    tags_limit = _parse_positive_int(
+        request.args.get("tags_limit"), default=50, min_value=10, max_value=200
+    )
+    entries_limit = _parse_positive_int(
+        request.args.get("limit"), default=12, min_value=6, max_value=60
+    )
+    entries, next_cursor, has_more = await tag_service.get_archive_entries_page(
+        user["id"],
+        [tag_hash_bytes],
+        dek,
+        limit=entries_limit,
+        cursor=(request.args.get("cursor") or "").strip() or None,
+    )
+    if not entries:
+        return ""
+    return await render_template(
+        "partials/tags_view_entries_chunk.html",
+        day=normalized_date,
+        entries=entries,
+        sort_kind=sort_kind,
+        sort_dir=sort_dir,
+        selected_tag=tag_service.normalize_tag_query(request.args.get("tag")),
+        tag_hash=tag_hash,
+        has_more=has_more,
+        next_cursor=next_cursor,
+        tags_limit=tags_limit,
+        entries_limit=entries_limit,
+        page_size=entries_limit,
     )

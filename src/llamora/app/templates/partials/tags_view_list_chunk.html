@@ -1,0 +1,15 @@
+{% for item in tag_items %}
+  {% include 'partials/tags_view_list_row.html' %}
+{% endfor %}
+{% if tags_has_more and tags_next_cursor %}
+  <div class="load-more tags-view__index-load-more"
+       hx-get="{{ url_for('tags.tags_view_index_chunk', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&tags_limit={{ tags_limit }}&entries_limit={{ entries_limit }}&cursor={{ tags_next_cursor|urlencode }}{% if active_tag %}&tag={{ active_tag|urlencode }}{% endif %}{% if target %}&target={{ target|urlencode }}{% endif %}"
+       hx-trigger="intersect once delay:140ms"
+       hx-swap="outerHTML"
+       hx-target="this"
+       hx-sync="this:replace"
+       aria-hidden="true">
+    <span class="load-indicator" aria-hidden="true"></span>
+    <span class="visually-hidden">Loading more traces...</span>
+  </div>
+{% endif %}

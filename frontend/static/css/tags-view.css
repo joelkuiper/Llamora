@@ -90,6 +90,7 @@
   overflow-y: auto;
   padding-bottom: 0.5rem;
   scrollbar-width: thin;
+  contain: layout style paint;
 }
 
 .tags-view__list-body::-webkit-scrollbar {
@@ -191,6 +192,8 @@
     color 180ms ease,
     box-shadow 180ms ease,
     transform var(--motion-press) ease;
+  content-visibility: auto;
+  contain-intrinsic-size: 38px;
 }
 
 .tags-view__index-row::before {
@@ -399,10 +402,13 @@
   padding: 0 0 1rem;
   display: grid;
   gap: 1.8rem;
+  contain: layout style paint;
 }
 
 .tags-view__entry-item {
   margin: 0;
+  content-visibility: auto;
+  contain-intrinsic-size: 220px;
 }
 
 .tags-view__entry {
@@ -552,6 +558,11 @@
 
 #tags-view-list.htmx-settling .tags-view__index-row.htmx-added {
   animation: motion-tag-enter var(--motion-tag-enter-duration) ease both;
+}
+
+.tags-view__index-load-more,
+.tags-view__entries-load-more {
+  min-height: 2rem;
 }
 
 #main-content[data-view="tags"].htmx-added .tags-view__sidebar-fixed,

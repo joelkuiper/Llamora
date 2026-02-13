@@ -53,6 +53,18 @@ async def _render_day(date: str, target: str | None, view_kind: str):
     legacy_sort = services.tag_service.normalize_legacy_sort(request.args.get("sort"))
     if legacy_sort is not None:
         tags_sort_kind, tags_sort_dir = legacy_sort
+    try:
+        tags_limit = int(request.args.get("tags_limit") or 50)
+    except (TypeError, ValueError):
+        tags_limit = 50
+    tags_limit = max(10, min(tags_limit, 200))
+    try:
+        entries_limit = int(request.args.get("entries_limit") or 12)
+    except (TypeError, ValueError):
+        entries_limit = 12
+    entries_limit = max(6, min(entries_limit, 60))
+    tags_cursor = (request.args.get("tags_cursor") or "").strip() or None
+    target_param = (request.args.get("target") or "").strip() or None
     if view == "diary":
         entries_response = await render_entries(
             date,
@@ -70,6 +82,9 @@ async def _render_day(date: str, target: str | None, view_kind: str):
             selected_tag,
             sort_kind=tags_sort_kind,
             sort_dir=tags_sort_dir,
+            tags_limit=tags_limit,
+            tags_cursor=tags_cursor,
+            entry_limit=entries_limit,
         )
         selected_tag = tags_view.selected_tag
     context = {
@@ -86,6 +101,9 @@ async def _render_day(date: str, target: str | None, view_kind: str):
         "selected_tag": selected_tag,
         "tags_sort_kind": tags_sort_kind,
         "tags_sort_dir": tags_sort_dir,
+        "tags_limit": tags_limit,
+        "entries_limit": entries_limit,
+        "target": target_param,
     }
     if (
         request.headers.get("HX-Request")

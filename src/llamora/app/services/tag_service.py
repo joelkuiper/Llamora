@@ -38,6 +38,32 @@ def _parse_tag_cursor(cursor: str | None) -> tuple[str | None, str | None]:
     return created_at, entry_id
 
 
+def _parse_index_count_cursor(cursor: str | None) -> tuple[int | None, str | None]:
+    if not cursor:
+        return None, None
+    if "|" not in cursor:
+        return None, None
+    count_raw, _, hash_hex = cursor.partition("|")
+    try:
+        count = int(count_raw.strip())
+    except (TypeError, ValueError):
+        return None, None
+    digest = hash_hex.strip().lower()
+    if not digest:
+        return None, None
+    return count, digest
+
+
+def _parse_offset_cursor(cursor: str | None) -> int:
+    if not cursor:
+        return 0
+    try:
+        value = int(str(cursor).strip())
+    except (TypeError, ValueError):
+        return 0
+    return max(0, value)
+
+
 @dataclass(slots=True)
 class TagEntryPreview:
     entry_id: str
@@ -89,11 +115,15 @@ class TagArchiveDetail:
     first_used_label: str | None
     entries: tuple[TagArchiveEntry, ...]
     related_tags: tuple[TagRelatedItem, ...]
+    entries_has_more: bool = False
+    entries_next_cursor: str | None = None
 
 
 @dataclass(slots=True)
 class TagsViewData:
     tags: tuple[TagIndexItem, ...]
+    tags_has_more: bool
+    tags_next_cursor: str | None
     selected_tag: str | None
     detail: TagArchiveDetail | None
     sort_kind: TagsSortKind
@@ -256,34 +286,21 @@ class TagService:
         *,
         sort_kind: TagsSortKind = "alpha",
         sort_dir: TagsSortDirection = "asc",
-        entry_limit: int = 80,
+        tags_limit: int = 50,
+        tags_cursor: str | None = None,
+        entry_limit: int = 12,
         secondary_tag_limit: int = 4,
         related_tag_limit: int = 2,
     ) -> TagsViewData:
         """Return data for the two-column archival tags view."""
 
-        raw_tags = await self._db.tags.get_tags_index(user_id, dek)
-        index_items: list[TagIndexItem] = []
-        for row in raw_tags:
-            raw_name = str(row.get("name") or "").strip()
-            if not raw_name:
-                continue
-            try:
-                canonical = self.canonicalize(raw_name)
-            except ValueError:
-                continue
-            index_items.append(
-                TagIndexItem(
-                    name=self.display(canonical),
-                    hash=str(row.get("hash") or ""),
-                    count=int(row.get("count") or 0),
-                )
-            )
-
-        index_items = self._sort_index_items(
-            index_items,
+        index_items, tags_next_cursor, tags_has_more = await self.get_tags_index_page(
+            user_id,
+            dek,
             sort_kind=sort_kind,
             sort_dir=sort_dir,
+            limit=tags_limit,
+            cursor=tags_cursor,
         )
         selected_name = self.normalize_tag_query(selected_tag)
         selected_index = (
@@ -291,11 +308,21 @@ class TagService:
             if selected_name
             else None
         )
+        if selected_name and not selected_index:
+            selected_index = await self._resolve_index_item_by_name(
+                user_id, dek, selected_name
+            )
+            if selected_index and not any(
+                item.name == selected_index.name for item in index_items
+            ):
+                index_items = [selected_index, *index_items]
         if not selected_index and index_items:
             selected_index = index_items[0]
         if not selected_index:
             return TagsViewData(
                 tags=tuple(index_items),
+                tags_has_more=tags_has_more,
+                tags_next_cursor=tags_next_cursor,
                 selected_tag=None,
                 detail=None,
                 sort_kind=sort_kind,
@@ -312,11 +339,108 @@ class TagService:
         )
         return TagsViewData(
             tags=tuple(index_items),
+            tags_has_more=tags_has_more,
+            tags_next_cursor=tags_next_cursor,
             selected_tag=selected_index.name if detail else None,
             detail=detail,
             sort_kind=sort_kind,
             sort_dir=sort_dir,
         )
+
+    async def get_tags_index_page(
+        self,
+        user_id: str,
+        dek: bytes,
+        *,
+        sort_kind: TagsSortKind,
+        sort_dir: TagsSortDirection,
+        limit: int,
+        cursor: str | None = None,
+    ) -> tuple[list[TagIndexItem], str | None, bool]:
+        page_size = max(1, min(limit, 200))
+        if sort_kind == "count":
+            cursor_count, cursor_hash = _parse_index_count_cursor(cursor)
+            rows, next_cursor, has_more = await self._db.tags.get_tags_index_count_page(
+                user_id,
+                dek,
+                limit=page_size,
+                sort_dir=sort_dir,
+                cursor_count=cursor_count,
+                cursor_hash_hex=cursor_hash,
+            )
+            items: list[TagIndexItem] = []
+            for row in rows:
+                raw_name = str(row.get("name") or "").strip()
+                if not raw_name:
+                    continue
+                try:
+                    canonical = self.canonicalize(raw_name)
+                except ValueError:
+                    continue
+                items.append(
+                    TagIndexItem(
+                        name=self.display(canonical),
+                        hash=str(row.get("hash") or ""),
+                        count=int(row.get("count") or 0),
+                    )
+                )
+            return items, next_cursor, has_more
+
+        raw_tags = await self._db.tags.get_tags_index(user_id, dek)
+        items: list[TagIndexItem] = []
+        for row in raw_tags:
+            raw_name = str(row.get("name") or "").strip()
+            if not raw_name:
+                continue
+            try:
+                canonical = self.canonicalize(raw_name)
+            except ValueError:
+                continue
+            items.append(
+                TagIndexItem(
+                    name=self.display(canonical),
+                    hash=str(row.get("hash") or ""),
+                    count=int(row.get("count") or 0),
+                )
+            )
+        items = self._sort_index_items(
+            items,
+            sort_kind=sort_kind,
+            sort_dir=sort_dir,
+        )
+        offset = _parse_offset_cursor(cursor)
+        page = items[offset : offset + page_size + 1]
+        has_more = len(page) > page_size
+        page = page[:page_size]
+        next_cursor = str(offset + page_size) if has_more else None
+        return page, next_cursor, has_more
+
+    async def _resolve_index_item_by_name(
+        self,
+        user_id: str,
+        dek: bytes,
+        tag_name: str,
+    ) -> TagIndexItem | None:
+        target = self.normalize_tag_query(tag_name)
+        if not target:
+            return None
+        raw_tags = await self._db.tags.get_tags_index(user_id, dek)
+        for row in raw_tags:
+            raw_name = str(row.get("name") or "").strip()
+            if not raw_name:
+                continue
+            try:
+                canonical = self.canonicalize(raw_name)
+            except ValueError:
+                continue
+            if canonical != target:
+                continue
+            return TagIndexItem(
+                name=self.display(canonical),
+                hash=str(row.get("hash") or ""),
+                count=int(row.get("count") or 0),
+            )
+        return None
 
     def _sort_index_items(
         self,
@@ -356,12 +480,13 @@ class TagService:
         if not info:
             return None
 
-        entry_ids, _, _ = await self._db.tags.get_recent_entries_page_for_tag_hashes(
+        archive_entries, next_cursor, has_more = await self.get_archive_entries_page(
             user_id,
             [tag_hash],
+            dek,
             limit=max(1, limit),
         )
-        if not entry_ids:
+        if not archive_entries:
             return TagArchiveDetail(
                 name=tag_item.name,
                 hash=tag_item.hash,
@@ -369,17 +494,75 @@ class TagService:
                 first_used=info.get("first_used"),
                 first_used_label=_format_month_year(info.get("first_used")),
                 entries=(),
+                entries_has_more=False,
+                entries_next_cursor=None,
                 related_tags=(),
             )
+        related_counter: Counter[str] = Counter()
+        for entry in archive_entries:
+            for name in entry.secondary_tags:
+                if name == tag_item.name:
+                    continue
+                related_counter[name] += 1
+
+        related = tuple(
+            TagRelatedItem(name=name, count=count)
+            for name, count in sorted(
+                related_counter.items(), key=lambda item: (-item[1], item[0])
+            )[: max(0, related_tag_limit)]
+        )
+        return TagArchiveDetail(
+            name=tag_item.name,
+            hash=tag_item.hash,
+            count=int(info.get("count") or tag_item.count),
+            first_used=info.get("first_used"),
+            first_used_label=_format_month_year(info.get("first_used")),
+            entries=tuple(archive_entries),
+            entries_has_more=has_more,
+            entries_next_cursor=next_cursor,
+            related_tags=related,
+        )
+
+    async def get_archive_entries_page(
+        self,
+        user_id: str,
+        tag_hashes: list[bytes],
+        dek: bytes,
+        *,
+        limit: int,
+        cursor: str | None = None,
+        secondary_tag_limit: int = 4,
+    ) -> tuple[list[TagArchiveEntry], str | None, bool]:
+        before_created_at, before_entry_id = _parse_tag_cursor(cursor)
+        (
+            entry_ids,
+            next_cursor,
+            has_more,
+        ) = await self._db.tags.get_recent_entries_page_for_tag_hashes(
+            user_id,
+            tag_hashes,
+            limit=max(1, limit),
+            before_created_at=before_created_at,
+            before_entry_id=before_entry_id,
+        )
+        if not entry_ids:
+            return [], None, False
 
         entries = await self._db.entries.get_entries_by_ids(user_id, entry_ids, dek)
         entry_map = {entry.get("id"): entry for entry in entries}
         tags_by_entry = await self._db.tags.get_tags_for_entries(
             user_id, entry_ids, dek
         )
-        related_counter: Counter[str] = Counter()
-        archive_entries: list[TagArchiveEntry] = []
+        hash_names: set[str] = set()
+        if len(tag_hashes) == 1:
+            info = await self._db.tags.get_tag_info(user_id, tag_hashes[0], dek)
+            if info and info.get("name"):
+                try:
+                    hash_names.add(self.canonicalize(str(info["name"])))
+                except ValueError:
+                    pass
 
+        archive_entries: list[TagArchiveEntry] = []
         for entry_id in entry_ids:
             entry = entry_map.get(entry_id)
             if not entry:
@@ -398,11 +581,10 @@ class TagService:
                     canonical = self.canonicalize(raw_name)
                 except ValueError:
                     continue
-                if canonical == tag_item.name or canonical in seen_secondary:
+                if canonical in hash_names or canonical in seen_secondary:
                     continue
                 secondary_tags.append(canonical)
                 seen_secondary.add(canonical)
-                related_counter[canonical] += 1
 
             snippet = _extract_preview_excerpt(str(entry.get("text") or ""))
             if not snippet:
@@ -421,22 +603,7 @@ class TagService:
                     secondary_tags=tuple(secondary_tags[: max(1, secondary_tag_limit)]),
                 )
             )
-
-        related = tuple(
-            TagRelatedItem(name=name, count=count)
-            for name, count in sorted(
-                related_counter.items(), key=lambda item: (-item[1], item[0])
-            )[: max(0, related_tag_limit)]
-        )
-        return TagArchiveDetail(
-            name=tag_item.name,
-            hash=tag_item.hash,
-            count=int(info.get("count") or tag_item.count),
-            first_used=info.get("first_used"),
-            first_used_label=_format_month_year(info.get("first_used")),
-            entries=tuple(archive_entries),
-            related_tags=related,
-        )
+        return archive_entries, next_cursor, has_more
 
     async def hydrate_search_results(
         self,

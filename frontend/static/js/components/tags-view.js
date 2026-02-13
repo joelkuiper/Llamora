@@ -212,6 +212,7 @@ const highlightRequestedTag = (root = document) => {
 
 const sortRows = () => {
   if (!state.list || state.rows.length <= 1) return;
+  const sentinel = state.list.querySelector(".tags-view__index-load-more");
 
   const sorted = [...state.rows].sort((a, b) => {
     const nameA = (a.dataset.tagsName || "").toLowerCase();
@@ -233,6 +234,9 @@ const sortRows = () => {
   sorted.forEach((row) => {
     state.list.appendChild(row);
   });
+  if (sentinel instanceof HTMLElement) {
+    state.list.appendChild(sentinel);
+  }
   state.rows = sorted;
 };
 
@@ -355,10 +359,14 @@ const applySearch = (rawQuery) => {
       });
   }
   if (state.list) {
+    const sentinel = state.list.querySelector(".tags-view__index-load-more");
     const remainder = state.rows.filter((row) => !matches.has(row));
     [...orderedMatches, ...remainder].forEach((row) => {
       state.list.appendChild(row);
     });
+    if (sentinel instanceof HTMLElement) {
+      state.list.appendChild(sentinel);
+    }
   }
   let visibleCount = 0;
   state.rows.forEach((row) => {
@@ -491,10 +499,14 @@ if (!globalThis[BOOT_KEY]) {
   document.body.addEventListener("htmx:afterSwap", (event) => {
     const target = event.detail?.target;
     if (!(target instanceof Element)) return;
+    const inList = target.closest?.("#tags-view-list");
+    const inEntries = target.closest?.("[data-tags-view-entries]");
     if (
       target.id === "tags-view-detail" ||
       target.id === "main-content" ||
-      target.id === "tags-view-list"
+      target.id === "tags-view-list" ||
+      inList ||
+      inEntries
     ) {
       sync();
     }
