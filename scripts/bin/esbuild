@@ -4,6 +4,16 @@ set -eu
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 cached_bin="$script_dir/esbuild-0.27.0"
 
+is_valid_bin() {
+  "$cached_bin" --version >/dev/null 2>&1
+}
+
+if [ ! -x "$cached_bin" ]; then
+  :
+elif ! is_valid_bin; then
+  rm -f "$cached_bin"
+fi
+
 if [ ! -x "$cached_bin" ]; then
   dir=$(mktemp -d)
   cleanup() {
