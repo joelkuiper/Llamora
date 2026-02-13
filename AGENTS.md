@@ -8,8 +8,8 @@
 * No bundler. ES modules + CSS are handcrafted.
 * Logs via `logger = getLogger(__name__)`, not `print`.
 * Lint/format:
-  * Frontend: `scripts/lint_frontend_js.sh` (Biome check), `scripts/format_frontend.sh` (Biome format).
-  * Backend: `scripts/lint_backend.sh` (Ruff check + format --check).
+  * Frontend: `biome check`, `biome format --write`.
+  * Backend: `uv run ruff check`, `uv run ruff format --check`.
   * Git hooks live in `.githooks/` (enable with `git config core.hooksPath .githooks`).
 
 ---

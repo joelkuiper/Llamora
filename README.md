@@ -128,6 +128,29 @@ pnpm vendor
 This regenerates the vendor bundle files using esbuild and copies HTMX extensions straight from `node_modules`.
 
 ---
+## Linting & Formatting
+
+Frontend (Biome):
+
+```bash
+biome check
+biome format --write
+```
+
+Backend (Ruff):
+
+```bash
+uv run ruff check
+uv run ruff format --check
+```
+
+Git hooks are stored in `.githooks/`. Enable them with:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+---
 ## Migrations
 
 Llamora uses a lightweight SQLite migration flow (fastmigrate). Migrations live in `migrations/` and are applied

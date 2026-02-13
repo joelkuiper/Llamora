@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-scripts/lint_frontend_js.sh
-scripts/lint_backend.sh
+biome check
+uv run ruff check
+uv run ruff format --check
