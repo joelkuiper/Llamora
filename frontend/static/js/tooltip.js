@@ -1,27 +1,17 @@
-import { createTooltipPopover } from "./utils/tooltip-popover.js";
+import { autoUpdate, computePosition, flip, offset, shift } from "./vendor/setup-globals.js";
 
-const TOOLTIP_DELAY_MS = 320;
-const TOOLTIP_EXIT_MS = 180;
+const SHOW_DELAY_MS = 320;
 
-let tooltipEl;
-let innerEl;
-let tooltipPopover;
-let activeTrigger;
-let pendingTrigger;
-let showTimer;
-let hideTimer;
-let pendingHidePopover;
+let tooltipEl = null;
+let innerEl = null;
+let activeTrigger = null;
+let pendingTrigger = null;
+let delayTimer = null;
+let cleanupAutoUpdate = null;
 let initialized = false;
-let showToken = 0;
 
-function parseOffset(value, fallback) {
-  const parsed = Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function ensureTooltipElement() {
+function ensureElement() {
   if (tooltipEl?.isConnected) return;
-
   tooltipEl = document.createElement("div");
   tooltipEl.className = "tooltip";
   tooltipEl.innerHTML = '<div class="tooltip-inner"></div>';
@@ -30,12 +20,12 @@ function ensureTooltipElement() {
   document.body.appendChild(tooltipEl);
 }
 
-function findTooltipTrigger(node) {
+function findTrigger(node) {
   if (!(node instanceof Element)) return null;
   return node.closest("[data-tooltip-title]");
 }
 
-function shouldSuppressTooltip(trigger) {
+function isSuppressed(trigger) {
   if (!trigger) return true;
   if (trigger.dataset.tooltipDisabled === "true") return true;
   if (trigger.classList.contains("active")) return true;
@@ -44,135 +34,103 @@ function shouldSuppressTooltip(trigger) {
   return false;
 }
 
-function getTooltipTrigger(node) {
-  const trigger = findTooltipTrigger(node);
-  if (!trigger || shouldSuppressTooltip(trigger)) return null;
-  return trigger;
+function getTrigger(node) {
+  const trigger = findTrigger(node);
+  return trigger && !isSuppressed(trigger) ? trigger : null;
 }
 
-function isFocusVisible(trigger) {
-  if (!trigger || !(trigger instanceof Element)) return false;
-  try {
-    return trigger.matches(":focus-visible");
-  } catch (_error) {
-    return true;
+function parseFloat_(value, fallback) {
+  const n = Number.parseFloat(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function updatePosition(trigger) {
+  const placement = trigger.dataset.tooltipPlacement || "bottom";
+  const ox = parseFloat_(trigger.dataset.tooltipOffsetX, 0);
+  const oy = parseFloat_(trigger.dataset.tooltipOffsetY, 8);
+
+  computePosition(trigger, tooltipEl, {
+    placement,
+    strategy: "fixed",
+    middleware: [offset({ mainAxis: oy, crossAxis: ox }), flip(), shift({ padding: 8 })],
+  }).then(({ x, y }) => {
+    if (activeTrigger !== trigger) return;
+    tooltipEl.style.left = `${x}px`;
+    tooltipEl.style.top = `${y}px`;
+  });
+}
+
+function dismiss() {
+  if (delayTimer !== null) {
+    clearTimeout(delayTimer);
+    delayTimer = null;
   }
-}
-
-function clearShowTimer() {
-  if (!showTimer) return;
-  clearTimeout(showTimer);
-  showTimer = null;
-}
-
-function clearHideTimer({ cleanup = false } = {}) {
-  if (hideTimer) {
-    clearTimeout(hideTimer);
-    hideTimer = null;
-  }
-  if (cleanup && pendingHidePopover) {
-    void pendingHidePopover.cleanup();
-    pendingHidePopover = null;
-  }
-}
-
-function clearPendingTrigger() {
   pendingTrigger = null;
-  showToken += 1;
-  clearShowTimer();
-}
 
-function cleanupPopover() {
-  const popover = tooltipPopover;
-  tooltipPopover = null;
-  activeTrigger = null;
-  if (!popover) return;
-  void popover.cleanup();
-}
-
-function hideTooltip() {
-  clearPendingTrigger();
-  clearHideTimer({ cleanup: true });
-
-  const popover = tooltipPopover;
-  tooltipPopover = null;
-  activeTrigger = null;
-  pendingHidePopover = popover || null;
-
-  if (!tooltipEl) {
-    clearHideTimer({ cleanup: true });
-    return;
+  if (cleanupAutoUpdate) {
+    cleanupAutoUpdate();
+    cleanupAutoUpdate = null;
   }
 
-  tooltipEl.classList.remove("visible");
-  if (!pendingHidePopover) {
+  if (tooltipEl) {
+    tooltipEl.classList.remove("visible");
     tooltipEl.hidden = true;
-    return;
   }
 
-  hideTimer = window.setTimeout(() => {
-    hideTimer = null;
-    if (pendingTrigger || activeTrigger || tooltipPopover) return;
-    tooltipEl.hidden = true;
-    const currentPopover = pendingHidePopover;
-    pendingHidePopover = null;
-    if (currentPopover) {
-      void currentPopover.cleanup();
-    }
-  }, TOOLTIP_EXIT_MS);
+  activeTrigger = null;
 }
 
-function showTooltip(trigger) {
-  if (!trigger?.isConnected || shouldSuppressTooltip(trigger)) return;
+function show(trigger) {
+  if (activeTrigger === trigger) return;
+  if (!trigger?.isConnected || isSuppressed(trigger)) return;
 
   const title = trigger.dataset.tooltipTitle?.trim();
   if (!title) return;
 
-  clearPendingTrigger();
-  clearHideTimer({ cleanup: true });
-  if (activeTrigger === trigger && tooltipPopover) return;
-
-  cleanupPopover();
-  ensureTooltipElement();
+  dismiss();
+  ensureElement();
 
   innerEl.textContent = title;
+  tooltipEl.style.position = "fixed";
   tooltipEl.hidden = false;
-
-  const placement = trigger.dataset.tooltipPlacement || "bottom";
-  const offsetX = parseOffset(trigger.dataset.tooltipOffsetX, 0);
-  const offsetY = parseOffset(trigger.dataset.tooltipOffsetY, 8);
-
-  tooltipPopover = createTooltipPopover(trigger, tooltipEl, {
-    placement,
-    offset: [offsetX, offsetY],
-    onShow: () => {
-      tooltipEl.classList.add("visible");
-    },
-    onHide: () => {
-      tooltipEl.classList.remove("visible");
-    },
-    onHidden: () => {
-      tooltipEl.hidden = true;
-    },
-  });
-  tooltipPopover.controller.show();
   activeTrigger = trigger;
+
+  updatePosition(trigger);
+  cleanupAutoUpdate = autoUpdate(trigger, tooltipEl, () => updatePosition(trigger));
+
+  requestAnimationFrame(() => {
+    if (activeTrigger === trigger) {
+      tooltipEl.classList.add("visible");
+    }
+  });
 }
 
-function scheduleTooltip(trigger) {
+function scheduleShow(trigger) {
   if (!trigger || activeTrigger === trigger) return;
 
-  clearPendingTrigger();
+  // When switching between triggers, show immediately (no delay).
+  if (activeTrigger) {
+    show(trigger);
+    return;
+  }
+
+  // If already pending for this trigger, let the timer run.
+  if (pendingTrigger === trigger) return;
+
+  // Clear any previous pending.
+  if (delayTimer !== null) {
+    clearTimeout(delayTimer);
+    delayTimer = null;
+  }
   pendingTrigger = trigger;
-  showToken += 1;
-  const token = showToken;
-  showTimer = window.setTimeout(() => {
-    showTimer = null;
-    if (token !== showToken) return;
+
+  delayTimer = setTimeout(() => {
+    delayTimer = null;
     if (pendingTrigger !== trigger) return;
+    pendingTrigger = null;
     if (!trigger.isConnected || !trigger.matches(":hover")) return;
-    showTooltip(trigger);
-  }, TOOLTIP_DELAY_MS);
+    show(trigger);
+  }, SHOW_DELAY_MS);
 }
 
 export function initTooltips() {
@@ -181,70 +139,75 @@ export function initTooltips() {
 
   document.addEventListener(
     "pointerover",
-    (event) => {
-      const trigger = getTooltipTrigger(event.target);
+    (e) => {
+      const trigger = getTrigger(e.target);
       if (!trigger) return;
-      const related = event.relatedTarget;
-      if (related instanceof Node && trigger.contains(related)) return;
-      scheduleTooltip(trigger);
+      // Ignore moves within the same trigger.
+      if (e.relatedTarget instanceof Node && trigger.contains(e.relatedTarget)) return;
+      scheduleShow(trigger);
     },
     true,
   );
 
   document.addEventListener(
     "pointerout",
-    (event) => {
-      const trigger = findTooltipTrigger(event.target);
+    (e) => {
+      const trigger = findTrigger(e.target);
       if (!trigger) return;
-      const related = event.relatedTarget;
-      if (related instanceof Node && trigger.contains(related)) return;
+      // Ignore moves within the same trigger.
+      if (e.relatedTarget instanceof Node && trigger.contains(e.relatedTarget)) return;
+
+      // If moving to another trigger, let pointerover handle it.
+      // Only dismiss if we're leaving our active/pending trigger.
       if (pendingTrigger === trigger) {
-        clearPendingTrigger();
+        clearTimeout(delayTimer);
+        delayTimer = null;
+        pendingTrigger = null;
       }
       if (activeTrigger === trigger) {
-        hideTooltip();
+        dismiss();
       }
     },
     true,
   );
 
-  document.addEventListener("focusin", (event) => {
-    const trigger = getTooltipTrigger(event.target);
+  document.addEventListener("focusin", (e) => {
+    const trigger = getTrigger(e.target);
     if (!trigger) return;
-    if (!isFocusVisible(trigger)) return;
-    showTooltip(trigger);
+    try {
+      if (!trigger.matches(":focus-visible")) return;
+    } catch (_) {
+      /* proceed */
+    }
+    show(trigger);
   });
 
-  document.addEventListener("focusout", (event) => {
-    const trigger = findTooltipTrigger(event.target);
+  document.addEventListener("focusout", (e) => {
+    const trigger = findTrigger(e.target);
     if (!trigger || activeTrigger !== trigger) return;
-    const related = event.relatedTarget;
-    if (related instanceof Node && trigger.contains(related)) return;
-    hideTooltip();
+    if (e.relatedTarget instanceof Node && trigger.contains(e.relatedTarget)) return;
+    dismiss();
   });
 
-  document.addEventListener("pointerdown", hideTooltip, true);
-  document.addEventListener("click", hideTooltip, true);
-  document.addEventListener("scroll", hideTooltip, true);
-  window.addEventListener("resize", hideTooltip, { passive: true });
-  window.addEventListener("blur", hideTooltip, { passive: true });
-  window.addEventListener("popstate", hideTooltip);
+  document.addEventListener("pointerdown", dismiss, true);
+  document.addEventListener("click", dismiss, true);
+  document.addEventListener("scroll", dismiss, true);
+  window.addEventListener("resize", dismiss, { passive: true });
+  window.addEventListener("blur", dismiss, { passive: true });
+  window.addEventListener("popstate", dismiss);
 
-  const htmxHideEvents = [
+  for (const evt of [
     "htmx:beforeRequest",
     "htmx:beforeSwap",
     "htmx:afterSwap",
     "htmx:afterSettle",
     "app:rehydrate",
-  ];
-  htmxHideEvents.forEach((eventName) => {
-    document.addEventListener(eventName, hideTooltip);
-  });
+  ]) {
+    document.addEventListener(evt, dismiss);
+  }
 
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) {
-      hideTooltip();
-    }
+    if (document.hidden) dismiss();
   });
 }
 
