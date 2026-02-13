@@ -10,7 +10,25 @@
   <div class="tags-view__detail-inner">
     {% if detail %}
       <header class="tags-view__detail-header">
-        <h2 class="tags-view__title">{{ detail.name }}</h2>
+        {% set delete_trace_url = url_for('tags.delete_trace', tag_hash=detail.hash) ~ '?day=' ~ day ~ '&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tag=' ~ (detail.name|urlencode) ~ '&include_list=1' %}
+        <div class="tags-view__title-row">
+          <h2 class="tags-view__title">{{ detail.name }}</h2>
+          <button class="entry-action entry-delete tags-view__trace-delete"
+                  type="button"
+                  hx-delete="{{ delete_trace_url }}"
+                  hx-target="#tags-view-detail"
+                  hx-swap="outerHTML swap:140ms settle:140ms"
+                  hx-confirm="Delete this trace?"
+                  data-confirm-title="Delete trace?"
+                  data-confirm-message="This trace will be removed from all entries."
+                  data-confirm-confirm="Delete"
+                  data-confirm-cancel="Keep"
+                  data-confirm-variant="danger"
+                  aria-label="Delete trace"
+                  data-tooltip-title="Delete trace">
+            <span class="icon-mask icon-trash entry-action__icon" aria-hidden="true"></span>
+          </button>
+        </div>
         <p class="tags-view__meta">
           {{ detail.count }} {{ "entries" if detail.count != 1 else "entry" }} · first used {{ detail.first_used_label or "unknown" }}
         </p>

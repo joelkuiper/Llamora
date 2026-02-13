@@ -277,6 +277,29 @@
   color: color-mix(in srgb, var(--color-text) 96%, transparent);
 }
 
+.tags-view__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.tags-view__trace-delete {
+  width: 1.85rem;
+  height: 1.85rem;
+  opacity: 0.58;
+  --icon-size: 0.92rem;
+  transition:
+    opacity var(--motion-gentle) ease,
+    border-color var(--motion-gentle) ease,
+    background-color var(--motion-gentle) ease;
+}
+
+.tags-view__detail-header:hover .tags-view__trace-delete,
+.tags-view__detail-header:focus-within .tags-view__trace-delete {
+  opacity: 0.95;
+}
+
 .tags-view__meta {
   margin: 0.6rem 0 0;
   font-size: 0.78rem;

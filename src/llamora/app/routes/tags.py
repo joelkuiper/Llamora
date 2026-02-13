@@ -19,6 +19,17 @@ def _tags():
     return get_tag_service()
 
 
+def _resolve_view_day(raw_day: str | None) -> str:
+    fallback = local_date().isoformat()
+    value = str(raw_day or "").strip()
+    if not value:
+        return fallback
+    try:
+        return require_iso_date(value)
+    except Exception:
+        return fallback
+
+
 @tags_bp.delete("/t/<entry_id>/<tag_hash>")
 @login_required
 async def remove_tag(entry_id: str, tag_hash: str):
@@ -156,6 +167,7 @@ async def tag_detail(tag_hash: str):
         raise AssertionError("unreachable")
 
     entry_id = (request.args.get("entry_id") or "").strip() or None
+    detail_day = _resolve_view_day(request.args.get("day"))
     html = await render_template(
         "partials/tag_detail_body.html",
         tag=overview,
@@ -164,8 +176,59 @@ async def tag_detail(tag_hash: str):
         next_cursor=overview.next_cursor,
         page_size=page_size,
         entry_id=entry_id,
+        detail_day=detail_day,
     )
     return html
+
+
+@tags_bp.delete("/t/detail/<tag_hash>/trace")
+@login_required
+async def delete_trace(tag_hash: str):
+    day = _resolve_view_day(request.args.get("day"))
+    _, user, dek = await require_user_and_dek()
+    try:
+        tag_hash_bytes = bytes.fromhex(tag_hash)
+    except ValueError as exc:
+        abort(400, description="invalid tag hash")
+        raise AssertionError("unreachable") from exc
+
+    tag_service = _tags()
+    sort_kind = tag_service.normalize_tags_sort_kind(request.args.get("sort_kind"))
+    sort_dir = tag_service.normalize_tags_sort_dir(request.args.get("sort_dir"))
+    legacy_sort = tag_service.normalize_legacy_sort(request.args.get("sort"))
+    if legacy_sort is not None:
+        sort_kind, sort_dir = legacy_sort
+
+    include_list = str(request.args.get("include_list") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+    await get_services().db.tags.delete_tag_everywhere(
+        user["id"],
+        tag_hash_bytes,
+        client_today=local_date().isoformat(),
+    )
+
+    tags_view = await tag_service.get_tags_view_data(
+        user["id"],
+        dek,
+        request.args.get("tag"),
+        sort_kind=sort_kind,
+        sort_dir=sort_dir,
+    )
+    selected_tag = tags_view.selected_tag
+    return await render_template(
+        "partials/tags_view_fragment.html",
+        day=day,
+        tags_view=tags_view,
+        selected_tag=selected_tag,
+        tags_sort_kind=sort_kind,
+        tags_sort_dir=sort_dir,
+        include_list=include_list,
+    )
 
 
 @tags_bp.get("/t/detail/<tag_hash>/entries")

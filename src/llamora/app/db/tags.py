@@ -129,6 +129,58 @@ class TagsRepository(BaseRepository):
                 client_today=client_today,
             )
 
+    async def delete_tag_everywhere(
+        self,
+        user_id: str,
+        tag_hash: bytes,
+        *,
+        client_today: str | None = None,
+    ) -> bool:
+        """Delete a tag and all related xrefs for the user."""
+
+        affected_entries: list[tuple[str, str | None]] = []
+        async with self.pool.connection() as conn:
+            changed = False
+
+            async def _tx():
+                nonlocal changed
+                cursor = await conn.execute(
+                    """
+                    SELECT x.entry_id, e.created_date
+                    FROM tag_entry_xref x
+                    JOIN entries e
+                      ON e.user_id = x.user_id AND e.id = x.entry_id
+                    WHERE x.user_id = ? AND x.tag_hash = ?
+                    """,
+                    (user_id, tag_hash),
+                )
+                rows = await cursor.fetchall()
+                affected_entries.clear()
+                affected_entries.extend(
+                    (str(row["entry_id"]), row["created_date"]) for row in rows
+                )
+                delete_cursor = await conn.execute(
+                    "DELETE FROM tags WHERE user_id = ? AND tag_hash = ?",
+                    (user_id, tag_hash),
+                )
+                if delete_cursor.rowcount:
+                    changed = True
+
+            await self._run_in_transaction(conn, _tx)
+
+        if changed and self._event_bus:
+            for entry_id, created_date in affected_entries:
+                await self._event_bus.emit(
+                    ENTRY_TAGS_CHANGED_EVENT,
+                    user_id=user_id,
+                    entry_id=entry_id,
+                    tag_hash=tag_hash,
+                    created_date=created_date,
+                    client_today=client_today,
+                )
+
+        return changed
+
     async def get_tags_for_entry(
         self, user_id: str, entry_id: str, dek: bytes
     ) -> list[dict]:

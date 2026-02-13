@@ -1065,6 +1065,11 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       const separator = url.includes("?") ? "&" : "?";
       url = `${url}${separator}entry_id=${encodeURIComponent(entryId)}`;
     }
+    const day = document.getElementById("entries")?.dataset?.date?.trim() ?? "";
+    if (day) {
+      const separator = url.includes("?") ? "&" : "?";
+      url = `${url}${separator}day=${encodeURIComponent(day)}`;
+    }
     if (!url) {
       return;
     }
@@ -1089,6 +1094,11 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       return;
     }
     const target = event.target;
+    const goto = target?.closest?.(".tag-detail__goto");
+    if (goto) {
+      this.#forceHideDetailPopover("detail goto");
+      return;
+    }
     const item = target?.closest?.(".tag-detail__item");
     if (!item) return;
     const currentId = document.getElementById("entries")?.dataset?.date ?? "";

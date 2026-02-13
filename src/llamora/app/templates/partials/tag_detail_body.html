@@ -4,22 +4,43 @@
 {% set has_more = has_more|default(false) %}
 {% set next_cursor = next_cursor|default(None) %}
 {% set page_size = page_size|default(12) %}
+{% set detail_day = detail_day|default(None) %}
+{% if detail_day %}
+  {% set trace_url = url_for('days.day', date=detail_day) ~ '?view=tags&tag=' ~ (tag.name|urlencode) %}
+{% else %}
+  {% set trace_url = None %}
+{% endif %}
 <div class="tag-detail" data-tag-hash="{{ tag.hash }}">
   <div class="tag-detail__header">
     <div class="tag-detail__header-row">
       <div class="tag-detail__title">{{ tag.name }}</div>
-      {% if entry_id %}
-      <button
-        class="tag-detail__remove"
-        type="button"
-        data-tooltip-title="Remove trace"
-        aria-label="Remove tag {{ tag.name }}"
-        hx-delete="{{ url_for('tags.remove_tag', entry_id=entry_id, tag_hash=tag_hash) }}"
-        hx-target="entry-tags[data-entry-id='{{ entry_id }}'] .entry-tag[data-tag-hash='{{ tag_hash }}']"
-        hx-swap="outerHTML swap:0.15s">
-        <span class="icon-mask icon-bookmark-x" aria-hidden="true"></span>
-      </button>
-      {% endif %}
+      <div class="tag-detail__actions">
+        {% if trace_url %}
+          <a
+            class="tag-detail__action tag-detail__goto"
+            href="{{ trace_url }}"
+            data-tooltip-title="Go to trace"
+            aria-label="Go to trace {{ tag.name }}"
+            hx-get="{{ trace_url }}"
+            hx-target="#main-content"
+            hx-swap="outerHTML"
+            hx-push-url="true">
+            <span class="icon-mask icon-tag" aria-hidden="true"></span>
+          </a>
+        {% endif %}
+        {% if entry_id %}
+          <button
+            class="tag-detail__action tag-detail__remove"
+            type="button"
+            data-tooltip-title="Remove trace"
+            aria-label="Remove tag {{ tag.name }}"
+            hx-delete="{{ url_for('tags.remove_tag', entry_id=entry_id, tag_hash=tag_hash) }}"
+            hx-target="entry-tags[data-entry-id='{{ entry_id }}'] .entry-tag[data-tag-hash='{{ tag_hash }}']"
+            hx-swap="outerHTML swap:0.15s">
+            <span class="icon-mask icon-bookmark-x" aria-hidden="true"></span>
+          </button>
+        {% endif %}
+      </div>
     </div>
     <div class="tag-detail__meta">
       {{ entry_count }} {{ "entry" if entry_count == 1 else "entries" }}
