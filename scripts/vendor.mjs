@@ -10,10 +10,16 @@ const vendorDir = path.join(projectRoot, "frontend", "static", "js", "vendor");
 
 const bundles = [
   {
-    name: "marked",
-    entry: "marked",
-    outfile: "marked.umd.js",
-    globalName: "marked",
+    name: "markdown-it",
+    entry: "markdown-it",
+    outfile: "markdown-it.min.js",
+    globalName: "MarkdownIt",
+  },
+  {
+    name: "markdown-it-task-lists",
+    entry: "markdown-it-task-lists",
+    outfile: "markdown-it-task-lists.min.js",
+    globalName: "markdownitTaskLists",
   },
   {
     name: "floating-ui",

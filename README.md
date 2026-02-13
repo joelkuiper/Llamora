@@ -42,7 +42,7 @@ You can write freely, think aloud, or stay in silence.
   Each reply streams as plain text first, then a lightweight follow-up call adds an emoji and hashtags for search, filtering, and UI accents.
 
 * **Markdown support**
-  The interface renders formatted text safely through Marked + DOMPurify (vendored via `pnpm`).
+  The interface renders formatted text safely through Markdown-It + DOMPurify (vendored via `pnpm`).
 
 * **Minimal dependencies**
   The app uses Quart, NaCl, HTMX, and a few small Python libraries. Asset bundling relies on a vendored esbuild binary driven by Python.

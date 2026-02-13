@@ -1,32 +1,37 @@
 import { TYPING_INDICATOR_SELECTOR } from "./typing-indicator.js";
-import { DOMPurify as DOMPurifyGlobal, marked as markedGlobal } from "./vendor/setup-globals.js";
-
-const escapeHtml = (value) =>
-  String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+import {
+  DOMPurify as DOMPurifyGlobal,
+  MarkdownIt as MarkdownItGlobal,
+  markdownitTaskLists as markdownitTaskListsGlobal,
+} from "./vendor/setup-globals.js";
 
 const globalScope =
   typeof globalThis !== "undefined" ? globalThis : typeof window !== "undefined" ? window : {};
 
-const marked = markedGlobal ?? globalScope.marked;
+const MarkdownIt =
+  MarkdownItGlobal?.default ??
+  MarkdownItGlobal ??
+  globalScope.MarkdownIt?.default ??
+  globalScope.MarkdownIt;
+const markdownitTaskLists =
+  markdownitTaskListsGlobal?.default ??
+  markdownitTaskListsGlobal ??
+  globalScope.markdownitTaskLists?.default ??
+  globalScope.markdownitTaskLists;
 const DOMPurify = DOMPurifyGlobal ?? globalScope.DOMPurify;
+const markdownRenderer = MarkdownIt
+  ? new MarkdownIt("commonmark", { linkify: true, breaks: true, html: false })
+  : null;
 
-const renderer = new marked.Renderer();
-renderer.html = (html) => {
-  const raw = typeof html === "string" ? html : (html?.text ?? "");
-  return `<pre class="code-block"><code>${escapeHtml(raw)}</code></pre>`;
-};
+if (markdownRenderer) {
+  markdownRenderer.enable(["table", "strikethrough"]);
+  if (typeof markdownitTaskLists === "function") {
+    markdownRenderer.use(markdownitTaskLists, { enabled: true, label: true });
+  }
+}
 
 export function renderMarkdown(text) {
-  const rawHtml = marked.parse(text, {
-    gfm: true,
-    breaks: true,
-    renderer,
-  });
+  const rawHtml = markdownRenderer ? markdownRenderer.render(text ?? "") : "";
   return DOMPurify.sanitize(rawHtml);
 }
 
@@ -35,6 +40,15 @@ function normalizeMarkdownSource(value) {
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n");
   const lines = normalized.split("\n");
+  const hasCodeFence = lines.some((line) => /^\s*(```|~~~)/.test(line));
+  const hasIndentedCode = lines.some((line) => /^\s{4,}\S/.test(line));
+  if (hasCodeFence || hasIndentedCode) {
+    while (lines.length && lines[0].trim() === "") lines.shift();
+    while (lines.length && lines[lines.length - 1].trim() === "") {
+      lines.pop();
+    }
+    return lines.join("\n");
+  }
   const nonEmpty = lines.filter((line) => line.trim().length > 0);
   if (nonEmpty.length === 0) {
     return "";

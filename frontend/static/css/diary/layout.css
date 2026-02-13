@@ -11,7 +11,11 @@
 }
 
 #entries .entry code {
-  white-space: pre-line;
+  white-space: normal;
+}
+
+#entries .entry pre code {
+  white-space: pre;
 }
 
 #entries .entry.user {

@@ -16,6 +16,7 @@ def _markdown_renderer() -> MarkdownIt:
     """Return a configured MarkdownIt renderer with GFM features enabled."""
 
     md = MarkdownIt("commonmark", {"linkify": True, "breaks": True})
+    md.options["preserve_whitespace"] = True
     md.enable("table")
     md.enable("strikethrough")
     tasklists_plugin = getattr(tasklists_module, "tasklists_plugin", None)

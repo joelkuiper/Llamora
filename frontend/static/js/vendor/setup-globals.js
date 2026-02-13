@@ -44,7 +44,8 @@ const vendorBase = (() => {
 
 const vendorSpecs = [
   { path: "htmx.min.js", globals: ["htmx"] },
-  { path: "marked.umd.js", globals: ["marked"] },
+  { path: "markdown-it.min.js", globals: ["MarkdownIt"] },
+  { path: "markdown-it-task-lists.min.js", globals: ["markdownitTaskLists"] },
   { path: "purify.min.js", globals: ["DOMPurify"] },
   { path: "floating-ui.min.js", globals: ["FloatingUIDOM"] },
 ];
@@ -62,14 +63,16 @@ if (globalScope.DOMPurify && globalScope.DOMPurify.default?.sanitize) {
 
 const resolvedGlobals = {
   htmx: globalScope.htmx,
-  marked: globalScope.marked,
+  MarkdownIt: globalScope.MarkdownIt,
+  markdownitTaskLists: globalScope.markdownitTaskLists,
   DOMPurify: globalScope.DOMPurify,
   FloatingUIDOM: globalScope.FloatingUIDOM?.default || globalScope.FloatingUIDOM,
 };
 
 const requiredGlobals = [
   ["htmx", resolvedGlobals.htmx],
-  ["marked", resolvedGlobals.marked],
+  ["MarkdownIt", resolvedGlobals.MarkdownIt],
+  ["markdownitTaskLists", resolvedGlobals.markdownitTaskLists],
   ["DOMPurify", resolvedGlobals.DOMPurify],
   ["FloatingUIDOM", resolvedGlobals.FloatingUIDOM],
 ];
@@ -82,7 +85,8 @@ for (const [name, value] of requiredGlobals) {
 
 export const ready = Promise.resolve(resolvedGlobals);
 export const htmx = resolvedGlobals.htmx;
-export const marked = resolvedGlobals.marked;
+export const MarkdownIt = resolvedGlobals.MarkdownIt;
+export const markdownitTaskLists = resolvedGlobals.markdownitTaskLists;
 export const DOMPurify = resolvedGlobals.DOMPurify;
 export const computePosition = resolvedGlobals.FloatingUIDOM?.computePosition;
 export const autoUpdate = resolvedGlobals.FloatingUIDOM?.autoUpdate;
