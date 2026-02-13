@@ -572,20 +572,44 @@ class EntriesRepository(BaseRepository):
         return self._rows_to_history(rows, user_id, dek)
 
     async def get_days_with_entries(
-        self, user_id: str, year: int, month: int
-    ) -> list[int]:
+        self, user_id: str, year: int, month: int, dek: bytes
+    ) -> tuple[list[int], list[int]]:
         month_prefix = f"{year:04d}-{month:02d}"
+        active_days: set[int] = set()
+        non_opening_days: set[int] = set()
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT DISTINCT CAST(substr(created_date, 9, 2) AS INTEGER) AS day
+                SELECT id, created_date, nonce, ciphertext, alg
                 FROM entries
                 WHERE user_id = ? AND substr(created_date, 1, 7) = ?
                 """,
                 (user_id, month_prefix),
             )
             rows = await cursor.fetchall()
-        return [row["day"] for row in rows]
+        for row in rows:
+            created_date = row["created_date"]
+            if not created_date:
+                continue
+            try:
+                day = int(created_date[8:10])
+            except (TypeError, ValueError):
+                continue
+            active_days.add(day)
+            record_json = self._decrypt_message(
+                dek,
+                user_id,
+                row["id"],
+                row["nonce"],
+                row["ciphertext"],
+                row["alg"],
+            )
+            rec = orjson.loads(record_json)
+            meta = rec.get("meta", {}) or {}
+            if not meta.get("auto_opening"):
+                non_opening_days.add(day)
+        opening_only_days = sorted(active_days - non_opening_days)
+        return sorted(active_days), opening_only_days
 
     async def get_first_entry_date(self, user_id: str) -> str | None:
         async with self.pool.connection() as conn:

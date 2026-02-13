@@ -45,6 +45,7 @@ async def get_month_context(
     user_id: str,
     year: int,
     month: int,
+    dek: bytes,
     *,
     today: date | None = None,
 ) -> dict:
@@ -116,8 +117,8 @@ async def get_month_context(
         desired_day = active_candidate.day
         clamped_day = _clamp(desired_day, month_min_day, month_max_day)
         active_day_iso = date(selected_year, selected_month, clamped_day).isoformat()
-    active_days = await services.db.entries.get_days_with_entries(
-        user_id, selected_year, selected_month
+    active_days, opening_only_days = await services.db.entries.get_days_with_entries(
+        user_id, selected_year, selected_month, dek
     )
     prev_year, prev_month, next_year, next_month = _nav_months(
         selected_year, selected_month, min_month_start, max_month_start
@@ -140,6 +141,7 @@ async def get_month_context(
         "min_day": min_date_obj.day,
         "month_names": month_names,
         "active_days": active_days,
+        "opening_only_days": opening_only_days,
         "prev_year": prev_year,
         "prev_month": prev_month,
         "next_year": next_year,

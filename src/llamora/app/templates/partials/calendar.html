@@ -76,6 +76,7 @@
             {% if date_str == active_day %}{% set classes = classes + ['active'] %}{% endif %}
             {% if date_str == today %}{% set classes = classes + ['is-today'] %}{% endif %}
             {% if day in active_days %}{% set classes = classes + ['has-entry'] %}{% endif %}
+            {% if day in opening_only_days %}{% set classes = classes + ['has-opening-only'] %}{% endif %}
             {% set is_today = (date_str == today) %}
             <td data-date="{{ date_str }}"
                 data-calendar-cell

@@ -61,9 +61,8 @@ async def _render_day(date: str, target: str | None, view_kind: str):
 
 
 async def _render_calendar(year: int, month: int, *, today=None, mode="calendar"):
-    session = get_session_context()
-    user = await session.require_user()
-    context = await get_month_context(user["id"], year, month, today=today)
+    _, user, dek = await require_user_and_dek()
+    context = await get_month_context(user["id"], year, month, dek, today=today)
     context["mode"] = mode
     template = (
         "partials/calendar_popover.html"
