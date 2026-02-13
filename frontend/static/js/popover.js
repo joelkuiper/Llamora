@@ -1,5 +1,11 @@
-import { autoUpdate, computePosition, flip, offset as offsetMiddleware, shift } from "./vendor/setup-globals.js";
 import { createListenerBag } from "./utils/events.js";
+import {
+  autoUpdate,
+  computePosition,
+  flip,
+  offset as offsetMiddleware,
+  shift,
+} from "./vendor/setup-globals.js";
 
 const DEFAULT_TIMEOUT = 250;
 
@@ -88,9 +94,7 @@ export function createPopover(trigger, popover, options = {}) {
 
   const buildFloatingOptions = () => {
     const strategy = popperOptions.strategy || "absolute";
-    const middleware = Array.isArray(popperOptions.middleware)
-      ? [...popperOptions.middleware]
-      : [];
+    const middleware = Array.isArray(popperOptions.middleware) ? [...popperOptions.middleware] : [];
     const legacyOffset = extractOffset(popperOptions.modifiers || []);
     if (legacyOffset && !hasMiddleware(middleware, "offset")) {
       middleware.unshift(offsetMiddleware(legacyOffset));

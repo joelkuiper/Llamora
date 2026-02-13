@@ -9,7 +9,6 @@ from datetime import date, datetime, timedelta
 from typing import Any, Iterable
 
 from rich.console import Console
-from rich.rule import Rule
 
 
 logger = logging.getLogger(__name__)

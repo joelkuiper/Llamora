@@ -39,7 +39,9 @@ class TagRecallSummaryCache:
     def get(self, key: CacheKey) -> str | None:
         return self._entries.get(key)
 
-    def set(self, key: CacheKey, summary: str, *, max_entries: int | None = None) -> None:
+    def set(
+        self, key: CacheKey, summary: str, *, max_entries: int | None = None
+    ) -> None:
         # Resize cache if max_entries differs from current maxsize
         if max_entries is not None and max_entries > 0 and max_entries != self._maxsize:
             self._maxsize = max_entries

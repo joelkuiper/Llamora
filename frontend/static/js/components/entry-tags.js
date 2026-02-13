@@ -639,22 +639,22 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
             }
           });
         }
-      if (canonicalValue) {
-        this.#tagHistory.add(canonicalValue);
-        this.setAutocompleteLocalEntries("history", this.#tagHistory.values());
-        this.applyAutocompleteCandidates();
+        if (canonicalValue) {
+          this.#tagHistory.add(canonicalValue);
+          this.setAutocompleteLocalEntries("history", this.#tagHistory.values());
+          this.applyAutocompleteCandidates();
+        }
+        this.#clearEmptySuggestionCache();
       }
+      this.#updateSubmitState();
+      this.#invalidateAutocompleteCache({ immediate: true });
+    } else if (target.classList?.contains("tag-tombstone")) {
+      target.remove();
+      this.#updateSubmitState();
+      this.#invalidateAutocompleteCache({ immediate: true });
       this.#clearEmptySuggestionCache();
     }
-    this.#updateSubmitState();
-    this.#invalidateAutocompleteCache({ immediate: true });
-  } else if (target.classList?.contains("tag-tombstone")) {
-    target.remove();
-    this.#updateSubmitState();
-    this.#invalidateAutocompleteCache({ immediate: true });
-    this.#clearEmptySuggestionCache();
   }
-}
 
   #handleSuggestionsSwap() {
     if (!this.#isActiveOwner()) {

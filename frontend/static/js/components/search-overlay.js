@@ -742,9 +742,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     if (!body) return;
     if (body.dataset.searchCompact !== "true") return;
     body.dataset.searchCompact = "false";
-    const toggle = this.ownerDocument?.querySelector?.(
-      '[data-action="toggle-search-compact"]',
-    );
+    const toggle = this.ownerDocument?.querySelector?.('[data-action="toggle-search-compact"]');
     if (toggle) {
       toggle.setAttribute("aria-expanded", "false");
     }

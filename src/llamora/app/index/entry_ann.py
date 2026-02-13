@@ -259,7 +259,9 @@ class EntryIndexStore:
         self.warm_entry_batch = int(index_cfg.get("warm_entry_batch", 200))
         dtype = str(vector_cfg.get("dtype", "float32")).lower()
         if dtype not in {"float32", "float16"}:
-            logger.warning("Unsupported vector dtype '%s'; defaulting to float32", dtype)
+            logger.warning(
+                "Unsupported vector dtype '%s'; defaulting to float32", dtype
+            )
             dtype = "float32"
         self.vector_dtype = dtype
         self._vector_np_dtype = np.float16 if dtype == "float16" else np.float32
@@ -444,9 +446,7 @@ class EntryIndexStore:
             self.indexes[user_id] = idx
             return idx
 
-    def _schedule_warm(
-        self, user_id: str, dek: bytes, entries: list[dict]
-    ) -> None:
+    def _schedule_warm(self, user_id: str, dek: bytes, entries: list[dict]) -> None:
         existing = self._warm_tasks.get(user_id)
         if existing and not existing.done():
             return

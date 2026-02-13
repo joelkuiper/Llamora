@@ -116,7 +116,9 @@ class UpstreamProcessManager:
             return
 
         if resp.status_code != 200:
-            self.logger.debug("Failed to fetch upstream props (status %s)", resp.status_code)
+            self.logger.debug(
+                "Failed to fetch upstream props (status %s)", resp.status_code
+            )
             return
 
         try:
@@ -134,14 +136,17 @@ class UpstreamProcessManager:
             try:
                 self._ctx_size = int(ctx_raw)
             except (TypeError, ValueError):
-                self.logger.debug("Ignoring invalid ctx size from upstream props", exc_info=True)
+                self.logger.debug(
+                    "Ignoring invalid ctx size from upstream props", exc_info=True
+                )
 
         slots_raw = data.get("total_slots")
         if slots_raw is not None:
             try:
-                self._parallel_slots = _coerce_parallel(slots_raw, default=self._parallel_slots)
+                self._parallel_slots = _coerce_parallel(
+                    slots_raw, default=self._parallel_slots
+                )
             except Exception:
                 self.logger.debug(
                     "Ignoring invalid total_slots from upstream props", exc_info=True
                 )
-

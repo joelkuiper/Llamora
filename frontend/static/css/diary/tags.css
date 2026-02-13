@@ -362,7 +362,6 @@
     transform: translateY(0);
   }
 
-
   /* Gentle cross-fade during HTMX swap */
   .tag-suggestions.htmx-swapping:not(:empty) {
     max-height: 12rem;
@@ -762,7 +761,6 @@
 .tag-detail__summary .tag-detail-skeleton span {
   height: 0.6rem;
 }
-
 
 .tag-detail-skeleton span {
   display: block;

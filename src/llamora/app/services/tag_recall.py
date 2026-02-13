@@ -9,11 +9,8 @@ from typing import Any, Iterable, Mapping, Sequence, TypedDict
 import orjson
 import tiktoken
 
-from llamora.app.db.events import RepositoryEventBus
 from llamora.app.services.tag_recall_cache import (
     CacheKey,
-    TagRecallCacheSynchronizer,
-    TagRecallSummaryCache,
     TAG_RECALL_SUMMARY_CACHE,
 )
 from llamora.app.util.number import coerce_int
@@ -59,10 +56,14 @@ class TagRecallConfig:
         """Construct a TagRecallConfig from application settings."""
 
         def _get_int(key: str, default: int, *, minimum: int = 0) -> int:
-            result = coerce_int(settings.get(key, default), minimum=minimum, default=default)
+            result = coerce_int(
+                settings.get(key, default), minimum=minimum, default=default
+            )
             return result if result is not None else default
 
-        mode = str(settings.get("TAG_RECALL.mode", "hybrid") or "hybrid").strip().lower()
+        mode = (
+            str(settings.get("TAG_RECALL.mode", "hybrid") or "hybrid").strip().lower()
+        )
         if mode not in {"summary", "extractive", "hybrid"}:
             mode = "hybrid"
 
@@ -76,8 +77,12 @@ class TagRecallConfig:
             mode=mode,
             llm_max_tokens=_get_int("TAG_RECALL.llm_max_tokens", 256),
             summary_parallel=_get_int("TAG_RECALL.summary_parallel", 2, minimum=1),
-            background_summarize=bool(settings.get("TAG_RECALL.background_summarize", False)),
-            summary_cache_max=_get_int("TAG_RECALL.summary_cache_max", _SUMMARY_CACHE_LIMIT_FALLBACK),
+            background_summarize=bool(
+                settings.get("TAG_RECALL.background_summarize", False)
+            ),
+            summary_cache_max=_get_int(
+                "TAG_RECALL.summary_cache_max", _SUMMARY_CACHE_LIMIT_FALLBACK
+            ),
         )
 
 
@@ -509,6 +514,7 @@ async def build_tag_recall_context(
             return None
 
         if cfg.mode == "hybrid" and cfg.background_summarize and llm is not None:
+
             async def _background() -> None:
                 await _summarize_with_llm(
                     llm,

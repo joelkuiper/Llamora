@@ -98,19 +98,27 @@ function initLogo(anchor) {
 
   const toDefault = () => {
     clearPressed();
-    imgs.forEach((node) => applyState(node, "default"));
+    imgs.forEach((node) => {
+      applyState(node, "default");
+    });
   };
   const toHover = () => {
     clearPressed();
-    imgs.forEach((node) => applyState(node, "hover"));
+    imgs.forEach((node) => {
+      applyState(node, "hover");
+    });
   };
   const toActive = () => {
     setPressed();
-    imgs.forEach((node) => applyState(node, "active"));
+    imgs.forEach((node) => {
+      applyState(node, "active");
+    });
   };
   const reset = () => {
     clearPressed();
-    imgs.forEach((node) => releaseState(anchor, node));
+    imgs.forEach((node) => {
+      releaseState(anchor, node);
+    });
   };
 
   const handleFocus = () => {
@@ -159,7 +167,9 @@ function initLogo(anchor) {
     "htmx:beforeRequest",
     () => {
       setPressed();
-      imgs.forEach((node) => applyState(node, "active"));
+      imgs.forEach((node) => {
+        applyState(node, "active");
+      });
     },
     { signal },
   );
@@ -174,7 +184,9 @@ function initLogo(anchor) {
   anchor.addEventListener("htmx:sendError", clearAfterRequest, { signal });
 
   const startingState = anchor.matches(":hover") || isFocusVisible(anchor) ? "hover" : "default";
-  imgs.forEach((node) => applyState(node, startingState));
+  imgs.forEach((node) => {
+    applyState(node, startingState);
+  });
 }
 
 function refreshAll() {

@@ -290,9 +290,9 @@ export class CalendarControl extends HTMLElement {
     if (!tooltip) return;
     const calendar = document.querySelector("#calendar");
     if (calendar) {
-      calendar
-        .querySelectorAll("[data-calendar-cell].is-summarizing")
-        .forEach((cell) => cell.classList.remove("is-summarizing"));
+      calendar.querySelectorAll("[data-calendar-cell].is-summarizing").forEach((cell) => {
+        cell.classList.remove("is-summarizing");
+      });
     }
     if (this.#summaryCell) {
       this.#summaryCell.classList.remove("is-summarizing");
@@ -472,11 +472,9 @@ export class CalendarControl extends HTMLElement {
     };
 
     pop.addEventListener("calendar-popover:show", ensureFocus, { signal });
-    pop.addEventListener(
-      "calendar-popover:hide",
-      () => this.#hideTooltip({ immediate: true }),
-      { signal },
-    );
+    pop.addEventListener("calendar-popover:hide", () => this.#hideTooltip({ immediate: true }), {
+      signal,
+    });
     pop.addEventListener("mouseleave", () => this.#hideTooltip(), { signal });
 
     grid.addEventListener(
@@ -528,11 +526,10 @@ export class CalendarControl extends HTMLElement {
       },
       { signal },
     );
-    window.addEventListener(
-      "scroll",
-      () => this.#hideTooltip({ immediate: true }),
-      { signal, passive: true },
-    );
+    window.addEventListener("scroll", () => this.#hideTooltip({ immediate: true }), {
+      signal,
+      passive: true,
+    });
 
     const focusCell = (cell) => {
       if (!cell) return;

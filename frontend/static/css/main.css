@@ -56,18 +56,15 @@ body {
   position: relative;
   z-index: 2;
   width: 100%;
-  background-color: var(--inline-input-bg);
   background: var(--inline-input-bg);
 }
 
 .inline-autocomplete__input:hover {
-  background-color: var(--inline-input-bg-hover);
   background: var(--inline-input-bg-hover);
 }
 
 .inline-autocomplete__input:focus,
 .inline-autocomplete__input:focus-visible {
-  background-color: var(--inline-input-bg-focus);
   background: var(--inline-input-bg-focus);
 }
 .inline-autocomplete__input::selection {

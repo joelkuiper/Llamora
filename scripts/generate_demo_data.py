@@ -29,7 +29,6 @@ from demo_data_utils import (
     coerce_int,
     coerce_str,
     iter_days,
-    get_console,
     log_block,
     log_header,
     log_item,
@@ -142,7 +141,8 @@ def _build_demo_config(
     )
 
     return DemoConfig(
-        base_url=coerce_str(merged.get("base_url"), DEFAULTS["base_url"]) or DEFAULTS["base_url"],
+        base_url=coerce_str(merged.get("base_url"), DEFAULTS["base_url"])
+        or DEFAULTS["base_url"],
         username=require_value(merged.get("username"), "username"),
         password=require_value(merged.get("password"), "password"),
         start_date=start_date,
@@ -151,22 +151,36 @@ def _build_demo_config(
         max_entries=coerce_int(merged.get("max_entries"), DEFAULTS["max_entries"]),
         day_open_only_rate=day_open_only_rate,
         day_empty_rate=day_empty_rate,
-        response_rate=coerce_float(merged.get("response_rate"), DEFAULTS["response_rate"]),
+        response_rate=coerce_float(
+            merged.get("response_rate"), DEFAULTS["response_rate"]
+        ),
         max_tags=coerce_int(merged.get("max_tags"), DEFAULTS["max_tags"]),
-        tz=coerce_str(merged.get("timezone"), DEFAULTS["timezone"]) or DEFAULTS["timezone"],
+        tz=coerce_str(merged.get("timezone"), DEFAULTS["timezone"])
+        or DEFAULTS["timezone"],
         seed=coerce_int(merged.get("seed"), DEFAULTS["seed"]),
-        persona_hint=coerce_str(merged.get("persona"), DEFAULTS["persona"]) or DEFAULTS["persona"],
-        llm_max_tokens=coerce_int(merged.get("llm_max_tokens"), DEFAULTS["llm_max_tokens"]),
-        markdown_rate=coerce_float(merged.get("markdown_rate"), DEFAULTS["markdown_rate"]),
+        persona_hint=coerce_str(merged.get("persona"), DEFAULTS["persona"])
+        or DEFAULTS["persona"],
+        llm_max_tokens=coerce_int(
+            merged.get("llm_max_tokens"), DEFAULTS["llm_max_tokens"]
+        ),
+        markdown_rate=coerce_float(
+            merged.get("markdown_rate"), DEFAULTS["markdown_rate"]
+        ),
         multi_response_rate=coerce_float(
             merged.get("multi_response_rate"), DEFAULTS["multi_response_rate"]
         ),
         max_responses_per_entry=coerce_int(
             merged.get("max_responses_per_entry"), DEFAULTS["max_responses_per_entry"]
         ),
-        min_entry_chars=coerce_int(merged.get("min_entry_chars"), DEFAULTS["min_entry_chars"]),
-        max_entry_chars=coerce_int(merged.get("max_entry_chars"), DEFAULTS["max_entry_chars"]),
-        entry_retries=coerce_int(merged.get("entry_retries"), DEFAULTS["entry_retries"]),
+        min_entry_chars=coerce_int(
+            merged.get("min_entry_chars"), DEFAULTS["min_entry_chars"]
+        ),
+        max_entry_chars=coerce_int(
+            merged.get("max_entry_chars"), DEFAULTS["max_entry_chars"]
+        ),
+        entry_retries=coerce_int(
+            merged.get("entry_retries"), DEFAULTS["entry_retries"]
+        ),
         entry_context_size=coerce_int(
             merged.get("entry_context_size"), DEFAULTS["entry_context_size"]
         ),
@@ -370,9 +384,7 @@ async def _generate_narrative_timeline(
     ).strip()
     model = settings.get("LLM.chat.model") or "local"
     params = dict(settings.get("LLM.chat.parameters") or {})
-    params["temperature"] = min(
-        0.7, max(0.1, float(params.get("temperature", 0.4)))
-    )
+    params["temperature"] = min(0.7, max(0.1, float(params.get("temperature", 0.4))))
     params["response_format"] = {
         "type": "json_schema",
         "json_schema": {
@@ -459,8 +471,7 @@ async def _generate_narrative_timeline(
         missing = [
             item
             for item in data
-            if isinstance(item, dict)
-            and not str(item.get("emoji") or "").strip()
+            if isinstance(item, dict) and not str(item.get("emoji") or "").strip()
         ]
         if not missing:
             break
@@ -676,9 +687,7 @@ async def _generate_entry_text(
         chosen = recent_entries[-max_entries:]
         snippet_chars = max(64, int(config.entry_context_chars))
         snippets = "\n".join(
-            f"- {entry[:snippet_chars].strip()}"
-            for entry in chosen
-            if entry.strip()
+            f"- {entry[:snippet_chars].strip()}" for entry in chosen if entry.strip()
         )
         continuity_message = textwrap.dedent(
             f"""
@@ -787,7 +796,9 @@ async def _register_user(client: httpx.AsyncClient, config: DemoConfig) -> bool:
     if error:
         logger.warning("Register failed: %s", error)
         return False
-    logger.warning("Register response did not include recovery screen; treating as failure")
+    logger.warning(
+        "Register response did not include recovery screen; treating as failure"
+    )
     return False
 
 
@@ -826,7 +837,9 @@ async def _refresh_csrf(client: httpx.AsyncClient) -> str:
     for path in candidates:
         resp = await _get(client, path)
         if resp.status_code >= 400:
-            logger.warning("CSRF refresh failed for %s (status=%s)", path, resp.status_code)
+            logger.warning(
+                "CSRF refresh failed for %s (status=%s)", path, resp.status_code
+            )
             continue
         csrf = _select_body_csrf(resp.text) or _select_csrf_from_html(resp.text)
         if csrf:
@@ -836,13 +849,17 @@ async def _refresh_csrf(client: httpx.AsyncClient) -> str:
     raise RuntimeError("Failed to locate CSRF token from known pages")
 
 
-async def _open_day(client: httpx.AsyncClient, day: date, headers: dict[str, str]) -> None:
+async def _open_day(
+    client: httpx.AsyncClient, day: date, headers: dict[str, str]
+) -> None:
     logger.debug("Opening day %s", day)
     resp = await _get(client, f"/e/{day.isoformat()}", headers=headers)
     resp.raise_for_status()
 
 
-async def _open_day_opening(client: httpx.AsyncClient, day: date, headers: dict[str, str]) -> None:
+async def _open_day_opening(
+    client: httpx.AsyncClient, day: date, headers: dict[str, str]
+) -> None:
     logger.debug("Opening day opening stream %s", day)
     for attempt in range(1, HTTP_RETRIES_DEFAULT + 1):
         try:
@@ -883,12 +900,16 @@ async def _create_entry(
         "text": text,
         "user_time": user_time.isoformat(),
     }
-    resp = await _post(client, f"/e/{day.isoformat()}/entry", data=data, headers=headers)
+    resp = await _post(
+        client, f"/e/{day.isoformat()}/entry", data=data, headers=headers
+    )
     if _is_login_page(resp.text, str(resp.url)):
         logger.warning("Session expired while posting entry; re-authenticating")
         csrf = await _login_and_refresh_csrf(client, config)
         headers["X-CSRFToken"] = csrf
-        resp = await _post(client, f"/e/{day.isoformat()}/entry", data=data, headers=headers)
+        resp = await _post(
+            client, f"/e/{day.isoformat()}/entry", data=data, headers=headers
+        )
     resp.raise_for_status()
     entry_id = _select_entry_id(resp.text)
     if not entry_id:
@@ -1145,7 +1166,6 @@ async def generate_dataset(config: DemoConfig) -> None:
         }
 
         total_entries = 0
-        opened_any_day = False
         for day in iter_days(config.start_date, config.end_date):
             log_rule(f"Day {day.isoformat()}")
             headers = {
@@ -1155,19 +1175,13 @@ async def generate_dataset(config: DemoConfig) -> None:
             event_note = None
             followup_note = None
             events_today = narrative_events.get(day) or []
-            has_primary_event = False
             if events_today:
                 event = events_today[0]
                 if event.date == day:
-                    has_primary_event = True
                     if random.random() < config.story_intensity:
-                        event_note = (
-                            f"{event.emoji} {event.summary or event.title}."
-                        )
+                        event_note = f"{event.emoji} {event.summary or event.title}."
                     else:
-                        event_note = (
-                            f"{event.emoji} {event.summary or event.title}."
-                        )
+                        event_note = f"{event.emoji} {event.summary or event.title}."
                     log_item(f"event: {event.emoji} {event.title or event.summary}")
                     if event_note:
                         log_wrapped("     note: ", event_note)
@@ -1201,8 +1215,6 @@ async def generate_dataset(config: DemoConfig) -> None:
                         day.isoformat(),
                     )
                     continue
-                opened_any_day = True
-
             if open_only:
                 log_item("entries: 0 (opening only)")
                 continue
@@ -1217,7 +1229,9 @@ async def generate_dataset(config: DemoConfig) -> None:
             times = _choose_entry_times(entries_today, day)
             log_item(f"entries: {entries_today}")
             for idx, entry_time in enumerate(times):
-                logger.debug("Generating entry %s/%s for %s", idx + 1, entries_today, day)
+                logger.debug(
+                    "Generating entry %s/%s for %s", idx + 1, entries_today, day
+                )
                 include_markdown = random.random() < config.markdown_rate
                 text = await _generate_entry_text(
                     llm,
@@ -1231,7 +1245,12 @@ async def generate_dataset(config: DemoConfig) -> None:
                     followup_note,
                 )
                 if text:
-                    logger.info("  entry %s/%s @ %s", idx + 1, entries_today, entry_time.strftime("%H:%M"))
+                    logger.info(
+                        "  entry %s/%s @ %s",
+                        idx + 1,
+                        entries_today,
+                        entry_time.strftime("%H:%M"),
+                    )
                     log_wrapped("     ", text.strip())
                     recent_entries.append(text)
                 try:
@@ -1266,7 +1285,9 @@ async def generate_dataset(config: DemoConfig) -> None:
                         config.max_responses_per_entry > 1
                         and random.random() < config.multi_response_rate
                     ):
-                        response_count = random.randint(2, config.max_responses_per_entry)
+                        response_count = random.randint(
+                            2, config.max_responses_per_entry
+                        )
                     for _ in range(response_count):
                         await _trigger_response(
                             client,
@@ -1315,14 +1336,24 @@ def run_cmd(
     ),
     response_rate: float | None = typer.Option(None, help="Chance of responses."),
     max_tags: int | None = typer.Option(None, help="Max tags per entry."),
-    timezone: str | None = typer.Option(None, help="IANA timezone (e.g. Europe/Amsterdam)."),
+    timezone: str | None = typer.Option(
+        None, help="IANA timezone (e.g. Europe/Amsterdam)."
+    ),
     seed: int | None = typer.Option(None, help="Random seed."),
     persona: str | None = typer.Option(None, help="Persona hint for entries."),
     llm_max_tokens: int | None = typer.Option(None, help="Max tokens per entry."),
-    entry_temperature: float | None = typer.Option(None, help="Entry temperature override."),
-    markdown_rate: float | None = typer.Option(None, help="Chance of markdown in entries."),
-    entry_context_size: int | None = typer.Option(None, help="Recent entries to include."),
-    entry_context_chars: int | None = typer.Option(None, help="Chars per context snippet."),
+    entry_temperature: float | None = typer.Option(
+        None, help="Entry temperature override."
+    ),
+    markdown_rate: float | None = typer.Option(
+        None, help="Chance of markdown in entries."
+    ),
+    entry_context_size: int | None = typer.Option(
+        None, help="Recent entries to include."
+    ),
+    entry_context_chars: int | None = typer.Option(
+        None, help="Chars per context snippet."
+    ),
     min_entry_chars: int | None = typer.Option(None, help="Minimum entry length."),
     max_entry_chars: int | None = typer.Option(None, help="Maximum entry length."),
     entry_retries: int | None = typer.Option(None, help="Retries for short entries."),
@@ -1331,11 +1362,19 @@ def run_cmd(
         help="Chance of no opening and no entries (ignored for event days).",
     ),
     story_events: int | None = typer.Option(None, help="Narrative event count."),
-    story_followup_rate: float | None = typer.Option(None, help="Chance of follow-up days."),
-    story_intensity: float | None = typer.Option(None, help="Event injection strength."),
+    story_followup_rate: float | None = typer.Option(
+        None, help="Chance of follow-up days."
+    ),
+    story_intensity: float | None = typer.Option(
+        None, help="Event injection strength."
+    ),
     story_allow_overlap: bool | None = typer.Option(None, help="Allow event overlap."),
-    multi_response_rate: float | None = typer.Option(None, help="Chance of multi responses."),
-    max_responses_per_entry: int | None = typer.Option(None, help="Max responses per entry."),
+    multi_response_rate: float | None = typer.Option(
+        None, help="Chance of multi responses."
+    ),
+    max_responses_per_entry: int | None = typer.Option(
+        None, help="Max responses per entry."
+    ),
     verbose: bool = typer.Option(False, "--verbose", help="Verbose logging."),
 ) -> None:
     _setup_logging(verbose)

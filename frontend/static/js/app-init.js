@@ -274,11 +274,9 @@ function init() {
       btn.classList.remove("active");
       btn.setAttribute("aria-expanded", "false");
     });
-    document
-      .querySelectorAll("entry-tags.popover-open")
-      .forEach((el) => {
-        el.classList.remove("popover-open");
-      });
+    document.querySelectorAll("entry-tags.popover-open").forEach((el) => {
+      el.classList.remove("popover-open");
+    });
   };
 
   document.addEventListener("htmx:beforeHistorySave", resetSharedPopovers);

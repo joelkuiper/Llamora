@@ -9,8 +9,6 @@ import base64
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Iterable
 
 from llamora.app.util.tags import canonicalize, tag_hash
 from llamora.persistence.local_db import LocalDB

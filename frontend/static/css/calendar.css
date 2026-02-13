@@ -581,7 +581,6 @@
   }
 }
 
-
 #calendar[data-calendar-mode="picker"] .calendar-month-year,
 .calendar-month-year[aria-expanded="true"] {
   color: var(--accent-hover);
