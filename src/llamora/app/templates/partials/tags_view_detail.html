@@ -24,7 +24,7 @@
                  class="tags-view__related-link"
                  hx-get="{{ url_for('tags.tags_view_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&tag={{ related.name|urlencode }}"
                  hx-target="#tags-view-detail"
-                 hx-swap="outerHTML"
+                 hx-swap="outerHTML swap:140ms settle:140ms"
                  hx-push-url="{{ related_url }}">
                 {{ related.name }}
               </a>
@@ -70,7 +70,7 @@
                            class="entry-tag tags-view__entry-tag"
                            hx-get="{{ url_for('tags.tags_view_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&tag={{ name|urlencode }}"
                            hx-target="#tags-view-detail"
-                           hx-swap="outerHTML"
+                           hx-swap="outerHTML swap:140ms settle:140ms"
                            hx-push-url="{{ tag_url }}">
                           <span class="tag-label">{{ name }}</span>
                         </a>

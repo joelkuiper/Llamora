@@ -14,7 +14,7 @@
          {% if item.name == active_tag %}aria-current="true"{% endif %}
          hx-get="{{ url_for('tags.tags_view_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&tag={{ item.name|urlencode }}"
          hx-target="#tags-view-detail"
-         hx-swap="outerHTML"
+         hx-swap="outerHTML swap:140ms settle:140ms"
          hx-push-url="{{ tag_url }}">
         <span class="tags-view__index-name">{{ item.name }}</span>
         <span class="tags-view__index-count">{{ item.count }}</span>

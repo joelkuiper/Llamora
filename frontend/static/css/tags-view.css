@@ -106,17 +106,23 @@
 }
 
 .tags-view__search {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 0.34rem;
   margin-bottom: 0.42rem;
   padding: 0 0.1rem;
 }
 
 .tags-view__search .icon-mask {
+  position: absolute;
+  left: 0.78rem;
+  top: 50%;
+  transform: translateY(-50%);
   width: 0.8rem;
   height: 0.8rem;
   color: color-mix(in srgb, var(--color-text-muted) 72%, transparent);
+  pointer-events: none;
+  z-index: 1;
 }
 
 .tags-view__search-input {
@@ -125,6 +131,7 @@
   min-width: 0;
   font-size: 0.85rem;
   line-height: 1.3;
+  padding-left: 1.95rem;
 }
 
 .tags-view__controls {
@@ -466,61 +473,28 @@
 }
 
 .tags-view__index-row.htmx-added {
-  animation: tags-index-row-in var(--motion-gentle) ease both;
+  animation: motion-tag-enter var(--motion-tag-enter-duration) ease both;
 }
 
 #tags-view-detail.htmx-added .tags-view__detail-inner {
-  animation: tags-detail-in var(--motion-gentle) ease both;
+  animation: lull-in var(--motion-lull) ease both;
 }
 
 #tags-view-detail.htmx-swapping .tags-view__detail-inner {
-  animation: tags-detail-out var(--motion-tight) ease both;
+  animation: lull-out var(--motion-lull) ease both;
 }
 
 #tags-view-detail.htmx-settling .tags-view__detail-inner {
-  animation: tags-detail-in var(--motion-gentle) ease both;
+  animation: lull-in var(--motion-lull) ease both;
 }
 
 #tags-view-list.htmx-settling .tags-view__index-row.htmx-added {
-  animation: tags-index-row-in var(--motion-gentle) ease both;
+  animation: motion-tag-enter var(--motion-tag-enter-duration) ease both;
 }
 
 #main-content[data-view="tags"].htmx-added .tags-view__sidebar-fixed,
 #main-content[data-view="tags"].htmx-added .tags-view__detail-inner {
-  animation: tags-detail-in var(--motion-gentle) ease both;
-}
-
-@keyframes tags-detail-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px) scale(0.995);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes tags-detail-out {
-  from {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(2px) scale(0.997);
-  }
-}
-
-@keyframes tags-index-row-in {
-  from {
-    opacity: 0;
-    transform: translateY(2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  animation: lull-in var(--motion-lull) ease both;
 }
 
 @media (max-width: 1200px) {
