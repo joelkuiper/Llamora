@@ -1,9 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-biome check
+mapfile -t staged_files < <(git diff --cached --name-only --diff-filter=ACMR)
 
-mapfile -t staged_py_files < <(git diff --cached --name-only --diff-filter=ACMR -- '*.py')
+staged_biome_files=()
+staged_py_files=()
+
+for file in "${staged_files[@]}"; do
+  if [[ "$file" =~ ^frontend/static/js/.*\.js$ || "$file" =~ ^frontend/static/css/.*\.css$ ]]; then
+    staged_biome_files+=("$file")
+  fi
+  if [[ "$file" =~ \.py$ ]]; then
+    staged_py_files+=("$file")
+  fi
+done
+
+if ((${#staged_biome_files[@]} > 0)); then
+  biome format --write "${staged_biome_files[@]}"
+  biome lint "${staged_biome_files[@]}"
+  git add -- "${staged_biome_files[@]}"
+fi
 
 if ((${#staged_py_files[@]} > 0)); then
   uv run ruff format "${staged_py_files[@]}"
