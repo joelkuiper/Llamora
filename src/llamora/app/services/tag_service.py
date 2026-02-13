@@ -291,6 +291,8 @@ class TagService:
             if selected_name
             else None
         )
+        if not selected_index and index_items:
+            selected_index = index_items[0]
         if not selected_index:
             return TagsViewData(
                 tags=tuple(index_items),

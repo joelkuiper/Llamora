@@ -3,6 +3,7 @@ import * as FuseModule from "fuse.js";
 const FuseCtor = FuseModule.default ?? FuseModule;
 
 const BOOT_KEY = "__llamoraTagsViewBooted";
+const SEARCH_QUERY_STORAGE_KEY = "llamora:tags-view:query";
 
 const state = {
   query: "",
@@ -13,6 +14,26 @@ const state = {
   input: null,
   empty: null,
   list: null,
+};
+
+const readStoredSearchQuery = () => {
+  try {
+    return String(window.sessionStorage.getItem(SEARCH_QUERY_STORAGE_KEY) || "").trim();
+  } catch {
+    return "";
+  }
+};
+
+const persistSearchQuery = (value) => {
+  try {
+    if (value) {
+      window.sessionStorage.setItem(SEARCH_QUERY_STORAGE_KEY, value);
+    } else {
+      window.sessionStorage.removeItem(SEARCH_QUERY_STORAGE_KEY);
+    }
+  } catch {
+    // Ignore storage failures.
+  }
 };
 
 const findList = (root = document) =>
@@ -226,6 +247,7 @@ const applySearch = (rawQuery) => {
   }
   const query = String(rawQuery || "").trim();
   state.query = query;
+  persistSearchQuery(query);
   if (!state.rows.length) return;
 
   if (!query) {
@@ -333,6 +355,9 @@ const applySort = (kind, dir) => {
 
 const sync = (root = document) => {
   updateHeaderHeight();
+  if (!state.query) {
+    state.query = readStoredSearchQuery();
+  }
   syncFromDetail(root);
   buildSearchIndex(root);
   syncSortLinks();

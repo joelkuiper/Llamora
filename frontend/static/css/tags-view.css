@@ -30,7 +30,9 @@
   left: calc((100vw - var(--page-width)) / 2 + var(--page-gutter));
   width: var(--sidebar-width);
   max-height: calc(100dvh - 11rem);
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   scrollbar-width: thin;
   padding: 0.36rem;
   border-radius: 0.9rem;
@@ -73,9 +75,8 @@
 }
 
 .tags-view__list-head {
-  position: sticky;
-  top: 0;
-  z-index: 4;
+  position: relative;
+  z-index: 8;
   padding: 0.12rem 0.12rem 0.62rem;
   margin-bottom: 0.42rem;
   background: color-mix(in srgb, var(--glass-bg-alt) 92%, var(--color-bg));
@@ -85,6 +86,23 @@
 
 .tags-view__list-body {
   min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding-bottom: 0.5rem;
+  scrollbar-width: thin;
+}
+
+.tags-view__list-body::-webkit-scrollbar {
+  width: 0.5rem;
+}
+
+.tags-view__list-body::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--border) 60%, transparent);
+  border-radius: 999px;
+}
+
+.tags-view__list-body::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .tags-view__search {
@@ -457,6 +475,19 @@
 
 #tags-view-detail.htmx-swapping .tags-view__detail-inner {
   animation: tags-detail-out var(--motion-tight) ease both;
+}
+
+#tags-view-detail.htmx-settling .tags-view__detail-inner {
+  animation: tags-detail-in var(--motion-gentle) ease both;
+}
+
+#tags-view-list.htmx-settling .tags-view__index-row.htmx-added {
+  animation: tags-index-row-in var(--motion-gentle) ease both;
+}
+
+#main-content[data-view="tags"].htmx-added .tags-view__sidebar-fixed,
+#main-content[data-view="tags"].htmx-added .tags-view__detail-inner {
+  animation: tags-detail-in var(--motion-gentle) ease both;
 }
 
 @keyframes tags-detail-in {
