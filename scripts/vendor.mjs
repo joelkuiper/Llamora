@@ -16,10 +16,10 @@ const bundles = [
     globalName: "marked",
   },
   {
-    name: "popper",
-    entry: "@popperjs/core",
-    outfile: "popper.min.jsm.js",
-    globalName: "Popper",
+    name: "floating-ui",
+    entry: "@floating-ui/dom",
+    outfile: "floating-ui.min.js",
+    globalName: "FloatingUIDOM",
   },
 ];
 

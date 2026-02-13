@@ -260,7 +260,9 @@ function init() {
       const pop = document.getElementById(id);
       if (!pop) return;
       pop.hidden = true;
-      pop.removeAttribute("data-popper-placement");
+      pop.removeAttribute("data-floating-ui-placement");
+      pop.style.left = "";
+      pop.style.top = "";
       pop.style.inset = "";
       pop.style.transform = "";
       pop.style.margin = "";

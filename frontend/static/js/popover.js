@@ -1,4 +1,4 @@
-/* global Popper */
+import { autoUpdate, computePosition, flip, offset as offsetMiddleware, shift } from "./vendor/setup-globals.js";
 import { createListenerBag } from "./utils/events.js";
 
 const DEFAULT_TIMEOUT = 250;
@@ -73,19 +73,70 @@ export function createPopover(trigger, popover, options = {}) {
     onHidden,
   } = options;
 
-  let popperInstance = null;
+  let autoUpdateCleanup = null;
   let open = false;
   let globalListeners = null;
   let version = 0;
 
-  const ensurePopper = () => {
-    if (!popperInstance) {
-      popperInstance = Popper.createPopper(trigger, popover, {
-        placement,
-        ...popperOptions,
-      });
+  const hasMiddleware = (middleware, name) =>
+    Array.isArray(middleware) && middleware.some((item) => item?.name === name);
+
+  const extractOffset = (modifiers = []) => {
+    const offsetMod = modifiers.find((mod) => mod?.name === "offset");
+    return offsetMod?.options?.offset;
+  };
+
+  const buildFloatingOptions = () => {
+    const strategy = popperOptions.strategy || "absolute";
+    const middleware = Array.isArray(popperOptions.middleware)
+      ? [...popperOptions.middleware]
+      : [];
+    const legacyOffset = extractOffset(popperOptions.modifiers || []);
+    if (legacyOffset && !hasMiddleware(middleware, "offset")) {
+      middleware.unshift(offsetMiddleware(legacyOffset));
     }
-    popperInstance.update();
+    if (!hasMiddleware(middleware, "flip")) {
+      middleware.push(flip());
+    }
+    if (!hasMiddleware(middleware, "shift")) {
+      middleware.push(shift({ padding: 8 }));
+    }
+    return { placement, strategy, middleware };
+  };
+
+  const applyPosition = async () => {
+    if (!trigger || !popover) return;
+    if (typeof computePosition !== "function") return;
+    const currentVersion = version;
+    const floatingOptions = buildFloatingOptions();
+    let result;
+    try {
+      result = await computePosition(trigger, popover, floatingOptions);
+    } catch (_error) {
+      return;
+    }
+    const { x, y, placement: resolvedPlacement } = result;
+    if (!open || currentVersion !== version) return;
+    popover.style.position = floatingOptions.strategy;
+    popover.style.left = `${x}px`;
+    popover.style.top = `${y}px`;
+    popover.style.transform = "";
+    popover.setAttribute("data-floating-ui-placement", resolvedPlacement);
+  };
+
+  const stopAutoUpdate = () => {
+    autoUpdateCleanup?.();
+    autoUpdateCleanup = null;
+  };
+
+  const startAutoUpdate = () => {
+    stopAutoUpdate();
+    if (typeof autoUpdate !== "function") {
+      return;
+    }
+    autoUpdateCleanup = autoUpdate(trigger, popover, () => {
+      applyPosition();
+    });
   };
 
   const outsideHandler = (event) => {
@@ -131,7 +182,8 @@ export function createPopover(trigger, popover, options = {}) {
     version += 1;
     onBeforeShow?.();
     popover.hidden = false;
-    ensurePopper();
+    applyPosition();
+    startAutoUpdate();
     open = true;
     addGlobalListeners();
     animateOpen();
@@ -148,6 +200,7 @@ export function createPopover(trigger, popover, options = {}) {
     const finalize = () => {
       if (hideVersion === version) {
         popover.hidden = true;
+        stopAutoUpdate();
         onHidden?.();
       }
     };
@@ -161,15 +214,16 @@ export function createPopover(trigger, popover, options = {}) {
       open = false;
     }
     version += 1;
-    if (popperInstance) {
-      popperInstance.destroy();
-      popperInstance = null;
-    }
+    stopAutoUpdate();
+    popover.removeAttribute("data-floating-ui-placement");
+    popover.style.left = "";
+    popover.style.top = "";
+    popover.style.transform = "";
   };
 
   const update = () => {
-    if (popperInstance) {
-      popperInstance.update();
+    if (open) {
+      applyPosition();
     }
   };
 

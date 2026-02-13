@@ -401,7 +401,9 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     const pop = getSharedTagPopoverEl();
     if (!pop) return;
     pop.hidden = true;
-    pop.removeAttribute("data-popper-placement");
+    pop.removeAttribute("data-floating-ui-placement");
+    pop.style.left = "";
+    pop.style.top = "";
     pop.style.inset = "";
     pop.style.transform = "";
     pop.style.margin = "";

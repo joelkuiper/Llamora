@@ -1,12 +1,13 @@
 import { createPopover } from "../popover.js";
+import { offset as offsetMiddleware } from "../vendor/setup-globals.js";
 import { createListenerBag } from "./events.js";
 
-function withOffset(modifiers = [], offset = [0, 8]) {
-  const existingOffset = modifiers.find((mod) => mod?.name === "offset");
+function withOffset(middleware = [], offset = [0, 8]) {
+  const existingOffset = middleware.find((item) => item?.name === "offset");
   if (existingOffset) {
-    return modifiers;
+    return middleware;
   }
-  return [...modifiers, { name: "offset", options: { offset } }];
+  return [offsetMiddleware(offset), ...middleware];
 }
 
 export function createTooltipPopover(trigger, popover, options = {}) {
@@ -22,7 +23,7 @@ export function createTooltipPopover(trigger, popover, options = {}) {
     popperOptions: {
       strategy: "fixed",
       ...popperOptions,
-      modifiers: withOffset(popperOptions.modifiers || [], offset),
+      middleware: withOffset(popperOptions.middleware || [], offset),
     },
     onHidden: () => {
       onHidden?.();

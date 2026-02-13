@@ -46,7 +46,7 @@ const vendorSpecs = [
   { path: "htmx.min.js", globals: ["htmx"] },
   { path: "marked.umd.js", globals: ["marked"] },
   { path: "purify.min.js", globals: ["DOMPurify"] },
-  { path: "popper.min.jsm.js", globals: ["createPopper", "Popper"] },
+  { path: "floating-ui.min.js", globals: ["FloatingUIDOM"] },
 ];
 
 for (const spec of vendorSpecs) {
@@ -56,33 +56,22 @@ for (const spec of vendorSpecs) {
   }
 }
 
-if (!globalScope.createPopper && globalScope.Popper?.createPopper) {
-  globalScope.createPopper = globalScope.Popper.createPopper;
-}
-
 if (globalScope.DOMPurify && globalScope.DOMPurify.default?.sanitize) {
   globalScope.DOMPurify = globalScope.DOMPurify.default;
-}
-
-if (globalScope.createPopper) {
-  if (!globalScope.Popper || typeof globalScope.Popper !== "object") {
-    globalScope.Popper = { createPopper: globalScope.createPopper };
-  } else if (!globalScope.Popper.createPopper) {
-    globalScope.Popper.createPopper = globalScope.createPopper;
-  }
 }
 
 const resolvedGlobals = {
   htmx: globalScope.htmx,
   marked: globalScope.marked,
   DOMPurify: globalScope.DOMPurify,
-  createPopper: globalScope.createPopper,
+  FloatingUIDOM: globalScope.FloatingUIDOM?.default || globalScope.FloatingUIDOM,
 };
 
 const requiredGlobals = [
   ["htmx", resolvedGlobals.htmx],
   ["marked", resolvedGlobals.marked],
   ["DOMPurify", resolvedGlobals.DOMPurify],
+  ["FloatingUIDOM", resolvedGlobals.FloatingUIDOM],
 ];
 
 for (const [name, value] of requiredGlobals) {
@@ -95,6 +84,11 @@ export const ready = Promise.resolve(resolvedGlobals);
 export const htmx = resolvedGlobals.htmx;
 export const marked = resolvedGlobals.marked;
 export const DOMPurify = resolvedGlobals.DOMPurify;
-export const createPopper = resolvedGlobals.createPopper;
+export const computePosition = resolvedGlobals.FloatingUIDOM?.computePosition;
+export const autoUpdate = resolvedGlobals.FloatingUIDOM?.autoUpdate;
+export const offset = resolvedGlobals.FloatingUIDOM?.offset;
+export const flip = resolvedGlobals.FloatingUIDOM?.flip;
+export const shift = resolvedGlobals.FloatingUIDOM?.shift;
+export const size = resolvedGlobals.FloatingUIDOM?.size;
 
 export default resolvedGlobals;

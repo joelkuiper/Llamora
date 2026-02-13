@@ -5,7 +5,7 @@
     "vendor": "node scripts/vendor.mjs"
   },
   "devDependencies": {
-    "@popperjs/core": "^2.11.8",
+    "@floating-ui/dom": "^1.7.5",
     "dompurify": "^3.3.1",
     "esbuild": "^0.24.2",
     "htmx-ext-response-targets": "^2.0.4",
