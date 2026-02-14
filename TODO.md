@@ -3,7 +3,7 @@
   - [ ] Transitions for tags page / indicators
   - [ ] Scroll jank 🙄
   - [ ] Unify lazy scroll behavior between tags and diary
-  - [ ] Unify entries / response threads between diary and tags
+  - [x] Unify entries / response threads between diary and tags
 - [ ] Structure or other fancy viz view
 - [x] Recovery code generation page rethink
 - [x] Summaries for days as "tooltip" in calendar nav

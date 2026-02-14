@@ -2,6 +2,7 @@ from quart import Blueprint, request, abort, render_template, jsonify, url_for
 from urllib.parse import urlencode
 from llamora.app.services.container import get_services, get_tag_service
 from llamora.app.services.auth_helpers import login_required
+from llamora.app.services.tag_service import TagsViewData
 from llamora.app.services.tag_summary import generate_tag_summary
 from llamora.app.services.time import local_date
 from llamora.settings import settings
@@ -64,14 +65,14 @@ def _build_view_context_query(
     return f"?{urlencode(payload)}"
 
 
-async def _render_tags_oob_updates(
+async def _load_tags_view_from_context(
     user_id: str,
     dek: bytes,
     context: dict[str, str | dict[str, str]],
-) -> str:
+) -> tuple[TagsViewData, str, str, int]:
     params = context.get("params")
     if not isinstance(params, dict):
-        return ""
+        raise ValueError("invalid context params")
     tag_service = _tags()
     sort_kind = tag_service.normalize_tags_sort_kind(params.get("sort_kind"))
     sort_dir = tag_service.normalize_tags_sort_dir(params.get("sort_dir"))
@@ -90,6 +91,17 @@ async def _render_tags_oob_updates(
         sort_dir=sort_dir,
         entry_limit=entries_limit,
     )
+    return tags_view, sort_kind, sort_dir, entries_limit
+
+
+async def _render_tags_detail_and_list_oob_updates(
+    user_id: str,
+    dek: bytes,
+    context: dict[str, str | dict[str, str]],
+) -> str:
+    tags_view, sort_kind, sort_dir, entries_limit = await _load_tags_view_from_context(
+        user_id, dek, context
+    )
     return await render_template(
         "partials/tags_view_fragment.html",
         day=str(context["day"]),
@@ -105,16 +117,40 @@ async def _render_tags_oob_updates(
     )
 
 
+async def _render_tags_list_oob_updates(
+    user_id: str,
+    dek: bytes,
+    context: dict[str, str | dict[str, str]],
+) -> str:
+    tags_view, sort_kind, sort_dir, entries_limit = await _load_tags_view_from_context(
+        user_id, dek, context
+    )
+    return await render_template(
+        "partials/tags_view_list_oob.html",
+        day=str(context["day"]),
+        tags_view=tags_view,
+        selected_tag=tags_view.selected_tag,
+        tags_sort_kind=sort_kind,
+        tags_sort_dir=sort_dir,
+        entries_limit=entries_limit,
+        target=None,
+    )
+
+
 async def _render_view_oob_updates(
     user_id: str,
     dek: bytes,
     context: dict[str, str | dict[str, str]] | None,
+    *,
+    tags_mode: str = "detail_and_list",
 ) -> str:
     if not context:
         return ""
     view = str(context.get("view") or "").strip().lower()
     if view == "tags":
-        return await _render_tags_oob_updates(user_id, dek, context)
+        if tags_mode == "list_only":
+            return await _render_tags_list_oob_updates(user_id, dek, context)
+        return await _render_tags_detail_and_list_oob_updates(user_id, dek, context)
     return ""
 
 
@@ -128,6 +164,18 @@ async def remove_tag(entry_id: str, tag_hash: str):
     except ValueError as exc:
         abort(400, description="invalid tag hash")
         raise AssertionError("unreachable") from exc
+    context = _parse_view_context()
+    selected_tag: str | None = None
+    removed_tag_name: str | None = None
+    if context and str(context.get("view") or "").strip().lower() == "tags":
+        params = context.get("params")
+        if isinstance(params, dict):
+            selected_tag = _tags().normalize_tag_query(params.get("tag"))
+        if selected_tag:
+            tag_info = await db.tags.get_tag_info(user["id"], tag_hash_bytes, dek)
+            if tag_info:
+                removed_tag_name = _tags().normalize_tag_query(tag_info.get("name"))
+
     created_date = await db.entries.get_entry_date(user["id"], entry_id)
     client_today = local_date().isoformat()
     await db.tags.unlink_tag_entry(
@@ -137,10 +185,17 @@ async def remove_tag(entry_id: str, tag_hash: str):
         created_date=created_date,
         client_today=client_today,
     )
-    context = _parse_view_context()
     if not context:
         return "<span class='tag-tombstone'></span>"
-    oob = await _render_view_oob_updates(user["id"], dek, context)
+    tags_mode = "detail_and_list"
+    if (
+        str(context.get("view") or "").strip().lower() == "tags"
+        and selected_tag
+        and removed_tag_name
+        and selected_tag != removed_tag_name
+    ):
+        tags_mode = "list_only"
+    oob = await _render_view_oob_updates(user["id"], dek, context, tags_mode=tags_mode)
     if not oob:
         return "<span class='tag-tombstone'></span>"
     return f"<span class='tag-tombstone'></span>\n{oob}"
@@ -183,7 +238,9 @@ async def add_tag(entry_id: str):
     )
     if not context:
         return html
-    oob = await _render_view_oob_updates(user["id"], dek, context)
+    oob = await _render_view_oob_updates(
+        user["id"], dek, context, tags_mode="list_only"
+    )
     if not oob:
         return html
     return f"{html}\n{oob}"
