@@ -85,32 +85,33 @@ class UsersRepository(BaseRepository):
 
     async def update_state(self, user_id: str, **updates) -> None:
         async with self.pool.connection() as conn:
-            cursor = await conn.execute(
-                "SELECT state FROM users WHERE id = ?", (user_id,)
-            )
-            row = await cursor.fetchone()
 
-            state: dict = {}
-            if row and row["state"]:
-                try:
-                    state = orjson.loads(row["state"])
-                except Exception:
-                    state = {}
+            async def _update() -> None:
+                cursor = await conn.execute(
+                    "SELECT state FROM users WHERE id = ?", (user_id,)
+                )
+                row = await cursor.fetchone()
 
-            for key, value in updates.items():
-                if value is None:
-                    state.pop(key, None)
-                else:
-                    state[key] = value
+                state: dict = {}
+                if row and row["state"]:
+                    try:
+                        state = orjson.loads(row["state"])
+                    except Exception:
+                        state = {}
 
-            state_json = orjson.dumps(state)
+                for key, value in updates.items():
+                    if value is None:
+                        state.pop(key, None)
+                    else:
+                        state[key] = value
 
-            await self._run_in_transaction(
-                conn,
-                conn.execute,
-                "UPDATE users SET state = ? WHERE id = ?",
-                (state_json, user_id),
-            )
+                state_json = orjson.dumps(state)
+                await conn.execute(
+                    "UPDATE users SET state = ? WHERE id = ?",
+                    (state_json, user_id),
+                )
+
+            await self._run_in_transaction(conn, _update)
 
     async def update_password_wrap(
         self,
