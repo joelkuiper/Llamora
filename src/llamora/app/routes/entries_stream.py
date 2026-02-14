@@ -198,10 +198,9 @@ async def sse_opening(date: str):
                     },
                 )
                 raise ValueError("Opening prompt exceeds context window")
-    except Exception as exc:
+    except Exception:
         logger.exception("Failed to prepare opening prompt")
-        error_text = f"⚠️ {exc}"
-        return StreamSession.error(error_text)
+        return StreamSession.error("⚠️ Unable to prepare the day opening.")
 
     stream_id = f"opening:{uid}:{today_iso}"
     manager = _entry_stream_manager()
