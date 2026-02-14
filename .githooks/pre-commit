@@ -26,7 +26,7 @@ if ((${#staged_biome_files[@]} > 0)); then
 fi
 
 if ((${#staged_py_files[@]} > 0)); then
+  uv run ruff check --fix "${staged_py_files[@]}"
   uv run ruff format "${staged_py_files[@]}"
-  uv run ruff check "${staged_py_files[@]}"
   git add -- "${staged_py_files[@]}"
 fi
