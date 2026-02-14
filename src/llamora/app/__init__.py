@@ -213,6 +213,7 @@ def create_app():
     from .routes.entries_stream import entries_stream_bp
     from .routes.search import search_bp
     from .routes.tags import tags_bp
+    from .api.lockbox_api import lockbox_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(days_bp)
@@ -220,6 +221,7 @@ def create_app():
     app.register_blueprint(entries_stream_bp)
     app.register_blueprint(search_bp)
     app.register_blueprint(tags_bp)
+    app.register_blueprint(lockbox_bp)
 
     from datetime import datetime
     from .util.tags import canonicalize as canonicalize_tag, display as display_tag

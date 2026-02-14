@@ -168,6 +168,7 @@ force_secure = false
 [default.CRYPTO]
 dek_storage = "cookie"
 
+
 [default.WORKERS.index_worker]
 max_queue_size = 1024
 batch_size = 32
