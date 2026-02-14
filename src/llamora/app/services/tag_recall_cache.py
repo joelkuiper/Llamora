@@ -1,70 +1,84 @@
-"""Cache infrastructure for tag recall summaries.
-
-This module provides caching for LLM-generated tag summaries with support
-for tag-based invalidation when tag assignments change.
-"""
+"""Lockbox-backed cache for tag recall summaries."""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from cachetools import LRUCache
-
 from llamora.app.db.events import ENTRY_TAGS_CHANGED_EVENT, RepositoryEventBus
+from llamora.app.services.lockbox import Lockbox, LockboxDecryptionError
 
 if TYPE_CHECKING:
     from llamora.app.db.entries import EntriesRepository
+    from llamora.persistence.local_db import LocalDB
 
-# Cache key: (user_id, tag_hash_hex, text_digest, max_chars)
-CacheKey = tuple[str, str, str, int]
-
-_SUMMARY_CACHE_LIMIT_FALLBACK = 512
+CacheKey = str
 
 
 class TagRecallSummaryCache:
-    """Cache LLM-generated summaries keyed by tag hash.
+    """Lockbox-backed cache keyed by tag hash."""
 
-    Uses cachetools.LRUCache for automatic eviction while maintaining
-    a secondary index for tag-based invalidation.
-    """
+    __slots__ = ("_lockbox",)
 
-    __slots__ = ("_entries", "_by_tag", "_maxsize")
+    def __init__(self, lockbox: Lockbox) -> None:
+        self._lockbox = lockbox
 
-    def __init__(self, maxsize: int = _SUMMARY_CACHE_LIMIT_FALLBACK) -> None:
-        self._maxsize = max(1, maxsize)
-        self._entries: LRUCache[CacheKey, str] = LRUCache(maxsize=self._maxsize)
-        self._by_tag: dict[tuple[str, str], set[CacheKey]] = {}
+    @staticmethod
+    def _namespace(tag_hash_hex: str) -> str:
+        return f"tag-recall:{tag_hash_hex}"
 
-    def get(self, key: CacheKey) -> str | None:
-        return self._entries.get(key)
+    async def get(
+        self, user_id: str, dek: bytes, tag_hash_hex: str, key: CacheKey
+    ) -> str | None:
+        try:
+            value = await self._lockbox.get(
+                user_id, dek, self._namespace(tag_hash_hex), key
+            )
+        except LockboxDecryptionError:
+            return None
+        if value is None:
+            return None
+        try:
+            return value.decode("utf-8")
+        except UnicodeDecodeError:
+            return None
 
-    def set(
-        self, key: CacheKey, summary: str, *, max_entries: int | None = None
+    async def set(
+        self,
+        user_id: str,
+        dek: bytes,
+        tag_hash_hex: str,
+        key: CacheKey,
+        summary: str,
+        *,
+        max_entries: int | None = None,
     ) -> None:
-        # Resize cache if max_entries differs from current maxsize
-        if max_entries is not None and max_entries > 0 and max_entries != self._maxsize:
-            self._maxsize = max_entries
-            # Create new cache with updated size, preserving recent entries
-            old_entries = list(self._entries.items())
-            self._entries = LRUCache(maxsize=self._maxsize)
-            for k, v in old_entries[-self._maxsize :]:
-                self._entries[k] = v
+        if max_entries is not None and max_entries <= 0:
+            return
+        await self._lockbox.set(
+            user_id,
+            dek,
+            self._namespace(tag_hash_hex),
+            key,
+            summary.encode("utf-8"),
+        )
 
-        self._entries[key] = summary
-        user_id, tag_hash_hex, *_ = key
-        self._by_tag.setdefault((user_id, tag_hash_hex), set()).add(key)
-
-    def invalidate_tag(self, user_id: str, tag_hash_hex: str) -> None:
-        """Remove all cached entries for a specific tag."""
-        tag_key = (user_id, tag_hash_hex)
-        keys = self._by_tag.pop(tag_key, set())
+    async def invalidate_tag(self, user_id: str, tag_hash_hex: str) -> None:
+        keys = await self._lockbox.list(user_id, self._namespace(tag_hash_hex))
         for key in keys:
-            self._entries.pop(key, None)
+            await self._lockbox.delete(user_id, self._namespace(tag_hash_hex), key)
 
 
-# Module-level singleton cache instance
-TAG_RECALL_SUMMARY_CACHE = TagRecallSummaryCache()
+_lockbox_cache: TagRecallSummaryCache | None = None
+_lockbox_pool = None
+
+
+def get_tag_recall_cache(db: "LocalDB") -> TagRecallSummaryCache:
+    global _lockbox_cache, _lockbox_pool
+    if _lockbox_cache is None or db.pool is not _lockbox_pool:
+        _lockbox_cache = TagRecallSummaryCache(Lockbox(db.pool))
+        _lockbox_pool = db.pool
+    return _lockbox_cache
 
 
 class TagRecallCacheSynchronizer:
@@ -114,12 +128,12 @@ class TagRecallCacheSynchronizer:
         if entry_date == today_iso:
             return
         tag_hash_hex = tag_hash.hex() if isinstance(tag_hash, bytes) else str(tag_hash)
-        self._cache.invalidate_tag(user_id, tag_hash_hex)
+        await self._cache.invalidate_tag(user_id, tag_hash_hex)
 
 
 __all__ = [
     "CacheKey",
     "TagRecallSummaryCache",
     "TagRecallCacheSynchronizer",
-    "TAG_RECALL_SUMMARY_CACHE",
+    "get_tag_recall_cache",
 ]

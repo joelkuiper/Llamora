@@ -9,10 +9,7 @@ from typing import Any, Iterable, Mapping, Sequence, TypedDict
 import orjson
 import tiktoken
 
-from llamora.app.services.tag_recall_cache import (
-    CacheKey,
-    TAG_RECALL_SUMMARY_CACHE,
-)
+from llamora.app.services.tag_recall_cache import CacheKey, get_tag_recall_cache
 from llamora.app.util.number import coerce_int
 from llamora.llm.prompt_templates import render_prompt_template
 from llamora.llm.tokenizers.tokenizer import count_message_tokens
@@ -156,13 +153,15 @@ def _truncate_to_tokens(text: str, max_tokens: int) -> str:
 
 
 def _build_summary_cache_key(
-    user_id: str,
-    tag_hash_hex: str,
-    text: str,
+    entry_digests: Sequence[str],
+    *,
     max_chars: int,
+    input_max_chars: int,
+    max_snippets: int,
 ) -> CacheKey:
-    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
-    return (user_id, tag_hash_hex, digest, max_chars)
+    payload = "|".join(sorted(d for d in entry_digests if d))
+    payload = f"{payload}|{max_chars}|{input_max_chars}|{max_snippets}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 async def _summarize_with_llm(
@@ -174,13 +173,15 @@ async def _summarize_with_llm(
     tag_hash_hex: str,
     max_tokens: int,
     cache_limit: int,
+    cache_key: CacheKey,
+    cache,
+    dek: bytes,
 ) -> str:
     clean = (text or "").strip()
     if not clean:
         return ""
 
-    cache_key = _build_summary_cache_key(user_id, tag_hash_hex, clean, max_chars)
-    cached = TAG_RECALL_SUMMARY_CACHE.get(cache_key)
+    cached = await cache.get(user_id, dek, tag_hash_hex, cache_key)
     if cached is not None:
         return cached
 
@@ -249,7 +250,14 @@ async def _summarize_with_llm(
             return ""
     summary = _truncate_text(summary, max_chars)
     if summary:
-        TAG_RECALL_SUMMARY_CACHE.set(cache_key, summary, max_entries=cache_limit)
+        await cache.set(
+            user_id,
+            dek,
+            tag_hash_hex,
+            cache_key,
+            summary,
+            max_entries=cache_limit,
+        )
     return summary
 
 
@@ -398,6 +406,8 @@ async def build_tag_recall_context(
     if not focus_tags:
         return None
 
+    cache = get_tag_recall_cache(db)
+
     tag_entry_ids: dict[bytes, list[str]] = {}
     all_ids: list[str] = []
     seen_ids: set[str] = set()
@@ -446,7 +456,7 @@ async def build_tag_recall_context(
         if not ids_for_tag:
             return None
         tag_hash = tag_digest.hex()
-        tag_items: list[tuple[str, str, str]] = []
+        tag_items: list[tuple[str, str, str, str]] = []
         for entry_id in ids_for_tag:
             if len(tag_items) >= cfg.max_snippets:
                 break
@@ -467,7 +477,10 @@ async def build_tag_recall_context(
                     continue
             when = _extract_date(created_at) or "Previous day"
             role = str(entry.get("role") or "assistant").strip().title()
-            tag_items.append((when, role, text))
+            digest = str(entry.get("digest") or "").strip()
+            if not digest:
+                digest = f"missing:{entry_id}"
+            tag_items.append((when, role, text, digest))
 
         if not tag_items:
             return None
@@ -476,13 +489,17 @@ async def build_tag_recall_context(
         summary_items = [
             item for item in tag_items if item[1].lower() == "user"
         ] or tag_items
-        lines = [f"{when} {role}: {text}" for when, role, text in summary_items]
+        lines = [f"{when} {role}: {text}" for when, role, text, _ in summary_items]
         aggregate = "\n".join(lines)
+        entry_digests = [digest for *_rest, digest in summary_items]
 
         cache_key = _build_summary_cache_key(
-            user_id, tag_hash, aggregate, cfg.summary_max_chars
+            entry_digests,
+            max_chars=cfg.summary_max_chars,
+            input_max_chars=cfg.summary_input_max_chars,
+            max_snippets=cfg.max_snippets,
         )
-        cached = TAG_RECALL_SUMMARY_CACHE.get(cache_key)
+        cached = await cache.get(user_id, dek, tag_hash, cache_key)
 
         if cfg.mode == "summary":
             if llm is None:
@@ -495,6 +512,9 @@ async def build_tag_recall_context(
                 tag_hash_hex=tag_hash,
                 max_tokens=cfg.llm_max_tokens,
                 cache_limit=cfg.summary_cache_max,
+                cache_key=cache_key,
+                cache=cache,
+                dek=dek,
             )
             if not summary:
                 return None
@@ -507,7 +527,7 @@ async def build_tag_recall_context(
             item for item in tag_items if item[1].lower() == "user"
         ] or tag_items
         snippet = _build_extractive_snippet(
-            items=extractive_items,
+            items=[(when, role, text) for when, role, text, _ in extractive_items],
             max_chars=cfg.snippet_max_chars,
         )
         if not snippet:
@@ -524,6 +544,9 @@ async def build_tag_recall_context(
                     tag_hash_hex=tag_hash,
                     max_tokens=cfg.llm_max_tokens,
                     cache_limit=cfg.summary_cache_max,
+                    cache_key=cache_key,
+                    cache=cache,
+                    dek=dek,
                 )
 
             asyncio.create_task(_background())
