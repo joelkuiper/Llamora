@@ -3,6 +3,8 @@ from urllib.parse import urlencode
 from llamora.app.services.container import get_services, get_tag_service
 from llamora.app.services.auth_helpers import login_required
 from llamora.app.services.tag_service import TagsViewData
+from llamora.app.services.lockbox import Lockbox
+from llamora.app.services.lockbox_store import LockboxStore
 from llamora.app.services.tag_summary import generate_tag_summary
 from llamora.app.services.time import local_date
 from llamora.settings import settings
@@ -463,6 +465,25 @@ async def tag_detail_summary(tag_hash: str):
         num_words = 28
     num_words = max(18, min(num_words, 160))
 
+    summary_cache_key = f"tag:{tag_hash}:w{num_words}"
+    summary_cache_namespace = "summary"
+    summary_digest = overview.summary_digest
+    if summary_digest:
+        store = LockboxStore(Lockbox(get_services().db.pool))
+        cached = await store.get_json(
+            user["id"],
+            dek,
+            summary_cache_namespace,
+            summary_cache_key,
+        )
+        if isinstance(cached, dict):
+            cached_digest = str(cached.get("digest") or "")
+            cached_html = cached.get("html")
+            if cached_digest == summary_digest and isinstance(cached_html, str):
+                cached_html = cached_html.strip()
+                if cached_html:
+                    return cached_html
+
     llm = get_services().llm_service.llm
     summary = await generate_tag_summary(
         llm,
@@ -476,6 +497,18 @@ async def tag_detail_summary(tag_hash: str):
         "partials/tag_detail_summary.html",
         summary=summary,
     )
+    if summary and summary_digest:
+        store = LockboxStore(Lockbox(get_services().db.pool))
+        await store.set_json(
+            user["id"],
+            dek,
+            summary_cache_namespace,
+            summary_cache_key,
+            {
+                "digest": summary_digest,
+                "html": html,
+            },
+        )
     return html
 
 
