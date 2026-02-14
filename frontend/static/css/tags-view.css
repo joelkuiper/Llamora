@@ -256,12 +256,24 @@
 .tags-view__controls {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .tags-view__sort {
   display: inline-flex;
   align-items: center;
   gap: 0.32rem;
+}
+
+.tags-view__list-spinner {
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity var(--motion-gentle) ease;
+}
+
+.tags-view__list-spinner.htmx-request {
+  opacity: 0.9;
 }
 
 .tags-view__sort-btn {

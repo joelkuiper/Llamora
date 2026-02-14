@@ -22,7 +22,6 @@ const state = {
   saveSuppressed: false,
   pendingDetailScrollTop: false,
   pendingTagHighlight: "",
-  listAnchorOffset: null,
   listPositions: null,
   restoreAfterBfcache: false,
 };
@@ -311,6 +310,19 @@ const scrollRowIntoView = (row, container, behavior = "auto") => {
   container.scrollTo({ top: nextTop, behavior });
 };
 
+const scrollActiveRowIntoView = (root = document, behavior = "smooth") => {
+  const listBody = findListBody(root);
+  const activeRow = getActiveRow();
+  if (!(listBody instanceof HTMLElement) || !(activeRow instanceof HTMLElement)) return;
+  if (isRowInView(activeRow, listBody)) return;
+  const scrollBehavior = prefersReducedMotion() ? "auto" : behavior;
+  window.requestAnimationFrame(() => {
+    if (!activeRow.isConnected || !listBody.isConnected) return;
+    if (isRowInView(activeRow, listBody)) return;
+    scrollRowIntoView(activeRow, listBody, scrollBehavior);
+  });
+};
+
 const setActiveTag = (tagName, root = document, options = {}) => {
   const behavior = options.behavior === "smooth" ? "smooth" : "auto";
   const shouldScroll = options.scroll !== false;
@@ -459,7 +471,6 @@ const syncFromDetail = (root = document) => {
       });
     }
   }
-  updateSortButtons(root);
 };
 
 const updateSortButtons = (root = document) => {
@@ -837,27 +848,6 @@ const sync = (root = document) => {
   state.restoreAfterBfcache = false;
 };
 
-const captureListAnchor = () => {
-  const listBody = findListBody();
-  if (!(listBody instanceof HTMLElement)) return;
-  const activeRow = getActiveRow();
-  if (!(activeRow instanceof HTMLElement)) {
-    state.listAnchorOffset = null;
-    return;
-  }
-  state.listAnchorOffset = activeRow.offsetTop - listBody.scrollTop;
-};
-
-const restoreListAnchor = () => {
-  const listBody = findListBody();
-  if (!(listBody instanceof HTMLElement)) return;
-  if (state.listAnchorOffset == null) return;
-  const activeRow = getActiveRow();
-  if (!(activeRow instanceof HTMLElement)) return;
-  const nextTop = activeRow.offsetTop - state.listAnchorOffset;
-  listBody.scrollTop = Math.max(0, nextTop);
-};
-
 const captureListPositions = () => {
   if (prefersReducedMotion()) {
     state.listPositions = null;
@@ -897,19 +887,12 @@ const syncListOnly = (root = document) => {
   syncSortStateFromDom(root);
   buildSearchIndex(root);
   applySearch(state.query);
-  updateSortButtons(root);
   refreshDetailLinksForSort(root);
-  const listBody = findListBody(root);
   const selectedTag = getSelectedTrace(root);
   if (selectedTag) {
-    setActiveTag(selectedTag, root, { behavior: "auto" });
+    setActiveTag(selectedTag, root, { behavior: "auto", scroll: false });
   }
-  const activeRow = getActiveRow();
-  if (listBody instanceof HTMLElement && activeRow instanceof HTMLElement) {
-    if (!isRowInView(activeRow, listBody)) {
-      scrollRowIntoView(activeRow, listBody, "auto");
-    }
-  }
+  scrollActiveRowIntoView(root, "smooth");
 };
 
 const syncDetailOnly = (root = document) => {
@@ -1032,6 +1015,16 @@ if (!globalThis[BOOT_KEY]) {
     if (event.detail?.verb !== "get") return;
     const target = event.detail?.target;
     if (!(target instanceof Element)) return;
+    if (target.id === "tags-view-list") {
+      const selectedInput = document.getElementById("tags-view-selected-tag");
+      const selected =
+        String(selectedInput?.value || "").trim() || getSelectedTrace(document) || "";
+      if (selected) {
+        event.detail.parameters.tag = selected;
+      }
+      event.detail.parameters.view = "tags";
+      return;
+    }
     if (target.id !== "tags-view-detail") return;
 
     const path = event.detail?.path || "";
@@ -1055,14 +1048,11 @@ if (!globalThis[BOOT_KEY]) {
   document.body.addEventListener("htmx:beforeRequest", (event) => {
     const target = event.detail?.target;
     if (!(target instanceof Element)) return;
-    if (target.id !== "tags-view-detail") {
-      if (target.id === "tags-view-list" || target.closest?.("#tags-view-list")) {
-        captureListAnchor();
-        captureListPositions();
-      }
+    if (target.id === "tags-view-list" || target.closest?.("#tags-view-list")) {
+      captureListPositions();
       return;
     }
-    captureListAnchor();
+    if (target.id !== "tags-view-detail") return;
     captureListPositions();
     if (!state.saveSuppressed) {
       storeMainScrollTop();
@@ -1079,11 +1069,8 @@ if (!globalThis[BOOT_KEY]) {
     const target = event.detail?.target;
     if (!(target instanceof Element)) return;
     if (target.id === "tags-view-list" || target.closest?.("#tags-view-list")) {
-      restoreListAnchor();
       animateListReorder();
-      if (state.restoreAfterBfcache) {
-        restoreListAnchor();
-      }
+      scrollActiveRowIntoView(document, "smooth");
     }
     if (target.id !== "tags-view-detail") return;
     if (!state.pendingDetailScrollTop) return;

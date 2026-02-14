@@ -2,8 +2,6 @@
 {% set sort_dir = tags_sort_dir if tags_sort_dir is defined else (tags_view.sort_dir if tags_view is defined and tags_view else 'desc') %}
 {% set selected_tag = tags_view.selected_tag if tags_view is defined and tags_view else '' %}
 {% set entries_limit = entries_limit|default(12) %}
-{% set base_day_url = url_for('days.day', date=day) %}
-{% set base_list_url = url_for('days.day', date=day) %}
 <section id="tags-view" class="tags-view page-grid grid-12" data-day="{{ day }}">
   <aside class="tags-view__sidebar span-3">
     <div class="tags-view__sidebar-fixed">
@@ -27,67 +25,8 @@
                   tabindex="-1">&times;</button>
         </label>
         <div class="tags-view__controls">
-          <div class="tags-view__sort" role="group" aria-label="Sort traces">
-            {% set sort_params = 'view=tags&sort_kind=count&sort_dir=desc&entries_limit=' ~ entries_limit %}
-            <button type="button"
-                    class="icon-btn tags-view__sort-btn{% if sort_kind == 'count' and sort_dir == 'desc' %} is-active{% endif %}"
-                    data-tags-sort-kind="count"
-                    data-tags-sort-dir="desc"
-                    data-tooltip-title="Most used first"
-                    hx-get="{{ base_list_url }}?{{ sort_params }}"
-                    hx-target="#tags-view-list"
-                    hx-swap="outerHTML"
-                    hx-include="#tags-view-selected-tag"
-                    hx-push-url="true"
-                    hx-indicator="#tags-view-list-loading">
-              <span class="icon-mask icon-arrow-down-1-0" aria-hidden="true"></span>
-              <span class="visually-hidden">Sort by trace count descending</span>
-            </button>
-            {% set sort_params = 'view=tags&sort_kind=count&sort_dir=asc&entries_limit=' ~ entries_limit %}
-            <button type="button"
-                    class="icon-btn tags-view__sort-btn{% if sort_kind == 'count' and sort_dir == 'asc' %} is-active{% endif %}"
-                    data-tags-sort-kind="count"
-                    data-tags-sort-dir="asc"
-                    data-tooltip-title="Least used first"
-                    hx-get="{{ base_list_url }}?{{ sort_params }}"
-                    hx-target="#tags-view-list"
-                    hx-swap="outerHTML"
-                    hx-include="#tags-view-selected-tag"
-                    hx-push-url="true"
-                    hx-indicator="#tags-view-list-loading">
-              <span class="icon-mask icon-arrow-up-1-0" aria-hidden="true"></span>
-              <span class="visually-hidden">Sort by trace count ascending</span>
-            </button>
-            {% set sort_params = 'view=tags&sort_kind=alpha&sort_dir=asc&entries_limit=' ~ entries_limit %}
-            <button type="button"
-                    class="icon-btn tags-view__sort-btn{% if sort_kind == 'alpha' and sort_dir == 'asc' %} is-active{% endif %}"
-                    data-tags-sort-kind="alpha"
-                    data-tags-sort-dir="asc"
-                    data-tooltip-title="A → Z"
-                    hx-get="{{ base_list_url }}?{{ sort_params }}"
-                    hx-target="#tags-view-list"
-                    hx-swap="outerHTML"
-                    hx-include="#tags-view-selected-tag"
-                    hx-push-url="true"
-                    hx-indicator="#tags-view-list-loading">
-              <span class="icon-mask icon-arrow-up-a-z" aria-hidden="true"></span>
-              <span class="visually-hidden">Sort traces alphabetically ascending</span>
-            </button>
-            {% set sort_params = 'view=tags&sort_kind=alpha&sort_dir=desc&entries_limit=' ~ entries_limit %}
-            <button type="button"
-                    class="icon-btn tags-view__sort-btn{% if sort_kind == 'alpha' and sort_dir == 'desc' %} is-active{% endif %}"
-                    data-tags-sort-kind="alpha"
-                    data-tags-sort-dir="desc"
-                    data-tooltip-title="Z → A"
-                    hx-get="{{ base_list_url }}?{{ sort_params }}"
-                    hx-target="#tags-view-list"
-                    hx-swap="outerHTML"
-                    hx-include="#tags-view-selected-tag"
-                    hx-push-url="true"
-                    hx-indicator="#tags-view-list-loading">
-              <span class="icon-mask icon-arrow-down-a-z" aria-hidden="true"></span>
-              <span class="visually-hidden">Sort traces alphabetically descending</span>
-            </button>
+          <div id="tags-view-sort-controls">
+            {% include 'partials/tags_view_sort_controls.html' %}
           </div>
         </div>
       </div>
@@ -97,16 +36,6 @@
              data-sort-kind="{{ sort_kind }}"
              data-sort-dir="{{ sort_dir }}">
           {% include 'partials/tags_view_list.html' %}
-        </div>
-        <div id="tags-view-list-loading"
-             class="entries-loading tags-view__loading"
-             hidden
-             aria-hidden="true">
-          <div class="entries-loading__backdrop" aria-hidden="true"></div>
-          <div class="entries-loading__panel" role="status" aria-live="polite">
-            <span class="entries-loading__spinner spinner" aria-hidden="true"></span>
-            <span class="entries-loading__label">Retrieving…</span>
-          </div>
         </div>
       </div>
     </div>
