@@ -59,11 +59,8 @@
 
     {% else %}
     <div class="return-today" role="group" aria-label="Archived day divider">
-      <div class="return-today__divider" aria-hidden="true">
-        <span class="return-today__line return-today__line--left"></span>
-        <span class="return-today__date">{{ day|long_date }}</span>
-        <span class="return-today__line return-today__line--right"></span>
-      </div>
+      {% set divider_date = day %}
+      {% include 'partials/day_divider.html' %}
       <p class="return-today__copy">
         {% if is_future %}
         This day has not arrived yet.

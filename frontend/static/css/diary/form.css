@@ -8,7 +8,6 @@
   justify-items: center;
 }
 
-.return-today__divider,
 .day-divider {
   width: min(100%, 30rem);
   display: grid;
@@ -17,7 +16,6 @@
   gap: var(--spacing-sm);
 }
 
-.return-today__line,
 .day-divider__line {
   height: 1px;
   background: linear-gradient(
@@ -27,7 +25,6 @@
   );
 }
 
-.return-today__line--right,
 .day-divider__line--right {
   background: linear-gradient(
     to left,
@@ -36,7 +33,6 @@
   );
 }
 
-.return-today__date,
 .day-divider__date {
   font-size: 0.95rem;
   letter-spacing: 0.02em;
