@@ -572,6 +572,8 @@
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+  --tag-summary-line-height: 0.95rem;
+  --tag-summary-line-gap: 0.76rem;
 }
 
 .tags-view__summary--header {
@@ -590,12 +592,12 @@
 }
 
 .tags-view__summary .tag-detail-skeleton {
-  gap: 0.35rem;
+  gap: var(--tag-summary-line-gap, 0.35rem);
   margin-top: 0.34rem;
 }
 
-.tags-view__summary .tag-detail-skeleton span {
-  height: 0.6rem;
+.tags-view__summary .tag-detail-skeleton .tag-detail-skeleton__line {
+  height: var(--tag-summary-line-height, 0.6rem);
 }
 
 .tags-view__entries {

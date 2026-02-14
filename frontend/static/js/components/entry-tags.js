@@ -7,6 +7,7 @@ import { ReactiveElement } from "../utils/reactive-element.js";
 import { getValue, setValue } from "../services/lockbox-store.js";
 import { animateMotion } from "../utils/transition.js";
 import { AutocompleteOverlayMixin } from "./base/autocomplete-overlay.js";
+import { syncSummarySkeletons } from "../services/summary-skeleton.js";
 
 const canonicalizeTag = (value, limit = null) => {
   const raw = `${value ?? ""}`.trim().toLowerCase();
@@ -1203,7 +1204,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       return;
     }
     this.#activeTagHash = tagHash;
-    this.#detailBody.innerHTML = this.#detailSkeleton || DEFAULT_TAG_DETAIL_SKELETON;
+    this.#detailBody.innerHTML = this.#detailSkeleton || getDetailSkeletonMarkup();
     this.#detailBody.dataset.resetScroll = "1";
     this.#detailBody.setAttribute("hx-get", url);
     if (typeof htmx !== "undefined" && htmx?.ajax) {
@@ -1248,6 +1249,9 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   #handleDetailAfterSwap(event) {
     if (!this.#isActiveOwner()) {
       return;
+    }
+    if (this.#detailBody) {
+      syncSummarySkeletons(this.#detailBody);
     }
     this.#detailPopover?.update();
     const target = event?.detail?.target ?? event?.target;
@@ -1363,16 +1367,13 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 }
 
-const DEFAULT_TAG_DETAIL_SKELETON = `
-  <div class="tag-detail-skeleton" aria-hidden="true">
-    <span class="tag-detail-skeleton__title"></span>
-    <span class="tag-detail-skeleton__meta"></span>
-    <span class="tag-detail-skeleton__line"></span>
-    <span class="tag-detail-skeleton__line"></span>
-    <span class="tag-detail-skeleton__item"></span>
-    <span class="tag-detail-skeleton__item"></span>
-  </div>
-`;
+const getDetailSkeletonMarkup = () => {
+  const tpl = document.getElementById("summary-skeleton-template");
+  if (tpl?.innerHTML?.trim()) {
+    return tpl.innerHTML.trim();
+  }
+  return '<div class="tag-detail-skeleton" aria-hidden="true"><span class="tag-detail-skeleton__line"></span><span class="tag-detail-skeleton__line"></span><span class="tag-detail-skeleton__line"></span></div>';
+};
 
 if (typeof customElements !== "undefined" && !customElements.get("entry-tags")) {
   customElements.define("entry-tags", EntryTags);

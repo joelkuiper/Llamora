@@ -587,6 +587,8 @@
   color: var(--glass-text-muted);
   min-height: 1.8rem;
   transition: opacity calc(var(--motion-gentle) * 1.4) ease;
+  --tag-summary-line-height: 0.72rem;
+  --tag-summary-line-gap: 0.32rem;
 }
 
 .tag-detail__summary p {
@@ -762,12 +764,12 @@
 }
 
 .tag-detail__summary .tag-detail-skeleton {
-  gap: 0.35rem;
+  gap: var(--tag-summary-line-gap, 0.35rem);
   margin-top: 0.1rem;
 }
 
-.tag-detail__summary .tag-detail-skeleton span {
-  height: 0.6rem;
+.tag-detail__summary .tag-detail-skeleton .tag-detail-skeleton__line {
+  height: var(--tag-summary-line-height, 0.6rem);
 }
 
 .tag-detail-skeleton span {
@@ -777,11 +779,13 @@
   background: linear-gradient(
     90deg,
     color-mix(in srgb, var(--border) 0%, transparent),
-    color-mix(in srgb, var(--border) 22%, transparent),
+    color-mix(in srgb, var(--border) 32%, transparent),
     color-mix(in srgb, var(--border) 0%, transparent)
   );
   background-size: 220% 100%;
-  animation: tag-skeleton-shimmer 2.3s ease-in-out infinite;
+  animation:
+    tag-skeleton-shimmer 2.2s ease-in-out infinite,
+    tag-skeleton-breathe 3.2s ease-in-out infinite;
   opacity: 0.92;
 }
 

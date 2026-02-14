@@ -5,6 +5,7 @@ import { clearScrollTarget, flashHighlight } from "../ui.js";
 import { prefersReducedMotion } from "../utils/motion.js";
 import { sessionStore } from "../utils/storage.js";
 import { Fuse as FuseCtor } from "../vendor/setup-globals.js";
+import { syncSummarySkeletons } from "../services/summary-skeleton.js";
 
 const BOOT_KEY = "__llamoraTagsViewBooted";
 const SUMMARY_NAMESPACE = "summary";
@@ -995,6 +996,7 @@ const sync = (root = document) => {
     state.query = readStoredSearchQuery();
   }
   syncFromDetail(root);
+  syncSummarySkeletons(root);
   buildSearchIndex(root);
   clearSearchForTargetNavigation();
   applySearch(state.query);
@@ -1055,6 +1057,7 @@ const syncListOnly = (root = document) => {
 
 const syncDetailOnly = (root = document) => {
   syncFromDetail(root);
+  syncSummarySkeletons(root);
   buildSearchIndex(root);
   applySearch(state.query);
   animateDetailEntries(root);

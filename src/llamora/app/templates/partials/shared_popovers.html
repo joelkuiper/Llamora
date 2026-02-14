@@ -40,14 +40,15 @@
   <div class="tp-content tag-detail-panel">
     <button type="button" class="overlay-close" aria-label="Close">×</button>
     <div class="tag-detail-body" hx-trigger="tag-detail:show">
-      <div class="tag-detail-skeleton" aria-hidden="true">
-        <span class="tag-detail-skeleton__title"></span>
-        <span class="tag-detail-skeleton__meta"></span>
-        <span class="tag-detail-skeleton__line"></span>
-        <span class="tag-detail-skeleton__line"></span>
-        <span class="tag-detail-skeleton__item"></span>
-        <span class="tag-detail-skeleton__item"></span>
-      </div>
+      {% with lines=3 %}
+        {% include 'partials/summary_shimmer.html' %}
+      {% endwith %}
     </div>
   </div>
 </div>
+
+<template id="summary-skeleton-template">
+  {% with lines=3 %}
+    {% include 'partials/summary_shimmer.html' %}
+  {% endwith %}
+</template>

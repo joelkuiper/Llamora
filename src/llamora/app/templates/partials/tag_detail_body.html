@@ -56,13 +56,13 @@
        hx-target="this"
        data-summary-digest="{{ tag.summary_digest }}"
        data-summary-words="28"
+       data-summary-lines="3"
        data-tag-hash="{{ tag.hash }}"
        hx-disinherit="hx-target"
        hx-swap="innerHTML swap:120ms">
-    <div class="tag-detail-skeleton" aria-hidden="true">
-      <span class="tag-detail-skeleton__line"></span>
-      <span class="tag-detail-skeleton__line"></span>
-    </div>
+    {% with lines=3 %}
+      {% include 'partials/summary_shimmer.html' %}
+    {% endwith %}
   </div>
   <div class="tag-detail__entries">
     {% if entries %}

@@ -1,0 +1,7 @@
+{% set lines = lines|default(3) %}
+{% set extra_class = extra_class|default('') %}
+<div class="tag-detail-skeleton{% if extra_class %} {{ extra_class }}{% endif %}" aria-hidden="true">
+  {% for _ in range(lines) %}
+  <span class="tag-detail-skeleton__line"></span>
+  {% endfor %}
+</div>

@@ -62,12 +62,11 @@
                    hx-swap="innerHTML"
                    data-summary-digest="{{ detail.summary_digest }}"
                    data-summary-words="72"
+                   data-summary-lines="4"
                    data-tag-hash="{{ detail.hash }}">
-            <div class="tag-detail-skeleton" aria-hidden="true">
-              <span class="tag-detail-skeleton__line"></span>
-              <span class="tag-detail-skeleton__line"></span>
-              <span class="tag-detail-skeleton__line"></span>
-            </div>
+            {% with lines=4 %}
+              {% include 'partials/summary_shimmer.html' %}
+            {% endwith %}
           </section>
         </div>
       </header>
