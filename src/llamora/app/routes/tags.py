@@ -348,6 +348,7 @@ async def tags_view_fragment(date: str):
     entries_limit = _parse_positive_int(
         request.args.get("entries_limit"), default=12, min_value=6, max_value=60
     )
+    restore_entry = (request.args.get("restore_entry") or "").strip() or None
     tags_view = await tag_service.get_tags_view_data(
         user["id"],
         dek,
@@ -355,6 +356,7 @@ async def tags_view_fragment(date: str):
         sort_kind=sort_kind,
         sort_dir=sort_dir,
         entry_limit=entries_limit,
+        around_entry_id=restore_entry,
     )
     selected_tag = tags_view.selected_tag
     return await render_template(

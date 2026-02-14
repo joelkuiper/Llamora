@@ -260,6 +260,7 @@ class TagService:
         sort_kind: TagsSortKind = "alpha",
         sort_dir: TagsSortDirection = "asc",
         entry_limit: int = 12,
+        around_entry_id: str | None = None,
         secondary_tag_limit: int = 4,
         related_tag_limit: int = 2,
     ) -> TagsViewData:
@@ -316,6 +317,7 @@ class TagService:
             dek,
             selected_index,
             limit=entry_limit,
+            around_entry_id=around_entry_id,
             secondary_tag_limit=secondary_tag_limit,
             related_tag_limit=related_tag_limit,
         )
@@ -380,6 +382,7 @@ class TagService:
         tag_item: TagIndexItem,
         *,
         limit: int,
+        around_entry_id: str | None = None,
         secondary_tag_limit: int,
         related_tag_limit: int,
     ) -> TagArchiveDetail | None:
@@ -397,6 +400,7 @@ class TagService:
             [tag_hash],
             dek,
             limit=max(1, limit),
+            around_entry_id=around_entry_id,
         )
         if not archive_entries:
             return TagArchiveDetail(
@@ -443,8 +447,16 @@ class TagService:
         *,
         limit: int,
         cursor: str | None = None,
+        around_entry_id: str | None = None,
         secondary_tag_limit: int = 4,
     ) -> tuple[list[TagArchiveEntry], str | None, bool]:
+        if around_entry_id and not cursor:
+            rank = await self._db.tags.count_entries_newer_than(
+                user_id, tag_hashes, around_entry_id
+            )
+            if rank is not None:
+                limit = min(max(limit, rank + 5), 200)
+
         before_created_at, before_entry_id = _parse_tag_cursor(cursor)
         (
             entry_ids,

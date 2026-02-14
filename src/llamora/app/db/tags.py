@@ -664,3 +664,55 @@ class TagsRepository(BaseRepository):
             else None
         )
         return entry_ids, next_cursor, has_more
+
+    async def count_entries_newer_than(
+        self,
+        user_id: str,
+        tag_hashes: list[bytes],
+        entry_id: str,
+    ) -> int | None:
+        """Count entries that rank above *entry_id* in display order.
+
+        Display order is ``created_at DESC, entry_id DESC``.  Returns the
+        number of entries that would appear *before* the given entry in that
+        ordering, or ``None`` when the entry is not linked to any of the
+        supplied tags.
+        """
+        if not tag_hashes or not entry_id:
+            return None
+
+        tag_placeholders = ",".join("?" * len(tag_hashes))
+        params: list[object] = [user_id, *tag_hashes, entry_id, entry_id]
+
+        sql = f"""
+            WITH ranked AS (
+                SELECT x.entry_id, MAX(m.created_at) AS created_at
+                FROM tag_entry_xref x
+                JOIN entries m
+                  ON m.user_id = x.user_id AND m.id = x.entry_id
+                WHERE x.user_id = ? AND x.tag_hash IN ({tag_placeholders})
+                  AND m.created_at IS NOT NULL AND m.created_at != ''
+                GROUP BY x.entry_id
+            ),
+            target AS (
+                SELECT created_at FROM ranked WHERE entry_id = ?
+            )
+            SELECT COUNT(*) AS cnt
+            FROM ranked
+            WHERE EXISTS (SELECT 1 FROM target)
+              AND (
+                ranked.created_at > (SELECT created_at FROM target)
+                OR (
+                  ranked.created_at = (SELECT created_at FROM target)
+                  AND ranked.entry_id > ?
+                )
+              )
+        """
+
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(sql, params)
+            row = await cursor.fetchone()
+
+        if not row or row["cnt"] is None:
+            return None
+        return int(row["cnt"])

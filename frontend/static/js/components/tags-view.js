@@ -7,8 +7,6 @@ import { sessionStore } from "../utils/storage.js";
 const FuseCtor = FuseModule.default ?? FuseModule;
 
 const BOOT_KEY = "__llamoraTagsViewBooted";
-const ENTRIES_LOAD_RESTORE_LIMIT = 48;
-
 const state = {
   query: "",
   sortKind: "count",
@@ -21,8 +19,6 @@ const state = {
   list: null,
   scrollElement: null,
   saveFrame: 0,
-  restoreToken: 0,
-  restoreInFlight: false,
   restoreAppliedForLocation: "",
   saveSuppressed: false,
 };
@@ -46,9 +42,13 @@ const setClearButtonVisibility = () => {
 };
 
 const readEntriesAnchorMap = () => sessionStore.get("tags:anchor") ?? {};
+const readMainScrollMap = () => sessionStore.get("tags:scroll") ?? {};
 
 const writeEntriesAnchorMap = (map) => {
   sessionStore.set("tags:anchor", map);
+};
+const writeMainScrollMap = (map) => {
+  sessionStore.set("tags:scroll", map);
 };
 
 const findList = (root = document) =>
@@ -83,10 +83,10 @@ const scrollMainContentTop = () => {
   }
 };
 
-const getTagsLocationKey = () => {
+const getTagsLocationKey = (tagOverride) => {
   const url = new URL(window.location.href);
-  if (url.searchParams.get("view") !== "tags") return "";
-  const tag = url.searchParams.get("tag") || "";
+  if (!tagOverride && url.searchParams.get("view") !== "tags") return "";
+  const tag = tagOverride || String(url.searchParams.get("tag") || "").trim();
   return `${url.pathname}?view=tags&tag=${tag}`;
 };
 
@@ -133,6 +133,55 @@ const storeEntriesAnchor = (payload) => {
   writeEntriesAnchorMap(map);
 };
 
+const getMainScrollTop = () => {
+  const scrollElement = getMainScrollElement();
+  if (!(scrollElement instanceof HTMLElement)) return null;
+  return Math.max(0, Math.round(scrollElement.scrollTop || 0));
+};
+
+const storeMainScrollTop = () => {
+  const key = getTagsLocationKey();
+  if (!key) return;
+  const top = getMainScrollTop();
+  if (!Number.isFinite(top)) return;
+
+  const map = readMainScrollMap();
+  map[key] = {
+    top,
+    updatedAt: Date.now(),
+  };
+  const entries = Object.entries(map);
+  if (entries.length > 120) {
+    entries
+      .sort((a, b) => Number(b[1]?.updatedAt || 0) - Number(a[1]?.updatedAt || 0))
+      .slice(120)
+      .forEach(([oldKey]) => {
+        delete map[oldKey];
+      });
+  }
+  writeMainScrollMap(map);
+};
+
+const readStoredMainScrollTop = () => {
+  const key = getTagsLocationKey();
+  if (!key) return null;
+  const map = readMainScrollMap();
+  const value = map[key];
+  if (!value || typeof value !== "object") return null;
+  const top = Number.parseInt(String(value.top ?? ""), 10);
+  if (!Number.isFinite(top)) return null;
+  return Math.max(0, top);
+};
+
+const applyStoredMainScrollTop = () => {
+  const scrollElement = getMainScrollElement();
+  if (!(scrollElement instanceof HTMLElement)) return false;
+  const top = readStoredMainScrollTop();
+  if (!Number.isFinite(top)) return false;
+  scrollElement.scrollTop = top;
+  return true;
+};
+
 const captureEntriesAnchor = () => {
   const selectedTag = getSelectedTrace();
   if (!selectedTag) return;
@@ -161,18 +210,15 @@ const scheduleEntriesAnchorSave = () => {
   if (state.saveFrame) return;
   state.saveFrame = window.requestAnimationFrame(() => {
     state.saveFrame = 0;
-    if (state.restoreInFlight || state.saveSuppressed) return;
+    if (state.saveSuppressed) return;
+    storeMainScrollTop();
     captureEntriesAnchor();
   });
 };
 
 const resetEntriesRestoreState = () => {
-  state.restoreToken += 1;
-  state.restoreInFlight = false;
   state.restoreAppliedForLocation = "";
 };
-
-const shouldForceRestoreCycle = (reason) => reason === "bfcache" || reason === "history-restore";
 
 const applyEntriesAnchor = (entryElement, offset) => {
   const scrollElement = getMainScrollElement();
@@ -185,52 +231,6 @@ const applyEntriesAnchor = (entryElement, offset) => {
   return true;
 };
 
-const requestEntriesChunk = (sentinel, token) =>
-  new Promise((resolve) => {
-    const url = sentinel.getAttribute("hx-get");
-    if (!url || typeof htmx === "undefined" || typeof htmx.ajax !== "function") {
-      resolve(false);
-      return;
-    }
-
-    let done = false;
-    const cleanup = () => {
-      document.body.removeEventListener("htmx:afterSwap", onAfterSwap);
-      document.body.removeEventListener("htmx:responseError", onResponseError);
-      window.clearTimeout(timeoutId);
-    };
-    const finish = (value) => {
-      if (done) return;
-      done = true;
-      cleanup();
-      resolve(value);
-    };
-    const onAfterSwap = (event) => {
-      if (token !== state.restoreToken) {
-        finish(false);
-        return;
-      }
-      const source = event.detail?.requestConfig?.elt;
-      if (source !== sentinel) return;
-      finish(true);
-    };
-    const onResponseError = (event) => {
-      const source = event.detail?.requestConfig?.elt;
-      if (source !== sentinel) return;
-      finish(false);
-    };
-
-    const timeoutId = window.setTimeout(() => finish(false), 3000);
-    document.body.addEventListener("htmx:afterSwap", onAfterSwap);
-    document.body.addEventListener("htmx:responseError", onResponseError);
-
-    htmx.ajax("GET", url, {
-      source: sentinel,
-      target: sentinel,
-      swap: "outerHTML",
-    });
-  });
-
 const escapeSelectorValue = (value) => {
   if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
     return CSS.escape(value);
@@ -238,59 +238,26 @@ const escapeSelectorValue = (value) => {
   return String(value).replaceAll('"', '\\"');
 };
 
-const ensureEntriesAnchorVisible = async (anchor, token) => {
-  const escapedId = escapeSelectorValue(anchor.entryId);
-  for (let i = 0; i <= ENTRIES_LOAD_RESTORE_LIMIT; i += 1) {
-    if (token !== state.restoreToken) return null;
-    const entry = document.querySelector(`.tags-view__entry-item[data-entry-id="${escapedId}"]`);
-    if (entry instanceof HTMLElement) {
-      return entry;
-    }
-    const sentinel = document.querySelector(".tags-view__entries .tags-view__entries-load-more");
-    if (!(sentinel instanceof HTMLElement)) {
-      return null;
-    }
-    const loaded = await requestEntriesChunk(sentinel, token);
-    if (!loaded) {
-      return null;
-    }
-  }
-  return null;
-};
-
-const maybeRestoreEntriesAnchor = async () => {
+const maybeRestoreEntriesAnchor = () => {
   const currentLocation = getTagsLocationKey();
   if (!currentLocation) return;
   if (state.restoreAppliedForLocation === currentLocation) return;
-  if (state.restoreInFlight) return;
   const params = new URLSearchParams(window.location.search);
   if (params.has("target")) return;
   const selectedTag = getSelectedTrace();
   if (!selectedTag) return;
 
-  const anchor = readStoredEntriesAnchor();
-  if (!anchor || anchor.key !== currentLocation || anchor.tag !== selectedTag) {
-    state.restoreAppliedForLocation = currentLocation;
-    return;
-  }
+  applyStoredMainScrollTop();
 
-  state.restoreInFlight = true;
-  state.restoreToken += 1;
-  const token = state.restoreToken;
-  try {
-    const entry = await ensureEntriesAnchorVisible(anchor, token);
-    if (!(entry instanceof HTMLElement)) {
-      state.restoreAppliedForLocation = currentLocation;
-      return;
-    }
-    applyEntriesAnchor(entry, anchor.offset);
-    state.restoreAppliedForLocation = currentLocation;
-    scheduleEntriesAnchorSave();
-  } finally {
-    if (token === state.restoreToken) {
-      state.restoreInFlight = false;
+  const anchor = readStoredEntriesAnchor();
+  if (anchor && anchor.tag === selectedTag) {
+    const escapedId = escapeSelectorValue(anchor.entryId);
+    const entry = document.querySelector(`.tags-view__entry-item[data-entry-id="${escapedId}"]`);
+    if (entry instanceof HTMLElement) {
+      applyEntriesAnchor(entry, anchor.offset);
     }
   }
+  state.restoreAppliedForLocation = currentLocation;
 };
 
 const attachEntriesScrollListener = () => {
@@ -741,7 +708,7 @@ const sync = (root = document) => {
   animateDetailEntries(root);
   highlightRequestedTag(root);
   if (!hadTargetParam) {
-    void maybeRestoreEntriesAnchor();
+    maybeRestoreEntriesAnchor();
   }
 };
 
@@ -784,8 +751,10 @@ if (!globalThis[BOOT_KEY]) {
       ensureSortParams(row);
       const tagName = row.dataset.tagName || "";
       if (!tagName) return;
-      captureEntriesAnchor();
-      state.saveSuppressed = true;
+      if (!state.saveSuppressed) {
+        captureEntriesAnchor();
+        state.saveSuppressed = true;
+      }
       clearScrollTarget(null, { emitEvent: false });
       setActiveTag(tagName, document, { behavior: "smooth" });
       scrollMainContentTop();
@@ -797,8 +766,10 @@ if (!globalThis[BOOT_KEY]) {
     );
     if (!(detailLink instanceof HTMLAnchorElement)) return;
     ensureSortParams(detailLink);
-    captureEntriesAnchor();
-    state.saveSuppressed = true;
+    if (!state.saveSuppressed) {
+      captureEntriesAnchor();
+      state.saveSuppressed = true;
+    }
     const tagName = (detailLink.textContent || "").trim();
     if (tagName) {
       setActiveTag(tagName, document, { behavior: "smooth" });
@@ -843,8 +814,31 @@ if (!globalThis[BOOT_KEY]) {
       inList ||
       inEntries
     ) {
-      if (inEntries && state.restoreInFlight) return;
       sync();
+    }
+  });
+
+  document.body.addEventListener("htmx:configRequest", (event) => {
+    if (event.detail?.verb !== "get") return;
+    const target = event.detail?.target;
+    if (!(target instanceof Element)) return;
+    if (target.id !== "tags-view-detail") return;
+
+    const path = event.detail?.path || "";
+    let destTag = "";
+    try {
+      const url = new URL(path, window.location.origin);
+      destTag = url.searchParams.get("tag") || "";
+    } catch {
+      return;
+    }
+    if (!destTag) return;
+
+    const key = getTagsLocationKey(destTag);
+    const map = readEntriesAnchorMap();
+    const stored = map[key];
+    if (stored?.entryId && stored?.tag === destTag) {
+      event.detail.parameters["restore_entry"] = stored.entryId;
     }
   });
 
@@ -856,14 +850,12 @@ if (!globalThis[BOOT_KEY]) {
       captureEntriesAnchor();
       state.saveSuppressed = true;
     }
-    resetEntriesRestoreState();
+    state.restoreAppliedForLocation = "";
     scrollMainContentTop();
   });
 
   document.addEventListener("app:rehydrate", (event) => {
-    if (shouldForceRestoreCycle(event?.detail?.reason)) {
-      resetEntriesRestoreState();
-    }
+    state.restoreAppliedForLocation = "";
     sync(event?.detail?.context || document);
   });
   document.addEventListener("app:view-changed", (event) => {
@@ -872,14 +864,15 @@ if (!globalThis[BOOT_KEY]) {
   });
   document.addEventListener("app:teardown", () => {
     if (!state.saveSuppressed) {
+      storeMainScrollTop();
       captureEntriesAnchor();
     }
   });
   window.addEventListener("pagehide", () => {
     if (!state.saveSuppressed) {
+      storeMainScrollTop();
       captureEntriesAnchor();
     }
-    resetEntriesRestoreState();
   });
 
   sync(document);
