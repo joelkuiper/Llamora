@@ -3,7 +3,11 @@ import { getActiveDay } from "./entries/active-day-store.js";
 import { ScrollIntent } from "./entries/scroll-intent.js";
 import { ScrollManager } from "./entries/scroll-manager.js";
 import { initGlobalShortcuts } from "./global-shortcuts.js";
-import { applyRequestTimeHeaders, updateClientToday as syncClientToday } from "./services/time.js";
+import {
+  applyRequestTimeHeaders,
+  formatTimeElements,
+  updateClientToday as syncClientToday,
+} from "./services/time.js";
 import { createInlineSpinner } from "./ui.js";
 import {
   getAlertContainer,
@@ -19,6 +23,7 @@ let scrollManager = null;
 let scrollIntent = null;
 let resolveAppReady = null;
 let entriesLoaderRegistered = false;
+let timeFormatterRegistered = false;
 
 export const appReady = new Promise((resolve) => {
   resolveAppReady = resolve;
@@ -217,6 +222,34 @@ function registerEntriesLoader() {
   entriesLoaderRegistered = true;
 }
 
+function registerTimeFormatter() {
+  if (timeFormatterRegistered) return;
+
+  const run = (context) => {
+    if (context instanceof DocumentFragment || context instanceof Element) {
+      formatTimeElements(context);
+      return;
+    }
+    formatTimeElements(document);
+  };
+
+  document.addEventListener("app:rehydrate", (event) => {
+    run(event?.detail?.target || event?.detail?.context);
+  });
+
+  document.body.addEventListener("htmx:afterSwap", (event) => {
+    const target = event?.detail?.target;
+    if (target && target.querySelector?.("time.entry-time")) {
+      run(target);
+      return;
+    }
+    run(document);
+  });
+
+  run(document);
+  timeFormatterRegistered = true;
+}
+
 function ensureScrollManager() {
   if (!scrollManager) {
     scrollManager = new ScrollManager();
@@ -238,6 +271,7 @@ function init() {
   registerHtmxHeaderHooks(csrfToken);
   registerOfflineHandler();
   registerEntryDeleteAnimationHook();
+  registerTimeFormatter();
   initAlertCenter();
   registerEntriesLoader();
   initRegionFeedback();

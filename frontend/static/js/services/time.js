@@ -152,17 +152,21 @@ export function formatTimeElements(root = document) {
     const style = String(el.dataset?.timeStyle || "")
       .trim()
       .toLowerCase();
-    const timeText =
+    let timeText =
       style === "ago-date-time" ? formatLocalDateTimeContext(raw) : formatLocalTime(raw);
+    if (!timeText) {
+      timeText = formatLocalTimestamp(raw);
+    }
     if (timeText) {
       el.textContent = timeText;
     }
     const stamp = formatLocalTimestamp(raw);
     const relative = formatRelativeTime(raw);
-    if (stamp) {
-      el.title = stamp;
-      const tooltipText = relative ? `${relative} · ${stamp}` : stamp;
+    const tooltipText = formatLocalDateTimeContext(raw);
+    if (tooltipText) {
       el.dataset.tooltipTitle = tooltipText;
+    } else if (stamp) {
+      el.dataset.tooltipTitle = relative ? `${relative} · ${stamp}` : stamp;
     } else if (relative) {
       el.dataset.tooltipTitle = relative;
     }
@@ -181,7 +185,12 @@ function normalizeTimeValue(value) {
     if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/.test(raw)) {
       return new Date(`${raw.replace(" ", "T")}Z`);
     }
-    return new Date(raw);
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+    const fallback = raw.replace(/([+-]\d{2}):(\d{2})$/, "$1$2");
+    return new Date(fallback);
   }
   return new Date(value);
 }

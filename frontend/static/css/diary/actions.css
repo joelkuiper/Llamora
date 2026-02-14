@@ -54,7 +54,8 @@
   transform: translateY(0);
   opacity: 0;
   transition: opacity var(--motion-gentle) ease;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: default;
 }
 
 #entries .entry-actions-row .entry-time {
