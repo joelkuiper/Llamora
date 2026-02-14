@@ -1,8 +1,8 @@
-import { Fuse as FuseCtor } from "../vendor/setup-globals.js";
 import { armEntryAnimations, armInitialEntryAnimations } from "../entries/entry-animations.js";
 import { formatTimeElements } from "../services/time.js";
 import { clearScrollTarget, flashHighlight } from "../ui.js";
 import { sessionStore } from "../utils/storage.js";
+import { Fuse as FuseCtor } from "../vendor/setup-globals.js";
 
 const BOOT_KEY = "__llamoraTagsViewBooted";
 const state = {
@@ -729,9 +729,7 @@ if (!globalThis[BOOT_KEY]) {
       return;
     }
 
-    const entryLink = target.closest(
-      "#tags-view-detail .tags-view__entry-open, #tags-view-detail .tags-view__entry-date",
-    );
+    const entryLink = target.closest("#tags-view-detail .tags-view__entry-open");
     if (entryLink) {
       captureEntriesAnchor();
       return;
@@ -836,7 +834,7 @@ if (!globalThis[BOOT_KEY]) {
     const map = readEntriesAnchorMap();
     const stored = map[key];
     if (stored?.entryId && stored?.tag === destTag) {
-      event.detail.parameters["restore_entry"] = stored.entryId;
+      event.detail.parameters.restore_entry = stored.entryId;
     }
   });
 

@@ -79,6 +79,15 @@ class TagArchiveEntry:
     date_label: str
     text_html: str
     secondary_tags: tuple[str, ...]
+    responses: tuple["TagArchiveResponse", ...]
+
+
+@dataclass(slots=True)
+class TagArchiveResponse:
+    entry_id: str
+    created_at: str
+    created_date: str | None
+    text_html: str
 
 
 @dataclass(slots=True)
@@ -487,6 +496,7 @@ class TagService:
                     pass
 
         archive_entries: list[TagArchiveEntry] = []
+        user_entry_ids: list[str] = []
         for entry_id in entry_ids:
             entry = entry_map.get(entry_id)
             if not entry:
@@ -494,6 +504,9 @@ class TagService:
             created_at = str(entry.get("created_at") or "").strip()
             if not created_at:
                 continue
+            role = str(entry.get("role") or "")
+            if role == "user":
+                user_entry_ids.append(entry_id)
 
             secondary_tags: list[str] = []
             seen_secondary: set[str] = set()
@@ -526,8 +539,48 @@ class TagService:
                     ),
                     text_html=text_html,
                     secondary_tags=tuple(secondary_tags[: max(1, secondary_tag_limit)]),
+                    responses=(),
                 )
             )
+
+        responses_by_reply_to: dict[str, list[TagArchiveResponse]] = {}
+        reply_entries = await self._db.entries.get_entries_by_reply_to_ids(
+            user_id,
+            user_entry_ids,
+            dek,
+        )
+        for response in reply_entries:
+            reply_to = str(response.get("reply_to") or "").strip()
+            created_at = str(response.get("created_at") or "").strip()
+            if not reply_to or not created_at:
+                continue
+            if str(response.get("role") or "") == "user":
+                continue
+            response_html = render_markdown_to_html(str(response.get("text") or ""))
+            if not response_html:
+                response_html = "<p>...</p>"
+            responses_by_reply_to.setdefault(reply_to, []).append(
+                TagArchiveResponse(
+                    entry_id=str(response.get("id") or ""),
+                    created_at=created_at,
+                    created_date=response.get("created_date"),
+                    text_html=response_html,
+                )
+            )
+
+        if responses_by_reply_to:
+            archive_entries = [
+                TagArchiveEntry(
+                    entry_id=item.entry_id,
+                    created_at=item.created_at,
+                    created_date=item.created_date,
+                    date_label=item.date_label,
+                    text_html=item.text_html,
+                    secondary_tags=item.secondary_tags,
+                    responses=tuple(responses_by_reply_to.get(item.entry_id, ())),
+                )
+                for item in archive_entries
+            ]
         return archive_entries, next_cursor, has_more
 
     async def hydrate_search_results(

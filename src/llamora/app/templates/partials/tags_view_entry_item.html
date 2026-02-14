@@ -1,21 +1,15 @@
 {% set item_date = item.created_date or item.created_at[:10] %}
 {% set entry_url = url_for('days.day', date=item_date) ~ '?view=diary&target=entry-' ~ item.entry_id %}
 <li class="tags-view__entry-item" data-entry-id="{{ item.entry_id }}">
-  <article class="tags-view__entry entry user">
-    <a class="tags-view__entry-date"
-       href="{{ entry_url }}"
-       hx-get="{{ entry_url }}"
-       hx-target="#main-content"
-       hx-swap="outerHTML"
-       hx-push-url="true">
-      <time class="entry-time"
-            datetime="{{ item.created_at }}"
-            data-time-raw="{{ item.created_at }}"
-            data-time-style="ago-date-time"></time>
-    </a>
+  <article id="entry-{{ item.entry_id }}"
+           class="tags-view__entry entry user"
+           data-entry-id="{{ item.entry_id }}"
+           role="article"
+           aria-labelledby="entry-{{ item.entry_id }}-speaker entry-{{ item.entry_id }}-body">
+    <span class="visually-hidden" id="entry-{{ item.entry_id }}-speaker">Your entry</span>
     <div class="tags-view__entry-main">
       <div class="markdown-body"
-           id="tags-entry-{{ item.entry_id }}-body"
+           id="entry-{{ item.entry_id }}-body"
            data-rendered="true">
         {{ item.text_html | safe }}
       </div>
@@ -40,6 +34,10 @@
         <div></div>
       {% endif %}
       <div class="entry-actions-row tags-view__entry-actions">
+        <time class="entry-time tags-view__entry-time"
+              datetime="{{ item.created_at }}"
+              data-time-raw="{{ item.created_at }}"
+              data-time-style="ago-date-time"></time>
         <a class="entry-action tags-view__entry-open"
            href="{{ entry_url }}"
            hx-get="{{ entry_url }}"
@@ -69,4 +67,13 @@
       </div>
     </div>
   </article>
+  {% if item.responses %}
+    <div class="entry-responses tags-view__entry-responses"
+         id="entry-responses-{{ item.entry_id }}"
+         data-responses-for="{{ item.entry_id }}">
+      {% for response in item.responses %}
+        {% include 'partials/tags_view_response_item.html' %}
+      {% endfor %}
+    </div>
+  {% endif %}
 </li>

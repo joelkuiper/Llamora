@@ -497,6 +497,27 @@ class EntriesRepository(BaseRepository):
 
         return self._rows_to_entries(rows, user_id, dek)
 
+    async def get_entries_by_reply_to_ids(
+        self, user_id: str, reply_to_ids: list[str], dek: bytes
+    ) -> list[dict]:
+        if not reply_to_ids:
+            return []
+        placeholders = ",".join("?" for _ in reply_to_ids)
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                f"""
+                SELECT m.id, m.created_at, m.created_date, m.role, m.reply_to,
+                       m.nonce, m.ciphertext, m.alg, m.prompt_tokens
+                FROM entries m
+                WHERE m.user_id = ? AND m.reply_to IN ({placeholders})
+                ORDER BY m.id ASC
+                """,
+                (user_id, *reply_to_ids),
+            )
+            rows = await cursor.fetchall()
+
+        return self._rows_to_entries(rows, user_id, dek)
+
     async def get_entries_for_date(
         self, user_id: str, created_date: str, dek: bytes
     ) -> list[dict]:

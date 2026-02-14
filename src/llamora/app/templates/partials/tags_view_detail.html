@@ -13,62 +13,61 @@
     {% if detail %}
       <header class="tags-view__detail-header">
         {% set delete_trace_url = url_for('tags.delete_trace', tag_hash=detail.hash) ~ '?day=' ~ day ~ '&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tags_limit=' ~ tags_limit ~ '&entries_limit=' ~ entries_limit ~ '&tag=' ~ (detail.name|urlencode) ~ '&include_list=1' %}
-        <div class="tags-view__title-row">
+        <button class="entry-action entry-delete tags-view__trace-delete"
+                type="button"
+                hx-delete="{{ delete_trace_url }}"
+                hx-target="#tags-view-detail"
+                hx-swap="outerHTML"
+                hx-confirm="Delete this trace?"
+                data-confirm-title="Delete trace?"
+                data-confirm-message="This trace will be removed from all entries."
+                data-confirm-confirm="Delete"
+                data-confirm-cancel="Keep"
+                data-confirm-variant="danger"
+                aria-label="Delete trace"
+                data-tooltip-title="Delete trace">
+          <span class="icon-mask icon-trash entry-action__icon" aria-hidden="true"></span>
+        </button>
+        <div class="tags-view__title-wrap">
           <h2 class="tags-view__title">{{ detail.name }}</h2>
-          <button class="entry-action entry-delete tags-view__trace-delete"
-                  type="button"
-                  hx-delete="{{ delete_trace_url }}"
-                  hx-target="#tags-view-detail"
-                  hx-swap="outerHTML"
-                  hx-confirm="Delete this trace?"
-                  data-confirm-title="Delete trace?"
-                  data-confirm-message="This trace will be removed from all entries."
-                  data-confirm-confirm="Delete"
-                  data-confirm-cancel="Keep"
-                  data-confirm-variant="danger"
-                  aria-label="Delete trace"
-                  data-tooltip-title="Delete trace">
-            <span class="icon-mask icon-trash entry-action__icon" aria-hidden="true"></span>
-          </button>
-        </div>
-        <p class="tags-view__meta">
-          {{ detail.count }} {{ "entries" if detail.count != 1 else "entry" }} · first used {{ detail.first_used_label or "unknown" }}
-        </p>
-        {% if detail.related_tags %}
-          <p class="tags-view__related">
-            <span>Frequently appears with:</span>
-            {% for related in detail.related_tags %}
-              {% if not loop.first %}<span class="tags-view__dot">·</span>{% endif %}
-              {% set related_target = 'tag-index-' ~ related.name %}
-              {% set related_url = url_for('days.day', date=day) ~ '?view=tags&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tags_limit=' ~ tags_limit ~ '&entries_limit=' ~ entries_limit ~ '&tag=' ~ (related.name|urlencode) ~ '&target=' ~ (related_target|urlencode) %}
-              <a href="{{ related_url }}"
-                 class="tags-view__related-link"
-                 hx-get="{{ url_for('tags.tags_view_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&tags_limit={{ tags_limit }}&entries_limit={{ entries_limit }}&tag={{ related.name|urlencode }}&target={{ related_target|urlencode }}"
-                 hx-target="#tags-view-detail"
-                 hx-swap="outerHTML"
-                 hx-push-url="{{ related_url }}">
-                {{ related.name }}
-              </a>
-            {% endfor %}
+          <p class="tags-view__meta">
+            {{ detail.count }} {{ "entries" if detail.count != 1 else "entry" }} · first used {{ detail.first_used_label or "unknown" }}
           </p>
-        {% endif %}
+          {% if detail.related_tags %}
+            <div class="tags-view__related">
+              <span class="tags-view__related-prefix">frequently appears with</span>
+              {% for related in detail.related_tags %}
+                {% set related_target = 'tag-index-' ~ related.name %}
+                {% set related_url = url_for('days.day', date=day) ~ '?view=tags&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tags_limit=' ~ tags_limit ~ '&entries_limit=' ~ entries_limit ~ '&tag=' ~ (related.name|urlencode) ~ '&target=' ~ (related_target|urlencode) %}
+                <a href="{{ related_url }}"
+                   class="tags-view__related-link entry-tag"
+                   hx-get="{{ url_for('tags.tags_view_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&tags_limit={{ tags_limit }}&entries_limit={{ entries_limit }}&tag={{ related.name|urlencode }}&target={{ related_target|urlencode }}"
+                   hx-target="#tags-view-detail"
+                   hx-swap="outerHTML"
+                   hx-push-url="{{ related_url }}">
+                  <span class="tag-label">{{ related.name }}</span>
+                </a>
+              {% endfor %}
+            </div>
+          {% endif %}
+          <section class="tags-view__summary tags-view__summary--header"
+                   hx-get="{{ url_for('tags.tag_detail_summary', tag_hash=detail.hash) }}?num_words=72"
+                   hx-trigger="load"
+                   hx-target="this"
+                   hx-swap="innerHTML"
+                   data-cache-key="tag-summary-{{ detail.hash }}-{{ detail.count }}-{{ detail.first_used }}-72"
+                   data-cache-ttl="21600">
+            <div class="tag-detail-skeleton" aria-hidden="true">
+              <span class="tag-detail-skeleton__line"></span>
+              <span class="tag-detail-skeleton__line"></span>
+              <span class="tag-detail-skeleton__line"></span>
+            </div>
+          </section>
+        </div>
       </header>
 
-      <section class="tags-view__summary"
-               hx-get="{{ url_for('tags.tag_detail_summary', tag_hash=detail.hash) }}?num_words=72"
-               hx-trigger="load"
-               hx-target="this"
-               hx-swap="innerHTML"
-               data-cache-key="tag-summary-{{ detail.hash }}-{{ detail.count }}-{{ detail.first_used }}-72"
-               data-cache-ttl="21600">
-        <div class="tag-detail-skeleton" aria-hidden="true">
-          <span class="tag-detail-skeleton__line"></span>
-          <span class="tag-detail-skeleton__line"></span>
-        </div>
-      </section>
-
       {% if detail.entries %}
-        <ol class="tags-view__entries" data-tags-view-entries>
+        <ol id="entries" class="tags-view__entries" data-tags-view-entries>
           {% set entries = detail.entries %}
           {% set has_more = detail.entries_has_more %}
           {% set next_cursor = detail.entries_next_cursor %}

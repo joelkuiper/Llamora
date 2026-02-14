@@ -363,96 +363,143 @@
 }
 
 .tags-view__detail-header {
-  padding: 0.5rem 0.15rem 1.85rem;
+  position: relative;
+  margin: 0 0.15rem 1.85rem;
+  padding: 1.2rem 2.8rem 1.3rem 1.15rem;
+  border-radius: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
+  background: color-mix(in srgb, var(--color-surface) 90%, transparent);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, var(--shadow-light) 62%, transparent),
+    0 6px 14px color-mix(in srgb, var(--shadow-dark) 4%, transparent);
 }
 
 .tags-view__title {
   margin: 0;
-  font-size: clamp(1.32rem, 2vw, 1.48rem);
-  font-weight: 600;
-  letter-spacing: 0.012em;
-  color: color-mix(in srgb, var(--color-text) 96%, transparent);
+  font-size: clamp(1.7rem, 2.35vw, 2rem);
+  font-weight: 560;
+  letter-spacing: 0.006em;
+  color: color-mix(in srgb, var(--color-text) 93%, transparent);
 }
 
-.tags-view__title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.65rem;
+.tags-view__title-wrap {
+  width: 100%;
 }
 
 .tags-view__trace-delete {
+  position: absolute;
+  top: 0.72rem;
+  right: 0.72rem;
   width: 1.85rem;
   height: 1.85rem;
-  opacity: 0.58;
+  opacity: 0.36;
   --icon-size: 0.92rem;
+  border-color: transparent;
+  background: transparent;
   transition:
     opacity var(--motion-gentle) ease,
+    color var(--motion-gentle) ease,
     border-color var(--motion-gentle) ease,
-    background-color var(--motion-gentle) ease;
+    background-color var(--motion-gentle) ease,
+    box-shadow var(--motion-gentle) ease;
 }
 
 .tags-view__detail-header:hover .tags-view__trace-delete,
 .tags-view__detail-header:focus-within .tags-view__trace-delete {
-  opacity: 0.95;
+  opacity: 0.68;
+}
+
+.tags-view__trace-delete:hover,
+.tags-view__trace-delete:focus-visible {
+  opacity: 1;
+  color: color-mix(in srgb, var(--danger) 72%, var(--color-text));
+  border-color: color-mix(in srgb, var(--danger) 24%, transparent);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 15%, transparent);
+}
+
+.tags-view__trace-delete:focus-visible {
+  outline: none;
 }
 
 .tags-view__meta {
-  margin: 0.72rem 0 0;
-  font-size: 0.78rem;
-  color: color-mix(in srgb, var(--color-text-muted) 60%, transparent);
+  margin: 0.7rem 0 0;
+  font-size: 0.8rem;
+  color: color-mix(in srgb, var(--color-text-muted) 64%, transparent);
+  letter-spacing: 0.01em;
 }
 
 .tags-view__related {
-  margin: 0.95rem 0 0;
+  margin: 0.62rem 0 0;
   font-size: 0.74rem;
-  color: color-mix(in srgb, var(--color-text-muted) 60%, transparent);
+  color: color-mix(in srgb, var(--color-text-muted) 66%, transparent);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.28rem;
-  letter-spacing: 0.015em;
+  gap: 0.4rem;
+  letter-spacing: 0.01em;
 }
 
-.tags-view__dot {
-  opacity: 0.4;
+.tags-view__related-prefix {
+  font-size: 0.72rem;
+  color: color-mix(in srgb, var(--color-text-muted) 66%, transparent);
+  letter-spacing: 0.02em;
+  margin-right: 0.12rem;
 }
 
 .tags-view__related-link {
-  color: color-mix(in srgb, var(--color-text-muted) 80%, var(--accent-active));
   text-decoration: none;
-  border-radius: 0.28rem;
-  padding: 0.06rem 0.18rem;
-  transition:
-    color var(--motion-hover) ease,
-    background-color var(--motion-hover) ease;
 }
 
-.tags-view__related-link:hover,
-.tags-view__related-link:focus-visible {
-  color: color-mix(in srgb, var(--accent-active) 78%, var(--color-text));
-  background: color-mix(in srgb, var(--accent-05) 82%, transparent);
+.tags-view__related .entry-tag {
+  opacity: 0.68;
+  border-color: color-mix(in srgb, var(--border) 66%, transparent);
+  background: color-mix(in srgb, var(--glass-bg-alt) 84%, transparent);
+  transition:
+    opacity var(--motion-hover) ease,
+    border-color var(--motion-hover) ease,
+    background-color var(--motion-hover) ease,
+    box-shadow var(--motion-hover) ease,
+    color var(--motion-hover) ease;
+}
+
+.tags-view__related .entry-tag:hover,
+.tags-view__related .entry-tag:focus-visible {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--accent-20) 44%, var(--border));
+  background: color-mix(in srgb, var(--accent-05) 52%, var(--glass-bg-alt));
+  box-shadow:
+    var(--inset-shadow),
+    0 0 0 1px color-mix(in srgb, var(--accent-10) 50%, transparent);
   outline: none;
 }
 
 .tags-view__summary {
-  margin: 0 0.15rem 1.8rem;
+  margin: 0 0.15rem 2.2rem;
   padding: 0.08rem 0;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
 }
 
+.tags-view__summary--header {
+  margin: 1.18rem 0 0;
+  padding-top: 0.38rem;
+  border-top: 1px solid color-mix(in srgb, var(--border) 52%, transparent);
+}
+
 .tags-view__summary .tag-detail-summary {
   margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.68;
-  color: color-mix(in srgb, var(--color-text-muted) 84%, transparent);
+  padding-top: 0.14rem;
+  font-size: 0.95rem;
+  line-height: 1.8;
+  color: color-mix(in srgb, var(--color-text-muted) 82%, transparent);
+  width: 100%;
 }
 
 .tags-view__summary .tag-detail-skeleton {
   gap: 0.35rem;
-  margin-top: 0;
+  margin-top: 0.14rem;
 }
 
 .tags-view__summary .tag-detail-skeleton span {
@@ -501,22 +548,6 @@
   content: none;
 }
 
-.tags-view__entry-date {
-  display: inline-flex;
-  align-items: center;
-  margin-bottom: 0.62rem;
-  font-size: 0.76rem;
-  color: color-mix(in srgb, var(--color-text-muted) 58%, transparent);
-  text-decoration: none;
-  transition: color 180ms ease;
-}
-
-.tags-view__entry-date:hover,
-.tags-view__entry-date:focus-visible {
-  color: color-mix(in srgb, var(--accent-active) 62%, var(--color-text-muted));
-  outline: none;
-}
-
 .tags-view__entry-main {
   margin: 0;
   font-size: 0.93rem;
@@ -530,7 +561,7 @@
 }
 
 .tags-view__entry-footer {
-  margin-top: 0.86rem;
+  margin-top: 1.05rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -575,6 +606,11 @@
 .tags-view__entry-actions {
   opacity: 0;
   transition: opacity 180ms ease;
+}
+
+.tags-view__entry-time.entry-time {
+  color: color-mix(in srgb, var(--color-text-muted) 52%, transparent);
+  font-size: 0.75rem;
 }
 
 .tags-view__entry:hover .tags-view__entry-actions,
