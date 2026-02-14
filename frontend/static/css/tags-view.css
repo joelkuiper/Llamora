@@ -97,26 +97,9 @@
   transition: opacity var(--motion-gentle) ease;
 }
 
-.tags-view__list-body.is-searching {
-  opacity: 0.96;
-}
+/* search animations handled via list row transitions */
 
-.tags-view__index-row {
-  transition:
-    opacity var(--motion-gentle) ease,
-    transform var(--motion-gentle) ease,
-    background-color var(--motion-hover) ease,
-    color var(--motion-hover) ease;
-  max-height: 2.6rem;
-  overflow: hidden;
-}
-
-.tags-view__index-row.is-filtered-out {
-  opacity: 0;
-  transform: translateY(-2px);
-  pointer-events: none;
-  max-height: 0;
-}
+/* search transitions are defined on the main index row block below */
 .tags-view__list-body::-webkit-scrollbar {
   width: 0.5rem;
 }
@@ -329,16 +312,20 @@
   border-radius: 0.56rem;
   padding: 0.46rem 0.56rem 0.46rem 0.72rem;
   line-height: 1.46;
+  max-height: 2.6rem;
+  overflow: hidden;
   transition:
+    opacity var(--motion-gentle) ease,
+    max-height var(--motion-gentle) ease,
+    transform var(--motion-gentle) ease,
     background-color 180ms ease,
     color 180ms ease,
-    box-shadow 180ms ease,
-    transform var(--motion-press) ease;
+    box-shadow 180ms ease;
   content-visibility: auto;
   contain-intrinsic-size: 38px;
 }
 
-.tags-view__list.is-filtering .tags-view__index-row {
+.tags-view__index.is-filtering .tags-view__index-row {
   content-visibility: visible;
   contain-intrinsic-size: auto;
 }
@@ -401,6 +388,9 @@
 }
 
 .tags-view__index-row.is-filtered-out {
+  opacity: 0;
+  transform: translateY(-2px);
+  max-height: 0;
   pointer-events: none;
 }
 

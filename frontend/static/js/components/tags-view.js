@@ -676,6 +676,42 @@ const highlightMatch = (text, query) => {
   return `${before}<mark>${match}</mark>${after}`;
 };
 
+const captureRowPositions = (rows) => {
+  const positions = new Map();
+  rows.forEach((row) => {
+    if (!(row instanceof HTMLElement)) return;
+    if (row.classList.contains("is-filtered-out")) return;
+    positions.set(row, row.getBoundingClientRect());
+  });
+  return positions;
+};
+
+const runFlip = (rows, beforePositions) => {
+  if (!beforePositions || beforePositions.size === 0) return;
+  const moves = [];
+  rows.forEach((row) => {
+    if (!(row instanceof HTMLElement)) return;
+    if (row.classList.contains("is-filtered-out")) return;
+    const first = beforePositions.get(row);
+    if (!first) return;
+    const last = row.getBoundingClientRect();
+    const deltaY = first.top - last.top;
+    if (Math.abs(deltaY) < 1) return;
+    moves.push({ row, deltaY });
+  });
+  if (!moves.length) return;
+  moves.forEach(({ row, deltaY }) => {
+    row.style.transform = `translateY(${deltaY}px)`;
+    row.style.transition = "transform 0s";
+  });
+  window.requestAnimationFrame(() => {
+    moves.forEach(({ row }) => {
+      row.style.transition = "";
+      row.style.transform = "";
+    });
+  });
+};
+
 const applySearch = (rawQuery) => {
   if (!state.rows.length) {
     buildSearchIndex();
@@ -686,27 +722,17 @@ const applySearch = (rawQuery) => {
   persistSearchQuery(query);
   setClearButtonVisibility();
   const listBody = findListBody();
-  if (listBody) {
-    listBody.classList.remove("is-searching");
+  if (!state.rows.length) return;
+  const beforePositions = captureRowPositions(state.rows);
+  if (listBody && query !== previousQuery) {
     window.requestAnimationFrame(() => {
       if (!listBody.isConnected) return;
-      listBody.classList.add("is-searching");
-    });
-    window.setTimeout(() => {
-      if (!listBody.isConnected) return;
-      listBody.classList.remove("is-searching");
-    }, 200);
-    if (query !== previousQuery) {
-      window.requestAnimationFrame(() => {
-        if (!listBody.isConnected) return;
-        listBody.scrollTo({
-          top: 0,
-          behavior: query ? "smooth" : "auto",
-        });
+      listBody.scrollTo({
+        top: 0,
+        behavior: query ? "smooth" : "auto",
       });
-    }
+    });
   }
-  if (!state.rows.length) return;
 
   if (!query) {
     state.list?.classList.remove("is-filtering");
@@ -733,6 +759,7 @@ const applySearch = (rawQuery) => {
     if (state.empty) {
       state.empty.hidden = true;
     }
+    runFlip(state.rows, beforePositions);
     return;
   }
   state.list?.classList.add("is-filtering");
@@ -765,28 +792,39 @@ const applySearch = (rawQuery) => {
       });
   }
   orderedMatches = ensureActiveRowVisibleInFilteredSet(matches, orderedMatches);
-  if (state.list) {
-    const remainder = state.rows.filter((row) => !matches.has(row));
-    [...orderedMatches, ...remainder].forEach((row) => {
-      state.list.appendChild(row);
-    });
-  }
-  let visibleCount = 0;
-  state.rows.forEach((row) => {
-    const isVisible = matches.has(row);
-    row.classList.toggle("is-filtered-out", !isVisible);
-    row.setAttribute("aria-hidden", isVisible ? "false" : "true");
-    if (isVisible) {
-      const nameEl = row.querySelector(".tags-view__index-name");
-      if (nameEl instanceof HTMLElement) {
-        const original = nameEl.dataset.originalText || row.dataset.tagsName || "";
-        nameEl.innerHTML = highlightMatch(original, query);
-      }
+  const applyFilter = () => {
+    if (state.list) {
+      const remainder = state.rows.filter((row) => !matches.has(row));
+      [...orderedMatches, ...remainder].forEach((row) => {
+        state.list.appendChild(row);
+      });
     }
-    if (isVisible) visibleCount += 1;
-  });
-  if (state.empty) {
-    state.empty.hidden = visibleCount > 0;
+    let visibleCount = 0;
+    state.rows.forEach((row) => {
+      const isVisible = matches.has(row);
+      row.classList.toggle("is-filtered-out", !isVisible);
+      row.setAttribute("aria-hidden", isVisible ? "false" : "true");
+      if (isVisible) {
+        const nameEl = row.querySelector(".tags-view__index-name");
+        if (nameEl instanceof HTMLElement) {
+          const original = nameEl.dataset.originalText || row.dataset.tagsName || "";
+          nameEl.innerHTML = highlightMatch(original, query);
+        }
+      }
+      if (isVisible) visibleCount += 1;
+    });
+    if (state.empty) {
+      state.empty.hidden = visibleCount > 0;
+    }
+    runFlip(state.rows, beforePositions);
+  };
+  if (listBody) {
+    window.requestAnimationFrame(() => {
+      if (!listBody.isConnected) return;
+      applyFilter();
+    });
+  } else {
+    applyFilter();
   }
 };
 
@@ -804,6 +842,24 @@ const updateUrlSort = () => {
   }
   url.searchParams.delete("target");
   window.history.replaceState(window.history.state, "", url.toString());
+};
+
+let searchTimer = null;
+let pendingQuery = "";
+const scheduleSearch = (value, { immediate = false } = {}) => {
+  pendingQuery = String(value ?? "");
+  if (searchTimer) {
+    window.clearTimeout(searchTimer);
+    searchTimer = null;
+  }
+  if (immediate) {
+    applySearch(pendingQuery);
+    return;
+  }
+  searchTimer = window.setTimeout(() => {
+    searchTimer = null;
+    applySearch(pendingQuery);
+  }, 140);
 };
 
 const applySort = (kind, dir, { updateUrl = true, refreshSearch = true } = {}) => {
@@ -994,7 +1050,7 @@ if (!globalThis[BOOT_KEY]) {
     const clearBtn = target.closest("[data-tags-view-search-clear]");
     if (clearBtn instanceof HTMLButtonElement) {
       event.preventDefault();
-      applySearch("");
+      scheduleSearch("", { immediate: true });
       if (state.input instanceof HTMLInputElement) {
         state.input.value = "";
         state.input.focus();
@@ -1034,21 +1090,14 @@ if (!globalThis[BOOT_KEY]) {
     const target = event.target;
     if (!(target instanceof HTMLInputElement)) return;
     if (!target.matches("[data-tags-view-search]")) return;
-    applySearch(target.value);
-  });
-
-  document.addEventListener("keyup", (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLInputElement)) return;
-    if (!target.matches("[data-tags-view-search]")) return;
-    applySearch(target.value);
+    scheduleSearch(target.value);
   });
 
   document.addEventListener("search", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLInputElement)) return;
     if (!target.matches("[data-tags-view-search]")) return;
-    applySearch(target.value);
+    scheduleSearch(target.value, { immediate: true });
   });
 
   document.addEventListener("tags-view:navigate", (event) => {
