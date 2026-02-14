@@ -34,13 +34,14 @@
   flex-direction: column;
   overflow: hidden;
   scrollbar-width: thin;
-  padding: 0.36rem;
+  padding: 0.44rem;
   border-radius: 0.9rem;
-  background: color-mix(in srgb, var(--glass-bg-alt) 78%, var(--color-bg));
+  background: color-mix(in srgb, var(--glass-bg-alt) 86%, var(--color-bg));
   box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--border) 42%, transparent),
-    inset 0 1px 3px color-mix(in srgb, var(--shadow-dark) 8%, transparent),
-    0 6px 18px color-mix(in srgb, var(--shadow-dark) 8%, transparent);
+    inset 0 0 0 1px color-mix(in srgb, var(--border) 36%, transparent),
+    inset -1px 0 0 color-mix(in srgb, var(--border) 34%, transparent),
+    inset 0 1px 2px color-mix(in srgb, var(--shadow-dark) 5%, transparent),
+    0 5px 14px color-mix(in srgb, var(--shadow-dark) 5%, transparent);
   transition:
     box-shadow var(--motion-gentle) ease,
     background-color var(--motion-gentle) ease;
@@ -78,9 +79,9 @@
 .tags-view__list-head {
   position: relative;
   z-index: 8;
-  padding: 0.12rem 0.12rem 0.62rem;
+  padding: 0.14rem 0.14rem 0.64rem;
   margin-bottom: 0.42rem;
-  background: color-mix(in srgb, var(--glass-bg-alt) 92%, var(--color-bg));
+  background: color-mix(in srgb, var(--glass-bg-alt) 90%, var(--color-bg));
   backdrop-filter: blur(8px);
   border-bottom: 1px solid color-mix(in srgb, var(--border) 35%, transparent);
 }
@@ -133,11 +134,11 @@
   position: relative;
   display: flex;
   align-items: center;
-  margin-bottom: 0.42rem;
-  padding: 0 0.1rem;
-  --inline-input-bg: color-mix(in srgb, var(--color-bg) 88%, var(--color-bg-alt));
-  --inline-input-bg-hover: color-mix(in srgb, var(--color-bg) 84%, var(--color-bg-alt));
-  --inline-input-bg-focus: color-mix(in srgb, var(--color-bg) 80%, var(--color-bg-alt));
+  margin-bottom: 0.48rem;
+  padding: 0 0.14rem;
+  --inline-input-bg: color-mix(in srgb, var(--glass-bg-alt) 88%, var(--color-bg));
+  --inline-input-bg-hover: color-mix(in srgb, var(--glass-bg-alt) 84%, var(--color-bg));
+  --inline-input-bg-focus: color-mix(in srgb, var(--glass-bg-alt) 82%, var(--color-bg-alt));
 }
 
 .tags-view__search .icon-mask {
@@ -147,7 +148,7 @@
   transform: translateY(-50%);
   width: 0.8rem;
   height: 0.8rem;
-  color: color-mix(in srgb, var(--color-text-muted) 72%, transparent);
+  color: color-mix(in srgb, var(--color-text-muted) 62%, var(--border));
   pointer-events: none;
   z-index: 1;
 }
@@ -161,11 +162,13 @@
   padding-left: 1.95rem;
   padding-right: 2.15rem;
   height: 2.2rem;
-  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent 45%);
-  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border) 45%, transparent 55%);
+  border-radius: 0.75rem;
   background: var(--inline-input-bg);
   color: var(--color-text);
-  box-shadow: var(--soft-outline-shadow);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--shadow-light) 40%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--shadow-dark) 6%, transparent);
   outline: none;
   transition:
     box-shadow var(--motion-calm) ease,
@@ -175,21 +178,22 @@
 }
 
 .tags-view__search-input:hover {
-  border-color: color-mix(in srgb, var(--border) 22%, var(--accent-20));
+  border-color: color-mix(in srgb, var(--border) 34%, var(--accent-10));
   background: var(--inline-input-bg-hover);
   box-shadow:
-    var(--soft-outline-shadow),
-    0 0 0 2px color-mix(in srgb, var(--accent-20) 60%, transparent 40%);
+    inset 0 1px 0 color-mix(in srgb, var(--shadow-light) 44%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--shadow-dark) 8%, transparent),
+    0 0 0 2px color-mix(in srgb, var(--accent-10) 22%, transparent 78%);
 }
 
 .tags-view__search-input:focus,
 .tags-view__search-input:focus-visible {
   transform: none;
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  border-color: color-mix(in srgb, var(--accent-20) 60%, var(--border));
   box-shadow:
-    var(--soft-outline-shadow),
-    0 0 0 2px color-mix(in srgb, var(--accent-20) 70%, transparent 30%),
-    0 8px 18px color-mix(in srgb, var(--accent-10) 55%, transparent 45%);
+    inset 0 1px 0 color-mix(in srgb, var(--shadow-light) 40%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--shadow-dark) 8%, transparent),
+    0 0 0 2px color-mix(in srgb, var(--accent-10) 26%, transparent 74%);
   background: var(--inline-input-bg-focus);
   outline: none;
 }
@@ -257,13 +261,13 @@
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.42rem;
 }
 
 .tags-view__sort {
   display: inline-flex;
   align-items: center;
-  gap: 0.32rem;
+  gap: 0.24rem;
 }
 
 .tags-view__list-spinner {
@@ -279,8 +283,10 @@
 .tags-view__sort-btn {
   width: 1.7rem;
   height: 1.7rem;
-  color: color-mix(in srgb, var(--color-text-muted) 76%, transparent);
-  opacity: 0.72;
+  border-color: transparent;
+  background: transparent;
+  color: color-mix(in srgb, var(--color-text-muted) 64%, transparent);
+  opacity: 0.64;
   transition:
     opacity 180ms ease,
     color 180ms ease,
@@ -290,25 +296,26 @@
 
 .tags-view__sort-btn:hover,
 .tags-view__sort-btn:focus-visible {
-  opacity: 1;
-  color: color-mix(in srgb, var(--color-text) 88%, transparent);
+  opacity: 0.94;
+  color: color-mix(in srgb, var(--color-text) 76%, transparent);
+  background: color-mix(in srgb, var(--accent-10) 22%, transparent);
 }
 
 .tags-view__sort-btn.is-active {
   opacity: 1;
-  color: color-mix(in srgb, var(--accent-active) 62%, var(--color-text));
-  background: color-mix(in srgb, var(--accent-10) 58%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-20) 62%, transparent);
+  color: color-mix(in srgb, var(--accent-active) 28%, var(--color-text));
+  background: color-mix(in srgb, var(--accent-10) 24%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-20) 28%, transparent);
 }
 
 .tags-view__index {
   display: grid;
-  gap: 0.42rem;
+  gap: 0.32rem;
 }
 
 .tags-view__index-row {
-  --tags-index-bg-hover: color-mix(in srgb, var(--accent-10) 65%, var(--glass-bg-alt));
-  --tags-index-bg-active: color-mix(in srgb, var(--accent-10) 82%, var(--glass-bg-alt));
+  --tags-index-bg-hover: color-mix(in srgb, var(--accent-10) 46%, var(--glass-bg-alt));
+  --tags-index-bg-active: color-mix(in srgb, var(--accent-10) 40%, var(--glass-bg-alt));
   --motion-highlight-start: color-mix(in srgb, var(--accent-active) 22%, var(--color-bg));
   --motion-highlight-end: transparent;
   --motion-highlight-duration: 820ms;
@@ -318,9 +325,9 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(2rem, auto);
   align-items: baseline;
-  gap: 0.56rem;
+  gap: 0.46rem;
   border-radius: 0.56rem;
-  padding: 0.42rem 0.56rem 0.42rem 0.7rem;
+  padding: 0.46rem 0.56rem 0.46rem 0.72rem;
   line-height: 1.46;
   transition:
     background-color 180ms ease,
@@ -344,7 +351,7 @@
   bottom: 0.48rem;
   width: 2px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--accent-active) 62%, transparent);
+  background: color-mix(in srgb, var(--accent-active) 26%, transparent);
   opacity: 0;
   transition: opacity 180ms ease;
 }
@@ -353,11 +360,11 @@
 .tags-view__index-row:focus-visible {
   --motion-highlight-end: var(--tags-index-bg-hover);
   background: var(--tags-index-bg-hover);
-  color: color-mix(in srgb, var(--accent-active) 18%, var(--color-text));
+  color: color-mix(in srgb, var(--accent-active) 7%, var(--color-text));
   box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--accent-20) 72%, transparent),
-    0 2px 8px color-mix(in srgb, var(--accent-10) 26%, transparent);
-  transform: translateX(1px);
+    inset 0 0 0 1px color-mix(in srgb, var(--accent-20) 34%, transparent),
+    0 1px 4px color-mix(in srgb, var(--accent-10) 14%, transparent);
+  transform: translateX(0.5px);
   outline: none;
 }
 
@@ -370,10 +377,11 @@
   --motion-highlight-start: color-mix(in srgb, var(--accent-active) 34%, var(--color-bg));
   --motion-highlight-end: var(--tags-index-bg-active);
   background: var(--tags-index-bg-active);
-  color: color-mix(in srgb, var(--accent-active) 24%, var(--color-text));
+  color: color-mix(in srgb, var(--accent-active) 9%, var(--color-text));
   box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--accent-20) 78%, transparent),
-    0 1px 8px color-mix(in srgb, var(--accent-10) 32%, transparent);
+    inset 0 0 0 1px color-mix(in srgb, var(--accent-20) 38%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--shadow-light) 55%, transparent),
+    0 1px 5px color-mix(in srgb, var(--accent-10) 16%, transparent);
 }
 
 .tags-view__index-row.is-active::before {
@@ -418,17 +426,17 @@
 
 .tags-view__index-count {
   justify-self: end;
-  font-size: 0.62rem;
+  font-size: 0.64rem;
   color: color-mix(in srgb, var(--color-text-muted) 44%, transparent);
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.025em;
+  letter-spacing: 0.04em;
   transition: color 180ms ease;
 }
 
 .tags-view__index-row:hover .tags-view__index-count,
 .tags-view__index-row:focus-visible .tags-view__index-count,
 .tags-view__index-row.is-active .tags-view__index-count {
-  color: color-mix(in srgb, var(--accent-active) 42%, var(--color-text-muted));
+  color: color-mix(in srgb, var(--accent-active) 28%, var(--color-text-muted));
 }
 
 .tags-view__search-empty,
