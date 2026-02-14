@@ -316,10 +316,18 @@ const scrollActiveRowIntoView = (root = document, behavior = "smooth") => {
   if (!(listBody instanceof HTMLElement) || !(activeRow instanceof HTMLElement)) return;
   if (isRowInView(activeRow, listBody)) return;
   const scrollBehavior = prefersReducedMotion() ? "auto" : behavior;
-  window.requestAnimationFrame(() => {
+  const attemptScroll = () => {
     if (!activeRow.isConnected || !listBody.isConnected) return;
     if (isRowInView(activeRow, listBody)) return;
     scrollRowIntoView(activeRow, listBody, scrollBehavior);
+  };
+  window.requestAnimationFrame(() => {
+    attemptScroll();
+    window.requestAnimationFrame(() => {
+      attemptScroll();
+      window.setTimeout(attemptScroll, 120);
+      window.setTimeout(attemptScroll, 240);
+    });
   });
 };
 
