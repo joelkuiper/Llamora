@@ -24,8 +24,10 @@ from llamora.app.services.crypto import (
 from llamora.app.services.migrations import run_db_migrations
 from llamora.app.db.events import RepositoryEventBus
 from llamora.app.services.history_cache import HistoryCache, HistoryCacheSynchronizer
-from llamora.app.services.tag_recall import TAG_RECALL_SUMMARY_CACHE
-from llamora.app.services.tag_recall_cache import TagRecallCacheSynchronizer
+from llamora.app.services.tag_recall_cache import (
+    TagRecallCacheSynchronizer,
+    get_tag_recall_cache,
+)
 from llamora.app.db.users import UsersRepository
 from llamora.app.db.entries import EntriesRepository
 from llamora.app.db.tags import TagsRepository
@@ -191,10 +193,6 @@ class LocalDB:
             history_cache=self._history_cache,
             entries_repository=self._entries,
         )
-        # Tag recall summary cache is keyed by summary input digest, so we do
-        # not invalidate on tag changes; cache misses occur naturally when the
-        # aggregated input changes.
-        self._tag_recall_synchronizer = None
         self._tags = TagsRepository(
             self.pool,
             encrypt_message,
@@ -204,7 +202,7 @@ class LocalDB:
         self._tag_recall_synchronizer = TagRecallCacheSynchronizer(
             event_bus=self._events,
             entries_repository=self._entries,
-            cache=TAG_RECALL_SUMMARY_CACHE,
+            cache=get_tag_recall_cache(self),
         )
         self._vectors = VectorsRepository(self.pool, encrypt_vector, decrypt_vector)
         self._search_history = SearchHistoryRepository(
