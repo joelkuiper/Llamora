@@ -250,7 +250,7 @@ def _normalise_mapping_keys(data: dict[str, Any]) -> dict[str, Any]:
         key_str = str(key).replace("-", "_").lower()
         if isinstance(value, Mapping):
             value = _normalise_mapping_keys(_coerce_mapping(value))
-            normalised[key_str] = value
+        normalised[key_str] = value
     return normalised
 
 
