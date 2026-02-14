@@ -88,8 +88,19 @@ async def sse_opening(date: str):
     tz = get_timezone()
     normalized_date = require_iso_date(date)
     target_date = datetime.fromisoformat(normalized_date).date()
-    now = datetime.now(ZoneInfo(tz))
-    target_dt = datetime.combine(target_date, now.timetz())
+    tz_info = ZoneInfo(tz)
+    now = datetime.now(tz_info)
+    if target_date == now.date():
+        target_dt = now
+    else:
+        target_dt = datetime(
+            target_date.year,
+            target_date.month,
+            target_date.day,
+            12,
+            0,
+            tzinfo=tz_info,
+        )
     today_iso = target_date.isoformat()
     ctx = build_llm_context(
         user_time=target_dt.isoformat(),

@@ -182,6 +182,8 @@ function normalizeTimeValue(value) {
     if (!raw) {
       return new Date("");
     }
+    // SQLite CURRENT_TIMESTAMP produces space-delimited UTC strings (e.g. "2025-01-15 14:30:00").
+    // Append "Z" to interpret them as UTC.
     if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/.test(raw)) {
       return new Date(`${raw.replace(" ", "T")}Z`);
     }

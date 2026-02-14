@@ -1,4 +1,5 @@
 import { isNearBottom } from "../entries/scroll-utils.js";
+import { getClientToday } from "../services/time.js";
 import { getAlertContainer } from "../utils/alert-center.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 import { draftStore } from "../utils/storage.js";
@@ -120,10 +121,7 @@ class EntryFormElement extends ReactiveElement {
       return;
     }
 
-    const now = new Date();
-    const pad = (n) => String(n).padStart(2, "0");
-    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-    this.#isToday = this.#date === today;
+    this.#isToday = this.#date === getClientToday();
 
     this.#restoreDraft();
     this.#configureForm();

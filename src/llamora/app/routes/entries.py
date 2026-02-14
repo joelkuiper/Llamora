@@ -180,12 +180,13 @@ async def update_entry(entry_id: str):
         "tags": tags,
         "created_at": updated.get("created_at"),
     }
-    day = updated.get("created_date") or local_date().isoformat()
+    today = local_date().isoformat()
+    day = updated.get("created_date") or today
     return await render_template(
         "partials/entry_main_only.html",
         entry=entry_payload,
         day=day,
-        is_today=day == local_date().isoformat(),
+        is_today=day == today,
     )
 
 
@@ -202,8 +203,9 @@ async def entry_edit(entry_id: str):
     entry = entries[0]
     if entry.get("role") != "user":
         abort(403, description="Only user entries can be edited.")
-    day = entry.get("created_date") or local_date().isoformat()
-    if day != local_date().isoformat():
+    today = local_date().isoformat()
+    day = entry.get("created_date") or today
+    if day != today:
         abort(403, description="Editing is available on the current day only.")
     text_html = entry.get("text_html") or render_markdown_to_html(entry.get("text", ""))
     entry_payload = {
@@ -246,12 +248,13 @@ async def entry_main(entry_id: str):
         "tags": tags,
         "created_at": entry.get("created_at"),
     }
-    day = entry.get("created_date") or local_date().isoformat()
+    today = local_date().isoformat()
+    day = entry.get("created_date") or today
     return await render_template(
         "partials/entry_main_only.html",
         entry=entry_payload,
         day=day,
-        is_today=day == local_date().isoformat(),
+        is_today=day == today,
     )
 
 
@@ -297,7 +300,7 @@ async def send_entry(date):
         logger.exception("Failed to save entry")
         raise
 
-    created_at = created_at or user_time or datetime.now(timezone.utc).isoformat()
+    created_at = created_at or datetime.now(timezone.utc).isoformat()
     entry_payload = {
         "id": entry_id,
         "role": "user",

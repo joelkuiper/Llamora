@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import date as _date_type
 from typing import Awaitable, Callable
 
 import orjson
@@ -59,10 +60,13 @@ class EntriesRepository(BaseRepository):
         for row in rows:
             created_date = None
             updated_at = None
+            digest = None
             if "created_date" in row.keys():
                 created_date = row["created_date"]
             if "updated_at" in row.keys():
                 updated_at = row["updated_at"]
+            if "digest" in row.keys():
+                digest = row["digest"]
             record_json = self._decrypt_message(
                 dek,
                 user_id,
@@ -83,6 +87,7 @@ class EntriesRepository(BaseRepository):
                     "text": rec.get("text", ""),
                     "meta": rec.get("meta", {}),
                     "prompt_tokens": int(row["prompt_tokens"] or 0),
+                    "digest": digest,
                 }
             )
         return entries
@@ -501,7 +506,7 @@ class EntriesRepository(BaseRepository):
             cursor = await conn.execute(
                 f"""
                 SELECT m.id, m.created_at, m.updated_at, m.created_date, m.role, m.reply_to,
-                       m.nonce, m.ciphertext, m.alg, m.prompt_tokens
+                       m.nonce, m.ciphertext, m.alg, m.prompt_tokens, m.digest
                 FROM entries m
                 WHERE m.user_id = ? AND m.id IN ({placeholders})
                 """,
@@ -521,7 +526,7 @@ class EntriesRepository(BaseRepository):
             cursor = await conn.execute(
                 f"""
                 SELECT m.id, m.created_at, m.updated_at, m.created_date, m.role, m.reply_to,
-                       m.nonce, m.ciphertext, m.alg, m.prompt_tokens
+                       m.nonce, m.ciphertext, m.alg, m.prompt_tokens, m.digest
                 FROM entries m
                 WHERE m.user_id = ? AND m.reply_to IN ({placeholders})
                 ORDER BY m.id ASC
@@ -627,7 +632,7 @@ class EntriesRepository(BaseRepository):
             if not created_date:
                 continue
             try:
-                day = int(created_date[8:10])
+                day = _date_type.fromisoformat(created_date).day
             except (TypeError, ValueError):
                 continue
             active_days.add(day)
@@ -666,10 +671,10 @@ class EntriesRepository(BaseRepository):
         digests_by_day: dict[int, list[str]] = {}
         for row in rows:
             created_date = row["created_date"] or ""
-            if len(created_date) < 10:
+            if not created_date:
                 continue
             try:
-                day = int(created_date[8:10])
+                day = _date_type.fromisoformat(created_date).day
             except (TypeError, ValueError):
                 continue
             digest = str(row["digest"] or "").strip()

@@ -1,5 +1,10 @@
 import { requestScrollForceBottom } from "../entries/scroll-manager.js";
-import { applyTimezoneQuery, formatLocalTime, formatLocalTimestamp } from "../services/time.js";
+import {
+  applyTimezoneQuery,
+  formatLocalTime,
+  formatLocalTimestamp,
+  getClientToday,
+} from "../services/time.js";
 import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
 import { isMotionReduced } from "../utils/motion.js";
 import { StreamRenderer } from "./stream-renderer.js";
@@ -161,7 +166,14 @@ class ResponseStreamElement extends HTMLElement {
   #startStream() {
     if (this.#transport?.active || !this.sseUrl) return;
 
-    const url = applyTimezoneQuery(this.sseUrl);
+    let url = applyTimezoneQuery(this.sseUrl);
+    try {
+      const parsed = new URL(url, window.location.origin);
+      parsed.searchParams.set("client_today", getClientToday());
+      url = `${parsed.pathname}${parsed.search}`;
+    } catch {
+      // fall through with tz-only URL
+    }
 
     this.dataset.sseUrl = url;
 
