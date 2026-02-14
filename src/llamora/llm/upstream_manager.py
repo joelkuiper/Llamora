@@ -73,7 +73,7 @@ class UpstreamProcessManager:
         configured_parallel = upstream_cfg.get("parallel")
         self._parallel_slots = _coerce_parallel(configured_parallel, default=1)
 
-        self._refresh_upstream_metadata()
+        # Defer metadata fetching to ensure_upstream_ready (run in a worker thread).
 
     @property
     def ctx_size(self) -> int | None:

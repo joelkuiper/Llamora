@@ -46,7 +46,8 @@ class _ChatStream:
         try:
             self._queue.put_nowait(item)
         except asyncio.QueueFull:
-            pass
+            self._client.logger.warning("LLM stream queue full; scheduling async emit")
+            asyncio.create_task(self._emit(item))
 
     async def _run(self) -> None:
         try:
@@ -56,15 +57,15 @@ class _ChatStream:
                 if content:
                     await self._emit(content)
         except APIStatusError as exc:
-            self._client.upstream.ensure_upstream_ready()
+            await asyncio.to_thread(self._client.upstream.ensure_upstream_ready)
             detail = f"{exc.status_code} {exc.message}".strip()
             self._client.logger.error("Completion request failed: %s", detail)
             await self._emit({"type": "error", "data": detail})
         except APITimeoutError as exc:
-            self._client.upstream.ensure_upstream_ready()
+            await asyncio.to_thread(self._client.upstream.ensure_upstream_ready)
             await self._emit({"type": "error", "data": f"Timeout: {exc}"})
         except APIError as exc:
-            self._client.upstream.ensure_upstream_ready()
+            await asyncio.to_thread(self._client.upstream.ensure_upstream_ready)
             await self._emit({"type": "error", "data": f"API error: {exc}"})
         except asyncio.CancelledError:
             raise
