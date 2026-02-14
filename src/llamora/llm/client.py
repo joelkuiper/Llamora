@@ -57,15 +57,15 @@ class _ChatStream:
                 if content:
                     await self._emit(content)
         except APIStatusError as exc:
-            await asyncio.to_thread(self._client.upstream.ensure_upstream_ready)
+            await self._client.upstream.async_ensure_upstream_ready()
             detail = f"{exc.status_code} {exc.message}".strip()
             self._client.logger.error("Completion request failed: %s", detail)
             await self._emit({"type": "error", "data": detail})
         except APITimeoutError as exc:
-            await asyncio.to_thread(self._client.upstream.ensure_upstream_ready)
+            await self._client.upstream.async_ensure_upstream_ready()
             await self._emit({"type": "error", "data": f"Timeout: {exc}"})
         except APIError as exc:
-            await asyncio.to_thread(self._client.upstream.ensure_upstream_ready)
+            await self._client.upstream.async_ensure_upstream_ready()
             await self._emit({"type": "error", "data": f"API error: {exc}"})
         except asyncio.CancelledError:
             raise
@@ -459,7 +459,7 @@ class LLMClient:
         context: dict[str, Any] | None = None,
         messages: list[dict[str, Any]] | None = None,
     ) -> AsyncGenerator[Any, None]:
-        self.upstream.ensure_upstream_ready()
+        await self.upstream.async_ensure_upstream_ready()
         cfg = {**self.default_generation, **(params or {})}
         cfg["stream"] = True
 
@@ -510,7 +510,7 @@ class LLMClient:
     ) -> str:
         """Request a non-streamed chat completion for ``messages``."""
 
-        self.upstream.ensure_upstream_ready()
+        await self.upstream.async_ensure_upstream_ready()
 
         cfg = {**self.default_generation, **(params or {})}
         cfg["stream"] = False
@@ -532,15 +532,15 @@ class LLMClient:
         try:
             response = await self._openai.chat.completions.create(**payload)
         except APIStatusError as exc:
-            self.upstream.ensure_upstream_ready()
+            await self.upstream.async_ensure_upstream_ready()
             detail = f"{exc.status_code} {exc.message}".strip()
             self.logger.error("Completion request failed: %s", detail)
             raise RuntimeError(detail) from exc
         except APITimeoutError as exc:
-            self.upstream.ensure_upstream_ready()
+            await self.upstream.async_ensure_upstream_ready()
             raise RuntimeError(f"Timeout: {exc}") from exc
         except APIError as exc:
-            self.upstream.ensure_upstream_ready()
+            await self.upstream.async_ensure_upstream_ready()
             raise RuntimeError(f"API error: {exc}") from exc
         except Exception as exc:  # pragma: no cover - defensive
             raise RuntimeError(f"Unexpected error: {exc}") from exc

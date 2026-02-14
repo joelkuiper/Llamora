@@ -263,4 +263,15 @@ class LocalDB:
         self, user_id: str, entry_id: str, plaintext: str, dek: bytes
     ) -> None:
         if self.search_api:
+            asyncio.create_task(
+                self._safe_enqueue_index(user_id, entry_id, plaintext, dek),
+                name=f"index-{entry_id}",
+            )
+
+    async def _safe_enqueue_index(
+        self, user_id: str, entry_id: str, plaintext: str, dek: bytes
+    ) -> None:
+        try:
             await self.search_api.enqueue_index_job(user_id, entry_id, plaintext, dek)
+        except Exception:
+            logger.exception("Failed to enqueue index job for %s", entry_id)

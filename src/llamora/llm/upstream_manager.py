@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Mapping
 from typing import Any
 
@@ -72,8 +73,8 @@ class UpstreamProcessManager:
         self._upstream_props: dict[str, Any] | None = None
         configured_parallel = upstream_cfg.get("parallel")
         self._parallel_slots = _coerce_parallel(configured_parallel, default=1)
-
-        # Defer metadata fetching to ensure_upstream_ready (run in a worker thread).
+        self._health_ttl = float(upstream_cfg.get("health_ttl", 10.0))
+        self._last_healthy: float = 0.0
 
     @property
     def ctx_size(self) -> int | None:
@@ -95,6 +96,21 @@ class UpstreamProcessManager:
             raise RuntimeError("LLM upstream is unavailable")
         if self._upstream_props is None or self._ctx_size is None:
             self._refresh_upstream_metadata()
+
+    async def async_ensure_upstream_ready(self) -> None:
+        """Non-blocking variant of :meth:`ensure_upstream_ready`.
+
+        Skips the health check if the upstream was healthy within the last
+        ``health_ttl`` seconds.
+        """
+        now = time.monotonic()
+        if (now - self._last_healthy) < self._health_ttl:
+            return
+        if not await self._async_is_upstream_healthy():
+            raise RuntimeError("LLM upstream is unavailable")
+        self._last_healthy = now
+        if self._upstream_props is None or self._ctx_size is None:
+            await self._async_refresh_upstream_metadata()
 
     def shutdown(self) -> None:
         """No-op for remote upstreams."""
@@ -130,6 +146,10 @@ class UpstreamProcessManager:
         if not isinstance(data, Mapping):
             return
 
+        self._apply_props(data)
+
+    def _apply_props(self, data: Mapping) -> None:
+        """Apply parsed upstream props (shared by sync and async paths)."""
         self._upstream_props = dict(data)
         ctx_raw = data.get("ctx_size") or data.get("n_ctx")
         if ctx_raw is not None:
@@ -150,3 +170,36 @@ class UpstreamProcessManager:
                 self.logger.debug(
                     "Ignoring invalid total_slots from upstream props", exc_info=True
                 )
+
+    async def _async_is_upstream_healthy(self) -> bool:
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(f"{self.upstream_url}/health", timeout=1.0)
+        except Exception:
+            return False
+        return resp.status_code == 200
+
+    async def _async_refresh_upstream_metadata(self) -> None:
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(f"{self.upstream_url}/props", timeout=2.0)
+        except Exception:
+            self.logger.debug("Failed to fetch upstream props", exc_info=True)
+            return
+
+        if resp.status_code != 200:
+            self.logger.debug(
+                "Failed to fetch upstream props (status %s)", resp.status_code
+            )
+            return
+
+        try:
+            data = resp.json()
+        except Exception:
+            self.logger.debug("Failed to parse upstream props", exc_info=True)
+            return
+
+        if not isinstance(data, Mapping):
+            return
+
+        self._apply_props(data)

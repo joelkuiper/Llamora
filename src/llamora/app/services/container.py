@@ -177,6 +177,14 @@ class AppLifecycle:
             errors.append(exc)
 
         try:
+            event_bus = self._services.db._events
+            if event_bus:
+                await event_bus.drain(timeout=5.0)
+        except Exception as exc:
+            logger.exception("Failed to drain event bus background tasks")
+            errors.append(exc)
+
+        try:
             await self._services.search_api.stop()
         except Exception as exc:  # pragma: no cover - defensive logging occurs below
             logger.exception("Failed to stop search API cleanly")

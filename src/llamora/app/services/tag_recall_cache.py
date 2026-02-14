@@ -63,7 +63,11 @@ class TagRecallCacheSynchronizer:
         self._entries = entries_repository
         if not self._events:
             return
-        self._events.subscribe(ENTRY_TAGS_CHANGED_EVENT, self._handle_tags_changed)
+        self._events.subscribe(
+            ENTRY_TAGS_CHANGED_EVENT,
+            self._handle_tags_changed,
+            background=True,
+        )
 
     async def _handle_tags_changed(
         self,

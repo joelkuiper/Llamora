@@ -198,7 +198,11 @@ class HistoryCacheSynchronizer:
         self._events.subscribe(
             ENTRY_HISTORY_CHANGED_EVENT, self._handle_history_changed
         )
-        self._events.subscribe(ENTRY_TAGS_CHANGED_EVENT, self._handle_tags_changed)
+        self._events.subscribe(
+            ENTRY_TAGS_CHANGED_EVENT,
+            self._handle_tags_changed,
+            background=True,
+        )
 
     async def _handle_history_changed(
         self,

@@ -5,6 +5,7 @@ For SSE streaming endpoints, see entries_stream.py.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -124,7 +125,10 @@ async def delete_entry(entry_id: str):
     await ensure_entry_exists(db, user["id"], entry_id)
     deleted_ids, root_role = await db.entries.delete_entry(user["id"], entry_id)
     if deleted_ids:
-        await get_services().search_api.delete_entries(user["id"], deleted_ids)
+        asyncio.create_task(
+            _safe_search_delete(user["id"], deleted_ids),
+            name=f"search-delete-{entry_id}",
+        )
     if root_role == "user":
         oob_targets = [f"entry-responses-{entry_id}"]
     else:
@@ -164,11 +168,10 @@ async def update_entry(entry_id: str):
     if not updated:
         abort(404, description="Entry not found.")
 
-    try:
-        await get_services().search_api.delete_entries(uid, [entry_id])
-        await get_services().search_api.enqueue_index_job(uid, entry_id, text, dek)
-    except Exception:
-        logger.exception("Failed to update search index for entry %s", entry_id)
+    asyncio.create_task(
+        _safe_search_reindex(uid, entry_id, text, dek),
+        name=f"search-reindex-{entry_id}",
+    )
 
     tags = await db.tags.get_tags_for_entry(uid, entry_id, dek)
     entry_payload = {
@@ -371,3 +374,19 @@ async def entry_actions_item(entry_id: str):
         response_active=False,
     )
     return Response(html, status=200, mimetype="text/html")
+
+
+async def _safe_search_delete(uid: str, ids: list[str]) -> None:
+    try:
+        await get_services().search_api.delete_entries(uid, ids)
+    except Exception:
+        logger.exception("Background search delete failed for %s", ids)
+
+
+async def _safe_search_reindex(uid: str, entry_id: str, text: str, dek: bytes) -> None:
+    try:
+        api = get_services().search_api
+        await api.delete_entries(uid, [entry_id])
+        await api.enqueue_index_job(uid, entry_id, text, dek)
+    except Exception:
+        logger.exception("Background search reindex failed for %s", entry_id)
