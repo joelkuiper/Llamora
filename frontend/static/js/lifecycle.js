@@ -59,6 +59,11 @@ export function init() {
   document.body.addEventListener("htmx:afterSwap", (e) => {
     const target = e.detail?.target;
     if (!target) return;
+    dispatch("app:region-swapped", {
+      reason: "htmx-after-swap",
+      target,
+      id: target.id || null,
+    });
     const id = target.id;
     if (!rehydrateTargets.has(id)) return;
 
@@ -72,6 +77,16 @@ export function init() {
     }
 
     dispatch("app:rehydrate", { reason: "swap", target });
+  });
+
+  document.body.addEventListener("htmx:afterSettle", (e) => {
+    const target = e.detail?.target;
+    if (!target) return;
+    dispatch("app:region-settled", {
+      reason: "htmx-after-settle",
+      target,
+      id: target.id || null,
+    });
   });
 
   // visibility

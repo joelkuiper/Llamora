@@ -127,4 +127,12 @@
   :where(.entry.htmx-swapping) {
     animation: var(--motion-entry-delete-animation);
   }
+
+  :where(.motion-animate-region-enter) {
+    animation: lull-in var(--motion-lull) ease both;
+  }
+
+  :where(.motion-animate-region-enter-soft) {
+    animation: fade-in var(--motion-fade) ease both;
+  }
 }

@@ -85,6 +85,7 @@
 }
 
 .tags-view__list-body {
+  position: relative;
   min-height: 0;
   flex: 1 1 auto;
   overflow-y: auto;
@@ -349,6 +350,7 @@
   grid-column: span 9;
   min-width: 0;
   min-height: calc(100dvh - 12rem);
+  position: relative;
 }
 
 .tags-view__detail-inner {
@@ -661,6 +663,36 @@
 
 .tags-view__entries-load-more {
   min-height: 2rem;
+}
+
+.tags-view__loading {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  border-radius: inherit;
+  pointer-events: auto;
+}
+
+.tags-view__list-body > .tags-view__loading {
+  border-radius: 0.72rem;
+}
+
+.tags-view__detail > .tags-view__loading {
+  border-radius: 0.9rem;
+}
+
+.tags-view__loading .entries-loading__backdrop {
+  background: color-mix(in srgb, var(--color-bg) 46%, transparent);
+  backdrop-filter: blur(4px) saturate(108%);
+  -webkit-backdrop-filter: blur(4px) saturate(108%);
+}
+
+.tags-view__loading .entries-loading__panel {
+  transform: translateY(0);
+}
+
+.tags-view__loading .entries-loading__label {
+  font-size: 0.78rem;
 }
 
 #main-content[data-view="tags"].htmx-added .tags-view__sidebar-fixed,

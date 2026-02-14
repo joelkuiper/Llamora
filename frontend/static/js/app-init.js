@@ -1,3 +1,4 @@
+import { initRegionFeedback } from "./components/region-feedback.js";
 import { getActiveDay } from "./entries/active-day-store.js";
 import { ScrollIntent } from "./entries/scroll-intent.js";
 import { ScrollManager } from "./entries/scroll-manager.js";
@@ -147,7 +148,7 @@ function registerEntriesLoader() {
     spinner = getSpinner(loader);
   };
 
-  const LOADER_TARGET_IDS = new Set(["content-wrapper", "main-content", "tags-view-detail"]);
+  const LOADER_TARGET_IDS = new Set(["content-wrapper", "main-content"]);
 
   const isLoaderTarget = (event) => {
     const target = event?.detail?.target;
@@ -239,6 +240,7 @@ function init() {
   registerEntryDeleteAnimationHook();
   initAlertCenter();
   registerEntriesLoader();
+  initRegionFeedback();
   initGlobalShell();
   initGlobalShortcuts();
 

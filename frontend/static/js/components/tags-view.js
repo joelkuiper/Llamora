@@ -19,6 +19,7 @@ const state = {
   saveFrame: 0,
   restoreAppliedForLocation: "",
   saveSuppressed: false,
+  pendingDetailScrollTop: false,
 };
 
 const readStoredSearchQuery = () => sessionStore.get("tags:query") ?? "";
@@ -752,8 +753,8 @@ if (!globalThis[BOOT_KEY]) {
         state.saveSuppressed = true;
       }
       clearScrollTarget(null, { emitEvent: false });
+      state.pendingDetailScrollTop = true;
       setActiveTag(tagName, document, { behavior: "smooth" });
-      scrollMainContentTop();
       return;
     }
 
@@ -766,6 +767,7 @@ if (!globalThis[BOOT_KEY]) {
       captureEntriesAnchor();
       state.saveSuppressed = true;
     }
+    state.pendingDetailScrollTop = true;
     const tagName = (detailLink.textContent || "").trim();
     if (tagName) {
       setActiveTag(tagName, document, { behavior: "smooth" });
@@ -774,7 +776,6 @@ if (!globalThis[BOOT_KEY]) {
         flashHighlight(linkedRow);
       }
     }
-    scrollMainContentTop();
   });
 
   document.addEventListener("input", (event) => {
@@ -848,6 +849,17 @@ if (!globalThis[BOOT_KEY]) {
       state.saveSuppressed = true;
     }
     state.restoreAppliedForLocation = "";
+    if (!state.pendingDetailScrollTop) {
+      state.pendingDetailScrollTop = true;
+    }
+  });
+
+  document.body.addEventListener("htmx:afterSettle", (event) => {
+    const target = event.detail?.target;
+    if (!(target instanceof Element)) return;
+    if (target.id !== "tags-view-detail") return;
+    if (!state.pendingDetailScrollTop) return;
+    state.pendingDetailScrollTop = false;
     scrollMainContentTop();
   });
 
