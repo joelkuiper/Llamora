@@ -58,6 +58,11 @@ for (const spec of vendorSpecs) {
   }
 }
 
+if (globalScope.htmx?.findExtension?.("morph") == null) {
+  const morphUrl = new URL("idiomorph-ext.min.js", vendorBase);
+  await loadScript(morphUrl);
+}
+
 if (globalScope.DOMPurify && globalScope.DOMPurify.default?.sanitize) {
   globalScope.DOMPurify = globalScope.DOMPurify.default;
 }

@@ -32,6 +32,9 @@ importers:
       htmx.org:
         specifier: ^1.9.12
         version: 1.9.12
+      idiomorph:
+        specifier: ^0.7.4
+        version: 0.7.4
       markdown-it:
         specifier: ^14.1.0
         version: 14.1.1
@@ -291,6 +294,9 @@ packages:
   htmx.org@2.0.8:
     resolution: {integrity: sha512-fm297iru0iWsNJlBrjvtN7V9zjaxd+69Oqjh4F/Vq9Wwi2kFisLcrLCiv5oBX0KLfOX/zG8AUo9ROMU5XUB44Q==}
 
+  idiomorph@0.7.4:
+    resolution: {integrity: sha512-uCdSpLo3uMfqOmrwXTpR1k/sq4sSmKC7l4o/LdJOEU+MMMq+wkevRqOQYn3lP7vfz9Mv+USBEqPvi0XhdL9ENw==}
+
   linkify-it@5.0.0:
     resolution: {integrity: sha512-5aHCbzQRADcdP+ATqnDuhhJ/MRIqDkZX5pyjFHRRysS8vZ5AbqGEoFIb6pYHPZ+L/OC2Lc+xT8uHVVR5CAK/wQ==}
 
@@ -486,6 +492,8 @@ snapshots:
   htmx.org@1.9.12: {}
 
   htmx.org@2.0.8: {}
+
+  idiomorph@0.7.4: {}
 
   linkify-it@5.0.0:
     dependencies:

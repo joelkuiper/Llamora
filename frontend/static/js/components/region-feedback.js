@@ -18,14 +18,14 @@ const REGION_CONFIG = {
   },
   "tags-view-detail": {
     indicator: "#tags-view-detail-loading",
-    delayMs: 120,
+    delayMs: 80,
     spinnerSelector: ".entries-loading__spinner",
     animationClass: "motion-animate-region-enter",
     animationSelector: ".tags-view__detail-inner",
   },
   "tags-view-list": {
     indicator: "#tags-view-list-loading",
-    delayMs: 120,
+    delayMs: 40,
     spinnerSelector: ".entries-loading__spinner",
     animationClass: "motion-animate-region-enter-soft",
     animationSelector: "[data-tags-view-index]",
@@ -76,6 +76,8 @@ const shouldRefreshTagsList = (event) => {
 const resolveRegions = (event) => {
   const ids = new Set();
   const target = event?.detail?.target;
+  const path = String(event?.detail?.path || "");
+  const pathname = parsePathname(path);
   if (target instanceof Element) {
     const id = String(target.id || "").trim();
     if (id && REGION_CONFIG[id]) {
@@ -85,12 +87,14 @@ const resolveRegions = (event) => {
 
   const source = event?.detail?.requestConfig?.elt;
   if (source instanceof Element && source.closest("#tags-view") && shouldRefreshTagsList(event)) {
-    ids.add("tags-view-detail");
     ids.add("tags-view-list");
   }
 
-  const targetId = String(event?.detail?.target?.id || "").trim();
-  if (targetId === "tags-view-detail" && shouldRefreshTagsList(event)) {
+  if (
+    pathname.startsWith("/fragments/tags/") &&
+    path.includes("include_list=1") &&
+    !ids.has("tags-view-list")
+  ) {
     ids.add("tags-view-list");
   }
 

@@ -9,6 +9,7 @@
 - [x] Summaries for days as "tooltip" in calendar nav
 - [x] Bugfix for multi token search
 - [x] Performance issue tag summarization?
+- [ ] Security: get rid of cached summaries in localstorage/session storage, implement generic lockbox with api.
 - [ ] README
 Later
 - [ ] Better model than Qwen4B, find something that's a bit more chatty

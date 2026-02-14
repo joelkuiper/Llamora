@@ -54,6 +54,7 @@
   border-radius: 0.72rem;
   padding: 0.14rem 0.28rem 1.8rem;
   scrollbar-width: thin;
+  transition: opacity 170ms ease;
 }
 
 .tags-view__sidebar-fixed::-webkit-scrollbar {
@@ -242,6 +243,11 @@
     transform var(--motion-press) ease;
   content-visibility: auto;
   contain-intrinsic-size: 38px;
+}
+
+.tags-view__list.is-filtering .tags-view__index-row {
+  content-visibility: visible;
+  contain-intrinsic-size: auto;
 }
 
 .tags-view__index-row::before {

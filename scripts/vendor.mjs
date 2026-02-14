@@ -61,6 +61,17 @@ const copies = [
     from: path.join(projectRoot, "node_modules", "dompurify", "dist", "purify.min.js"),
     outfile: "purify.min.js",
   },
+  {
+    name: "idiomorph-ext",
+    from: path.join(
+      projectRoot,
+      "node_modules",
+      "idiomorph",
+      "dist",
+      "idiomorph-ext.min.js",
+    ),
+    outfile: "idiomorph-ext.min.js",
+  },
 ];
 
 async function run() {

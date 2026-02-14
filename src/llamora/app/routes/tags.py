@@ -366,6 +366,12 @@ async def delete_trace(tag_hash: str):
         "yes",
         "on",
     }
+    str(request.args.get("list_only") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
     await get_services().db.tags.delete_tag_everywhere(
         user["id"],
@@ -520,6 +526,41 @@ async def tags_view_fragment(date: str):
         tags_sort_kind=sort_kind,
         tags_sort_dir=sort_dir,
         include_list=include_list,
+        entries_limit=entries_limit,
+        target=(request.args.get("target") or "").strip() or None,
+        today=local_date().isoformat(),
+    )
+
+
+@tags_bp.get("/fragments/tags/<date>/list")
+@login_required
+async def tags_view_list_fragment(date: str):
+    normalized_date = require_iso_date(date)
+    _, user, dek = await require_user_and_dek()
+    tag_service = _tags()
+    sort_kind = tag_service.normalize_tags_sort_kind(request.args.get("sort_kind"))
+    sort_dir = tag_service.normalize_tags_sort_dir(request.args.get("sort_dir"))
+    legacy_sort = tag_service.normalize_legacy_sort(request.args.get("sort"))
+    if legacy_sort is not None:
+        sort_kind, sort_dir = legacy_sort
+    entries_limit = _parse_positive_int(
+        request.args.get("entries_limit"), default=12, min_value=6, max_value=60
+    )
+    tags_view = await tag_service.get_tags_view_data(
+        user["id"],
+        dek,
+        request.args.get("tag"),
+        sort_kind=sort_kind,
+        sort_dir=sort_dir,
+        entry_limit=entries_limit,
+    )
+    return await render_template(
+        "partials/tags_view_list_fragment.html",
+        day=normalized_date,
+        tags_view=tags_view,
+        selected_tag=tags_view.selected_tag,
+        tags_sort_kind=sort_kind,
+        tags_sort_dir=sort_dir,
         entries_limit=entries_limit,
         target=(request.args.get("target") or "").strip() or None,
         today=local_date().isoformat(),

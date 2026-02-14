@@ -1,6 +1,7 @@
 import { armEntryAnimations, armInitialEntryAnimations } from "../entries/entry-animations.js";
 import { formatTimeElements } from "../services/time.js";
 import { clearScrollTarget, flashHighlight } from "../ui.js";
+import { prefersReducedMotion } from "../utils/motion.js";
 import { sessionStore } from "../utils/storage.js";
 import { Fuse as FuseCtor } from "../vendor/setup-globals.js";
 
@@ -20,6 +21,37 @@ const state = {
   restoreAppliedForLocation: "",
   saveSuppressed: false,
   pendingDetailScrollTop: false,
+  pendingTagHighlight: "",
+  listAnchorOffset: null,
+  listPositions: null,
+  restoreAfterBfcache: false,
+};
+
+const DEBUG = true;
+const debugLog = (...args) => {
+  if (!DEBUG) return;
+  console.debug("[tags-view]", ...args);
+};
+
+const getStateSnapshot = (root = document) => {
+  const detail = findDetail(root);
+  const list = findList(root);
+  const activeRow = getActiveRow();
+  return {
+    url: window.location.pathname + window.location.search,
+    sort: {
+      stateKind: state.sortKind,
+      stateDir: state.sortDir,
+      detailKind: detail?.dataset?.sortKind,
+      detailDir: detail?.dataset?.sortDir,
+      listKind: list?.dataset?.sortKind,
+      listDir: list?.dataset?.sortDir,
+    },
+    selectedTag: {
+      detail: detail?.dataset?.selectedTag,
+      activeRow: activeRow?.dataset?.tagName,
+    },
+  };
 };
 
 const readStoredSearchQuery = () => sessionStore.get("tags:query") ?? "";
@@ -363,33 +395,96 @@ const ensureActiveRowVisibleInFilteredSet = (matches, orderedMatches) => {
   return [activeRow, ...orderedMatches];
 };
 
-const readSortFromUrl = () => {
+const readTagFromUrl = () => {
   const params = new URLSearchParams(window.location.search);
-  const hasKind = params.has("sort_kind");
-  const hasDir = params.has("sort_dir");
+  return String(params.get("tag") || "").trim();
+};
+
+const readSortFromDom = (root = document) => {
+  const detail = findDetail(root);
+  const list = findList(root);
+  const detailKind = detail?.dataset?.sortKind;
+  const detailDir = detail?.dataset?.sortDir;
+  const listKind = list?.dataset?.sortKind;
+  const listDir = list?.dataset?.sortDir;
+  const rawKind = listKind || detailKind;
+  const rawDir = listDir || detailDir;
   return {
-    kind: normalizeSortKind(params.get("sort_kind")),
-    dir: normalizeSortDir(params.get("sort_dir")),
-    hasKind,
-    hasDir,
+    kind: rawKind ? normalizeSortKind(rawKind) : state.sortKind || "count",
+    dir: rawDir ? normalizeSortDir(rawDir) : state.sortDir || "desc",
   };
+};
+
+const updateUrlSortParams = (rawUrl, sortKind, sortDir) => {
+  if (!rawUrl) return rawUrl;
+  try {
+    const current = new URL(window.location.href);
+    const next = new URL(rawUrl, current.origin);
+    next.searchParams.set("sort_kind", sortKind);
+    next.searchParams.set("sort_dir", sortDir);
+    return `${next.pathname}${next.search}${next.hash}`;
+  } catch {
+    return rawUrl;
+  }
+};
+
+const refreshDetailLinksForSort = (root = document) => {
+  const detail = findDetail(root);
+  if (!detail) return;
+  const kind = state.sortKind;
+  const dir = state.sortDir;
+  detail.querySelectorAll(".tags-view__related-link, .tags-view__entry-tag").forEach((link) => {
+    if (!(link instanceof HTMLAnchorElement)) return;
+    const href = link.getAttribute("href");
+    const hxGet = link.getAttribute("hx-get");
+    const hxPush = link.getAttribute("hx-push-url");
+    if (href) link.setAttribute("href", updateUrlSortParams(href, kind, dir));
+    if (hxGet) link.setAttribute("hx-get", updateUrlSortParams(hxGet, kind, dir));
+    if (hxPush) link.setAttribute("hx-push-url", updateUrlSortParams(hxPush, kind, dir));
+  });
+  detail.querySelectorAll("entry-tags").forEach((el) => {
+    if (!(el instanceof HTMLElement)) return;
+    const pageTemplate = el.dataset.tagNavigatePageTemplate;
+    const fragmentTemplate = el.dataset.tagNavigateFragmentTemplate;
+    const addUrl = el.dataset.addTagUrl;
+    const suggestUrl = el.dataset.suggestionsUrl;
+    if (pageTemplate) {
+      el.dataset.tagNavigatePageTemplate = updateUrlSortParams(pageTemplate, kind, dir);
+    }
+    if (fragmentTemplate) {
+      el.dataset.tagNavigateFragmentTemplate = updateUrlSortParams(fragmentTemplate, kind, dir);
+    }
+    if (addUrl) {
+      el.dataset.addTagUrl = updateUrlSortParams(addUrl, kind, dir);
+    }
+    if (suggestUrl) {
+      el.dataset.suggestionsUrl = updateUrlSortParams(suggestUrl, kind, dir);
+    }
+  });
 };
 
 const syncFromDetail = (root = document) => {
   const detail = findDetail(root);
-  const urlSort = readSortFromUrl();
+  const sortFromDom = readSortFromDom(root);
+  const urlTag = readTagFromUrl();
   const target = String(new URLSearchParams(window.location.search).get("target") || "").trim();
   const keepTargetScrollForHighlight = target.startsWith("tag-index-");
+
+  state.sortKind = sortFromDom.kind;
+  state.sortDir = sortFromDom.dir;
+
   if (detail) {
-    state.sortKind = urlSort.hasKind ? urlSort.kind : normalizeSortKind(detail.dataset.sortKind);
-    state.sortDir = urlSort.hasDir ? urlSort.dir : normalizeSortDir(detail.dataset.sortDir);
-    setActiveTag(detail.dataset.selectedTag || "", root, {
-      behavior: "auto",
-      scroll: !keepTargetScrollForHighlight,
-    });
-  } else {
-    state.sortKind = urlSort.kind;
-    state.sortDir = urlSort.dir;
+    const detailTag = String(detail.dataset.selectedTag || "").trim();
+    const selectedTag = detailTag || urlTag;
+    if (selectedTag) {
+      detail.dataset.selectedTag = selectedTag;
+    }
+    if (selectedTag) {
+      setActiveTag(selectedTag, root, {
+        behavior: "auto",
+        scroll: !keepTargetScrollForHighlight,
+      });
+    }
   }
   updateSortButtons(root);
 };
@@ -405,41 +500,10 @@ const updateSortButtons = (root = document) => {
   });
 };
 
-const updateUrlWithSort = (rawUrl, { clearTarget = false } = {}) => {
-  const current = new URL(window.location.href);
-  const next = new URL(rawUrl, current.origin);
-  next.searchParams.set("sort_kind", state.sortKind);
-  next.searchParams.set("sort_dir", state.sortDir);
-  if (clearTarget) {
-    next.searchParams.delete("target");
-  }
-  return `${next.pathname}${next.search}${next.hash}`;
-};
-
-const ensureSortParams = (element) => {
-  if (!(element instanceof Element)) return;
-  const href = element.getAttribute("href");
-  const hxGet = element.getAttribute("hx-get");
-  const hxPush = element.getAttribute("hx-push-url");
-  const clearTarget = element.classList.contains("tags-view__index-row");
-  if (href) element.setAttribute("href", updateUrlWithSort(href, { clearTarget }));
-  if (hxGet) element.setAttribute("hx-get", updateUrlWithSort(hxGet, { clearTarget }));
-  if (hxPush) element.setAttribute("hx-push-url", updateUrlWithSort(hxPush, { clearTarget }));
-};
-
-const syncSortLinks = () => {
-  const list = findList();
-  if (!list) return;
-  list.querySelectorAll(".tags-view__index-row").forEach((row) => {
-    ensureSortParams(row);
-  });
-
-  const detail = findDetail();
-  if (!detail) return;
-  detail.querySelectorAll(".tags-view__related-link, .tags-view__entry-tag").forEach((link) => {
-    if (!(link instanceof HTMLAnchorElement)) return;
-    ensureSortParams(link);
-  });
+const syncSortStateFromDom = (root = document) => {
+  const sortFromDom = readSortFromDom(root);
+  state.sortKind = sortFromDom.kind;
+  state.sortDir = sortFromDom.dir;
 };
 
 const animateDetailEntries = (root = document) => {
@@ -483,7 +547,7 @@ const clearSearchForTargetNavigation = () => {
   }
 };
 
-const sortRows = () => {
+const _sortRows = () => {
   if (!state.list || state.rows.length <= 1) return;
 
   const sorted = [...state.rows].sort((a, b) => {
@@ -585,6 +649,7 @@ const applySearch = (rawQuery) => {
   if (!state.rows.length) return;
 
   if (!query) {
+    state.list?.classList.remove("is-filtering");
     state.rows.forEach((row) => {
       row.hidden = false;
       row.classList.remove("is-filtered-out");
@@ -596,12 +661,23 @@ const applySearch = (rawQuery) => {
         nameEl.textContent = original;
       }
     });
-    sortRows();
+    if (state.list) {
+      const byIndex = [...state.rows].sort((a, b) => {
+        const aIndex = Number.parseInt(a.dataset.tagsIndex || "0", 10);
+        const bIndex = Number.parseInt(b.dataset.tagsIndex || "0", 10);
+        return aIndex - bIndex;
+      });
+      byIndex.forEach((row) => {
+        state.list.appendChild(row);
+      });
+      state.rows = byIndex;
+    }
     if (state.empty) {
       state.empty.hidden = true;
     }
     return;
   }
+  state.list?.classList.add("is-filtering");
 
   let matches = new Set();
   let orderedMatches = [];
@@ -674,7 +750,7 @@ const updateUrlSort = () => {
   window.history.replaceState(window.history.state, "", url.toString());
 };
 
-const applySort = (kind, dir) => {
+const applySort = (kind, dir, { updateUrl = true, refreshSearch = true } = {}) => {
   state.sortKind = normalizeSortKind(kind);
   state.sortDir = normalizeSortDir(dir);
   const detail = findDetail();
@@ -682,11 +758,81 @@ const applySort = (kind, dir) => {
     detail.dataset.sortKind = state.sortKind;
     detail.dataset.sortDir = state.sortDir;
   }
-  syncSortLinks();
-  sortRows();
   updateSortButtons();
-  applySearch(state.query);
-  updateUrlSort();
+  if (refreshSearch) {
+    applySearch(state.query);
+  }
+  if (updateUrl) {
+    updateUrlSort();
+  }
+};
+
+const getTagsDay = () =>
+  String(
+    document.querySelector("#tags-view")?.dataset?.day ||
+      window.location.pathname.match(/\/d\/(\d{4}-\d{2}-\d{2})$/)?.[1] ||
+      "",
+  ).trim();
+
+const getEntriesLimitFromUrl = () => {
+  const params = new URLSearchParams(window.location.search);
+  const raw = String(params.get("entries_limit") || "").trim();
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 12;
+};
+
+const requestSort = (kind, dir) => {
+  const nextKind = normalizeSortKind(kind);
+  const nextDir = normalizeSortDir(dir);
+
+  const detail = findDetail();
+  const list = findList();
+  const day = getTagsDay();
+  if (!(detail instanceof HTMLElement) || !day || typeof htmx === "undefined") {
+    applySort(nextKind, nextDir, { updateUrl: true });
+    return;
+  }
+
+  const entriesLimit = getEntriesLimitFromUrl();
+  const selectedTag =
+    String(detail.dataset.selectedTag || "").trim() || getSelectedTrace() || readTagFromUrl();
+
+  const fragmentParams = new URLSearchParams({
+    sort_kind: nextKind,
+    sort_dir: nextDir,
+    entries_limit: String(entriesLimit),
+  });
+  if (selectedTag) {
+    fragmentParams.set("tag", selectedTag);
+  }
+
+  const pageParams = new URLSearchParams({
+    view: "tags",
+    sort_kind: nextKind,
+    sort_dir: nextDir,
+    entries_limit: String(entriesLimit),
+  });
+  if (selectedTag) {
+    pageParams.set("tag", selectedTag);
+  }
+
+  const fragmentUrl = `/fragments/tags/${day}/list?${fragmentParams.toString()}`;
+  const pageUrl = `/d/${day}?${pageParams.toString()}`;
+
+  state.sortKind = nextKind;
+  state.sortDir = nextDir;
+  updateSortButtons();
+  refreshDetailLinksForSort(document);
+
+  const target = list instanceof HTMLElement ? list : detail;
+  if (!target) return;
+
+  htmx.ajax("GET", fragmentUrl, {
+    source: target,
+    target,
+    swap: "outerHTML",
+    pushURL: pageUrl,
+  });
 };
 
 const sync = (root = document) => {
@@ -699,16 +845,112 @@ const sync = (root = document) => {
   }
   syncFromDetail(root);
   buildSearchIndex(root);
-  syncSortLinks();
-  sortRows();
   clearSearchForTargetNavigation();
   applySearch(state.query);
   syncFromDetail(root);
   animateDetailEntries(root);
   highlightRequestedTag(root);
-  if (!hadTargetParam) {
+  debugLog("sync", getStateSnapshot(root));
+  if (!hadTargetParam && !state.restoreAfterBfcache) {
     maybeRestoreEntriesAnchor();
   }
+  state.restoreAfterBfcache = false;
+};
+
+const captureListAnchor = () => {
+  const listBody = findListBody();
+  if (!(listBody instanceof HTMLElement)) return;
+  const activeRow = getActiveRow();
+  if (!(activeRow instanceof HTMLElement)) {
+    state.listAnchorOffset = null;
+    return;
+  }
+  state.listAnchorOffset = activeRow.offsetTop - listBody.scrollTop;
+};
+
+const restoreListAnchor = () => {
+  const listBody = findListBody();
+  if (!(listBody instanceof HTMLElement)) return;
+  if (state.listAnchorOffset == null) return;
+  const activeRow = getActiveRow();
+  if (!(activeRow instanceof HTMLElement)) return;
+  const nextTop = activeRow.offsetTop - state.listAnchorOffset;
+  listBody.scrollTop = Math.max(0, nextTop);
+};
+
+const captureListPositions = () => {
+  if (prefersReducedMotion()) {
+    state.listPositions = null;
+    return;
+  }
+  const list = findList();
+  if (!list) return;
+  const positions = new Map();
+  list.querySelectorAll(".tags-view__index-row").forEach((row) => {
+    if (!(row instanceof HTMLElement)) return;
+    positions.set(row.dataset.tagName || row.id, row.getBoundingClientRect().top);
+  });
+  state.listPositions = positions;
+};
+
+const animateListReorder = () => {
+  const list = findList();
+  if (!list || !state.listPositions) return;
+  list.querySelectorAll(".tags-view__index-row").forEach((row) => {
+    if (!(row instanceof HTMLElement)) return;
+    const key = row.dataset.tagName || row.id;
+    const prevTop = state.listPositions.get(key);
+    if (prevTop == null) return;
+    const nextTop = row.getBoundingClientRect().top;
+    const delta = prevTop - nextTop;
+    if (Math.abs(delta) < 2) return;
+    row.animate([{ transform: `translateY(${delta}px)` }, { transform: "translateY(0)" }], {
+      duration: 220,
+      easing: "cubic-bezier(0.22, 0.61, 0.36, 1)",
+    });
+  });
+  state.listPositions = null;
+};
+
+const syncListOnly = (root = document) => {
+  updateHeaderHeight();
+  syncSortStateFromDom(root);
+  buildSearchIndex(root);
+  applySearch(state.query);
+  updateSortButtons(root);
+  refreshDetailLinksForSort(root);
+  debugLog("syncListOnly", getStateSnapshot(root));
+  const listBody = findListBody(root);
+  const activeRow = getActiveRow();
+  if (listBody instanceof HTMLElement && activeRow instanceof HTMLElement) {
+    if (!isRowInView(activeRow, listBody)) {
+      scrollRowIntoView(activeRow, listBody, "auto");
+    }
+  }
+};
+
+const syncDetailOnly = (root = document) => {
+  syncFromDetail(root);
+  buildSearchIndex(root);
+  applySearch(state.query);
+  animateDetailEntries(root);
+  highlightRequestedTag(root);
+  if (state.pendingTagHighlight) {
+    const selected = getSelectedTrace(root);
+    if (selected && selected === state.pendingTagHighlight) {
+      setActiveTag(selected, root, { behavior: "smooth" });
+      const linkedRow = document.getElementById(`tag-index-${selected}`);
+      if (linkedRow instanceof HTMLElement) {
+        const listBody = findListBody(root);
+        if (listBody instanceof HTMLElement) {
+          scrollRowIntoView(linkedRow, listBody, "smooth");
+        }
+        flashHighlight(linkedRow);
+      }
+      state.pendingTagHighlight = "";
+    }
+  }
+  debugLog("syncDetailOnly", getStateSnapshot(root));
 };
 
 if (!globalThis[BOOT_KEY]) {
@@ -736,25 +978,18 @@ if (!globalThis[BOOT_KEY]) {
       return;
     }
 
-    const sortButton = target.closest("[data-tags-sort-kind][data-tags-sort-dir]");
-    if (sortButton instanceof HTMLButtonElement) {
-      event.preventDefault();
-      applySort(sortButton.dataset.tagsSortKind, sortButton.dataset.tagsSortDir);
-      return;
-    }
-
     const row = target.closest("#tags-view-list .tags-view__index-row");
     if (row) {
-      ensureSortParams(row);
-      const tagName = row.dataset.tagName || "";
-      if (!tagName) return;
+      debugLog("click sidebar tag", {
+        tag: row.dataset.tagName,
+        snapshot: getStateSnapshot(document),
+      });
       if (!state.saveSuppressed) {
         captureEntriesAnchor();
         state.saveSuppressed = true;
       }
       clearScrollTarget(null, { emitEvent: false });
       state.pendingDetailScrollTop = true;
-      setActiveTag(tagName, document, { behavior: "smooth" });
       return;
     }
 
@@ -762,20 +997,15 @@ if (!globalThis[BOOT_KEY]) {
       "#tags-view-detail .tags-view__related-link, #tags-view-detail .tags-view__entry-tag",
     );
     if (!(detailLink instanceof HTMLAnchorElement)) return;
-    ensureSortParams(detailLink);
+    debugLog("click detail tag", {
+      tag: detailLink.textContent?.trim(),
+      snapshot: getStateSnapshot(document),
+    });
     if (!state.saveSuppressed) {
       captureEntriesAnchor();
       state.saveSuppressed = true;
     }
     state.pendingDetailScrollTop = true;
-    const tagName = (detailLink.textContent || "").trim();
-    if (tagName) {
-      setActiveTag(tagName, document, { behavior: "smooth" });
-      const linkedRow = document.getElementById(`tag-index-${tagName}`);
-      if (linkedRow instanceof HTMLElement) {
-        flashHighlight(linkedRow);
-      }
-    }
   });
 
   document.addEventListener("input", (event) => {
@@ -799,18 +1029,33 @@ if (!globalThis[BOOT_KEY]) {
     applySearch(target.value);
   });
 
+  document.addEventListener("tags-view:navigate", (event) => {
+    const tag = String(event?.detail?.tag || "").trim();
+    if (!tag) return;
+    state.pendingTagHighlight = tag;
+    setActiveTag(tag, document, { behavior: "smooth" });
+    debugLog("navigate event", { tag, snapshot: getStateSnapshot(document) });
+  });
+
   document.body.addEventListener("htmx:afterSwap", (event) => {
     const target = event.detail?.target;
     if (!(target instanceof Element)) return;
+    debugLog("htmx:afterSwap", {
+      target: target.id || target.className,
+      path: event.detail?.path,
+      snapshot: getStateSnapshot(document),
+    });
     const inList = target.closest?.("#tags-view-list");
     const inEntries = target.closest?.("[data-tags-view-entries]");
-    if (
-      target.id === "tags-view-detail" ||
-      target.id === "main-content" ||
-      target.id === "tags-view-list" ||
-      inList ||
-      inEntries
-    ) {
+    if (target.id === "tags-view-list" || inList) {
+      syncListOnly(document);
+      return;
+    }
+    if (target.id === "tags-view-detail" || inEntries) {
+      syncDetailOnly(document);
+      return;
+    }
+    if (target.id === "main-content") {
       sync(document);
     }
   });
@@ -820,6 +1065,11 @@ if (!globalThis[BOOT_KEY]) {
     const target = event.detail?.target;
     if (!(target instanceof Element)) return;
     if (target.id !== "tags-view-detail") return;
+    debugLog("htmx:configRequest", {
+      target: target.id,
+      path: event.detail?.path,
+      snapshot: getStateSnapshot(document),
+    });
 
     const path = event.detail?.path || "";
     let destTag = "";
@@ -842,7 +1092,20 @@ if (!globalThis[BOOT_KEY]) {
   document.body.addEventListener("htmx:beforeRequest", (event) => {
     const target = event.detail?.target;
     if (!(target instanceof Element)) return;
-    if (target.id !== "tags-view-detail") return;
+    debugLog("htmx:beforeRequest", {
+      target: target.id || target.className,
+      path: event.detail?.path,
+      snapshot: getStateSnapshot(document),
+    });
+    if (target.id !== "tags-view-detail") {
+      if (target.id === "tags-view-list" || target.closest?.("#tags-view-list")) {
+        captureListAnchor();
+        captureListPositions();
+      }
+      return;
+    }
+    captureListAnchor();
+    captureListPositions();
     if (!state.saveSuppressed) {
       storeMainScrollTop();
       captureEntriesAnchor();
@@ -857,14 +1120,33 @@ if (!globalThis[BOOT_KEY]) {
   document.body.addEventListener("htmx:afterSettle", (event) => {
     const target = event.detail?.target;
     if (!(target instanceof Element)) return;
+    debugLog("htmx:afterSettle", {
+      target: target.id || target.className,
+      path: event.detail?.path,
+      snapshot: getStateSnapshot(document),
+    });
+    if (target.id === "tags-view-list" || target.closest?.("#tags-view-list")) {
+      restoreListAnchor();
+      animateListReorder();
+      if (state.restoreAfterBfcache) {
+        restoreListAnchor();
+      }
+    }
     if (target.id !== "tags-view-detail") return;
     if (!state.pendingDetailScrollTop) return;
     state.pendingDetailScrollTop = false;
     scrollMainContentTop();
+    if (state.restoreAfterBfcache) {
+      maybeRestoreEntriesAnchor();
+      state.restoreAfterBfcache = false;
+    }
   });
 
   document.addEventListener("app:rehydrate", (event) => {
     state.restoreAppliedForLocation = "";
+    if (event?.detail?.reason === "bfcache") {
+      state.restoreAfterBfcache = true;
+    }
     sync(event?.detail?.context || document);
   });
   document.addEventListener("app:view-changed", (event) => {

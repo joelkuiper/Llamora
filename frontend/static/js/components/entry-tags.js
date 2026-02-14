@@ -976,12 +976,9 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     if (!normalizedTag) {
       return;
     }
-    const rowId = `tag-index-${normalizedTag}`;
-    const row = document.getElementById(rowId);
-    if (row instanceof HTMLAnchorElement) {
-      row.click();
-      return;
-    }
+    document.dispatchEvent(
+      new CustomEvent("tags-view:navigate", { detail: { tag: normalizedTag } }),
+    );
 
     const fragmentTemplate = this.dataset?.tagNavigateFragmentTemplate || "";
     const pageTemplate = this.dataset?.tagNavigatePageTemplate || "";
