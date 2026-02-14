@@ -24,7 +24,6 @@ const state = {
   pendingDetailScrollTop: false,
   pendingTagHighlight: "",
   listPositions: null,
-  restoreAfterBfcache: false,
 };
 
 const readStoredSearchQuery = () => sessionStore.get("tags:query") ?? "";
@@ -259,6 +258,10 @@ const maybeRestoreEntriesAnchor = () => {
     const entry = document.querySelector(`.tags-view__entry-item[data-entry-id="${escapedId}"]`);
     if (entry instanceof HTMLElement) {
       applyEntriesAnchor(entry, anchor.offset);
+      // Re-apply after content-visibility layout settles
+      requestAnimationFrame(() => {
+        applyEntriesAnchor(entry, anchor.offset);
+      });
     }
   }
   state.restoreAppliedForLocation = currentLocation;
@@ -962,10 +965,9 @@ const sync = (root = document) => {
   syncFromDetail(root);
   animateDetailEntries(root);
   highlightRequestedTag(root);
-  if (!hadTargetParam && !state.restoreAfterBfcache) {
+  if (!hadTargetParam) {
     maybeRestoreEntriesAnchor();
   }
-  state.restoreAfterBfcache = false;
 };
 
 const captureListPositions = () => {
@@ -1060,6 +1062,7 @@ if (!globalThis[BOOT_KEY]) {
 
     const entryLink = target.closest("#tags-view-detail .tags-view__entry-open");
     if (entryLink) {
+      storeMainScrollTop();
       captureEntriesAnchor();
       return;
     }
@@ -1067,6 +1070,7 @@ if (!globalThis[BOOT_KEY]) {
     const row = target.closest("#tags-view-list .tags-view__index-row");
     if (row) {
       if (!state.saveSuppressed) {
+        storeMainScrollTop();
         captureEntriesAnchor();
         state.saveSuppressed = true;
       }
@@ -1080,6 +1084,7 @@ if (!globalThis[BOOT_KEY]) {
     );
     if (!(detailLink instanceof HTMLAnchorElement)) return;
     if (!state.saveSuppressed) {
+      storeMainScrollTop();
       captureEntriesAnchor();
       state.saveSuppressed = true;
     }
@@ -1196,17 +1201,12 @@ if (!globalThis[BOOT_KEY]) {
     if (!state.pendingDetailScrollTop) return;
     state.pendingDetailScrollTop = false;
     scrollMainContentTop();
-    if (state.restoreAfterBfcache) {
-      maybeRestoreEntriesAnchor();
-      state.restoreAfterBfcache = false;
-    }
+    state.saveSuppressed = false;
+    maybeRestoreEntriesAnchor();
   });
 
   document.addEventListener("app:rehydrate", (event) => {
     state.restoreAppliedForLocation = "";
-    if (event?.detail?.reason === "bfcache") {
-      state.restoreAfterBfcache = true;
-    }
     sync(event?.detail?.context || document);
   });
   document.addEventListener("app:view-changed", (event) => {
