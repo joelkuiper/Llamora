@@ -7,6 +7,10 @@ staged_biome_files=()
 staged_py_files=()
 
 for file in "${staged_files[@]}"; do
+  # Third-party vendor assets are intentionally excluded from Biome passes.
+  if [[ "$file" =~ ^frontend/static/js/vendor/ ]]; then
+    continue
+  fi
   if [[ "$file" =~ ^frontend/static/js/.*\.js$ || "$file" =~ ^frontend/static/css/.*\.css$ ]]; then
     staged_biome_files+=("$file")
   fi
@@ -16,8 +20,8 @@ for file in "${staged_files[@]}"; do
 done
 
 if ((${#staged_biome_files[@]} > 0)); then
-  biome format --write "${staged_biome_files[@]}"
-  biome lint "${staged_biome_files[@]}"
+  biome format --write --no-errors-on-unmatched "${staged_biome_files[@]}"
+  biome lint --no-errors-on-unmatched "${staged_biome_files[@]}"
   git add -- "${staged_biome_files[@]}"
 fi
 
