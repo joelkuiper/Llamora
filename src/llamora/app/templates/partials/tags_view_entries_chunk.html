@@ -1,4 +1,14 @@
+{% set ns = namespace(last_date=None) %}
 {% for item in entries %}
+  {% set entry = item.entry %}
+  {% set item_date = item.created_date or entry['created_at'][:10] %}
+  {% if item_date and item_date != ns.last_date %}
+    {% set divider_date = item_date %}
+    <li class="tags-view__entries-divider" aria-hidden="true">
+      {% include 'partials/day_divider.html' %}
+    </li>
+    {% set ns.last_date = item_date %}
+  {% endif %}
   {% include 'partials/tags_view_entry_item.html' %}
 {% endfor %}
 {% if has_more and next_cursor and tag_hash %}

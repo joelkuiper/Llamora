@@ -757,6 +757,18 @@
   min-height: 2rem;
 }
 
+.tags-view__entries-divider {
+  list-style: none;
+  margin: var(--spacing-md) 0 var(--spacing-sm);
+  padding: 0;
+}
+
+.tags-view__entries-divider .day-divider {
+  width: min(100%, 32rem);
+  margin: 0 auto;
+  color: var(--color-text-muted);
+}
+
 .tags-view__loading {
   position: absolute;
   inset: 0;
