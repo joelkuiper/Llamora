@@ -24,6 +24,7 @@ const state = {
   restoreToken: 0,
   restoreInFlight: false,
   restoreAppliedForLocation: "",
+  saveSuppressed: false,
 };
 
 const readStoredSearchQuery = () => sessionStore.get("tags:query") ?? "";
@@ -85,8 +86,8 @@ const scrollMainContentTop = () => {
 const getTagsLocationKey = () => {
   const url = new URL(window.location.href);
   if (url.searchParams.get("view") !== "tags") return "";
-  url.searchParams.delete("target");
-  return `${url.pathname}?${url.searchParams.toString()}`;
+  const tag = url.searchParams.get("tag") || "";
+  return `${url.pathname}?view=tags&tag=${tag}`;
 };
 
 const getSelectedTrace = (root = document) =>
@@ -160,7 +161,7 @@ const scheduleEntriesAnchorSave = () => {
   if (state.saveFrame) return;
   state.saveFrame = window.requestAnimationFrame(() => {
     state.saveFrame = 0;
-    if (state.restoreInFlight) return;
+    if (state.restoreInFlight || state.saveSuppressed) return;
     captureEntriesAnchor();
   });
 };
@@ -325,7 +326,23 @@ const normalizeSortDir = (value) =>
     ? "desc"
     : "asc";
 
-const setActiveTag = (tagName, root = document) => {
+const isRowInView = (row, container, padding = 8) => {
+  const rowTop = row.offsetTop;
+  const rowBottom = rowTop + row.offsetHeight;
+  const viewTop = container.scrollTop + padding;
+  const viewBottom = container.scrollTop + container.clientHeight - padding;
+  return rowTop >= viewTop && rowBottom <= viewBottom;
+};
+
+const scrollRowIntoView = (row, container, behavior = "auto") => {
+  const centerTop = row.offsetTop - (container.clientHeight - row.offsetHeight) / 2;
+  const nextTop = Math.max(0, Math.round(centerTop));
+  container.scrollTo({ top: nextTop, behavior });
+};
+
+const setActiveTag = (tagName, root = document, options = {}) => {
+  const behavior = options.behavior === "smooth" ? "smooth" : "auto";
+  const shouldScroll = options.scroll !== false;
   const list = findList(root);
   if (!list) return;
   const targetName = String(tagName || "").trim();
@@ -341,18 +358,43 @@ const setActiveTag = (tagName, root = document) => {
     }
   });
   if (!(activeRow instanceof HTMLElement)) return;
+  if (!shouldScroll) return;
   const listBody = findListBody(root);
   if (listBody instanceof HTMLElement) {
-    const bodyRect = listBody.getBoundingClientRect();
-    const rowRect = activeRow.getBoundingClientRect();
-    const outsideTop = rowRect.top < bodyRect.top + 6;
-    const outsideBottom = rowRect.bottom > bodyRect.bottom - 6;
-    if (outsideTop || outsideBottom) {
-      activeRow.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+    if (!isRowInView(activeRow, listBody)) {
+      scrollRowIntoView(activeRow, listBody, behavior);
+    }
+    if (behavior === "auto") {
+      window.requestAnimationFrame(() => {
+        if (!activeRow.isConnected || !listBody.isConnected) return;
+        if (isRowInView(activeRow, listBody)) return;
+        // Retry after layout settles (htmx swap + row animations can shift geometry).
+        scrollRowIntoView(activeRow, listBody, "auto");
+      });
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          if (!activeRow.isConnected || !listBody.isConnected) return;
+          if (isRowInView(activeRow, listBody)) return;
+          scrollRowIntoView(activeRow, listBody, "auto");
+        });
+      });
     }
     return;
   }
-  activeRow.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+  activeRow.scrollIntoView({ block: "center", inline: "nearest", behavior });
+};
+
+const getActiveRow = () => {
+  if (!state.rows.length) return null;
+  return state.rows.find((row) => row.classList.contains("is-active")) || null;
+};
+
+const ensureActiveRowVisibleInFilteredSet = (matches, orderedMatches) => {
+  const activeRow = getActiveRow();
+  if (!(activeRow instanceof HTMLElement)) return orderedMatches;
+  if (matches.has(activeRow)) return orderedMatches;
+  matches.add(activeRow);
+  return [activeRow, ...orderedMatches];
 };
 
 const readSortFromUrl = () => {
@@ -370,10 +412,15 @@ const readSortFromUrl = () => {
 const syncFromDetail = (root = document) => {
   const detail = findDetail(root);
   const urlSort = readSortFromUrl();
+  const target = String(new URLSearchParams(window.location.search).get("target") || "").trim();
+  const keepTargetScrollForHighlight = target.startsWith("tag-index-");
   if (detail) {
     state.sortKind = urlSort.hasKind ? urlSort.kind : normalizeSortKind(detail.dataset.sortKind);
     state.sortDir = urlSort.hasDir ? urlSort.dir : normalizeSortDir(detail.dataset.sortDir);
-    setActiveTag(detail.dataset.selectedTag || "", root);
+    setActiveTag(detail.dataset.selectedTag || "", root, {
+      behavior: "auto",
+      scroll: !keepTargetScrollForHighlight,
+    });
   } else {
     state.sortKind = urlSort.kind;
     state.sortDir = urlSort.dir;
@@ -447,7 +494,7 @@ const highlightRequestedTag = (root = document) => {
   if (row instanceof HTMLElement) {
     const tagName = row.dataset.tagName || "";
     if (tagName) {
-      setActiveTag(tagName, root);
+      setActiveTag(tagName, root, { behavior: "smooth" });
     }
     flashHighlight(row);
   }
@@ -617,6 +664,7 @@ const applySearch = (rawQuery) => {
         return aName.localeCompare(bName);
       });
   }
+  orderedMatches = ensureActiveRowVisibleInFilteredSet(matches, orderedMatches);
   if (state.list) {
     const remainder = state.rows.filter((row) => !matches.has(row));
     [...orderedMatches, ...remainder].forEach((row) => {
@@ -676,6 +724,7 @@ const applySort = (kind, dir) => {
 };
 
 const sync = (root = document) => {
+  state.saveSuppressed = false;
   const hadTargetParam = new URLSearchParams(window.location.search).has("target");
   updateHeaderHeight();
   attachEntriesScrollListener();
@@ -735,8 +784,10 @@ if (!globalThis[BOOT_KEY]) {
       ensureSortParams(row);
       const tagName = row.dataset.tagName || "";
       if (!tagName) return;
+      captureEntriesAnchor();
+      state.saveSuppressed = true;
       clearScrollTarget(null, { emitEvent: false });
-      setActiveTag(tagName);
+      setActiveTag(tagName, document, { behavior: "smooth" });
       scrollMainContentTop();
       return;
     }
@@ -746,9 +797,11 @@ if (!globalThis[BOOT_KEY]) {
     );
     if (!(detailLink instanceof HTMLAnchorElement)) return;
     ensureSortParams(detailLink);
+    captureEntriesAnchor();
+    state.saveSuppressed = true;
     const tagName = (detailLink.textContent || "").trim();
     if (tagName) {
-      setActiveTag(tagName);
+      setActiveTag(tagName, document, { behavior: "smooth" });
       const linkedRow = document.getElementById(`tag-index-${tagName}`);
       if (linkedRow instanceof HTMLElement) {
         flashHighlight(linkedRow);
@@ -790,6 +843,7 @@ if (!globalThis[BOOT_KEY]) {
       inList ||
       inEntries
     ) {
+      if (inEntries && state.restoreInFlight) return;
       sync();
     }
   });
@@ -798,6 +852,11 @@ if (!globalThis[BOOT_KEY]) {
     const target = event.detail?.target;
     if (!(target instanceof Element)) return;
     if (target.id !== "tags-view-detail") return;
+    if (!state.saveSuppressed) {
+      captureEntriesAnchor();
+      state.saveSuppressed = true;
+    }
+    resetEntriesRestoreState();
     scrollMainContentTop();
   });
 
@@ -812,10 +871,14 @@ if (!globalThis[BOOT_KEY]) {
     resetEntriesRestoreState();
   });
   document.addEventListener("app:teardown", () => {
-    captureEntriesAnchor();
+    if (!state.saveSuppressed) {
+      captureEntriesAnchor();
+    }
   });
   window.addEventListener("pagehide", () => {
-    captureEntriesAnchor();
+    if (!state.saveSuppressed) {
+      captureEntriesAnchor();
+    }
     resetEntriesRestoreState();
   });
 

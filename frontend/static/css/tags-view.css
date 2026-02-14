@@ -219,6 +219,11 @@
 }
 
 .tags-view__index-row {
+  --tags-index-bg-hover: color-mix(in srgb, var(--accent-10) 65%, var(--glass-bg-alt));
+  --tags-index-bg-active: color-mix(in srgb, var(--accent-10) 82%, var(--glass-bg-alt));
+  --motion-highlight-start: color-mix(in srgb, var(--accent-active) 22%, var(--color-bg));
+  --motion-highlight-end: transparent;
+  --motion-highlight-duration: 820ms;
   position: relative;
   text-decoration: none;
   color: color-mix(in srgb, var(--color-text-muted) 80%, transparent);
@@ -246,32 +251,47 @@
   bottom: 0.48rem;
   width: 2px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--accent-20) 75%, transparent);
+  background: color-mix(in srgb, var(--accent-active) 62%, transparent);
   opacity: 0;
   transition: opacity 180ms ease;
 }
 
 .tags-view__index-row:hover,
 .tags-view__index-row:focus-visible {
-  background: color-mix(in srgb, var(--accent-05) 30%, var(--glass-bg-alt));
-  color: color-mix(in srgb, var(--color-text) 88%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-10) 24%, transparent);
+  --motion-highlight-end: var(--tags-index-bg-hover);
+  background: var(--tags-index-bg-hover);
+  color: color-mix(in srgb, var(--accent-active) 18%, var(--color-text));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--accent-20) 72%, transparent),
+    0 2px 8px color-mix(in srgb, var(--accent-10) 26%, transparent);
+  transform: translateX(1px);
   outline: none;
 }
 
 .tags-view__index-row:hover::before,
 .tags-view__index-row:focus-visible::before {
-  opacity: 0.28;
+  opacity: 0.62;
 }
 
 .tags-view__index-row.is-active {
-  background: color-mix(in srgb, var(--accent-05) 24%, var(--glass-bg-alt));
-  color: color-mix(in srgb, var(--color-text) 90%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-10) 26%, transparent);
+  --motion-highlight-start: color-mix(in srgb, var(--accent-active) 34%, var(--color-bg));
+  --motion-highlight-end: var(--tags-index-bg-active);
+  background: var(--tags-index-bg-active);
+  color: color-mix(in srgb, var(--accent-active) 24%, var(--color-text));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--accent-20) 78%, transparent),
+    0 1px 8px color-mix(in srgb, var(--accent-10) 32%, transparent);
 }
 
 .tags-view__index-row.is-active::before {
-  opacity: 0.56;
+  opacity: 0.94;
+}
+
+.tags-view__index-row.highlight {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--accent-20) 84%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent-10) 48%, transparent),
+    0 3px 10px color-mix(in srgb, var(--accent-10) 34%, transparent);
 }
 
 .tags-view__index-row:active {
@@ -293,7 +313,7 @@
 }
 
 .tags-view__index-row.is-active .tags-view__index-name {
-  font-weight: 560;
+  font-weight: 610;
 }
 
 .tags-view__index-name mark {
@@ -313,8 +333,9 @@
 }
 
 .tags-view__index-row:hover .tags-view__index-count,
-.tags-view__index-row:focus-visible .tags-view__index-count {
-  color: color-mix(in srgb, var(--color-text-muted) 56%, transparent);
+.tags-view__index-row:focus-visible .tags-view__index-count,
+.tags-view__index-row.is-active .tags-view__index-count {
+  color: color-mix(in srgb, var(--accent-active) 42%, var(--color-text-muted));
 }
 
 .tags-view__search-empty,
@@ -496,16 +517,16 @@
   outline: none;
 }
 
-.tags-view__entry-snippet {
+.tags-view__entry-main {
   margin: 0;
   font-size: 0.93rem;
   line-height: 1.68;
   color: color-mix(in srgb, var(--color-text) 84%, transparent);
-  white-space: pre-line;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
-  overflow: hidden;
+}
+
+.tags-view__entry-main .markdown-body {
+  display: block;
+  opacity: 1;
 }
 
 .tags-view__entry-footer {

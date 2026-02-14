@@ -26,10 +26,10 @@
 @layer motion.keyframes {
   @keyframes motion-highlight-flash {
     from {
-      background-color: var(--highlight-color);
+      background-color: var(--motion-highlight-start, var(--highlight-color));
     }
     to {
-      background-color: transparent;
+      background-color: var(--motion-highlight-end, transparent);
     }
   }
 

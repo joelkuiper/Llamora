@@ -13,7 +13,13 @@
             data-time-raw="{{ item.created_at }}"
             data-time-style="ago-date-time"></time>
     </a>
-    <p class="tags-view__entry-snippet">{{ item.snippet }}</p>
+    <div class="tags-view__entry-main">
+      <div class="markdown-body"
+           id="tags-entry-{{ item.entry_id }}-body"
+           data-rendered="true">
+        {{ item.text_html | safe }}
+      </div>
+    </div>
     <div class="tags-view__entry-footer">
       {% if item.secondary_tags %}
         <div class="entry-tags tags-view__entry-tags">

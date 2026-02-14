@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any, Iterable, Literal, Sequence
 
 from llamora.app.util.tags import canonicalize as _canonicalize, display as _display
+from llamora.app.services.markdown import render_markdown_to_html
 from llamora.persistence.local_db import LocalDB
 from llamora.app.services.entry_metadata import generate_metadata
 
@@ -76,7 +77,7 @@ class TagArchiveEntry:
     created_at: str
     created_date: str | None
     date_label: str
-    snippet: str
+    text_html: str
     secondary_tags: tuple[str, ...]
 
 
@@ -497,9 +498,10 @@ class TagService:
                 secondary_tags.append(canonical)
                 seen_secondary.add(canonical)
 
-            snippet = _extract_preview_excerpt(str(entry.get("text") or ""))
-            if not snippet:
-                snippet = "..."
+            raw_text = str(entry.get("text") or "")
+            text_html = render_markdown_to_html(raw_text)
+            if not text_html:
+                text_html = "<p>...</p>"
 
             archive_entries.append(
                 TagArchiveEntry(
@@ -510,7 +512,7 @@ class TagService:
                         created_at,
                         entry.get("created_date"),
                     ),
-                    snippet=snippet,
+                    text_html=text_html,
                     secondary_tags=tuple(secondary_tags[: max(1, secondary_tag_limit)]),
                 )
             )
