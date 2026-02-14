@@ -375,6 +375,29 @@ class TagsRepository(BaseRepository):
             )
         return index_rows
 
+    async def get_entry_digests_for_tag(
+        self, user_id: str, tag_hash: bytes
+    ) -> list[str]:
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                """
+                SELECT e.id, e.digest
+                FROM tag_entry_xref x
+                JOIN entries e
+                  ON e.user_id = x.user_id AND e.id = x.entry_id
+                WHERE x.user_id = ? AND x.tag_hash = ?
+                """,
+                (user_id, tag_hash),
+            )
+            rows = await cursor.fetchall()
+        digests: list[str] = []
+        for row in rows:
+            digest = str(row["digest"] or "").strip()
+            if not digest:
+                digest = f"missing:{row['id']}"
+            digests.append(digest)
+        return digests
+
     async def get_tag_frecency(
         self, user_id: str, limit: int, lambda_: Any, dek: bytes
     ) -> list[dict]:

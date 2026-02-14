@@ -10,6 +10,7 @@ from ulid import ULID
 from llamora.llm.tokenizers.tokenizer import count_message_tokens
 
 from llamora.app.services.history_cache import HistoryCache
+from llamora.app.services.crypto import entry_digest
 
 from .base import BaseRepository
 from .events import RepositoryEventBus, ENTRY_HISTORY_CHANGED_EVENT
@@ -175,6 +176,7 @@ class EntriesRepository(BaseRepository):
         prompt_tokens = await asyncio.to_thread(
             count_message_tokens, role, record.get("text", "")
         )
+        digest = entry_digest(dek, entry_id, role, record.get("text", ""))
 
         async with self.pool.connection() as conn:
             columns = [
@@ -186,6 +188,7 @@ class EntriesRepository(BaseRepository):
                 "ciphertext",
                 "alg",
                 "prompt_tokens",
+                "digest",
             ]
             params: list = [
                 entry_id,
@@ -196,6 +199,7 @@ class EntriesRepository(BaseRepository):
                 ct,
                 alg,
                 prompt_tokens,
+                digest,
             ]
 
             if created_at:
@@ -371,15 +375,16 @@ class EntriesRepository(BaseRepository):
             prompt_tokens = await asyncio.to_thread(
                 count_message_tokens, row["role"], record.get("text", "")
             )
+            digest = entry_digest(dek, entry_id, row["role"], record.get("text", ""))
 
             async def _execute_update():
                 await conn.execute(
                     """
                     UPDATE entries
-                    SET nonce = ?, ciphertext = ?, alg = ?, prompt_tokens = ?, updated_at = CURRENT_TIMESTAMP
+                    SET nonce = ?, ciphertext = ?, alg = ?, prompt_tokens = ?, digest = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE id = ? AND user_id = ?
                     """,
-                    (nonce, ct, alg, prompt_tokens, entry_id, user_id),
+                    (nonce, ct, alg, prompt_tokens, digest, entry_id, user_id),
                 )
 
             await self._run_in_transaction(conn, _execute_update)
@@ -650,17 +655,15 @@ class EntriesRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT created_date,
-                       COUNT(*) AS entry_count,
-                       MAX(COALESCE(updated_at, created_at)) AS last_updated
+                SELECT id, created_date, digest
                 FROM entries
                 WHERE user_id = ? AND substr(created_date, 1, 7) = ?
-                GROUP BY created_date
                 """,
                 (user_id, month_prefix),
             )
             rows = await cursor.fetchall()
         summary_digests: dict[int, str] = {}
+        digests_by_day: dict[int, list[str]] = {}
         for row in rows:
             created_date = row["created_date"] or ""
             if len(created_date) < 10:
@@ -669,9 +672,12 @@ class EntriesRepository(BaseRepository):
                 day = int(created_date[8:10])
             except (TypeError, ValueError):
                 continue
-            count = int(row["entry_count"] or 0)
-            last_updated = row["last_updated"] or ""
-            payload = f"{count}:{last_updated}".encode("utf-8")
+            digest = str(row["digest"] or "").strip()
+            if not digest:
+                digest = f"missing:{row['id']}"
+            digests_by_day.setdefault(day, []).append(digest)
+        for day, digests in digests_by_day.items():
+            payload = "|".join(sorted(digests)).encode("utf-8")
             summary_digests[day] = hashlib.sha256(payload).hexdigest()
         return summary_digests
 

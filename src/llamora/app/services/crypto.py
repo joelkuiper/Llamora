@@ -1,4 +1,6 @@
 from nacl import pwhash, utils
+import hashlib
+import hmac
 from nacl.bindings import (
     crypto_aead_xchacha20poly1305_ietf_encrypt,
     crypto_aead_xchacha20poly1305_ietf_decrypt,
@@ -8,6 +10,7 @@ import secrets
 ALG = b"xchacha20poly1305_ietf"
 OPSLIMIT = pwhash.argon2id.OPSLIMIT_MODERATE
 MEMLIMIT = pwhash.argon2id.MEMLIMIT_MODERATE
+ENTRY_DIGEST_CONTEXT = b"llamora:entry-digest:v1"
 
 
 def generate_dek() -> bytes:
@@ -39,6 +42,16 @@ def format_recovery_code(code: str, group: int = 4) -> str:
 
 def derive_key(secret: bytes, salt: bytes) -> bytes:
     return pwhash.argon2id.kdf(32, secret, salt, opslimit=OPSLIMIT, memlimit=MEMLIMIT)
+
+
+def derive_entry_digest_key(dek: bytes) -> bytes:
+    return hashlib.sha256(ENTRY_DIGEST_CONTEXT + dek).digest()
+
+
+def entry_digest(dek: bytes, entry_id: str, role: str, text: str) -> str:
+    key = derive_entry_digest_key(dek)
+    payload = f"{entry_id}\0{role}\0{text}".encode("utf-8")
+    return hmac.new(key, payload, hashlib.sha256).hexdigest()
 
 
 def wrap_key(key: bytes, secret: str):

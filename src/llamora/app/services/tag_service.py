@@ -40,8 +40,9 @@ def _parse_tag_cursor(cursor: str | None) -> tuple[str | None, str | None]:
     return created_at, entry_id
 
 
-def _build_summary_digest(entry_count: int, last_updated: str | None) -> str:
-    payload = f"{entry_count}:{last_updated or ''}".encode("utf-8")
+def _build_summary_digest(entry_digests: Iterable[str]) -> str:
+    digests = [d for d in entry_digests if d]
+    payload = "|".join(sorted(digests)).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
 
 
@@ -204,6 +205,7 @@ class TagService:
             limit=limit,
             cursor=cursor,
         )
+        entry_digests = await self._db.tags.get_entry_digests_for_tag(user_id, tag_hash)
 
         return TagOverview(
             name=self.display(info["name"]),
@@ -211,9 +213,7 @@ class TagService:
             count=int(info.get("count", 0) or 0),
             last_used=info.get("last_used"),
             last_updated=info.get("last_updated"),
-            summary_digest=_build_summary_digest(
-                int(info.get("count", 0) or 0), info.get("last_updated")
-            ),
+            summary_digest=_build_summary_digest(entry_digests),
             entries=tuple(previews),
             has_more=has_more,
             next_cursor=next_cursor,
@@ -411,6 +411,7 @@ class TagService:
         info = await self._db.tags.get_tag_info(user_id, tag_hash, dek)
         if not info:
             return None
+        entry_digests = await self._db.tags.get_entry_digests_for_tag(user_id, tag_hash)
 
         archive_entries, next_cursor, has_more = await self.get_archive_entries_page(
             user_id,
@@ -427,9 +428,7 @@ class TagService:
                 first_used=info.get("first_used"),
                 first_used_label=_format_month_year(info.get("first_used")),
                 last_updated=info.get("last_updated"),
-                summary_digest=_build_summary_digest(
-                    int(info.get("count") or 0), info.get("last_updated")
-                ),
+                summary_digest=_build_summary_digest(entry_digests),
                 entries=(),
                 entries_has_more=False,
                 entries_next_cursor=None,
@@ -455,9 +454,7 @@ class TagService:
             first_used=info.get("first_used"),
             first_used_label=_format_month_year(info.get("first_used")),
             last_updated=info.get("last_updated"),
-            summary_digest=_build_summary_digest(
-                int(info.get("count") or tag_item.count), info.get("last_updated")
-            ),
+            summary_digest=_build_summary_digest(entry_digests),
             entries=tuple(archive_entries),
             entries_has_more=has_more,
             entries_next_cursor=next_cursor,
