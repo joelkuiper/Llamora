@@ -26,10 +26,10 @@ history_scope = 12
 max_tags = 4
 max_snippets = 8
 snippet_max_chars = 160
-mode = "hybrid"
+mode = "summary"
 llm_max_tokens = 256
 summary_parallel = 1
-background_summarize = false
+background_summarize = true
 summary_cache_max = 512
 
 [default.SEARCH]

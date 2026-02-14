@@ -1,12 +1,13 @@
 import { armEntryAnimations, armInitialEntryAnimations } from "../entries/entry-animations.js";
 import { formatTimeElements } from "../services/time.js";
-import { getTagSummary, setTagSummary } from "../services/summary-store.js";
+import { getValue, setValue } from "../services/lockbox-store.js";
 import { clearScrollTarget, flashHighlight } from "../ui.js";
 import { prefersReducedMotion } from "../utils/motion.js";
 import { sessionStore } from "../utils/storage.js";
 import { Fuse as FuseCtor } from "../vendor/setup-globals.js";
 
 const BOOT_KEY = "__llamoraTagsViewBooted";
+const SUMMARY_NAMESPACE = "summary";
 const state = {
   query: "",
   sortKind: "count",
@@ -24,6 +25,41 @@ const state = {
   pendingDetailScrollTop: false,
   pendingTagHighlight: "",
   listPositions: null,
+};
+
+const normalizeSummaryWords = (value) => {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+const makeTagSummaryKey = (tagHash, words) => {
+  const base = `tag:${String(tagHash || "").trim()}`;
+  if (!base || base === "tag:") return "";
+  const count = normalizeSummaryWords(words);
+  return count ? `${base}:w${count}` : base;
+};
+
+const readTagSummaryPayload = (payload, digest) => {
+  if (!payload || typeof payload !== "object") return "";
+  if (digest != null && String(payload.digest || "") !== String(digest)) return "";
+  const value = payload.html;
+  return typeof value === "string" ? value : "";
+};
+
+const getCachedTagSummary = async (tagHash, { digest, words } = {}) => {
+  const key = makeTagSummaryKey(tagHash, words);
+  if (!key) return "";
+  const payload = await getValue(SUMMARY_NAMESPACE, key);
+  return readTagSummaryPayload(payload, digest);
+};
+
+const setCachedTagSummary = async (tagHash, html, { digest, words } = {}) => {
+  const key = makeTagSummaryKey(tagHash, words);
+  if (!key || html == null) return false;
+  return setValue(SUMMARY_NAMESPACE, key, {
+    digest: String(digest ?? ""),
+    html,
+  });
 };
 
 const readStoredSearchQuery = () => sessionStore.get("tags:query") ?? "";
@@ -532,7 +568,7 @@ const hydrateTagsViewSummary = async (root = document) => {
   const summaryDigest = summaryEl.dataset?.summaryDigest || "";
   const summaryWords = summaryEl.dataset?.summaryWords || "";
   if (!tagHash) return;
-  const cached = await getTagSummary(tagHash, {
+  const cached = await getCachedTagSummary(tagHash, {
     digest: summaryDigest,
     words: summaryWords,
   });
@@ -551,7 +587,7 @@ const cacheTagsViewSummary = (summaryEl) => {
   if (!tagHash) return;
   const html = isCacheableSummary(summaryEl);
   if (!html) return;
-  void setTagSummary(tagHash, html, {
+  void setCachedTagSummary(tagHash, html, {
     digest: summaryDigest,
     words: summaryWords,
   });

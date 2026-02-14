@@ -26,7 +26,7 @@ from llamora.app.db.events import RepositoryEventBus
 from llamora.app.services.history_cache import HistoryCache, HistoryCacheSynchronizer
 from llamora.app.services.tag_recall_cache import (
     TagRecallCacheSynchronizer,
-    get_tag_recall_cache,
+    get_tag_recall_store,
 )
 from llamora.app.db.users import UsersRepository
 from llamora.app.db.entries import EntriesRepository
@@ -202,7 +202,7 @@ class LocalDB:
         self._tag_recall_synchronizer = TagRecallCacheSynchronizer(
             event_bus=self._events,
             entries_repository=self._entries,
-            cache=get_tag_recall_cache(self),
+            store=get_tag_recall_store(self),
         )
         self._vectors = VectorsRepository(self.pool, encrypt_vector, decrypt_vector)
         self._search_history = SearchHistoryRepository(

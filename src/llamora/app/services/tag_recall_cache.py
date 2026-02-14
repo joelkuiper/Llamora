@@ -1,4 +1,4 @@
-"""Lockbox-backed cache for tag recall summaries."""
+"""Lockbox helpers for tag recall summaries."""
 
 from __future__ import annotations
 
@@ -6,7 +6,8 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from llamora.app.db.events import ENTRY_TAGS_CHANGED_EVENT, RepositoryEventBus
-from llamora.app.services.lockbox import Lockbox, LockboxDecryptionError
+from llamora.app.services.lockbox import Lockbox
+from llamora.app.services.lockbox_store import LockboxStore
 
 if TYPE_CHECKING:
     from llamora.app.db.entries import EntriesRepository
@@ -15,70 +16,29 @@ if TYPE_CHECKING:
 CacheKey = str
 
 
-class TagRecallSummaryCache:
-    """Lockbox-backed cache keyed by tag hash."""
-
-    __slots__ = ("_lockbox",)
-
-    def __init__(self, lockbox: Lockbox) -> None:
-        self._lockbox = lockbox
-
-    @staticmethod
-    def _namespace(tag_hash_hex: str) -> str:
-        return f"tag-recall:{tag_hash_hex}"
-
-    async def get(
-        self, user_id: str, dek: bytes, tag_hash_hex: str, key: CacheKey
-    ) -> str | None:
-        try:
-            value = await self._lockbox.get(
-                user_id, dek, self._namespace(tag_hash_hex), key
-            )
-        except LockboxDecryptionError:
-            return None
-        if value is None:
-            return None
-        try:
-            return value.decode("utf-8")
-        except UnicodeDecodeError:
-            return None
-
-    async def set(
-        self,
-        user_id: str,
-        dek: bytes,
-        tag_hash_hex: str,
-        key: CacheKey,
-        summary: str,
-        *,
-        max_entries: int | None = None,
-    ) -> None:
-        if max_entries is not None and max_entries <= 0:
-            return
-        await self._lockbox.set(
-            user_id,
-            dek,
-            self._namespace(tag_hash_hex),
-            key,
-            summary.encode("utf-8"),
-        )
-
-    async def invalidate_tag(self, user_id: str, tag_hash_hex: str) -> None:
-        keys = await self._lockbox.list(user_id, self._namespace(tag_hash_hex))
-        for key in keys:
-            await self._lockbox.delete(user_id, self._namespace(tag_hash_hex), key)
+def tag_recall_namespace(tag_hash_hex: str) -> str:
+    return f"tag-recall:{tag_hash_hex}"
 
 
-_lockbox_cache: TagRecallSummaryCache | None = None
+_lockbox_store: LockboxStore | None = None
 _lockbox_pool = None
 
 
-def get_tag_recall_cache(db: "LocalDB") -> TagRecallSummaryCache:
-    global _lockbox_cache, _lockbox_pool
-    if _lockbox_cache is None or db.pool is not _lockbox_pool:
-        _lockbox_cache = TagRecallSummaryCache(Lockbox(db.pool))
+def get_tag_recall_store(db: "LocalDB") -> LockboxStore:
+    global _lockbox_store, _lockbox_pool
+    if _lockbox_store is None or db.pool is not _lockbox_pool:
+        _lockbox_store = LockboxStore(Lockbox(db.pool))
         _lockbox_pool = db.pool
-    return _lockbox_cache
+    return _lockbox_store
+
+
+async def invalidate_tag_recall(
+    store: LockboxStore, user_id: str, tag_hash_hex: str
+) -> None:
+    namespace = tag_recall_namespace(tag_hash_hex)
+    keys = await store.list(user_id, namespace)
+    for key in keys:
+        await store.delete(user_id, namespace, key)
 
 
 class TagRecallCacheSynchronizer:
@@ -89,16 +49,16 @@ class TagRecallCacheSynchronizer:
     on the current day since those don't affect recall context.
     """
 
-    __slots__ = ("_cache", "_events", "_entries")
+    __slots__ = ("_store", "_events", "_entries")
 
     def __init__(
         self,
         *,
         event_bus: RepositoryEventBus | None,
         entries_repository: "EntriesRepository | None",
-        cache: TagRecallSummaryCache,
+        store: LockboxStore,
     ) -> None:
-        self._cache = cache
+        self._store = store
         self._events = event_bus
         self._entries = entries_repository
         if not self._events:
@@ -128,12 +88,13 @@ class TagRecallCacheSynchronizer:
         if entry_date == today_iso:
             return
         tag_hash_hex = tag_hash.hex() if isinstance(tag_hash, bytes) else str(tag_hash)
-        await self._cache.invalidate_tag(user_id, tag_hash_hex)
+        await invalidate_tag_recall(self._store, user_id, tag_hash_hex)
 
 
 __all__ = [
     "CacheKey",
-    "TagRecallSummaryCache",
     "TagRecallCacheSynchronizer",
-    "get_tag_recall_cache",
+    "get_tag_recall_store",
+    "invalidate_tag_recall",
+    "tag_recall_namespace",
 ]

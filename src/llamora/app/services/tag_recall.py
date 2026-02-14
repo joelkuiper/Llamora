@@ -9,7 +9,11 @@ from typing import Any, Iterable, Mapping, Sequence, TypedDict
 import orjson
 import tiktoken
 
-from llamora.app.services.tag_recall_cache import CacheKey, get_tag_recall_cache
+from llamora.app.services.tag_recall_cache import (
+    CacheKey,
+    get_tag_recall_store,
+    tag_recall_namespace,
+)
 from llamora.app.util.number import coerce_int
 from llamora.llm.prompt_templates import render_prompt_template
 from llamora.llm.tokenizers.tokenizer import count_message_tokens
@@ -161,7 +165,8 @@ def _build_summary_cache_key(
 ) -> CacheKey:
     payload = "|".join(sorted(d for d in entry_digests if d))
     payload = f"{payload}|{max_chars}|{input_max_chars}|{max_snippets}"
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return f"recall:{digest}"
 
 
 async def _summarize_with_llm(
@@ -174,14 +179,15 @@ async def _summarize_with_llm(
     max_tokens: int,
     cache_limit: int,
     cache_key: CacheKey,
-    cache,
+    store,
     dek: bytes,
 ) -> str:
     clean = (text or "").strip()
     if not clean:
         return ""
 
-    cached = await cache.get(user_id, dek, tag_hash_hex, cache_key)
+    namespace = tag_recall_namespace(tag_hash_hex)
+    cached = await store.get_text(user_id, dek, namespace, cache_key)
     if cached is not None:
         return cached
 
@@ -249,15 +255,8 @@ async def _summarize_with_llm(
         if not summary:
             return ""
     summary = _truncate_text(summary, max_chars)
-    if summary:
-        await cache.set(
-            user_id,
-            dek,
-            tag_hash_hex,
-            cache_key,
-            summary,
-            max_entries=cache_limit,
-        )
+    if summary and cache_limit > 0:
+        await store.set_text(user_id, dek, namespace, cache_key, summary)
     return summary
 
 
@@ -406,7 +405,7 @@ async def build_tag_recall_context(
     if not focus_tags:
         return None
 
-    cache = get_tag_recall_cache(db)
+    store = get_tag_recall_store(db)
 
     tag_entry_ids: dict[bytes, list[str]] = {}
     all_ids: list[str] = []
@@ -499,7 +498,8 @@ async def build_tag_recall_context(
             input_max_chars=cfg.summary_input_max_chars,
             max_snippets=cfg.max_snippets,
         )
-        cached = await cache.get(user_id, dek, tag_hash, cache_key)
+        namespace = tag_recall_namespace(tag_hash)
+        cached = await store.get_text(user_id, dek, namespace, cache_key)
 
         if cfg.mode == "summary":
             if llm is None:
@@ -513,7 +513,7 @@ async def build_tag_recall_context(
                 max_tokens=cfg.llm_max_tokens,
                 cache_limit=cfg.summary_cache_max,
                 cache_key=cache_key,
-                cache=cache,
+                store=store,
                 dek=dek,
             )
             if not summary:
@@ -545,7 +545,7 @@ async def build_tag_recall_context(
                     max_tokens=cfg.llm_max_tokens,
                     cache_limit=cfg.summary_cache_max,
                     cache_key=cache_key,
-                    cache=cache,
+                    store=store,
                     dek=dek,
                 )
 

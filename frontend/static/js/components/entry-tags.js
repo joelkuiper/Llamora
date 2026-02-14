@@ -4,7 +4,7 @@ import { scrollToHighlight } from "../ui.js";
 import { AutocompleteHistory } from "../utils/autocomplete-history.js";
 import { parsePositiveInteger } from "../utils/number.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
-import { getTagSummary, setTagSummary } from "../services/summary-store.js";
+import { getValue, setValue } from "../services/lockbox-store.js";
 import { animateMotion } from "../utils/transition.js";
 import { AutocompleteOverlayMixin } from "./base/autocomplete-overlay.js";
 
@@ -28,10 +28,46 @@ const prepareTagAutocompleteValue = (value) => `${value ?? ""}`.trim();
 const TAG_HISTORY_MAX = 50;
 const TAG_SUGGESTION_EMPTY_DELAY_MS = 180;
 const TAG_SKELETON_COUNT = 6;
+const SUMMARY_NAMESPACE = "summary";
 
 let sharedTagPopoverEl = null;
 let sharedTagDetailPopoverEl = null;
 let activeTagOwner = null;
+
+const normalizeSummaryWords = (value) => {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+const makeTagSummaryKey = (tagHash, words) => {
+  const base = `tag:${String(tagHash || "").trim()}`;
+  if (!base || base === "tag:") return "";
+  const count = normalizeSummaryWords(words);
+  return count ? `${base}:w${count}` : base;
+};
+
+const readTagSummaryPayload = (payload, digest) => {
+  if (!payload || typeof payload !== "object") return "";
+  if (digest != null && String(payload.digest || "") !== String(digest)) return "";
+  const value = payload.html;
+  return typeof value === "string" ? value : "";
+};
+
+const getCachedTagSummary = async (tagHash, { digest, words } = {}) => {
+  const key = makeTagSummaryKey(tagHash, words);
+  if (!key) return "";
+  const payload = await getValue(SUMMARY_NAMESPACE, key);
+  return readTagSummaryPayload(payload, digest);
+};
+
+const setCachedTagSummary = async (tagHash, html, { digest, words } = {}) => {
+  const key = makeTagSummaryKey(tagHash, words);
+  if (!key || html == null) return false;
+  return setValue(SUMMARY_NAMESPACE, key, {
+    digest: String(digest ?? ""),
+    html,
+  });
+};
 
 const getSharedTagPopoverEl = () => {
   if (!sharedTagPopoverEl || !sharedTagPopoverEl.isConnected) {
@@ -1293,7 +1329,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     if (html.includes("Summary unavailable")) {
       return;
     }
-    void setTagSummary(tagHash, html, {
+    void setCachedTagSummary(tagHash, html, {
       digest: summaryDigest,
       words: summaryWords,
     });
@@ -1307,7 +1343,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     const summaryDigest = summaryEl.dataset?.summaryDigest || "";
     const summaryWords = summaryEl.dataset?.summaryWords || "";
     if (!tagHash) return;
-    const cached = await getTagSummary(tagHash, {
+    const cached = await getCachedTagSummary(tagHash, {
       digest: summaryDigest,
       words: summaryWords,
     });
