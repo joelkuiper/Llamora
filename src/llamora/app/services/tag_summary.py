@@ -2,10 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass
 from typing import Any, Sequence
-
-from cachetools import TTLCache
 
 import orjson
 
@@ -17,19 +14,6 @@ from .tag_service import TagEntryPreview
 logger = logging.getLogger(__name__)
 
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
-_SUMMARY_CACHE_TTL = 6 * 60 * 60
-_SUMMARY_CACHE_MAX = 512
-_SUMMARY_CACHE: TTLCache[str, "TagSummaryState"] = TTLCache(
-    maxsize=_SUMMARY_CACHE_MAX, ttl=_SUMMARY_CACHE_TTL
-)
-
-
-@dataclass(slots=True)
-class TagSummaryState:
-    summary: str
-    last_entry_id: str | None
-    count: int
-    last_used: str | None
 
 
 def _tag_summary_system_prompt(
@@ -145,30 +129,6 @@ def _summary_mentions_tag_once(text: str, tag_name: str) -> bool:
     return len(matches) <= 1
 
 
-def _get_cache_key(key: str | None) -> str | None:
-    if not key:
-        return None
-    return str(key).strip() or None
-
-
-def _latest_entry_id(samples: Sequence[TagEntryPreview]) -> str | None:
-    if not samples:
-        return None
-    entry_id = str(samples[0].entry_id or "").strip()
-    return entry_id or None
-
-
-def _new_samples_since(
-    samples: Sequence[TagEntryPreview], last_entry_id: str | None
-) -> list[TagEntryPreview]:
-    if not last_entry_id:
-        return list(samples)
-    for idx, sample in enumerate(samples):
-        if sample.entry_id == last_entry_id:
-            return list(samples[:idx])
-    return list(samples)
-
-
 async def generate_tag_summary(
     llm,
     tag_name: str,
@@ -176,7 +136,6 @@ async def generate_tag_summary(
     last_used: str | None,
     samples: Sequence[TagEntryPreview],
     *,
-    cache_key: str | None = None,
     num_words: int = 28,
 ) -> str:
     if not tag_name or not samples:
@@ -199,30 +158,7 @@ async def generate_tag_summary(
         min_words=min_words,
         max_sentences=max_sentences,
     )
-    cache_key = _get_cache_key(cache_key)
-    cached = _SUMMARY_CACHE.get(cache_key) if cache_key else None
-    latest_entry_id = _latest_entry_id(samples)
-    if cached and cached.summary:
-        if (
-            cached.count == entry_count
-            and cached.last_entry_id == latest_entry_id
-            and cached.last_used == last_used
-        ):
-            return cached.summary
-        new_samples = _new_samples_since(samples, cached.last_entry_id)
-        if new_samples and len(new_samples) < len(samples):
-            user_prompt = _build_user_prompt(
-                tag_name,
-                entry_count,
-                last_used,
-                new_samples,
-                prior_summary=cached.summary,
-                incremental=True,
-            )
-        else:
-            user_prompt = _build_user_prompt(tag_name, entry_count, last_used, samples)
-    else:
-        user_prompt = _build_user_prompt(tag_name, entry_count, last_used, samples)
+    user_prompt = _build_user_prompt(tag_name, entry_count, last_used, samples)
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt},
@@ -248,13 +184,6 @@ async def generate_tag_summary(
     if _summary_word_count(summary) >= min_words and _summary_mentions_tag_once(
         summary, tag_name
     ):
-        if cache_key and summary:
-            _SUMMARY_CACHE[cache_key] = TagSummaryState(
-                summary=summary,
-                last_entry_id=latest_entry_id,
-                count=entry_count,
-                last_used=last_used,
-            )
         return summary
 
     retry_messages = [
@@ -281,13 +210,6 @@ async def generate_tag_summary(
         raw_retry = await llm.complete_messages(retry_messages, params=params)
     except Exception:
         logger.exception("Tag summary retry failed")
-        if cache_key and summary:
-            _SUMMARY_CACHE[cache_key] = TagSummaryState(
-                summary=summary,
-                last_entry_id=latest_entry_id,
-                count=entry_count,
-                last_used=last_used,
-            )
         return summary
 
     retry_summary = _extract_summary(
@@ -295,15 +217,7 @@ async def generate_tag_summary(
         max_sentences=max_sentences,
         max_chars=max_chars,
     )
-    final = retry_summary or summary
-    if cache_key and final:
-        _SUMMARY_CACHE[cache_key] = TagSummaryState(
-            summary=final,
-            last_entry_id=latest_entry_id,
-            count=entry_count,
-            last_used=last_used,
-        )
-    return final
+    return retry_summary or summary
 
 
 __all__ = ["generate_tag_summary"]

@@ -49,18 +49,6 @@ export async function setTagSummary(tag, value, options = {}) {
   }
 }
 
-export async function deleteTagSummary(tag, options = {}) {
-  const { words } = options || {};
-  const key = makeTagKey(tag, words);
-  if (!key || key === "tag:") return false;
-  try {
-    await lockbox.delete(SUMMARY_NAMESPACE, key);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export async function getDaySummary(date, options = {}) {
   const { digest } = options || {};
   const key = makeDayKey(date);
@@ -83,17 +71,6 @@ export async function setDaySummary(date, value, options = {}) {
       digest: String(digest ?? ""),
       text: value,
     });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export async function deleteDaySummary(date) {
-  const key = makeDayKey(date);
-  if (!key || key === "day:") return false;
-  try {
-    await lockbox.delete(SUMMARY_NAMESPACE, key);
     return true;
   } catch {
     return false;

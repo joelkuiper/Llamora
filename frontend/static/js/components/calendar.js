@@ -2,7 +2,7 @@
 import { getActiveDayParts } from "../entries/active-day-store.js";
 import { createPopover } from "../popover.js";
 import { triggerLabelFlash } from "../utils/motion.js";
-import { deleteDaySummary, getDaySummary, setDaySummary } from "../services/summary-store.js";
+import { getDaySummary, setDaySummary } from "../services/summary-store.js";
 import { transitionHide, transitionShow } from "../utils/transition.js";
 
 export class CalendarControl extends HTMLElement {
@@ -48,20 +48,7 @@ export class CalendarControl extends HTMLElement {
       { signal },
     );
 
-    // Invalidate summary cache when entries are swapped
-    document.body.addEventListener(
-      "htmx:afterSwap",
-      (event) => {
-        const target = event?.detail?.target ?? event?.target;
-        if (target?.id === "entries") {
-          const date = target?.dataset?.date;
-          if (date) {
-            void deleteDaySummary(date);
-          }
-        }
-      },
-      { signal },
-    );
+    // Summary cache is validated via digests, no manual invalidation needed.
   }
 
   disconnectedCallback() {
