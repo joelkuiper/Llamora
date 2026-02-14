@@ -27,6 +27,12 @@ const bundles = [
     outfile: "floating-ui.min.js",
     globalName: "FloatingUIDOM",
   },
+  {
+    name: "fuse",
+    entry: "fuse.js",
+    outfile: "fuse.min.js",
+    globalName: "Fuse",
+  },
 ];
 
 const copies = [

@@ -1,10 +1,8 @@
-import * as FuseModule from "fuse.js";
+import { Fuse as FuseCtor } from "../vendor/setup-globals.js";
 import { armEntryAnimations, armInitialEntryAnimations } from "../entries/entry-animations.js";
 import { formatTimeElements } from "../services/time.js";
 import { clearScrollTarget, flashHighlight } from "../ui.js";
 import { sessionStore } from "../utils/storage.js";
-
-const FuseCtor = FuseModule.default ?? FuseModule;
 
 const BOOT_KEY = "__llamoraTagsViewBooted";
 const state = {
