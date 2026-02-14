@@ -2,7 +2,7 @@
 import { getActiveDayParts } from "../entries/active-day-store.js";
 import { createPopover } from "../popover.js";
 import { triggerLabelFlash } from "../utils/motion.js";
-import { summaryCache } from "../utils/storage.js";
+import { deleteDaySummary, getDaySummary, setDaySummary } from "../services/summary-store.js";
 import { transitionHide, transitionShow } from "../utils/transition.js";
 
 export class CalendarControl extends HTMLElement {
@@ -10,7 +10,6 @@ export class CalendarControl extends HTMLElement {
   #btn = null;
   #pop = null;
   #globalListeners = null;
-  #summaryCache = new Map();
   #summaryRequests = new Map();
   #tooltip = null;
   #tooltipTimer = null;
@@ -57,8 +56,7 @@ export class CalendarControl extends HTMLElement {
         if (target?.id === "entries") {
           const date = target?.dataset?.date;
           if (date) {
-            this.#summaryCache.delete(date);
-            summaryCache.delete(`day:${date}`);
+            void deleteDaySummary(date);
           }
         }
       },
@@ -338,12 +336,8 @@ export class CalendarControl extends HTMLElement {
 
   async #fetchDaySummary(date) {
     if (!date) return "";
-    if (this.#summaryCache.has(date)) {
-      return this.#summaryCache.get(date);
-    }
-    const cached = summaryCache.get(`day:${date}`);
+    const cached = await getDaySummary(date);
     if (cached) {
-      this.#summaryCache.set(date, cached);
       return cached;
     }
     if (this.#summaryRequests.has(date)) {
@@ -356,8 +350,7 @@ export class CalendarControl extends HTMLElement {
       .then((data) => {
         const summary = typeof data?.summary === "string" ? data.summary.trim() : "";
         if (summary) {
-          this.#summaryCache.set(date, summary);
-          summaryCache.set(`day:${date}`, summary);
+          void setDaySummary(date, summary);
         }
         this.#summaryRequests.delete(date);
         return summary;

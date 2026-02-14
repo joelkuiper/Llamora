@@ -56,7 +56,6 @@ async function ensureShell() {
     importOnce("app-init", () => import("../app-init.js")),
     importOnce("logo-toggle", () => import("../logo-toggle.js")),
     importOnce("tooltip", () => import("../tooltip.js")),
-    importOnce("fragment-cache", () => import("../components/fragment-cache.js")),
     importOnce("confirm-modal", () => import("../components/confirm-modal.js")),
     importOnce("tags-view", () => import("../components/tags-view.js")),
   ]);

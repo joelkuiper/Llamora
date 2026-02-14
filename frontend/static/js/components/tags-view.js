@@ -1,5 +1,6 @@
 import { armEntryAnimations, armInitialEntryAnimations } from "../entries/entry-animations.js";
 import { formatTimeElements } from "../services/time.js";
+import { getTagSummary, setTagSummary } from "../services/summary-store.js";
 import { clearScrollTarget, flashHighlight } from "../ui.js";
 import { prefersReducedMotion } from "../utils/motion.js";
 import { sessionStore } from "../utils/storage.js";
@@ -508,6 +509,41 @@ const animateDetailEntries = (root = document) => {
   armInitialEntryAnimations(entries);
 };
 
+const getSummaryElement = (root = document) =>
+  root.querySelector?.(".tags-view__summary[data-tag-hash]") ||
+  document.querySelector(".tags-view__summary[data-tag-hash]");
+
+const isCacheableSummary = (summaryEl) => {
+  if (!(summaryEl instanceof HTMLElement)) return null;
+  if (summaryEl.querySelector(".tag-detail-skeleton")) return null;
+  const html = summaryEl.innerHTML?.trim();
+  if (!html) return null;
+  if (html.includes("Summary unavailable")) return null;
+  return html;
+};
+
+const hydrateTagsViewSummary = async (root = document) => {
+  const summaryEl = getSummaryElement(root);
+  if (!summaryEl) return;
+  const tagHash = summaryEl.dataset?.tagHash || "";
+  if (!tagHash) return;
+  const cached = await getTagSummary(tagHash);
+  if (!cached) return;
+  summaryEl.innerHTML = cached;
+  summaryEl.removeAttribute("hx-get");
+  summaryEl.removeAttribute("hx-trigger");
+  summaryEl.removeAttribute("hx-swap");
+};
+
+const cacheTagsViewSummary = (summaryEl) => {
+  if (!(summaryEl instanceof HTMLElement)) return;
+  const tagHash = summaryEl.dataset?.tagHash || "";
+  if (!tagHash) return;
+  const html = isCacheableSummary(summaryEl);
+  if (!html) return;
+  void setTagSummary(tagHash, html);
+};
+
 const highlightRequestedTag = (root = document) => {
   const params = new URLSearchParams(window.location.search);
   const target = String(params.get("target") || "").trim();
@@ -909,6 +945,7 @@ const syncDetailOnly = (root = document) => {
   applySearch(state.query);
   animateDetailEntries(root);
   highlightRequestedTag(root);
+  void hydrateTagsViewSummary(root);
   if (state.pendingTagHighlight) {
     const selected = getSelectedTrace(root);
     if (selected && selected === state.pendingTagHighlight) {
@@ -1004,6 +1041,12 @@ if (!globalThis[BOOT_KEY]) {
   document.body.addEventListener("htmx:afterSwap", (event) => {
     const target = event.detail?.target;
     if (!(target instanceof Element)) return;
+    const summaryEl =
+      target.closest?.(".tags-view__summary") ||
+      (target.classList?.contains("tags-view__summary") ? target : null);
+    if (summaryEl) {
+      cacheTagsViewSummary(summaryEl);
+    }
     const inList = target.closest?.("#tags-view-list");
     const inEntries = target.closest?.("[data-tags-view-entries]");
     if (target.id === "tags-view-list" || inList) {

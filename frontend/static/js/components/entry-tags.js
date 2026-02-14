@@ -4,7 +4,7 @@ import { scrollToHighlight } from "../ui.js";
 import { AutocompleteHistory } from "../utils/autocomplete-history.js";
 import { parsePositiveInteger } from "../utils/number.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
-import { summaryCache } from "../utils/storage.js";
+import { getTagSummary, setTagSummary } from "../services/summary-store.js";
 import { animateMotion } from "../utils/transition.js";
 import { AutocompleteOverlayMixin } from "./base/autocomplete-overlay.js";
 
@@ -1225,7 +1225,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     if (this.#detailBody) {
       formatTimeElements(this.#detailBody);
       if (target === this.#detailBody) {
-        this.#hydrateSummaryFromCache();
+        void this.#hydrateSummaryFromCache();
       }
       const entriesList = this.#detailBody.querySelector(".tag-detail__entries");
       if (entriesList && this.#detailBody.dataset.resetScroll === "1") {
@@ -1291,16 +1291,16 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     if (html.includes("Summary unavailable")) {
       return;
     }
-    summaryCache.set(`tag:${tagHash}`, html);
+    void setTagSummary(tagHash, html);
   }
 
-  #hydrateSummaryFromCache() {
+  async #hydrateSummaryFromCache() {
     if (!this.#detailBody) return;
     const summaryEl = this.#detailBody.querySelector(".tag-detail__summary");
     if (!summaryEl) return;
     const tagHash = summaryEl.dataset?.tagHash || this.#activeTagHash || "";
     if (!tagHash) return;
-    const cached = summaryCache.get(`tag:${tagHash}`);
+    const cached = await getTagSummary(tagHash);
     if (cached) {
       summaryEl.innerHTML = cached;
       summaryEl.removeAttribute("hx-get");

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import base64
 import logging
 import sqlite3
+import orjson
 
 from quart import Blueprint, jsonify, request
 
@@ -24,14 +24,14 @@ async def put_value(namespace: str, key: str):
     user_id = str(user["id"])
 
     payload = await request.get_json(silent=True)
-    encoded = payload.get("value") if isinstance(payload, dict) else None
-    if not isinstance(encoded, str):
+    if not isinstance(payload, dict) or "value" not in payload:
         return jsonify({"ok": False}), 400
+    encoded = payload.get("value")
 
     try:
-        value = base64.b64decode(encoded, validate=True)
+        value = orjson.dumps(encoded)
         await lockbox.set(user_id, dek, namespace, key, value)
-    except ValueError:
+    except (TypeError, orjson.JSONEncodeError):
         return jsonify({"ok": False}), 400
     except sqlite3.Error:
         logger.exception("Lockbox write failed")
@@ -66,7 +66,12 @@ async def get_value(namespace: str, key: str):
 
     if value is None:
         return jsonify({"ok": False})
-    return jsonify({"ok": True, "value": base64.b64encode(value).decode("ascii")})
+    try:
+        decoded = orjson.loads(value)
+    except orjson.JSONDecodeError:
+        logger.exception("Lockbox decode failed")
+        return jsonify({"ok": False}), 500
+    return jsonify({"ok": True, "value": decoded})
 
 
 @lockbox_bp.delete("/<namespace>/<key>")

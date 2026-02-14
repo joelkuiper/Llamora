@@ -1,5 +1,3 @@
-const SIX_HOURS = 6 * 60 * 60 * 1000;
-
 export class CacheStore {
   #backend;
   #prefix;
@@ -60,18 +58,6 @@ export class CacheStore {
     }
   }
 }
-
-export const fragmentCache = new CacheStore({
-  backend: globalThis.localStorage,
-  prefix: "llamora:cache:",
-  defaultTTL: SIX_HOURS,
-});
-
-export const summaryCache = new CacheStore({
-  backend: globalThis.sessionStorage,
-  prefix: "llamora:summary:",
-  defaultTTL: SIX_HOURS,
-});
 
 export const draftStore = new CacheStore({
   backend: globalThis.sessionStorage,
