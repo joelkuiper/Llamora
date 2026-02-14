@@ -120,6 +120,9 @@ async def get_month_context(
     active_days, opening_only_days = await services.db.entries.get_days_with_entries(
         user_id, selected_year, selected_month, dek
     )
+    day_summary_digests = await services.db.entries.get_day_summary_digests(
+        user_id, selected_year, selected_month
+    )
     prev_year, prev_month, next_year, next_month = _nav_months(
         selected_year, selected_month, min_month_start, max_month_start
     )
@@ -142,6 +145,7 @@ async def get_month_context(
         "month_names": month_names,
         "active_days": active_days,
         "opening_only_days": opening_only_days,
+        "day_summary_digests": day_summary_digests,
         "prev_year": prev_year,
         "prev_month": prev_month,
         "next_year": next_year,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+import hashlib
 from datetime import datetime
 import logging
 import re
@@ -39,6 +40,11 @@ def _parse_tag_cursor(cursor: str | None) -> tuple[str | None, str | None]:
     return created_at, entry_id
 
 
+def _build_summary_digest(entry_count: int, last_updated: str | None) -> str:
+    payload = f"{entry_count}:{last_updated or ''}".encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
 @dataclass(slots=True)
 class TagEntryPreview:
     entry_id: str
@@ -53,6 +59,8 @@ class TagOverview:
     hash: str
     count: int
     last_used: str | None
+    last_updated: str | None
+    summary_digest: str
     entries: tuple[TagEntryPreview, ...]
     has_more: bool = False
     next_cursor: str | None = None
@@ -91,6 +99,8 @@ class TagArchiveDetail:
     count: int
     first_used: str | None
     first_used_label: str | None
+    last_updated: str | None
+    summary_digest: str
     entries: tuple[TagArchiveEntry, ...]
     related_tags: tuple[TagRelatedItem, ...]
     entries_has_more: bool = False
@@ -200,6 +210,10 @@ class TagService:
             hash=info["hash"],
             count=int(info.get("count", 0) or 0),
             last_used=info.get("last_used"),
+            last_updated=info.get("last_updated"),
+            summary_digest=_build_summary_digest(
+                int(info.get("count", 0) or 0), info.get("last_updated")
+            ),
             entries=tuple(previews),
             has_more=has_more,
             next_cursor=next_cursor,
@@ -412,6 +426,10 @@ class TagService:
                 count=int(info.get("count") or 0),
                 first_used=info.get("first_used"),
                 first_used_label=_format_month_year(info.get("first_used")),
+                last_updated=info.get("last_updated"),
+                summary_digest=_build_summary_digest(
+                    int(info.get("count") or 0), info.get("last_updated")
+                ),
                 entries=(),
                 entries_has_more=False,
                 entries_next_cursor=None,
@@ -436,6 +454,10 @@ class TagService:
             count=int(info.get("count") or tag_item.count),
             first_used=info.get("first_used"),
             first_used_label=_format_month_year(info.get("first_used")),
+            last_updated=info.get("last_updated"),
+            summary_digest=_build_summary_digest(
+                int(info.get("count") or tag_item.count), info.get("last_updated")
+            ),
             entries=tuple(archive_entries),
             entries_has_more=has_more,
             entries_next_cursor=next_cursor,

@@ -57,8 +57,11 @@ class EntriesRepository(BaseRepository):
         entries: list[dict] = []
         for row in rows:
             created_date = None
+            updated_at = None
             if "created_date" in row.keys():
                 created_date = row["created_date"]
+            if "updated_at" in row.keys():
+                updated_at = row["updated_at"]
             record_json = self._decrypt_message(
                 dek,
                 user_id,
@@ -72,6 +75,7 @@ class EntriesRepository(BaseRepository):
                 {
                     "id": row["id"],
                     "created_at": row["created_at"],
+                    "updated_at": updated_at,
                     "created_date": created_date,
                     "role": row["role"],
                     "reply_to": row["reply_to"],
@@ -88,6 +92,9 @@ class EntriesRepository(BaseRepository):
         for row in rows:
             entry_id = row["id"]
             if not history or history[-1]["id"] != entry_id:
+                updated_at = None
+                if "updated_at" in row.keys():
+                    updated_at = row["updated_at"]
                 record_json = self._decrypt_message(
                     dek,
                     user_id,
@@ -100,6 +107,7 @@ class EntriesRepository(BaseRepository):
                 current = {
                     "id": entry_id,
                     "created_at": row["created_at"],
+                    "updated_at": updated_at,
                     "role": row["role"],
                     "reply_to": row["reply_to"],
                     "text": rec.get("text", ""),
@@ -334,7 +342,7 @@ class EntriesRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT id, role, reply_to, nonce, ciphertext, alg, created_at, created_date
+                SELECT id, role, reply_to, nonce, ciphertext, alg, created_at, updated_at, created_date
                 FROM entries
                 WHERE id = ? AND user_id = ?
                 """,
@@ -368,7 +376,7 @@ class EntriesRepository(BaseRepository):
                 await conn.execute(
                     """
                     UPDATE entries
-                    SET nonce = ?, ciphertext = ?, alg = ?, prompt_tokens = ?
+                    SET nonce = ?, ciphertext = ?, alg = ?, prompt_tokens = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE id = ? AND user_id = ?
                     """,
                     (nonce, ct, alg, prompt_tokens, entry_id, user_id),
@@ -379,6 +387,7 @@ class EntriesRepository(BaseRepository):
         entry_record = {
             "id": entry_id,
             "created_at": row["created_at"],
+            "updated_at": row["updated_at"] if "updated_at" in row.keys() else None,
             "created_date": row["created_date"],
             "role": row["role"],
             "reply_to": row["reply_to"],
@@ -431,7 +440,7 @@ class EntriesRepository(BaseRepository):
             cursor = await conn.execute(
                 """
                 SELECT m.id, m.role, m.reply_to, m.nonce, m.ciphertext, m.alg,
-                       m.created_at, m.created_date, m.prompt_tokens
+                       m.created_at, m.updated_at, m.created_date, m.prompt_tokens
                 FROM entries m
                 WHERE m.user_id = ?
                 ORDER BY m.id DESC
@@ -450,7 +459,7 @@ class EntriesRepository(BaseRepository):
             cursor = await conn.execute(
                 """
                 SELECT m.id, m.role, m.reply_to, m.nonce, m.ciphertext, m.alg,
-                       m.created_at, m.created_date, m.prompt_tokens
+                       m.created_at, m.updated_at, m.created_date, m.prompt_tokens
                 FROM entries m
                 WHERE m.user_id = ? AND m.id < ?
                 ORDER BY m.id DESC
@@ -486,7 +495,7 @@ class EntriesRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 f"""
-                SELECT m.id, m.created_at, m.created_date, m.role, m.reply_to,
+                SELECT m.id, m.created_at, m.updated_at, m.created_date, m.role, m.reply_to,
                        m.nonce, m.ciphertext, m.alg, m.prompt_tokens
                 FROM entries m
                 WHERE m.user_id = ? AND m.id IN ({placeholders})
@@ -506,7 +515,7 @@ class EntriesRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 f"""
-                SELECT m.id, m.created_at, m.created_date, m.role, m.reply_to,
+                SELECT m.id, m.created_at, m.updated_at, m.created_date, m.role, m.reply_to,
                        m.nonce, m.ciphertext, m.alg, m.prompt_tokens
                 FROM entries m
                 WHERE m.user_id = ? AND m.reply_to IN ({placeholders})
@@ -534,7 +543,7 @@ class EntriesRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT m.id, m.created_at, m.role, m.reply_to, m.nonce,
+                SELECT m.id, m.created_at, m.updated_at, m.role, m.reply_to, m.nonce,
                        m.ciphertext, m.alg AS msg_alg,
                        m.prompt_tokens,
                        x.ulid AS tag_ulid,
@@ -567,14 +576,14 @@ class EntriesRepository(BaseRepository):
             cursor = await conn.execute(
                 """
                 WITH recent AS (
-                    SELECT m.id, m.created_at, m.role, m.reply_to, m.nonce,
+                    SELECT m.id, m.created_at, m.updated_at, m.role, m.reply_to, m.nonce,
                            m.ciphertext, m.alg, m.prompt_tokens
                     FROM entries m
                     WHERE m.user_id = ? AND m.created_date = ?
                     ORDER BY m.id DESC
                     LIMIT ?
                 )
-                SELECT recent.id, recent.created_at, recent.role, recent.reply_to,
+                SELECT recent.id, recent.created_at, recent.updated_at, recent.role, recent.reply_to,
                        recent.nonce, recent.ciphertext, recent.alg AS msg_alg,
                        recent.prompt_tokens,
                        x.ulid AS tag_ulid,
@@ -631,6 +640,40 @@ class EntriesRepository(BaseRepository):
                 non_opening_days.add(day)
         opening_only_days = sorted(active_days - non_opening_days)
         return sorted(active_days), opening_only_days
+
+    async def get_day_summary_digests(
+        self, user_id: str, year: int, month: int
+    ) -> dict[int, str]:
+        import hashlib
+
+        month_prefix = f"{year:04d}-{month:02d}"
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                """
+                SELECT created_date,
+                       COUNT(*) AS entry_count,
+                       MAX(COALESCE(updated_at, created_at)) AS last_updated
+                FROM entries
+                WHERE user_id = ? AND substr(created_date, 1, 7) = ?
+                GROUP BY created_date
+                """,
+                (user_id, month_prefix),
+            )
+            rows = await cursor.fetchall()
+        summary_digests: dict[int, str] = {}
+        for row in rows:
+            created_date = row["created_date"] or ""
+            if len(created_date) < 10:
+                continue
+            try:
+                day = int(created_date[8:10])
+            except (TypeError, ValueError):
+                continue
+            count = int(row["entry_count"] or 0)
+            last_updated = row["last_updated"] or ""
+            payload = f"{count}:{last_updated}".encode("utf-8")
+            summary_digests[day] = hashlib.sha256(payload).hexdigest()
+        return summary_digests
 
     async def get_first_entry_date(self, user_id: str) -> str | None:
         async with self.pool.connection() as conn:

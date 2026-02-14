@@ -336,7 +336,8 @@ export class CalendarControl extends HTMLElement {
 
   async #fetchDaySummary(date) {
     if (!date) return "";
-    const cached = await getDaySummary(date);
+    const summaryDigest = this.#summaryCell?.dataset?.summaryDigest || "";
+    const cached = await getDaySummary(date, { digest: summaryDigest });
     if (cached) {
       return cached;
     }
@@ -350,7 +351,7 @@ export class CalendarControl extends HTMLElement {
       .then((data) => {
         const summary = typeof data?.summary === "string" ? data.summary.trim() : "";
         if (summary) {
-          void setDaySummary(date, summary);
+          void setDaySummary(date, summary, { digest: summaryDigest });
         }
         this.#summaryRequests.delete(date);
         return summary;

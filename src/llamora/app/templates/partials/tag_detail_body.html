@@ -54,6 +54,8 @@
        hx-get="{{ url_for('tags.tag_detail_summary', tag_hash=tag.hash) }}?num_words=28"
        hx-trigger="tag-detail:summary"
        hx-target="this"
+       data-summary-digest="{{ tag.summary_digest }}"
+       data-summary-words="28"
        data-tag-hash="{{ tag.hash }}"
        hx-disinherit="hx-target"
        hx-swap="innerHTML swap:120ms">

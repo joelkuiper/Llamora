@@ -77,8 +77,10 @@
             {% if date_str == today %}{% set classes = classes + ['is-today'] %}{% endif %}
             {% if day in active_days %}{% set classes = classes + ['has-entry'] %}{% endif %}
             {% if day in opening_only_days %}{% set classes = classes + ['has-opening-only'] %}{% endif %}
+            {% set summary_digest = (day_summary_digests.get(day) if day_summary_digests is defined else '') %}
             {% set is_today = (date_str == today) %}
             <td data-date="{{ date_str }}"
+                {% if summary_digest %}data-summary-digest="{{ summary_digest }}"{% endif %}
                 data-calendar-cell
                 role="gridcell"
                 tabindex="{{ 0 if date_str == active_day else -1 }}"

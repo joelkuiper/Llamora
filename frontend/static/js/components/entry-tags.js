@@ -1287,11 +1287,16 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     if (!(summaryEl instanceof HTMLElement)) return;
     const tagHash = summaryEl.dataset?.tagHash || this.#activeTagHash || "";
     const html = summaryEl.innerHTML?.trim();
+    const summaryDigest = summaryEl.dataset?.summaryDigest || "";
+    const summaryWords = summaryEl.dataset?.summaryWords || "";
     if (!tagHash || !html) return;
     if (html.includes("Summary unavailable")) {
       return;
     }
-    void setTagSummary(tagHash, html);
+    void setTagSummary(tagHash, html, {
+      digest: summaryDigest,
+      words: summaryWords,
+    });
   }
 
   async #hydrateSummaryFromCache() {
@@ -1299,8 +1304,13 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     const summaryEl = this.#detailBody.querySelector(".tag-detail__summary");
     if (!summaryEl) return;
     const tagHash = summaryEl.dataset?.tagHash || this.#activeTagHash || "";
+    const summaryDigest = summaryEl.dataset?.summaryDigest || "";
+    const summaryWords = summaryEl.dataset?.summaryWords || "";
     if (!tagHash) return;
-    const cached = await getTagSummary(tagHash);
+    const cached = await getTagSummary(tagHash, {
+      digest: summaryDigest,
+      words: summaryWords,
+    });
     if (cached) {
       summaryEl.innerHTML = cached;
       summaryEl.removeAttribute("hx-get");

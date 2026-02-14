@@ -526,8 +526,13 @@ const hydrateTagsViewSummary = async (root = document) => {
   const summaryEl = getSummaryElement(root);
   if (!summaryEl) return;
   const tagHash = summaryEl.dataset?.tagHash || "";
+  const summaryDigest = summaryEl.dataset?.summaryDigest || "";
+  const summaryWords = summaryEl.dataset?.summaryWords || "";
   if (!tagHash) return;
-  const cached = await getTagSummary(tagHash);
+  const cached = await getTagSummary(tagHash, {
+    digest: summaryDigest,
+    words: summaryWords,
+  });
   if (!cached) return;
   summaryEl.innerHTML = cached;
   summaryEl.removeAttribute("hx-get");
@@ -538,10 +543,15 @@ const hydrateTagsViewSummary = async (root = document) => {
 const cacheTagsViewSummary = (summaryEl) => {
   if (!(summaryEl instanceof HTMLElement)) return;
   const tagHash = summaryEl.dataset?.tagHash || "";
+  const summaryDigest = summaryEl.dataset?.summaryDigest || "";
+  const summaryWords = summaryEl.dataset?.summaryWords || "";
   if (!tagHash) return;
   const html = isCacheableSummary(summaryEl);
   if (!html) return;
-  void setTagSummary(tagHash, html);
+  void setTagSummary(tagHash, html, {
+    digest: summaryDigest,
+    words: summaryWords,
+  });
 };
 
 const highlightRequestedTag = (root = document) => {

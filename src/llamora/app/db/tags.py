@@ -288,6 +288,15 @@ class TagsRepository(BaseRepository):
                        ) AS last_used
                        ,
                        (
+                           SELECT MAX(COALESCE(e.updated_at, e.created_at))
+                           FROM tag_entry_xref x
+                           JOIN entries e
+                             ON e.user_id = x.user_id AND e.id = x.entry_id
+                            WHERE x.user_id = t.user_id
+                              AND x.tag_hash = t.tag_hash
+                       ) AS last_updated
+                       ,
+                       (
                            SELECT MIN(e.created_at)
                            FROM tag_entry_xref x
                            JOIN entries e
@@ -320,6 +329,7 @@ class TagsRepository(BaseRepository):
             "hash": row["tag_hash"].hex(),
             "count": row["seen_count"],
             "last_used": row["last_used"],
+            "last_updated": row["last_updated"],
             "first_used": row["first_used"],
         }
 
