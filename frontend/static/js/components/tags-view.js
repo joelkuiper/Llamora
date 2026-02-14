@@ -105,7 +105,7 @@ const readStoredEntriesAnchor = () => {
     key,
     tag,
     entryId,
-    offset: Number.isFinite(offset) ? Math.max(0, offset) : 0,
+    offset: Number.isFinite(offset) ? offset : 0,
   };
 };
 
@@ -196,7 +196,7 @@ const captureEntriesAnchor = () => {
   if (!(anchor instanceof HTMLElement)) return;
   const entryId = String(anchor.dataset.entryId || "").trim();
   if (!entryId) return;
-  const offset = Math.max(0, Math.round(viewportTop - anchor.getBoundingClientRect().top));
+  const offset = Math.round(viewportTop - anchor.getBoundingClientRect().top);
   storeEntriesAnchor({
     tag: selectedTag,
     entryId,
@@ -223,7 +223,7 @@ const applyEntriesAnchor = (entryElement, offset) => {
   if (!(scrollElement instanceof HTMLElement)) return false;
   const viewportTop = scrollElement.getBoundingClientRect().top + 8;
   const entryTop = entryElement.getBoundingClientRect().top;
-  const desiredTop = viewportTop - Math.max(0, offset);
+  const desiredTop = viewportTop - offset;
   const delta = entryTop - desiredTop;
   scrollElement.scrollTop += delta;
   return true;

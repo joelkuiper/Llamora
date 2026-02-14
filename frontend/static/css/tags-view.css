@@ -90,7 +90,7 @@
   overflow-y: auto;
   padding-bottom: 0.5rem;
   scrollbar-width: thin;
-  contain: layout style paint;
+  /* contain: layout style paint; */
 }
 
 .tags-view__list-body::-webkit-scrollbar {
@@ -499,7 +499,7 @@
 
 .tags-view__summary .tag-detail-skeleton {
   gap: 0.35rem;
-  margin-top: 0.14rem;
+  margin-top: 0.34rem;
 }
 
 .tags-view__summary .tag-detail-skeleton span {
