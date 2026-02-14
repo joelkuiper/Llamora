@@ -104,11 +104,13 @@ async def _verify_password(hash_bytes: bytes, password: bytes) -> bool:
 
 def _get_client_ip() -> str:
     trusted_hops = int(settings.get("PROXY.trusted_hops") or 0)
-    if trusted_hops > 0:
-        access_route = getattr(request, "access_route", None)
-        if access_route:
-            return str(access_route[0]).strip()
-    return request.remote_addr or "unknown"
+    access_route = getattr(request, "access_route", None) or []
+    if trusted_hops > 0 and access_route:
+        if len(access_route) > trusted_hops:
+            return str(access_route[-(trusted_hops + 1)]).strip()
+    return request.remote_addr or (
+        str(access_route[0]).strip() if access_route else "unknown"
+    )
 
 
 PROFILE_TABS: dict[str, str] = {
