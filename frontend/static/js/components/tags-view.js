@@ -680,6 +680,7 @@ const applySearch = (rawQuery) => {
   if (!state.rows.length) {
     buildSearchIndex();
   }
+  const previousQuery = state.query;
   const query = String(rawQuery || "").trim();
   state.query = query;
   persistSearchQuery(query);
@@ -695,6 +696,15 @@ const applySearch = (rawQuery) => {
       if (!listBody.isConnected) return;
       listBody.classList.remove("is-searching");
     }, 200);
+    if (query !== previousQuery) {
+      window.requestAnimationFrame(() => {
+        if (!listBody.isConnected) return;
+        listBody.scrollTo({
+          top: 0,
+          behavior: query ? "smooth" : "auto",
+        });
+      });
+    }
   }
   if (!state.rows.length) return;
 
