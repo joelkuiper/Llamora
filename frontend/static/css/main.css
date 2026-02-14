@@ -601,6 +601,12 @@ input[type="checkbox"]:focus {
 .icon-square {
   --icon: url("../icons/square.svg");
 }
+.icon-circle-arrow-right {
+  --icon: url("../icons/circle-arrow-right.svg");
+}
+.icon-square-chevron-right {
+  --icon: url("../icons/square-chevron-right.svg");
+}
 
 .icon-btn.active {
   background: var(--accent-15);

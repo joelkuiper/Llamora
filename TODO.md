@@ -26,5 +26,5 @@ Later
 - [ ] Image support?
 - [ ] Generic attachment support?
 Maybe
-- [ ] Github / squarespace page, domain, etc?
+- [ ] Github / squarespace page, domain, etc
 - [ ] Desktop app (Electron/Tauri)

@@ -9,11 +9,14 @@
   responses=None,
   include_responses=True,
   animate_entries=False,
+  entry_class='',
   tags_context_query='',
   tags_click_mode='detail',
   tags_navigate_page_template='',
   tags_navigate_fragment_template='',
   entry_open_url=None,
+  entry_open_variant='footer',
+  entry_open_icon='icon-book-marked',
   entry_open_hx_get=None,
   entry_open_hx_target=None,
   entry_open_hx_swap=None,
@@ -24,16 +27,31 @@
 {% set repeat_guard = entry_meta.get('repeat_guard') %}
 {% set is_opening = entry_meta.get('auto_opening') %}
 {% set speaker = 'Your' if e['role'] == 'user' else 'Assistant' %}
+{% set extra_entry_class = entry_class.strip() %}
 <div id="entry-{{ e['id'] }}"
-     class="entry {{ 'assistant' if e['role'] != 'user' else 'user'}}{% if is_error %} entry--error{% endif %}{% if is_opening %} entry--opening{% endif %}{% if animate_entries %} motion-animate-entry{% endif %}"
+     class="entry {{ 'assistant' if e['role'] != 'user' else 'user'}}{% if is_error %} entry--error{% endif %}{% if is_opening %} entry--opening{% endif %}{% if animate_entries %} motion-animate-entry{% endif %}{% if extra_entry_class %} {{ extra_entry_class }}{% endif %}"
      data-entry-id="{{ e['id'] }}"
      {% if e['role'] == 'assistant' and e.get('reply_to') %}
      data-response-to="{{ e['reply_to'] }}"
      {% endif %}
-     {% if repeat_guard %}data-repeat-guard="true"{% endif %}
+  {% if repeat_guard %}data-repeat-guard="true"{% endif %}
      role="article"
      aria-labelledby="entry-{{ e['id'] }}-speaker entry-{{ e['id'] }}-body">
   <span class="visually-hidden" id="entry-{{ e['id'] }}-speaker">{{ speaker }} entry</span>
+  {% if e['role'] == 'user' and entry_open_url and entry_open_variant == 'corner' %}
+  <div class="entry-corner-actions">
+    <a class="entry-action entry-open entry-open--corner tags-view__entry-open"
+       href="{{ entry_open_url }}"
+       {% if entry_open_hx_get %}hx-get="{{ entry_open_hx_get }}"{% endif %}
+       {% if entry_open_hx_target %}hx-target="{{ entry_open_hx_target }}"{% endif %}
+       {% if entry_open_hx_swap %}hx-swap="{{ entry_open_hx_swap }}"{% endif %}
+       {% if entry_open_hx_push_url %}hx-push-url="{{ entry_open_hx_push_url }}"{% endif %}
+       aria-label="Go to entry"
+       data-tooltip-title="Go to entry">
+      <span class="icon-mask {{ entry_open_icon }} entry-action__icon" aria-hidden="true"></span>
+    </a>
+  </div>
+  {% endif %}
   {{ render_entry_main(e, day) }}
   {% if e['role'] == 'user' and not entry_meta.get('error') %}
   <div class="entry-footer">
@@ -52,7 +70,7 @@
             data-time-raw="{{ e['created_at'] }}"></time>
       {% endif %}
       {{ entry_edit_button(e['id'], is_today, mode="view") }}
-      {% if entry_open_url %}
+      {% if entry_open_url and entry_open_variant == 'footer' %}
       <a class="entry-action entry-open"
          href="{{ entry_open_url }}"
          {% if entry_open_hx_get %}hx-get="{{ entry_open_hx_get }}"{% endif %}
@@ -61,7 +79,7 @@
          {% if entry_open_hx_push_url %}hx-push-url="{{ entry_open_hx_push_url }}"{% endif %}
          aria-label="Go to entry"
          data-tooltip-title="Go to entry">
-        <span class="icon-mask icon-book-marked entry-action__icon" aria-hidden="true"></span>
+        <span class="icon-mask {{ entry_open_icon }} entry-action__icon" aria-hidden="true"></span>
       </a>
       {% endif %}
       <button class="entry-action entry-delete"
