@@ -158,8 +158,13 @@ export function formatTimeElements(root = document) {
       el.textContent = timeText;
     }
     const stamp = formatLocalTimestamp(raw);
+    const relative = formatRelativeTime(raw);
     if (stamp) {
       el.title = stamp;
+      const tooltipText = relative ? `${relative} · ${stamp}` : stamp;
+      el.dataset.tooltipTitle = tooltipText;
+    } else if (relative) {
+      el.dataset.tooltipTitle = relative;
     }
   });
 }

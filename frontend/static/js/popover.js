@@ -189,10 +189,8 @@ export function createPopover(trigger, popover, options = {}) {
 
   const destroy = () => {
     removeGlobalListeners();
-    if (open) {
-      popover.hidden = true;
-      open = false;
-    }
+    open = false;
+    popover.hidden = true;
     version += 1;
     stopAutoUpdate();
     popover.removeAttribute("data-floating-ui-placement");

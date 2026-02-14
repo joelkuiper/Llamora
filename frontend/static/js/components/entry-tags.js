@@ -948,6 +948,61 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     return inputLimit;
   }
 
+  #getTagClickMode() {
+    const mode = String(this.dataset?.tagClickMode || "")
+      .trim()
+      .toLowerCase();
+    return mode === "navigate" ? "navigate" : "detail";
+  }
+
+  #getTagName(label) {
+    if (!(label instanceof HTMLElement)) {
+      return "";
+    }
+    return String(label.dataset?.tagName || label.textContent || "").trim();
+  }
+
+  #resolveTagTemplate(template, tagName) {
+    const raw = String(template || "").trim();
+    const tag = String(tagName || "").trim();
+    if (!raw || !tag) {
+      return "";
+    }
+    return raw.replaceAll("__TAG__", encodeURIComponent(tag));
+  }
+
+  #navigateToTag(tagName) {
+    const normalizedTag = String(tagName || "").trim();
+    if (!normalizedTag) {
+      return;
+    }
+    const rowId = `tag-index-${normalizedTag}`;
+    const row = document.getElementById(rowId);
+    if (row instanceof HTMLAnchorElement) {
+      row.click();
+      return;
+    }
+
+    const fragmentTemplate = this.dataset?.tagNavigateFragmentTemplate || "";
+    const pageTemplate = this.dataset?.tagNavigatePageTemplate || "";
+    const fragmentUrl = this.#resolveTagTemplate(fragmentTemplate, normalizedTag);
+    const pageUrl = this.#resolveTagTemplate(pageTemplate, normalizedTag);
+    const target = document.getElementById("tags-view-detail");
+
+    if (fragmentUrl && target instanceof HTMLElement && typeof htmx !== "undefined") {
+      htmx.ajax("GET", fragmentUrl, {
+        target,
+        swap: "outerHTML",
+        pushURL: pageUrl || fragmentUrl,
+      });
+      return;
+    }
+
+    if (pageUrl) {
+      window.location.assign(pageUrl);
+    }
+  }
+
   #handleTagActivation(event) {
     const label = event.target.closest?.(".tag-label");
     if (!label || !(label instanceof HTMLElement)) return;
@@ -957,6 +1012,10 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     }
 
     event.preventDefault();
+    if (this.#getTagClickMode() === "navigate") {
+      this.#navigateToTag(this.#getTagName(label));
+      return;
+    }
     void this.#openTagDetail(label);
   }
 
@@ -1068,6 +1127,35 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     if (day) {
       const separator = url.includes("?") ? "&" : "?";
       url = `${url}${separator}day=${encodeURIComponent(day)}`;
+    }
+    try {
+      const currentUrl = new URL(window.location.href);
+      const params = new URLSearchParams();
+      const currentView = currentUrl.searchParams.get("view");
+      if (currentView) {
+        params.set("view", currentView);
+      }
+      const contextDay =
+        document.getElementById("tags-view")?.dataset?.day?.trim() ||
+        document.getElementById("entries")?.dataset?.date?.trim() ||
+        currentUrl.pathname.match(/\/d\/(\d{4}-\d{2}-\d{2})$/)?.[1] ||
+        "";
+      if (contextDay) {
+        params.set("day", contextDay);
+      }
+      for (const key of ["sort_kind", "sort_dir", "entries_limit", "tag", "target"]) {
+        const value = currentUrl.searchParams.get(key);
+        if (value) {
+          params.set(key, value);
+        }
+      }
+      const serialized = params.toString();
+      if (serialized) {
+        const separator = url.includes("?") ? "&" : "?";
+        url = `${url}${separator}${serialized}`;
+      }
+    } catch (_error) {
+      // Ignore malformed location state and continue with base URL.
     }
     if (!url) {
       return;

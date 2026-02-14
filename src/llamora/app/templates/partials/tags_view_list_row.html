@@ -3,8 +3,8 @@
 {% set row_target = 'tag-index-' ~ item.name %}
 {% set base_day_url = url_for('days.day', date=day) %}
 {% set base_fragment_url = url_for('tags.tags_view_fragment', date=day) %}
-{% set tag_url = base_day_url ~ '?view=tags&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tags_limit=' ~ tags_limit ~ '&entries_limit=' ~ entries_limit ~ '&tag=' ~ (item.name|urlencode) %}
-{% set fragment_url = base_fragment_url ~ '?sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tags_limit=' ~ tags_limit ~ '&entries_limit=' ~ entries_limit ~ '&tag=' ~ (item.name|urlencode) %}
+{% set tag_url = base_day_url ~ '?view=tags&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&entries_limit=' ~ entries_limit ~ '&tag=' ~ (item.name|urlencode) %}
+{% set fragment_url = base_fragment_url ~ '?sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&entries_limit=' ~ entries_limit ~ '&tag=' ~ (item.name|urlencode) %}
 {% if list_target and list_target == row_target %}
   {% set tag_url = tag_url ~ '&target=' ~ (list_target|urlencode) %}
   {% set fragment_url = fragment_url ~ '&target=' ~ (list_target|urlencode) %}

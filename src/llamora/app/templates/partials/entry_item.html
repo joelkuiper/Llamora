@@ -2,7 +2,23 @@
 {% from 'partials/entry_actions.html' import entry_actions %}
 {% from 'partials/entry_edit_button.html' import entry_edit_button %}
 {% from 'partials/entry_main.html' import render_entry_main %}
-{% macro render_entry(e, day, is_today=True, responses=None, include_responses=True, animate_entries=False) -%}
+{% macro render_entry(
+  e,
+  day,
+  is_today=True,
+  responses=None,
+  include_responses=True,
+  animate_entries=False,
+  tags_context_query='',
+  tags_click_mode='detail',
+  tags_navigate_page_template='',
+  tags_navigate_fragment_template='',
+  entry_open_url=None,
+  entry_open_hx_get=None,
+  entry_open_hx_target=None,
+  entry_open_hx_swap=None,
+  entry_open_hx_push_url=None
+) -%}
 {% set entry_meta = e.get('meta', {}) %}
 {% set is_error = entry_meta.get('error') %}
 {% set repeat_guard = entry_meta.get('repeat_guard') %}
@@ -21,7 +37,14 @@
   {{ render_entry_main(e, day) }}
   {% if e['role'] == 'user' and not entry_meta.get('error') %}
   <div class="entry-footer">
-    {{ render_entry_tags(entry_id=e['id'], tags=e.get('tags', [])) }}
+    {{ render_entry_tags(
+      entry_id=e['id'],
+      tags=e.get('tags', []),
+      context_query=tags_context_query,
+      tag_click_mode=tags_click_mode,
+      tag_navigate_page_template=tags_navigate_page_template,
+      tag_navigate_fragment_template=tags_navigate_fragment_template
+    ) }}
     <div class="entry-actions-row" aria-label="Entry actions">
       {% if e.get('created_at') %}
       <time class="entry-time"
@@ -29,6 +52,18 @@
             data-time-raw="{{ e['created_at'] }}"></time>
       {% endif %}
       {{ entry_edit_button(e['id'], is_today, mode="view") }}
+      {% if entry_open_url %}
+      <a class="entry-action entry-open"
+         href="{{ entry_open_url }}"
+         {% if entry_open_hx_get %}hx-get="{{ entry_open_hx_get }}"{% endif %}
+         {% if entry_open_hx_target %}hx-target="{{ entry_open_hx_target }}"{% endif %}
+         {% if entry_open_hx_swap %}hx-swap="{{ entry_open_hx_swap }}"{% endif %}
+         {% if entry_open_hx_push_url %}hx-push-url="{{ entry_open_hx_push_url }}"{% endif %}
+         aria-label="Go to entry"
+         data-tooltip-title="Go to entry">
+        <span class="icon-mask icon-book-marked entry-action__icon" aria-hidden="true"></span>
+      </a>
+      {% endif %}
       <button class="entry-action entry-delete"
               type="button"
               hx-delete="{{ url_for('entries.delete_entry', entry_id=e['id']) }}"

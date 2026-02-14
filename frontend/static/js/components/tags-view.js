@@ -180,7 +180,7 @@ const applyStoredMainScrollTop = () => {
   return true;
 };
 
-const captureEntriesAnchor = (label) => {
+const captureEntriesAnchor = () => {
   const selectedTag = getSelectedTrace();
   if (!selectedTag) return;
   const scrollElement = getMainScrollElement();
@@ -197,13 +197,6 @@ const captureEntriesAnchor = (label) => {
   const entryId = String(anchor.dataset.entryId || "").trim();
   if (!entryId) return;
   const offset = Math.round(viewportTop - anchor.getBoundingClientRect().top);
-  console.debug("[tags-capture]", label || "", {
-    tag: selectedTag,
-    entryId,
-    offset,
-    scrollTop: scrollElement.scrollTop,
-    key: getTagsLocationKey(),
-  });
   storeEntriesAnchor({
     tag: selectedTag,
     entryId,
@@ -243,57 +236,25 @@ const escapeSelectorValue = (value) => {
   return String(value).replaceAll('"', '\\"');
 };
 
-const maybeRestoreEntriesAnchor = (reason) => {
+const maybeRestoreEntriesAnchor = () => {
   const currentLocation = getTagsLocationKey();
-  if (!currentLocation) {
-    console.debug("[tags-restore] skip: no location key", { url: window.location.href });
-    return;
-  }
-  if (state.restoreAppliedForLocation === currentLocation) {
-    console.debug("[tags-restore] skip: already applied for", currentLocation);
-    return;
-  }
+  if (!currentLocation) return;
+  if (state.restoreAppliedForLocation === currentLocation) return;
   const params = new URLSearchParams(window.location.search);
-  if (params.has("target")) {
-    console.debug("[tags-restore] skip: has target param");
-    return;
-  }
+  if (params.has("target")) return;
   const selectedTag = getSelectedTrace();
-  if (!selectedTag) {
-    console.debug("[tags-restore] skip: no selectedTag from detail");
-    return;
-  }
+  if (!selectedTag) return;
 
-  const scrollEl = getMainScrollElement();
-  const scrollBefore = scrollEl?.scrollTop ?? -1;
-  const scrollApplied = applyStoredMainScrollTop();
-  const scrollAfter = scrollEl?.scrollTop ?? -1;
-  const scrollHeight = scrollEl?.scrollHeight ?? -1;
+  applyStoredMainScrollTop();
 
   const anchor = readStoredEntriesAnchor();
-  let entryFound = false;
   if (anchor && anchor.tag === selectedTag) {
     const escapedId = escapeSelectorValue(anchor.entryId);
     const entry = document.querySelector(`.tags-view__entry-item[data-entry-id="${escapedId}"]`);
     if (entry instanceof HTMLElement) {
-      entryFound = true;
       applyEntriesAnchor(entry, anchor.offset);
     }
   }
-
-  console.debug("[tags-restore]", {
-    reason,
-    key: currentLocation,
-    selectedTag,
-    scrollApplied,
-    scrollBefore,
-    scrollAfter,
-    scrollFinal: scrollEl?.scrollTop ?? -1,
-    scrollHeight,
-    anchor: anchor ? { tag: anchor.tag, entryId: anchor.entryId, offset: anchor.offset } : null,
-    entryFound,
-    saveSuppressed: state.saveSuppressed,
-  });
   state.restoreAppliedForLocation = currentLocation;
 };
 
@@ -727,11 +688,7 @@ const applySort = (kind, dir) => {
   updateUrlSort();
 };
 
-const sync = (root = document, reason = "unknown") => {
-  console.debug("[tags-sync]", reason, {
-    saveSuppressed: state.saveSuppressed,
-    url: window.location.href,
-  });
+const sync = (root = document) => {
   state.saveSuppressed = false;
   const hadTargetParam = new URLSearchParams(window.location.search).has("target");
   updateHeaderHeight();
@@ -749,7 +706,7 @@ const sync = (root = document, reason = "unknown") => {
   animateDetailEntries(root);
   highlightRequestedTag(root);
   if (!hadTargetParam) {
-    maybeRestoreEntriesAnchor(reason);
+    maybeRestoreEntriesAnchor();
   }
 };
 
@@ -853,7 +810,7 @@ if (!globalThis[BOOT_KEY]) {
       inList ||
       inEntries
     ) {
-      sync(document, `afterSwap:${target.id || "nested"}`);
+      sync(document);
     }
   });
 
@@ -878,10 +835,6 @@ if (!globalThis[BOOT_KEY]) {
     const stored = map[key];
     if (stored?.entryId && stored?.tag === destTag) {
       event.detail.parameters.restore_entry = stored.entryId;
-      console.debug("[tags-configRequest] injecting restore_entry", {
-        destTag,
-        entryId: stored.entryId,
-      });
     }
   });
 
@@ -889,10 +842,6 @@ if (!globalThis[BOOT_KEY]) {
     const target = event.detail?.target;
     if (!(target instanceof Element)) return;
     if (target.id !== "tags-view-detail") return;
-    console.debug("[tags-beforeRequest]", {
-      saveSuppressed: state.saveSuppressed,
-      scrollTop: getMainScrollElement()?.scrollTop,
-    });
     if (!state.saveSuppressed) {
       storeMainScrollTop();
       captureEntriesAnchor();
@@ -903,35 +852,25 @@ if (!globalThis[BOOT_KEY]) {
   });
 
   document.addEventListener("app:rehydrate", (event) => {
-    const reason = event?.detail?.reason || "rehydrate";
-    console.debug("[tags-rehydrate]", reason);
     state.restoreAppliedForLocation = "";
-    sync(event?.detail?.context || document, `rehydrate:${reason}`);
+    sync(event?.detail?.context || document);
   });
   document.addEventListener("app:view-changed", (event) => {
     if (event?.detail?.view === "tags") return;
     resetEntriesRestoreState();
   });
-  document.addEventListener("app:teardown", (event) => {
-    console.debug("[tags-teardown]", event?.detail?.reason, {
-      saveSuppressed: state.saveSuppressed,
-      scrollTop: getMainScrollElement()?.scrollTop,
-    });
+  document.addEventListener("app:teardown", () => {
     if (!state.saveSuppressed) {
       storeMainScrollTop();
       captureEntriesAnchor();
     }
   });
   window.addEventListener("pagehide", () => {
-    console.debug("[tags-pagehide]", {
-      saveSuppressed: state.saveSuppressed,
-      scrollTop: getMainScrollElement()?.scrollTop,
-    });
     if (!state.saveSuppressed) {
       storeMainScrollTop();
       captureEntriesAnchor();
     }
   });
 
-  sync(document, "boot");
+  sync(document);
 }

@@ -1,7 +1,7 @@
-from quart import Blueprint, request, abort, render_template, jsonify
+from quart import Blueprint, request, abort, render_template, jsonify, url_for
+from urllib.parse import urlencode
 from llamora.app.services.container import get_services, get_tag_service
 from llamora.app.services.auth_helpers import login_required
-from llamora.app.services.session_context import get_session_context
 from llamora.app.services.tag_summary import generate_tag_summary
 from llamora.app.services.time import local_date
 from llamora.settings import settings
@@ -40,11 +40,88 @@ def _parse_positive_int(
     return max(min_value, min(value, max_value))
 
 
+def _parse_view_context() -> dict[str, str | dict[str, str]] | None:
+    view = str(request.args.get("view") or "").strip().lower()
+    if not view:
+        return None
+    day = _resolve_view_day(request.args.get("day"))
+    params: dict[str, str] = {"view": view, "day": day}
+    for key in ("sort_kind", "sort_dir", "entries_limit", "tag", "target"):
+        value = str(request.args.get(key) or "").strip()
+        if value:
+            params[key] = value
+    return {"view": view, "day": day, "params": params}
+
+
+def _build_view_context_query(
+    context: dict[str, str | dict[str, str]] | None,
+) -> str:
+    if not context:
+        return ""
+    payload = context.get("params")
+    if not isinstance(payload, dict):
+        return ""
+    return f"?{urlencode(payload)}"
+
+
+async def _render_tags_oob_updates(
+    user_id: str,
+    dek: bytes,
+    context: dict[str, str | dict[str, str]],
+) -> str:
+    params = context.get("params")
+    if not isinstance(params, dict):
+        return ""
+    tag_service = _tags()
+    sort_kind = tag_service.normalize_tags_sort_kind(params.get("sort_kind"))
+    sort_dir = tag_service.normalize_tags_sort_dir(params.get("sort_dir"))
+    legacy_sort = tag_service.normalize_legacy_sort(params.get("sort"))
+    if legacy_sort is not None:
+        sort_kind, sort_dir = legacy_sort
+    entries_limit = _parse_positive_int(
+        params.get("entries_limit"), default=12, min_value=6, max_value=60
+    )
+    selected_tag = tag_service.normalize_tag_query(params.get("tag"))
+    tags_view = await tag_service.get_tags_view_data(
+        user_id,
+        dek,
+        selected_tag,
+        sort_kind=sort_kind,
+        sort_dir=sort_dir,
+        entry_limit=entries_limit,
+    )
+    return await render_template(
+        "partials/tags_view_fragment.html",
+        day=str(context["day"]),
+        tags_view=tags_view,
+        selected_tag=tags_view.selected_tag,
+        tags_sort_kind=sort_kind,
+        tags_sort_dir=sort_dir,
+        include_list=True,
+        entries_limit=entries_limit,
+        target=None,
+        oob_detail=True,
+        today=local_date().isoformat(),
+    )
+
+
+async def _render_view_oob_updates(
+    user_id: str,
+    dek: bytes,
+    context: dict[str, str | dict[str, str]] | None,
+) -> str:
+    if not context:
+        return ""
+    view = str(context.get("view") or "").strip().lower()
+    if view == "tags":
+        return await _render_tags_oob_updates(user_id, dek, context)
+    return ""
+
+
 @tags_bp.delete("/t/<entry_id>/<tag_hash>")
 @login_required
 async def remove_tag(entry_id: str, tag_hash: str):
-    session = get_session_context()
-    user = await session.require_user()
+    _, user, dek = await require_user_and_dek()
     db = get_services().db
     try:
         tag_hash_bytes = bytes.fromhex(tag_hash)
@@ -60,7 +137,13 @@ async def remove_tag(entry_id: str, tag_hash: str):
         created_date=created_date,
         client_today=client_today,
     )
-    return "<span class='tag-tombstone'></span>"
+    context = _parse_view_context()
+    if not context:
+        return "<span class='tag-tombstone'></span>"
+    oob = await _render_view_oob_updates(user["id"], dek, context)
+    if not oob:
+        return "<span class='tag-tombstone'></span>"
+    return f"<span class='tag-tombstone'></span>\n{oob}"
 
 
 @tags_bp.post("/t/<entry_id>")
@@ -89,13 +172,21 @@ async def add_tag(entry_id: str):
         created_date=created_date,
         client_today=client_today,
     )
+    context = _parse_view_context()
+    context_query = _build_view_context_query(context)
     html = await render_template(
         "partials/tag_item.html",
         tag=canonical,
         tag_hash=tag_hash.hex(),
         entry_id=entry_id,
+        context_query=context_query,
     )
-    return html
+    if not context:
+        return html
+    oob = await _render_view_oob_updates(user["id"], dek, context)
+    if not oob:
+        return html
+    return f"{html}\n{oob}"
 
 
 @tags_bp.get("/t/suggestions/<entry_id>")
@@ -151,6 +242,7 @@ async def get_tag_suggestions(entry_id: str):
         "partials/tag_suggestions.html",
         suggestions=suggestions,
         entry_id=entry_id,
+        add_tag_url=f"{url_for('tags.add_tag', entry_id=entry_id)}{_build_view_context_query(_parse_view_context())}",
     )
     return html
 
@@ -178,6 +270,7 @@ async def tag_detail(tag_hash: str):
 
     entry_id = (request.args.get("entry_id") or "").strip() or None
     detail_day = _resolve_view_day(request.args.get("day"))
+    context_query = _build_view_context_query(_parse_view_context())
     html = await render_template(
         "partials/tag_detail_body.html",
         tag=overview,
@@ -187,6 +280,7 @@ async def tag_detail(tag_hash: str):
         page_size=page_size,
         entry_id=entry_id,
         detail_day=detail_day,
+        context_query=context_query,
     )
     return html
 
@@ -233,6 +327,9 @@ async def delete_trace(tag_hash: str):
         ),
     )
     selected_tag = tags_view.selected_tag
+    entries_limit = _parse_positive_int(
+        request.args.get("entries_limit"), default=12, min_value=6, max_value=60
+    )
     return await render_template(
         "partials/tags_view_fragment.html",
         day=day,
@@ -241,6 +338,8 @@ async def delete_trace(tag_hash: str):
         tags_sort_kind=sort_kind,
         tags_sort_dir=sort_dir,
         include_list=include_list,
+        entries_limit=entries_limit,
+        today=local_date().isoformat(),
     )
 
 
@@ -342,9 +441,6 @@ async def tags_view_fragment(date: str):
         "yes",
         "on",
     }
-    tags_limit = _parse_positive_int(
-        request.args.get("tags_limit"), default=50, min_value=10, max_value=200
-    )
     entries_limit = _parse_positive_int(
         request.args.get("entries_limit"), default=12, min_value=6, max_value=60
     )
@@ -367,9 +463,9 @@ async def tags_view_fragment(date: str):
         tags_sort_kind=sort_kind,
         tags_sort_dir=sort_dir,
         include_list=include_list,
-        tags_limit=tags_limit,
         entries_limit=entries_limit,
         target=(request.args.get("target") or "").strip() or None,
+        today=local_date().isoformat(),
     )
 
 
@@ -387,9 +483,6 @@ async def tags_view_detail_entries_chunk(date: str, tag_hash: str):
     tag_service = _tags()
     sort_kind = tag_service.normalize_tags_sort_kind(request.args.get("sort_kind"))
     sort_dir = tag_service.normalize_tags_sort_dir(request.args.get("sort_dir"))
-    tags_limit = _parse_positive_int(
-        request.args.get("tags_limit"), default=50, min_value=10, max_value=200
-    )
     entries_limit = _parse_positive_int(
         request.args.get("limit"), default=12, min_value=6, max_value=60
     )
@@ -412,7 +505,7 @@ async def tags_view_detail_entries_chunk(date: str, tag_hash: str):
         tag_hash=tag_hash,
         has_more=has_more,
         next_cursor=next_cursor,
-        tags_limit=tags_limit,
         entries_limit=entries_limit,
         page_size=entries_limit,
+        today=local_date().isoformat(),
     )

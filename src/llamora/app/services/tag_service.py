@@ -73,21 +73,15 @@ class TagRelatedItem:
 
 @dataclass(slots=True)
 class TagArchiveEntry:
-    entry_id: str
-    created_at: str
+    entry: dict[str, Any]
     created_date: str | None
-    date_label: str
-    text_html: str
-    secondary_tags: tuple[str, ...]
-    responses: tuple["TagArchiveResponse", ...]
+    related_tags: tuple[str, ...]
+    responses: tuple[dict[str, Any], ...]
 
 
 @dataclass(slots=True)
 class TagArchiveResponse:
-    entry_id: str
-    created_at: str
-    created_date: str | None
-    text_html: str
+    entry: dict[str, Any]
 
 
 @dataclass(slots=True)
@@ -425,7 +419,7 @@ class TagService:
             )
         related_counter: Counter[str] = Counter()
         for entry in archive_entries:
-            for name in entry.secondary_tags:
+            for name in entry.related_tags:
                 if name == tag_item.name:
                     continue
                 related_counter[name] += 1
@@ -530,20 +524,22 @@ class TagService:
 
             archive_entries.append(
                 TagArchiveEntry(
-                    entry_id=entry_id,
-                    created_at=created_at,
+                    entry={
+                        "id": entry_id,
+                        "role": role,
+                        "text": raw_text,
+                        "text_html": text_html,
+                        "meta": entry.get("meta", {}),
+                        "tags": tuple(tags_by_entry.get(entry_id, [])),
+                        "created_at": created_at,
+                    },
                     created_date=entry.get("created_date"),
-                    date_label=_format_month_day(
-                        created_at,
-                        entry.get("created_date"),
-                    ),
-                    text_html=text_html,
-                    secondary_tags=tuple(secondary_tags[: max(1, secondary_tag_limit)]),
+                    related_tags=tuple(secondary_tags[: max(1, secondary_tag_limit)]),
                     responses=(),
                 )
             )
 
-        responses_by_reply_to: dict[str, list[TagArchiveResponse]] = {}
+        responses_by_reply_to: dict[str, list[dict[str, Any]]] = {}
         reply_entries = await self._db.entries.get_entries_by_reply_to_ids(
             user_id,
             user_entry_ids,
@@ -560,24 +556,26 @@ class TagService:
             if not response_html:
                 response_html = "<p>...</p>"
             responses_by_reply_to.setdefault(reply_to, []).append(
-                TagArchiveResponse(
-                    entry_id=str(response.get("id") or ""),
-                    created_at=created_at,
-                    created_date=response.get("created_date"),
-                    text_html=response_html,
-                )
+                {
+                    "id": str(response.get("id") or ""),
+                    "role": str(response.get("role") or "assistant"),
+                    "reply_to": reply_to,
+                    "text": str(response.get("text") or ""),
+                    "text_html": response_html,
+                    "meta": response.get("meta", {}),
+                    "created_at": created_at,
+                }
             )
 
         if responses_by_reply_to:
             archive_entries = [
                 TagArchiveEntry(
-                    entry_id=item.entry_id,
-                    created_at=item.created_at,
+                    entry=item.entry,
                     created_date=item.created_date,
-                    date_label=item.date_label,
-                    text_html=item.text_html,
-                    secondary_tags=item.secondary_tags,
-                    responses=tuple(responses_by_reply_to.get(item.entry_id, ())),
+                    related_tags=item.related_tags,
+                    responses=tuple(
+                        responses_by_reply_to.get(str(item.entry.get("id") or ""), ())
+                    ),
                 )
                 for item in archive_entries
             ]

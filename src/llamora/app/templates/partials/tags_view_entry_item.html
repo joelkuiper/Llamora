@@ -1,79 +1,30 @@
-{% set item_date = item.created_date or item.created_at[:10] %}
-{% set entry_url = url_for('days.day', date=item_date) ~ '?view=diary&target=entry-' ~ item.entry_id %}
-<li class="tags-view__entry-item" data-entry-id="{{ item.entry_id }}">
-  <article id="entry-{{ item.entry_id }}"
-           class="tags-view__entry entry user"
-           data-entry-id="{{ item.entry_id }}"
-           role="article"
-           aria-labelledby="entry-{{ item.entry_id }}-speaker entry-{{ item.entry_id }}-body">
-    <span class="visually-hidden" id="entry-{{ item.entry_id }}-speaker">Your entry</span>
-    <div class="tags-view__entry-main">
-      <div class="markdown-body"
-           id="entry-{{ item.entry_id }}-body"
-           data-rendered="true">
-        {{ item.text_html | safe }}
-      </div>
-    </div>
-    <div class="tags-view__entry-footer">
-      {% if item.secondary_tags %}
-        <div class="entry-tags tags-view__entry-tags">
-          {% for name in item.secondary_tags %}
-            {% set tag_target = 'tag-index-' ~ name %}
-            {% set tag_url = url_for('days.day', date=day) ~ '?view=tags&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tags_limit=' ~ tags_limit ~ '&entries_limit=' ~ entries_limit ~ '&tag=' ~ (name|urlencode) ~ '&target=' ~ (tag_target|urlencode) %}
-            <a href="{{ tag_url }}"
-               class="entry-tag tags-view__entry-tag"
-               hx-get="{{ url_for('tags.tags_view_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&tags_limit={{ tags_limit }}&entries_limit={{ entries_limit }}&tag={{ name|urlencode }}&target={{ tag_target|urlencode }}"
-               hx-target="#tags-view-detail"
-               hx-swap="outerHTML"
-               hx-push-url="{{ tag_url }}">
-              <span class="tag-label">{{ name }}</span>
-            </a>
-          {% endfor %}
-        </div>
-      {% else %}
-        <div></div>
-      {% endif %}
-      <div class="entry-actions-row tags-view__entry-actions">
-        <time class="entry-time tags-view__entry-time"
-              datetime="{{ item.created_at }}"
-              data-time-raw="{{ item.created_at }}"
-              data-time-style="ago-date-time"></time>
-        <a class="entry-action tags-view__entry-open"
-           href="{{ entry_url }}"
-           hx-get="{{ entry_url }}"
-           hx-target="#main-content"
-           hx-swap="outerHTML"
-           hx-push-url="true"
-           aria-label="Go to entry"
-           data-tooltip-title="Go to entry">
-          <span class="icon-mask icon-book-marked entry-action__icon" aria-hidden="true"></span>
-        </a>
-        <button class="entry-action entry-delete"
-                type="button"
-                hx-delete="{{ url_for('entries.delete_entry', entry_id=item.entry_id) }}"
-                hx-target="closest .tags-view__entry-item"
-                hx-swap="delete swap:180ms"
-                hx-confirm="Delete this entry?"
-                data-confirm-title="Delete entry?"
-                data-confirm-message="This entry will be removed from your diary."
-                data-confirm-confirm="Delete"
-                data-confirm-cancel="Keep"
-                data-confirm-variant="danger"
-                aria-label="Delete entry"
-                data-tooltip-title="Delete entry"
-                data-ready="true">
-          <span class="icon-mask icon-trash entry-action__icon" aria-hidden="true"></span>
-        </button>
-      </div>
-    </div>
-  </article>
-  {% if item.responses %}
-    <div class="entry-responses tags-view__entry-responses"
-         id="entry-responses-{{ item.entry_id }}"
-         data-responses-for="{{ item.entry_id }}">
-      {% for response in item.responses %}
-        {% include 'partials/tags_view_response_item.html' %}
-      {% endfor %}
-    </div>
-  {% endif %}
+{% from 'partials/entry_item.html' import render_entry %}
+{% set entry = item.entry %}
+{% set entry_id = entry['id'] %}
+{% set entry_date = item.created_date or entry['created_at'][:10] %}
+{% set entry_url = url_for('days.day', date=entry_date) ~ '?view=diary&target=entry-' ~ entry_id %}
+{% set is_entry_today = (today is defined and entry_date == today) %}
+{% set context_query = '?view=tags&day=' ~ (day|urlencode) ~ '&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&entries_limit=' ~ entries_limit %}
+{% set tag_page_template = url_for('days.day', date=day) ~ '?view=tags&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&entries_limit=' ~ entries_limit ~ '&tag=__TAG__&target=tag-index-__TAG__' %}
+{% set tag_fragment_template = url_for('tags.tags_view_fragment', date=day) ~ '?sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&entries_limit=' ~ entries_limit ~ '&tag=__TAG__&target=tag-index-__TAG__' %}
+{% if selected_tag %}
+  {% set context_query = context_query ~ '&tag=' ~ (selected_tag|urlencode) %}
+{% endif %}
+<li class="tags-view__entry-item" data-entry-id="{{ entry_id }}">
+  {{ render_entry(
+      entry,
+      entry_date,
+      is_today=is_entry_today,
+      responses=item.responses,
+      include_responses=True,
+      tags_context_query=context_query,
+      tags_click_mode='navigate',
+      tags_navigate_page_template=tag_page_template,
+      tags_navigate_fragment_template=tag_fragment_template,
+      entry_open_url=entry_url,
+      entry_open_hx_get=entry_url,
+      entry_open_hx_target='#main-content',
+      entry_open_hx_swap='outerHTML',
+      entry_open_hx_push_url='true'
+    ) }}
 </li>

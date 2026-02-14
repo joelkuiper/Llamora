@@ -67,6 +67,10 @@ const FEATURE_IMPORTS = {
     selector: "entry-view",
     loader: () => import("../entries-entry.js"),
   },
+  entryTags: {
+    selector: "entry-tags",
+    loader: () => import("../components/entry-tags.js"),
+  },
   calendar: {
     selector: "calendar-control",
     loader: () => import("../components/calendar.js"),

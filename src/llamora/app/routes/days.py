@@ -54,11 +54,6 @@ async def _render_day(date: str, target: str | None, view_kind: str):
     if legacy_sort is not None:
         tags_sort_kind, tags_sort_dir = legacy_sort
     try:
-        tags_limit = int(request.args.get("tags_limit") or 50)
-    except (TypeError, ValueError):
-        tags_limit = 50
-    tags_limit = max(10, min(tags_limit, 200))
-    try:
         entries_limit = int(request.args.get("entries_limit") or 12)
     except (TypeError, ValueError):
         entries_limit = 12
@@ -98,7 +93,6 @@ async def _render_day(date: str, target: str | None, view_kind: str):
         "selected_tag": selected_tag,
         "tags_sort_kind": tags_sort_kind,
         "tags_sort_dir": tags_sort_dir,
-        "tags_limit": tags_limit,
         "entries_limit": entries_limit,
         "target": target_param,
     }

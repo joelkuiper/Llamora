@@ -6,7 +6,7 @@
 {% set page_size = page_size|default(12) %}
 {% set detail_day = detail_day|default(None) %}
 {% if detail_day %}
-  {% set trace_url = url_for('days.day', date=detail_day) ~ '?view=tags&tags_limit=50&entries_limit=12&tag=' ~ (tag.name|urlencode) ~ '&target=' ~ (('tag-index-' ~ tag.name)|urlencode) %}
+  {% set trace_url = url_for('days.day', date=detail_day) ~ '?view=tags&entries_limit=12&tag=' ~ (tag.name|urlencode) ~ '&target=' ~ (('tag-index-' ~ tag.name)|urlencode) %}
 {% else %}
   {% set trace_url = None %}
 {% endif %}
@@ -34,7 +34,7 @@
             type="button"
             data-tooltip-title="Remove trace"
             aria-label="Remove trace {{ tag.name }}"
-            hx-delete="{{ url_for('tags.remove_tag', entry_id=entry_id, tag_hash=tag_hash) }}"
+            hx-delete="{{ url_for('tags.remove_tag', entry_id=entry_id, tag_hash=tag_hash) }}{{ context_query|default('') }}"
             hx-target="entry-tags[data-entry-id='{{ entry_id }}'] .entry-tag[data-tag-hash='{{ tag_hash }}']"
             hx-swap="outerHTML swap:0.15s">
             <span class="icon-mask icon-bookmark-x" aria-hidden="true"></span>

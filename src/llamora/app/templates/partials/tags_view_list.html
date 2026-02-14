@@ -2,7 +2,6 @@
 {% set sort_kind = tags_sort_kind if tags_sort_kind is defined else (tags_view.sort_kind if tags_view is defined and tags_view else 'count') %}
 {% set sort_dir = tags_sort_dir if tags_sort_dir is defined else (tags_view.sort_dir if tags_view is defined and tags_view else 'desc') %}
 {% set tag_items = tags_view.tags if tags_view is defined and tags_view else [] %}
-{% set tags_limit = tags_limit|default(50) %}
 {% set entries_limit = entries_limit|default(12) %}
 {% set target = target|default(None) %}
 {% if tag_items %}

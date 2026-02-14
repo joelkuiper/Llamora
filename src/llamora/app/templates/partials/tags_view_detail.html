@@ -2,17 +2,17 @@
 {% set sort_kind = tags_sort_kind if tags_sort_kind is defined else (tags_view.sort_kind if tags_view is defined and tags_view else 'count') %}
 {% set sort_dir = tags_sort_dir if tags_sort_dir is defined else (tags_view.sort_dir if tags_view is defined and tags_view else 'desc') %}
 {% set selected_tag_name = detail.name if detail else (selected_tag if selected_tag is defined else '') %}
-{% set tags_limit = tags_limit|default(50) %}
 {% set entries_limit = entries_limit|default(12) %}
 <section id="tags-view-detail"
          class="tags-view__detail span-9"
+         {% if oob_detail %}hx-swap-oob="outerHTML"{% endif %}
          data-selected-tag="{{ selected_tag_name }}"
          data-sort-kind="{{ sort_kind }}"
          data-sort-dir="{{ sort_dir }}">
   <div class="tags-view__detail-inner">
     {% if detail %}
       <header class="tags-view__detail-header">
-        {% set delete_trace_url = url_for('tags.delete_trace', tag_hash=detail.hash) ~ '?day=' ~ day ~ '&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tags_limit=' ~ tags_limit ~ '&entries_limit=' ~ entries_limit ~ '&tag=' ~ (detail.name|urlencode) ~ '&include_list=1' %}
+        {% set delete_trace_url = url_for('tags.delete_trace', tag_hash=detail.hash) ~ '?day=' ~ day ~ '&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&entries_limit=' ~ entries_limit ~ '&tag=' ~ (detail.name|urlencode) ~ '&include_list=1' %}
         <button class="entry-action entry-delete tags-view__trace-delete"
                 type="button"
                 hx-delete="{{ delete_trace_url }}"
@@ -38,10 +38,10 @@
               <span class="tags-view__related-prefix">frequently appears with</span>
               {% for related in detail.related_tags %}
                 {% set related_target = 'tag-index-' ~ related.name %}
-                {% set related_url = url_for('days.day', date=day) ~ '?view=tags&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tags_limit=' ~ tags_limit ~ '&entries_limit=' ~ entries_limit ~ '&tag=' ~ (related.name|urlencode) ~ '&target=' ~ (related_target|urlencode) %}
+                {% set related_url = url_for('days.day', date=day) ~ '?view=tags&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&entries_limit=' ~ entries_limit ~ '&tag=' ~ (related.name|urlencode) ~ '&target=' ~ (related_target|urlencode) %}
                 <a href="{{ related_url }}"
                    class="tags-view__related-link entry-tag"
-                   hx-get="{{ url_for('tags.tags_view_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&tags_limit={{ tags_limit }}&entries_limit={{ entries_limit }}&tag={{ related.name|urlencode }}&target={{ related_target|urlencode }}"
+                   hx-get="{{ url_for('tags.tags_view_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&entries_limit={{ entries_limit }}&tag={{ related.name|urlencode }}&target={{ related_target|urlencode }}"
                    hx-target="#tags-view-detail"
                    hx-swap="outerHTML"
                    hx-push-url="{{ related_url }}">

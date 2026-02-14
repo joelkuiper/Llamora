@@ -4,7 +4,7 @@
         hx-indicator="closest .tag-suggestion"
         hx-disinherit="hx-indicator"
         data-tag="{{ canonical_value }}"
-        hx-post="{{ url_for('tags.add_tag', entry_id=entry_id) }}"
+        hx-post="{{ add_tag_url if add_tag_url is defined and add_tag_url else url_for('tags.add_tag', entry_id=entry_id) }}"
         hx-target="#entry-tags-{{ entry_id }}"
         hx-swap="beforeend"
         hx-vals='{"tag": {{ canonical_value|tojson }} }'
