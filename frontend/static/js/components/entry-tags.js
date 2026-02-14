@@ -1008,6 +1008,15 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       return;
     }
 
+    if (label instanceof HTMLAnchorElement && this.#getTagClickMode() === "navigate") {
+      document.dispatchEvent(
+        new CustomEvent("tags-view:navigate", {
+          detail: { tag: this.#getTagName(label) },
+        }),
+      );
+      return;
+    }
+
     event.preventDefault();
     if (this.#getTagClickMode() === "navigate") {
       this.#navigateToTag(this.#getTagName(label));

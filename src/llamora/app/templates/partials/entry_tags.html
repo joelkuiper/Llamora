@@ -1,11 +1,40 @@
-{% macro entry_tag_item(label, tag_hash, entry_id=None, context_query='') -%}
+{% macro entry_tag_item(
+  label,
+  tag_hash,
+  entry_id=None,
+  context_query='',
+  tag_click_mode='detail',
+  tag_navigate_page_template='',
+  tag_navigate_fragment_template=''
+) -%}
   {% set canonical_value = display(label) %}
+  {% set encoded_value = canonical_value|urlencode %}
+  {% if tag_click_mode == 'navigate' and tag_navigate_page_template %}
+    {% set navigate_page_url = tag_navigate_page_template|replace('__TAG__', encoded_value) %}
+  {% else %}
+    {% set navigate_page_url = '' %}
+  {% endif %}
+  {% if tag_click_mode == 'navigate' and tag_navigate_fragment_template %}
+    {% set navigate_fragment_url = tag_navigate_fragment_template|replace('__TAG__', encoded_value) %}
+  {% else %}
+    {% set navigate_fragment_url = '' %}
+  {% endif %}
   <span class="entry-tag" data-tag-hash="{{ tag_hash }}" data-tag-name="{{ canonical_value }}">
-    <button class="tag-label"
-            type="button"
-            aria-haspopup="dialog"
-            data-tag-hash="{{ tag_hash }}"
-            data-tag-name="{{ canonical_value }}">{{ canonical_value }}</button>
+    {% if tag_click_mode == 'navigate' and navigate_fragment_url %}
+      <a class="tag-label"
+         href="{{ navigate_page_url }}"
+         hx-get="{{ navigate_fragment_url }}"
+         hx-target="#tags-view-detail"
+         hx-swap="outerHTML"
+         hx-push-url="{{ navigate_page_url }}"
+         data-tag-name="{{ canonical_value }}">{{ canonical_value }}</a>
+    {% else %}
+      <button class="tag-label"
+              type="button"
+              aria-haspopup="dialog"
+              data-tag-hash="{{ tag_hash }}"
+              data-tag-name="{{ canonical_value }}">{{ canonical_value }}</button>
+    {% endif %}
     {% if entry_id %}
     <button class="tag-remove"
             aria-label="Remove trace {{ canonical_value }}"
@@ -46,7 +75,15 @@
 
     <div class="entry-tags-list" id="entry-tags-{{ entry_id }}">
       {% for tag in tags %}
-      {{ entry_tag_item(tag.name, tag.hash, entry_id, context_query=context_query) }}
+      {{ entry_tag_item(
+          tag.name,
+          tag.hash,
+          entry_id,
+          context_query=context_query,
+          tag_click_mode=tag_click_mode,
+          tag_navigate_page_template=tag_navigate_page_template,
+          tag_navigate_fragment_template=tag_navigate_fragment_template
+        ) }}
       {% endfor %}
     </div>
   </entry-tags>

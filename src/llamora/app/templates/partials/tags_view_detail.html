@@ -9,6 +9,10 @@
          data-selected-tag="{{ selected_tag_name }}"
          data-sort-kind="{{ sort_kind }}"
          data-sort-dir="{{ sort_dir }}">
+  <input type="hidden"
+         id="tags-view-selected-tag"
+         name="tag"
+         value="{{ selected_tag_name }}">
   <div class="tags-view__detail-inner">
     {% if detail %}
       <header class="tags-view__detail-header">

@@ -27,33 +27,6 @@ const state = {
   restoreAfterBfcache: false,
 };
 
-const DEBUG = true;
-const debugLog = (...args) => {
-  if (!DEBUG) return;
-  console.debug("[tags-view]", ...args);
-};
-
-const getStateSnapshot = (root = document) => {
-  const detail = findDetail(root);
-  const list = findList(root);
-  const activeRow = getActiveRow();
-  return {
-    url: window.location.pathname + window.location.search,
-    sort: {
-      stateKind: state.sortKind,
-      stateDir: state.sortDir,
-      detailKind: detail?.dataset?.sortKind,
-      detailDir: detail?.dataset?.sortDir,
-      listKind: list?.dataset?.sortKind,
-      listDir: list?.dataset?.sortDir,
-    },
-    selectedTag: {
-      detail: detail?.dataset?.selectedTag,
-      activeRow: activeRow?.dataset?.tagName,
-    },
-  };
-};
-
 const readStoredSearchQuery = () => sessionStore.get("tags:query") ?? "";
 
 const persistSearchQuery = (value) => {
@@ -646,15 +619,25 @@ const applySearch = (rawQuery) => {
   state.query = query;
   persistSearchQuery(query);
   setClearButtonVisibility();
+  const listBody = findListBody();
+  if (listBody) {
+    listBody.classList.remove("is-searching");
+    window.requestAnimationFrame(() => {
+      if (!listBody.isConnected) return;
+      listBody.classList.add("is-searching");
+    });
+    window.setTimeout(() => {
+      if (!listBody.isConnected) return;
+      listBody.classList.remove("is-searching");
+    }, 200);
+  }
   if (!state.rows.length) return;
 
   if (!query) {
     state.list?.classList.remove("is-filtering");
     state.rows.forEach((row) => {
-      row.hidden = false;
       row.classList.remove("is-filtered-out");
-      row.toggleAttribute("hidden", false);
-      row.style.display = "";
+      row.removeAttribute("aria-hidden");
       const nameEl = row.querySelector(".tags-view__index-name");
       if (nameEl instanceof HTMLElement) {
         const original = nameEl.dataset.originalText || row.dataset.tagsName || "";
@@ -716,10 +699,8 @@ const applySearch = (rawQuery) => {
   let visibleCount = 0;
   state.rows.forEach((row) => {
     const isVisible = matches.has(row);
-    row.hidden = !isVisible;
     row.classList.toggle("is-filtered-out", !isVisible);
-    row.toggleAttribute("hidden", !isVisible);
-    row.style.display = isVisible ? "" : "none";
+    row.setAttribute("aria-hidden", isVisible ? "false" : "true");
     if (isVisible) {
       const nameEl = row.querySelector(".tags-view__index-name");
       if (nameEl instanceof HTMLElement) {
@@ -816,7 +797,7 @@ const requestSort = (kind, dir) => {
     pageParams.set("tag", selectedTag);
   }
 
-  const fragmentUrl = `/fragments/tags/${day}/list?${fragmentParams.toString()}`;
+  const fragmentUrl = `/d/${day}?view=tags&${fragmentParams.toString()}`;
   const pageUrl = `/d/${day}?${pageParams.toString()}`;
 
   state.sortKind = nextKind;
@@ -850,7 +831,6 @@ const sync = (root = document) => {
   syncFromDetail(root);
   animateDetailEntries(root);
   highlightRequestedTag(root);
-  debugLog("sync", getStateSnapshot(root));
   if (!hadTargetParam && !state.restoreAfterBfcache) {
     maybeRestoreEntriesAnchor();
   }
@@ -919,8 +899,11 @@ const syncListOnly = (root = document) => {
   applySearch(state.query);
   updateSortButtons(root);
   refreshDetailLinksForSort(root);
-  debugLog("syncListOnly", getStateSnapshot(root));
   const listBody = findListBody(root);
+  const selectedTag = getSelectedTrace(root);
+  if (selectedTag) {
+    setActiveTag(selectedTag, root, { behavior: "auto" });
+  }
   const activeRow = getActiveRow();
   if (listBody instanceof HTMLElement && activeRow instanceof HTMLElement) {
     if (!isRowInView(activeRow, listBody)) {
@@ -950,7 +933,6 @@ const syncDetailOnly = (root = document) => {
       state.pendingTagHighlight = "";
     }
   }
-  debugLog("syncDetailOnly", getStateSnapshot(root));
 };
 
 if (!globalThis[BOOT_KEY]) {
@@ -980,10 +962,6 @@ if (!globalThis[BOOT_KEY]) {
 
     const row = target.closest("#tags-view-list .tags-view__index-row");
     if (row) {
-      debugLog("click sidebar tag", {
-        tag: row.dataset.tagName,
-        snapshot: getStateSnapshot(document),
-      });
       if (!state.saveSuppressed) {
         captureEntriesAnchor();
         state.saveSuppressed = true;
@@ -997,10 +975,6 @@ if (!globalThis[BOOT_KEY]) {
       "#tags-view-detail .tags-view__related-link, #tags-view-detail .tags-view__entry-tag",
     );
     if (!(detailLink instanceof HTMLAnchorElement)) return;
-    debugLog("click detail tag", {
-      tag: detailLink.textContent?.trim(),
-      snapshot: getStateSnapshot(document),
-    });
     if (!state.saveSuppressed) {
       captureEntriesAnchor();
       state.saveSuppressed = true;
@@ -1034,17 +1008,11 @@ if (!globalThis[BOOT_KEY]) {
     if (!tag) return;
     state.pendingTagHighlight = tag;
     setActiveTag(tag, document, { behavior: "smooth" });
-    debugLog("navigate event", { tag, snapshot: getStateSnapshot(document) });
   });
 
   document.body.addEventListener("htmx:afterSwap", (event) => {
     const target = event.detail?.target;
     if (!(target instanceof Element)) return;
-    debugLog("htmx:afterSwap", {
-      target: target.id || target.className,
-      path: event.detail?.path,
-      snapshot: getStateSnapshot(document),
-    });
     const inList = target.closest?.("#tags-view-list");
     const inEntries = target.closest?.("[data-tags-view-entries]");
     if (target.id === "tags-view-list" || inList) {
@@ -1065,11 +1033,6 @@ if (!globalThis[BOOT_KEY]) {
     const target = event.detail?.target;
     if (!(target instanceof Element)) return;
     if (target.id !== "tags-view-detail") return;
-    debugLog("htmx:configRequest", {
-      target: target.id,
-      path: event.detail?.path,
-      snapshot: getStateSnapshot(document),
-    });
 
     const path = event.detail?.path || "";
     let destTag = "";
@@ -1092,11 +1055,6 @@ if (!globalThis[BOOT_KEY]) {
   document.body.addEventListener("htmx:beforeRequest", (event) => {
     const target = event.detail?.target;
     if (!(target instanceof Element)) return;
-    debugLog("htmx:beforeRequest", {
-      target: target.id || target.className,
-      path: event.detail?.path,
-      snapshot: getStateSnapshot(document),
-    });
     if (target.id !== "tags-view-detail") {
       if (target.id === "tags-view-list" || target.closest?.("#tags-view-list")) {
         captureListAnchor();
@@ -1120,11 +1078,6 @@ if (!globalThis[BOOT_KEY]) {
   document.body.addEventListener("htmx:afterSettle", (event) => {
     const target = event.detail?.target;
     if (!(target instanceof Element)) return;
-    debugLog("htmx:afterSettle", {
-      target: target.id || target.className,
-      path: event.detail?.path,
-      snapshot: getStateSnapshot(document),
-    });
     if (target.id === "tags-view-list" || target.closest?.("#tags-view-list")) {
       restoreListAnchor();
       animateListReorder();

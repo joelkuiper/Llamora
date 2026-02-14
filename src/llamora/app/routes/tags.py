@@ -366,13 +366,6 @@ async def delete_trace(tag_hash: str):
         "yes",
         "on",
     }
-    str(request.args.get("list_only") or "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
-
     await get_services().db.tags.delete_tag_everywhere(
         user["id"],
         tag_hash_bytes,

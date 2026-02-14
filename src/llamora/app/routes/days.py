@@ -96,12 +96,16 @@ async def _render_day(date: str, target: str | None, view_kind: str):
         "entries_limit": entries_limit,
         "target": target_param,
     }
-    if (
-        request.headers.get("HX-Request")
-        and request.headers.get("HX-Target") == "main-content"
-    ):
-        html = await render_template("partials/main_content.html", **context)
-        return await make_response(html, 200)
+    if request.headers.get("HX-Request"):
+        target_id = request.headers.get("HX-Target")
+        if target_id == "tags-view-list" and view == "tags":
+            html = await render_template(
+                "partials/tags_view_list_fragment.html", **context
+            )
+            return await make_response(html, 200)
+        if target_id == "main-content":
+            html = await render_template("partials/main_content.html", **context)
+            return await make_response(html, 200)
     html = await render_template("index.html", **context)
     return await make_response(html, 200)
 
