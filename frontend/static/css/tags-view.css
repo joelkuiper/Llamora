@@ -734,8 +734,13 @@
   pointer-events: none;
 }
 
-.activity-heatmap__cell:hover,
-.activity-heatmap__cell:focus-visible {
+.activity-heatmap__cell.is-empty-day {
+  pointer-events: none;
+  cursor: default;
+}
+
+.activity-heatmap__cell:not(.level-0):hover,
+.activity-heatmap__cell:not(.level-0):focus-visible {
   transform: translateY(-1px) scale(1.04);
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--heatmap-level-4) 72%, transparent),
@@ -743,7 +748,7 @@
   outline: none;
 }
 
-.activity-heatmap__cell:active {
+.activity-heatmap__cell:not(.level-0):active {
   transform: translateY(0) scale(0.98);
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--heatmap-level-4) 88%, transparent),

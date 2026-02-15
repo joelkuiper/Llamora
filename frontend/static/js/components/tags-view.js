@@ -153,6 +153,10 @@ const fetchHeatmapSummary = async (date) => {
 const scheduleHeatmapTooltip = (cell) => {
   const date = String(cell?.dataset?.heatmapDate || "").trim();
   if (!date) return;
+  const count = Number(cell?.dataset?.heatmapCount || 0);
+  if (!Number.isFinite(count) || count <= 0) {
+    return;
+  }
   if (heatmapState.timer) {
     clearTimeout(heatmapState.timer);
   }
