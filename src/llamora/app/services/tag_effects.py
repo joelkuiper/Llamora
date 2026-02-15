@@ -19,14 +19,12 @@ async def after_tag_changed(
     entry_id: str,
     tag_hash: bytes | str,
     created_date: str | None,
-    client_today: str | None,
 ) -> None:
     """Side-effects for a single tag link/unlink."""
     if history_cache and created_date:
         await history_cache.invalidate(user_id, created_date)
-    if created_date and client_today and created_date != client_today:
-        tag_hex = tag_hash.hex() if isinstance(tag_hash, bytes) else str(tag_hash)
-        await invalidate_tag_recall(tag_recall_store, user_id, tag_hex)
+    tag_hex = tag_hash.hex() if isinstance(tag_hash, bytes) else str(tag_hash)
+    await invalidate_tag_recall(tag_recall_store, user_id, tag_hex)
 
 
 async def after_tag_deleted(
@@ -36,7 +34,6 @@ async def after_tag_deleted(
     user_id: str,
     tag_hash: bytes | str,
     affected_entries: list[tuple[str, str | None]],
-    client_today: str | None,
 ) -> None:
     """Side-effects for a bulk tag deletion. Batches by unique date."""
     dates_seen: set[str] = set()

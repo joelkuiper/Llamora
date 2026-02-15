@@ -205,7 +205,6 @@ async def remove_tag(entry_id: str, tag_hash: str):
                 removed_tag_name = _tags().normalize_tag_query(tag_info.get("name"))
 
     created_date = await db.entries.get_entry_date(user["id"], entry_id)
-    client_today = local_date().isoformat()
     changed = await db.tags.unlink_tag_entry(
         user["id"],
         tag_hash_bytes,
@@ -219,7 +218,6 @@ async def remove_tag(entry_id: str, tag_hash: str):
                 entry_id=entry_id,
                 tag_hash=tag_hash_bytes,
                 created_date=created_date,
-                client_today=client_today,
             )
         )
     if not context:
@@ -256,7 +254,6 @@ async def add_tag(entry_id: str):
     await ensure_entry_exists(db, user["id"], entry_id)
     tag_hash = await db.tags.resolve_or_create_tag(user["id"], canonical, dek)
     created_date = await db.entries.get_entry_date(user["id"], entry_id)
-    client_today = local_date().isoformat()
     changed = await db.tags.xref_tag_entry(
         user["id"],
         tag_hash,
@@ -270,7 +267,6 @@ async def add_tag(entry_id: str):
                 entry_id=entry_id,
                 tag_hash=tag_hash,
                 created_date=created_date,
-                client_today=client_today,
             )
         )
     context = _parse_view_context()
@@ -412,7 +408,6 @@ async def delete_trace(tag_hash: str):
         "yes",
         "on",
     }
-    client_today = local_date().isoformat()
     affected = await get_services().db.tags.delete_tag_everywhere(
         user["id"],
         tag_hash_bytes,
@@ -424,7 +419,6 @@ async def delete_trace(tag_hash: str):
                 user_id=user["id"],
                 tag_hash=tag_hash_bytes,
                 affected_entries=affected,
-                client_today=client_today,
             )
         )
 
