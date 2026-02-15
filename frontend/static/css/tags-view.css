@@ -613,6 +613,9 @@
   margin: 0;
   content-visibility: auto;
   contain-intrinsic-size: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
 }
 
 .tags-view__entry {
@@ -706,6 +709,18 @@
 .tags-view__entry-main .markdown-body {
   display: block;
   opacity: 1;
+}
+
+.tags-view__entries .entry-responses {
+  display: grid;
+  gap: calc(var(--spacing-xs) * 1.2);
+  margin-top: 0;
+  position: relative;
+  padding-left: 0;
+}
+
+.tags-view__entries .entry.user + .entry-responses {
+  margin-top: 0;
 }
 
 .tags-view__entry-footer {
