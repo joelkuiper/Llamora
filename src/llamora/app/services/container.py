@@ -15,6 +15,8 @@ from llamora.app.api.search import SearchAPI
 from llamora.app.services.lexical_reranker import LexicalReranker
 from llamora.app.services.llm_service import LLMService
 from llamora.app.services.llm_stream_config import LLMStreamConfig
+from llamora.app.services.lockbox_store import LockboxStore
+from llamora.app.services.lockbox_provider import get_lockbox_store_for_db
 from llamora.app.services.tag_service import TagService
 from llamora.app.services.service_pulse import ServicePulse
 from llamora.app.services.search_config import SearchConfig
@@ -253,6 +255,13 @@ def get_tag_service() -> TagService:
     """Convenience accessor for the tag service."""
 
     return get_services().tag_service
+
+
+def get_lockbox_store(db: LocalDB | None = None) -> LockboxStore:
+    """Convenience accessor for a shared lockbox store."""
+
+    current_db = db or get_db()
+    return get_lockbox_store_for_db(current_db)
 
 
 async def _warmup_embeddings() -> None:

@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from llamora.app.db.events import ENTRY_TAGS_CHANGED_EVENT, RepositoryEventBus
-from llamora.app.services.lockbox import Lockbox
+from llamora.app.services.lockbox_provider import get_lockbox_store_for_db
 from llamora.app.services.lockbox_store import LockboxStore
 
 if TYPE_CHECKING:
@@ -20,16 +20,8 @@ def tag_recall_namespace(tag_hash_hex: str) -> str:
     return f"tag-recall:{tag_hash_hex}"
 
 
-_lockbox_store: LockboxStore | None = None
-_lockbox_pool = None
-
-
 def get_tag_recall_store(db: "LocalDB") -> LockboxStore:
-    global _lockbox_store, _lockbox_pool
-    if _lockbox_store is None or db.pool is not _lockbox_pool:
-        _lockbox_store = LockboxStore(Lockbox(db.pool))
-        _lockbox_pool = db.pool
-    return _lockbox_store
+    return get_lockbox_store_for_db(db)
 
 
 async def invalidate_tag_recall(
