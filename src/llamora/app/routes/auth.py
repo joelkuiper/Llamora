@@ -22,6 +22,7 @@ from llamora.app.services.auth_helpers import (
 from llamora.app.services.session_context import get_session_context
 from llamora.app.services.validators import validate_password, PasswordValidationError
 from llamora.app.services.crypto import (
+    CURRENT_SUITE,
     generate_dek,
     wrap_key,
     unwrap_key,
@@ -273,6 +274,17 @@ async def register():
             rc_nonce,
             rc_cipher,
         )
+        await db.users.create_key_epoch(
+            user_id,
+            epoch=1,
+            suite=CURRENT_SUITE,
+            pw_salt=pw_salt,
+            pw_nonce=pw_nonce,
+            pw_cipher=pw_cipher,
+            rc_salt=rc_salt,
+            rc_nonce=rc_nonce,
+            rc_cipher=rc_cipher,
+        )
 
         if settings.FEATURES.disable_registration:
             current_app.config["REGISTRATION_TOKEN"] = None
@@ -461,6 +473,10 @@ async def reset_password():
         await db.users.update_password_wrap(
             user["id"], password_hash, pw_salt, pw_nonce, pw_cipher
         )
+        epoch = await db.users.get_current_epoch(user["id"])
+        await db.users.update_key_epoch_pw(
+            user["id"], epoch, pw_salt, pw_nonce, pw_cipher
+        )
         invalidate_user_snapshot(user["id"])
         return redirect("/login")
 
@@ -570,9 +586,12 @@ async def change_password():
     hash_bytes = await _hash_password(password_bytes)
     password_hash = hash_bytes.decode("utf-8")
     pw_salt, pw_nonce, pw_cipher = wrap_key(dek, new)
-    await get_services().db.users.update_password_wrap(
+    db = get_services().db
+    await db.users.update_password_wrap(
         user["id"], password_hash, pw_salt, pw_nonce, pw_cipher
     )
+    epoch = await db.users.get_current_epoch(user["id"])
+    await db.users.update_key_epoch_pw(user["id"], epoch, pw_salt, pw_nonce, pw_cipher)
     invalidate_user_snapshot(user["id"])
 
     return await _render_profile_tab(user, "security", pw_success=True)
@@ -591,9 +610,10 @@ async def regen_recovery():
 
     recovery_code = generate_recovery_code()
     rc_salt, rc_nonce, rc_cipher = wrap_key(dek, recovery_code)
-    await get_services().db.users.update_recovery_wrap(
-        user["id"], rc_salt, rc_nonce, rc_cipher
-    )
+    db = get_services().db
+    await db.users.update_recovery_wrap(user["id"], rc_salt, rc_nonce, rc_cipher)
+    epoch = await db.users.get_current_epoch(user["id"])
+    await db.users.update_key_epoch_rc(user["id"], epoch, rc_salt, rc_nonce, rc_cipher)
 
     return await _render_profile_tab(
         user,

@@ -13,6 +13,12 @@ from nacl.bindings import (
 from nacl.exceptions import CryptoError
 from nacl.utils import random as random_bytes
 
+from llamora.app.services.crypto import (
+    CURRENT_SUITE,
+    CryptoDescriptor,
+    get_crypto_epoch,
+)
+
 logger = getLogger(__name__)
 
 _NONCE_BYTES = 24
@@ -41,18 +47,21 @@ class Lockbox:
         self._validate_dek(dek)
         scoped_namespace = self._scope_namespace(user_id, namespace)
         packed = self._encrypt(dek, user_id, namespace, key, value)
+        descriptor = CryptoDescriptor(algorithm=CURRENT_SUITE, epoch=get_crypto_epoch())
+        alg = descriptor.encode()
         updated_at = int(time())
 
         async with self.pool.connection() as conn:
             await conn.execute("BEGIN")
             await conn.execute(
                 """
-                INSERT INTO lockbox(namespace, key, value, updated_at)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO lockbox(namespace, key, value, alg, updated_at)
+                VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(namespace, key)
-                DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at
+                DO UPDATE SET value=excluded.value, alg=excluded.alg,
+                             updated_at=excluded.updated_at
                 """,
-                (scoped_namespace, key, packed, updated_at),
+                (scoped_namespace, key, packed, alg, updated_at),
             )
             await conn.commit()
 
@@ -71,13 +80,13 @@ class Lockbox:
 
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
-                "SELECT value FROM lockbox WHERE namespace = ? AND key = ?",
+                "SELECT value, alg FROM lockbox WHERE namespace = ? AND key = ?",
                 (scoped_namespace, key),
             )
             row = await cursor.fetchone()
             if row is None:
                 return None
-            return self._decrypt(dek, user_id, namespace, key, bytes(row[0]))
+            return self._decrypt(dek, user_id, namespace, key, bytes(row["value"]))
 
     async def delete(self, user_id: str, namespace: str, key: str) -> None:
         self._validate_user_id(user_id)
