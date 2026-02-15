@@ -13,7 +13,6 @@ from dataclasses import dataclass
 from typing import Any, Iterable, Literal, Sequence
 
 from llamora.app.util.tags import canonicalize as _canonicalize, display as _display
-from llamora.app.services.markdown import render_markdown_to_html
 from llamora.persistence.local_db import LocalDB
 from llamora.app.services.entry_metadata import generate_metadata
 
@@ -82,15 +81,30 @@ class TagRelatedItem:
 
 @dataclass(slots=True)
 class TagArchiveEntry:
-    entry: dict[str, Any]
+    entry: TagArchiveRecord
     created_date: str | None
     related_tags: tuple[str, ...]
-    responses: tuple[dict[str, Any], ...]
+    responses: tuple[TagArchiveResponse, ...]
 
 
 @dataclass(slots=True)
 class TagArchiveResponse:
-    entry: dict[str, Any]
+    id: str
+    role: str
+    reply_to: str
+    text: str
+    meta: dict[str, Any]
+    created_at: str
+
+
+@dataclass(slots=True)
+class TagArchiveRecord:
+    id: str
+    role: str
+    text: str
+    meta: dict[str, Any]
+    tags: tuple[dict[str, Any], ...]
+    created_at: str
 
 
 @dataclass(slots=True)
@@ -537,28 +551,24 @@ class TagService:
                 seen_secondary.add(canonical)
 
             raw_text = str(entry.get("text") or "")
-            text_html = render_markdown_to_html(raw_text)
-            if not text_html:
-                text_html = "<p>...</p>"
 
             archive_entries.append(
                 TagArchiveEntry(
-                    entry={
-                        "id": entry_id,
-                        "role": role,
-                        "text": raw_text,
-                        "text_html": text_html,
-                        "meta": entry.get("meta", {}),
-                        "tags": tuple(tags_by_entry.get(entry_id, [])),
-                        "created_at": created_at,
-                    },
+                    entry=TagArchiveRecord(
+                        id=entry_id,
+                        role=role,
+                        text=raw_text,
+                        meta=entry.get("meta", {}),
+                        tags=tuple(tags_by_entry.get(entry_id, [])),
+                        created_at=created_at,
+                    ),
                     created_date=entry.get("created_date"),
                     related_tags=tuple(secondary_tags[: max(1, secondary_tag_limit)]),
                     responses=(),
                 )
             )
 
-        responses_by_reply_to: dict[str, list[dict[str, Any]]] = {}
+        responses_by_reply_to: dict[str, list[TagArchiveResponse]] = {}
         reply_entries = await self._db.entries.get_entries_by_reply_to_ids(
             user_id,
             user_entry_ids,
@@ -571,19 +581,15 @@ class TagService:
                 continue
             if str(response.get("role") or "") == "user":
                 continue
-            response_html = render_markdown_to_html(str(response.get("text") or ""))
-            if not response_html:
-                response_html = "<p>...</p>"
             responses_by_reply_to.setdefault(reply_to, []).append(
-                {
-                    "id": str(response.get("id") or ""),
-                    "role": str(response.get("role") or "assistant"),
-                    "reply_to": reply_to,
-                    "text": str(response.get("text") or ""),
-                    "text_html": response_html,
-                    "meta": response.get("meta", {}),
-                    "created_at": created_at,
-                }
+                TagArchiveResponse(
+                    id=str(response.get("id") or ""),
+                    role=str(response.get("role") or "assistant"),
+                    reply_to=reply_to,
+                    text=str(response.get("text") or ""),
+                    meta=response.get("meta", {}),
+                    created_at=created_at,
+                )
             )
 
         if responses_by_reply_to:
@@ -592,9 +598,7 @@ class TagService:
                     entry=item.entry,
                     created_date=item.created_date,
                     related_tags=item.related_tags,
-                    responses=tuple(
-                        responses_by_reply_to.get(str(item.entry.get("id") or ""), ())
-                    ),
+                    responses=tuple(responses_by_reply_to.get(item.entry.id, ())),
                 )
                 for item in archive_entries
             ]

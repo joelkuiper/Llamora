@@ -3,6 +3,10 @@ from urllib.parse import urlencode
 from llamora.app.services.container import get_services, get_tag_service
 from llamora.app.services.auth_helpers import login_required
 from llamora.app.services.tag_service import TagsViewData
+from llamora.app.services.tag_presenter import (
+    present_archive_entries,
+    present_tags_view_data,
+)
 from llamora.app.services.lockbox import Lockbox
 from llamora.app.services.lockbox_store import LockboxStore
 from llamora.app.services.tag_summary import generate_tag_summary
@@ -104,10 +108,11 @@ async def _render_tags_detail_and_list_oob_updates(
     tags_view, sort_kind, sort_dir, entries_limit = await _load_tags_view_from_context(
         user_id, dek, context
     )
+    presented_tags_view = present_tags_view_data(tags_view)
     return await render_template(
         "partials/tags_view_fragment.html",
         day=str(context["day"]),
-        tags_view=tags_view,
+        tags_view=presented_tags_view,
         selected_tag=tags_view.selected_tag,
         tags_sort_kind=sort_kind,
         tags_sort_dir=sort_dir,
@@ -127,10 +132,11 @@ async def _render_tags_list_oob_updates(
     tags_view, sort_kind, sort_dir, entries_limit = await _load_tags_view_from_context(
         user_id, dek, context
     )
+    presented_tags_view = present_tags_view_data(tags_view)
     return await render_template(
         "partials/tags_view_list_oob.html",
         day=str(context["day"]),
-        tags_view=tags_view,
+        tags_view=presented_tags_view,
         selected_tag=tags_view.selected_tag,
         tags_sort_kind=sort_kind,
         tags_sort_dir=sort_dir,
@@ -388,10 +394,11 @@ async def delete_trace(tag_hash: str):
     entries_limit = _parse_positive_int(
         request.args.get("entries_limit"), default=12, min_value=6, max_value=60
     )
+    presented_tags_view = present_tags_view_data(tags_view)
     return await render_template(
         "partials/tags_view_fragment.html",
         day=day,
-        tags_view=tags_view,
+        tags_view=presented_tags_view,
         selected_tag=selected_tag,
         tags_sort_kind=sort_kind,
         tags_sort_dir=sort_dir,
@@ -543,10 +550,11 @@ async def tags_view_fragment(date: str):
         around_entry_id=restore_entry,
     )
     selected_tag = tags_view.selected_tag
+    presented_tags_view = present_tags_view_data(tags_view)
     return await render_template(
         "partials/tags_view_fragment.html",
         day=normalized_date,
-        tags_view=tags_view,
+        tags_view=presented_tags_view,
         selected_tag=selected_tag,
         tags_sort_kind=sort_kind,
         tags_sort_dir=sort_dir,
@@ -579,10 +587,11 @@ async def tags_view_list_fragment(date: str):
         sort_dir=sort_dir,
         entry_limit=entries_limit,
     )
+    presented_tags_view = present_tags_view_data(tags_view)
     return await render_template(
         "partials/tags_view_list_fragment.html",
         day=normalized_date,
-        tags_view=tags_view,
+        tags_view=presented_tags_view,
         selected_tag=tags_view.selected_tag,
         tags_sort_kind=sort_kind,
         tags_sort_dir=sort_dir,
@@ -621,7 +630,7 @@ async def tags_view_detail_entries_chunk(date: str, tag_hash: str):
     return await render_template(
         "partials/tags_view_entries_chunk.html",
         day=normalized_date,
-        entries=entries,
+        entries=present_archive_entries(entries),
         sort_kind=sort_kind,
         sort_dir=sort_dir,
         selected_tag=tag_service.normalize_tag_query(request.args.get("tag")),

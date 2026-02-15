@@ -13,6 +13,7 @@ from llamora.app.routes.helpers import require_iso_date
 from llamora.app.services.calendar import get_month_context
 from llamora.app.routes.entries import render_entries
 from llamora.app.services.container import get_services
+from llamora.app.services.tag_presenter import present_tags_view_data
 from llamora.app.services.day_summary import generate_day_summary
 from llamora.app.routes.helpers import require_user_and_dek
 from logging import getLogger
@@ -78,6 +79,7 @@ async def _render_day(date: str, target: str | None, view_kind: str):
             sort_dir=tags_sort_dir,
             entry_limit=entries_limit,
         )
+        tags_view = present_tags_view_data(tags_view)
         selected_tag = tags_view.selected_tag
     context = {
         "day": date,
