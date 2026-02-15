@@ -329,7 +329,7 @@ class TagsRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT e.id, e.digest
+                SELECT e.digest
                 FROM tag_entry_xref x
                 JOIN entries e
                   ON e.user_id = x.user_id AND e.id = x.entry_id
@@ -341,9 +341,8 @@ class TagsRepository(BaseRepository):
         digests: list[str] = []
         for row in rows:
             digest = str(row["digest"] or "").strip()
-            if not digest:
-                digest = f"missing:{row['id']}"
-            digests.append(digest)
+            if digest:
+                digests.append(digest)
         return digests
 
     async def get_tag_frecency(

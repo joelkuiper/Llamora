@@ -16,13 +16,15 @@ from llamora.persistence.local_db import LocalDB
 
 logger = logging.getLogger(__name__)
 
+_ENTRY_DIGEST_VERSION = 2
+
 
 async def _load_entries(db: LocalDB, user_id: str) -> list[dict]:
     assert db.pool is not None
     async with db.pool.connection() as conn:
         cursor = await conn.execute(
             """
-            SELECT id, role, nonce, ciphertext, alg, digest
+            SELECT id, role, nonce, ciphertext, alg, digest, digest_version
             FROM entries
             WHERE user_id = ?
             """,
@@ -62,7 +64,7 @@ async def _backfill_user(
         logger.info("No entries found for user %s", user_id)
         return
 
-    updates: list[tuple[str, str, str]] = []
+    updates: list[tuple[str, int, str, str]] = []
     skipped = 0
     already = 0
 
@@ -79,7 +81,7 @@ async def _backfill_user(
             record = _decrypt_entry(db, dek, user_id, row)
             text = str(record.get("text") or "")
             digest = entry_digest(dek, entry_id, role, text)
-            updates.append((digest, entry_id, user_id))
+            updates.append((digest, _ENTRY_DIGEST_VERSION, entry_id, user_id))
         except Exception as exc:
             skipped += 1
             logger.warning("Skipping entry %s: %s", entry_id, exc)
@@ -101,7 +103,8 @@ async def _backfill_user(
             await conn.executemany(
                 """
                 UPDATE entries
-                SET digest = ?
+                SET digest = ?,
+                    digest_version = ?
                 WHERE id = ? AND user_id = ?
                 """,
                 updates,

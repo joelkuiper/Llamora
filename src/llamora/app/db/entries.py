@@ -23,6 +23,7 @@ EntryAppendedCallback = Callable[[str, str, str, bytes], Awaitable[None]]
 
 _FLAG_PATTERN = re.compile(r"^[a-z0-9_]+$")
 _AUTO_OPENING_FLAG = "auto_opening"
+_ENTRY_DIGEST_VERSION = 2
 
 
 def parse_entry_flags(value: str | None) -> set[str]:
@@ -202,6 +203,13 @@ class EntriesRepository(BaseRepository):
 
         return entries
 
+    @staticmethod
+    def _require_entry_digest(dek: bytes, entry_id: str, role: str, text: str) -> str:
+        digest = entry_digest(dek, entry_id, role, text)
+        if not digest:
+            raise ValueError(f"unable to compute digest for entry {entry_id}")
+        return digest
+
     async def append_entry(
         self,
         user_id: str,
@@ -220,7 +228,7 @@ class EntriesRepository(BaseRepository):
         prompt_tokens = await asyncio.to_thread(
             count_message_tokens, role, record.get("text", "")
         )
-        digest = entry_digest(dek, entry_id, role, record.get("text", ""))
+        digest = self._require_entry_digest(dek, entry_id, role, record.get("text", ""))
         flags = build_entry_flags_from_meta(record.get("meta", {}))
 
         async with self.pool.connection() as conn:
@@ -234,6 +242,7 @@ class EntriesRepository(BaseRepository):
                 "alg",
                 "prompt_tokens",
                 "digest",
+                "digest_version",
                 "flags",
             ]
             params: list = [
@@ -246,6 +255,7 @@ class EntriesRepository(BaseRepository):
                 alg,
                 prompt_tokens,
                 digest,
+                _ENTRY_DIGEST_VERSION,
                 flags,
             ]
 
@@ -422,7 +432,9 @@ class EntriesRepository(BaseRepository):
             prompt_tokens = await asyncio.to_thread(
                 count_message_tokens, row["role"], record.get("text", "")
             )
-            digest = entry_digest(dek, entry_id, row["role"], record.get("text", ""))
+            digest = self._require_entry_digest(
+                dek, entry_id, row["role"], record.get("text", "")
+            )
             flags = build_entry_flags_from_meta(
                 meta or {}, parse_entry_flags(row["flags"])
             )
@@ -436,11 +448,22 @@ class EntriesRepository(BaseRepository):
                         alg = ?,
                         prompt_tokens = ?,
                         digest = ?,
+                        digest_version = ?,
                         flags = ?,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE id = ? AND user_id = ?
                     """,
-                    (nonce, ct, alg, prompt_tokens, digest, flags, entry_id, user_id),
+                    (
+                        nonce,
+                        ct,
+                        alg,
+                        prompt_tokens,
+                        digest,
+                        _ENTRY_DIGEST_VERSION,
+                        flags,
+                        entry_id,
+                        user_id,
+                    ),
                 )
 
             await self._run_in_transaction(conn, _execute_update)
@@ -709,7 +732,7 @@ class EntriesRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT id, created_date, digest
+                SELECT created_date, digest
                 FROM entries
                 WHERE user_id = ? AND created_date >= ? AND created_date < ?
                 """,
@@ -727,9 +750,8 @@ class EntriesRepository(BaseRepository):
             except (TypeError, ValueError):
                 continue
             digest = str(row["digest"] or "").strip()
-            if not digest:
-                digest = f"missing:{row['id']}"
-            digests_by_day.setdefault(day, []).append(digest)
+            if digest:
+                digests_by_day.setdefault(day, []).append(digest)
         for day, digests in digests_by_day.items():
             payload = "|".join(sorted(digests)).encode("utf-8")
             summary_digests[day] = hashlib.sha256(payload).hexdigest()
@@ -741,7 +763,7 @@ class EntriesRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT id, digest
+                SELECT digest
                 FROM entries
                 WHERE user_id = ? AND created_date = ?
                 """,
@@ -752,9 +774,8 @@ class EntriesRepository(BaseRepository):
         digests: list[str] = []
         for row in rows:
             digest = str(row["digest"] or "").strip()
-            if not digest:
-                digest = f"missing:{row['id']}"
-            digests.append(digest)
+            if digest:
+                digests.append(digest)
 
         payload = "|".join(sorted(digests)).encode("utf-8")
         return hashlib.sha256(payload).hexdigest()
