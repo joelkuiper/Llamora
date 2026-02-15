@@ -585,6 +585,8 @@
   border: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
   background: color-mix(in srgb, var(--color-surface) 95%, transparent);
   box-shadow: 0 6px 14px color-mix(in srgb, var(--shadow-dark) 5%, transparent);
+  --heatmap-slide-in: 16px;
+  --heatmap-slide-out: -16px;
   --heatmap-level-0: color-mix(in srgb, var(--color-text) 6%, transparent);
   --heatmap-level-1: color-mix(in srgb, #f8dda8 72%, transparent);
   --heatmap-level-2: color-mix(in srgb, #f5c874 82%, transparent);
@@ -621,6 +623,11 @@
   background: color-mix(in srgb, var(--glass-bg-alt) 92%, transparent);
   color: color-mix(in srgb, var(--color-text) 70%, transparent);
   opacity: 0.7;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
   transition:
     opacity var(--motion-hover) ease,
     border-color var(--motion-hover) ease,
@@ -630,6 +637,7 @@
 
 .tags-view__heatmap-btn .icon-mask {
   --icon-size: 0.65rem;
+  display: block;
 }
 
 .tags-view__heatmap-btn:hover:not(:disabled),
@@ -644,6 +652,55 @@
 .tags-view__heatmap-btn:disabled {
   opacity: 0.35;
   cursor: default;
+}
+
+.tags-view__heatmap-body {
+  position: relative;
+  min-height: 9rem;
+}
+
+.tags-view__heatmap.htmx-swapping .tags-view__heatmap-body {
+  animation: heatmap-slide-out var(--motion-gentle) ease both;
+  will-change: transform;
+}
+
+.tags-view__heatmap.htmx-settling .tags-view__heatmap-body {
+  animation: heatmap-slide-in var(--motion-gentle) ease both;
+  will-change: transform;
+}
+
+@keyframes heatmap-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(var(--heatmap-slide-in));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes heatmap-slide-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(var(--heatmap-slide-out));
+  }
+}
+
+.tags-view__heatmap-empty {
+  min-height: 9rem;
+  display: grid;
+  place-items: center;
+  color: color-mix(in srgb, var(--color-text-muted) 70%, transparent);
+  font-size: 0.8rem;
+}
+
+.tags-view__heatmap-empty p {
+  margin: 0;
 }
 
 .activity-heatmap {

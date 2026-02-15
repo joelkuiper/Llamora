@@ -28,6 +28,7 @@ const state = {
   listPositions: null,
 };
 
+
 const heatmapState = {
   initialized: false,
   tooltip: null,

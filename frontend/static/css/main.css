@@ -520,6 +520,12 @@ input[type="checkbox"]:focus {
 .icon-chevron-right {
   --icon: url("../icons/chevron-right.svg");
 }
+.icon-circle-arrow-left {
+  --icon: url("../icons/circle-arrow-left.svg");
+}
+.icon-circle-arrow-right {
+  --icon: url("../icons/circle-arrow-right.svg");
+}
 .icon-chevron-up {
   --icon: url("../icons/chevron-up.svg");
 }
