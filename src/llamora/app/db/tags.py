@@ -148,6 +148,38 @@ class TagsRepository(BaseRepository):
 
         return affected_entries if changed else []
 
+    async def get_tag_activity_counts(
+        self,
+        user_id: str,
+        tag_hash: bytes,
+        start_date: str,
+        end_date: str,
+    ) -> dict[str, int]:
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                """
+                SELECT e.created_date AS created_date,
+                       COUNT(*) AS total_entries
+                FROM tag_entry_xref x
+                JOIN entries e
+                  ON e.user_id = x.user_id AND e.id = x.entry_id
+                WHERE x.user_id = ?
+                  AND x.tag_hash = ?
+                  AND e.created_date >= ?
+                  AND e.created_date <= ?
+                GROUP BY e.created_date
+                """,
+                (user_id, tag_hash, start_date, end_date),
+            )
+            rows = await cursor.fetchall()
+        counts: dict[str, int] = {}
+        for row in rows:
+            created_date = row["created_date"]
+            if not created_date:
+                continue
+            counts[str(created_date)] = int(row["total_entries"] or 0)
+        return counts
+
     async def get_tags_for_entry(
         self, user_id: str, entry_id: str, dek: bytes
     ) -> list[dict]:

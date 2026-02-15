@@ -36,25 +36,29 @@
         <div class="tags-view__title-wrap">
           <h2 class="tags-view__title">{{ detail.name }}</h2>
           <p class="tags-view__meta">
-            {{ detail.count }} {{ "entries" if detail.count != 1 else "entry" }} · first used {{ detail.first_used_label or "unknown" }}
+            {{ detail.count }} {{ "entries" if detail.count != 1 else "entry" }} ·
+            {% if detail.first_used_label %}since {{ detail.first_used_label }}{% else %}first used unknown{% endif %}
           </p>
-          {% if detail.related_tags %}
-            <div class="tags-view__related">
-              <span class="tags-view__related-prefix">frequently appears with</span>
-              {% for related in detail.related_tags %}
-                {% set related_target = 'tag-index-' ~ related.name %}
-                {% set related_url = url_for('days.day', date=day) ~ '?view=tags&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&entries_limit=' ~ entries_limit ~ '&tag=' ~ (related.name|urlencode) ~ '&target=' ~ (related_target|urlencode) %}
-                <a href="{{ related_url }}"
-                   class="tags-view__related-link entry-tag"
-                   hx-get="{{ url_for('tags.tags_view_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&entries_limit={{ entries_limit }}&tag={{ related.name|urlencode }}&target={{ related_target|urlencode }}"
-                   hx-target="#tags-view-detail"
-                   hx-swap="outerHTML"
-                   hx-push-url="{{ related_url }}">
-                  <span class="tag-label">{{ related.name }}</span>
-                </a>
-              {% endfor %}
-            </div>
-          {% endif %}
+          <div class="tags-view__related{% if not detail.related_tags %} tags-view__related--solo{% endif %}">
+            {% if detail.related_tags %}
+              <div class="tags-view__related-row">
+                <span class="tags-view__related-prefix">frequently appears with</span>
+                {% for related in detail.related_tags %}
+                  {% set related_target = 'tag-index-' ~ related.name %}
+                  {% set related_url = url_for('days.day', date=day) ~ '?view=tags&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&entries_limit=' ~ entries_limit ~ '&tag=' ~ (related.name|urlencode) ~ '&target=' ~ (related_target|urlencode) %}
+                  <a href="{{ related_url }}"
+                     class="tags-view__related-link entry-tag"
+                     hx-get="{{ url_for('tags.tags_view_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&entries_limit={{ entries_limit }}&tag={{ related.name|urlencode }}&target={{ related_target|urlencode }}"
+                     hx-target="#tags-view-detail"
+                     hx-swap="outerHTML"
+                     hx-push-url="{{ related_url }}">
+                    <span class="tag-label">{{ related.name }}</span>
+                  </a>
+                {% endfor %}
+              </div>
+            {% endif %}
+            {% include 'partials/tags_view_heatmap.html' %}
+          </div>
           <section class="tags-view__summary tags-view__summary--header"
                    hx-get="{{ url_for('tags.tag_detail_summary', tag_hash=detail.hash) }}?num_words=72"
                    hx-trigger="tag-summary:load"

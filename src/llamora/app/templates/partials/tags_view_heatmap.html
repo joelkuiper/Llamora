@@ -1,0 +1,36 @@
+{% if activity_heatmap %}
+  {% set heatmap_tag_hash = tag_hash if tag_hash is defined else (tags_view.detail.hash if tags_view is defined and tags_view and tags_view.detail else detail.hash if detail is defined else '') %}
+  {% set heatmap_offset = heatmap_offset|default(0) %}
+  {% if min_date is not defined or not min_date %}
+    {% set min_date = (tags_view.detail.first_used if tags_view is defined and tags_view and tags_view.detail else detail.first_used if detail is defined else '') %}
+  {% endif %}
+  <div class="tags-view__heatmap"
+       hx-get="{{ url_for('tags.tags_view_heatmap', date=day) }}?tag_hash={{ heatmap_tag_hash }}&heatmap_offset={{ heatmap_offset }}{% if min_date %}&min_date={{ min_date }}{% endif %}"
+       hx-trigger="entries:changed from:body"
+       hx-swap="outerHTML">
+    <div class="tags-view__heatmap-header">
+      <span class="tags-view__heatmap-title">Trace</span>
+      <div class="tags-view__heatmap-controls" role="group" aria-label="Heatmap paging">
+        <button type="button"
+                class="tags-view__heatmap-btn"
+                aria-label="Previous months"
+                {% if not activity_heatmap.has_prev %}disabled aria-disabled="true"{% endif %}
+                hx-get="{{ url_for('tags.tags_view_heatmap', date=day) }}?tag_hash={{ heatmap_tag_hash }}&heatmap_offset={{ heatmap_offset + 1 }}{% if min_date %}&min_date={{ min_date }}{% endif %}"
+                hx-target="closest .tags-view__heatmap"
+                hx-swap="outerHTML">
+          <span class="icon-mask icon-chevron-left" aria-hidden="true"></span>
+        </button>
+        <button type="button"
+                class="tags-view__heatmap-btn"
+                aria-label="Next months"
+                {% if not activity_heatmap.has_next %}disabled aria-disabled="true"{% endif %}
+                hx-get="{{ url_for('tags.tags_view_heatmap', date=day) }}?tag_hash={{ heatmap_tag_hash }}&heatmap_offset={{ heatmap_offset - 1 if heatmap_offset > 0 else 0 }}{% if min_date %}&min_date={{ min_date }}{% endif %}"
+                hx-target="closest .tags-view__heatmap"
+                hx-swap="outerHTML">
+          <span class="icon-mask icon-chevron-right" aria-hidden="true"></span>
+        </button>
+      </div>
+    </div>
+    {% include 'partials/activity_heatmap.html' %}
+  </div>
+{% endif %}

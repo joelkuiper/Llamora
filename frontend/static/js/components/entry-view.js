@@ -371,6 +371,9 @@ export class EntryView extends ReactiveElement {
     if (!this.#entries) return;
 
     const swapTargets = this.#collectSwapTargets(event);
+    const shouldNotify = swapTargets.some(
+      (target) => target === this.#entries || target?.classList?.contains?.("entry"),
+    );
 
     swapTargets.forEach((target) => {
       if (target === this.#entries) {
@@ -407,6 +410,10 @@ export class EntryView extends ReactiveElement {
     }
 
     this.#syncToEntryDate();
+
+    if (shouldNotify) {
+      document.body.dispatchEvent(new CustomEvent("entries:changed"));
+    }
   }
 
   #collectSwapTargets(event) {

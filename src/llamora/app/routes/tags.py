@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import datetime as dt
 
 from quart import Blueprint, request, abort, render_template, jsonify, url_for
 from urllib.parse import urlencode
@@ -17,6 +18,7 @@ from llamora.app.services.tag_presenter import (
 )
 from llamora.app.services.tag_effects import after_tag_changed, after_tag_deleted
 from llamora.app.services.tag_summary import generate_tag_summary
+from llamora.app.services.activity_heatmap import get_tag_activity_heatmap
 from llamora.app.services.time import local_date
 from llamora.settings import settings
 from llamora.app.routes.helpers import require_iso_date
@@ -565,6 +567,7 @@ async def tag_detail_summary(tag_hash: str):
 async def tags_view_fragment(date: str):
     normalized_date = require_iso_date(date)
     _, user, dek = await require_user_and_dek()
+    services = get_services()
     tag_service = _tags()
     sort_kind = tag_service.normalize_tags_sort_kind(request.args.get("sort_kind"))
     sort_dir = tag_service.normalize_tags_sort_dir(request.args.get("sort_dir"))
@@ -592,6 +595,32 @@ async def tags_view_fragment(date: str):
     )
     selected_tag = tags_view.selected_tag
     presented_tags_view = present_tags_view_data(tags_view)
+    heatmap_offset = _parse_positive_int(
+        request.args.get("heatmap_offset"), default=0, min_value=0, max_value=240
+    )
+    activity_heatmap = None
+    if presented_tags_view.detail:
+        try:
+            tag_hash = bytes.fromhex(presented_tags_view.detail.hash)
+        except ValueError:
+            tag_hash = b""
+        if tag_hash:
+            min_date = None
+            if presented_tags_view.detail.first_used:
+                try:
+                    min_date = dt.date.fromisoformat(
+                        presented_tags_view.detail.first_used
+                    )
+                except ValueError:
+                    min_date = None
+            activity_heatmap = await get_tag_activity_heatmap(
+                services.db.tags,
+                user["id"],
+                tag_hash,
+                months=12,
+                offset=heatmap_offset,
+                min_date=min_date,
+            )
     return await render_template(
         "partials/tags_view_fragment.html",
         day=normalized_date,
@@ -601,6 +630,8 @@ async def tags_view_fragment(date: str):
         tags_sort_dir=sort_dir,
         include_list=include_list,
         entries_limit=entries_limit,
+        heatmap_offset=heatmap_offset,
+        activity_heatmap=activity_heatmap,
         target=(request.args.get("target") or "").strip() or None,
         today=local_date().isoformat(),
     )
@@ -638,6 +669,50 @@ async def tags_view_list_fragment(date: str):
         tags_sort_dir=sort_dir,
         entries_limit=entries_limit,
         target=(request.args.get("target") or "").strip() or None,
+        today=local_date().isoformat(),
+    )
+
+
+@tags_bp.get("/fragments/tags/<date>/heatmap")
+@login_required
+async def tags_view_heatmap(date: str):
+    normalized_date = require_iso_date(date)
+    _, user, _ = await require_user_and_dek()
+    services = get_services()
+    tag_hash_raw = (request.args.get("tag_hash") or "").strip()
+    heatmap_offset = _parse_positive_int(
+        request.args.get("heatmap_offset"), default=0, min_value=0, max_value=240
+    )
+    min_date_raw = (request.args.get("min_date") or "").strip()
+    activity_heatmap = None
+    if tag_hash_raw:
+        try:
+            tag_hash = bytes.fromhex(tag_hash_raw)
+        except ValueError:
+            tag_hash = b""
+        if tag_hash:
+            min_date = None
+            if min_date_raw:
+                try:
+                    min_date = dt.date.fromisoformat(min_date_raw)
+                except ValueError:
+                    min_date = None
+            activity_heatmap = await get_tag_activity_heatmap(
+                services.db.tags,
+                user["id"],
+                tag_hash,
+                months=12,
+                offset=heatmap_offset,
+                min_date=min_date,
+            )
+    return await render_template(
+        "partials/tags_view_heatmap.html",
+        day=normalized_date,
+        activity_heatmap=activity_heatmap,
+        tag_hash=tag_hash_raw,
+        heatmap_offset=heatmap_offset,
+        min_date=min_date_raw,
+        selected_day=normalized_date,
         today=local_date().isoformat(),
     )
 

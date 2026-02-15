@@ -1,0 +1,37 @@
+{% if activity_heatmap %}
+  {% set selected_day = selected_day|default(day|default("")) %}
+  <div class="activity-heatmap">
+    {% for month in activity_heatmap.months %}
+      <section class="activity-heatmap__month" role="group" aria-labelledby="heatmap-month-{{ loop.index }}">
+        <div class="activity-heatmap__month-label" id="heatmap-month-{{ loop.index }}">{{ month.label }}</div>
+        <div class="activity-heatmap__grid" role="grid" aria-label="{{ month.aria_label }}">
+          {% for week in month.weeks %}
+            <div class="activity-heatmap__week" role="row">
+              {% for cell in week.days %}
+                {% if cell.in_month %}
+                  {% set entry_label = "entry" if cell.count == 1 else "entries" %}
+                  {% if cell.count > 0 %}
+                    {% set tooltip = (cell.date|long_date) ~ ' · ' ~ cell.count ~ ' ' ~ entry_label %}
+                  {% else %}
+                    {% set tooltip = (cell.date|long_date) ~ ' · No entries' %}
+                  {% endif %}
+                  <a class="activity-heatmap__cell level-{{ cell.level }}{% if today is defined and cell.date == today %} is-today{% endif %}{% if selected_day and cell.date == selected_day %} is-selected{% endif %}"
+                     role="gridcell"
+                     href="{{ url_for('days.day', date=cell.date) }}?view=diary"
+                     hx-get="{{ url_for('days.day', date=cell.date) }}?view=diary"
+                     hx-target="#main-content"
+                     hx-swap="outerHTML"
+                     hx-push-url="true"
+                     aria-label="{{ tooltip }}"
+                     data-tooltip-title="{{ tooltip }}"></a>
+                {% else %}
+                  <span class="activity-heatmap__cell is-empty" aria-hidden="true"></span>
+                {% endif %}
+              {% endfor %}
+            </div>
+          {% endfor %}
+        </div>
+      </section>
+    {% endfor %}
+  </div>
+{% endif %}

@@ -1,4 +1,5 @@
 import asyncio
+import datetime as dt
 from collections.abc import Awaitable, Callable
 from logging import getLogger
 
@@ -16,6 +17,7 @@ from llamora.app.routes.entries import render_entries
 from llamora.app.services.auth_helpers import login_required
 from llamora.app.routes.helpers import require_iso_date, require_user_and_dek
 from llamora.app.services.calendar import get_month_context
+from llamora.app.services.activity_heatmap import get_tag_activity_heatmap
 from llamora.app.services.container import get_services, get_summarize_service
 from llamora.app.services.day_summary import generate_day_summary
 from llamora.app.services.session_context import get_session_context
@@ -69,6 +71,8 @@ async def _render_day(date: str, target: str | None, view_kind: str):
     entries_html = None
     tags_view = None
     selected_tag = None
+    activity_heatmap = None
+    heatmap_offset = 0
     tags_sort_kind = services.tag_service.normalize_tags_sort_kind(
         request.args.get("sort_kind")
     )
@@ -105,6 +109,31 @@ async def _render_day(date: str, target: str | None, view_kind: str):
         )
         tags_view = present_tags_view_data(tags_view)
         selected_tag = tags_view.selected_tag
+        try:
+            heatmap_offset = int(request.args.get("heatmap_offset") or 0)
+        except (TypeError, ValueError):
+            heatmap_offset = 0
+        heatmap_offset = max(0, heatmap_offset)
+        if tags_view.detail:
+            try:
+                tag_hash = bytes.fromhex(tags_view.detail.hash)
+            except ValueError:
+                tag_hash = b""
+            if tag_hash:
+                min_date = None
+                if tags_view.detail.first_used:
+                    try:
+                        min_date = dt.date.fromisoformat(tags_view.detail.first_used)
+                    except ValueError:
+                        min_date = None
+                activity_heatmap = await get_tag_activity_heatmap(
+                    services.db.tags,
+                    user["id"],
+                    tag_hash,
+                    months=12,
+                    offset=heatmap_offset,
+                    min_date=min_date,
+                )
     context = {
         "day": date,
         "is_today": date == today,
@@ -121,6 +150,8 @@ async def _render_day(date: str, target: str | None, view_kind: str):
         "tags_sort_dir": tags_sort_dir,
         "entries_limit": entries_limit,
         "target": target_param,
+        "activity_heatmap": activity_heatmap,
+        "heatmap_offset": heatmap_offset,
     }
     if request.headers.get("HX-Request"):
         target_id = request.headers.get("HX-Target")

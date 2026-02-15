@@ -627,11 +627,13 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       }
       this.#updateSubmitState();
       this.#invalidateAutocompleteCache({ immediate: true });
+      document.body.dispatchEvent(new CustomEvent("entries:changed"));
     } else if (target.classList?.contains("tag-tombstone")) {
       target.remove();
       this.#updateSubmitState();
       this.#invalidateAutocompleteCache({ immediate: true });
       this.#clearEmptySuggestionCache();
+      document.body.dispatchEvent(new CustomEvent("entries:changed"));
     }
   }
 

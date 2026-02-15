@@ -457,7 +457,7 @@
 .tags-view__detail-header {
   position: relative;
   margin: 0 0.15rem 1.85rem;
-  padding: 1.2rem 2.8rem 1.3rem 1.15rem;
+  padding: 1.2rem 3.1rem 1.3rem 1.15rem;
   border-radius: 0.9rem;
   border: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
   background: color-mix(in srgb, var(--color-surface) 90%, transparent);
@@ -484,7 +484,7 @@
   right: 0.72rem;
   width: 1.85rem;
   height: 1.85rem;
-  opacity: 0.36;
+  opacity: 0.3;
   --icon-size: 0.92rem;
   border-color: transparent;
   background: transparent;
@@ -522,14 +522,21 @@
 }
 
 .tags-view__related {
-  margin: 0.62rem 0 0;
+  margin: 0.35rem 0 0;
   font-size: 0.74rem;
   color: color-mix(in srgb, var(--color-text-muted) 66%, transparent);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 0.65rem 1rem;
+  letter-spacing: 0.01em;
+}
+
+.tags-view__related-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem;
-  letter-spacing: 0.01em;
 }
 
 .tags-view__related-prefix {
@@ -564,6 +571,162 @@
     var(--inset-shadow),
     0 0 0 1px color-mix(in srgb, var(--accent-10) 50%, transparent);
   outline: none;
+}
+
+.tags-view__heatmap {
+  min-width: 0;
+  width: 100%;
+  padding: 0.5rem 0.8rem 0.55rem;
+  border-radius: 0.82rem;
+  border: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+  background: color-mix(in srgb, var(--color-surface) 95%, transparent);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--shadow-dark) 5%, transparent);
+  --heatmap-level-0: color-mix(in srgb, var(--color-text) 6%, transparent);
+  --heatmap-level-1: color-mix(in srgb, #f8dda8 72%, transparent);
+  --heatmap-level-2: color-mix(in srgb, #f5c874 82%, transparent);
+  --heatmap-level-3: color-mix(in srgb, #f0ab4f 88%, transparent);
+  --heatmap-level-4: color-mix(in srgb, #e28c2f 92%, transparent);
+  --heatmap-muted: var(--heatmap-level-0);
+}
+
+.tags-view__heatmap-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.tags-view__heatmap-title {
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text-muted) 58%, transparent);
+}
+
+.tags-view__heatmap-controls {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.tags-view__heatmap-btn {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
+  background: color-mix(in srgb, var(--glass-bg-alt) 92%, transparent);
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+  opacity: 0.7;
+  transition:
+    opacity var(--motion-hover) ease,
+    border-color var(--motion-hover) ease,
+    box-shadow var(--motion-hover) ease,
+    transform var(--motion-hover) ease;
+}
+
+.tags-view__heatmap-btn .icon-mask {
+  --icon-size: 0.65rem;
+}
+
+.tags-view__heatmap-btn:hover:not(:disabled),
+.tags-view__heatmap-btn:focus-visible:not(:disabled) {
+  opacity: 1;
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent-20) 70%, var(--border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-10) 50%, transparent);
+  outline: none;
+}
+
+.tags-view__heatmap-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.activity-heatmap {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  gap: 0.65rem 0.95rem;
+}
+
+.activity-heatmap__month {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.activity-heatmap__month-label {
+  font-size: 0.56rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text-muted) 54%, transparent);
+}
+
+.activity-heatmap__grid {
+  display: flex;
+  gap: 0.28rem;
+}
+
+.activity-heatmap__week {
+  display: grid;
+  grid-template-rows: repeat(7, 1fr);
+  gap: 0.28rem;
+}
+
+.activity-heatmap__cell {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 0.22rem;
+  background: var(--heatmap-muted);
+  transition:
+    background-color var(--motion-hover) ease,
+    box-shadow var(--motion-hover) ease,
+    transform var(--motion-hover) ease;
+}
+
+.activity-heatmap__cell.level-1 {
+  background: var(--heatmap-level-1);
+}
+
+.activity-heatmap__cell.level-0 {
+  background: var(--heatmap-level-0);
+}
+
+.activity-heatmap__cell.level-2 {
+  background: var(--heatmap-level-2);
+}
+
+.activity-heatmap__cell.level-3 {
+  background: var(--heatmap-level-3);
+}
+
+.activity-heatmap__cell.level-4 {
+  background: var(--heatmap-level-4);
+}
+
+.activity-heatmap__cell.is-empty {
+  background: var(--heatmap-level-0);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.activity-heatmap__cell:hover,
+.activity-heatmap__cell:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--heatmap-level-4) 60%, transparent);
+  outline: none;
+}
+
+.activity-heatmap__cell.is-today {
+  box-shadow:
+    0 0 0 1.5px var(--accent-30),
+    0 0 0 4px color-mix(in srgb, var(--accent-15) 80%, transparent);
+}
+
+.activity-heatmap__cell.is-selected {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--heatmap-level-4) 88%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--heatmap-level-2) 30%, transparent);
 }
 
 .tags-view__summary {
@@ -914,6 +1077,15 @@
     margin-top: 0.45rem;
     width: 100%;
     padding: 0.9rem 0.6rem 0.35rem;
+  }
+
+  .tags-view__related {
+    grid-template-columns: 1fr;
+  }
+
+  .tags-view__heatmap {
+    justify-self: start;
+    width: 100%;
   }
 
   .tags-view__placeholder {
