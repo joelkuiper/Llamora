@@ -95,6 +95,19 @@ class Lockbox:
             )
             await conn.commit()
 
+    async def delete_namespace(self, user_id: str, namespace: str) -> None:
+        self._validate_user_id(user_id)
+        self._validate_name(namespace, "namespace")
+        scoped_namespace = self._scope_namespace(user_id, namespace)
+
+        async with self.pool.connection() as conn:
+            await conn.execute("BEGIN")
+            await conn.execute(
+                "DELETE FROM lockbox WHERE namespace = ?",
+                (scoped_namespace,),
+            )
+            await conn.commit()
+
     async def list(self, user_id: str, namespace: str) -> list[str]:
         self._validate_user_id(user_id)
         self._validate_name(namespace, "namespace")

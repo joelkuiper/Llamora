@@ -36,9 +36,7 @@ async def invalidate_tag_recall(
     store: LockboxStore, user_id: str, tag_hash_hex: str
 ) -> None:
     namespace = tag_recall_namespace(tag_hash_hex)
-    keys = await store.list(user_id, namespace)
-    for key in keys:
-        await store.delete(user_id, namespace, key)
+    await store.delete_namespace(user_id, namespace)
 
 
 class TagRecallCacheSynchronizer:

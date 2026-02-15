@@ -51,6 +51,9 @@ class LockboxStore:
     async def delete(self, user_id: str, namespace: str, key: str) -> None:
         await self.lockbox.delete(user_id, namespace, key)
 
+    async def delete_namespace(self, user_id: str, namespace: str) -> None:
+        await self.lockbox.delete_namespace(user_id, namespace)
+
     async def list(self, user_id: str, namespace: str) -> list[str]:
         return await self.lockbox.list(user_id, namespace)
 
