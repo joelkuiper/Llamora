@@ -68,15 +68,6 @@
               <span class="icon-mask icon-tags" aria-hidden="true"></span>
               <span>Traces</span>
             </a>
-            <a class="view-mode-option{% if view == 'structure' %} is-active{% endif %}"
-               role="menuitem"
-               hx-get="{{ url_for('days.day', date=day) }}?view=structure"
-               hx-target="#main-content"
-               hx-swap="outerHTML"
-               hx-push-url="true">
-              <span class="icon-mask icon-chart-column" aria-hidden="true"></span>
-              <span>Structure</span>
-            </a>
           </div>
         </div>
       </div>
