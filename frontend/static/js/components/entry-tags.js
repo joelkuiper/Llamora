@@ -4,7 +4,7 @@ import { scrollToHighlight } from "../ui.js";
 import { AutocompleteHistory } from "../utils/autocomplete-history.js";
 import { parsePositiveInteger } from "../utils/number.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
-import { getValue, setValue } from "../services/lockbox-store.js";
+import { cacheLoader } from "../services/cache-loader.js";
 import { animateMotion } from "../utils/transition.js";
 import { AutocompleteOverlayMixin } from "./base/autocomplete-overlay.js";
 import { syncSummarySkeletons } from "../services/summary-skeleton.js";
@@ -29,46 +29,9 @@ const prepareTagAutocompleteValue = (value) => `${value ?? ""}`.trim();
 const TAG_HISTORY_MAX = 50;
 const TAG_SUGGESTION_EMPTY_DELAY_MS = 180;
 const TAG_SKELETON_COUNT = 6;
-const SUMMARY_NAMESPACE = "summary";
-
 let sharedTagPopoverEl = null;
 let sharedTagDetailPopoverEl = null;
 let activeTagOwner = null;
-
-const normalizeSummaryWords = (value) => {
-  const parsed = Number.parseInt(value ?? "", 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-};
-
-const makeTagSummaryKey = (tagHash, words) => {
-  const base = `tag:${String(tagHash || "").trim()}`;
-  if (!base || base === "tag:") return "";
-  const count = normalizeSummaryWords(words);
-  return count ? `${base}:w${count}` : base;
-};
-
-const readTagSummaryPayload = (payload, digest) => {
-  if (!payload || typeof payload !== "object") return "";
-  if (digest != null && String(payload.digest || "") !== String(digest)) return "";
-  const value = payload.html;
-  return typeof value === "string" ? value : "";
-};
-
-const getCachedTagSummary = async (tagHash, { digest, words } = {}) => {
-  const key = makeTagSummaryKey(tagHash, words);
-  if (!key) return "";
-  const payload = await getValue(SUMMARY_NAMESPACE, key);
-  return readTagSummaryPayload(payload, digest);
-};
-
-const setCachedTagSummary = async (tagHash, html, { digest, words } = {}) => {
-  const key = makeTagSummaryKey(tagHash, words);
-  if (!key || html == null) return false;
-  return setValue(SUMMARY_NAMESPACE, key, {
-    digest: String(digest ?? ""),
-    html,
-  });
-};
 
 const getSharedTagPopoverEl = () => {
   if (!sharedTagPopoverEl || !sharedTagPopoverEl.isConnected) {
@@ -1325,45 +1288,14 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
 
   #cacheTagSummary(summaryEl) {
     if (!(summaryEl instanceof HTMLElement)) return;
-    const tagHash = summaryEl.dataset?.tagHash || this.#activeTagHash || "";
-    const html = summaryEl.innerHTML?.trim();
-    const summaryDigest = summaryEl.dataset?.summaryDigest || "";
-    const summaryWords = summaryEl.dataset?.summaryWords || "";
-    if (!tagHash || !html) return;
-    if (html.includes("Summary unavailable")) {
-      return;
-    }
-    void setCachedTagSummary(tagHash, html, {
-      digest: summaryDigest,
-      words: summaryWords,
-    });
+    void cacheLoader.capture(summaryEl);
   }
 
   async #hydrateSummaryFromCache() {
     if (!this.#detailBody) return;
     const summaryEl = this.#detailBody.querySelector(".tag-detail__summary");
     if (!summaryEl) return;
-    const tagHash = summaryEl.dataset?.tagHash || this.#activeTagHash || "";
-    const summaryDigest = summaryEl.dataset?.summaryDigest || "";
-    const summaryWords = summaryEl.dataset?.summaryWords || "";
-    if (!tagHash) return;
-    const cached = await getCachedTagSummary(tagHash, {
-      digest: summaryDigest,
-      words: summaryWords,
-    });
-    if (cached) {
-      summaryEl.innerHTML = cached;
-      summaryEl.removeAttribute("hx-get");
-      summaryEl.removeAttribute("hx-trigger");
-      summaryEl.removeAttribute("hx-swap");
-      summaryEl.removeAttribute("hx-disinherit");
-      return;
-    }
-    if (typeof htmx !== "undefined") {
-      window.setTimeout(() => {
-        htmx.trigger(summaryEl, "tag-detail:summary");
-      }, 60);
-    }
+    await cacheLoader.hydrate(summaryEl);
   }
 }
 

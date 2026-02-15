@@ -1,6 +1,6 @@
 import { armEntryAnimations, armInitialEntryAnimations } from "../entries/entry-animations.js";
 import { formatTimeElements } from "../services/time.js";
-import { getValue, setValue } from "../services/lockbox-store.js";
+import { cacheLoader } from "../services/cache-loader.js";
 import { clearScrollTarget, flashHighlight } from "../ui.js";
 import { prefersReducedMotion } from "../utils/motion.js";
 import { sessionStore } from "../utils/storage.js";
@@ -8,7 +8,6 @@ import { Fuse as FuseCtor } from "../vendor/setup-globals.js";
 import { syncSummarySkeletons } from "../services/summary-skeleton.js";
 
 const BOOT_KEY = "__llamoraTagsViewBooted";
-const SUMMARY_NAMESPACE = "summary";
 const state = {
   query: "",
   sortKind: "count",
@@ -26,41 +25,6 @@ const state = {
   pendingDetailScrollTop: false,
   pendingTagHighlight: "",
   listPositions: null,
-};
-
-const normalizeSummaryWords = (value) => {
-  const parsed = Number.parseInt(value ?? "", 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-};
-
-const makeTagSummaryKey = (tagHash, words) => {
-  const base = `tag:${String(tagHash || "").trim()}`;
-  if (!base || base === "tag:") return "";
-  const count = normalizeSummaryWords(words);
-  return count ? `${base}:w${count}` : base;
-};
-
-const readTagSummaryPayload = (payload, digest) => {
-  if (!payload || typeof payload !== "object") return "";
-  if (digest != null && String(payload.digest || "") !== String(digest)) return "";
-  const value = payload.html;
-  return typeof value === "string" ? value : "";
-};
-
-const getCachedTagSummary = async (tagHash, { digest, words } = {}) => {
-  const key = makeTagSummaryKey(tagHash, words);
-  if (!key) return "";
-  const payload = await getValue(SUMMARY_NAMESPACE, key);
-  return readTagSummaryPayload(payload, digest);
-};
-
-const setCachedTagSummary = async (tagHash, html, { digest, words } = {}) => {
-  const key = makeTagSummaryKey(tagHash, words);
-  if (!key || html == null) return false;
-  return setValue(SUMMARY_NAMESPACE, key, {
-    digest: String(digest ?? ""),
-    html,
-  });
 };
 
 const readStoredSearchQuery = () => sessionStore.get("tags:query") ?? "";
@@ -553,45 +517,15 @@ const getSummaryElement = (root = document) =>
   root.querySelector?.(".tags-view__summary[data-tag-hash]") ||
   document.querySelector(".tags-view__summary[data-tag-hash]");
 
-const isCacheableSummary = (summaryEl) => {
-  if (!(summaryEl instanceof HTMLElement)) return null;
-  if (summaryEl.querySelector(".tag-detail-skeleton")) return null;
-  const html = summaryEl.innerHTML?.trim();
-  if (!html) return null;
-  if (html.includes("Summary unavailable")) return null;
-  return html;
-};
-
 const hydrateTagsViewSummary = async (root = document) => {
   const summaryEl = getSummaryElement(root);
   if (!summaryEl) return;
-  const tagHash = summaryEl.dataset?.tagHash || "";
-  const summaryDigest = summaryEl.dataset?.summaryDigest || "";
-  const summaryWords = summaryEl.dataset?.summaryWords || "";
-  if (!tagHash) return;
-  const cached = await getCachedTagSummary(tagHash, {
-    digest: summaryDigest,
-    words: summaryWords,
-  });
-  if (!cached) return;
-  summaryEl.innerHTML = cached;
-  summaryEl.removeAttribute("hx-get");
-  summaryEl.removeAttribute("hx-trigger");
-  summaryEl.removeAttribute("hx-swap");
+  await cacheLoader.hydrate(summaryEl);
 };
 
 const cacheTagsViewSummary = (summaryEl) => {
   if (!(summaryEl instanceof HTMLElement)) return;
-  const tagHash = summaryEl.dataset?.tagHash || "";
-  const summaryDigest = summaryEl.dataset?.summaryDigest || "";
-  const summaryWords = summaryEl.dataset?.summaryWords || "";
-  if (!tagHash) return;
-  const html = isCacheableSummary(summaryEl);
-  if (!html) return;
-  void setCachedTagSummary(tagHash, html, {
-    digest: summaryDigest,
-    words: summaryWords,
-  });
+  void cacheLoader.capture(summaryEl);
 };
 
 const highlightRequestedTag = (root = document) => {
@@ -997,6 +931,7 @@ const sync = (root = document) => {
   }
   syncFromDetail(root);
   syncSummarySkeletons(root);
+  void hydrateTagsViewSummary(root);
   buildSearchIndex(root);
   clearSearchForTargetNavigation();
   applySearch(state.query);

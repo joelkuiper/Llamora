@@ -58,6 +58,12 @@
        data-summary-words="28"
        data-summary-lines="3"
        data-tag-hash="{{ tag.hash }}"
+       data-cache-namespace="summary"
+       data-cache-key="tag:{{ tag.hash }}:w28"
+       data-cache-digest="{{ tag.summary_digest }}"
+       data-cache-kind="summary"
+       data-cache-trigger="tag-detail:summary"
+       data-cache-strip-htmx="1"
        hx-disinherit="hx-target"
        hx-swap="innerHTML swap:120ms">
     {% with lines=3 %}

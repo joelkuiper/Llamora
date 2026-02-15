@@ -2,36 +2,10 @@
 import { getActiveDayParts } from "../entries/active-day-store.js";
 import { createPopover } from "../popover.js";
 import { triggerLabelFlash } from "../utils/motion.js";
-import { getValue, setValue } from "../services/lockbox-store.js";
+import { cacheLoader } from "../services/cache-loader.js";
 import { transitionHide, transitionShow } from "../utils/transition.js";
 
-const SUMMARY_NAMESPACE = "summary";
-
 const makeDaySummaryKey = (date) => `day:${String(date || "").trim()}`;
-
-const readSummaryPayload = (payload, digest, field) => {
-  if (!payload || typeof payload !== "object") return "";
-  if (digest != null && String(payload.digest || "") !== String(digest)) return "";
-  const value = payload[field];
-  return typeof value === "string" ? value : "";
-};
-
-const getCachedDaySummary = async (date, digest) => {
-  const key = makeDaySummaryKey(date);
-  if (!key || key === "day:") return "";
-  const payload = await getValue(SUMMARY_NAMESPACE, key);
-  return readSummaryPayload(payload, digest, "text");
-};
-
-const setCachedDaySummary = async (date, summary, digest) => {
-  const key = makeDaySummaryKey(date);
-  if (!key || key === "day:") return false;
-  if (summary == null) return false;
-  return setValue(SUMMARY_NAMESPACE, key, {
-    digest: String(digest ?? ""),
-    text: summary,
-  });
-};
 
 export class CalendarControl extends HTMLElement {
   #state = null;
@@ -352,7 +326,12 @@ export class CalendarControl extends HTMLElement {
   async #fetchDaySummary(date) {
     if (!date) return "";
     const summaryDigest = this.#summaryCell?.dataset?.summaryDigest || "";
-    const cached = await getCachedDaySummary(date, summaryDigest);
+    const cached = await cacheLoader.read({
+      namespace: "summary",
+      key: makeDaySummaryKey(date),
+      digest: summaryDigest,
+      kind: "text",
+    });
     if (cached) {
       return cached;
     }
@@ -366,7 +345,13 @@ export class CalendarControl extends HTMLElement {
       .then((data) => {
         const summary = typeof data?.summary === "string" ? data.summary.trim() : "";
         if (summary) {
-          void setCachedDaySummary(date, summary, summaryDigest);
+          void cacheLoader.write({
+            namespace: "summary",
+            key: makeDaySummaryKey(date),
+            digest: summaryDigest,
+            kind: "text",
+            value: summary,
+          });
         }
         this.#summaryRequests.delete(date);
         return summary;

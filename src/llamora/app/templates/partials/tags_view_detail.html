@@ -57,13 +57,19 @@
           {% endif %}
           <section class="tags-view__summary tags-view__summary--header"
                    hx-get="{{ url_for('tags.tag_detail_summary', tag_hash=detail.hash) }}?num_words=72"
-                   hx-trigger="load"
+                   hx-trigger="tag-summary:load"
                    hx-target="this"
                    hx-swap="innerHTML"
                    data-summary-digest="{{ detail.summary_digest }}"
                    data-summary-words="72"
                    data-summary-lines="4"
-                   data-tag-hash="{{ detail.hash }}">
+                   data-tag-hash="{{ detail.hash }}"
+                   data-cache-namespace="summary"
+                   data-cache-key="tag:{{ detail.hash }}:w72"
+                   data-cache-digest="{{ detail.summary_digest }}"
+                   data-cache-kind="summary"
+                   data-cache-trigger="tag-summary:load"
+                   data-cache-strip-htmx="1">
             {% with lines=4 %}
               {% include 'partials/summary_shimmer.html' %}
             {% endwith %}
