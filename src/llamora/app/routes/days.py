@@ -16,9 +16,8 @@ from llamora.app.routes.entries import render_entries
 from llamora.app.services.auth_helpers import login_required
 from llamora.app.routes.helpers import require_iso_date, require_user_and_dek
 from llamora.app.services.calendar import get_month_context
-from llamora.app.services.container import get_lockbox_store, get_services
+from llamora.app.services.container import get_services, get_summarize_service
 from llamora.app.services.day_summary import generate_day_summary
-from llamora.app.services.lockbox_store import LockboxStore
 from llamora.app.services.session_context import get_session_context
 from llamora.app.services.tag_presenter import present_tags_view_data
 from llamora.app.services.time import local_date
@@ -46,24 +45,6 @@ async def _run_day_summary_singleflight(
         async with _day_summary_singleflight_lock:
             if _day_summary_singleflight.get(key) is task:
                 _day_summary_singleflight.pop(key, None)
-
-
-async def _get_cached_day_summary(
-    store: LockboxStore,
-    user_id: str,
-    dek: bytes,
-    date: str,
-    digest: str,
-) -> str | None:
-    cached = await store.get_json(user_id, dek, "summary", f"day:{date}")
-    if not isinstance(cached, dict):
-        return None
-    cached_digest = str(cached.get("digest") or "").strip()
-    cached_text = cached.get("text")
-    if cached_digest != digest or not isinstance(cached_text, str):
-        return None
-    cached_text = cached_text.strip()
-    return cached_text or None
 
 
 @days_bp.route("/")
@@ -240,16 +221,11 @@ async def day_summary(date):
     _, user, dek = await require_user_and_dek()
     services = get_services()
     user_id = user["id"]
-    digest = await services.db.entries.get_day_summary_digest_for_date(
-        user_id, normalized_date
-    )
-    store = get_lockbox_store(services.db)
-    cached_summary = await _get_cached_day_summary(
-        store,
-        user_id,
-        dek,
-        normalized_date,
-        digest,
+    summarize = get_summarize_service()
+    digest = await summarize.get_day_digest(user_id, dek, normalized_date)
+
+    cached_summary = await summarize.get_cached(
+        user_id, dek, "summary", f"day:{normalized_date}", digest
     )
     if cached_summary is not None:
         payload = {"summary": cached_summary}
@@ -258,12 +234,8 @@ async def day_summary(date):
         return resp
 
     async def _generate_and_cache_summary() -> str:
-        cache_hit = await _get_cached_day_summary(
-            store,
-            user_id,
-            dek,
-            normalized_date,
-            digest,
+        cache_hit = await summarize.get_cached(
+            user_id, dek, "summary", f"day:{normalized_date}", digest
         )
         if cache_hit is not None:
             return cache_hit
@@ -277,12 +249,8 @@ async def day_summary(date):
                 entries,
             )
         ).strip()
-        await store.set_json(
-            user_id,
-            dek,
-            "summary",
-            f"day:{normalized_date}",
-            {"digest": digest, "text": text},
+        await summarize.cache(
+            user_id, dek, "summary", f"day:{normalized_date}", digest, text
         )
         return text
 

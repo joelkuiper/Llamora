@@ -14,6 +14,7 @@ from llamora.app.services.tag_recall_cache import (
     get_tag_recall_store,
     tag_recall_namespace,
 )
+from llamora.app.services.summarize import SummaryPrompt
 from llamora.app.util.number import coerce_int
 from llamora.llm.prompt_templates import render_prompt_template
 from llamora.llm.tokenizers.tokenizer import count_message_tokens
@@ -170,6 +171,7 @@ def _build_summary_cache_key(
 
 
 async def _summarize_with_llm(
+    summarize_service,
     llm,
     text: str,
     *,
@@ -193,65 +195,62 @@ async def _summarize_with_llm(
 
     system_prompt = _summary_system_prompt(max_chars)
     user_prompt = clean
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt},
-    ]
 
     n_predict = max_tokens if max_tokens > 0 else 256
-    params = {
-        "temperature": 0.2,
-        "n_predict": n_predict,
-        "response_format": _summary_response_format(),
-    }
 
     try:
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+        params = {
+            "temperature": 0.2,
+            "n_predict": n_predict,
+            "response_format": _summary_response_format(),
+        }
         prompt_tokens = sum(
             count_message_tokens(msg["role"], msg["content"]) for msg in messages
         )
         max_prompt = llm.prompt_budget.max_prompt_tokens(params)
         if max_prompt is not None and prompt_tokens > max_prompt:
-            # Trim user content to fit within the available prompt budget.
             system_tokens = count_message_tokens("system", system_prompt)
             budget_for_user = max(max_prompt - system_tokens, 0)
             if budget_for_user > 0:
                 user_prompt = _truncate_to_tokens(user_prompt, budget_for_user)
-                messages[1]["content"] = user_prompt
             else:
                 user_prompt = ""
-                messages[1]["content"] = ""
     except Exception:  # pragma: no cover - defensive
         pass
 
     if not user_prompt:
         return ""
 
+    prompt = SummaryPrompt(
+        system=system_prompt,
+        user=user_prompt,
+        temperature=0.2,
+        max_tokens=n_predict,
+        response_format=_summary_response_format(),
+    )
+
     try:
-        raw = await llm.complete_messages(messages, params=params)
+        summary = await summarize_service.generate(prompt)
     except Exception:
         return ""
 
-    summary = _extract_summary_payload(raw)
     if not summary:
-        retry_messages = [
-            {
-                "role": "system",
-                "content": system_prompt
-                + '\nReturn ONLY strict JSON matching {"summary":"..."}.',
-            },
-            {"role": "user", "content": user_prompt},
-        ]
+        retry_prompt = SummaryPrompt(
+            system=system_prompt
+            + '\nReturn ONLY strict JSON matching {"summary":"..."}.',
+            user=user_prompt,
+            temperature=0.0,
+            max_tokens=n_predict,
+            response_format=_summary_response_format(),
+        )
         try:
-            raw_retry = await llm.complete_messages(
-                retry_messages,
-                params={
-                    **params,
-                    "temperature": 0.0,
-                },
-            )
+            summary = await summarize_service.generate(retry_prompt)
         except Exception:
             return ""
-        summary = _extract_summary_payload(raw_retry)
         if not summary:
             return ""
     summary = _truncate_text(summary, max_chars)
@@ -367,6 +366,7 @@ async def build_tag_recall_context(
     history: Sequence[Mapping[str, Any] | dict[str, Any]],
     current_date: str | None,
     llm,
+    summarize_service,
     max_entry_id: str | None = None,
     max_created_at: str | None = None,
     config: TagRecallConfig | None = None,
@@ -505,6 +505,7 @@ async def build_tag_recall_context(
             if llm is None:
                 return None
             summary = await _summarize_with_llm(
+                summarize_service,
                 llm,
                 aggregate,
                 max_chars=cfg.summary_max_chars,
@@ -537,6 +538,7 @@ async def build_tag_recall_context(
 
             async def _background() -> None:
                 await _summarize_with_llm(
+                    summarize_service,
                     llm,
                     aggregate,
                     max_chars=cfg.summary_max_chars,

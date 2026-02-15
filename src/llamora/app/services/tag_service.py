@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections import Counter
-import hashlib
 from datetime import datetime
 import logging
 import re
@@ -40,9 +39,9 @@ def _parse_tag_cursor(cursor: str | None) -> tuple[str | None, str | None]:
 
 
 def _build_summary_digest(entry_digests: Iterable[str]) -> str:
-    digests = [d for d in entry_digests if d]
-    payload = "|".join(sorted(digests)).encode("utf-8")
-    return hashlib.sha256(payload).hexdigest()
+    from llamora.app.services.summarize import SummarizeService
+
+    return SummarizeService.compute_digest(entry_digests)
 
 
 @dataclass(slots=True)

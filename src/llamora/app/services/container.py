@@ -268,6 +268,31 @@ def get_lockbox_store(db: LocalDB | None = None) -> LockboxStore:
     return get_lockbox_store_for_db(current_db)
 
 
+_summarize_service: Any = None
+_summarize_service_pool: Any = None
+
+
+def get_summarize_service() -> Any:
+    """Convenience accessor for the shared summarize service."""
+
+    from llamora.app.services.summarize import SummarizeService
+
+    global _summarize_service, _summarize_service_pool
+    services = get_services()
+    store = get_lockbox_store()
+    current_pool = services.db.pool
+    if _summarize_service is None or current_pool is not _summarize_service_pool:
+        _summarize_service = SummarizeService(
+            llm=services.llm_service.llm,
+            store=store,
+            lockbox=store.lockbox,
+            entries_repo=services.db.entries,
+            tags_repo=services.db.tags,
+        )
+        _summarize_service_pool = current_pool
+    return _summarize_service
+
+
 async def _warmup_embeddings() -> None:
     """Prime the embedding model cache in the background."""
 

@@ -24,6 +24,7 @@ from llamora.app.services.crypto import (
 from llamora.app.services.migrations import run_db_migrations
 from llamora.app.db.events import RepositoryEventBus
 from llamora.app.services.history_cache import HistoryCache, HistoryCacheSynchronizer
+from llamora.app.services.lockbox import Lockbox
 from llamora.app.db.users import UsersRepository
 from llamora.app.db.entries import EntriesRepository
 from llamora.app.db.tags import TagsRepository
@@ -185,6 +186,7 @@ class LocalDB:
             event_bus=self._events,
             history_cache=self._history_cache,
             entries_repository=self._entries,
+            lockbox=Lockbox(self.pool),
         )
         self._tags = TagsRepository(
             self.pool,

@@ -21,7 +21,7 @@ from llamora.app.routes.helpers import (
     require_user_and_dek,
 )
 from llamora.app.services.auth_helpers import login_required
-from llamora.app.services.container import get_services
+from llamora.app.services.container import get_services, get_summarize_service
 from llamora.app.services.entry_context import build_entry_context, build_llm_context
 from llamora.app.services.entry_helpers import (
     StreamSession,
@@ -144,6 +144,7 @@ async def sse_opening(date: str):
             history=yesterday_msgs,
             current_date=today_iso,
             llm=llm_client,
+            summarize_service=get_summarize_service(),
         )
         augmentation = await augment_opening_with_recall(
             opening_messages,
@@ -284,6 +285,7 @@ async def sse_response(entry_id: str, date: str):
                 history=history,
                 current_date=actual_date or normalized_date,
                 llm=llm_client,
+                summarize_service=get_summarize_service(),
                 max_entry_id=entry_id,
                 target_entry_id=entry_id,
             )

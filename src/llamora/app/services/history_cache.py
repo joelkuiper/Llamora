@@ -18,6 +18,7 @@ CacheKey = tuple[str, str]
 if TYPE_CHECKING:
     from llamora.app.db.events import RepositoryEventBus
     from llamora.app.db.entries import EntriesRepository
+    from llamora.app.services.lockbox import Lockbox
 
 
 @dataclass(slots=True)
@@ -254,7 +255,7 @@ class HistoryCache:
 class HistoryCacheSynchronizer:
     """Bridge repository events with the entry history cache."""
 
-    __slots__ = ("_cache", "_events", "_entries")
+    __slots__ = ("_cache", "_events", "_entries", "_lockbox")
 
     def __init__(
         self,
@@ -262,10 +263,12 @@ class HistoryCacheSynchronizer:
         event_bus: RepositoryEventBus | None,
         history_cache: HistoryCache | None,
         entries_repository: EntriesRepository | None,
+        lockbox: "Lockbox | None" = None,
     ) -> None:
         self._cache = history_cache
         self._events = event_bus
         self._entries = entries_repository
+        self._lockbox = lockbox
         if not self._events:
             return
         self._events.subscribe(
@@ -282,12 +285,15 @@ class HistoryCacheSynchronizer:
         entry_id: str | None = None,
         entry: Mapping[str, Any] | None = None,
     ) -> None:
-        if not self._cache:
-            return
-        if reason == "insert" and entry is not None:
-            await self._cache.append(user_id, created_date, entry, revision=revision)
-            return
-        await self._cache.invalidate(user_id, created_date, revision=revision)
+        if self._cache:
+            if reason == "insert" and entry is not None:
+                await self._cache.append(
+                    user_id, created_date, entry, revision=revision
+                )
+            else:
+                await self._cache.invalidate(user_id, created_date, revision=revision)
+        if self._lockbox:
+            await self._lockbox.delete(user_id, "digest", f"day:{created_date}")
 
 
 __all__ = [

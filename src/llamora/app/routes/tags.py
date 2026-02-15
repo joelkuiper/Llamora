@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 from llamora.app.services.container import (
     get_lockbox_store,
     get_services,
+    get_summarize_service,
     get_tag_service,
 )
 from llamora.app.services.auth_helpers import login_required
@@ -33,9 +34,11 @@ tags_bp = Blueprint("tags", __name__)
 async def _run_tag_effects(effect_fn, **kwargs):
     try:
         services = get_services()
+        store = get_lockbox_store()
         await effect_fn(
             history_cache=services.db.history_cache,
-            tag_recall_store=get_lockbox_store(),
+            tag_recall_store=store,
+            lockbox=store.lockbox,
             **kwargs,
         )
     except Exception:
@@ -514,24 +517,22 @@ async def tag_detail_summary(tag_hash: str):
         num_words = 28
     num_words = max(18, min(num_words, 160))
 
+    summarize = get_summarize_service()
     summary_cache_key = f"tag:{tag_hash}:w{num_words}"
     summary_cache_namespace = "summary"
     summary_digest = overview.summary_digest
+
     if summary_digest:
-        store = get_lockbox_store()
-        cached = await store.get_json(
+        cached_html = await summarize.get_cached(
             user["id"],
             dek,
             summary_cache_namespace,
             summary_cache_key,
+            summary_digest,
+            field="html",
         )
-        if isinstance(cached, dict):
-            cached_digest = str(cached.get("digest") or "")
-            cached_html = cached.get("html")
-            if cached_digest == summary_digest and isinstance(cached_html, str):
-                cached_html = cached_html.strip()
-                if cached_html:
-                    return cached_html
+        if cached_html:
+            return cached_html
 
     llm = get_services().llm_service.llm
     summary = await generate_tag_summary(
@@ -547,16 +548,14 @@ async def tag_detail_summary(tag_hash: str):
         summary=summary,
     )
     if summary and summary_digest:
-        store = get_lockbox_store()
-        await store.set_json(
+        await summarize.cache(
             user["id"],
             dek,
             summary_cache_namespace,
             summary_cache_key,
-            {
-                "digest": summary_digest,
-                "html": html,
-            },
+            summary_digest,
+            html,
+            field="html",
         )
     return html
 
