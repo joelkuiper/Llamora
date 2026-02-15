@@ -1165,9 +1165,13 @@ const captureListPositions = () => {
   state.listPositions = positions;
 };
 
-const animateListReorder = () => {
+const animateListReorder = (onFinish) => {
   const list = findList();
-  if (!list || !state.listPositions) return;
+  if (!list || !state.listPositions) {
+    if (typeof onFinish === "function") onFinish();
+    return;
+  }
+  const animations = [];
   list.querySelectorAll(".tags-view__index-row").forEach((row) => {
     if (!(row instanceof HTMLElement)) return;
     const key = row.dataset.tagName || row.id;
@@ -1176,12 +1180,21 @@ const animateListReorder = () => {
     const nextTop = row.getBoundingClientRect().top;
     const delta = prevTop - nextTop;
     if (Math.abs(delta) < 2) return;
-    row.animate([{ transform: `translateY(${delta}px)` }, { transform: "translateY(0)" }], {
-      duration: 220,
-      easing: "cubic-bezier(0.22, 0.61, 0.36, 1)",
-    });
+    animations.push(
+      row.animate([{ transform: `translateY(${delta}px)` }, { transform: "translateY(0)" }], {
+        duration: 220,
+        easing: "cubic-bezier(0.22, 0.61, 0.36, 1)",
+      }),
+    );
   });
   state.listPositions = null;
+  if (typeof onFinish === "function") {
+    if (animations.length) {
+      Promise.all(animations.map((a) => a.finished.catch(() => {}))).then(onFinish);
+    } else {
+      onFinish();
+    }
+  }
 };
 
 const syncListOnly = (root = document) => {
@@ -1194,7 +1207,7 @@ const syncListOnly = (root = document) => {
   if (selectedTag) {
     setActiveTag(selectedTag, root, { behavior: "auto", scroll: false });
   }
-  scrollActiveRowIntoView(root, "smooth");
+  // Scroll deferred to htmx:afterSettle — runs after FLIP animation completes.
 };
 
 const syncDetailOnly = (root = document) => {
@@ -1376,8 +1389,9 @@ if (!globalThis[BOOT_KEY]) {
     const target = event.detail?.target;
     if (!(target instanceof Element)) return;
     if (target.id === "tags-view-list" || target.closest?.("#tags-view-list")) {
-      animateListReorder();
-      scrollActiveRowIntoView(document, "smooth");
+      animateListReorder(() => {
+        scrollActiveRowIntoView(document, "smooth");
+      });
     }
     if (target.id !== "tags-view-detail") return;
     if (!state.pendingDetailScrollTop) return;
