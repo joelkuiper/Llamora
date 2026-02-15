@@ -15,6 +15,8 @@ from llamora.app.api.search import SearchAPI
 from llamora.app.services.lexical_reranker import LexicalReranker
 from llamora.app.services.llm_service import LLMService
 from llamora.app.services.llm_stream_config import LLMStreamConfig
+from llamora.app.services.lockbox import Lockbox
+from llamora.app.services.lockbox_store import LockboxStore
 from llamora.app.services.tag_service import TagService
 from llamora.app.services.service_pulse import ServicePulse
 from llamora.app.services.search_config import SearchConfig
@@ -23,6 +25,9 @@ from llamora.settings import settings
 
 
 logger = logging.getLogger(__name__)
+
+_lockbox_store: LockboxStore | None = None
+_lockbox_pool: Any | None = None
 
 
 @dataclass(slots=True)
@@ -253,6 +258,20 @@ def get_tag_service() -> TagService:
     """Convenience accessor for the tag service."""
 
     return get_services().tag_service
+
+
+def get_lockbox_store(db: LocalDB | None = None) -> LockboxStore:
+    """Convenience accessor for a shared lockbox store."""
+
+    current_db = db or get_db()
+    if current_db.pool is None:
+        raise RuntimeError("Database pool is not initialized")
+
+    global _lockbox_store, _lockbox_pool
+    if _lockbox_store is None or current_db.pool is not _lockbox_pool:
+        _lockbox_store = LockboxStore(Lockbox(current_db.pool))
+        _lockbox_pool = current_db.pool
+    return _lockbox_store
 
 
 async def _warmup_embeddings() -> None:
