@@ -70,13 +70,11 @@ class Lockbox:
         scoped_namespace = self._scope_namespace(user_id, namespace)
 
         async with self.pool.connection() as conn:
-            await conn.execute("BEGIN")
             cursor = await conn.execute(
                 "SELECT value FROM lockbox WHERE namespace = ? AND key = ?",
                 (scoped_namespace, key),
             )
             row = await cursor.fetchone()
-            await conn.commit()
             if row is None:
                 return None
             return self._decrypt(dek, user_id, namespace, key, bytes(row[0]))
@@ -114,13 +112,11 @@ class Lockbox:
         scoped_namespace = self._scope_namespace(user_id, namespace)
 
         async with self.pool.connection() as conn:
-            await conn.execute("BEGIN")
             cursor = await conn.execute(
                 "SELECT key FROM lockbox WHERE namespace = ? ORDER BY key ASC",
                 (scoped_namespace,),
             )
             rows = await cursor.fetchall()
-            await conn.commit()
             return [str(row[0]) for row in rows]
 
     def _encrypt(
