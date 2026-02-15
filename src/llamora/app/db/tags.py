@@ -266,48 +266,29 @@ class TagsRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
+                WITH tag_stats AS (
+                    SELECT COUNT(*) AS seen_count,
+                           MAX(e.created_at) AS last_used,
+                           MAX(COALESCE(e.updated_at, e.created_at)) AS last_updated,
+                           MIN(e.created_at) AS first_used
+                    FROM tag_entry_xref x
+                    JOIN entries e
+                      ON e.user_id = x.user_id AND e.id = x.entry_id
+                    WHERE x.user_id = ? AND x.tag_hash = ?
+                )
                 SELECT t.tag_hash,
                        t.name_ct,
                        t.name_nonce,
                        t.alg,
-                       (
-                           SELECT COUNT(*)
-                           FROM tag_entry_xref x
-                           JOIN entries e
-                             ON e.user_id = x.user_id AND e.id = x.entry_id
-                           WHERE x.user_id = t.user_id
-                             AND x.tag_hash = t.tag_hash
-                       ) AS seen_count,
-                       (
-                           SELECT MAX(e.created_at)
-                           FROM tag_entry_xref x
-                           JOIN entries e
-                             ON e.user_id = x.user_id AND e.id = x.entry_id
-                            WHERE x.user_id = t.user_id
-                              AND x.tag_hash = t.tag_hash
-                       ) AS last_used
-                       ,
-                       (
-                           SELECT MAX(COALESCE(e.updated_at, e.created_at))
-                           FROM tag_entry_xref x
-                           JOIN entries e
-                             ON e.user_id = x.user_id AND e.id = x.entry_id
-                            WHERE x.user_id = t.user_id
-                              AND x.tag_hash = t.tag_hash
-                       ) AS last_updated
-                       ,
-                       (
-                           SELECT MIN(e.created_at)
-                           FROM tag_entry_xref x
-                           JOIN entries e
-                             ON e.user_id = x.user_id AND e.id = x.entry_id
-                            WHERE x.user_id = t.user_id
-                              AND x.tag_hash = t.tag_hash
-                       ) AS first_used
+                       s.seen_count,
+                       s.last_used,
+                       s.last_updated,
+                       s.first_used
                 FROM tags t
+                CROSS JOIN tag_stats s
                 WHERE t.user_id = ? AND t.tag_hash = ?
                 """,
-                (user_id, tag_hash),
+                (user_id, tag_hash, user_id, tag_hash),
             )
             row = await cursor.fetchone()
 
