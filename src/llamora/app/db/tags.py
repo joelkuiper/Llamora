@@ -6,7 +6,7 @@ from aiosqlitepool import SQLiteConnectionPool
 from ulid import ULID
 
 from .base import BaseRepository
-from .events import RepositoryEventBus, ENTRY_TAGS_CHANGED_EVENT
+from .events import RepositoryEventBus
 from .utils import cached_tag_name
 from llamora.app.util.tags import canonicalize, tag_hash
 from llamora.app.util.frecency import DEFAULT_FRECENCY_DECAY, resolve_frecency_lambda
@@ -64,12 +64,9 @@ class TagsRepository(BaseRepository):
         user_id: str,
         tag_hash: bytes,
         entry_id: str,
-        *,
-        created_date: str | None = None,
-        client_today: str | None = None,
-    ) -> None:
+    ) -> bool:
+        changed = False
         async with self.pool.connection() as conn:
-            changed = False
 
             async def _tx():
                 nonlocal changed
@@ -85,28 +82,16 @@ class TagsRepository(BaseRepository):
                     )
 
             await self._run_in_transaction(conn, _tx)
-
-        if changed and self._event_bus:
-            await self._event_bus.emit(
-                ENTRY_TAGS_CHANGED_EVENT,
-                user_id=user_id,
-                entry_id=entry_id,
-                tag_hash=tag_hash,
-                created_date=created_date,
-                client_today=client_today,
-            )
+        return changed
 
     async def unlink_tag_entry(
         self,
         user_id: str,
         tag_hash: bytes,
         entry_id: str,
-        *,
-        created_date: str | None = None,
-        client_today: str | None = None,
-    ) -> None:
+    ) -> bool:
+        changed = False
         async with self.pool.connection() as conn:
-            changed = False
 
             async def _tx():
                 nonlocal changed
@@ -118,25 +103,18 @@ class TagsRepository(BaseRepository):
                     changed = True
 
             await self._run_in_transaction(conn, _tx)
-
-        if changed and self._event_bus:
-            await self._event_bus.emit(
-                ENTRY_TAGS_CHANGED_EVENT,
-                user_id=user_id,
-                entry_id=entry_id,
-                tag_hash=tag_hash,
-                created_date=created_date,
-                client_today=client_today,
-            )
+        return changed
 
     async def delete_tag_everywhere(
         self,
         user_id: str,
         tag_hash: bytes,
-        *,
-        client_today: str | None = None,
-    ) -> bool:
-        """Delete a tag and all related xrefs for the user."""
+    ) -> list[tuple[str, str | None]]:
+        """Delete a tag and all related xrefs for the user.
+
+        Returns a list of ``(entry_id, created_date)`` pairs for every entry
+        that was linked to the tag, or an empty list if nothing changed.
+        """
 
         affected_entries: list[tuple[str, str | None]] = []
         async with self.pool.connection() as conn:
@@ -168,18 +146,7 @@ class TagsRepository(BaseRepository):
 
             await self._run_in_transaction(conn, _tx)
 
-        if changed and self._event_bus:
-            for entry_id, created_date in affected_entries:
-                await self._event_bus.emit(
-                    ENTRY_TAGS_CHANGED_EVENT,
-                    user_id=user_id,
-                    entry_id=entry_id,
-                    tag_hash=tag_hash,
-                    created_date=created_date,
-                    client_today=client_today,
-                )
-
-        return changed
+        return affected_entries if changed else []
 
     async def get_tags_for_entry(
         self, user_id: str, entry_id: str, dek: bytes

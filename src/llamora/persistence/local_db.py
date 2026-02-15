@@ -24,10 +24,6 @@ from llamora.app.services.crypto import (
 from llamora.app.services.migrations import run_db_migrations
 from llamora.app.db.events import RepositoryEventBus
 from llamora.app.services.history_cache import HistoryCache, HistoryCacheSynchronizer
-from llamora.app.services.tag_recall_cache import (
-    TagRecallCacheSynchronizer,
-    get_tag_recall_store,
-)
 from llamora.app.db.users import UsersRepository
 from llamora.app.db.entries import EntriesRepository
 from llamora.app.db.tags import TagsRepository
@@ -57,7 +53,6 @@ class LocalDB:
         self._events: RepositoryEventBus | None = None
         self._history_cache: HistoryCache | None = None
         self._history_synchronizer: HistoryCacheSynchronizer | None = None
-        self._tag_recall_synchronizer: TagRecallCacheSynchronizer | None = None
         self._init_lock = asyncio.Lock()
         self._sync_lock = threading.Lock()
 
@@ -122,7 +117,6 @@ class LocalDB:
                 self._search_history = None
                 self._events = None
                 self._history_cache = None
-                self._tag_recall_synchronizer = None
                 raise
 
     async def close(self) -> None:
@@ -139,7 +133,6 @@ class LocalDB:
             self._search_history = None
             self._events = None
             self._history_cache = None
-            self._tag_recall_synchronizer = None
 
     async def _create_connection(self) -> aiosqlite.Connection:
         conn = await aiosqlite.connect(
@@ -198,11 +191,6 @@ class LocalDB:
             encrypt_message,
             decrypt_message,
             self._events,
-        )
-        self._tag_recall_synchronizer = TagRecallCacheSynchronizer(
-            event_bus=self._events,
-            entries_repository=self._entries,
-            store=get_tag_recall_store(self),
         )
         self._vectors = VectorsRepository(self.pool, encrypt_vector, decrypt_vector)
         self._search_history = SearchHistoryRepository(

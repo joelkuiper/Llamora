@@ -9,10 +9,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from cachetools import TTLCache
 
-from llamora.app.db.events import (
-    ENTRY_HISTORY_CHANGED_EVENT,
-    ENTRY_TAGS_CHANGED_EVENT,
-)
+from llamora.app.db.events import ENTRY_HISTORY_CHANGED_EVENT
 
 logger = getLogger(__name__)
 
@@ -198,11 +195,6 @@ class HistoryCacheSynchronizer:
         self._events.subscribe(
             ENTRY_HISTORY_CHANGED_EVENT, self._handle_history_changed
         )
-        self._events.subscribe(
-            ENTRY_TAGS_CHANGED_EVENT,
-            self._handle_tags_changed,
-            background=True,
-        )
 
     async def _handle_history_changed(
         self,
@@ -219,30 +211,6 @@ class HistoryCacheSynchronizer:
             await self._cache.append(user_id, created_date, entry)
             return
         await self._cache.invalidate(user_id, created_date)
-
-    async def _handle_tags_changed(
-        self,
-        *,
-        user_id: str,
-        entry_id: str,
-        tag_hash: bytes | str | None = None,
-        created_date: str | None = None,
-        client_today: str | None = None,
-    ) -> None:
-        if not self._events or not self._entries:
-            return
-        created_date = created_date or await self._entries.get_entry_date(
-            user_id, entry_id
-        )
-        if not created_date:
-            return
-        await self._events.emit_for_entry_date(
-            ENTRY_HISTORY_CHANGED_EVENT,
-            user_id=user_id,
-            created_date=created_date,
-            entry_id=entry_id,
-            reason="tags-changed",
-        )
 
 
 __all__ = [
