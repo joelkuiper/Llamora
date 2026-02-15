@@ -1,6 +1,6 @@
 import { formatIsoDate, navigateToDate, parseDateFromSource } from "./day.js";
 import { getActiveDay } from "./entries/active-day-store.js";
-import { requestScrollForceBottom } from "./entries/scroll-manager.js";
+import { requestScrollForceEdge } from "./entries/scroll-manager.js";
 import { registerShortcut } from "./utils/global-shortcuts.js";
 import { motionSafeBehavior } from "./utils/motion.js";
 
@@ -110,7 +110,7 @@ const goToToday = () => {
 const toggleCalendar = () => clickIfEnabled("#calendar-btn");
 
 const scrollEntriesToBottom = () => {
-  requestScrollForceBottom({ source: "shortcut", force: true });
+  requestScrollForceEdge({ source: "shortcut", force: true, direction: "down" });
   return true;
 };
 

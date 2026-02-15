@@ -1,7 +1,7 @@
 import { createListenerBag } from "../utils/events.js";
 import { scheduleFrame } from "../utils/scheduler.js";
 import {
-  FORCE_BOTTOM_EVENT,
+  FORCE_EDGE_EVENT,
   REFRESH_EVENT,
   scrollEvents,
   TARGET_CONSUMED_EVENT,
@@ -27,7 +27,7 @@ export class ScrollIntent {
     const bag = this.#listeners;
     const manager = this.#manager;
     const scrollPolicies = {
-      [FORCE_BOTTOM_EVENT]: (event) => manager.handleForceBottom(event?.detail),
+      [FORCE_EDGE_EVENT]: (event) => manager.handleForceEdge(event?.detail),
       [TARGET_EVENT]: (event) => {
         const detail = event?.detail || {};
         if (!detail || (!detail.id && !detail.element)) return;

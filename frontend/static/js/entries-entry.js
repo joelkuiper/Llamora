@@ -1,7 +1,7 @@
 import { EntryView } from "./components/entry-view.js";
 import "./components/day-opening.js";
 import "./components/search-overlay.js";
-import "./components/scroll-bottom-button.js";
+import "./components/scroll-edge-button.js";
 import "./components/entry-tags.js";
 import "./components/entry-edit-autosize.js";
 import "./components/char-counter.js";

@@ -1,4 +1,4 @@
-import { requestScrollForceBottom } from "./scroll-manager.js";
+import { requestScrollForceEdge } from "./scroll-manager.js";
 import { normalizeStreamId } from "./stream-id.js";
 
 const STATUS_IDLE = "idle";
@@ -84,7 +84,7 @@ export class StreamController {
         entryId: id,
       }),
     );
-    requestScrollForceBottom({ source: "stream:start" });
+    requestScrollForceEdge({ source: "stream:start", direction: "down" });
   }
 
   notifyStreamAbort(stream, { reason: _reason = "user:abort" } = {}) {
@@ -128,7 +128,7 @@ export class StreamController {
       }),
     );
     if (status !== "aborted") {
-      requestScrollForceBottom({ source: "stream:complete" });
+      requestScrollForceEdge({ source: "stream:complete", direction: "down" });
     }
   }
 

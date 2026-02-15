@@ -2,7 +2,12 @@ import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
 import { createListenerBag } from "../utils/events.js";
 import { motionSafeBehavior, prefersReducedMotion } from "../utils/motion.js";
 import { scheduleFrame, scheduleRafLoop } from "../utils/scheduler.js";
-import { isNearBottom } from "./scroll-utils.js";
+import {
+  applyEdgeMetrics,
+  computeEdgeMetrics,
+  normalizeEdgeDirection,
+} from "../utils/scroll-edge.js";
+import { isNearBottom, isNearTop } from "./scroll-utils.js";
 
 export const scrollEvents = new EventTarget();
 
@@ -16,13 +21,14 @@ export const scrollEvents = new EventTarget();
  * - `emittedAt`: timestamp (ms) noting when the helper dispatched the event.
  *
  * Additional fields are provided per-event:
- * - `force`: `boolean` present on `scroll:force-bottom` to request a hard scroll.
+ * - `force`: `boolean` present on `scroll:force-edge` to request a hard scroll.
+ * - `direction`: optional `up` or `down` for `scroll:force-edge` to request a direction.
  * - `id` / `element`: target identifier or element for `scroll:target` requests.
  * - `options`: scrollIntoView options supplied for target navigation.
  * - `target`: identifier consumed by listeners acknowledging a target request.
  */
 
-export const FORCE_BOTTOM_EVENT = "scroll:force-bottom";
+export const FORCE_EDGE_EVENT = "scroll:force-edge";
 export const TARGET_EVENT = "scroll:target";
 export const TARGET_CONSUMED_EVENT = "scroll:target-consumed";
 export const REFRESH_EVENT = "scroll:refresh";
@@ -35,9 +41,10 @@ const SCROLL_DETAIL_BASE = Object.freeze({
   emittedAt: 0,
 });
 
-const FORCE_BOTTOM_DETAIL_BASE = Object.freeze({
+const FORCE_EDGE_DETAIL_BASE = Object.freeze({
   ...SCROLL_DETAIL_BASE,
   force: false,
+  direction: "down",
 });
 
 const TARGET_DETAIL_BASE = Object.freeze({
@@ -70,10 +77,19 @@ const emitScrollEvent = (eventName, baseDetail, detail = {}) => {
   return normalized;
 };
 
-export function requestScrollForceBottom(detail = {}) {
-  return emitScrollEvent(FORCE_BOTTOM_EVENT, FORCE_BOTTOM_DETAIL_BASE, {
+export function requestScrollForceEdge(detail = {}) {
+  const direction = normalizeEdgeDirection(detail?.direction, "down");
+  return emitScrollEvent(FORCE_EDGE_EVENT, FORCE_EDGE_DETAIL_BASE, {
     ...detail,
     force: detail?.force === true,
+    direction,
+  });
+}
+
+export function requestScrollForceBottom(detail = {}) {
+  return requestScrollForceEdge({
+    ...detail,
+    direction: "down",
   });
 }
 
@@ -101,7 +117,7 @@ export function requestScrollTargetConsumed(target, detail = {}) {
 }
 
 const DEFAULT_CONTAINER_SELECTOR = "#content-wrapper";
-const DEFAULT_BUTTON_SELECTOR = "scroll-bottom-button, #scroll-bottom";
+const DEFAULT_BUTTON_SELECTOR = "scroll-edge-button, #scroll-bottom, #scroll-top";
 const STORAGE_PREFIX = "scroll-pos";
 const _MARKDOWN_EVENT = "markdown:rendered";
 
@@ -125,12 +141,16 @@ export class ScrollManager {
     this.root = root;
     this.containerSelector = containerSelector;
     this.buttonSelector = buttonSelector;
+    this.containerSelectorOverride = null;
 
     this.entries = null;
     this.container = null;
     this.scrollElement = null;
     this.scrollBtn = null;
     this.scrollBtnContainer = null;
+    this.edgeDirection = "down";
+    this.edgeThreshold = 150;
+    this.edgeOffset = 0;
     this.autoScrollEnabled = true;
     this.lastScrollTop = 0;
 
@@ -167,12 +187,13 @@ export class ScrollManager {
   }
 
   ensureElements() {
-    this.ensureContainer();
     this.resolveScrollButton();
+    this.ensureContainer();
   }
 
   ensureContainer() {
-    const next = this.root.querySelector(this.containerSelector);
+    const selector = this.containerSelectorOverride || this.containerSelector;
+    const next = this.root.querySelector(selector);
     if (next === this.container) {
       return this.container;
     }
@@ -184,7 +205,7 @@ export class ScrollManager {
     }
 
     this.container = next instanceof HTMLElement ? next : null;
-    if (this.container && this.entries) {
+    if (this.container && (this.entries || this.scrollElement)) {
       this.#attachContextListeners();
     }
     return this.container;
@@ -193,6 +214,7 @@ export class ScrollManager {
   resolveScrollButton() {
     const element = this.root.querySelector(this.buttonSelector);
     if (element === this.scrollElement) {
+      this.refreshEdgeMetrics();
       return;
     }
 
@@ -206,9 +228,15 @@ export class ScrollManager {
     this.scrollElement = element instanceof HTMLElement ? element : null;
     this.scrollBtn = null;
     this.scrollBtnContainer = null;
+    this.containerSelectorOverride = null;
 
     if (!this.scrollElement) {
       return;
+    }
+
+    const override = String(this.scrollElement.dataset.edgeContainer || "").trim();
+    if (override) {
+      this.containerSelectorOverride = override;
     }
 
     if (this.scrollElement instanceof HTMLButtonElement) {
@@ -243,6 +271,8 @@ export class ScrollManager {
     } else if (this.scrollElement) {
       this.scrollElement.addEventListener("click", this.onScrollBtnClick);
     }
+
+    this.refreshEdgeMetrics();
   }
 
   attachEntries(entries) {
@@ -281,22 +311,31 @@ export class ScrollManager {
 
     this.entries = null;
 
-    if (shouldResetCenter) {
-      document.documentElement?.style?.removeProperty?.("--entries-center");
+    if (shouldResetCenter && this.scrollElement instanceof HTMLElement) {
+      this.scrollElement.style.removeProperty("--scroll-edge-center");
     }
   }
 
-  scrollToBottom(force = false) {
+  scrollToEdge(force = false, direction = this.edgeDirection) {
     this.ensureContainer();
     if (!this.container) return;
 
-    if (force) {
-      this.autoScrollEnabled = true;
-    }
+    const normalizedDirection = normalizeEdgeDirection(direction, this.edgeDirection);
 
-    if (this.autoScrollEnabled || force) {
+    if (normalizedDirection === "down") {
+      if (force) {
+        this.autoScrollEnabled = true;
+      }
+
+      if (this.autoScrollEnabled || force) {
+        this.container.scrollTo({
+          top: this.container.scrollHeight,
+          behavior: motionSafeBehavior("smooth"),
+        });
+      }
+    } else {
       this.container.scrollTo({
-        top: this.container.scrollHeight,
+        top: 0,
         behavior: motionSafeBehavior("smooth"),
       });
     }
@@ -310,17 +349,26 @@ export class ScrollManager {
     }
   }
 
-  handleForceBottom(detail) {
+  scrollToBottom(force = false) {
+    this.scrollToEdge(force, "down");
+  }
+
+  scrollToTop(force = false) {
+    this.scrollToEdge(force, "up");
+  }
+
+  handleForceEdge(detail) {
     const meta = detail || {};
     const force = meta.force === true;
+    const direction = normalizeEdgeDirection(meta.direction, this.edgeDirection);
 
-    if (!force && !this.autoScrollEnabled) {
+    if (direction === "down" && !force && !this.autoScrollEnabled) {
       this.toggleScrollBtn();
       this.alignScrollButton();
       return;
     }
 
-    this.scrollToBottom(force);
+    this.scrollToEdge(force, direction);
   }
 
   handleTargetConsumed(detail) {
@@ -382,6 +430,14 @@ export class ScrollManager {
     return isNearBottom(this.container, threshold);
   }
 
+  isUserNearEdge(threshold = 0) {
+    if (!this.container) return true;
+    if (this.edgeDirection === "up") {
+      return isNearTop(this.container, threshold);
+    }
+    return isNearBottom(this.container, threshold);
+  }
+
   toggleScrollBtn() {
     if (!this.scrollBtn && !this.scrollBtnContainer) {
       return;
@@ -397,7 +453,7 @@ export class ScrollManager {
       return;
     }
 
-    const shouldShow = !this.isUserNearBottom(150);
+    const shouldShow = !this.isUserNearEdge(this.edgeThreshold || 0);
     if (typeof this.scrollBtnContainer?.setVisible === "function") {
       this.scrollBtnContainer.setVisible(shouldShow);
       return;
@@ -409,16 +465,18 @@ export class ScrollManager {
 
   updateScrollState(currentTop) {
     if (!this.container) return;
-    if (currentTop < this.lastScrollTop - 2) {
-      this.autoScrollEnabled = false;
-    } else if (this.isUserNearBottom(10)) {
-      this.autoScrollEnabled = true;
+    if (this.edgeDirection === "down") {
+      if (currentTop < this.lastScrollTop - 2) {
+        this.autoScrollEnabled = false;
+      } else if (this.isUserNearBottom(10)) {
+        this.autoScrollEnabled = true;
+      }
     }
     this.lastScrollTop = currentTop;
   }
 
   alignScrollButton() {
-    if (this.#alignFrame != null || !this.entries) {
+    if (this.#alignFrame != null) {
       return;
     }
 
@@ -433,17 +491,8 @@ export class ScrollManager {
   }
 
   alignScrollButtonNow() {
-    if (!this.entries) return;
-
     this.#cancelAlign();
-
-    const rect = this.entries.getBoundingClientRect();
-    if (rect.width === 0) {
-      return;
-    }
-
-    const centerPx = rect.left + rect.width / 2;
-    document.documentElement.style.setProperty("--entries-center", `${centerPx}px`);
+    this.refreshEdgeMetrics();
   }
 
   onScroll() {
@@ -476,7 +525,27 @@ export class ScrollManager {
         window.setTimeout(() => this.scrollBtn?.classList.remove("clicked"), 300);
       }
     }
-    this.scrollToBottom(true);
+    this.scrollToEdge(true, this.edgeDirection);
+  }
+
+  refreshEdgeMetrics() {
+    if (!this.scrollElement) return;
+    const metrics = computeEdgeMetrics({
+      button: this.scrollElement,
+      root: this.root,
+      fallbackCenter: this.entries,
+      fallbackDirection: this.edgeDirection,
+    });
+    this.edgeDirection = metrics.direction;
+    this.edgeThreshold = metrics.threshold;
+    this.edgeOffset = metrics.offset;
+    applyEdgeMetrics(this.scrollElement, metrics);
+    if (
+      this.scrollElement instanceof HTMLElement &&
+      this.scrollElement.dataset.direction !== metrics.direction
+    ) {
+      this.scrollElement.dataset.direction = metrics.direction;
+    }
   }
 
   #attachContextListeners() {
@@ -570,11 +639,13 @@ export class ScrollManager {
   handleLoad(event) {
     const detail = event?.detail || {};
     const possibleSources = [detail.item, detail.target, event?.target];
+    this.ensureElements();
+    this.toggleScrollBtn();
+    this.alignScrollButton();
 
     for (const source of possibleSources) {
       const wrapper = this.resolveWrapperFromNode(source);
       if (wrapper) {
-        this.ensureContainer();
         this.maybeRestore();
         return;
       }
@@ -585,14 +656,15 @@ export class ScrollManager {
     if (!node) return null;
 
     if (typeof DocumentFragment !== "undefined" && node instanceof DocumentFragment) {
-      return node.querySelector?.(this.containerSelector) ?? null;
+      return node.querySelector?.(this.containerSelectorOverride || this.containerSelector) ?? null;
     }
 
     if (typeof Element !== "undefined" && node instanceof Element) {
-      if (node.matches?.(this.containerSelector)) {
+      const selector = this.containerSelectorOverride || this.containerSelector;
+      if (node.matches?.(selector)) {
         return node;
       }
-      return node.querySelector?.(this.containerSelector) ?? null;
+      return node.querySelector?.(selector) ?? null;
     }
 
     return null;

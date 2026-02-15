@@ -82,6 +82,10 @@ const FEATURE_IMPORTS = {
     selector: "#view-mode-toggle",
     loader: () => import("../components/view-mode.js"),
   },
+  scrollEdge: {
+    selector: "scroll-edge-button",
+    loader: () => import("../components/scroll-edge-button.js"),
+  },
   profile: {
     selector: "[data-profile-modal]",
     loader: () =>

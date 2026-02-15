@@ -1,18 +1,23 @@
-scroll-bottom-button {
-  left: var(--entries-center, 50%); /* pixel value set by JS */
+scroll-edge-button {
+  left: var(--scroll-edge-center, 50%); /* pixel value set by JS */
   transform: translateX(-50%);
   position: fixed;
-  bottom: 7.5rem;
+  bottom: var(--scroll-edge-offset, 7.5rem);
   pointer-events: none;
   display: block;
   z-index: 4500;
 }
 
-scroll-bottom-button.visible {
+scroll-edge-button[data-direction="up"] {
+  top: var(--scroll-edge-offset, 5.25rem);
+  bottom: auto;
+}
+
+scroll-edge-button.visible {
   pointer-events: auto;
 }
 
-scroll-bottom-button .scroll-btn {
+scroll-edge-button .scroll-btn {
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 50%;
@@ -36,7 +41,7 @@ scroll-bottom-button .scroll-btn {
   z-index: 4501;
   cursor: pointer;
 
-  scroll-bottom-button.visible & {
+  scroll-edge-button.visible & {
     opacity: 0.95;
     pointer-events: auto;
   }

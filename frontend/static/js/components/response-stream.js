@@ -1,4 +1,4 @@
-import { requestScrollForceBottom } from "../entries/scroll-manager.js";
+import { requestScrollForceEdge } from "../entries/scroll-manager.js";
 import {
   applyTimezoneQuery,
   formatLocalTime,
@@ -21,7 +21,7 @@ function decodeChunk(data) {
 }
 
 function requestScrollToBottom(detail = {}) {
-  requestScrollForceBottom({ source: "response-stream", ...detail });
+  requestScrollForceEdge({ source: "response-stream", direction: "down", ...detail });
 }
 
 class ResponseStreamElement extends HTMLElement {
@@ -185,7 +185,7 @@ class ResponseStreamElement extends HTMLElement {
     if (controller && typeof controller.notifyStreamStart === "function") {
       controller.notifyStreamStart(this, { reason: "stream:start" });
     }
-    requestScrollForceBottom({ source: "stream:start" });
+    requestScrollForceEdge({ source: "stream:start", direction: "down" });
     this.dispatchEvent(
       new CustomEvent("response-stream:start", {
         bubbles: true,

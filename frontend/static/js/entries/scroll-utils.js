@@ -7,3 +7,10 @@ export function isNearBottom(element, threshold = 0) {
 
   return distance < threshold;
 }
+
+export function isNearTop(element, threshold = 0) {
+  if (!(element instanceof Element)) {
+    return true;
+  }
+  return element.scrollTop <= threshold;
+}

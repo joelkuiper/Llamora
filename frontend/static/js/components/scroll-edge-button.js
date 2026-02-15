@@ -1,7 +1,8 @@
 import { ReactiveElement } from "../utils/reactive-element.js";
 import { animateMotion } from "../utils/transition.js";
+import { normalizeEdgeDirection } from "../utils/scroll-edge.js";
 
-class ScrollBottomButtonElement extends ReactiveElement {
+class ScrollEdgeButtonElement extends ReactiveElement {
   #button = null;
   #pulseCleanup = null;
 
@@ -21,6 +22,10 @@ class ScrollBottomButtonElement extends ReactiveElement {
 
   get button() {
     return this.#button;
+  }
+
+  get direction() {
+    return normalizeEdgeDirection(this.dataset?.direction || this.dataset?.edgeDirection, "down");
   }
 
   setVisible(visible) {
@@ -77,6 +82,7 @@ class ScrollBottomButtonElement extends ReactiveElement {
 
   #ensureButton() {
     if (this.#button && this.contains(this.#button)) {
+      this.#applyDirectionConfig();
       return;
     }
 
@@ -103,14 +109,28 @@ class ScrollBottomButtonElement extends ReactiveElement {
     if (!this.#button.classList.contains("scroll-btn")) {
       this.#button.classList.add("scroll-btn");
     }
-    if (!this.#button.hasAttribute("aria-label")) {
-      this.#button.setAttribute("aria-label", "Scroll to bottom");
+    this.#applyDirectionConfig();
+  }
+
+  #applyDirectionConfig() {
+    const button = this.#button;
+    if (!button) return;
+    const direction = this.direction;
+    const icon = direction === "up" ? "icon-chevron-up" : "icon-chevron-down";
+    const label = direction === "up" ? "Scroll to top" : "Scroll to bottom";
+
+    const iconEl = button.querySelector(".icon-mask");
+    if (iconEl) {
+      iconEl.classList.remove("icon-chevron-up", "icon-chevron-down");
+      iconEl.classList.add(icon);
     }
+
+    button.setAttribute("aria-label", label);
   }
 }
 
-if (!customElements.get("scroll-bottom-button")) {
-  customElements.define("scroll-bottom-button", ScrollBottomButtonElement);
+if (!customElements.get("scroll-edge-button")) {
+  customElements.define("scroll-edge-button", ScrollEdgeButtonElement);
 }
 
-export { ScrollBottomButtonElement as ScrollBottomButton };
+export { ScrollEdgeButtonElement as ScrollEdgeButton };

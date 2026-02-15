@@ -35,8 +35,8 @@
     }
   }
 
-  scroll-bottom-button .scroll-btn {
-    scroll-bottom-button.visible & {
+  scroll-edge-button .scroll-btn {
+    scroll-edge-button.visible & {
       animation:
         appear var(--motion-fade) ease-out,
         breathe var(--motion-breathe) ease-in-out var(--motion-delay-short) infinite;
