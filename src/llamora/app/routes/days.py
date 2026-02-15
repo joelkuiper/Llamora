@@ -1,26 +1,69 @@
+import asyncio
+from collections.abc import Awaitable, Callable
+from logging import getLogger
+
+import orjson
 from quart import (
     Blueprint,
+    make_response,
     redirect,
+    render_template,
     request,
     url_for,
-    render_template,
-    make_response,
 )
-from llamora.app.services.auth_helpers import login_required
-from llamora.app.services.session_context import get_session_context
-from llamora.app.services.time import local_date
-from llamora.app.routes.helpers import require_iso_date
-from llamora.app.services.calendar import get_month_context
+
 from llamora.app.routes.entries import render_entries
-from llamora.app.services.container import get_services
-from llamora.app.services.tag_presenter import present_tags_view_data
+from llamora.app.services.auth_helpers import login_required
+from llamora.app.routes.helpers import require_iso_date, require_user_and_dek
+from llamora.app.services.calendar import get_month_context
+from llamora.app.services.container import get_lockbox_store, get_services
 from llamora.app.services.day_summary import generate_day_summary
-from llamora.app.routes.helpers import require_user_and_dek
-from logging import getLogger
-import orjson
+from llamora.app.services.lockbox_store import LockboxStore
+from llamora.app.services.session_context import get_session_context
+from llamora.app.services.tag_presenter import present_tags_view_data
+from llamora.app.services.time import local_date
 
 days_bp = Blueprint("days", __name__)
 logger = getLogger(__name__)
+
+_day_summary_singleflight: dict[tuple[str, str, str], asyncio.Task[str]] = {}
+_day_summary_singleflight_lock = asyncio.Lock()
+
+
+async def _run_day_summary_singleflight(
+    key: tuple[str, str, str],
+    producer: Callable[[], Awaitable[str]],
+) -> str:
+    async with _day_summary_singleflight_lock:
+        task = _day_summary_singleflight.get(key)
+        if task is None:
+            task = asyncio.create_task(producer())
+            _day_summary_singleflight[key] = task
+
+    try:
+        return await task
+    finally:
+        async with _day_summary_singleflight_lock:
+            if _day_summary_singleflight.get(key) is task:
+                _day_summary_singleflight.pop(key, None)
+
+
+async def _get_cached_day_summary(
+    store: LockboxStore,
+    user_id: str,
+    dek: bytes,
+    date: str,
+    digest: str,
+) -> str | None:
+    cached = await store.get_json(user_id, dek, "summary", f"day:{date}")
+    if not isinstance(cached, dict):
+        return None
+    cached_digest = str(cached.get("digest") or "").strip()
+    cached_text = cached.get("text")
+    if cached_digest != digest or not isinstance(cached_text, str):
+        return None
+    cached_text = cached_text.strip()
+    return cached_text or None
 
 
 @days_bp.route("/")
@@ -196,13 +239,56 @@ async def day_summary(date):
     normalized_date = require_iso_date(date)
     _, user, dek = await require_user_and_dek()
     services = get_services()
-    entries = await services.db.entries.get_flat_entries_for_date(
-        user["id"], normalized_date, dek
+    user_id = user["id"]
+    digest = await services.db.entries.get_day_summary_digest_for_date(
+        user_id, normalized_date
     )
-    summary = await generate_day_summary(
-        services.llm_service.llm,
+    store = get_lockbox_store(services.db)
+    cached_summary = await _get_cached_day_summary(
+        store,
+        user_id,
+        dek,
         normalized_date,
-        entries,
+        digest,
+    )
+    if cached_summary is not None:
+        payload = {"summary": cached_summary}
+        resp = await make_response(orjson.dumps(payload), 200)
+        resp.mimetype = "application/json"
+        return resp
+
+    async def _generate_and_cache_summary() -> str:
+        cache_hit = await _get_cached_day_summary(
+            store,
+            user_id,
+            dek,
+            normalized_date,
+            digest,
+        )
+        if cache_hit is not None:
+            return cache_hit
+        entries = await services.db.entries.get_flat_entries_for_date(
+            user_id, normalized_date, dek
+        )
+        text = (
+            await generate_day_summary(
+                services.llm_service.llm,
+                normalized_date,
+                entries,
+            )
+        ).strip()
+        await store.set_json(
+            user_id,
+            dek,
+            "summary",
+            f"day:{normalized_date}",
+            {"digest": digest, "text": text},
+        )
+        return text
+
+    summary = await _run_day_summary_singleflight(
+        (user_id, normalized_date, digest),
+        _generate_and_cache_summary,
     )
     payload = {"summary": summary or ""}
     resp = await make_response(orjson.dumps(payload), 200)

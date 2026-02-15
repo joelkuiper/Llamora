@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import re
 from datetime import date as _date_type
 from typing import Awaitable, Callable, Iterable, Mapping
@@ -704,8 +705,6 @@ class EntriesRepository(BaseRepository):
     async def get_day_summary_digests(
         self, user_id: str, year: int, month: int
     ) -> dict[int, str]:
-        import hashlib
-
         month_start, next_month_start = get_month_bounds(year, month)
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
@@ -735,6 +734,30 @@ class EntriesRepository(BaseRepository):
             payload = "|".join(sorted(digests)).encode("utf-8")
             summary_digests[day] = hashlib.sha256(payload).hexdigest()
         return summary_digests
+
+    async def get_day_summary_digest_for_date(
+        self, user_id: str, created_date: str
+    ) -> str:
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                """
+                SELECT id, digest
+                FROM entries
+                WHERE user_id = ? AND created_date = ?
+                """,
+                (user_id, created_date),
+            )
+            rows = await cursor.fetchall()
+
+        digests: list[str] = []
+        for row in rows:
+            digest = str(row["digest"] or "").strip()
+            if not digest:
+                digest = f"missing:{row['id']}"
+            digests.append(digest)
+
+        payload = "|".join(sorted(digests)).encode("utf-8")
+        return hashlib.sha256(payload).hexdigest()
 
     async def get_first_entry_date(self, user_id: str) -> str | None:
         async with self.pool.connection() as conn:
