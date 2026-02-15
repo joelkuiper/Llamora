@@ -8,7 +8,8 @@
          {% if oob_detail %}hx-swap-oob="outerHTML"{% endif %}
          data-selected-tag="{{ selected_tag_name }}"
          data-sort-kind="{{ sort_kind }}"
-         data-sort-dir="{{ sort_dir }}">
+         data-sort-dir="{{ sort_dir }}"
+         {% if detail %}data-selected-tag-count="{{ detail.count }}"{% endif %}>
   <input type="hidden"
          id="tags-view-selected-tag"
          name="tag"

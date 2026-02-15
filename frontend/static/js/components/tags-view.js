@@ -714,6 +714,34 @@ const updateSortButtons = (root = document) => {
   });
 };
 
+const updateSelectedTagCounts = (root = document, delta = -1) => {
+  const detail = findDetail(root);
+  if (!detail) return;
+  const rawCount =
+    Number.parseInt(detail.dataset.selectedTagCount || "", 10) ||
+    Number.parseInt(detail.querySelector(".tags-view__meta")?.textContent || "", 10) ||
+    0;
+  const nextCount = Math.max(0, rawCount + delta);
+  detail.dataset.selectedTagCount = String(nextCount);
+  const metaEl = detail.querySelector(".tags-view__meta");
+  if (metaEl) {
+    const parts = metaEl.textContent.split("·");
+    const suffix = parts.length > 1 ? parts.slice(1).join("·").trim() : "";
+    const entryLabel = nextCount === 1 ? "entry" : "entries";
+    metaEl.textContent = suffix
+      ? `${nextCount} ${entryLabel} · ${suffix}`
+      : `${nextCount} ${entryLabel}`;
+  }
+  const activeRow = getActiveRow();
+  if (activeRow) {
+    const countEl = activeRow.querySelector(".tags-view__index-count");
+    if (countEl) {
+      countEl.textContent = String(nextCount);
+    }
+    activeRow.dataset.tagsCount = String(nextCount);
+  }
+};
+
 const syncSortStateFromDom = (root = document) => {
   const sortFromDom = readSortFromDom(root);
   state.sortKind = sortFromDom.kind;
@@ -1333,6 +1361,19 @@ if (!globalThis[BOOT_KEY]) {
     if (target.id === "main-content") {
       sync(document);
     }
+  });
+
+  document.body.addEventListener("htmx:afterRequest", (event) => {
+    const elt = event.detail?.elt;
+    if (!(elt instanceof Element)) return;
+    if (!elt.classList.contains("entry-delete")) return;
+    const detailRoot = findDetail(document);
+    if (!detailRoot || !elt.closest("#tags-view-detail")) return;
+    const xhr = event.detail?.xhr;
+    if (xhr && (xhr.status < 200 || xhr.status >= 300)) return;
+    const entry = elt.closest(".entry");
+    if (entry && entry.classList.contains("assistant")) return;
+    updateSelectedTagCounts(document, -1);
   });
 
   document.body.addEventListener("htmx:configRequest", (event) => {
