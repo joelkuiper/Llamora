@@ -10,7 +10,7 @@ import secrets
 ALG = b"xchacha20poly1305_ietf"
 OPSLIMIT = pwhash.argon2id.OPSLIMIT_MODERATE
 MEMLIMIT = pwhash.argon2id.MEMLIMIT_MODERATE
-ENTRY_DIGEST_CONTEXT = b"llamora:entry-digest:v1"
+ENTRY_DIGEST_CONTEXT = b"llamora:entry-digest:v2"
 
 
 def generate_dek() -> bytes:
@@ -45,7 +45,7 @@ def derive_key(secret: bytes, salt: bytes) -> bytes:
 
 
 def derive_entry_digest_key(dek: bytes) -> bytes:
-    return hashlib.sha256(ENTRY_DIGEST_CONTEXT + dek).digest()
+    return hmac.new(ENTRY_DIGEST_CONTEXT, dek, hashlib.sha256).digest()
 
 
 def entry_digest(dek: bytes, entry_id: str, role: str, text: str) -> str:

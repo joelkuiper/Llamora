@@ -54,7 +54,9 @@ def _decrypt_entry(db: LocalDB, dek: bytes, user_id: str, row: dict) -> dict:
     return orjson.loads(payload)
 
 
-async def _backfill_user(db: LocalDB, user_id: str, dek: bytes) -> None:
+async def _backfill_user(
+    db: LocalDB, user_id: str, dek: bytes, *, force: bool = False
+) -> None:
     rows = await _load_entries(db, user_id)
     if not rows:
         logger.info("No entries found for user %s", user_id)
@@ -65,7 +67,7 @@ async def _backfill_user(db: LocalDB, user_id: str, dek: bytes) -> None:
     already = 0
 
     for row in rows:
-        if row["digest"]:
+        if row["digest"] and not force:
             already += 1
             continue
         entry_id = str(row["id"] or "").strip()
@@ -127,7 +129,7 @@ async def _run(args: argparse.Namespace) -> None:
         dek = base64.b64decode(args.dek_b64)
         if not dek:
             raise SystemExit("DEK is empty")
-        await _backfill_user(db, user["id"], dek)
+        await _backfill_user(db, user["id"], dek, force=args.force)
     finally:
         await db.close()
 
@@ -138,6 +140,11 @@ def main() -> None:
     parser.add_argument("username", help="Username to backfill entry digests for")
     parser.add_argument("dek_b64", help="Base64-encoded DEK for the user")
     parser.add_argument("--db-path", help="Path to the SQLite database")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Recompute digests even for entries that already have one",
+    )
     args = parser.parse_args()
     asyncio.run(_run(args))
 
