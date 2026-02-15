@@ -19,23 +19,25 @@
     {% if detail %}
       <header class="tags-view__detail-header">
         {% set delete_trace_url = url_for('tags.delete_trace', tag_hash=detail.hash) ~ '?day=' ~ day ~ '&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&entries_limit=' ~ entries_limit ~ '&tag=' ~ (detail.name|urlencode) ~ '&include_list=1' %}
-        <button class="entry-action entry-delete tags-view__trace-delete"
-                type="button"
-                hx-delete="{{ delete_trace_url }}"
-                hx-target="#tags-view-detail"
-                hx-swap="outerHTML"
-                hx-confirm="Delete this trace?"
-                data-confirm-title="Delete trace?"
-                data-confirm-message="This trace will be removed from all entries."
-                data-confirm-confirm="Delete"
-                data-confirm-cancel="Keep"
-                data-confirm-variant="danger"
-                aria-label="Delete trace"
-                data-tooltip-title="Delete trace">
-          <span class="icon-mask icon-trash entry-action__icon" aria-hidden="true"></span>
-        </button>
         <div class="tags-view__title-wrap">
-          <h2 class="tags-view__title">{{ detail.name }}</h2>
+          <div class="tags-view__title-row">
+            <h2 class="tags-view__title">{{ detail.name }}</h2>
+            <button class="entry-action entry-delete tags-view__trace-delete"
+                    type="button"
+                    hx-delete="{{ delete_trace_url }}"
+                    hx-target="#tags-view-detail"
+                    hx-swap="outerHTML"
+                    hx-confirm="Delete this trace?"
+                    data-confirm-title="Delete trace?"
+                    data-confirm-message="This trace will be removed from all entries."
+                    data-confirm-confirm="Delete"
+                    data-confirm-cancel="Keep"
+                    data-confirm-variant="danger"
+                    aria-label="Delete trace"
+                    data-tooltip-title="Delete trace">
+              <span class="icon-mask icon-trash entry-action__icon" aria-hidden="true"></span>
+            </button>
+          </div>
           <p class="tags-view__meta">
             {{ detail.count }} {{ "entries" if detail.count != 1 else "entry" }} ·
             {% if detail.first_used_label %}since {{ detail.first_used_label }}{% else %}first used unknown{% endif %}
