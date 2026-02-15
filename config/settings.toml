@@ -42,7 +42,7 @@ initial_page_size = 15
 result_window = 100
 stream_ttl = 900
 stream_max_sessions = 200
-stream_global_memory_budget_bytes = "32MiB"
+stream_global_memory_budget_bytes = "128MiB"
 
 [default.SEARCH.progressive]
 k1 = 128
