@@ -736,9 +736,18 @@
 
 .activity-heatmap__cell:hover,
 .activity-heatmap__cell:focus-visible {
-  transform: translateY(-1px);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--heatmap-level-4) 60%, transparent);
+  transform: translateY(-1px) scale(1.04);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--heatmap-level-4) 72%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--heatmap-level-2) 28%, transparent);
   outline: none;
+}
+
+.activity-heatmap__cell:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--heatmap-level-4) 88%, transparent),
+    0 0 0 6px color-mix(in srgb, var(--heatmap-level-3) 26%, transparent);
 }
 
 .activity-heatmap__cell.is-today {
@@ -749,8 +758,8 @@
 
 .activity-heatmap__cell.is-selected {
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--heatmap-level-4) 88%, transparent),
-    0 0 0 3px color-mix(in srgb, var(--heatmap-level-2) 30%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--heatmap-level-4) 92%, transparent),
+    0 0 0 5px color-mix(in srgb, var(--heatmap-level-2) 34%, transparent);
 }
 
 .heatmap-day-tooltip .tag-detail-skeleton {
