@@ -2,8 +2,18 @@
   {% set selected_day = selected_day|default(day|default("")) %}
   <div class="activity-heatmap">
     {% for month in activity_heatmap.months %}
-      <section class="activity-heatmap__month" role="group" aria-labelledby="heatmap-month-{{ loop.index }}">
-        <div class="activity-heatmap__month-label" id="heatmap-month-{{ loop.index }}">{{ month.label }}</div>
+      {% set prev_month = activity_heatmap.months[loop.index0 - 1] if loop.index0 > 0 else None %}
+      {% set year_break = prev_month and prev_month.year != month.year %}
+      <section class="activity-heatmap__month{% if year_break %} is-year-break{% endif %}"
+               role="group"
+               aria-labelledby="heatmap-month-{{ loop.index }}"
+               data-year="{{ month.year }}">
+        <div class="activity-heatmap__month-label" id="heatmap-month-{{ loop.index }}">
+          {{ month.label }}
+          {% if year_break %}
+            <span class="activity-heatmap__year">{{ month.year }}</span>
+          {% endif %}
+        </div>
         <div class="activity-heatmap__grid" role="grid" aria-label="{{ month.aria_label }}">
           {% for week in month.weeks %}
             <div class="activity-heatmap__week" role="row">

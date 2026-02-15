@@ -26,6 +26,7 @@ class ActivityHeatmapWeek:
 class ActivityHeatmapMonth:
     label: str
     aria_label: str
+    year: int
     weeks: tuple[ActivityHeatmapWeek, ...]
 
 
@@ -111,12 +112,16 @@ def build_activity_heatmap(
             ActivityHeatmapMonth(
                 label=month_start.strftime("%b"),
                 aria_label=month_start.strftime("%B %Y"),
+                year=month_start.year,
                 weeks=tuple(weeks),
             )
         )
 
     min_month = _month_start(min_date) if min_date else None
-    has_prev = bool(min_month and window_start > min_month)
+    if min_month:
+        has_prev = window_start > min_month
+    else:
+        has_prev = True
     has_next = offset > 0
 
     return ActivityHeatmapData(
