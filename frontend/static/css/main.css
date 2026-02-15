@@ -730,6 +730,10 @@ input[type="checkbox"]:focus {
 .tooltip.visible {
   transform: translateY(0) scale(1);
   transition-delay: 40ms;
+  @starting-style {
+    opacity: 0;
+    transform: translateY(4px) scale(0.985);
+  }
 }
 
 .password-suggestions {

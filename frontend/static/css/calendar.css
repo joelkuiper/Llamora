@@ -56,6 +56,10 @@
 .calendar-day-tooltip.is-visible {
   opacity: 1;
   transform: translateY(0);
+  @starting-style {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
 
 #calendar-btn #calendar-label {

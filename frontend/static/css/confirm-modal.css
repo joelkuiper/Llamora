@@ -39,13 +39,13 @@
     transform 220ms ease;
 }
 
-.confirm-modal.is-open .confirm-modal__backdrop {
-  opacity: 1;
-}
-
 .confirm-modal.is-open .confirm-modal__panel {
   opacity: 1;
   transform: translateY(0) scale(1);
+}
+
+.confirm-modal.is-open .confirm-modal__backdrop {
+  opacity: 1;
 }
 
 .confirm-modal__header {
