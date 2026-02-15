@@ -71,6 +71,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
   #recentHistory;
   #shortcutBag = null;
   #toggleHandler;
+  #activePanelEl = null;
 
   constructor() {
     super();
@@ -237,6 +238,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
 
     const panel = wrap.querySelector(".sr-panel");
     if (!panel) {
+      this.#activePanelEl = null;
       wrap.classList.remove("is-open");
       this.#deactivateOverlayListeners();
       this.#addCurrentQueryToAutocomplete();
@@ -244,8 +246,12 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       return;
     }
 
+    const panelWasReplaced = panel !== this.#activePanelEl;
+    this.#activePanelEl = panel;
+
     if (wrap.classList.contains("is-open")) {
       panel.classList.remove("htmx-added");
+      this.#activateOverlayListeners();
       this.#addCurrentQueryToAutocomplete();
       this.#loadRecentSearches();
       return;
@@ -256,7 +262,13 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       this.#activateOverlayListeners();
     };
 
-    playAnimation(panel, "pop-enter").then(completeEnter);
+    if (panelWasReplaced && panel.classList.contains("htmx-added")) {
+      playAnimation(panel, "pop-enter").then(completeEnter);
+    } else {
+      completeEnter();
+    }
+
+    panel.classList.remove("htmx-added");
     this.#addCurrentQueryToAutocomplete();
     this.#loadRecentSearches();
   }
@@ -512,6 +524,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       wrap.classList.remove("is-open");
       wrap.removeAttribute("aria-busy");
       wrap.innerHTML = "";
+      this.#activePanelEl = null;
       this.#deactivateOverlayListeners();
     };
 

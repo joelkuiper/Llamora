@@ -1,7 +1,7 @@
 <form id="search-form"
       hx-get="/search"
       hx-target="#search-results"
-      hx-swap="innerHTML"
+      hx-swap="morph:innerHTML"
       hx-trigger="keyup changed delay:300ms from:#search-input, submit"
       hx-indicator="#search-spinner"
       hx-sync="this:replace">
