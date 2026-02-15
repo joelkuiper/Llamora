@@ -440,7 +440,7 @@ class EntriesRepository(BaseRepository):
             )
 
             async def _execute_update():
-                await conn.execute(
+                cursor = await conn.execute(
                     """
                     UPDATE entries
                     SET nonce = ?,
@@ -452,6 +452,7 @@ class EntriesRepository(BaseRepository):
                         flags = ?,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE id = ? AND user_id = ?
+                    RETURNING updated_at
                     """,
                     (
                         nonce,
@@ -465,13 +466,16 @@ class EntriesRepository(BaseRepository):
                         user_id,
                     ),
                 )
+                updated_row = await cursor.fetchone()
+                await cursor.close()
+                return updated_row
 
-            await self._run_in_transaction(conn, _execute_update)
+            updated_row = await self._run_in_transaction(conn, _execute_update)
 
         entry_record = {
             "id": entry_id,
             "created_at": row["created_at"],
-            "updated_at": row["updated_at"] if "updated_at" in row.keys() else None,
+            "updated_at": updated_row["updated_at"] if updated_row else None,
             "created_date": row["created_date"],
             "role": row["role"],
             "reply_to": row["reply_to"],

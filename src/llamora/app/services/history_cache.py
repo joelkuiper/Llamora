@@ -20,9 +20,6 @@ if TYPE_CHECKING:
     from llamora.app.db.entries import EntriesRepository
 
 
-HistoryCacheBackend = MutableMapping[CacheKey, object]
-
-
 @dataclass(slots=True)
 class HistoryCacheEvent:
     name: str
@@ -33,6 +30,17 @@ class HistoryCacheEvent:
 HistoryCacheListener = Callable[[HistoryCacheEvent], None]
 
 FrozenHistory = tuple[Mapping[str, Any], ...]
+
+
+@dataclass(slots=True, frozen=True)
+class HistoryCacheEntry:
+    history: FrozenHistory | object
+    revision: int
+
+
+HistoryCacheBackend = MutableMapping[CacheKey, HistoryCacheEntry]
+
+
 _INVALID_HISTORY_SENTINEL = object()
 
 
@@ -99,12 +107,14 @@ class HistoryCache:
         key = (user_id, created_date)
         async with self._lock:
             cached = self._backend.get(key)
-        if cached is None or cached is _INVALID_HISTORY_SENTINEL:
+        if cached is None or cached.history is _INVALID_HISTORY_SENTINEL:
             self._notify("miss", key)
             return None
-        frozen = cast(FrozenHistory, cached)
+        frozen = cast(FrozenHistory, cached.history)
         history = _thaw_history(frozen)
-        self._notify("hit", key, payload=history)
+        self._notify(
+            "hit", key, payload={"history": history, "revision": cached.revision}
+        )
         return history
 
     async def store(
@@ -112,24 +122,59 @@ class HistoryCache:
         user_id: str,
         created_date: str,
         history: Sequence[Mapping[str, Any] | dict[str, Any]],
+        *,
+        revision: int | None = None,
     ) -> None:
         key = (user_id, created_date)
         frozen = _freeze_history(history)
         async with self._lock:
-            self._backend[key] = frozen
-        self._notify("store", key, payload=_thaw_history(frozen))
+            current = self._backend.get(key)
+            if revision is not None and current and revision < current.revision:
+                self._notify(
+                    "store-rejected",
+                    key,
+                    payload={
+                        "revision": revision,
+                        "current_revision": current.revision,
+                    },
+                )
+                return
+            if revision is not None:
+                next_revision = max(revision, current.revision if current else 0)
+            else:
+                next_revision = current.revision if current else 0
+            self._backend[key] = HistoryCacheEntry(
+                history=frozen, revision=next_revision
+            )
+        self._notify(
+            "store",
+            key,
+            payload={"history": _thaw_history(frozen), "revision": next_revision},
+        )
 
     async def append(
-        self, user_id: str, created_date: str, entry: Mapping[str, Any]
+        self,
+        user_id: str,
+        created_date: str,
+        entry: Mapping[str, Any],
+        *,
+        revision: int | None = None,
     ) -> None:
         key = (user_id, created_date)
         while True:
             async with self._lock:
                 cached = self._backend.get(key)
-            if cached is None or cached is _INVALID_HISTORY_SENTINEL:
-                self._notify("append-skip", key)
+            if cached is None or cached.history is _INVALID_HISTORY_SENTINEL:
+                self._notify("append-skip", key, payload={"revision": revision})
                 return
-            frozen = cast(FrozenHistory, cached)
+            if revision is not None and revision < cached.revision:
+                self._notify(
+                    "append-rejected",
+                    key,
+                    payload={"revision": revision, "current_revision": cached.revision},
+                )
+                return
+            frozen = cast(FrozenHistory, cached.history)
             history = _thaw_history(frozen)
             new_entry = dict(entry)
             new_entry["tags"] = list(new_entry.get("tags", []))
@@ -154,15 +199,46 @@ class HistoryCache:
             async with self._lock:
                 current = self._backend.get(key)
                 if current is cached:
-                    self._backend[key] = updated
-                    self._notify("append", key, payload=dict(entry))
+                    next_revision = (
+                        revision if revision is not None else current.revision + 1
+                    )
+                    self._backend[key] = HistoryCacheEntry(
+                        history=updated, revision=next_revision
+                    )
+                    self._notify(
+                        "append",
+                        key,
+                        payload={"entry": dict(entry), "revision": next_revision},
+                    )
                     return
 
-    async def invalidate(self, user_id: str, created_date: str) -> None:
+    async def invalidate(
+        self,
+        user_id: str,
+        created_date: str,
+        *,
+        revision: int | None = None,
+    ) -> None:
         key = (user_id, created_date)
         async with self._lock:
-            self._backend[key] = _INVALID_HISTORY_SENTINEL
-        self._notify("invalidate", key)
+            current = self._backend.get(key)
+            current_revision = current.revision if current else 0
+            if revision is not None and revision < current_revision:
+                self._notify(
+                    "invalidate-rejected",
+                    key,
+                    payload={
+                        "revision": revision,
+                        "current_revision": current_revision,
+                    },
+                )
+                return
+            next_revision = revision if revision is not None else current_revision + 1
+            self._backend[key] = HistoryCacheEntry(
+                history=_INVALID_HISTORY_SENTINEL,
+                revision=next_revision,
+            )
+        self._notify("invalidate", key, payload={"revision": next_revision})
 
     def _notify(self, name: str, key: CacheKey, *, payload: Any = None) -> None:
         if not self._listeners:
@@ -202,15 +278,16 @@ class HistoryCacheSynchronizer:
         user_id: str,
         created_date: str,
         reason: str,
+        revision: int,
         entry_id: str | None = None,
         entry: Mapping[str, Any] | None = None,
     ) -> None:
         if not self._cache:
             return
         if reason == "insert" and entry is not None:
-            await self._cache.append(user_id, created_date, entry)
+            await self._cache.append(user_id, created_date, entry, revision=revision)
             return
-        await self._cache.invalidate(user_id, created_date)
+        await self._cache.invalidate(user_id, created_date, revision=revision)
 
 
 __all__ = [
@@ -218,6 +295,7 @@ __all__ = [
     "HistoryCacheEvent",
     "HistoryCacheListener",
     "FrozenHistory",
+    "HistoryCacheEntry",
     "HistoryCacheSynchronizer",
     "default_backend_factory",
 ]
