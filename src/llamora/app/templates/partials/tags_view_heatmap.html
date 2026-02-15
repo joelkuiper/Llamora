@@ -4,8 +4,7 @@
 <div class="tags-view__heatmap"
      hx-get="{{ url_for('tags.tags_view_heatmap', date=day) }}?tag_hash={{ heatmap_tag_hash }}&heatmap_offset={{ heatmap_offset }}"
      hx-trigger="entries:changed from:body"
-     hx-select=".tags-view__heatmap > *"
-     hx-swap="morph:innerHTML">
+     hx-swap="outerHTML">
   <div class="tags-view__heatmap-header">
     <span class="tags-view__heatmap-title">Trace</span>
     <div class="tags-view__heatmap-controls" role="group" aria-label="Heatmap paging">
@@ -14,7 +13,7 @@
               aria-label="Previous months"
               hx-get="{{ url_for('tags.tags_view_heatmap', date=day) }}?tag_hash={{ heatmap_tag_hash }}&heatmap_offset={{ heatmap_offset + 1 }}"
               hx-target="closest .tags-view__heatmap"
-              hx-swap="morph:innerHTML swap:160ms settle:160ms">
+              hx-swap="outerHTML swap:160ms settle:160ms">
         <span class="icon-mask icon-circle-arrow-left" aria-hidden="true"></span>
       </button>
       <button type="button"
@@ -23,12 +22,12 @@
               {% if not safe_has_next %}disabled aria-disabled="true"{% endif %}
               hx-get="{{ url_for('tags.tags_view_heatmap', date=day) }}?tag_hash={{ heatmap_tag_hash }}&heatmap_offset={{ heatmap_offset - 1 if heatmap_offset > 0 else 0 }}"
               hx-target="closest .tags-view__heatmap"
-              hx-swap="morph:innerHTML swap:160ms settle:160ms">
+              hx-swap="outerHTML swap:160ms settle:160ms">
         <span class="icon-mask icon-circle-arrow-right" aria-hidden="true"></span>
       </button>
     </div>
   </div>
-  <div class="tags-view__heatmap-body" hx-disinherit="hx-select">
+  <div class="tags-view__heatmap-body">
     {% if activity_heatmap %}
       {% include 'partials/activity_heatmap.html' %}
     {% else %}
