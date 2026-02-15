@@ -80,7 +80,7 @@ export function clearAllStores() {
       const toRemove = [];
       for (let i = 0; i < backend.length; i++) {
         const k = backend.key(i);
-        if (k?.startsWith("llamora:")) {
+        if (k?.startsWith("llamora:") || k === "htmx-history-cache") {
           toRemove.push(k);
         }
       }

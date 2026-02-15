@@ -1,6 +1,7 @@
 import { getTimezone } from "./services/datetime.js";
 import { startButtonSpinner, stopButtonSpinner } from "./ui.js";
 import { runWhenDocumentReady } from "./utils/dom-ready.js";
+import { clearAllStores } from "./utils/storage.js";
 
 const FORM_SELECTOR = ".form-container form, .profile-modal form";
 
@@ -75,6 +76,12 @@ export function initForms(root = document) {
 }
 
 const onReady = () => {
+  // Auth pages (login, register, reset) are rendered outside the app shell.
+  // Clear cached stores so a previous user's data doesn't leak via htmx
+  // history cache or llamora session storage.
+  if (document.body?.dataset?.entry === "auth-forms") {
+    clearAllStores();
+  }
   initForms(document);
 };
 
