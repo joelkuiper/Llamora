@@ -98,32 +98,27 @@ export const cacheLoader = {
     const { namespace, key, digest, triggerEvent, kind, stripHtmx } = resolveConfig(el, overrides);
     if (!namespace || !key) return false;
     const requestKey = cacheKeyFor(namespace, key);
-    if (inflight.has(requestKey)) {
-      return inflight.get(requestKey);
+    let fetchPromise = inflight.get(requestKey);
+    if (!fetchPromise) {
+      fetchPromise = getValue(namespace, key);
+      inflight.set(requestKey, fetchPromise);
+      fetchPromise.finally(() => inflight.delete(requestKey));
     }
-    const task = (async () => {
-      const payload = await getValue(namespace, key);
-      const cached = extractCachedValue(payload, digest, kind);
-      if (cached) {
-        applyCached(el, cached, stripHtmx);
-        return true;
-      }
-      if (!triggerEvent) return false;
-      if (el.dataset?.cacheRequested === "1") return false;
-      el.dataset.cacheRequested = "1";
-      if (typeof htmx !== "undefined") {
-        window.setTimeout(() => {
-          htmx.trigger(el, triggerEvent);
-        }, 60);
-      }
-      return false;
-    })();
-    inflight.set(requestKey, task);
-    try {
-      return await task;
-    } finally {
-      inflight.delete(requestKey);
+    const payload = await fetchPromise;
+    const cached = extractCachedValue(payload, digest, kind);
+    if (cached) {
+      applyCached(el, cached, stripHtmx);
+      return true;
     }
+    if (!triggerEvent) return false;
+    if (el.dataset?.cacheRequested === "1") return false;
+    el.dataset.cacheRequested = "1";
+    if (typeof htmx !== "undefined") {
+      window.setTimeout(() => {
+        htmx.trigger(el, triggerEvent);
+      }, 60);
+    }
+    return false;
   },
 
   async capture(el, overrides = {}) {

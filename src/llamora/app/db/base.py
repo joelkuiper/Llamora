@@ -3,8 +3,17 @@ from __future__ import annotations
 from aiosqlitepool import SQLiteConnectionPool
 
 
-async def run_in_transaction(conn, func, *args, **kwargs):
-    """Execute the given coroutine within a transaction."""
+async def run_in_transaction(conn, func, *args, immediate=True, **kwargs):
+    """Execute the given coroutine within a transaction.
+
+    When *immediate* is True (the default), a ``BEGIN IMMEDIATE``
+    statement is issued so the write lock is acquired upfront rather
+    than on the first DML statement.  This prevents ``SQLITE_BUSY``
+    errors that arise when a deferred transaction tries to upgrade to a
+    write lock and another writer got there first.
+    """
+    if immediate and not conn.in_transaction:
+        await conn.execute("BEGIN IMMEDIATE")
     try:
         result = await func(*args, **kwargs)
         await conn.commit()
