@@ -169,6 +169,12 @@ class SecureCookieManager:
             if sid:
                 self.dek_store.pop(sid, None)
 
+    def invalidate_user_snapshot(self, uid: str) -> None:
+        """Remove all cached snapshots for *uid* so the next lookup hits the DB."""
+        to_remove = [k for k in self._user_snapshot_cache if k[0] == uid]
+        for k in to_remove:
+            self._user_snapshot_cache.pop(k, None)
+
     def _user_cache_key(self, uid: str) -> tuple[str, str]:
         if self.dek_storage == "session":
             sid = self.get_secure_cookie("sid")
@@ -288,6 +294,10 @@ def set_dek(response: Response, dek: bytes) -> None:
 
 def clear_session_dek() -> None:
     get_secure_cookie_manager().clear_session_dek()
+
+
+def invalidate_user_snapshot(uid: str) -> None:
+    get_secure_cookie_manager().invalidate_user_snapshot(uid)
 
 
 async def get_current_user() -> Mapping[str, Any] | None:

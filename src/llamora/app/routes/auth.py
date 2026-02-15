@@ -15,6 +15,7 @@ from typing import Any, Mapping
 from nacl import pwhash
 from cachetools import TTLCache
 from llamora.app.services.auth_helpers import (
+    invalidate_user_snapshot,
     login_required,
     sanitize_return_path,
 )
@@ -39,6 +40,14 @@ _login_failures: TTLCache = TTLCache(
     maxsize=int(settings.AUTH.login_failure_cache_size),
     ttl=int(settings.AUTH.login_lockout_ttl),
 )
+
+
+def _record_login_failure(cache_key: tuple[str, str]) -> int:
+    """Atomically increment and return the failure count for *cache_key*."""
+    current = _login_failures.get(cache_key, 0)
+    new_count = current + 1
+    _login_failures[cache_key] = new_count
+    return new_count
 
 
 PASSWORD_ERROR_MESSAGES: dict[PasswordValidationError, str] = {
@@ -309,7 +318,7 @@ async def login():
             username, password, max_user=max_user, max_pass=max_pass
         )
         if length_error:
-            _login_failures[cache_key] = attempts + 1
+            _record_login_failure(cache_key)
             return await _render_auth_error(
                 "login.html",
                 error="Invalid credentials",
@@ -360,7 +369,7 @@ async def login():
                     "Login verification failed for %s", username, exc_info=True
                 )
         current_app.logger.debug("Login failed for %s", username)
-        _login_failures[cache_key] = attempts + 1
+        _record_login_failure(cache_key)
         return await render_template(
             "login.html",
             error="Invalid credentials",
@@ -452,6 +461,7 @@ async def reset_password():
         await db.users.update_password_wrap(
             user["id"], password_hash, pw_salt, pw_nonce, pw_cipher
         )
+        invalidate_user_snapshot(user["id"])
         return redirect("/login")
 
     return await render_template("reset_password.html")
@@ -563,6 +573,7 @@ async def change_password():
     await get_services().db.users.update_password_wrap(
         user["id"], password_hash, pw_salt, pw_nonce, pw_cipher
     )
+    invalidate_user_snapshot(user["id"])
 
     return await _render_profile_tab(user, "security", pw_success=True)
 
