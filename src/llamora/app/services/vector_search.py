@@ -18,7 +18,14 @@ logger = logging.getLogger(__name__)
 class VectorSearchService:
     """Handles ANN index access and progressive warm-up for entry search."""
 
-    def __init__(self, db, config: SearchConfig, index_max_elements: int | None = None):
+    def __init__(
+        self,
+        db,
+        config: SearchConfig,
+        index_max_elements: int | None = None,
+        *,
+        service_pulse=None,
+    ):
         self._config = config
         max_elements = index_max_elements or config.limits.entry_index_max_elements
         allow_growth = bool(config.limits.entry_index_allow_growth)
@@ -26,6 +33,11 @@ class VectorSearchService:
             db,
             max_elements=max_elements,
             allow_growth=allow_growth,
+            global_memory_budget_bytes=int(
+                getattr(config, "embedding_global_memory_budget_bytes", 0)
+            )
+            or None,
+            service_pulse=service_pulse,
         )
 
     def _quality_satisfied(self, ids: List[str], cosines: List[float], k2: int) -> bool:

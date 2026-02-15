@@ -12,6 +12,7 @@ from ulid import ULID
 from llamora.app.embed.model import async_embed_texts
 from llamora.app.services.search_config import SearchConfig
 from llamora.app.services.search_pipeline import SearchPipelineComponents
+from llamora.app.services.service_pulse import ServicePulse
 from llamora.app.services.tag_service import TagService
 from llamora.app.services.vector_search import VectorSearchService
 
@@ -30,6 +31,18 @@ class SearchStreamSession:
     current_k2: int = 0
     exhausted: bool = False
     last_access: float = field(default_factory=time.monotonic)
+
+    def estimated_memory_bytes(self) -> int:
+        query_vec_bytes = int(getattr(self.query_vec, "nbytes", 0))
+        candidate_payload_bytes = 0
+        for entry_id, candidate in self.candidate_map.items():
+            candidate_payload_bytes += len(entry_id) + 96
+            candidate_payload_bytes += len(str(candidate.get("content", "")))
+        delivered_bytes = sum(len(entry_id) + 32 for entry_id in self.delivered_ids)
+        return query_vec_bytes + candidate_payload_bytes + delivered_bytes + 256
+
+    def priority_score(self) -> int:
+        return len(self.delivered_ids) + len(self.candidate_map) + self.current_k2
 
 
 @dataclass(slots=True)
@@ -56,6 +69,8 @@ class SearchStreamManager:
         stream_ttl: float,
         stream_max_sessions: int,
         tag_service: TagService,
+        stream_global_memory_budget_bytes: int,
+        service_pulse: ServicePulse | None = None,
     ) -> None:
         self._vector_search = vector_search
         self._components = pipeline_components
@@ -63,7 +78,52 @@ class SearchStreamManager:
         self._stream_ttl = stream_ttl
         self._stream_max_sessions = stream_max_sessions
         self._tag_service = tag_service
+        self._stream_global_memory_budget_bytes = max(
+            int(stream_global_memory_budget_bytes), 0
+        )
+        self._service_pulse = service_pulse
         self._sessions: dict[str, SearchStreamSession] = {}
+
+    def _emit_budget_pressure(self, *, evicted: int, total_bytes: int) -> None:
+        if self._service_pulse is None:
+            return
+        budget = self._stream_global_memory_budget_bytes
+        pressure = (total_bytes / budget) if budget > 0 else 0.0
+        payload = {
+            "budget_bytes": budget,
+            "total_bytes": total_bytes,
+            "pressure": pressure,
+            "evicted_sessions": evicted,
+            "active_sessions": len(self._sessions),
+        }
+        try:
+            self._service_pulse.emit("search.stream_budget", payload)
+        except Exception:  # pragma: no cover - defensive
+            logger.exception("Failed to emit stream budget pulse")
+
+    def _estimated_total_memory_bytes(self) -> int:
+        return sum(
+            session.estimated_memory_bytes() for session in self._sessions.values()
+        )
+
+    def _enforce_memory_budget(self) -> None:
+        budget = self._stream_global_memory_budget_bytes
+        if budget <= 0 or not self._sessions:
+            return
+        total_bytes = self._estimated_total_memory_bytes()
+        evicted = 0
+        if total_bytes > budget:
+            ordered = sorted(
+                self._sessions.values(),
+                key=lambda session: (session.priority_score(), session.last_access),
+            )
+            for session in ordered:
+                if total_bytes <= budget:
+                    break
+                total_bytes = max(total_bytes - session.estimated_memory_bytes(), 0)
+                self._sessions.pop(session.session_id, None)
+                evicted += 1
+        self._emit_budget_pressure(evicted=evicted, total_bytes=total_bytes)
 
     def _prune(self) -> None:
         if not self._sessions:
@@ -76,6 +136,7 @@ class SearchStreamManager:
         ]
         for sid in stale:
             self._sessions.pop(sid, None)
+        self._enforce_memory_budget()
         if len(self._sessions) <= self._stream_max_sessions:
             return
         ordered = sorted(self._sessions.values(), key=lambda s: s.last_access)

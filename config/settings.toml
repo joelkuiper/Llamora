@@ -42,6 +42,7 @@ initial_page_size = 15
 result_window = 100
 stream_ttl = 900
 stream_max_sessions = 200
+stream_global_memory_budget_bytes = "32MiB"
 
 [default.SEARCH.progressive]
 k1 = 128
@@ -80,6 +81,7 @@ allow_enroll_existing = false
 [default.EMBEDDING]
 model = "BAAI/bge-small-en-v1.5"
 concurrency = 0
+global_memory_budget_bytes = "256MiB"
 
 [default.EMBEDDING.chunking]
 max_chars = 1200

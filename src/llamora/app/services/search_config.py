@@ -44,6 +44,8 @@ class SearchConfig:
 
     progressive: ProgressiveSearchConfig
     limits: SearchLimits
+    embedding_global_memory_budget_bytes: int
+    stream_global_memory_budget_bytes: int
 
     @classmethod
     def from_settings(cls, settings: Any) -> "SearchConfig":
@@ -69,7 +71,16 @@ class SearchConfig:
             poor_match_max_cos=float(progressive_settings.poor_match_max_cos),
             poor_match_min_hits=int(progressive_settings.poor_match_min_hits),
         )
-        return cls(progressive=progressive, limits=limits)
+        return cls(
+            progressive=progressive,
+            limits=limits,
+            embedding_global_memory_budget_bytes=int(
+                getattr(settings.EMBEDDING, "global_memory_budget_bytes", 0)
+            ),
+            stream_global_memory_budget_bytes=int(
+                getattr(search_settings, "stream_global_memory_budget_bytes", 0)
+            ),
+        )
 
     def as_dict(self) -> dict[str, Any]:
         """Return the full configuration as a dictionary."""
@@ -77,6 +88,8 @@ class SearchConfig:
         return {
             "progressive": self.progressive.as_dict(),
             "limits": self.limits.as_dict(),
+            "embedding_global_memory_budget_bytes": self.embedding_global_memory_budget_bytes,
+            "stream_global_memory_budget_bytes": self.stream_global_memory_budget_bytes,
         }
 
 

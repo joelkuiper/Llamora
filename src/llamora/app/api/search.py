@@ -88,6 +88,10 @@ class SearchAPI:
                 getattr(settings.SEARCH, "stream_max_sessions", 200)
             ),
             tag_service=self._tag_service,
+            stream_global_memory_budget_bytes=int(
+                getattr(settings.SEARCH, "stream_global_memory_budget_bytes", 0)
+            ),
+            service_pulse=self._service_pulse,
         )
 
         self._emit_config_diagnostics()

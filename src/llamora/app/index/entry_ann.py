@@ -50,7 +50,30 @@ class EntryIndex:
         self._free_set: set[int] = set()
         self.next_idx = 0
         self.last_used = time.monotonic()
+        self.dim = dim
         self.max_elements = max_elements
+
+    def estimated_memory_bytes(self) -> int:
+        vector_count = len(self.id_to_idx)
+        base_vectors = vector_count * self.dim * np.dtype(np.float32).itemsize
+        graph_overhead = vector_count * 128
+        id_bytes = sum(len(vector_id) for vector_id in self.id_to_idx)
+        reverse_id_bytes = sum(len(vector_id) for vector_id in self.idx_to_id.values())
+        mapping_overhead = (len(self.id_to_idx) + len(self.idx_to_id)) * 72
+        entry_map_bytes = 0
+        for entry_id, vector_ids in self.entry_to_ids.items():
+            entry_map_bytes += len(entry_id) + 64
+            entry_map_bytes += sum(len(vector_id) + 16 for vector_id in vector_ids)
+        free_list_bytes = len(self._free_idxs) * 8 + len(self._free_set) * 16
+        return (
+            base_vectors
+            + graph_overhead
+            + id_bytes
+            + reverse_id_bytes
+            + mapping_overhead
+            + entry_map_bytes
+            + free_list_bytes
+        )
 
     def touch(self) -> None:
         self.last_used = time.monotonic()
@@ -234,6 +257,8 @@ class EntryIndexStore:
         allow_growth: bool = False,
         chunk_max_chars: int | None = None,
         chunk_overlap_chars: int | None = None,
+        global_memory_budget_bytes: int | None = None,
+        service_pulse=None,
     ):
         self.db = db
         self.ttl = ttl
@@ -272,6 +297,53 @@ class EntryIndexStore:
         self._default_dim: Optional[int] = None
         self._default_dim_lock = asyncio.Lock()
         self._warm_tasks: Dict[str, asyncio.Task] = {}
+        budget = (
+            global_memory_budget_bytes
+            if global_memory_budget_bytes is not None
+            else embedding_cfg.get("global_memory_budget_bytes", 256 * 1024 * 1024)
+        )
+        self._global_memory_budget_bytes = max(int(budget), 0)
+        self._service_pulse = service_pulse
+
+    def _estimate_total_memory_bytes(self) -> int:
+        return sum(index.estimated_memory_bytes() for index in self.indexes.values())
+
+    def _emit_budget_pressure(self, *, evicted: int, total_bytes: int) -> None:
+        if self._service_pulse is None:
+            return
+        budget = self._global_memory_budget_bytes
+        pressure = (total_bytes / budget) if budget > 0 else 0.0
+        payload = {
+            "budget_bytes": budget,
+            "total_bytes": total_bytes,
+            "pressure": pressure,
+            "evicted_indexes": evicted,
+            "active_indexes": len(self.indexes),
+        }
+        try:
+            self._service_pulse.emit("search.entry_index_budget", payload)
+        except Exception:  # pragma: no cover - defensive
+            logger.exception("Failed to emit entry index budget pulse")
+
+    def _enforce_global_budget(self) -> None:
+        budget = self._global_memory_budget_bytes
+        if budget <= 0 or not self.indexes:
+            return
+        total_bytes = self._estimate_total_memory_bytes()
+        evicted = 0
+        if total_bytes > budget:
+            ordered = sorted(self.indexes.items(), key=lambda item: item[1].last_used)
+            for user_id, index in ordered:
+                if total_bytes <= budget:
+                    break
+                reclaimed = index.estimated_memory_bytes()
+                self.indexes.pop(user_id, None)
+                self.cursors.pop(user_id, None)
+                self.locks.pop(user_id, None)
+                self._warm_tasks.pop(user_id, None)
+                total_bytes = max(total_bytes - reclaimed, 0)
+                evicted += 1
+        self._emit_budget_pressure(evicted=evicted, total_bytes=total_bytes)
 
     def _to_storage_vecs(self, vecs: np.ndarray) -> np.ndarray:
         if self._vector_np_dtype == np.float32:
@@ -633,6 +705,7 @@ class EntryIndexStore:
             return
         self._next_maintenance = now + self.maintenance_interval
         self._evict_idle()
+        self._enforce_global_budget()
 
     async def remove_entries(self, user_id: str, entry_ids: Iterable[str]) -> None:
         ids = [entry_id for entry_id in entry_ids if entry_id]

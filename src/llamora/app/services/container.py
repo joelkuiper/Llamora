@@ -44,7 +44,11 @@ class AppServices:
         db = LocalDB()
         service_pulse = ServicePulse()
         search_config = SearchConfig.from_settings(settings)
-        vector_search = VectorSearchService(db, search_config)
+        vector_search = VectorSearchService(
+            db,
+            search_config,
+            service_pulse=service_pulse,
+        )
         lexical_reranker = LexicalReranker()
         tag_service = TagService(db)
         search_api = SearchAPI(

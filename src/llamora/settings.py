@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import base64
 import binascii
 import secrets
@@ -84,6 +85,7 @@ DEFAULTS: dict[str, Any] = {
         "recent_suggestion_limit": 8,
         "entry_index_max_elements": 100_000,
         "entry_index_allow_growth": False,
+        "stream_global_memory_budget_bytes": 32 * 1024 * 1024,
         "progressive": {
             "k1": 128,
             "k2": 10,
@@ -123,6 +125,7 @@ DEFAULTS: dict[str, Any] = {
     "EMBEDDING": {
         "model": "BAAI/bge-small-en-v1.5",
         "concurrency": _cpu_count(),
+        "global_memory_budget_bytes": 256 * 1024 * 1024,
         "chunking": {
             "max_chars": 1200,
             "overlap_chars": 200,
@@ -254,6 +257,61 @@ def _normalise_mapping_keys(data: dict[str, Any]) -> dict[str, Any]:
     return normalised
 
 
+_BYTE_SIZE_UNITS: dict[str, int] = {
+    "b": 1,
+    "kb": 1000,
+    "mb": 1000**2,
+    "gb": 1000**3,
+    "tb": 1000**4,
+    "kib": 1024,
+    "mib": 1024**2,
+    "gib": 1024**3,
+    "tib": 1024**4,
+}
+
+
+def _parse_byte_size(value: Any, *, default: int) -> int:
+    if value is None:
+        return default
+    if isinstance(value, (int, float)):
+        return max(int(value), 0)
+
+    raw = str(value).strip()
+    if not raw:
+        return default
+
+    if raw.isdigit():
+        return max(int(raw), 0)
+
+    match = re.fullmatch(r"(?i)\s*(\d+(?:\.\d+)?)\s*([kmgt]i?b)\s*", raw)
+    if not match:
+        return default
+
+    amount = float(match.group(1))
+    unit = match.group(2).lower()
+    multiplier = _BYTE_SIZE_UNITS.get(unit)
+    if multiplier is None:
+        return default
+    return max(int(amount * multiplier), 0)
+
+
+def _normalise_byte_budgets() -> None:
+    search_default = int(DEFAULTS["SEARCH"]["stream_global_memory_budget_bytes"])
+    embedding_default = int(DEFAULTS["EMBEDDING"]["global_memory_budget_bytes"])
+
+    stream_budget = _parse_byte_size(
+        settings.get("SEARCH.stream_global_memory_budget_bytes"),
+        default=search_default,
+    )
+    embedding_budget = _parse_byte_size(
+        settings.get("EMBEDDING.global_memory_budget_bytes"),
+        default=embedding_default,
+    )
+
+    settings.set("SEARCH.stream_global_memory_budget_bytes", stream_budget)
+    settings.set("EMBEDDING.global_memory_budget_bytes", embedding_budget)
+
+
 def _normalise_secret_key() -> None:
     secret = settings.get("SECRET_KEY")
     if secret:
@@ -286,6 +344,7 @@ def _normalise_cookie_secret() -> None:
 
 _normalise_secret_key()
 _normalise_cookie_secret()
+_normalise_byte_budgets()
 
 
 generation_overrides = _normalise_mapping_keys(
