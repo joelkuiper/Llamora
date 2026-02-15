@@ -9,8 +9,6 @@ from typing import TYPE_CHECKING, Any, cast
 
 from cachetools import TTLCache
 
-from llamora.app.db.events import ENTRY_HISTORY_CHANGED_EVENT
-
 logger = getLogger(__name__)
 
 CacheKey = tuple[str, str]
@@ -271,6 +269,8 @@ class HistoryCacheSynchronizer:
         self._lockbox = lockbox
         if not self._events:
             return
+        from llamora.app.db.events import ENTRY_HISTORY_CHANGED_EVENT
+
         self._events.subscribe(
             ENTRY_HISTORY_CHANGED_EVENT, self._handle_history_changed
         )
