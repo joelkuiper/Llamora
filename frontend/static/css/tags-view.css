@@ -944,35 +944,33 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.3rem;
-  opacity: 0.62;
-  transition: opacity 180ms ease;
 }
 
-.tags-view__entry-tags.entry-tags:hover,
-.tags-view__entry-tags.entry-tags:focus-within {
-  opacity: 1;
-}
-
-.tags-view__entry-tags .entry-tag {
+.tags-view__related .entry-tag,
+.tags-view__detail .entry-tags .entry-tag {
   font-size: 0.72rem;
-  opacity: 0.66;
-  border-color: color-mix(in srgb, var(--border) 62%, transparent);
-  background: color-mix(in srgb, var(--glass-bg-alt) 86%, transparent);
+  opacity: 0.68;
+  border-color: color-mix(in srgb, var(--border) 66%, transparent);
+  background: color-mix(in srgb, var(--glass-bg-alt) 84%, transparent);
   transition:
-    opacity 180ms ease,
-    border-color 180ms ease,
-    background-color 180ms ease,
-    box-shadow 180ms ease;
+    opacity var(--motion-hover) ease,
+    border-color var(--motion-hover) ease,
+    background-color var(--motion-hover) ease,
+    box-shadow var(--motion-hover) ease,
+    color var(--motion-hover) ease;
 }
 
-.tags-view__entry-tags .entry-tag:hover,
-.tags-view__entry-tags .entry-tag:focus-visible {
+.tags-view__related .entry-tag:hover,
+.tags-view__related .entry-tag:focus-visible,
+.tags-view__detail .entry-tags .entry-tag:hover,
+.tags-view__detail .entry-tags .entry-tag:focus-visible {
   opacity: 1;
   border-color: color-mix(in srgb, var(--accent-20) 44%, var(--border));
+  background: color-mix(in srgb, var(--accent-05) 52%, var(--glass-bg-alt));
   box-shadow:
     var(--inset-shadow),
     0 0 0 1px color-mix(in srgb, var(--accent-10) 50%, transparent);
-  background: color-mix(in srgb, var(--accent-05) 52%, var(--glass-bg-alt));
+  outline: none;
 }
 
 .tags-view__entry-actions {

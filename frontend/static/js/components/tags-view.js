@@ -912,13 +912,7 @@ const applySearch = (rawQuery) => {
   if (!state.rows.length) return;
   const beforePositions = captureRowPositions(state.rows);
   if (listBody && query !== previousQuery) {
-    window.requestAnimationFrame(() => {
-      if (!listBody.isConnected) return;
-      listBody.scrollTo({
-        top: 0,
-        behavior: query ? "smooth" : "auto",
-      });
-    });
+    listBody.scrollTop = 0;
   }
 
   if (!query) {
