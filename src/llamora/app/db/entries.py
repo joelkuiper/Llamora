@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from datetime import date as _date_type
-from typing import Awaitable, Callable
+from typing import Awaitable, Callable, Iterable, Mapping
 
 import orjson
 from aiosqlitepool import SQLiteConnectionPool
@@ -18,6 +19,43 @@ from .events import RepositoryEventBus, ENTRY_HISTORY_CHANGED_EVENT
 from .utils import cached_tag_name, get_month_bounds
 
 EntryAppendedCallback = Callable[[str, str, str, bytes], Awaitable[None]]
+
+_FLAG_PATTERN = re.compile(r"^[a-z0-9_]+$")
+_AUTO_OPENING_FLAG = "auto_opening"
+
+
+def parse_entry_flags(value: str | None) -> set[str]:
+    if not value:
+        return set()
+    return {part for part in value.strip("|").split("|") if part}
+
+
+def normalize_entry_flags(flags: Iterable[str]) -> str:
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for raw in flags:
+        text = str(raw or "").strip().lower()
+        if not text:
+            continue
+        if not _FLAG_PATTERN.fullmatch(text):
+            continue
+        if text in seen:
+            continue
+        seen.add(text)
+        cleaned.append(text)
+    if not cleaned:
+        return ""
+    cleaned.sort()
+    return f"|{'|'.join(cleaned)}|"
+
+
+def build_entry_flags_from_meta(
+    meta: Mapping[str, object] | None, existing: Iterable[str] | None = None
+) -> str:
+    flags: set[str] = set(existing or [])
+    if meta and meta.get("auto_opening"):
+        flags.add(_AUTO_OPENING_FLAG)
+    return normalize_entry_flags(flags)
 
 
 class EntriesRepository(BaseRepository):
@@ -182,6 +220,7 @@ class EntriesRepository(BaseRepository):
             count_message_tokens, role, record.get("text", "")
         )
         digest = entry_digest(dek, entry_id, role, record.get("text", ""))
+        flags = build_entry_flags_from_meta(record.get("meta", {}))
 
         async with self.pool.connection() as conn:
             columns = [
@@ -194,6 +233,7 @@ class EntriesRepository(BaseRepository):
                 "alg",
                 "prompt_tokens",
                 "digest",
+                "flags",
             ]
             params: list = [
                 entry_id,
@@ -205,6 +245,7 @@ class EntriesRepository(BaseRepository):
                 alg,
                 prompt_tokens,
                 digest,
+                flags,
             ]
 
             if created_at:
@@ -351,7 +392,7 @@ class EntriesRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT id, role, reply_to, nonce, ciphertext, alg, created_at, updated_at, created_date
+                SELECT id, role, reply_to, nonce, ciphertext, alg, flags, created_at, updated_at, created_date
                 FROM entries
                 WHERE id = ? AND user_id = ?
                 """,
@@ -381,15 +422,24 @@ class EntriesRepository(BaseRepository):
                 count_message_tokens, row["role"], record.get("text", "")
             )
             digest = entry_digest(dek, entry_id, row["role"], record.get("text", ""))
+            flags = build_entry_flags_from_meta(
+                meta or {}, parse_entry_flags(row["flags"])
+            )
 
             async def _execute_update():
                 await conn.execute(
                     """
                     UPDATE entries
-                    SET nonce = ?, ciphertext = ?, alg = ?, prompt_tokens = ?, digest = ?, updated_at = CURRENT_TIMESTAMP
+                    SET nonce = ?,
+                        ciphertext = ?,
+                        alg = ?,
+                        prompt_tokens = ?,
+                        digest = ?,
+                        flags = ?,
+                        updated_at = CURRENT_TIMESTAMP
                     WHERE id = ? AND user_id = ?
                     """,
-                    (nonce, ct, alg, prompt_tokens, digest, entry_id, user_id),
+                    (nonce, ct, alg, prompt_tokens, digest, flags, entry_id, user_id),
                 )
 
             await self._run_in_transaction(conn, _execute_update)
@@ -616,17 +666,23 @@ class EntriesRepository(BaseRepository):
     ) -> tuple[list[int], list[int]]:
         month_start, next_month_start = get_month_bounds(year, month)
         active_days: set[int] = set()
-        non_opening_days: set[int] = set()
+        opening_only_days: set[int] = set()
+
+        opening_like = f"%|{_AUTO_OPENING_FLAG}|%"
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT id, created_date, nonce, ciphertext, alg
+                SELECT created_date AS created_date,
+                       COUNT(*) AS total_entries,
+                       SUM(CASE WHEN flags LIKE ? THEN 1 ELSE 0 END) AS opening_entries
                 FROM entries
                 WHERE user_id = ? AND created_date >= ? AND created_date < ?
+                GROUP BY created_date
                 """,
-                (user_id, month_start, next_month_start),
+                (opening_like, user_id, month_start, next_month_start),
             )
             rows = await cursor.fetchall()
+
         for row in rows:
             created_date = row["created_date"]
             if not created_date:
@@ -635,21 +691,15 @@ class EntriesRepository(BaseRepository):
                 day = _date_type.fromisoformat(created_date).day
             except (TypeError, ValueError):
                 continue
+            total = row["total_entries"] or 0
+            opening = row["opening_entries"] or 0
+            if total <= 0:
+                continue
             active_days.add(day)
-            record_json = self._decrypt_message(
-                dek,
-                user_id,
-                row["id"],
-                row["nonce"],
-                row["ciphertext"],
-                row["alg"],
-            )
-            rec = orjson.loads(record_json)
-            meta = rec.get("meta", {}) or {}
-            if not meta.get("auto_opening"):
-                non_opening_days.add(day)
-        opening_only_days = sorted(active_days - non_opening_days)
-        return sorted(active_days), opening_only_days
+            if opening == total:
+                opening_only_days.add(day)
+
+        return sorted(active_days), sorted(opening_only_days)
 
     async def get_day_summary_digests(
         self, user_id: str, year: int, month: int
