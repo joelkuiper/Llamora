@@ -47,6 +47,7 @@
     grid-row: 1;
     gap: var(--spacing-xs);
     position: relative;
+    margin-left: calc(var(--spacing-sm) * -1);
   }
 
   #branding .branding-link {
@@ -161,7 +162,7 @@
 }
 
 .view-mode-toggle {
-  margin-left: var(--spacing-xxs);
+  margin-left: 0;
   margin-top: 2px;
   position: relative;
 }
