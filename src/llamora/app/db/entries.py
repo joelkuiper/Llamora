@@ -15,7 +15,7 @@ from llamora.app.services.crypto import entry_digest
 
 from .base import BaseRepository
 from .events import RepositoryEventBus, ENTRY_HISTORY_CHANGED_EVENT
-from .utils import cached_tag_name
+from .utils import cached_tag_name, get_month_bounds
 
 EntryAppendedCallback = Callable[[str, str, str, bytes], Awaitable[None]]
 
@@ -614,7 +614,7 @@ class EntriesRepository(BaseRepository):
     async def get_days_with_entries(
         self, user_id: str, year: int, month: int, dek: bytes
     ) -> tuple[list[int], list[int]]:
-        month_prefix = f"{year:04d}-{month:02d}"
+        month_start, next_month_start = get_month_bounds(year, month)
         active_days: set[int] = set()
         non_opening_days: set[int] = set()
         async with self.pool.connection() as conn:
@@ -622,9 +622,9 @@ class EntriesRepository(BaseRepository):
                 """
                 SELECT id, created_date, nonce, ciphertext, alg
                 FROM entries
-                WHERE user_id = ? AND substr(created_date, 1, 7) = ?
+                WHERE user_id = ? AND created_date >= ? AND created_date < ?
                 """,
-                (user_id, month_prefix),
+                (user_id, month_start, next_month_start),
             )
             rows = await cursor.fetchall()
         for row in rows:
@@ -656,15 +656,15 @@ class EntriesRepository(BaseRepository):
     ) -> dict[int, str]:
         import hashlib
 
-        month_prefix = f"{year:04d}-{month:02d}"
+        month_start, next_month_start = get_month_bounds(year, month)
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
                 SELECT id, created_date, digest
                 FROM entries
-                WHERE user_id = ? AND substr(created_date, 1, 7) = ?
+                WHERE user_id = ? AND created_date >= ? AND created_date < ?
                 """,
-                (user_id, month_prefix),
+                (user_id, month_start, next_month_start),
             )
             rows = await cursor.fetchall()
         summary_digests: dict[int, str] = {}
