@@ -595,9 +595,9 @@
   margin: 0;
 }
 
-.tag-detail-summary {
+.summary-fade {
   margin: 0;
-  animation: tag-summary-fade-in 220ms ease;
+  animation: summary-fade-in 220ms ease;
 }
 
 .tag-detail__summary.htmx-request {
@@ -789,7 +789,7 @@
   opacity: 0.92;
 }
 
-@keyframes tag-summary-fade-in {
+@keyframes summary-fade-in {
   from {
     opacity: 0;
     transform: translateY(2px);

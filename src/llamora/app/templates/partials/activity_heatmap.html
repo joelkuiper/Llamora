@@ -23,7 +23,10 @@
                      hx-swap="outerHTML"
                      hx-push-url="true"
                      aria-label="{{ tooltip }}"
-                     data-tooltip-title="{{ tooltip }}"></a>
+                     data-heatmap-date="{{ cell.date }}"
+                     data-heatmap-count="{{ cell.count }}"
+                     data-heatmap-label="{{ tooltip }}"
+                     data-tooltip-disabled="true"></a>
                 {% else %}
                   <span class="activity-heatmap__cell is-empty" aria-hidden="true"></span>
                 {% endif %}

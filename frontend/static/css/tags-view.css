@@ -705,8 +705,8 @@
 }
 
 .activity-heatmap__cell.is-empty {
-  background: var(--heatmap-level-0);
-  opacity: 0.55;
+  background: color-mix(in srgb, var(--heatmap-level-0) 55%, transparent);
+  opacity: 0.35;
   pointer-events: none;
 }
 
@@ -729,6 +729,52 @@
     0 0 0 3px color-mix(in srgb, var(--heatmap-level-2) 30%, transparent);
 }
 
+.heatmap-day-tooltip .tag-detail-skeleton {
+  gap: 0.3rem;
+  margin: 0;
+  width: 100%;
+}
+
+.heatmap-day-tooltip .tag-detail-skeleton__line {
+  height: 0.55rem;
+  width: 100%;
+}
+
+.heatmap-day-tooltip .tag-detail-skeleton__line:nth-of-type(2) {
+  width: 95%;
+}
+
+.heatmap-day-tooltip .tag-detail-skeleton__line:nth-of-type(3) {
+  width: 90%;
+}
+
+.heatmap-day-tooltip .tag-detail-skeleton__line:nth-of-type(4) {
+  width: 85%;
+}
+
+.heatmap-day-tooltip {
+  max-width: 360px;
+  min-width: 320px;
+}
+
+.heatmap-day-tooltip__date {
+  font-size: 0.74rem;
+  color: color-mix(in srgb, var(--color-text-muted) 72%, transparent);
+  letter-spacing: 0.02em;
+  margin-bottom: 0.35rem;
+}
+
+.heatmap-day-tooltip__summary {
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--color-text) 92%, transparent);
+}
+
+.heatmap-day-tooltip__summary .summary-fade {
+  margin: 0;
+  animation: summary-fade-in 220ms ease;
+}
+
 .tags-view__summary {
   margin: 0 0.15rem 2.2rem;
   padding: 0.08rem 0;
@@ -745,7 +791,7 @@
   border-top: 1px solid color-mix(in srgb, var(--border) 52%, transparent);
 }
 
-.tags-view__summary .tag-detail-summary {
+.tags-view__summary .summary-fade {
   margin: 0;
   padding-top: 0.14rem;
   font-size: 0.95rem;

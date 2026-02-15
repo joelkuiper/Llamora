@@ -4,6 +4,7 @@ import { cacheLoader } from "../services/cache-loader.js";
 import { clearScrollTarget, flashHighlight } from "../ui.js";
 import { prefersReducedMotion } from "../utils/motion.js";
 import { sessionStore } from "../utils/storage.js";
+import { transitionHide, transitionShow } from "../utils/transition.js";
 import { Fuse as FuseCtor } from "../vendor/setup-globals.js";
 import { syncSummarySkeletons } from "../services/summary-skeleton.js";
 
@@ -25,6 +26,218 @@ const state = {
   pendingDetailScrollTop: false,
   pendingTagHighlight: "",
   listPositions: null,
+};
+
+const heatmapState = {
+  initialized: false,
+  tooltip: null,
+  dateEl: null,
+  summaryEl: null,
+  timer: null,
+  hideTimer: null,
+  activeCell: null,
+  activeDate: "",
+  requests: new Map(),
+  cache: new Map(),
+};
+
+const makeDaySummaryKey = (date) => `day:${String(date || "").trim()}`;
+
+const ensureHeatmapTooltip = () => {
+  if (heatmapState.tooltip?.isConnected) {
+    return heatmapState.tooltip;
+  }
+  const tooltip = document.createElement("div");
+  tooltip.className = "calendar-day-tooltip heatmap-day-tooltip";
+  tooltip.hidden = true;
+  tooltip.innerHTML =
+    '<div class="heatmap-day-tooltip__date"></div><div class="heatmap-day-tooltip__summary"></div>';
+  const dateEl = tooltip.querySelector(".heatmap-day-tooltip__date");
+  const summaryEl = tooltip.querySelector(".heatmap-day-tooltip__summary");
+  heatmapState.tooltip = tooltip;
+  heatmapState.dateEl = dateEl;
+  heatmapState.summaryEl = summaryEl;
+  document.body.appendChild(tooltip);
+  return tooltip;
+};
+
+const hideHeatmapTooltip = ({ immediate = false } = {}) => {
+  if (heatmapState.timer) {
+    clearTimeout(heatmapState.timer);
+    heatmapState.timer = null;
+  }
+  if (heatmapState.hideTimer) {
+    heatmapState.hideTimer();
+    heatmapState.hideTimer = null;
+  }
+  heatmapState.activeCell = null;
+  heatmapState.activeDate = "";
+  const tooltip = heatmapState.tooltip;
+  if (!tooltip) return;
+  if (immediate) {
+    tooltip.classList.remove("is-visible");
+    tooltip.hidden = true;
+    return;
+  }
+  heatmapState.hideTimer = transitionHide(tooltip, "is-visible", 160);
+};
+
+const positionHeatmapTooltip = (tooltip, cell) => {
+  if (!(tooltip instanceof HTMLElement) || !(cell instanceof HTMLElement)) return;
+  tooltip.hidden = false;
+  tooltip.style.visibility = "hidden";
+
+  const cellRect = cell.getBoundingClientRect();
+  const tipRect = tooltip.getBoundingClientRect();
+  const margin = 10;
+  const offset = 10;
+
+  let left = cellRect.left + cellRect.width / 2 - tipRect.width / 2;
+  left = Math.max(margin, Math.min(left, window.innerWidth - tipRect.width - margin));
+
+  let top = cellRect.top - tipRect.height - offset;
+  if (top < margin) {
+    top = cellRect.bottom + offset;
+  }
+  top = Math.max(margin, Math.min(top, window.innerHeight - tipRect.height - margin));
+
+  tooltip.style.left = `${Math.round(left)}px`;
+  tooltip.style.top = `${Math.round(top)}px`;
+  tooltip.style.visibility = "visible";
+  transitionShow(tooltip, "is-visible");
+};
+
+const fetchHeatmapSummary = async (date) => {
+  if (!date) return "";
+  if (heatmapState.cache.has(date)) {
+    return heatmapState.cache.get(date);
+  }
+  const cached = await cacheLoader.read({
+    namespace: "summary",
+    key: makeDaySummaryKey(date),
+    kind: "text",
+  });
+  if (cached) {
+    heatmapState.cache.set(date, cached);
+    return cached;
+  }
+  if (heatmapState.requests.has(date)) {
+    return heatmapState.requests.get(date);
+  }
+  const request = fetch(`/d/${date}/summary`, {
+    headers: { Accept: "application/json" },
+  })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      const summary = typeof data?.summary === "string" ? data.summary.trim() : "";
+      if (summary) {
+        heatmapState.cache.set(date, summary);
+        void cacheLoader.write({
+          namespace: "summary",
+          key: makeDaySummaryKey(date),
+          kind: "text",
+          value: summary,
+        });
+      }
+      heatmapState.requests.delete(date);
+      return summary;
+    })
+    .catch(() => {
+      heatmapState.requests.delete(date);
+      return "";
+    });
+  heatmapState.requests.set(date, request);
+  return request;
+};
+
+const scheduleHeatmapTooltip = (cell) => {
+  const date = String(cell?.dataset?.heatmapDate || "").trim();
+  if (!date) return;
+  if (heatmapState.timer) {
+    clearTimeout(heatmapState.timer);
+  }
+  heatmapState.activeCell = cell;
+  heatmapState.activeDate = date;
+  heatmapState.timer = window.setTimeout(async () => {
+    if (heatmapState.activeDate !== date) return;
+    const tooltip = ensureHeatmapTooltip();
+    const label = String(cell.dataset.heatmapLabel || "").trim();
+    if (heatmapState.dateEl) {
+      heatmapState.dateEl.textContent = label;
+    }
+    if (heatmapState.summaryEl) {
+      heatmapState.summaryEl.innerHTML =
+        '<div class="tag-detail-skeleton heatmap-summary-skeleton" aria-hidden="true">' +
+        '<span class="tag-detail-skeleton__line"></span>' +
+        '<span class="tag-detail-skeleton__line"></span>' +
+        '<span class="tag-detail-skeleton__line"></span>' +
+        '<span class="tag-detail-skeleton__line"></span>' +
+        "</div>";
+    }
+    positionHeatmapTooltip(tooltip, cell);
+
+    const summary = await fetchHeatmapSummary(date);
+    if (heatmapState.activeDate !== date) return;
+    if (heatmapState.summaryEl) {
+      const text = summary || "Summary unavailable right now.";
+      heatmapState.summaryEl.innerHTML = `<p class="summary-fade">${text}</p>`;
+    }
+    positionHeatmapTooltip(tooltip, cell);
+  }, 420);
+};
+
+const initHeatmapTooltip = () => {
+  if (heatmapState.initialized) return;
+  heatmapState.initialized = true;
+
+  document.addEventListener(
+    "pointerover",
+    (event) => {
+      const cell = event.target?.closest?.(".activity-heatmap__cell[data-heatmap-date]");
+      if (!(cell instanceof HTMLElement)) return;
+      if (event.relatedTarget instanceof Node && cell.contains(event.relatedTarget)) return;
+      scheduleHeatmapTooltip(cell);
+    },
+    true,
+  );
+
+  document.addEventListener(
+    "pointerout",
+    (event) => {
+      const cell = event.target?.closest?.(".activity-heatmap__cell[data-heatmap-date]");
+      if (!cell) return;
+      if (event.relatedTarget instanceof Node && cell.contains(event.relatedTarget)) return;
+      hideHeatmapTooltip();
+    },
+    true,
+  );
+
+  document.addEventListener(
+    "focusin",
+    (event) => {
+      const cell = event.target?.closest?.(".activity-heatmap__cell[data-heatmap-date]");
+      if (!(cell instanceof HTMLElement)) return;
+      scheduleHeatmapTooltip(cell);
+    },
+    true,
+  );
+
+  document.addEventListener(
+    "focusout",
+    (event) => {
+      const cell = event.target?.closest?.(".activity-heatmap__cell[data-heatmap-date]");
+      if (!cell) return;
+      hideHeatmapTooltip();
+    },
+    true,
+  );
+
+  document.addEventListener("scroll", hideHeatmapTooltip, true);
+  window.addEventListener("resize", hideHeatmapTooltip, { passive: true });
+  window.addEventListener("blur", hideHeatmapTooltip, { passive: true });
+  document.addEventListener("htmx:beforeRequest", hideHeatmapTooltip);
+  document.addEventListener("app:teardown", () => hideHeatmapTooltip({ immediate: true }));
+  document.addEventListener("app:rehydrate", () => hideHeatmapTooltip({ immediate: true }));
 };
 
 const readStoredSearchQuery = () => sessionStore.get("tags:query") ?? "";
@@ -1018,6 +1231,7 @@ const syncDetailOnly = (root = document) => {
 if (!globalThis[BOOT_KEY]) {
   globalThis[BOOT_KEY] = true;
   window.addEventListener("resize", updateHeaderHeight);
+  initHeatmapTooltip();
 
   document.addEventListener("click", (event) => {
     const target = event.target;
