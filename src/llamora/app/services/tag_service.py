@@ -131,6 +131,13 @@ class TagsViewData:
     sort_dir: TagsSortDirection
 
 
+@dataclass(slots=True)
+class _TagsIndexRequestCache:
+    rows: tuple[dict[str, Any], ...]
+    items: tuple[TagIndexItem, ...]
+    items_by_name: dict[str, TagIndexItem]
+
+
 class TagService:
     """Provide higher level helpers for tag canonicalisation and hydration."""
 
@@ -296,37 +303,23 @@ class TagService:
         related_tag_limit: int = 2,
     ) -> TagsViewData:
         """Return data for the two-column archival tags view."""
-        raw_tags = await self._db.tags.get_tags_index(user_id, dek)
-        index_items: list[TagIndexItem] = []
-        for row in raw_tags:
-            raw_name = str(row.get("name") or "").strip()
-            if not raw_name:
-                continue
-            try:
-                canonical = self.canonicalize(raw_name)
-            except ValueError:
-                continue
-            index_items.append(
-                TagIndexItem(
-                    name=self.display(canonical),
-                    hash=str(row.get("hash") or ""),
-                    count=int(row.get("count") or 0),
-                )
-            )
+        index_cache = await self._get_tags_index_request_cache(user_id, dek)
+        index_items = list(index_cache.items)
         index_items = self._sort_index_items(
             index_items,
             sort_kind=sort_kind,
             sort_dir=sort_dir,
         )
         selected_name = self.normalize_tag_query(selected_tag)
-        selected_index = (
-            next((item for item in index_items if item.name == selected_name), None)
-            if selected_name
-            else None
-        )
+        selected_index = None
+        if selected_name:
+            selected_index = index_cache.items_by_name.get(selected_name)
         if selected_name and not selected_index:
             selected_index = await self._resolve_index_item_by_name(
-                user_id, dek, selected_name
+                user_id,
+                dek,
+                selected_name,
+                index_cache=index_cache,
             )
             if selected_index and not any(
                 item.name == selected_index.name for item in index_items
@@ -365,11 +358,19 @@ class TagService:
         user_id: str,
         dek: bytes,
         tag_name: str,
+        *,
+        index_cache: _TagsIndexRequestCache | None = None,
     ) -> TagIndexItem | None:
         target = self.normalize_tag_query(tag_name)
         if not target:
             return None
-        raw_tags = await self._db.tags.get_tags_index(user_id, dek)
+        if index_cache is not None:
+            cached = index_cache.items_by_name.get(target)
+            if cached:
+                return cached
+            raw_tags = index_cache.rows
+        else:
+            raw_tags = await self._db.tags.get_tags_index(user_id, dek)
         for row in raw_tags:
             raw_name = str(row.get("name") or "").strip()
             if not raw_name:
@@ -386,6 +387,35 @@ class TagService:
                 count=int(row.get("count") or 0),
             )
         return None
+
+    async def _get_tags_index_request_cache(
+        self,
+        user_id: str,
+        dek: bytes,
+    ) -> _TagsIndexRequestCache:
+        rows = tuple(await self._db.tags.get_tags_index(user_id, dek))
+        items: list[TagIndexItem] = []
+        items_by_name: dict[str, TagIndexItem] = {}
+        for row in rows:
+            raw_name = str(row.get("name") or "").strip()
+            if not raw_name:
+                continue
+            try:
+                canonical = self.canonicalize(raw_name)
+            except ValueError:
+                continue
+            item = TagIndexItem(
+                name=self.display(canonical),
+                hash=str(row.get("hash") or ""),
+                count=int(row.get("count") or 0),
+            )
+            items.append(item)
+            items_by_name.setdefault(canonical, item)
+        return _TagsIndexRequestCache(
+            rows=rows,
+            items=tuple(items),
+            items_by_name=items_by_name,
+        )
 
     def _sort_index_items(
         self,
