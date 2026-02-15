@@ -4,7 +4,9 @@
 <div class="tags-view__heatmap"
      hx-get="{{ url_for('tags.tags_view_heatmap', date=day) }}?tag_hash={{ heatmap_tag_hash }}&heatmap_offset={{ heatmap_offset }}"
      hx-trigger="entries:changed from:body"
-     hx-swap="outerHTML">
+     hx-swap="outerHTML"
+     data-heatmap-tag="{{ heatmap_tag_hash }}"
+     data-heatmap-offset="{{ heatmap_offset }}">
   <div class="tags-view__heatmap-header">
     <span class="tags-view__heatmap-title">Trace</span>
     <div class="tags-view__heatmap-controls" role="group" aria-label="Heatmap paging">

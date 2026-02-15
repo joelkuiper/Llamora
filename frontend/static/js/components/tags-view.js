@@ -42,7 +42,103 @@ const heatmapState = {
   cache: new Map(),
 };
 
+const HEATMAP_STORAGE_KEY = "tags:heatmap";
+
 const makeDaySummaryKey = (date) => `day:${String(date || "").trim()}`;
+
+const readHeatmapOffsetMap = () => sessionStore.get(HEATMAP_STORAGE_KEY) ?? {};
+
+const writeHeatmapOffsetMap = (map) => {
+  sessionStore.set(HEATMAP_STORAGE_KEY, map);
+};
+
+const normalizeHeatmapOffset = (value) => {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+};
+
+const getHeatmapElement = (root = document) =>
+  root.querySelector?.(".tags-view__heatmap") || document.querySelector(".tags-view__heatmap");
+
+const getHeatmapTagHash = (heatmap) =>
+  String(heatmap?.dataset?.heatmapTag || "").trim();
+
+const getHeatmapOffset = (heatmap) => normalizeHeatmapOffset(heatmap?.dataset?.heatmapOffset);
+
+const storeHeatmapOffset = (tagHash, offset) => {
+  if (!tagHash || !Number.isFinite(offset)) return;
+  const map = readHeatmapOffsetMap();
+  map[tagHash] = {
+    offset,
+    updatedAt: Date.now(),
+  };
+  const entries = Object.entries(map);
+  if (entries.length > 60) {
+    entries
+      .sort((a, b) => Number(b[1]?.updatedAt || 0) - Number(a[1]?.updatedAt || 0))
+      .slice(60)
+      .forEach(([oldKey]) => {
+        delete map[oldKey];
+      });
+  }
+  writeHeatmapOffsetMap(map);
+};
+
+const findHeatmapInRoot = (root = document) => {
+  if (!(root instanceof Element)) {
+    return getHeatmapElement();
+  }
+  if (root.classList?.contains("tags-view__heatmap")) return root;
+  return root.querySelector?.(".tags-view__heatmap") || root.closest?.(".tags-view__heatmap");
+};
+
+const storeHeatmapOffsetFromElement = (heatmap) => {
+  if (!(heatmap instanceof HTMLElement)) return;
+  const tagHash = getHeatmapTagHash(heatmap);
+  const offset = getHeatmapOffset(heatmap);
+  if (!tagHash || offset == null) return;
+  storeHeatmapOffset(tagHash, offset);
+};
+
+const storeHeatmapOffsetFromRoot = (root = document) => {
+  const heatmap = findHeatmapInRoot(root);
+  if (heatmap instanceof HTMLElement) {
+    storeHeatmapOffsetFromElement(heatmap);
+  }
+};
+
+const readStoredHeatmapOffset = (tagHash) => {
+  if (!tagHash) return null;
+  const map = readHeatmapOffsetMap();
+  const value = map[tagHash];
+  if (!value || typeof value !== "object") return null;
+  return normalizeHeatmapOffset(value.offset);
+};
+
+const applyStoredHeatmapOffset = (root = document) => {
+  const heatmap = getHeatmapElement(root);
+  if (!(heatmap instanceof HTMLElement)) return;
+  const tagHash = getHeatmapTagHash(heatmap);
+  if (!tagHash) return;
+  const currentOffset = getHeatmapOffset(heatmap);
+  const storedOffset = readStoredHeatmapOffset(tagHash);
+  if (storedOffset == null || storedOffset === currentOffset) return;
+
+  const hxGet = heatmap.getAttribute("hx-get");
+  if (!hxGet) return;
+  let url;
+  try {
+    url = new URL(hxGet, window.location.origin);
+  } catch {
+    return;
+  }
+  url.searchParams.set("heatmap_offset", String(storedOffset));
+  htmx.ajax("GET", `${url.pathname}${url.search}`, {
+    source: heatmap,
+    target: heatmap,
+    swap: "outerHTML",
+  });
+};
 
 const ensureHeatmapTooltip = () => {
   if (heatmapState.tooltip?.isConnected) {
@@ -1176,6 +1272,7 @@ const sync = (root = document) => {
   clearSearchForTargetNavigation();
   applySearch(state.query);
   syncFromDetail(root);
+  applyStoredHeatmapOffset(root);
   animateDetailEntries(root);
   highlightRequestedTag(root);
   if (!hadTargetParam) {
@@ -1248,6 +1345,7 @@ const syncDetailOnly = (root = document) => {
   syncSummarySkeletons(root);
   buildSearchIndex(root);
   applySearch(state.query);
+  applyStoredHeatmapOffset(root);
   animateDetailEntries(root);
   highlightRequestedTag(root);
   void hydrateTagsViewSummary(root);
@@ -1434,6 +1532,7 @@ if (!globalThis[BOOT_KEY]) {
   document.body.addEventListener("htmx:afterSettle", (event) => {
     const target = event.detail?.target;
     if (!(target instanceof Element)) return;
+    storeHeatmapOffsetFromRoot(target);
     if (target.id === "tags-view-list" || target.closest?.("#tags-view-list")) {
       animateListReorder(() => {
         scrollActiveRowIntoView(document, "smooth");
@@ -1460,12 +1559,14 @@ if (!globalThis[BOOT_KEY]) {
       storeMainScrollTop();
       captureEntriesAnchor();
     }
+    storeHeatmapOffsetFromRoot();
   });
   window.addEventListener("pagehide", () => {
     if (!state.saveSuppressed) {
       storeMainScrollTop();
       captureEntriesAnchor();
     }
+    storeHeatmapOffsetFromRoot();
   });
 
   sync(document);
