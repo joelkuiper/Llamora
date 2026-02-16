@@ -199,6 +199,9 @@ def create_app():
     )
 
     CSRFProtect(app)
+    app.jinja_env.trim_blocks = True
+    app.jinja_env.lstrip_blocks = True
+    app.jinja_env.keep_trailing_newline = False
     app.jinja_env.auto_reload = debug_flag
     if debug_flag:
 

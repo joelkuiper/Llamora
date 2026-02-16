@@ -8,6 +8,6 @@
   {% endif %}
 </div>
 {% endif %}
-{% for item in entries or [] %}
+{% for item in entries or [] -%}
 {{ render_entry(item.entry, day, is_today, responses=item.responses, animate_entries=animate_entries) }}
-{% endfor %}
+{%- endfor %}

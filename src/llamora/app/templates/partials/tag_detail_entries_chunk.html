@@ -1,5 +1,5 @@
 {% set items = entries|default([]) %}
-{% for entry in items %}
+{% for entry in items -%}
   {% set item_date = entry.created_date or entry.created_at[:10] %}
   <a class="tag-detail__item tag-row"
      href="{{ url_for('days.day', date=item_date) }}?target=entry-{{ entry.entry_id }}"
@@ -17,7 +17,7 @@
     <span class="tag-detail__preview tag-row__preview">{{ entry.preview }}</span>
     <span class="tag-row__chevron icon-mask icon-chevron-right" aria-hidden="true"></span>
   </a>
-{% endfor %}
+{%- endfor %}
 {% if has_more and next_cursor %}
   <div class="load-more tag-detail-load"
        hx-get="{{ url_for('tags.tag_detail_entries', tag_hash=tag_hash) }}?cursor={{ next_cursor|urlencode }}&limit={{ page_size|default(12) }}"

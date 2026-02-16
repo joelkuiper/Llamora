@@ -6,9 +6,9 @@
        value="{{ session_id|default('') }}"
        hx-swap-oob="true">
 {% endif %}
-{% for item in items %}
+{% for item in items -%}
 {% include 'partials/search_result_item.html' %}
-{% endfor %}
+{%- endfor %}
 {% if has_more %}
 <li class="load-more"
     hx-get="{{ url_for('search.search') }}?cursor={{ session_id|default('') }}"
