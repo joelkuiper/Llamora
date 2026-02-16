@@ -11,7 +11,6 @@ export const state = {
   indexPending: false,
   listBuilt: false,
   indexSignature: "",
-  scrollElement: null,
   saveFrame: 0,
   restoreAppliedForLocation: "",
   saveSuppressed: false,

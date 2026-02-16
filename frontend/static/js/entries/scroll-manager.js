@@ -132,6 +132,7 @@ export class ScrollManager {
   #skipNextRestore = false;
   #waitingKey = null;
   #started = false;
+  #strategies = new Map();
 
   constructor({
     root = document,
@@ -160,6 +161,50 @@ export class ScrollManager {
     this.onWheel = this.onWheel.bind(this);
     this.onTouchMove = this.onTouchMove.bind(this);
     this.onScrollBtnClick = this.onScrollBtnClick.bind(this);
+  }
+
+  registerStrategy(id, strategy) {
+    const key = String(id || "").trim();
+    if (!key) return null;
+    if (!strategy || typeof strategy !== "object") return null;
+    this.#strategies.set(key, strategy);
+    return () => this.unregisterStrategy(key);
+  }
+
+  unregisterStrategy(id) {
+    const key = String(id || "").trim();
+    if (!key) return;
+    this.#strategies.delete(key);
+  }
+
+  #buildStrategyContext(extra = {}) {
+    return {
+      manager: this,
+      container: this.container,
+      entries: this.entries,
+      ...extra,
+    };
+  }
+
+  #runStrategyHook(hook, extra = {}) {
+    if (!this.#strategies.size) return false;
+    const context = this.#buildStrategyContext(extra);
+    for (const strategy of this.#strategies.values()) {
+      if (typeof strategy?.matches === "function" && !strategy.matches(context)) {
+        continue;
+      }
+      const fn = strategy?.[hook];
+      if (typeof fn !== "function") continue;
+      try {
+        const result = fn(context);
+        if (result) return true;
+      } catch (error) {
+        if (typeof console !== "undefined" && console.warn) {
+          console.warn("Scroll strategy error", error);
+        }
+      }
+    }
+    return false;
   }
 
   #hasActiveHighlight() {
@@ -499,7 +544,9 @@ export class ScrollManager {
     if (!this.container) return;
     this.updateScrollState(this.container.scrollTop);
     this.toggleScrollBtn();
-    this.#safeSet(this.#getKey(), String(this.container.scrollTop));
+    if (!this.#runStrategyHook("save", { reason: "scroll" })) {
+      this.#safeSet(this.#getKey(), String(this.container.scrollTop));
+    }
   }
 
   onWheel(event) {
@@ -627,12 +674,16 @@ export class ScrollManager {
     if (!target || !this.container) return;
 
     if (target === this.container) {
-      this.#safeSet(this.#getKey(), String(this.container.scrollTop || 0));
+      if (!this.#runStrategyHook("save", { reason: "beforeSwap", event })) {
+        this.#safeSet(this.#getKey(), String(this.container.scrollTop || 0));
+      }
       return;
     }
 
     if (target instanceof Element && this.container.id && target.id === this.container.id) {
-      this.#safeSet(this.#getKey(), String(this.container.scrollTop || 0));
+      if (!this.#runStrategyHook("save", { reason: "beforeSwap", event })) {
+        this.#safeSet(this.#getKey(), String(this.container.scrollTop || 0));
+      }
     }
   }
 
@@ -737,12 +788,18 @@ export class ScrollManager {
 
   save() {
     if (!this.container) return;
-    this.#safeSet(this.#getKey(), String(this.container.scrollTop || 0));
+    if (!this.#runStrategyHook("save", { reason: "save" })) {
+      this.#safeSet(this.#getKey(), String(this.container.scrollTop || 0));
+    }
   }
 
   restore() {
     this.ensureContainer();
     if (!this.container) return;
+
+    if (this.#runStrategyHook("restore", { reason: "restore" })) {
+      return;
+    }
 
     if (this.#hasActiveHighlight()) {
       return;

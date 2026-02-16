@@ -37,10 +37,10 @@ import {
   storeHeatmapOffsetFromRoot,
 } from "./heatmap.js";
 import {
-  attachEntriesScrollListener,
   captureEntriesAnchor,
   getStoredEntriesAnchor,
   maybeRestoreEntriesAnchor,
+  registerTagsScrollStrategy,
   resetEntriesRestoreState,
   scrollMainContentTop,
   storeMainScrollTop,
@@ -135,7 +135,6 @@ const sync = (root = document) => {
   state.saveSuppressed = false;
   const hadTargetParam = new URLSearchParams(window.location.search).has("target");
   updateHeaderHeight();
-  attachEntriesScrollListener();
   if (!state.query) {
     state.query = readStoredSearchQuery();
   }
@@ -213,6 +212,7 @@ if (!globalThis[BOOT_KEY]) {
   globalThis[BOOT_KEY] = true;
   window.addEventListener("resize", updateHeaderHeight);
   initHeatmapTooltip();
+  registerTagsScrollStrategy();
 
   document.addEventListener("click", (event) => {
     const target = event.target;

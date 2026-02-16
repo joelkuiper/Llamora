@@ -212,14 +212,21 @@ export const maybeRestoreEntriesAnchor = () => {
   state.restoreAppliedForLocation = currentLocation;
 };
 
-export const attachEntriesScrollListener = () => {
-  const next = getMainScrollElement();
-  if (state.scrollElement === next) return;
-  if (state.scrollElement instanceof HTMLElement) {
-    state.scrollElement.removeEventListener("scroll", scheduleEntriesAnchorSave);
-  }
-  state.scrollElement = next instanceof HTMLElement ? next : null;
-  if (state.scrollElement) {
-    state.scrollElement.addEventListener("scroll", scheduleEntriesAnchorSave, { passive: true });
-  }
+const isTagsViewActive = () =>
+  String(document.getElementById("main-content")?.dataset?.view || "").trim() === "tags";
+
+export const registerTagsScrollStrategy = () => {
+  const manager = window.appInit?.scroll;
+  if (!manager || typeof manager.registerStrategy !== "function") return;
+  manager.registerStrategy("tags-view", {
+    matches: () => isTagsViewActive(),
+    save: () => {
+      scheduleEntriesAnchorSave();
+      return true;
+    },
+    restore: () => {
+      maybeRestoreEntriesAnchor();
+      return true;
+    },
+  });
 };
