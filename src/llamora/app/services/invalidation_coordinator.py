@@ -42,7 +42,7 @@ class InvalidationCoordinator:
         *,
         user_id: str,
         created_date: str,
-        revision: int,
+        revision: str,
         entry_id: str,
         **_: object,
     ) -> None:
@@ -139,7 +139,7 @@ class InvalidationCoordinator:
         *,
         user_id: str,
         created_date: str,
-        revision: int | None,
+        revision: str | None,
         cause: str,
         **extra: object,
     ) -> None:

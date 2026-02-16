@@ -5,6 +5,8 @@ import logging
 from collections import defaultdict
 from typing import Any, Awaitable, Callable, Coroutine, Dict, List, Tuple, TypedDict
 
+from ulid import ULID
+
 EventHandler = Callable[..., Awaitable[None]]
 
 ENTRY_INSERTED_EVENT = "entry.inserted"
@@ -19,7 +21,7 @@ class EntryEventPayload(TypedDict):
     user_id: str
     entry_id: str
     created_date: str
-    revision: int
+    revision: str
 
 
 class TagMutationPayload(TypedDict):
@@ -45,8 +47,6 @@ class RepositoryEventBus:
     def __init__(self) -> None:
         self._handlers: Dict[str, List[Tuple[EventHandler, bool]]] = defaultdict(list)
         self._background_tasks: set[asyncio.Task] = set()
-        self._entry_revisions: dict[tuple[str, str], int] = {}
-        self._revision_lock = asyncio.Lock()
         self._logger = logging.getLogger(__name__)
 
     def subscribe(
@@ -124,13 +124,13 @@ class RepositoryEventBus:
         * ``f"{event}:{user_id}:{created_date}"`` – for listeners scoped to a
           specific user and day.
 
-        A monotonic ``revision`` is attached to each emission and incremented per
-        ``(user_id, created_date)`` pair. Subscribers should treat ``revision`` as
-        the canonical ordering source for that day and ignore stale payloads with
-        lower revisions.
+        A monotonic ``revision`` token is attached to each emission. The token is
+        a ULID string, which is lexicographically sortable by time. Subscribers
+        should treat ``revision`` as the canonical ordering source for that day
+        and ignore stale payloads with lower revisions.
         """
 
-        revision = await self._next_entry_revision(user_id, created_date)
+        revision = self._next_entry_revision()
         data = {
             "user_id": user_id,
             "created_date": created_date,
@@ -143,12 +143,9 @@ class RepositoryEventBus:
             self.emit(self._user_date_event(event, user_id, created_date), **data),
         )
 
-    async def _next_entry_revision(self, user_id: str, created_date: str) -> int:
-        key = (user_id, created_date)
-        async with self._revision_lock:
-            next_revision = self._entry_revisions.get(key, 0) + 1
-            self._entry_revisions[key] = next_revision
-        return next_revision
+    @staticmethod
+    def _next_entry_revision() -> str:
+        return str(ULID())
 
     def _task_done(self, task: asyncio.Task) -> None:
         self._background_tasks.discard(task)
@@ -169,7 +166,6 @@ class RepositoryEventBus:
     def clear(self) -> None:
         """Remove all registered handlers and reset in-memory revisions."""
         self._handlers.clear()
-        self._entry_revisions.clear()
 
     @staticmethod
     def _user_event(event: str, user_id: str) -> str:

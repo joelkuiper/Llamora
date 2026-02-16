@@ -8,6 +8,7 @@ from types import MappingProxyType
 from typing import Any, cast
 
 from cachetools import TTLCache
+from ulid import ULID
 
 logger = getLogger(__name__)
 
@@ -29,7 +30,7 @@ FrozenHistory = tuple[Mapping[str, Any], ...]
 @dataclass(slots=True, frozen=True)
 class HistoryCacheEntry:
     history: FrozenHistory | object
-    revision: int
+    revision: str
 
 
 HistoryCacheBackend = MutableMapping[CacheKey, HistoryCacheEntry]
@@ -117,7 +118,7 @@ class HistoryCache:
         created_date: str,
         history: Sequence[Mapping[str, Any] | dict[str, Any]],
         *,
-        revision: int | None = None,
+        revision: str | None = None,
     ) -> None:
         key = (user_id, created_date)
         frozen = _freeze_history(history)
@@ -134,9 +135,13 @@ class HistoryCache:
                 )
                 return
             if revision is not None:
-                next_revision = max(revision, current.revision if current else 0)
+                next_revision = (
+                    revision
+                    if not current or revision >= current.revision
+                    else current.revision
+                )
             else:
-                next_revision = current.revision if current else 0
+                next_revision = current.revision if current else ""
             self._backend[key] = HistoryCacheEntry(
                 history=frozen, revision=next_revision
             )
@@ -152,7 +157,7 @@ class HistoryCache:
         created_date: str,
         entry: Mapping[str, Any],
         *,
-        revision: int | None = None,
+        revision: str | None = None,
     ) -> None:
         key = (user_id, created_date)
         while True:
@@ -193,9 +198,7 @@ class HistoryCache:
             async with self._lock:
                 current = self._backend.get(key)
                 if current is cached:
-                    next_revision = (
-                        revision if revision is not None else current.revision + 1
-                    )
+                    next_revision = revision or self._next_revision(current.revision)
                     self._backend[key] = HistoryCacheEntry(
                         history=updated, revision=next_revision
                     )
@@ -211,12 +214,12 @@ class HistoryCache:
         user_id: str,
         created_date: str,
         *,
-        revision: int | None = None,
+        revision: str | None = None,
     ) -> None:
         key = (user_id, created_date)
         async with self._lock:
             current = self._backend.get(key)
-            current_revision = current.revision if current else 0
+            current_revision = current.revision if current else ""
             if revision is not None and revision < current_revision:
                 self._notify(
                     "invalidate-rejected",
@@ -227,12 +230,19 @@ class HistoryCache:
                     },
                 )
                 return
-            next_revision = revision if revision is not None else current_revision + 1
+            next_revision = revision or self._next_revision(current_revision)
             self._backend[key] = HistoryCacheEntry(
                 history=_INVALID_HISTORY_SENTINEL,
                 revision=next_revision,
             )
         self._notify("invalidate", key, payload={"revision": next_revision})
+
+    @staticmethod
+    def _next_revision(current: str) -> str:
+        candidate = str(ULID())
+        if current and candidate < current:
+            return current
+        return candidate
 
     def _notify(self, name: str, key: CacheKey, *, payload: Any = None) -> None:
         if not self._listeners:
