@@ -1540,6 +1540,17 @@ const requestSort = (kind, dir) => {
   window.history.pushState(window.history.state, "", pageUrl);
   captureListPositions();
   hydrateIndexFromTemplate(document);
+  const finalizeSort = () => {
+    if (selectedTag) {
+      ensureActiveRowPresent(selectedTag);
+      setActiveTag(selectedTag, document, { behavior: "auto", scroll: false });
+    }
+    animateListReorder(() => {
+      if (selectedTag) {
+        scrollActiveRowIntoView(document, "smooth");
+      }
+    });
+  };
   if (Array.isArray(state.indexItems)) {
     state.indexItems = state.indexItems.slice().sort((a, b) => {
       const nameA = a.name.toLowerCase();
@@ -1556,11 +1567,11 @@ const requestSort = (kind, dir) => {
       return nextDir === "desc" ? -alphaCmp : alphaCmp;
     });
     rebuildIndexList(document);
-    animateListReorder();
+    finalizeSort();
   } else {
     loadIndexItems().then(() => {
       rebuildIndexList(document);
-      animateListReorder();
+      finalizeSort();
     });
   }
   updateUrlSort();
