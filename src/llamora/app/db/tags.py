@@ -13,7 +13,7 @@ from .events import (
     TAG_UNLINKED_EVENT,
 )
 from .utils import cached_tag_name
-from llamora.app.services.crypto import EncryptionContext
+from llamora.app.services.crypto import CryptoContext
 from llamora.app.util.tags import canonicalize, tag_hash
 from llamora.app.util.frecency import DEFAULT_FRECENCY_DECAY, resolve_frecency_lambda
 
@@ -24,18 +24,12 @@ class TagsRepository(BaseRepository):
     def __init__(
         self,
         pool: SQLiteConnectionPool,
-        encrypt_message,
-        decrypt_message,
         event_bus: RepositoryEventBus | None = None,
     ) -> None:
         super().__init__(pool)
-        self._encrypt_message = encrypt_message
-        self._decrypt_message = decrypt_message
         self._event_bus = event_bus
 
-    async def resolve_or_create_tag(
-        self, ctx: EncryptionContext, tag_name: str
-    ) -> bytes:
+    async def resolve_or_create_tag(self, ctx: CryptoContext, tag_name: str) -> bytes:
         canonical = canonicalize(tag_name)
         digest = tag_hash(ctx.user_id, canonical)
         async with self.pool.connection() as conn:
@@ -50,7 +44,7 @@ class TagsRepository(BaseRepository):
                     (ctx.user_id, digest, b"", b"", ""),
                 )
                 if cursor.rowcount:
-                    nonce, ct, alg = self._encrypt_message(ctx, digest.hex(), canonical)
+                    nonce, ct, alg = ctx.encrypt_entry(digest.hex(), canonical)
                     await conn.execute(
                         """
                         UPDATE tags
@@ -211,9 +205,7 @@ class TagsRepository(BaseRepository):
             counts[str(created_date)] = int(row["total_entries"] or 0)
         return counts
 
-    async def get_tags_for_entry(
-        self, user_id: str, entry_id: str, dek: bytes
-    ) -> list[dict]:
+    async def get_tags_for_entry(self, ctx: CryptoContext, entry_id: str) -> list[dict]:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
@@ -223,29 +215,26 @@ class TagsRepository(BaseRepository):
                 WHERE x.user_id = ? AND x.entry_id = ?
                 ORDER BY x.ulid ASC
                 """,
-                (user_id, entry_id),
+                (ctx.user_id, entry_id),
             )
             rows = await cursor.fetchall()
 
         tags: list[dict] = []
         for row in rows:
             tag_name = cached_tag_name(
-                user_id,
+                ctx,
                 row["tag_hash"],
                 row["name_nonce"],
                 row["name_ct"],
                 row["tag_alg"].encode(),
-                dek,
-                self._decrypt_message,
             )
             tags.append({"name": tag_name, "hash": row["tag_hash"].hex()})
         return tags
 
     async def get_tags_for_entries(
         self,
-        user_id: str,
+        ctx: CryptoContext,
         entry_ids: Sequence[str],
-        dek: bytes,
     ) -> dict[str, list[dict]]:
         """Return decrypted tags for each entry in ``entry_ids``."""
 
@@ -269,20 +258,18 @@ class TagsRepository(BaseRepository):
                 WHERE x.user_id = ? AND x.entry_id IN ({placeholders})
                 ORDER BY x.entry_id ASC, x.ulid ASC
                 """,
-                (user_id, *ids),
+                (ctx.user_id, *ids),
             )
             rows = await cursor.fetchall()
 
         mapping: dict[str, list[dict]] = {}
         for row in rows:
             tag_name = cached_tag_name(
-                user_id,
+                ctx,
                 row["tag_hash"],
                 row["name_nonce"],
                 row["name_ct"],
                 row["tag_alg"].encode(),
-                dek,
-                self._decrypt_message,
             )
             entry_id = row["entry_id"]
             mapping.setdefault(entry_id, []).append(
@@ -291,7 +278,7 @@ class TagsRepository(BaseRepository):
         return mapping
 
     async def get_tag_info(
-        self, user_id: str, tag_hash: bytes, dek: bytes
+        self, ctx: CryptoContext, tag_hash: bytes
     ) -> dict[str, Any] | None:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
@@ -318,7 +305,7 @@ class TagsRepository(BaseRepository):
                 CROSS JOIN tag_stats s
                 WHERE t.user_id = ? AND t.tag_hash = ?
                 """,
-                (user_id, tag_hash, user_id, tag_hash),
+                (ctx.user_id, tag_hash, ctx.user_id, tag_hash),
             )
             row = await cursor.fetchone()
 
@@ -326,13 +313,11 @@ class TagsRepository(BaseRepository):
             return None
 
         tag_name = cached_tag_name(
-            user_id,
+            ctx,
             row["tag_hash"],
             row["name_nonce"],
             row["name_ct"],
             row["alg"].encode(),
-            dek,
-            self._decrypt_message,
         )
 
         return {
@@ -344,7 +329,7 @@ class TagsRepository(BaseRepository):
             "first_used": row["first_used"],
         }
 
-    async def get_tags_index(self, user_id: str, dek: bytes) -> list[dict[str, Any]]:
+    async def get_tags_index(self, ctx: CryptoContext) -> list[dict[str, Any]]:
         """Return all tags with usage counts for index-style views."""
 
         async with self.pool.connection() as conn:
@@ -362,20 +347,18 @@ class TagsRepository(BaseRepository):
                 GROUP BY t.tag_hash, t.name_ct, t.name_nonce, t.alg
                 HAVING entry_count > 0
                 """,
-                (user_id,),
+                (ctx.user_id,),
             )
             rows = await cursor.fetchall()
 
         index_rows: list[dict[str, Any]] = []
         for row in rows:
             tag_name = cached_tag_name(
-                user_id,
+                ctx,
                 row["tag_hash"],
                 row["name_nonce"],
                 row["name_ct"],
                 row["alg"].encode(),
-                dek,
-                self._decrypt_message,
             )
             index_rows.append(
                 {
@@ -409,7 +392,7 @@ class TagsRepository(BaseRepository):
         return digests
 
     async def get_tag_frecency(
-        self, user_id: str, limit: int, lambda_: Any, dek: bytes
+        self, ctx: CryptoContext, limit: int, lambda_: Any
     ) -> list[dict]:
         decay_constant = resolve_frecency_lambda(
             lambda_, default=DEFAULT_FRECENCY_DECAY
@@ -426,20 +409,18 @@ class TagsRepository(BaseRepository):
                 ORDER BY frecency DESC
                 LIMIT ?
                 """,
-                (decay_constant, user_id, limit),
+                (decay_constant, ctx.user_id, limit),
             )
             rows = await cursor.fetchall()
 
         tags: list[dict] = []
         for row in rows:
             tag_name = cached_tag_name(
-                user_id,
+                ctx,
                 row["tag_hash"],
                 row["name_nonce"],
                 row["name_ct"],
                 row["alg"].encode(),
-                dek,
-                self._decrypt_message,
             )
             tags.append(
                 {
@@ -454,8 +435,7 @@ class TagsRepository(BaseRepository):
 
     async def search_tags(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: CryptoContext,
         *,
         limit: int = 15,
         prefix: str | None = None,
@@ -505,7 +485,7 @@ class TagsRepository(BaseRepository):
                     ORDER BY frecency DESC, last_seen DESC
                     LIMIT ? OFFSET ?
                     """,
-                    (decay_constant, user_id, batch_size, offset),
+                    (decay_constant, ctx.user_id, batch_size, offset),
                 )
                 rows = await cursor.fetchall()
                 if not rows:
@@ -514,13 +494,11 @@ class TagsRepository(BaseRepository):
 
                 for row in rows:
                     tag_name = cached_tag_name(
-                        user_id,
+                        ctx,
                         row["tag_hash"],
                         row["name_nonce"],
                         row["name_ct"],
                         row["alg"].encode(),
-                        dek,
-                        self._decrypt_message,
                     )
                     tag_name = (tag_name or "").strip()
                     if not tag_name:

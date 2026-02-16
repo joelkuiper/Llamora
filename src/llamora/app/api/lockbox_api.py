@@ -6,7 +6,7 @@ import orjson
 
 from quart import Blueprint, jsonify, request
 
-from llamora.app.routes.helpers import require_encryption_context, require_user_and_dek
+from llamora.app.routes.helpers import require_encryption_context
 from llamora.app.services.auth_helpers import login_required
 from llamora.app.services.container import get_db
 from llamora.app.services.lockbox import Lockbox, LockboxDecryptionError
@@ -19,7 +19,7 @@ lockbox_bp = Blueprint("lockbox_api", __name__, url_prefix="/api/lockbox")
 @lockbox_bp.put("/<namespace>/<key>")
 @login_required
 async def put_value(namespace: str, key: str):
-    _, user, ctx = await require_encryption_context()
+    _, _, ctx = await require_encryption_context()
     lockbox = _get_lockbox()
 
     payload = await request.get_json(silent=True)
@@ -45,12 +45,11 @@ async def put_value(namespace: str, key: str):
 @lockbox_bp.get("/<namespace>/<key>")
 @login_required
 async def get_value(namespace: str, key: str):
-    _, user, dek = await require_user_and_dek()
+    _, _, ctx = await require_encryption_context()
     lockbox = _get_lockbox()
-    user_id = str(user["id"])
 
     try:
-        value = await lockbox.get(user_id, dek, namespace, key)
+        value = await lockbox.get(ctx, namespace, key)
     except ValueError:
         return jsonify({"ok": False}), 400
     except LockboxDecryptionError:
@@ -76,12 +75,11 @@ async def get_value(namespace: str, key: str):
 @lockbox_bp.delete("/<namespace>/<key>")
 @login_required
 async def delete_value(namespace: str, key: str):
-    _, user, _ = await require_user_and_dek()
+    _, _, ctx = await require_encryption_context()
     lockbox = _get_lockbox()
-    user_id = str(user["id"])
 
     try:
-        await lockbox.delete(user_id, namespace, key)
+        await lockbox.delete(ctx.user_id, namespace, key)
     except ValueError:
         return jsonify({"ok": False}), 400
     except sqlite3.Error:
@@ -97,12 +95,11 @@ async def delete_value(namespace: str, key: str):
 @lockbox_bp.get("/<namespace>")
 @login_required
 async def list_keys(namespace: str):
-    _, user, _ = await require_user_and_dek()
+    _, _, ctx = await require_encryption_context()
     lockbox = _get_lockbox()
-    user_id = str(user["id"])
 
     try:
-        keys = await lockbox.list(user_id, namespace)
+        keys = await lockbox.list(ctx.user_id, namespace)
     except ValueError:
         return jsonify({"ok": False}), 400
     except sqlite3.Error:

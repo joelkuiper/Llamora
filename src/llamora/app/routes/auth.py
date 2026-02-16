@@ -19,6 +19,7 @@ from llamora.app.services.auth_helpers import (
     login_required,
     sanitize_return_path,
 )
+from llamora.app.routes.helpers import require_encryption_context
 from llamora.app.services.session_context import get_session_context
 from llamora.app.services.validators import validate_password, PasswordValidationError
 from llamora.app.services.crypto import (
@@ -510,17 +511,8 @@ async def profile_tab(tab: str):
 @login_required
 async def download_user_data():
     session = get_session_context()
-    user = await session.require_user()
-    dek = await session.dek()
-    if dek is None:
-        response = await make_response("Missing encryption key")
-        assert isinstance(response, Response)
-        response.status_code = 400
-        return response
-
-    messages = await get_services().db.entries.get_latest_entries(
-        user["id"], 1000000, dek
-    )
+    _, user, ctx = await require_encryption_context(session)
+    messages = await get_services().db.entries.get_latest_entries(ctx, 1000000)
     user_data = {
         "user": {
             "id": user["id"],

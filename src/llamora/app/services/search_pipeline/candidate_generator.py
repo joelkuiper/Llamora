@@ -7,7 +7,7 @@ from collections import OrderedDict
 from typing import Any, Iterable, Protocol
 
 from llamora.app.services.search_config import SearchConfig
-from llamora.app.services.crypto import EncryptionContext
+from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.vector_search import VectorSearchService
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ class BaseSearchCandidateGenerator(Protocol):
 
     async def generate(
         self,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         normalized_query: str,
         k1: int,
         k2: int,
@@ -43,7 +43,7 @@ class DefaultSearchCandidateGenerator:
 
     async def generate(
         self,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         normalized_query: str,
         k1: int,
         k2: int,

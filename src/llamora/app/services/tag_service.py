@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any, Iterable, Literal, Sequence
 
 from llamora.app.util.tags import canonicalize as _canonicalize, display as _display
+from llamora.app.services.crypto import CryptoContext
 from llamora.persistence.local_db import LocalDB
 from llamora.app.services.entry_metadata import generate_metadata
 from llamora.app.services.digest_policy import tag_digest
@@ -205,8 +206,7 @@ class TagService:
 
     async def get_tag_overview(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: CryptoContext,
         tag_hash: bytes,
         *,
         limit: int = 24,
@@ -214,18 +214,19 @@ class TagService:
     ) -> TagOverview | None:
         """Return tag metadata and recent entry previews."""
 
-        info = await self._db.tags.get_tag_info(user_id, tag_hash, dek)
+        info = await self._db.tags.get_tag_info(ctx, tag_hash)
         if not info:
             return None
 
         previews, next_cursor, has_more = await self.get_tag_entries_page(
-            user_id,
-            dek,
+            ctx,
             tag_hash,
             limit=limit,
             cursor=cursor,
         )
-        entry_digests = await self._db.tags.get_entry_digests_for_tag(user_id, tag_hash)
+        entry_digests = await self._db.tags.get_entry_digests_for_tag(
+            ctx.user_id, tag_hash
+        )
 
         return TagOverview(
             name=self.display(info["name"]),
@@ -241,8 +242,7 @@ class TagService:
 
     async def get_tag_entries_page(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: CryptoContext,
         tag_hash: bytes,
         *,
         limit: int = 24,
@@ -254,7 +254,7 @@ class TagService:
             next_cursor,
             has_more,
         ) = await self._db.tags.get_recent_entries_page_for_tag_hashes(
-            user_id,
+            ctx.user_id,
             [tag_hash],
             limit=limit,
             before_created_at=before_created_at,
@@ -263,7 +263,7 @@ class TagService:
         if not entry_ids:
             return [], None, False
 
-        entries = await self._db.entries.get_entries_by_ids(user_id, entry_ids, dek)
+        entries = await self._db.entries.get_entries_by_ids(ctx, entry_ids)
         entry_map = {entry.get("id"): entry for entry in entries}
 
         previews: list[TagEntryPreview] = []
@@ -290,8 +290,7 @@ class TagService:
 
     async def get_tags_view_data(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: CryptoContext,
         selected_tag: str | None,
         *,
         sort_kind: TagsSortKind = "alpha",
@@ -302,7 +301,7 @@ class TagService:
         related_tag_limit: int = 2,
     ) -> TagsViewData:
         """Return data for the two-column archival tags view."""
-        index_cache = await self._get_tags_index_request_cache(user_id, dek)
+        index_cache = await self._get_tags_index_request_cache(ctx)
         index_items = list(index_cache.items)
         index_items = self._sort_index_items(
             index_items,
@@ -315,8 +314,7 @@ class TagService:
             selected_index = index_cache.items_by_name.get(selected_name)
         if selected_name and not selected_index:
             selected_index = await self._resolve_index_item_by_name(
-                user_id,
-                dek,
+                ctx,
                 selected_name,
                 index_cache=index_cache,
             )
@@ -336,8 +334,7 @@ class TagService:
             )
 
         detail = await self._build_archive_detail(
-            user_id,
-            dek,
+            ctx,
             selected_index,
             limit=entry_limit,
             around_entry_id=around_entry_id,
@@ -354,8 +351,7 @@ class TagService:
 
     async def get_tag_detail(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: CryptoContext,
         *,
         tag_name: str | None = None,
         tag_hash_hex: str | None = None,
@@ -377,7 +373,7 @@ class TagService:
                 tag_hash_bytes = bytes.fromhex(tag_hash_hex)
             except ValueError:
                 return None
-            info = await self._db.tags.get_tag_info(user_id, tag_hash_bytes, dek)
+            info = await self._db.tags.get_tag_info(ctx, tag_hash_bytes)
             if info:
                 name = str(info.get("name") or "").strip()
                 try:
@@ -391,14 +387,13 @@ class TagService:
                 )
 
         if index_item is None and tag_name:
-            index_item = await self._resolve_index_item_by_name(user_id, dek, tag_name)
+            index_item = await self._resolve_index_item_by_name(ctx, tag_name)
 
         if index_item is None:
             return None
 
         return await self._build_archive_detail(
-            user_id,
-            dek,
+            ctx,
             index_item,
             limit=entry_limit,
             around_entry_id=around_entry_id,
@@ -408,15 +403,14 @@ class TagService:
 
     async def get_tags_index_items(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: CryptoContext,
         *,
         sort_kind: TagsSortKind = "alpha",
         sort_dir: TagsSortDirection = "asc",
     ) -> tuple[TagIndexItem, ...]:
         """Return the full tag index, sorted for client-side search."""
 
-        index_cache = await self._get_tags_index_request_cache(user_id, dek)
+        index_cache = await self._get_tags_index_request_cache(ctx)
         items = list(index_cache.items)
         items = self._sort_index_items(
             items,
@@ -427,8 +421,7 @@ class TagService:
 
     async def _resolve_index_item_by_name(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: CryptoContext,
         tag_name: str,
         *,
         index_cache: _TagsIndexRequestCache | None = None,
@@ -442,7 +435,7 @@ class TagService:
                 return cached
             raw_tags = index_cache.rows
         else:
-            raw_tags = await self._db.tags.get_tags_index(user_id, dek)
+            raw_tags = await self._db.tags.get_tags_index(ctx)
         for row in raw_tags:
             raw_name = str(row.get("name") or "").strip()
             if not raw_name:
@@ -462,10 +455,9 @@ class TagService:
 
     async def _get_tags_index_request_cache(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: CryptoContext,
     ) -> _TagsIndexRequestCache:
-        rows = tuple(await self._db.tags.get_tags_index(user_id, dek))
+        rows = tuple(await self._db.tags.get_tags_index(ctx))
         items: list[TagIndexItem] = []
         items_by_name: dict[str, TagIndexItem] = {}
         for row in rows:
@@ -510,8 +502,7 @@ class TagService:
 
     async def _build_archive_detail(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: CryptoContext,
         tag_item: TagIndexItem,
         *,
         limit: int,
@@ -524,15 +515,16 @@ class TagService:
         except ValueError:
             return None
 
-        info = await self._db.tags.get_tag_info(user_id, tag_hash, dek)
+        info = await self._db.tags.get_tag_info(ctx, tag_hash)
         if not info:
             return None
-        entry_digests = await self._db.tags.get_entry_digests_for_tag(user_id, tag_hash)
+        entry_digests = await self._db.tags.get_entry_digests_for_tag(
+            ctx.user_id, tag_hash
+        )
 
         archive_entries, next_cursor, has_more = await self.get_archive_entries_page(
-            user_id,
+            ctx,
             [tag_hash],
-            dek,
             limit=max(1, limit),
             around_entry_id=around_entry_id,
         )
@@ -594,9 +586,8 @@ class TagService:
 
     async def get_archive_entries_page(
         self,
-        user_id: str,
+        ctx: CryptoContext,
         tag_hashes: list[bytes],
-        dek: bytes,
         *,
         limit: int,
         cursor: str | None = None,
@@ -605,7 +596,7 @@ class TagService:
     ) -> tuple[list[TagArchiveEntry], str | None, bool]:
         if around_entry_id and not cursor:
             rank = await self._db.tags.count_entries_newer_than(
-                user_id, tag_hashes, around_entry_id
+                ctx.user_id, tag_hashes, around_entry_id
             )
             if rank is not None:
                 limit = min(max(limit, rank + 5), 200)
@@ -616,7 +607,7 @@ class TagService:
             next_cursor,
             has_more,
         ) = await self._db.tags.get_recent_entries_page_for_tag_hashes(
-            user_id,
+            ctx.user_id,
             tag_hashes,
             limit=max(1, limit),
             before_created_at=before_created_at,
@@ -625,14 +616,12 @@ class TagService:
         if not entry_ids:
             return [], None, False
 
-        entries = await self._db.entries.get_entries_by_ids(user_id, entry_ids, dek)
+        entries = await self._db.entries.get_entries_by_ids(ctx, entry_ids)
         entry_map = {entry.get("id"): entry for entry in entries}
-        tags_by_entry = await self._db.tags.get_tags_for_entries(
-            user_id, entry_ids, dek
-        )
+        tags_by_entry = await self._db.tags.get_tags_for_entries(ctx, entry_ids)
         hash_names: set[str] = set()
         if len(tag_hashes) == 1:
-            info = await self._db.tags.get_tag_info(user_id, tag_hashes[0], dek)
+            info = await self._db.tags.get_tag_info(ctx, tag_hashes[0])
             if info and info.get("name"):
                 try:
                     hash_names.add(self.canonicalize(str(info["name"])))
@@ -687,9 +676,8 @@ class TagService:
 
         responses_by_reply_to: dict[str, list[TagArchiveResponse]] = {}
         reply_entries = await self._db.entries.get_entries_by_reply_to_ids(
-            user_id,
+            ctx,
             user_entry_ids,
-            dek,
         )
         for response in reply_entries:
             reply_to = str(response.get("reply_to") or "").strip()
@@ -723,8 +711,7 @@ class TagService:
 
     async def hydrate_search_results(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: CryptoContext,
         results: list[dict[str, Any]],
         tokens: Sequence[str],
         *,
@@ -744,7 +731,7 @@ class TagService:
             return
 
         token_lookup = {token.lower() for token in tokens}
-        tag_map = await self._db.tags.get_tags_for_entries(user_id, entry_ids, dek)
+        tag_map = await self._db.tags.get_tags_for_entries(ctx, entry_ids)
 
         for res in results:
             entry_id = res.get("id")
@@ -758,9 +745,8 @@ class TagService:
 
     async def suggest_for_entry(
         self,
-        user_id: str,
+        ctx: CryptoContext,
         entry_id: str,
-        dek: bytes,
         *,
         llm,
         query: str | None = None,
@@ -770,19 +756,18 @@ class TagService:
     ) -> list[str] | None:
         """Return suggested tags for an entry."""
 
-        entries = await self._db.entries.get_entries_by_ids(user_id, [entry_id], dek)
+        entries = await self._db.entries.get_entries_by_ids(ctx, [entry_id])
         if not entries:
             return None
 
         entry = entries[0]
-        existing = await self._db.tags.get_tags_for_entry(user_id, entry_id, dek)
+        existing = await self._db.tags.get_tags_for_entry(ctx, entry_id)
         existing_names = self._extract_existing_names(existing)
 
         query_value = str(query or "").strip()
         if query_value:
             matches = await self._db.tags.search_tags(
-                user_id,
-                dek,
+                ctx,
                 limit=limit or 12,
                 prefix=query_value,
                 lambda_=decay_constant,
@@ -805,11 +790,11 @@ class TagService:
         meta = entry.get("meta") or {}
         tags: Iterable[Any] = meta.get("tags") or []
         if (not tags) and entry.get("role") == "user":
-            cached = self._get_cached_suggestions(user_id, entry_id)
+            cached = self._get_cached_suggestions(ctx.user_id, entry_id)
             if cached is None:
                 meta_payload = await generate_metadata(llm, entry.get("text", ""))
                 tags = meta_payload.get("tags") or []
-                self._set_cached_suggestions(user_id, entry_id, list(tags))
+                self._set_cached_suggestions(ctx.user_id, entry_id, list(tags))
             else:
                 tags = cached
 
@@ -822,7 +807,7 @@ class TagService:
             meta_suggestions.add(canonical)
 
         frecent_tags = await self._db.tags.get_tag_frecency(
-            user_id, frecency_limit, decay_constant, dek
+            ctx, frecency_limit, decay_constant
         )
         frecent_suggestions: set[str] = set()
         for tag in frecent_tags:

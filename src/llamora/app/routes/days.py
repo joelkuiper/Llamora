@@ -17,7 +17,6 @@ from llamora.app.services.auth_helpers import login_required
 from llamora.app.routes.helpers import (
     require_encryption_context,
     require_iso_date,
-    require_user_and_dek,
 )
 from llamora.app.services.calendar import get_month_context
 from llamora.app.services.container import get_services, get_summarize_service
@@ -100,8 +99,8 @@ async def _render_day(date: str, target: str | None, view_kind: str):
 
 
 async def _render_calendar(year: int, month: int, *, today=None, mode="calendar"):
-    _, user, dek = await require_user_and_dek()
-    context = await get_month_context(user["id"], year, month, dek, today=today)
+    _, user, ctx = await require_encryption_context()
+    context = await get_month_context(ctx, year, month, today=today)
     context["mode"] = mode
     template = (
         "components/calendar/calendar_popover.html"
@@ -188,7 +187,7 @@ async def day_summary(date):
     digest = await summarize.get_day_digest(ctx, normalized_date)
 
     cached_summary = await summarize.get_cached(
-        user_id, ctx.dek, "summary", f"day:{normalized_date}", digest
+        ctx, "summary", f"day:{normalized_date}", digest
     )
     if cached_summary is not None:
         payload = {"summary": cached_summary}
@@ -198,12 +197,12 @@ async def day_summary(date):
 
     async def _generate_and_cache_summary() -> str:
         cache_hit = await summarize.get_cached(
-            user_id, ctx.dek, "summary", f"day:{normalized_date}", digest
+            ctx, "summary", f"day:{normalized_date}", digest
         )
         if cache_hit is not None:
             return cache_hit
         entries = await services.db.entries.get_flat_entries_for_date(
-            user_id, normalized_date, ctx.dek
+            ctx, normalized_date
         )
         text = (
             await generate_day_summary(

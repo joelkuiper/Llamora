@@ -25,6 +25,7 @@ from llamora.app.services.tag_presenter import (
 )
 from llamora.app.services.tag_summary import generate_tag_summary
 from llamora.app.services.activity_heatmap import get_tag_activity_heatmap
+from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.time import local_date
 from llamora.settings import settings
 from llamora.app.routes.helpers import require_iso_date
@@ -35,7 +36,6 @@ from llamora.app.util.frecency import (
 from llamora.app.routes.helpers import (
     ensure_entry_exists,
     require_encryption_context,
-    require_user_and_dek,
 )
 
 
@@ -96,7 +96,7 @@ def _build_view_context_query(
 
 async def _render_tags_page(selected_tag: str | None):
     day = _resolve_view_day(request.args.get("day"))
-    _, user, dek = await require_user_and_dek()
+    _, user, ctx = await require_encryption_context()
     services = get_services()
     today = local_date().isoformat()
     min_date = await services.db.entries.get_first_entry_date(user["id"]) or today
@@ -111,8 +111,7 @@ async def _render_tags_page(selected_tag: str | None):
         selected_tag or (request.args.get("tag") or "")
     )
     tags_index_items = await tag_service.get_tags_index_items(
-        user["id"],
-        dek,
+        ctx,
         sort_kind=sort_kind,
         sort_dir=sort_dir,
     )
@@ -161,8 +160,7 @@ async def tags_view_tag(tag: str):
 
 
 async def _load_tags_view_from_context(
-    user_id: str,
-    dek: bytes,
+    ctx: CryptoContext,
     context: dict[str, str | dict[str, str]],
 ) -> tuple[TagsViewData, str, str, int]:
     params = context.get("params")
@@ -177,8 +175,7 @@ async def _load_tags_view_from_context(
     entries_limit = DEFAULT_TAG_ENTRIES_LIMIT
     selected_tag = tag_service.normalize_tag_query(params.get("tag"))
     tags_view = await tag_service.get_tags_view_data(
-        user_id,
-        dek,
+        ctx,
         selected_tag,
         sort_kind=sort_kind,
         sort_dir=sort_dir,
@@ -188,12 +185,11 @@ async def _load_tags_view_from_context(
 
 
 async def _render_tags_detail_and_list_oob_updates(
-    user_id: str,
-    dek: bytes,
+    ctx: CryptoContext,
     context: dict[str, str | dict[str, str]],
 ) -> str:
     tags_view, sort_kind, sort_dir, entries_limit = await _load_tags_view_from_context(
-        user_id, dek, context
+        ctx, context
     )
     presented_tags_view = present_tags_view_data(tags_view)
     return await render_template(
@@ -210,22 +206,21 @@ async def _render_tags_detail_and_list_oob_updates(
 
 
 async def _render_view_oob_updates(
-    user_id: str,
-    dek: bytes,
+    ctx: CryptoContext,
     context: dict[str, str | dict[str, str]] | None,
 ) -> str:
     if not context:
         return ""
     view = str(context.get("view") or "").strip().lower()
     if view == "tags":
-        return await _render_tags_detail_and_list_oob_updates(user_id, dek, context)
+        return await _render_tags_detail_and_list_oob_updates(ctx, context)
     return ""
 
 
 @tags_bp.delete("/t/entry/<entry_id>/<tag_hash>")
 @login_required
 async def remove_tag(entry_id: str, tag_hash: str):
-    _, user, dek = await require_user_and_dek()
+    _, user, ctx = await require_encryption_context()
     db = get_services().db
     try:
         tag_hash_bytes = bytes.fromhex(tag_hash)
@@ -250,7 +245,7 @@ async def remove_tag(entry_id: str, tag_hash: str):
     )
     if not context:
         return "<span class='tag-tombstone'></span>"
-    oob = await _render_view_oob_updates(user["id"], dek, context)
+    oob = await _render_view_oob_updates(ctx, context)
     if not oob:
         return "<span class='tag-tombstone'></span>"
     return f"<span class='tag-tombstone'></span>\n{oob}"
@@ -291,7 +286,7 @@ async def add_tag(entry_id: str):
     )
     if not context:
         return html
-    oob = await _render_view_oob_updates(user["id"], ctx.dek, context)
+    oob = await _render_view_oob_updates(ctx, context)
     if not oob:
         return html
     return f"{html}\n{oob}"
@@ -300,7 +295,7 @@ async def add_tag(entry_id: str):
 @tags_bp.get("/t/entry/<entry_id>/suggestions")
 @login_required
 async def get_tag_suggestions(entry_id: str):
-    _, user, dek = await require_user_and_dek()
+    _, user, ctx = await require_encryption_context()
     decay_constant = resolve_frecency_lambda(
         request.args.get("lambda"), default=DEFAULT_FRECENCY_DECAY
     )
@@ -326,9 +321,8 @@ async def get_tag_suggestions(entry_id: str):
         clamped_limit = max(1, min(clamped_limit, 50))
 
     suggestions = await _tags().suggest_for_entry(
-        user["id"],
+        ctx,
         entry_id,
-        dek,
         llm=llm,
         query=query_canonical or None,
         limit=clamped_limit,
@@ -358,7 +352,7 @@ async def get_tag_suggestions(entry_id: str):
 @tags_bp.get("/t/detail/<tag_hash>")
 @login_required
 async def tag_detail(tag_hash: str):
-    _, user, dek = await require_user_and_dek()
+    _, user, ctx = await require_encryption_context()
     try:
         tag_hash_bytes = bytes.fromhex(tag_hash)
     except ValueError as exc:
@@ -367,8 +361,7 @@ async def tag_detail(tag_hash: str):
 
     page_size = 12
     overview = await _tags().get_tag_overview(
-        user["id"],
-        dek,
+        ctx,
         tag_hash_bytes,
         limit=page_size,
     )
@@ -397,7 +390,7 @@ async def tag_detail(tag_hash: str):
 @login_required
 async def delete_trace(tag_hash: str):
     day = _resolve_view_day(request.args.get("day"))
-    _, user, dek = await require_user_and_dek()
+    _, user, ctx = await require_encryption_context()
     try:
         tag_hash_bytes = bytes.fromhex(tag_hash)
     except ValueError as exc:
@@ -417,8 +410,7 @@ async def delete_trace(tag_hash: str):
     )
 
     tags_view = await tag_service.get_tags_view_data(
-        user["id"],
-        dek,
+        ctx,
         request.args.get("tag"),
         sort_kind=sort_kind,
         sort_dir=sort_dir,
@@ -442,7 +434,7 @@ async def delete_trace(tag_hash: str):
 @tags_bp.get("/t/detail/<tag_hash>/entries")
 @login_required
 async def tag_detail_entries(tag_hash: str):
-    _, user, dek = await require_user_and_dek()
+    _, user, ctx = await require_encryption_context()
     try:
         tag_hash_bytes = bytes.fromhex(tag_hash)
     except ValueError as exc:
@@ -457,8 +449,7 @@ async def tag_detail_entries(tag_hash: str):
     page_size = max(1, min(page_size, 50))
 
     entries, next_cursor, has_more = await _tags().get_tag_entries_page(
-        user["id"],
-        dek,
+        ctx,
         tag_hash_bytes,
         limit=page_size,
         cursor=cursor,
@@ -488,8 +479,7 @@ async def tag_detail_summary(tag_hash: str):
         raise AssertionError("unreachable") from exc
 
     overview = await _tags().get_tag_overview(
-        user["id"],
-        ctx.dek,
+        ctx,
         tag_hash_bytes,
         limit=12,
     )
@@ -510,8 +500,7 @@ async def tag_detail_summary(tag_hash: str):
 
     if summary_digest:
         cached_html = await summarize.get_cached(
-            user["id"],
-            ctx.dek,
+            ctx,
             summary_cache_namespace,
             summary_cache_key,
             summary_digest,
@@ -555,7 +544,7 @@ async def tags_view_detail_fragment(date: str):
     """
 
     normalized_date = require_iso_date(date)
-    _, user, dek = await require_user_and_dek()
+    _, user, ctx = await require_encryption_context()
     tag_service = _tags()
     sort_kind = tag_service.normalize_tags_sort_kind(request.args.get("sort_kind"))
     sort_dir = tag_service.normalize_tags_sort_dir(request.args.get("sort_dir"))
@@ -568,8 +557,7 @@ async def tags_view_detail_fragment(date: str):
 
     if not tag_name and not tag_hash_hex:
         tag_items = await tag_service.get_tags_index_items(
-            user["id"],
-            dek,
+            ctx,
             sort_kind=sort_kind,
             sort_dir=sort_dir,
         )
@@ -579,8 +567,7 @@ async def tags_view_detail_fragment(date: str):
             tag_hash_hex = first_item.hash
 
     detail = await tag_service.get_tag_detail(
-        user["id"],
-        dek,
+        ctx,
         tag_name=tag_name,
         tag_hash_hex=tag_hash_hex,
         entry_limit=DEFAULT_TAG_ENTRIES_LIMIT,
@@ -636,7 +623,7 @@ async def tags_view_detail_fragment(date: str):
 @login_required
 async def tags_view_heatmap(date: str):
     normalized_date = require_iso_date(date)
-    _, user, _ = await require_user_and_dek()
+    _, user, _ctx = await require_encryption_context()
     services = get_services()
     tag_hash_raw = (request.args.get("tag_hash") or "").strip()
     heatmap_offset = _parse_positive_int(
@@ -680,7 +667,7 @@ async def tags_view_heatmap(date: str):
 @login_required
 async def tags_view_detail_entries_chunk(date: str, tag_hash: str):
     normalized_date = require_iso_date(date)
-    _, user, dek = await require_user_and_dek()
+    _, user, ctx = await require_encryption_context()
     try:
         tag_hash_bytes = bytes.fromhex(tag_hash)
     except ValueError as exc:
@@ -694,9 +681,8 @@ async def tags_view_detail_entries_chunk(date: str, tag_hash: str):
         request.args.get("limit"), default=12, min_value=6, max_value=60
     )
     entries, next_cursor, has_more = await tag_service.get_archive_entries_page(
-        user["id"],
+        ctx,
         [tag_hash_bytes],
-        dek,
         limit=entries_limit,
         cursor=(request.args.get("cursor") or "").strip() or None,
     )

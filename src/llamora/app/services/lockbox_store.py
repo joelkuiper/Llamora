@@ -5,7 +5,7 @@ from typing import Any
 
 import orjson
 
-from llamora.app.services.crypto import EncryptionContext
+from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.lockbox import Lockbox, LockboxDecryptionError
 
 
@@ -14,10 +14,10 @@ class LockboxStore:
     lockbox: Lockbox
 
     async def get_json(
-        self, user_id: str, dek: bytes, namespace: str, key: str
+        self, ctx: CryptoContext, namespace: str, key: str
     ) -> Any | None:
         try:
-            value = await self.lockbox.get(user_id, dek, namespace, key)
+            value = await self.lockbox.get(ctx, namespace, key)
         except LockboxDecryptionError:
             return None
         if value is None:
@@ -29,7 +29,7 @@ class LockboxStore:
 
     async def set_json(
         self,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         namespace: str,
         key: str,
         payload: Any,
@@ -38,13 +38,13 @@ class LockboxStore:
         await self.lockbox.set(ctx, namespace, key, data)
 
     async def get_text(
-        self, user_id: str, dek: bytes, namespace: str, key: str
+        self, ctx: CryptoContext, namespace: str, key: str
     ) -> str | None:
-        payload = await self.get_json(user_id, dek, namespace, key)
+        payload = await self.get_json(ctx, namespace, key)
         return payload if isinstance(payload, str) else None
 
     async def set_text(
-        self, ctx: EncryptionContext, namespace: str, key: str, value: str
+        self, ctx: CryptoContext, namespace: str, key: str, value: str
     ) -> None:
         await self.set_json(ctx, namespace, key, value)
 

@@ -13,7 +13,7 @@ import orjson
 from quart import Response
 from werkzeug.datastructures import Headers
 
-from llamora.app.services.crypto import EncryptionContext
+from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.tag_recall import TagRecallContext
 
 
@@ -111,7 +111,7 @@ async def start_stream_session(
     entry_id: str,
     date: str,
     history: list[dict],
-    ctx: EncryptionContext,
+    ctx: CryptoContext,
     params: dict | None = None,
     context: dict | None = None,
     reply_to: str | None = None,

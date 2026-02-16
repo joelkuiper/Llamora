@@ -8,7 +8,7 @@ from typing import Any, Iterable
 
 import orjson
 
-from llamora.app.services.crypto import EncryptionContext
+from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.lockbox import Lockbox
 from llamora.app.services.lockbox_store import LockboxStore
 from llamora.app.services.digest_policy import entry_digest_aggregate, tag_digest
@@ -64,7 +64,7 @@ class SummarizeService:
 
     async def get_or_generate(
         self,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         *,
         prompt: SummaryPrompt,
         cache_namespace: str,
@@ -74,7 +74,7 @@ class SummarizeService:
     ) -> SummaryResult:
         """Full cache-check -> generate -> store pipeline."""
         cached_text = await self.get_cached(
-            ctx.user_id, ctx.dek, cache_namespace, cache_key, digest, field=cache_field
+            ctx, cache_namespace, cache_key, digest, field=cache_field
         )
         if cached_text is not None:
             return SummaryResult(text=cached_text, digest=digest, from_cache=True)
@@ -87,8 +87,7 @@ class SummarizeService:
 
     async def get_cached(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: CryptoContext,
         namespace: str,
         key: str,
         digest: str,
@@ -96,7 +95,7 @@ class SummarizeService:
         field: str = "text",
     ) -> str | None:
         """Check lockbox for a cached summary matching the given digest."""
-        cached = await self.store.get_json(user_id, dek, namespace, key)
+        cached = await self.store.get_json(ctx, namespace, key)
         if not isinstance(cached, dict):
             return None
         cached_digest = str(cached.get("digest") or "").strip()
@@ -108,7 +107,7 @@ class SummarizeService:
 
     async def cache(
         self,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         namespace: str,
         key: str,
         digest: str,
@@ -121,10 +120,10 @@ class SummarizeService:
 
     # -- Digest cache methods ------------------------------------------------
 
-    async def get_day_digest(self, ctx: EncryptionContext, date: str) -> str:
+    async def get_day_digest(self, ctx: CryptoContext, date: str) -> str:
         """Return the aggregate digest for a day, cached in lockbox."""
         cache_key = f"day:{date}"
-        cached = await self.store.get_json(ctx.user_id, ctx.dek, "digest", cache_key)
+        cached = await self.store.get_json(ctx, "digest", cache_key)
         if isinstance(cached, dict):
             value = cached.get("value")
             if isinstance(value, str) and value:
@@ -136,10 +135,10 @@ class SummarizeService:
         await self.store.set_json(ctx, "digest", cache_key, {"value": digest})
         return digest
 
-    async def get_tag_digest(self, ctx: EncryptionContext, tag_hash: bytes) -> str:
+    async def get_tag_digest(self, ctx: CryptoContext, tag_hash: bytes) -> str:
         """Return the aggregate digest for a tag, cached in lockbox."""
         cache_key = f"tag:{tag_hash.hex()}"
-        cached = await self.store.get_json(ctx.user_id, ctx.dek, "digest", cache_key)
+        cached = await self.store.get_json(ctx, "digest", cache_key)
         if isinstance(cached, dict):
             value = cached.get("value")
             if isinstance(value, str) and value:

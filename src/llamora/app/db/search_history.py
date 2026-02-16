@@ -6,23 +6,16 @@ from aiosqlitepool import SQLiteConnectionPool
 
 from llamora.settings import settings
 from .base import BaseRepository
-from llamora.app.services.crypto import EncryptionContext
+from llamora.app.services.crypto import CryptoContext
 
 
 class SearchHistoryRepository(BaseRepository):
     """Persist and retrieve encrypted user search history."""
 
-    def __init__(
-        self,
-        pool: SQLiteConnectionPool,
-        encrypt_message,
-        decrypt_message,
-    ) -> None:
+    def __init__(self, pool: SQLiteConnectionPool) -> None:
         super().__init__(pool)
-        self._encrypt_message = encrypt_message
-        self._decrypt_message = decrypt_message
 
-    async def record_search(self, ctx: EncryptionContext, query: str) -> None:
+    async def record_search(self, ctx: CryptoContext, query: str) -> None:
         """Store or update a search query for the given user."""
 
         normalized = (query or "").strip()
@@ -32,7 +25,7 @@ class SearchHistoryRepository(BaseRepository):
         query_hash = hashlib.sha256(
             f"{ctx.user_id}:{normalized.lower()}".encode("utf-8")
         ).digest()
-        nonce, ct, alg = self._encrypt_message(ctx, query_hash.hex(), normalized)
+        nonce, ct, alg = ctx.encrypt_entry(query_hash.hex(), normalized)
 
         async with self.pool.connection() as conn:
 
@@ -67,9 +60,7 @@ class SearchHistoryRepository(BaseRepository):
 
             await self._run_in_transaction(conn, _tx)
 
-    async def get_recent_searches(
-        self, user_id: str, limit: int, dek: bytes
-    ) -> list[str]:
+    async def get_recent_searches(self, ctx: CryptoContext, limit: int) -> list[str]:
         """Return the most recent search queries for the user."""
 
         async with self.pool.connection() as conn:
@@ -81,16 +72,14 @@ class SearchHistoryRepository(BaseRepository):
                 ORDER BY last_used DESC
                 LIMIT ?
                 """,
-                (user_id, limit),
+                (ctx.user_id, limit),
             )
             rows = await cursor.fetchall()
 
         results: list[str] = []
         for row in rows:
             try:
-                decrypted = self._decrypt_message(
-                    dek,
-                    user_id,
+                decrypted = ctx.decrypt_entry(
                     row["query_hash"].hex(),
                     row["query_nonce"],
                     row["query_ct"],

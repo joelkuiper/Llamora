@@ -10,7 +10,7 @@ import orjson
 from llamora.app.services.index_worker import IndexWorker
 from llamora.app.services.lexical_reranker import LexicalReranker
 from llamora.app.services.search_config import SearchConfig
-from llamora.app.services.crypto import EncryptionContext
+from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.search_pipeline import (
     BaseSearchCandidateGenerator,
     BaseSearchNormalizer,
@@ -36,7 +36,7 @@ from llamora.settings import settings
 
 logger = logging.getLogger(__name__)
 
-IndexJob = Tuple[EncryptionContext, str, str]
+IndexJob = Tuple[CryptoContext, str, str]
 
 
 class SearchAPI:
@@ -104,13 +104,13 @@ class SearchAPI:
             flush_interval=float(settings.WORKERS.index_worker.flush_interval),
         )
 
-    async def warm_index(self, ctx: EncryptionContext) -> None:
+    async def warm_index(self, ctx: CryptoContext) -> None:
         """Ensure the vector index for ``user_id`` is resident in memory."""
 
         start = time.perf_counter()
         logger.debug("Pre-warming vector index for user %s", ctx.user_id)
         try:
-            await self.vector_search.index_store.ensure_index(ctx.user_id, ctx.dek, ctx)
+            await self.vector_search.index_store.ensure_index(ctx)
         except Exception:  # pragma: no cover - defensive logging
             logger.exception("Vector index warm-up failed for user %s", ctx.user_id)
             return
@@ -134,7 +134,7 @@ class SearchAPI:
 
     async def enqueue_index_job(
         self,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         entry_id: str,
         plaintext: str,
     ) -> None:
@@ -176,7 +176,7 @@ class SearchAPI:
 
     async def search(
         self,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         query: str,
         k1: int | None = None,
         k2: int | None = None,
@@ -206,8 +206,7 @@ class SearchAPI:
             return result.normalized.text, [], result.truncated
 
         await self._tag_service.hydrate_search_results(
-            ctx.user_id,
-            ctx.dek,
+            ctx,
             result.results,
             result.enrichment.tokens,
         )
@@ -236,7 +235,7 @@ class SearchAPI:
 
     async def on_entry_appended(
         self,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         entry_id: str,
         plaintext: str,
     ) -> None:
@@ -250,7 +249,7 @@ class SearchAPI:
 
     async def search_stream(
         self,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         query: str,
         *,
         session_id: str | None,

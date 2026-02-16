@@ -12,7 +12,7 @@ from llamora.app.util.frecency import (
     resolve_frecency_lambda,
     DEFAULT_FRECENCY_DECAY,
 )
-from llamora.app.routes.helpers import require_encryption_context, require_user_and_dek
+from llamora.app.routes.helpers import require_encryption_context
 
 
 logger = logging.getLogger(__name__)
@@ -153,15 +153,15 @@ async def search():
 @login_required
 async def recent_searches():
     context = resolve_search_context(request)
-    _, user, dek = await require_user_and_dek()
+    _, user, ctx = await require_encryption_context()
 
     limit = context.recent_limit
     decay_constant = context.decay_constant
     history_repo = get_services().db.search_history
     tags_repo = get_services().db.tags
 
-    recent_task = history_repo.get_recent_searches(user["id"], limit, dek)
-    frecent_task = tags_repo.get_tag_frecency(user["id"], limit, decay_constant, dek)
+    recent_task = history_repo.get_recent_searches(ctx, limit)
+    frecent_task = tags_repo.get_tag_frecency(ctx, limit, decay_constant)
 
     queries, frecent_rows = await asyncio.gather(recent_task, frecent_task)
 

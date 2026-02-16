@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from llamora.app.services.crypto import EncryptionContext
+from llamora.app.services.crypto import CryptoContext
 from .candidate_generator import (
     BaseSearchCandidateGenerator,
     CandidateMap,
@@ -49,7 +49,7 @@ class SearchPipeline:
 
     async def execute(
         self,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         query: str,
         k1: int,
         k2: int,

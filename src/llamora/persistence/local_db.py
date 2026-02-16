@@ -15,13 +15,7 @@ from aiosqlitepool.protocols import Connection as SQLitePoolConnection
 
 from llamora.settings import settings
 
-from llamora.app.services.crypto import (
-    EncryptionContext,
-    encrypt_message,
-    decrypt_message,
-    encrypt_vector,
-    decrypt_vector,
-)
+from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.migrations import run_db_migrations
 from llamora.app.db.events import RepositoryEventBus
 from llamora.app.services.history_cache import HistoryCache
@@ -176,21 +170,15 @@ class LocalDB:
         self._users = UsersRepository(self.pool)
         self._entries = EntriesRepository(
             self.pool,
-            encrypt_message,
-            decrypt_message,
             self._events,
             self._history_cache,
         )
         self._tags = TagsRepository(
             self.pool,
-            encrypt_message,
-            decrypt_message,
             self._events,
         )
-        self._vectors = VectorsRepository(self.pool, encrypt_vector, decrypt_vector)
-        self._search_history = SearchHistoryRepository(
-            self.pool, encrypt_message, decrypt_message
-        )
+        self._vectors = VectorsRepository(self.pool)
+        self._search_history = SearchHistoryRepository(self.pool)
         self._entries.set_on_entry_appended(self._on_entry_appended)
 
     def _require_repository(
@@ -243,18 +231,21 @@ class LocalDB:
         return self._require_repository(self._search_history, "Search history")
 
     async def _on_entry_appended(
-        self, ctx: EncryptionContext, entry_id: str, plaintext: str
+        self, ctx: CryptoContext, entry_id: str, plaintext: str
     ) -> None:
         if self.search_api:
+            job_ctx = ctx.fork()
             asyncio.create_task(
-                self._safe_enqueue_index(ctx, entry_id, plaintext),
+                self._safe_enqueue_index(job_ctx, entry_id, plaintext),
                 name=f"index-{entry_id}",
             )
 
     async def _safe_enqueue_index(
-        self, ctx: EncryptionContext, entry_id: str, plaintext: str
+        self, ctx: CryptoContext, entry_id: str, plaintext: str
     ) -> None:
         try:
             await self.search_api.enqueue_index_job(ctx, entry_id, plaintext)
         except Exception:
             logger.exception("Failed to enqueue index job for %s", entry_id)
+        finally:
+            ctx.drop()

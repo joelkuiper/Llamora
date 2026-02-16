@@ -8,7 +8,7 @@ from typing import Any, Iterable, Mapping, Sequence, TypedDict
 import orjson
 import tiktoken
 
-from llamora.app.services.crypto import EncryptionContext
+from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.tag_recall_cache import (
     CacheKey,
     get_tag_recall_store,
@@ -208,7 +208,7 @@ async def _summarize_with_llm(
     text: str,
     *,
     max_chars: int,
-    ctx: EncryptionContext,
+    ctx: CryptoContext,
     tag_hash_hex: str,
     max_tokens: int,
     cache_limit: int,
@@ -220,7 +220,7 @@ async def _summarize_with_llm(
         return ""
 
     namespace = tag_recall_namespace(tag_hash_hex)
-    cached = await store.get_text(ctx.user_id, ctx.dek, namespace, cache_key)
+    cached = await store.get_text(ctx, namespace, cache_key)
     if cached is not None:
         return cached
 
@@ -391,8 +391,7 @@ def _build_extractive_snippet(
 
 async def _build_recall_plan(
     db,
-    user_id: str,
-    dek: bytes,
+    ctx: CryptoContext,
     *,
     focus_tags: Sequence[bytes],
     tag_names: Mapping[bytes, str],
@@ -404,7 +403,7 @@ async def _build_recall_plan(
     max_created_at: str | None,
 ) -> RecallPlan:
     tag_entries = await db.tags.get_recent_entries_by_tag_hashes(
-        user_id,
+        ctx.user_id,
         focus_tags,
         per_tag_limit=max_snippets,
         max_entry_id=max_entry_id,
@@ -422,9 +421,8 @@ async def _build_recall_plan(
         return RecallPlan(slices=tuple())
 
     candidate_entries = await db.entries.get_recall_candidates_by_ids(
-        user_id,
+        ctx,
         all_ids,
-        dek,
         max_entry_id=max_entry_id,
         max_created_at=max_created_at,
     )
@@ -494,7 +492,7 @@ async def _build_recall_plan(
 
 async def build_tag_recall_context(
     db,
-    ctx: EncryptionContext,
+    ctx: CryptoContext,
     *,
     history: Sequence[Mapping[str, Any] | dict[str, Any]],
     current_date: str | None,
@@ -527,9 +525,7 @@ async def build_tag_recall_context(
         return None
 
     if target_entry_id:
-        entry_tags = await db.tags.get_tags_for_entry(
-            ctx.user_id, target_entry_id, ctx.dek
-        )
+        entry_tags = await db.tags.get_tags_for_entry(ctx, target_entry_id)
         focus_tags, tag_names = _extract_raw_tags(entry_tags, cfg.max_tags)
     else:
         focus_tags, tag_names = _extract_focus_tags(
@@ -551,8 +547,7 @@ async def build_tag_recall_context(
     focus_slice = focus_tags[: cfg.max_tags]
     plan = await _build_recall_plan(
         db,
-        ctx.user_id,
-        ctx.dek,
+        ctx,
         focus_tags=focus_slice,
         tag_names=tag_names,
         history_ids=history_ids,
@@ -582,7 +577,7 @@ async def build_tag_recall_context(
             max_snippets=cfg.max_snippets,
         )
         namespace = tag_recall_namespace(tag_hash)
-        cached = await store.get_text(ctx.user_id, ctx.dek, namespace, cache_key)
+        cached = await store.get_text(ctx, namespace, cache_key)
 
         if cfg.mode == "summary":
             if llm is None:
@@ -614,20 +609,24 @@ async def build_tag_recall_context(
             return None
 
         if cfg.mode == "hybrid" and cfg.background_summarize and llm is not None:
+            bg_ctx = ctx.fork()
 
             async def _background() -> None:
-                await _summarize_with_llm(
-                    summarize_service,
-                    llm,
-                    aggregate,
-                    max_chars=cfg.summary_max_chars,
-                    ctx=ctx,
-                    tag_hash_hex=tag_hash,
-                    max_tokens=cfg.llm_max_tokens,
-                    cache_limit=cfg.summary_cache_max,
-                    cache_key=cache_key,
-                    store=store,
-                )
+                try:
+                    await _summarize_with_llm(
+                        summarize_service,
+                        llm,
+                        aggregate,
+                        max_chars=cfg.summary_max_chars,
+                        ctx=bg_ctx,
+                        tag_hash_hex=tag_hash,
+                        max_tokens=cfg.llm_max_tokens,
+                        cache_limit=cfg.summary_cache_max,
+                        cache_key=cache_key,
+                        store=store,
+                    )
+                finally:
+                    bg_ctx.drop()
 
             asyncio.create_task(_background())
 

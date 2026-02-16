@@ -8,8 +8,8 @@ from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
 from llamora.app.services.container import get_services
+from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.markdown import render_markdown_to_html
-from llamora.app.services.session_context import get_session_context
 from llamora.app.services.time import local_date, date_and_part
 from datetime import date as date_cls
 
@@ -71,21 +71,20 @@ class EntryContext:
 
 async def build_entry_context(
     db,
-    user_id: str,
-    dek: bytes,
+    ctx: CryptoContext,
     *,
     entry_id: str,
 ) -> dict[str, Any] | None:
     """Build a context payload for a single user entry."""
 
-    entries = await db.entries.get_entries_by_ids(user_id, [entry_id], dek)
+    entries = await db.entries.get_entries_by_ids(ctx, [entry_id])
     if not entries:
         logger.info("Entry context skipped; entry %s not found", entry_id)
         return None
 
     entry = entries[0]
     text = str(entry.get("text") or "").strip()
-    tags = await db.tags.get_tags_for_entry(user_id, entry_id, dek)
+    tags = await db.tags.get_tags_for_entry(ctx, entry_id)
     tag_metadata = _extract_tag_metadata(entry.get("meta"))
     payload = EntryContext(
         entry_id=str(entry.get("id") or entry_id),
@@ -97,14 +96,14 @@ async def build_entry_context(
 
 
 async def get_entries_context(
+    ctx: CryptoContext,
     user: Mapping[str, Any],
     date: str,
 ) -> dict[str, Any]:
     """Return shared entry rendering context details for ``user`` on ``date``."""
 
     services = get_services()
-    dek = await get_session_context().require_dek()
-    entries = await services.db.entries.get_entries_for_date(user["id"], date, dek)
+    entries = await services.db.entries.get_entries_for_date(ctx, date)
     _render_entries_markdown(entries)
 
     today_date = local_date()

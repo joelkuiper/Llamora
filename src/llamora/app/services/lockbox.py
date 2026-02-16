@@ -6,22 +6,11 @@ from logging import getLogger
 from time import time
 
 from aiosqlitepool import SQLiteConnectionPool
-from nacl.bindings import (
-    crypto_aead_xchacha20poly1305_ietf_decrypt,
-    crypto_aead_xchacha20poly1305_ietf_encrypt,
-)
-from nacl.exceptions import CryptoError
-from nacl.utils import random as random_bytes
 
-from llamora.app.services.crypto import (
-    CURRENT_SUITE,
-    CryptoDescriptor,
-    EncryptionContext,
-)
+from llamora.app.services.crypto import CURRENT_SUITE, CryptoDescriptor, CryptoContext
 
 logger = getLogger(__name__)
 
-_NONCE_BYTES = 24
 _MAX_NAME_LENGTH = 128
 
 
@@ -35,7 +24,7 @@ class Lockbox:
 
     async def set(
         self,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         namespace: str,
         key: str,
         value: bytes,
@@ -43,12 +32,11 @@ class Lockbox:
         self._validate_user_id(ctx.user_id)
         self._validate_name(namespace, "namespace")
         self._validate_name(key, "key")
-        self._validate_dek(ctx.dek)
         if ctx.epoch <= 0:
             logger.warning("Encryption write missing epoch metadata for lockbox.set")
             raise ValueError("missing encryption epoch metadata")
         scoped_namespace = self._scope_namespace(ctx.user_id, namespace)
-        packed = self._encrypt(ctx.dek, ctx.user_id, namespace, key, value)
+        packed = ctx.encrypt_lockbox(namespace, key, value)
         descriptor = CryptoDescriptor(algorithm=CURRENT_SUITE, epoch=ctx.epoch)
         alg = descriptor.encode()
         updated_at = int(time())
@@ -69,16 +57,14 @@ class Lockbox:
 
     async def get(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: CryptoContext,
         namespace: str,
         key: str,
     ) -> bytes | None:
-        self._validate_user_id(user_id)
+        self._validate_user_id(ctx.user_id)
         self._validate_name(namespace, "namespace")
         self._validate_name(key, "key")
-        self._validate_dek(dek)
-        scoped_namespace = self._scope_namespace(user_id, namespace)
+        scoped_namespace = self._scope_namespace(ctx.user_id, namespace)
 
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
@@ -88,7 +74,7 @@ class Lockbox:
             row = await cursor.fetchone()
             if row is None:
                 return None
-            return self._decrypt(dek, user_id, namespace, key, bytes(row["value"]))
+            return ctx.decrypt_lockbox(namespace, key, bytes(row["value"]))
 
     async def delete(self, user_id: str, namespace: str, key: str) -> None:
         self._validate_user_id(user_id)
@@ -130,59 +116,9 @@ class Lockbox:
             rows = await cursor.fetchall()
             return [str(row[0]) for row in rows]
 
-    def _encrypt(
-        self,
-        dek: bytes,
-        user_id: str,
-        namespace: str,
-        key: str,
-        plaintext: bytes,
-    ) -> bytes:
-        nonce = random_bytes(_NONCE_BYTES)
-        aad = self._aad(user_id, namespace, key)
-        ciphertext = crypto_aead_xchacha20poly1305_ietf_encrypt(
-            plaintext,
-            aad,
-            nonce,
-            dek,
-        )
-        return nonce + ciphertext
-
-    def _decrypt(
-        self,
-        dek: bytes,
-        user_id: str,
-        namespace: str,
-        key: str,
-        packed: bytes,
-    ) -> bytes:
-        if len(packed) <= _NONCE_BYTES:
-            raise LockboxDecryptionError("failed to decrypt lockbox value")
-
-        nonce = packed[:_NONCE_BYTES]
-        ciphertext = packed[_NONCE_BYTES:]
-        aad = self._aad(user_id, namespace, key)
-        try:
-            return crypto_aead_xchacha20poly1305_ietf_decrypt(
-                ciphertext,
-                aad,
-                nonce,
-                dek,
-            )
-        except CryptoError as exc:
-            logger.warning("Lockbox authentication failed")
-            raise LockboxDecryptionError("failed to decrypt lockbox value") from exc
-
-    def _aad(self, user_id: str, namespace: str, key: str) -> bytes:
-        return f"{user_id}:{namespace}:{key}".encode("utf-8")
-
     def _scope_namespace(self, user_id: str, namespace: str) -> str:
         digest = hashlib.sha256(user_id.encode("utf-8")).hexdigest()
         return f"{digest}:{namespace}"
-
-    def _validate_dek(self, dek: bytes) -> None:
-        if len(dek) != 32:
-            raise ValueError("invalid key material")
 
     def _validate_user_id(self, user_id: str) -> None:
         if not user_id:

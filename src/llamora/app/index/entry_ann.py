@@ -8,7 +8,7 @@ import numpy as np
 
 from llamora.app.embed.model import async_embed_texts
 from llamora.app.services.chunking import chunk_text
-from llamora.app.services.crypto import EncryptionContext
+from llamora.app.services.crypto import CryptoContext
 from llamora.settings import settings
 
 
@@ -323,7 +323,7 @@ class EntryIndexStore:
         )
         self._backfill_order: list[str] = []
         self._backfill_cursor = 0
-        self._contexts: Dict[str, EncryptionContext] = {}
+        self._contexts: Dict[str, CryptoContext] = {}
         self._coverage_cache: Dict[str, dict[str, float | int | str]] = {}
         self._last_coverage_emit: Dict[str, float] = {}
 
@@ -363,6 +363,9 @@ class EntryIndexStore:
                 self.cursors.pop(user_id, None)
                 self.locks.pop(user_id, None)
                 self._warm_tasks.pop(user_id, None)
+                ctx = self._contexts.pop(user_id, None)
+                if ctx is not None:
+                    ctx.drop()
                 total_bytes = max(total_bytes - reclaimed, 0)
                 evicted += 1
         self._emit_budget_pressure(evicted=evicted, total_bytes=total_bytes)
@@ -386,10 +389,13 @@ class EntryIndexStore:
     def _get_lock(self, user_id: str) -> asyncio.Lock:
         return self.locks.setdefault(user_id, asyncio.Lock())
 
-    def _remember_context(self, ctx: EncryptionContext | None) -> None:
+    def _remember_context(self, ctx: CryptoContext | None) -> None:
         if ctx is None:
             return
-        self._contexts[ctx.user_id] = ctx
+        previous = self._contexts.pop(ctx.user_id, None)
+        if previous is not None:
+            previous.drop()
+        self._contexts[ctx.user_id] = ctx.fork()
 
     def _invalidate_coverage(self, user_id: str) -> None:
         self._coverage_cache.pop(user_id, None)
@@ -412,7 +418,7 @@ class EntryIndexStore:
 
     async def get_index_coverage(
         self,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         *,
         recalculate: bool = False,
     ) -> dict[str, float | int | str]:
@@ -422,11 +428,10 @@ class EntryIndexStore:
             if cached is not None:
                 return cached
 
-        idx = await self.ensure_index(user_id, ctx.dek, ctx)
+        idx = await self.ensure_index(ctx)
         rows = await self.db.entries.get_latest_entries(
-            user_id,
+            ctx,
             self.coverage_recent_limit,
-            ctx.dek,
         )
         total_recent = len(rows)
         indexed_recent = sum(1 for row in rows if idx.contains_entry(row["id"]))
@@ -512,7 +517,7 @@ class EntryIndexStore:
 
     async def _embed_and_store(
         self,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         entries: Iterable[dict],
         idx: Optional[EntryIndex],
     ) -> EntryIndex:
@@ -584,9 +589,8 @@ class EntryIndexStore:
         self._invalidate_coverage(ctx.user_id)
         return idx
 
-    async def ensure_index(
-        self, user_id: str, dek: bytes, ctx: EncryptionContext | None = None
-    ) -> EntryIndex:
+    async def ensure_index(self, ctx: CryptoContext) -> EntryIndex:
+        user_id = ctx.user_id
         logger.debug("Ensuring index for user %s", user_id)
         self._remember_context(ctx)
         lock = self._get_lock(user_id)
@@ -597,9 +601,7 @@ class EntryIndexStore:
                 idx.touch()
                 return idx
 
-            rows = await self.db.vectors.get_latest_vectors(
-                user_id, self.warm_limit, dek
-            )
+            rows = await self.db.vectors.get_latest_vectors(ctx, self.warm_limit)
             if rows:
                 logger.debug(
                     "Warming index for user %s with %d vectors", user_id, len(rows)
@@ -616,9 +618,7 @@ class EntryIndexStore:
                 self.indexes[user_id] = idx
                 self._invalidate_coverage(user_id)
 
-                entries = await self.db.entries.get_latest_entries(
-                    user_id, self.warm_limit, dek
-                )
+                entries = await self.db.entries.get_latest_entries(ctx, self.warm_limit)
                 missing = [
                     entry for entry in entries if not idx.contains_entry(entry["id"])
                 ]
@@ -628,18 +628,10 @@ class EntryIndexStore:
                         len(missing),
                         user_id,
                     )
-                    if ctx is None:
-                        logger.warning(
-                            "Skipping vector warm-up for user %s; missing encryption context",
-                            user_id,
-                        )
-                    else:
-                        self._schedule_warm(ctx, missing)
+                    self._schedule_warm(ctx, missing)
                 return idx
 
-            entries = await self.db.entries.get_latest_entries(
-                user_id, self.warm_limit, dek
-            )
+            entries = await self.db.entries.get_latest_entries(ctx, self.warm_limit)
             if entries:
                 logger.debug(
                     "Embedding and indexing %d entries for user %s",
@@ -652,13 +644,7 @@ class EntryIndexStore:
                 self._invalidate_coverage(user_id)
                 cursor = entries[-1]["id"]
                 self.cursors[user_id] = cursor
-                if ctx is None:
-                    logger.warning(
-                        "Skipping vector warm-up for user %s; missing encryption context",
-                        user_id,
-                    )
-                else:
-                    self._schedule_warm(ctx, entries)
+                self._schedule_warm(ctx, entries)
                 return idx
 
             logger.debug("No existing data for user %s, creating empty index", user_id)
@@ -669,11 +655,13 @@ class EntryIndexStore:
             self.indexes[user_id] = idx
             return idx
 
-    def _schedule_warm(self, ctx: EncryptionContext, entries: list[dict]) -> None:
+    def _schedule_warm(self, ctx: CryptoContext, entries: list[dict]) -> None:
         user_id = ctx.user_id
         existing = self._warm_tasks.get(user_id)
         if existing and not existing.done():
             return
+
+        warm_ctx = ctx.fork()
 
         async def worker() -> None:
             try:
@@ -685,11 +673,12 @@ class EntryIndexStore:
                     lock = self._get_lock(user_id)
                     async with lock:
                         idx = self.indexes.get(user_id)
-                        await self._embed_and_store(ctx, batch, idx)
+                        await self._embed_and_store(warm_ctx, batch, idx)
                     await asyncio.sleep(0)
             except Exception:
                 logger.exception("Warm-up failed for user %s", user_id)
             finally:
+                warm_ctx.drop()
                 task = self._warm_tasks.get(user_id)
                 if task is not None and task.done():
                     self._warm_tasks.pop(user_id, None)
@@ -698,15 +687,14 @@ class EntryIndexStore:
 
     async def expand_older(
         self,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         batch: int,
         *,
         embed_missing: bool = True,
     ) -> int:
         user_id = ctx.user_id
-        dek = ctx.dek
         self._remember_context(ctx)
-        await self.ensure_index(user_id, dek, ctx)
+        await self.ensure_index(ctx)
         lock = self._get_lock(user_id)
         async with lock:
             cursor = self.cursors.get(user_id)
@@ -722,9 +710,7 @@ class EntryIndexStore:
             added = 0
             new_cursor = cursor
 
-            rows = await self.db.vectors.get_vectors_older_than(
-                user_id, cursor, batch, dek
-            )
+            rows = await self.db.vectors.get_vectors_older_than(ctx, cursor, batch)
             if rows:
                 logger.debug(
                     "Loaded %d stored vectors older than %s for user %s",
@@ -740,9 +726,7 @@ class EntryIndexStore:
                 added += len(ids)
                 new_cursor = rows[-1]["entry_id"]
 
-            entries = await self.db.entries.get_entries_older_than(
-                user_id, cursor, batch, dek
-            )
+            entries = await self.db.entries.get_entries_older_than(ctx, cursor, batch)
             missing = [
                 entry for entry in entries if not idx.contains_entry(entry["id"])
             ]
@@ -768,26 +752,26 @@ class EntryIndexStore:
             return added
 
     async def hydrate_entries(
-        self, user_id: str, entry_ids: list[str], dek: bytes
+        self, ctx: CryptoContext, entry_ids: list[str]
     ) -> list[dict]:
         if not entry_ids:
             return []
-        rows = await self.db.entries.get_entries_by_ids(user_id, entry_ids, dek)
+        rows = await self.db.entries.get_entries_by_ids(ctx, entry_ids)
         return rows
 
     async def index_entry(
-        self, ctx: EncryptionContext, entry_id: str, content: str
+        self, ctx: CryptoContext, entry_id: str, content: str
     ) -> None:
         await self.bulk_index([(ctx, entry_id, content)])
 
     async def bulk_index(
-        self, entries: Iterable[tuple[EncryptionContext, str, str]]
+        self, entries: Iterable[tuple[CryptoContext, str, str]]
     ) -> None:
         items = list(entries)
         if not items:
             return
 
-        pending: list[tuple[EncryptionContext, str, str, int, str]] = []
+        pending: list[tuple[CryptoContext, str, str, int, str]] = []
         for ctx, entry_id, content in items:
             chunks = self._chunk_entry(content)
             for chunk_index, chunk_part in enumerate(chunks):
@@ -803,7 +787,7 @@ class EntryIndexStore:
             raise ValueError("Embedding count does not match input items")
 
         per_user_vectors: Dict[
-            str, list[tuple[str, str, int, np.ndarray, EncryptionContext]]
+            str, list[tuple[str, str, int, np.ndarray, CryptoContext]]
         ] = {}
         for (ctx, entry_id, vector_id, chunk_index, _), vec in zip(pending, vecs):
             per_user_vectors.setdefault(ctx.user_id, []).append(
@@ -818,7 +802,7 @@ class EntryIndexStore:
 
         for user_id, user_entries in per_user_vectors.items():
             ctx = user_entries[0][4]
-            idx = await self.ensure_index(user_id, ctx.dek, ctx)
+            idx = await self.ensure_index(ctx)
             lock = self._get_lock(user_id)
             ids = [vector_id for vector_id, _, _, _, _ in user_entries]
             vec_arr = np.asarray(
@@ -860,6 +844,9 @@ class EntryIndexStore:
             lock = self.locks.pop(uid, None)
             if lock and lock.locked():
                 logger.debug("Lock for user %s remained locked during eviction", uid)
+            ctx = self._contexts.pop(uid, None)
+            if ctx is not None:
+                ctx.drop()
 
     async def maintenance(self) -> None:
         now = time.monotonic()

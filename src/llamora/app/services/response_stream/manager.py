@@ -10,7 +10,7 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import suppress
 
 from llamora.llm.client import LLMClient
-from llamora.app.services.crypto import EncryptionContext
+from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.service_pulse import ServicePulse
 from llamora.app.services.queues import FairAsyncQueue
 
@@ -33,7 +33,7 @@ class PendingResponse(ResponsePipelineCallbacks):
     def __init__(
         self,
         entry_id: str,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         date: str,
         history: list[dict],
         llm: LLMClient,
@@ -119,6 +119,9 @@ class PendingResponse(ResponsePipelineCallbacks):
         self._task.add_done_callback(self._handle_task_result)
         if auto_start:
             self.start()
+
+    def drop_context(self) -> None:
+        self._ctx.drop()
 
     @property
     def uid(self) -> str:
@@ -298,7 +301,7 @@ class ResponseStreamManager:
     def set_db(self, db) -> None:
         self._db = db
 
-    def get(self, entry_id: str, ctx: EncryptionContext) -> PendingResponse | None:
+    def get(self, entry_id: str, ctx: CryptoContext) -> PendingResponse | None:
         pending = self._pending.get(entry_id)
         if not pending:
             return None
@@ -375,7 +378,7 @@ class ResponseStreamManager:
     def start_stream(
         self,
         entry_id: str,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         date: str,
         history: list[dict],
         params: dict | None = None,
@@ -414,9 +417,10 @@ class ResponseStreamManager:
                 retry_after = self._estimate_retry_after(queue_depth + 1, max_slots)
                 raise StreamCapacityError(retry_after, queue_depth=queue_depth)
 
+            stream_ctx = ctx.fork()
             pending = PendingResponse(
                 entry_id,
-                ctx,
+                stream_ctx,
                 date,
                 history,
                 self._llm,
@@ -437,9 +441,10 @@ class ResponseStreamManager:
             self._ensure_queue_worker()
             return pending
 
+        stream_ctx = ctx.fork()
         pending = PendingResponse(
             entry_id,
-            ctx,
+            stream_ctx,
             date,
             history,
             self._llm,
@@ -459,7 +464,7 @@ class ResponseStreamManager:
         self._activate_pending(pending)
         return pending
 
-    async def stop(self, entry_id: str, ctx: EncryptionContext) -> tuple[bool, bool]:
+    async def stop(self, entry_id: str, ctx: CryptoContext) -> tuple[bool, bool]:
         self._prune_stale_pending()
         pending = self._pending.get(entry_id)
         if pending and pending.uid != ctx.user_id:
@@ -487,6 +492,8 @@ class ResponseStreamManager:
         if pending and pending.started_at is not None:
             duration = max(0.0, time.monotonic() - pending.started_at)
             self._update_stream_duration(duration)
+        if pending is not None:
+            pending.drop_context()
         self._queue.remove(entry_id)
         self._active_ids.discard(entry_id)
         self._publish_queue_state()

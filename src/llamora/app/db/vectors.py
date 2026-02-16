@@ -6,25 +6,21 @@ import numpy as np
 from aiosqlitepool import SQLiteConnectionPool
 
 from .base import BaseRepository
-from llamora.app.services.crypto import EncryptionContext
+from llamora.app.services.crypto import CryptoContext
 
 
 class VectorsRepository(BaseRepository):
     """Persistence helpers for encrypted vector embeddings."""
 
-    def __init__(
-        self, pool: SQLiteConnectionPool, encrypt_vector, decrypt_vector
-    ) -> None:
+    def __init__(self, pool: SQLiteConnectionPool) -> None:
         super().__init__(pool)
-        self._encrypt_vector = encrypt_vector
-        self._decrypt_vector = decrypt_vector
 
     async def store_vector(
         self,
         vector_id: str,
         entry_id: str,
         vec: np.ndarray,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         dtype: str = "float32",
     ) -> None:
         dim, nonce, ct, alg = await asyncio.to_thread(
@@ -68,7 +64,7 @@ class VectorsRepository(BaseRepository):
     async def store_vectors_batch(
         self,
         vectors: list[tuple[str, str, int, np.ndarray]],
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         dtype: str = "float32",
     ) -> None:
         if not vectors:
@@ -124,9 +120,7 @@ class VectorsRepository(BaseRepository):
                 ],
             )
 
-    async def get_latest_vectors(
-        self, user_id: str, limit: int, dek: bytes
-    ) -> list[dict]:
+    async def get_latest_vectors(self, ctx: CryptoContext, limit: int) -> list[dict]:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
@@ -136,19 +130,18 @@ class VectorsRepository(BaseRepository):
                 ORDER BY m.id DESC
                 LIMIT ?
                 """,
-                (user_id, limit),
+                (ctx.user_id, limit),
             )
             rows = await cursor.fetchall()
 
         return await asyncio.to_thread(
             self._decrypt_vector_rows,
             rows,
-            dek,
-            user_id,
+            ctx,
         )
 
     async def get_vectors_older_than(
-        self, user_id: str, before_id: str, limit: int, dek: bytes
+        self, ctx: CryptoContext, before_id: str, limit: int
     ) -> list[dict]:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
@@ -160,21 +153,20 @@ class VectorsRepository(BaseRepository):
                 ORDER BY m.id DESC
                 LIMIT ?
                 """,
-                (user_id, before_id, limit),
+                (ctx.user_id, before_id, limit),
             )
             rows = await cursor.fetchall()
 
         return await asyncio.to_thread(
             self._decrypt_vector_rows,
             rows,
-            dek,
-            user_id,
+            ctx,
         )
 
     def _prepare_encrypted_vector(
         self,
         vec: np.ndarray,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         entry_id: str,
         vector_id: str,
         dtype: str,
@@ -182,18 +174,13 @@ class VectorsRepository(BaseRepository):
         np_dtype = np.float16 if dtype == "float16" else np.float32
         vec_arr = np.asarray(vec, dtype=np_dtype)
         dim = int(vec_arr.shape[0])
-        nonce, ct, alg = self._encrypt_vector(
-            ctx,
-            entry_id,
-            vector_id,
-            vec_arr.tobytes(),
-        )
+        nonce, ct, alg = ctx.encrypt_vector(entry_id, vector_id, vec_arr.tobytes())
         return dim, nonce, ct, alg
 
     def _prepare_batch_records(
         self,
         vectors: list[tuple[str, str, int, np.ndarray]],
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         dtype: str,
     ) -> list[tuple[str, str, str, int, int, bytes, bytes, bytes, str]]:
         records: list[tuple[str, str, str, int, int, bytes, bytes, bytes, str]] = []
@@ -201,12 +188,7 @@ class VectorsRepository(BaseRepository):
         for vector_id, entry_id, chunk_index, vec in vectors:
             vec_arr = np.asarray(vec, dtype=np_dtype).ravel()
             dim = int(vec_arr.shape[0])
-            nonce, ct, alg = self._encrypt_vector(
-                ctx,
-                entry_id,
-                vector_id,
-                vec_arr.tobytes(),
-            )
+            nonce, ct, alg = ctx.encrypt_vector(entry_id, vector_id, vec_arr.tobytes())
             records.append(
                 (
                     vector_id,
@@ -222,7 +204,7 @@ class VectorsRepository(BaseRepository):
             )
         return records
 
-    def _decrypt_vector_rows(self, rows, dek: bytes, user_id: str) -> list[dict]:
+    def _decrypt_vector_rows(self, rows, ctx: CryptoContext) -> list[dict]:
         vectors: list[dict] = []
         for row in rows:
             dtype = None
@@ -233,9 +215,7 @@ class VectorsRepository(BaseRepository):
                 dtype = row.get("dtype") if isinstance(row, dict) else None
             dtype = (dtype or "float32").lower()
             np_dtype = np.float16 if dtype == "float16" else np.float32
-            vec_bytes = self._decrypt_vector(
-                dek,
-                user_id,
+            vec_bytes = ctx.decrypt_vector(
                 row["entry_id"],
                 row["id"],
                 row["nonce"],

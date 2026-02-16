@@ -11,7 +11,6 @@ from urllib.parse import quote, urlparse
 from nacl import secret
 
 from llamora.app.services.container import get_services
-from llamora.app.services.crypto import set_crypto_epoch
 
 SECURE_COOKIE_MANAGER_KEY = "llamora_secure_cookie_manager"
 _MISSING_USER = object()
@@ -265,9 +264,6 @@ class SecureCookieManager:
         user = await self.get_current_user()
         if user:
             _ = self.get_dek()
-            epoch = user.get("current_epoch")
-            if epoch is not None:
-                set_crypto_epoch(int(epoch))
             current_app.logger.debug("Loaded user %s for request", user["id"])
         else:
             current_app.logger.debug("No user loaded for request")

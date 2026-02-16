@@ -6,6 +6,7 @@ import calendar as _calendar
 from datetime import date
 
 from llamora.app.services.container import get_services
+from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.time import local_date
 
 
@@ -42,10 +43,9 @@ def _clamp(value: int, minimum: int, maximum: int) -> int:
 
 
 async def get_month_context(
-    user_id: str,
+    ctx: CryptoContext,
     year: int,
     month: int,
-    dek: bytes,
     *,
     today: date | None = None,
 ) -> dict:
@@ -63,8 +63,8 @@ async def get_month_context(
     today_iso = today_date.isoformat()
 
     services = get_services()
-    state = await services.db.users.get_state(user_id)
-    min_date_iso = await services.db.entries.get_first_entry_date(user_id)
+    state = await services.db.users.get_state(ctx.user_id)
+    min_date_iso = await services.db.entries.get_first_entry_date(ctx.user_id)
     if min_date_iso:
         min_date_obj = date.fromisoformat(min_date_iso)
     else:
@@ -118,10 +118,10 @@ async def get_month_context(
         clamped_day = _clamp(desired_day, month_min_day, month_max_day)
         active_day_iso = date(selected_year, selected_month, clamped_day).isoformat()
     active_days, opening_only_days = await services.db.entries.get_days_with_entries(
-        user_id, selected_year, selected_month, dek
+        ctx.user_id, selected_year, selected_month
     )
     day_summary_digests = await services.db.entries.get_day_summary_digests(
-        user_id, selected_year, selected_month
+        ctx.user_id, selected_year, selected_month
     )
     prev_year, prev_month, next_year, next_month = _nav_months(
         selected_year, selected_month, min_month_start, max_month_start

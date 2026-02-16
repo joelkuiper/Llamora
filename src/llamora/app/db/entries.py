@@ -12,7 +12,7 @@ from ulid import ULID
 from llamora.llm.tokenizers.tokenizer import count_message_tokens
 
 from llamora.app.services.history_cache import HistoryCache
-from llamora.app.services.crypto import EncryptionContext, entry_digest
+from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.digest_policy import ENTRY_DIGEST_VERSION, day_digest
 
 from .base import BaseRepository
@@ -24,7 +24,7 @@ from .events import (
 )
 from .utils import cached_tag_name, get_month_bounds
 
-EntryAppendedCallback = Callable[[EncryptionContext, str, str], Awaitable[None]]
+EntryAppendedCallback = Callable[[CryptoContext, str, str], Awaitable[None]]
 
 _FLAG_PATTERN = re.compile(r"^[a-z0-9_]+$")
 _AUTO_OPENING_FLAG = "auto_opening"
@@ -70,14 +70,10 @@ class EntriesRepository(BaseRepository):
     def __init__(
         self,
         pool: SQLiteConnectionPool,
-        encrypt_message,
-        decrypt_message,
         event_bus: RepositoryEventBus | None = None,
         history_cache: HistoryCache | None = None,
     ) -> None:
         super().__init__(pool)
-        self._encrypt_message = encrypt_message
-        self._decrypt_message = decrypt_message
         self._on_entry_appended: EntryAppendedCallback | None = None
         self._event_bus = event_bus
         if history_cache is None:
@@ -98,7 +94,7 @@ class EntriesRepository(BaseRepository):
         await self._history_cache.store(user_id, created_date, history)
 
     def _rows_to_entries(
-        self, rows, user_id: str, dek: bytes
+        self, rows, ctx: CryptoContext
     ) -> list[dict]:  # pragma: no cover - trivial helper
         entries: list[dict] = []
         for row in rows:
@@ -111,9 +107,7 @@ class EntriesRepository(BaseRepository):
                 updated_at = row["updated_at"]
             if "digest" in row.keys():
                 digest = row["digest"]
-            record_json = self._decrypt_message(
-                dek,
-                user_id,
+            record_json = ctx.decrypt_entry(
                 row["id"],
                 row["nonce"],
                 row["ciphertext"],
@@ -136,7 +130,7 @@ class EntriesRepository(BaseRepository):
             )
         return entries
 
-    def _rows_to_history(self, rows, user_id: str, dek: bytes) -> list[dict]:
+    def _rows_to_history(self, rows, ctx: CryptoContext) -> list[dict]:
         history: list[dict] = []
         current: dict | None = None
         for row in rows:
@@ -145,9 +139,7 @@ class EntriesRepository(BaseRepository):
                 updated_at = None
                 if "updated_at" in row.keys():
                     updated_at = row["updated_at"]
-                record_json = self._decrypt_message(
-                    dek,
-                    user_id,
+                record_json = ctx.decrypt_entry(
                     entry_id,
                     row["nonce"],
                     row["ciphertext"],
@@ -168,13 +160,11 @@ class EntriesRepository(BaseRepository):
                 history.append(current)
             if row["tag_hash"] is not None and current is not None:
                 tag_name = cached_tag_name(
-                    user_id,
+                    ctx,
                     row["tag_hash"],
                     row["name_nonce"],
                     row["name_ct"],
                     row["tag_alg"].encode(),
-                    dek,
-                    self._decrypt_message,
                 )
                 current["tags"].append(
                     {"name": tag_name, "hash": row["tag_hash"].hex()}
@@ -208,15 +198,17 @@ class EntriesRepository(BaseRepository):
         return entries
 
     @staticmethod
-    def _require_entry_digest(dek: bytes, entry_id: str, role: str, text: str) -> str:
-        digest = entry_digest(dek, entry_id, role, text)
+    def _require_entry_digest(
+        ctx: CryptoContext, entry_id: str, role: str, text: str
+    ) -> str:
+        digest = ctx.entry_digest(entry_id, role, text)
         if not digest:
             raise ValueError(f"unable to compute digest for entry {entry_id}")
         return digest
 
     async def append_entry(
         self,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         role: str,
         content: str,
         meta: dict | None = None,
@@ -227,13 +219,11 @@ class EntriesRepository(BaseRepository):
         entry_id = str(ULID())
         record = {"text": content, "meta": meta or {}}
         plaintext = orjson.dumps(record).decode()
-        nonce, ct, alg = self._encrypt_message(ctx, entry_id, plaintext)
+        nonce, ct, alg = ctx.encrypt_entry(entry_id, plaintext)
         prompt_tokens = await asyncio.to_thread(
             count_message_tokens, role, record.get("text", "")
         )
-        digest = self._require_entry_digest(
-            ctx.dek, entry_id, role, record.get("text", "")
-        )
+        digest = self._require_entry_digest(ctx, entry_id, role, record.get("text", ""))
         flags = build_entry_flags_from_meta(record.get("meta", {}))
 
         async with self.pool.connection() as conn:
@@ -394,7 +384,7 @@ class EntriesRepository(BaseRepository):
 
     async def update_entry_text(
         self,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         entry_id: str,
         text: str,
         *,
@@ -415,9 +405,7 @@ class EntriesRepository(BaseRepository):
                 return None
 
             if meta is None:
-                record_json = self._decrypt_message(
-                    ctx.dek,
-                    ctx.user_id,
+                record_json = ctx.decrypt_entry(
                     row["id"],
                     row["nonce"],
                     row["ciphertext"],
@@ -428,12 +416,12 @@ class EntriesRepository(BaseRepository):
 
             record = {"text": text, "meta": meta or {}}
             plaintext = orjson.dumps(record).decode()
-            nonce, ct, alg = self._encrypt_message(ctx, entry_id, plaintext)
+            nonce, ct, alg = ctx.encrypt_entry(entry_id, plaintext)
             prompt_tokens = await asyncio.to_thread(
                 count_message_tokens, row["role"], record.get("text", "")
             )
             digest = self._require_entry_digest(
-                ctx.dek, entry_id, row["role"], record.get("text", "")
+                ctx, entry_id, row["role"], record.get("text", "")
             )
             flags = build_entry_flags_from_meta(
                 meta or {}, parse_entry_flags(row["flags"])
@@ -519,9 +507,7 @@ class EntriesRepository(BaseRepository):
                 entry_id=entry_id,
             )
 
-    async def get_latest_entries(
-        self, user_id: str, limit: int, dek: bytes
-    ) -> list[dict]:
+    async def get_latest_entries(self, ctx: CryptoContext, limit: int) -> list[dict]:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
@@ -532,14 +518,14 @@ class EntriesRepository(BaseRepository):
                 ORDER BY m.id DESC
                 LIMIT ?
                 """,
-                (user_id, limit),
+                (ctx.user_id, limit),
             )
             rows = await cursor.fetchall()
 
-        return self._rows_to_entries(rows, user_id, dek)
+        return self._rows_to_entries(rows, ctx)
 
     async def get_entries_older_than(
-        self, user_id: str, before_id: str, limit: int, dek: bytes
+        self, ctx: CryptoContext, before_id: str, limit: int
     ) -> list[dict]:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
@@ -551,11 +537,11 @@ class EntriesRepository(BaseRepository):
                 ORDER BY m.id DESC
                 LIMIT ?
                 """,
-                (user_id, before_id, limit),
+                (ctx.user_id, before_id, limit),
             )
             rows = await cursor.fetchall()
 
-        return self._rows_to_entries(rows, user_id, dek)
+        return self._rows_to_entries(rows, ctx)
 
     async def get_user_latest_entry_id(self, user_id: str) -> str | None:
         async with self.pool.connection() as conn:
@@ -573,7 +559,7 @@ class EntriesRepository(BaseRepository):
         return row["id"] if row else None
 
     async def get_entries_by_ids(
-        self, user_id: str, ids: list[str], dek: bytes
+        self, ctx: CryptoContext, ids: list[str]
     ) -> list[dict]:
         if not ids:
             return []
@@ -586,17 +572,16 @@ class EntriesRepository(BaseRepository):
                 FROM entries m
                 WHERE m.user_id = ? AND m.id IN ({placeholders})
                 """,
-                (user_id, *ids),
+                (ctx.user_id, *ids),
             )
             rows = await cursor.fetchall()
 
-        return self._rows_to_entries(rows, user_id, dek)
+        return self._rows_to_entries(rows, ctx)
 
     async def get_recall_candidates_by_ids(
         self,
-        user_id: str,
+        ctx: CryptoContext,
         ids: list[str],
-        dek: bytes,
         *,
         max_entry_id: str | None = None,
         max_created_at: str | None = None,
@@ -610,7 +595,7 @@ class EntriesRepository(BaseRepository):
             return []
 
         placeholders = ",".join("?" for _ in ids)
-        params: list[object] = [user_id, *ids]
+        params: list[object] = [ctx.user_id, *ids]
         conditions = [f"m.user_id = ? AND m.id IN ({placeholders})"]
         if max_entry_id:
             conditions.append("m.id <= ?")
@@ -635,10 +620,10 @@ class EntriesRepository(BaseRepository):
             cursor = await conn.execute(sql, params)
             rows = await cursor.fetchall()
 
-        return self._rows_to_entries(rows, user_id, dek)
+        return self._rows_to_entries(rows, ctx)
 
     async def get_entries_by_reply_to_ids(
-        self, user_id: str, reply_to_ids: list[str], dek: bytes
+        self, ctx: CryptoContext, reply_to_ids: list[str]
     ) -> list[dict]:
         if not reply_to_ids:
             return []
@@ -652,22 +637,22 @@ class EntriesRepository(BaseRepository):
                 WHERE m.user_id = ? AND m.reply_to IN ({placeholders})
                 ORDER BY m.id ASC
                 """,
-                (user_id, *reply_to_ids),
+                (ctx.user_id, *reply_to_ids),
             )
             rows = await cursor.fetchall()
 
-        return self._rows_to_entries(rows, user_id, dek)
+        return self._rows_to_entries(rows, ctx)
 
     async def get_entries_for_date(
-        self, user_id: str, created_date: str, dek: bytes
+        self, ctx: CryptoContext, created_date: str
     ) -> list[dict]:
-        history = await self.get_flat_entries_for_date(user_id, created_date, dek)
+        history = await self.get_flat_entries_for_date(ctx, created_date)
         return self._thread_entries(list(history))
 
     async def get_flat_entries_for_date(
-        self, user_id: str, created_date: str, dek: bytes
+        self, ctx: CryptoContext, created_date: str
     ) -> list[dict]:
-        cached = await self._get_cached_history(user_id, created_date)
+        cached = await self._get_cached_history(ctx.user_id, created_date)
         if cached is not None:
             return list(cached)
 
@@ -685,21 +670,21 @@ class EntriesRepository(BaseRepository):
                 WHERE m.user_id = ? AND m.created_date = ?
                 ORDER BY m.id ASC, x.ulid ASC
                 """,
-                (user_id, user_id, created_date),
+                (ctx.user_id, ctx.user_id, created_date),
             )
             rows = await cursor.fetchall()
 
-        history = self._rows_to_history(rows, user_id, dek)
-        await self._store_history_cache(user_id, created_date, history)
+        history = self._rows_to_history(rows, ctx)
+        await self._store_history_cache(ctx.user_id, created_date, history)
         return history
 
     async def get_recent_entries(
-        self, user_id: str, created_date: str, dek: bytes, limit: int
+        self, ctx: CryptoContext, created_date: str, limit: int
     ) -> list[dict]:
         if limit <= 0:
             return []
 
-        cached = await self._get_cached_history(user_id, created_date)
+        cached = await self._get_cached_history(ctx.user_id, created_date)
         if cached is not None:
             return list(cached[-limit:])
 
@@ -726,14 +711,14 @@ class EntriesRepository(BaseRepository):
                     ON t.user_id = x.user_id AND t.tag_hash = x.tag_hash
                 ORDER BY recent.id ASC, x.ulid ASC
                 """,
-                (user_id, created_date, limit, user_id),
+                (ctx.user_id, created_date, limit, ctx.user_id),
             )
             rows = await cursor.fetchall()
 
-        return self._rows_to_history(rows, user_id, dek)
+        return self._rows_to_history(rows, ctx)
 
     async def get_days_with_entries(
-        self, user_id: str, year: int, month: int, dek: bytes
+        self, user_id: str, year: int, month: int
     ) -> tuple[list[int], list[int]]:
         month_start, next_month_start = get_month_bounds(year, month)
         active_days: set[int] = set()

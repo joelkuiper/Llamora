@@ -6,7 +6,7 @@ import logging
 import time
 from typing import TYPE_CHECKING, Tuple
 
-from llamora.app.services.crypto import EncryptionContext
+from llamora.app.services.crypto import CryptoContext
 
 if TYPE_CHECKING:  # pragma: no cover - type checking only
     from llamora.app.api.search import SearchAPI
@@ -16,7 +16,7 @@ if TYPE_CHECKING:  # pragma: no cover - type checking only
 logger = logging.getLogger(__name__)
 
 
-Job = Tuple[EncryptionContext, str, str]
+Job = Tuple[CryptoContext, str, str]
 
 
 DEFAULT_MAX_QUEUE_SIZE = 1024
@@ -64,14 +64,13 @@ class IndexWorker:
         finally:
             self._task = None
 
-    async def enqueue(
-        self, ctx: EncryptionContext, entry_id: str, plaintext: str
-    ) -> None:
+    async def enqueue(self, ctx: CryptoContext, entry_id: str, plaintext: str) -> None:
         """Queue an entry for indexing."""
+        job_ctx = ctx.fork()
         try:
-            self._queue.put_nowait((ctx, entry_id, plaintext))
+            self._queue.put_nowait((job_ctx, entry_id, plaintext))
         except asyncio.QueueFull:
-            job = (ctx, entry_id, plaintext)
+            job = (job_ctx, entry_id, plaintext)
             self._backpressure_events += 1
             logger.warning(
                 "Index queue full (%s/%s); waiting up to %s seconds",
@@ -93,6 +92,7 @@ class IndexWorker:
                     self._queue.qsize(),
                     self._queue.maxsize,
                 )
+                job_ctx.drop()
                 put_task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await put_task
@@ -115,6 +115,8 @@ class IndexWorker:
                 self._dropped_jobs,
             )
         finally:
+            for ctx, _, _ in batch:
+                ctx.drop()
             for _ in batch:
                 self._queue.task_done()
 

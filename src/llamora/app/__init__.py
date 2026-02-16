@@ -279,6 +279,14 @@ def create_app():
 
     app.before_request(load_user)
     app.before_request(_refresh_manifest)
+
+    @app.teardown_request
+    async def _drop_crypto_context(_exc=None):  # type: ignore[override]
+        ctx = getattr(g, "_crypto_context", None)
+        if ctx is not None:
+            ctx.drop()
+            g._crypto_context = None
+
     app.extensions["llamora_lifecycle"] = lifecycle
 
     def _install_lifecycle() -> None:

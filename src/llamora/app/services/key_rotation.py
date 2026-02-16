@@ -24,7 +24,7 @@ from nacl.bindings import (
 
 from llamora.app.services.crypto import (
     CURRENT_SUITE,
-    EncryptionContext,
+    CryptoContext,
     generate_dek,
     wrap_key,
     encrypt_message,
@@ -172,38 +172,46 @@ async def reencrypt_entries(
                 break
 
             updates: list[tuple] = []
-            ctx = EncryptionContext(user_id=user_id, dek=new_dek, epoch=new_epoch)
-            for row in rows:
-                alg_bytes = (
-                    row["alg"].encode("utf-8")
-                    if isinstance(row["alg"], str)
-                    else row["alg"]
-                )
-                pt = decrypt_message(
-                    old_dek,
-                    user_id,
-                    row["id"],
-                    row["nonce"],
-                    row["ciphertext"],
-                    alg_bytes,
-                )
-                nonce, ct, new_alg = encrypt_message(ctx, row["id"], pt)
-                import orjson
-
-                rec = orjson.loads(pt)
-                text = rec.get("text", "")
-                digest = entry_digest(new_dek, row["id"], row["role"], text)
-                updates.append(
-                    (
-                        nonce,
-                        ct,
-                        new_alg,
-                        digest,
-                        ENTRY_DIGEST_VERSION,
-                        row["id"],
-                        user_id,
+            old_ctx = CryptoContext(
+                user_id=user_id,
+                dek=old_dek,
+                epoch=max(new_epoch - 1, 1),
+            )
+            new_ctx = CryptoContext(user_id=user_id, dek=new_dek, epoch=new_epoch)
+            try:
+                for row in rows:
+                    alg_bytes = (
+                        row["alg"].encode("utf-8")
+                        if isinstance(row["alg"], str)
+                        else row["alg"]
                     )
-                )
+                    pt = decrypt_message(
+                        old_ctx,
+                        row["id"],
+                        row["nonce"],
+                        row["ciphertext"],
+                        alg_bytes,
+                    )
+                    nonce, ct, new_alg = encrypt_message(new_ctx, row["id"], pt)
+                    import orjson
+
+                    rec = orjson.loads(pt)
+                    text = rec.get("text", "")
+                    digest = entry_digest(new_dek, row["id"], row["role"], text)
+                    updates.append(
+                        (
+                            nonce,
+                            ct,
+                            new_alg,
+                            digest,
+                            ENTRY_DIGEST_VERSION,
+                            row["id"],
+                            user_id,
+                        )
+                    )
+            finally:
+                old_ctx.drop()
+                new_ctx.drop()
 
             async def _batch_update():
                 await conn.executemany(
@@ -254,29 +262,37 @@ async def reencrypt_vectors(
                 break
 
             updates: list[tuple] = []
-            ctx = EncryptionContext(user_id=user_id, dek=new_dek, epoch=new_epoch)
-            for row in rows:
-                alg_bytes = (
-                    row["alg"].encode("utf-8")
-                    if isinstance(row["alg"], str)
-                    else row["alg"]
-                )
-                pt = decrypt_vector(
-                    old_dek,
-                    user_id,
-                    row["entry_id"],
-                    row["id"],
-                    row["nonce"],
-                    row["ciphertext"],
-                    alg_bytes,
-                )
-                nonce, ct, new_alg = encrypt_vector(
-                    ctx,
-                    row["entry_id"],
-                    row["id"],
-                    pt,
-                )
-                updates.append((nonce, ct, new_alg, row["id"], user_id))
+            old_ctx = CryptoContext(
+                user_id=user_id,
+                dek=old_dek,
+                epoch=max(new_epoch - 1, 1),
+            )
+            new_ctx = CryptoContext(user_id=user_id, dek=new_dek, epoch=new_epoch)
+            try:
+                for row in rows:
+                    alg_bytes = (
+                        row["alg"].encode("utf-8")
+                        if isinstance(row["alg"], str)
+                        else row["alg"]
+                    )
+                    pt = decrypt_vector(
+                        old_ctx,
+                        row["entry_id"],
+                        row["id"],
+                        row["nonce"],
+                        row["ciphertext"],
+                        alg_bytes,
+                    )
+                    nonce, ct, new_alg = encrypt_vector(
+                        new_ctx,
+                        row["entry_id"],
+                        row["id"],
+                        pt,
+                    )
+                    updates.append((nonce, ct, new_alg, row["id"], user_id))
+            finally:
+                old_ctx.drop()
+                new_ctx.drop()
 
             async def _batch_update():
                 await conn.executemany(
@@ -326,23 +342,35 @@ async def reencrypt_tags(
                 break
 
             updates: list[tuple] = []
-            ctx = EncryptionContext(user_id=user_id, dek=new_dek, epoch=new_epoch)
-            for row in rows:
-                alg_bytes = (
-                    row["alg"].encode("utf-8")
-                    if isinstance(row["alg"], str)
-                    else row["alg"]
-                )
-                pt = decrypt_message(
-                    old_dek,
-                    user_id,
-                    row["tag_hash"].hex(),
-                    row["name_nonce"],
-                    row["name_ct"],
-                    alg_bytes,
-                )
-                nonce, ct, new_alg = encrypt_message(ctx, row["tag_hash"].hex(), pt)
-                updates.append((nonce, ct, new_alg.decode(), row["tag_hash"], user_id))
+            old_ctx = CryptoContext(
+                user_id=user_id,
+                dek=old_dek,
+                epoch=max(new_epoch - 1, 1),
+            )
+            new_ctx = CryptoContext(user_id=user_id, dek=new_dek, epoch=new_epoch)
+            try:
+                for row in rows:
+                    alg_bytes = (
+                        row["alg"].encode("utf-8")
+                        if isinstance(row["alg"], str)
+                        else row["alg"]
+                    )
+                    pt = decrypt_message(
+                        old_ctx,
+                        row["tag_hash"].hex(),
+                        row["name_nonce"],
+                        row["name_ct"],
+                        alg_bytes,
+                    )
+                    nonce, ct, new_alg = encrypt_message(
+                        new_ctx, row["tag_hash"].hex(), pt
+                    )
+                    updates.append(
+                        (nonce, ct, new_alg.decode(), row["tag_hash"], user_id)
+                    )
+            finally:
+                old_ctx.drop()
+                new_ctx.drop()
 
             async def _batch_update():
                 await conn.executemany(
@@ -392,25 +420,35 @@ async def reencrypt_search_history(
                 break
 
             updates: list[tuple] = []
-            ctx = EncryptionContext(user_id=user_id, dek=new_dek, epoch=new_epoch)
-            for row in rows:
-                alg_bytes = (
-                    row["alg"].encode("utf-8")
-                    if isinstance(row["alg"], str)
-                    else row["alg"]
-                )
-                pt = decrypt_message(
-                    old_dek,
-                    user_id,
-                    row["query_hash"].hex(),
-                    row["query_nonce"],
-                    row["query_ct"],
-                    alg_bytes,
-                )
-                nonce, ct, new_alg = encrypt_message(ctx, row["query_hash"].hex(), pt)
-                updates.append(
-                    (nonce, ct, new_alg.decode(), row["query_hash"], user_id)
-                )
+            old_ctx = CryptoContext(
+                user_id=user_id,
+                dek=old_dek,
+                epoch=max(new_epoch - 1, 1),
+            )
+            new_ctx = CryptoContext(user_id=user_id, dek=new_dek, epoch=new_epoch)
+            try:
+                for row in rows:
+                    alg_bytes = (
+                        row["alg"].encode("utf-8")
+                        if isinstance(row["alg"], str)
+                        else row["alg"]
+                    )
+                    pt = decrypt_message(
+                        old_ctx,
+                        row["query_hash"].hex(),
+                        row["query_nonce"],
+                        row["query_ct"],
+                        alg_bytes,
+                    )
+                    nonce, ct, new_alg = encrypt_message(
+                        new_ctx, row["query_hash"].hex(), pt
+                    )
+                    updates.append(
+                        (nonce, ct, new_alg.decode(), row["query_hash"], user_id)
+                    )
+            finally:
+                old_ctx.drop()
+                new_ctx.drop()
 
             async def _batch_update():
                 await conn.executemany(

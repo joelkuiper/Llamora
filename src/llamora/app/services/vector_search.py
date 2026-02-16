@@ -9,7 +9,7 @@ else:
 
 from llamora.app.embed.model import async_embed_texts
 from llamora.app.index.entry_ann import EntryIndexStore
-from llamora.app.services.crypto import EncryptionContext
+from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.search_config import SearchConfig
 
 logger = logging.getLogger(__name__)
@@ -83,7 +83,7 @@ class VectorSearchService:
     @overload
     async def search_candidates(
         self,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         query: str,
         k1: int | None = None,
         k2: int | None = None,
@@ -96,7 +96,7 @@ class VectorSearchService:
     @overload
     async def search_candidates(
         self,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         query: str,
         k1: int | None = None,
         k2: int | None = None,
@@ -109,7 +109,7 @@ class VectorSearchService:
     @overload
     async def search_candidates(
         self,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         query: str,
         k1: int | None = None,
         k2: int | None = None,
@@ -121,7 +121,7 @@ class VectorSearchService:
 
     async def search_candidates(
         self,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         query: str,
         k1: int | None = None,
         k2: int | None = None,
@@ -137,7 +137,7 @@ class VectorSearchService:
         logger.debug(
             "Vector search requested by user %s with k1=%d k2=%d", user_id, k1, k2
         )
-        index = await self.index_store.ensure_index(user_id, ctx.dek, ctx)
+        index = await self.index_store.ensure_index(ctx)
         total_count = len(getattr(index, "entry_to_ids", {}))
         if query_vec is None:
             q_vec = (await async_embed_texts([query])).reshape(1, -1)
@@ -181,7 +181,7 @@ class VectorSearchService:
             if existing is None or cos > existing:
                 id_cos[entry_id] = cos
 
-        rows = await self.index_store.hydrate_entries(user_id, dedup_ids, ctx.dek)
+        rows = await self.index_store.hydrate_entries(ctx, dedup_ids)
         row_map = {r["id"]: r for r in rows}
 
         results: list[dict[str, Any]] = []
@@ -214,7 +214,7 @@ class VectorSearchService:
         return results
 
     async def append_entry(
-        self, ctx: EncryptionContext, entry_id: str, content: str
+        self, ctx: CryptoContext, entry_id: str, content: str
     ) -> None:
         logger.debug(
             "Adding entry %s to vector index for user %s", entry_id, ctx.user_id

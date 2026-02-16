@@ -8,7 +8,7 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Protocol
 
-from llamora.app.services.crypto import EncryptionContext
+from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.tag_service import TagService
 from llamora.app.util.tags import tag_hash
 from llamora.persistence.local_db import LocalDB
@@ -33,7 +33,7 @@ class BaseTagEnricher(Protocol):
 
     async def enrich(
         self,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         normalized_query: str,
         candidate_map: OrderedDict[str, dict],
         limit: int,
@@ -58,7 +58,7 @@ class DefaultTagEnricher:
 
     async def enrich(
         self,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         normalized_query: str,
         candidate_map: OrderedDict[str, dict],
         limit: int,
@@ -69,9 +69,7 @@ class DefaultTagEnricher:
             return TagEnrichment(tokens=tokens, boosts=boosts)
 
         tag_hashes = [tag_hash(ctx.user_id, token) for token in tokens]
-        await self._hydrate_candidates(
-            ctx.user_id, ctx.dek, candidate_map, tag_hashes, limit
-        )
+        await self._hydrate_candidates(ctx, candidate_map, tag_hashes, limit)
         boosts = await self._compute_tag_boosts(ctx.user_id, candidate_map, tag_hashes)
         return TagEnrichment(tokens=tokens, boosts=boosts)
 
@@ -106,8 +104,7 @@ class DefaultTagEnricher:
 
     async def _hydrate_candidates(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: CryptoContext,
         candidate_map: OrderedDict[str, dict],
         tag_hashes: list[bytes],
         limit: int,
@@ -116,7 +113,7 @@ class DefaultTagEnricher:
             return
 
         tag_entry_ids = await self._db.tags.get_recent_entries_for_tag_hashes(
-            user_id,
+            ctx.user_id,
             tag_hashes,
             limit=limit,
         )
@@ -128,9 +125,8 @@ class DefaultTagEnricher:
             return
 
         rows = await self._vector_search.index_store.hydrate_entries(
-            user_id,
+            ctx,
             missing_ids,
-            dek,
         )
         row_map = {row["id"]: row for row in rows}
         for entry_id in tag_entry_ids:

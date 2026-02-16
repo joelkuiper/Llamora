@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextvars
 from dataclasses import dataclass
 from logging import getLogger
 
@@ -21,23 +20,6 @@ ENTRY_DIGEST_CONTEXT = b"llamora:entry-digest:v2"
 CURRENT_SUITE = "xchacha20poly1305_ietf/argon2id_moderate/hmac_sha256_v2"
 
 logger = getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Crypto epoch context variable
-# ---------------------------------------------------------------------------
-
-_crypto_epoch: contextvars.ContextVar[int] = contextvars.ContextVar(
-    "crypto_epoch", default=1
-)
-
-
-def get_crypto_epoch() -> int:
-    return _crypto_epoch.get()
-
-
-def set_crypto_epoch(epoch: int) -> contextvars.Token:
-    return _crypto_epoch.set(epoch)
-
 
 # ---------------------------------------------------------------------------
 # CryptoDescriptor — structured metadata stored in the `alg` column
@@ -81,13 +63,119 @@ class CryptoDescriptor:
         return self.algorithm.encode("utf-8")
 
 
-@dataclass(frozen=True, slots=True)
-class EncryptionContext:
-    """Explicit metadata required for encryption writes."""
+class CryptoContext:
+    """Opaque crypto capability for a single user's encryption context."""
 
-    user_id: str
-    dek: bytes
-    epoch: int
+    __slots__ = ("user_id", "epoch", "_dek", "_dropped")
+
+    def __init__(self, *, user_id: str, dek: bytes, epoch: int) -> None:
+        self.user_id = str(user_id)
+        self.epoch = int(epoch)
+        self._dek = bytearray(dek)
+        self._dropped = False
+
+    def fork(self) -> "CryptoContext":
+        """Return a detached copy suitable for background tasks."""
+
+        return CryptoContext(
+            user_id=self.user_id,
+            dek=self._require_key(),
+            epoch=self.epoch,
+        )
+
+    def drop(self) -> None:
+        """Best-effort zeroize key material."""
+
+        if self._dropped:
+            return
+        for idx in range(len(self._dek)):
+            self._dek[idx] = 0
+        self._dropped = True
+
+    def _require_key(self) -> bytes:
+        if self._dropped:
+            raise ValueError("crypto context has been dropped")
+        return bytes(self._dek)
+
+    def encrypt_entry(self, entry_id: str, plaintext: str):
+        epoch = _require_epoch(self.epoch, operation="encrypt_entry")
+        nonce = utils.random(24)
+        aad = f"{self.user_id}|{entry_id}|{ALG.decode()}".encode("utf-8")
+        ct = crypto_aead_xchacha20poly1305_ietf_encrypt(
+            plaintext.encode("utf-8"), aad, nonce, self._require_key()
+        )
+        descriptor = CryptoDescriptor(algorithm=ALG.decode(), epoch=epoch)
+        return nonce, ct, descriptor.encode_bytes()
+
+    def decrypt_entry(
+        self,
+        entry_id: str,
+        nonce: bytes,
+        ct: bytes,
+        alg: bytes,
+    ) -> str:
+        alg_name = CryptoDescriptor.parse(alg).algorithm
+        aad = f"{self.user_id}|{entry_id}|{alg_name}".encode("utf-8")
+        pt = crypto_aead_xchacha20poly1305_ietf_decrypt(
+            ct, aad, nonce, self._require_key()
+        )
+        return pt.decode("utf-8")
+
+    def entry_digest(self, entry_id: str, role: str, text: str) -> str:
+        key = derive_entry_digest_key(self._require_key())
+        payload = f"{entry_id}\0{role}\0{text}".encode("utf-8")
+        return hmac.new(key, payload, hashlib.sha256).hexdigest()
+
+    def encrypt_vector(self, entry_id: str, vector_id: str, vec: bytes):
+        epoch = _require_epoch(self.epoch, operation="encrypt_vector")
+        nonce = utils.random(24)
+        aad = f"{self.user_id}|{entry_id}|{vector_id}|vector|{ALG.decode()}".encode(
+            "utf-8"
+        )
+        ct = crypto_aead_xchacha20poly1305_ietf_encrypt(
+            vec, aad, nonce, self._require_key()
+        )
+        descriptor = CryptoDescriptor(algorithm=ALG.decode(), epoch=epoch)
+        return nonce, ct, descriptor.encode_bytes()
+
+    def decrypt_vector(
+        self,
+        entry_id: str,
+        vector_id: str,
+        nonce: bytes,
+        ct: bytes,
+        alg: bytes,
+    ) -> bytes:
+        alg_name = CryptoDescriptor.parse(alg).algorithm
+        aad = f"{self.user_id}|{entry_id}|{vector_id}|vector|{alg_name}".encode("utf-8")
+        return crypto_aead_xchacha20poly1305_ietf_decrypt(
+            ct, aad, nonce, self._require_key()
+        )
+
+    def encrypt_lockbox(self, namespace: str, key: str, plaintext: bytes) -> bytes:
+        nonce = utils.random(24)
+        aad = f"{self.user_id}:{namespace}:{key}".encode("utf-8")
+        ciphertext = crypto_aead_xchacha20poly1305_ietf_encrypt(
+            plaintext,
+            aad,
+            nonce,
+            self._require_key(),
+        )
+        return nonce + ciphertext
+
+    def decrypt_lockbox(self, namespace: str, key: str, packed: bytes) -> bytes:
+        nonce_bytes = 24
+        if len(packed) <= nonce_bytes:
+            raise ValueError("failed to decrypt lockbox value")
+        nonce = packed[:nonce_bytes]
+        ciphertext = packed[nonce_bytes:]
+        aad = f"{self.user_id}:{namespace}:{key}".encode("utf-8")
+        return crypto_aead_xchacha20poly1305_ietf_decrypt(
+            ciphertext,
+            aad,
+            nonce,
+            self._require_key(),
+        )
 
 
 def _require_epoch(epoch: int | None, *, operation: str) -> int:
@@ -170,29 +258,18 @@ def unwrap_key(ct: bytes, salt: bytes, nonce: bytes, secret: str) -> bytes:
 # ---------------------------------------------------------------------------
 
 
-def encrypt_message(ctx: EncryptionContext, entry_id: str, plaintext: str):
-    epoch = _require_epoch(ctx.epoch, operation="encrypt_message")
-    nonce = utils.random(24)
-    aad = f"{ctx.user_id}|{entry_id}|{ALG.decode()}".encode("utf-8")
-    ct = crypto_aead_xchacha20poly1305_ietf_encrypt(
-        plaintext.encode("utf-8"), aad, nonce, ctx.dek
-    )
-    descriptor = CryptoDescriptor(algorithm=ALG.decode(), epoch=epoch)
-    return nonce, ct, descriptor.encode_bytes()
+def encrypt_message(ctx: CryptoContext, entry_id: str, plaintext: str):
+    return ctx.encrypt_entry(entry_id, plaintext)
 
 
 def decrypt_message(
-    dek: bytes,
-    user_id: str,
+    ctx: CryptoContext,
     entry_id: str,
     nonce: bytes,
     ct: bytes,
     alg: bytes,
 ) -> str:
-    alg_name = CryptoDescriptor.parse(alg).algorithm
-    aad = f"{user_id}|{entry_id}|{alg_name}".encode("utf-8")
-    pt = crypto_aead_xchacha20poly1305_ietf_decrypt(ct, aad, nonce, dek)
-    return pt.decode("utf-8")
+    return ctx.decrypt_entry(entry_id, nonce, ct, alg)
 
 
 # ---------------------------------------------------------------------------
@@ -201,29 +278,18 @@ def decrypt_message(
 
 
 def encrypt_vector(
-    ctx: EncryptionContext,
+    ctx: CryptoContext,
     entry_id: str,
     vector_id: str,
     vec: bytes,
 ):
-    """Encrypt a vector embedding for storage.
+    """Encrypt a vector embedding for storage."""
 
-    The vector is provided as raw bytes and is encrypted using the same AEAD
-    algorithm as messages. Associated data ties the vector to the owning user
-    and message identifier.
-    """
-
-    epoch = _require_epoch(ctx.epoch, operation="encrypt_vector")
-    nonce = utils.random(24)
-    aad = f"{ctx.user_id}|{entry_id}|{vector_id}|vector|{ALG.decode()}".encode("utf-8")
-    ct = crypto_aead_xchacha20poly1305_ietf_encrypt(vec, aad, nonce, ctx.dek)
-    descriptor = CryptoDescriptor(algorithm=ALG.decode(), epoch=epoch)
-    return nonce, ct, descriptor.encode_bytes()
+    return ctx.encrypt_vector(entry_id, vector_id, vec)
 
 
 def decrypt_vector(
-    dek: bytes,
-    user_id: str,
+    ctx: CryptoContext,
     entry_id: str,
     vector_id: str,
     nonce: bytes,
@@ -232,6 +298,4 @@ def decrypt_vector(
 ) -> bytes:
     """Decrypt an encrypted vector embedding."""
 
-    alg_name = CryptoDescriptor.parse(alg).algorithm
-    aad = f"{user_id}|{entry_id}|{vector_id}|vector|{alg_name}".encode("utf-8")
-    return crypto_aead_xchacha20poly1305_ietf_decrypt(ct, aad, nonce, dek)
+    return ctx.decrypt_vector(entry_id, vector_id, nonce, ct, alg)

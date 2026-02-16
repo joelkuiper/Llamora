@@ -24,13 +24,11 @@ from llamora.app.routes.helpers import (
     ensure_entry_exists,
     require_encryption_context,
     require_iso_date,
-    require_user_and_dek,
 )
 from llamora.app.services.auth_helpers import login_required
 from llamora.app.services.container import get_services
 from llamora.app.services.entry_context import get_entries_context
 from llamora.app.services.markdown import render_markdown_to_html
-from llamora.app.services.session_context import get_session_context
 from llamora.app.services.time import get_timezone, local_date
 from llamora.settings import settings
 
@@ -47,9 +45,8 @@ async def render_entries(
     hx_push_url: str | None = None,
     view_kind: str = "day",
 ) -> Response:
-    session = get_session_context()
-    user = await session.require_user()
-    context = await get_entries_context(user, date)
+    _, user, ctx = await require_encryption_context()
+    context = await get_entries_context(ctx, user, date)
     html = await render_template(
         "components/entries/entries.html",
         day=date,
@@ -105,10 +102,10 @@ async def entries_htmx_today():
 @entries_bp.get("/e/entry-tags/<entry_id>")
 @login_required
 async def entry_tags(entry_id: str):
-    _, user, dek = await require_user_and_dek()
+    _, user, ctx = await require_encryption_context()
     db = get_services().db
     await ensure_entry_exists(db, user["id"], entry_id)
-    tags = await db.tags.get_tags_for_entry(user["id"], entry_id, dek)
+    tags = await db.tags.get_tags_for_entry(ctx, entry_id)
     html = await render_template(
         "components/entries/entry_tags_wrapper.html",
         entry_id=entry_id,
@@ -121,7 +118,7 @@ async def entry_tags(entry_id: str):
 @entries_bp.route("/e/entry/<entry_id>", methods=["DELETE"])
 @login_required
 async def delete_entry(entry_id: str):
-    _, user, _ = await require_user_and_dek()
+    _, user, _ctx = await require_encryption_context()
     db = get_services().db
     await ensure_entry_exists(db, user["id"], entry_id)
     deleted_ids, root_role = await db.entries.delete_entry(user["id"], entry_id)
@@ -156,7 +153,7 @@ async def update_entry(entry_id: str):
 
     await ensure_entry_exists(db, uid, entry_id)
 
-    entries = await db.entries.get_entries_by_ids(uid, [entry_id], ctx.dek)
+    entries = await db.entries.get_entries_by_ids(ctx, [entry_id])
     if not entries:
         abort(404, description="Entry not found.")
     current = entries[0]
@@ -174,7 +171,7 @@ async def update_entry(entry_id: str):
         name=f"search-reindex-{entry_id}",
     )
 
-    tags = await db.tags.get_tags_for_entry(uid, entry_id, ctx.dek)
+    tags = await db.tags.get_tags_for_entry(ctx, entry_id)
     entry_payload = {
         "id": entry_id,
         "role": updated.get("role"),
@@ -197,11 +194,11 @@ async def update_entry(entry_id: str):
 @entries_bp.get("/e/entry/<entry_id>/edit")
 @login_required
 async def entry_edit(entry_id: str):
-    _, user, dek = await require_user_and_dek()
+    _, user, ctx = await require_encryption_context()
     uid = user["id"]
     db = get_services().db
     await ensure_entry_exists(db, uid, entry_id)
-    entries = await db.entries.get_entries_by_ids(uid, [entry_id], dek)
+    entries = await db.entries.get_entries_by_ids(ctx, [entry_id])
     if not entries:
         abort(404, description="Entry not found.")
     entry = entries[0]
@@ -231,17 +228,17 @@ async def entry_edit(entry_id: str):
 @entries_bp.get("/e/entry/<entry_id>/main")
 @login_required
 async def entry_main(entry_id: str):
-    _, user, dek = await require_user_and_dek()
+    _, user, ctx = await require_encryption_context()
     uid = user["id"]
     db = get_services().db
     await ensure_entry_exists(db, uid, entry_id)
-    entries = await db.entries.get_entries_by_ids(uid, [entry_id], dek)
+    entries = await db.entries.get_entries_by_ids(ctx, [entry_id])
     if not entries:
         abort(404, description="Entry not found.")
     entry = entries[0]
     tags = []
     if entry.get("role") == "user":
-        tags = await db.tags.get_tags_for_entry(uid, entry_id, dek)
+        tags = await db.tags.get_tags_for_entry(ctx, entry_id)
     text_html = entry.get("text_html") or render_markdown_to_html(entry.get("text", ""))
     entry_payload = {
         "id": entry_id,
@@ -326,7 +323,7 @@ async def request_response(date, entry_id: str):
     normalized_date = require_iso_date(date)
     form = await request.form
     user_time = form.get("user_time")
-    _, user, dek = await require_user_and_dek()
+    _, user, _ctx = await require_encryption_context()
     uid = user["id"]
 
     await ensure_entry_exists(get_services().db, uid, entry_id)
@@ -358,7 +355,7 @@ async def request_response(date, entry_id: str):
 @entries_bp.get("/e/actions/<entry_id>")
 @login_required
 async def entry_actions_item(entry_id: str):
-    _, user, dek = await require_user_and_dek()
+    _, user, _ctx = await require_encryption_context()
     uid = user["id"]
     await ensure_entry_exists(get_services().db, uid, entry_id)
     actual_date = await get_services().db.entries.get_entry_date(uid, entry_id)

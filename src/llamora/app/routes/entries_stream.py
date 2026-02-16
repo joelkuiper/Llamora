@@ -114,7 +114,7 @@ async def sse_opening(date: str):
     is_new = not await db.entries.user_has_entries(uid)
 
     yesterday_msgs = await db.entries.get_recent_entries(
-        uid, yesterday_iso, enc_ctx.dek, limit=20
+        enc_ctx, yesterday_iso, limit=20
     )
     had_yesterday_activity = bool(yesterday_msgs)
 
@@ -243,9 +243,7 @@ async def sse_response(entry_id: str, date: str):
     if not actual_date:
         logger.warning("Entry date not found for entry %s", entry_id)
         return StreamSession.error("Invalid ID")
-    entries = await get_services().db.entries.get_entries_for_date(
-        uid, actual_date, enc_ctx.dek
-    )
+    entries = await get_services().db.entries.get_entries_for_date(enc_ctx, actual_date)
     if not entries:
         logger.warning("Entries not found for entry %s", entry_id)
         return StreamSession.error("Invalid ID")
@@ -262,8 +260,7 @@ async def sse_response(entry_id: str, date: str):
     manager = services.llm_service.response_stream_manager
     entry_context = await build_entry_context(
         db,
-        uid,
-        enc_ctx.dek,
+        enc_ctx,
         entry_id=entry_id,
     )
     llm_ctx = build_llm_context(

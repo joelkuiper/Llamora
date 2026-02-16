@@ -8,7 +8,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Protocol
 
-from llamora.app.services.crypto import EncryptionContext
+from llamora.app.services.crypto import CryptoContext
 
 from ..llm_stream_config import LLMStreamConfig
 
@@ -59,7 +59,7 @@ class AssistantEntryWriter:
 
     async def save(
         self,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         content: str,
         meta: dict,
         reply_to: str | None,
@@ -195,7 +195,7 @@ class ResponsePipeline:
         abort: Callable[[], Awaitable[None]] | None,
         entry_id: str,
         writer: AssistantEntryWriter,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         reply_to: str | None,
         date: str,
         created_at: str | None,

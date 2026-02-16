@@ -10,7 +10,7 @@ import numpy as np
 from ulid import ULID
 
 from llamora.app.embed.model import async_embed_texts
-from llamora.app.services.crypto import EncryptionContext
+from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.search_config import SearchConfig
 from llamora.app.services.search_pipeline import SearchPipelineComponents
 from llamora.app.services.service_pulse import ServicePulse
@@ -148,7 +148,7 @@ class SearchStreamManager:
     async def fetch_page(
         self,
         *,
-        ctx: EncryptionContext,
+        ctx: CryptoContext,
         query: str,
         session_id: str | None,
         page_limit: int,
@@ -160,7 +160,6 @@ class SearchStreamManager:
 
         self._prune()
         user_id = ctx.user_id
-        dek = ctx.dek
         normalized = self._components.normalizer.normalize(user_id, query)
         normalized_query = normalized.text
         truncated = normalized.truncated
@@ -259,8 +258,7 @@ class SearchStreamManager:
 
         if page_results:
             await self._tag_service.hydrate_search_results(
-                user_id,
-                dek,
+                ctx,
                 page_results,
                 enrichment.tokens,
             )
