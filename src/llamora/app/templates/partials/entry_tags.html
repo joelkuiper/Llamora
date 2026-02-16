@@ -21,7 +21,7 @@
   {% endif %}
   <span class="entry-tag" data-tag-hash="{{ tag_hash }}" data-tag-name="{{ canonical_value }}">
     {% if tag_click_mode == 'navigate' and navigate_fragment_url %}
-      <a class="tag-label"
+      <a class="tag-label tags-view__entry-tag"
          href="{{ navigate_page_url }}"
          hx-get="{{ navigate_fragment_url }}"
          hx-target="#tags-view-detail"

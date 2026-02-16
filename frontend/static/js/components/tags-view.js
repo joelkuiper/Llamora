@@ -1443,9 +1443,17 @@ if (!globalThis[BOOT_KEY]) {
     }
 
     const detailLink = target.closest(
-      "#tags-view-detail .tags-view__related-link, #tags-view-detail .tags-view__entry-tag",
+      "#tags-view-detail .tags-view__related-link, #tags-view-detail .tags-view__entry-tag, #tags-view-detail .entry-tag .tag-label",
     );
-    if (!(detailLink instanceof HTMLAnchorElement)) return;
+    if (!(detailLink instanceof HTMLElement)) return;
+    if (detailLink.closest?.(".tag-remove")) {
+      return;
+    }
+    const tagName = String(detailLink.dataset?.tagName || "").trim();
+    if (tagName) {
+      state.pendingTagHighlight = tagName;
+      setActiveTag(tagName, document, { behavior: "smooth" });
+    }
     if (!state.saveSuppressed) {
       storeMainScrollTop();
       captureEntriesAnchor();
