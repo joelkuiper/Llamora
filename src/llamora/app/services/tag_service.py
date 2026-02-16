@@ -14,6 +14,7 @@ from typing import Any, Iterable, Literal, Sequence
 from llamora.app.util.tags import canonicalize as _canonicalize, display as _display
 from llamora.persistence.local_db import LocalDB
 from llamora.app.services.entry_metadata import generate_metadata
+from llamora.app.services.digest_policy import tag_digest
 
 
 logger = logging.getLogger(__name__)
@@ -39,9 +40,7 @@ def _parse_tag_cursor(cursor: str | None) -> tuple[str | None, str | None]:
 
 
 def _build_summary_digest(entry_digests: Iterable[str]) -> str:
-    from llamora.app.services.summarize import SummarizeService
-
-    return SummarizeService.compute_digest(entry_digests)
+    return tag_digest(entry_digests)
 
 
 @dataclass(slots=True)

@@ -33,10 +33,9 @@ from llamora.app.services.crypto import (
     entry_digest,
 )
 from llamora.persistence.local_db import LocalDB
+from llamora.app.services.digest_policy import ENTRY_DIGEST_VERSION
 
 logger = logging.getLogger(__name__)
-
-_ENTRY_DIGEST_VERSION = 2
 
 
 # ---------------------------------------------------------------------------
@@ -200,7 +199,7 @@ async def reencrypt_entries(
                         ct,
                         new_alg,
                         digest,
-                        _ENTRY_DIGEST_VERSION,
+                        ENTRY_DIGEST_VERSION,
                         row["id"],
                         user_id,
                     )

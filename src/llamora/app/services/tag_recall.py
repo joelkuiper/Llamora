@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Iterable, Mapping, Sequence, TypedDict
@@ -15,6 +14,10 @@ from llamora.app.services.tag_recall_cache import (
     tag_recall_namespace,
 )
 from llamora.app.services.summarize import SummaryPrompt
+from llamora.app.services.digest_policy import (
+    digest_policy_tag,
+    recall_cache_digest_inputs,
+)
 from llamora.app.util.number import coerce_int
 from llamora.llm.prompt_templates import render_prompt_template
 from llamora.llm.tokenizers.tokenizer import count_message_tokens
@@ -164,10 +167,13 @@ def _build_summary_cache_key(
     input_max_chars: int,
     max_snippets: int,
 ) -> CacheKey:
-    payload = "|".join(sorted(d for d in entry_digests if d))
-    payload = f"{payload}|{max_chars}|{input_max_chars}|{max_snippets}"
-    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
-    return f"recall:{digest}"
+    digest = recall_cache_digest_inputs(
+        entry_digests,
+        max_chars=max_chars,
+        input_max_chars=input_max_chars,
+        max_snippets=max_snippets,
+    )
+    return f"recall:{digest_policy_tag()}:{digest}"
 
 
 async def _summarize_with_llm(

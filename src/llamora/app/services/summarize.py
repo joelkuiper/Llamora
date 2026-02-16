@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
 from dataclasses import dataclass
 from typing import Any, Iterable
@@ -11,6 +10,7 @@ import orjson
 
 from llamora.app.services.lockbox import Lockbox
 from llamora.app.services.lockbox_store import LockboxStore
+from llamora.app.services.digest_policy import entry_digest_aggregate, tag_digest
 
 logger = logging.getLogger(__name__)
 
@@ -41,13 +41,9 @@ class SummarizeService:
 
     @staticmethod
     def compute_digest(entry_digests: Iterable[str]) -> str:
-        """Compute an aggregate digest from individual entry digests.
+        """Compute the canonical aggregate digest from individual entry digests."""
 
-        Produces SHA256("|".join(sorted(digests))).
-        """
-        digests = [d for d in entry_digests if d]
-        payload = "|".join(sorted(digests)).encode("utf-8")
-        return hashlib.sha256(payload).hexdigest()
+        return entry_digest_aggregate(entry_digests)
 
     async def generate(self, prompt: SummaryPrompt) -> str:
         """Call the LLM and extract the ``"summary"`` field from the JSON response."""
@@ -153,7 +149,7 @@ class SummarizeService:
         entry_digests = await self.tags_repo.get_entry_digests_for_tag(
             user_id, tag_hash
         )
-        digest = self.compute_digest(entry_digests)
+        digest = tag_digest(entry_digests)
         await self.store.set_json(user_id, dek, "digest", cache_key, {"value": digest})
         return digest
 

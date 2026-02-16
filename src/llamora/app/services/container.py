@@ -21,6 +21,10 @@ from llamora.app.services.tag_service import TagService
 from llamora.app.services.service_pulse import ServicePulse
 from llamora.app.services.search_config import SearchConfig
 from llamora.app.services.vector_search import VectorSearchService
+from llamora.app.services.digest_policy import (
+    DIGEST_POLICY_VERSION,
+    ENTRY_DIGEST_VERSION,
+)
 from llamora.settings import settings
 
 
@@ -109,6 +113,11 @@ class AppLifecycle:
 
             logger.debug(
                 "Starting application lifecycle: db.init -> search_api.start -> llm_service.ensure_started"
+            )
+            logger.info(
+                "Digest policy active: policy_version=%s entry_digest_version=%s",
+                DIGEST_POLICY_VERSION,
+                ENTRY_DIGEST_VERSION,
             )
             db_initialised = False
             search_started = False

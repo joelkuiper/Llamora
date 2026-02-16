@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import re
 from datetime import date as _date_type
 from typing import Awaitable, Callable, Iterable, Mapping
@@ -14,6 +13,7 @@ from llamora.llm.tokenizers.tokenizer import count_message_tokens
 
 from llamora.app.services.history_cache import HistoryCache
 from llamora.app.services.crypto import entry_digest
+from llamora.app.services.digest_policy import ENTRY_DIGEST_VERSION, day_digest
 
 from .base import BaseRepository
 from .events import RepositoryEventBus, ENTRY_HISTORY_CHANGED_EVENT
@@ -23,7 +23,6 @@ EntryAppendedCallback = Callable[[str, str, str, bytes], Awaitable[None]]
 
 _FLAG_PATTERN = re.compile(r"^[a-z0-9_]+$")
 _AUTO_OPENING_FLAG = "auto_opening"
-_ENTRY_DIGEST_VERSION = 2
 
 
 def parse_entry_flags(value: str | None) -> set[str]:
@@ -255,7 +254,7 @@ class EntriesRepository(BaseRepository):
                 alg,
                 prompt_tokens,
                 digest,
-                _ENTRY_DIGEST_VERSION,
+                ENTRY_DIGEST_VERSION,
                 flags,
             ]
 
@@ -460,7 +459,7 @@ class EntriesRepository(BaseRepository):
                         alg,
                         prompt_tokens,
                         digest,
-                        _ENTRY_DIGEST_VERSION,
+                        ENTRY_DIGEST_VERSION,
                         flags,
                         entry_id,
                         user_id,
@@ -757,8 +756,7 @@ class EntriesRepository(BaseRepository):
             if digest:
                 digests_by_day.setdefault(day, []).append(digest)
         for day, digests in digests_by_day.items():
-            payload = "|".join(sorted(digests)).encode("utf-8")
-            summary_digests[day] = hashlib.sha256(payload).hexdigest()
+            summary_digests[day] = day_digest(digests)
         return summary_digests
 
     async def get_day_summary_digest_for_date(
@@ -781,8 +779,7 @@ class EntriesRepository(BaseRepository):
             if digest:
                 digests.append(digest)
 
-        payload = "|".join(sorted(digests)).encode("utf-8")
-        return hashlib.sha256(payload).hexdigest()
+        return day_digest(digests)
 
     async def get_first_entry_date(self, user_id: str) -> str | None:
         async with self.pool.connection() as conn:
