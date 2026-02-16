@@ -109,5 +109,8 @@ const initViewMode = (root = document) => {
 
 initViewMode(document);
 document.addEventListener("app:rehydrate", (event) => {
-  initViewMode(event?.detail?.context || document);
+  const regionId = event?.detail?.regionId;
+  const context =
+    regionId && regionId !== "document" ? document.getElementById(regionId) : document;
+  initViewMode(context || document);
 });

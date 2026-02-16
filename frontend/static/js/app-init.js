@@ -214,9 +214,12 @@ function registerEntriesLoader() {
     }
   });
 
-  document.addEventListener("app:rehydrate", () => {
-    refreshLoader();
-    reset();
+  document.addEventListener("app:rehydrate", (event) => {
+    const detail = event?.detail || {};
+    if (!detail.regionId || detail.regionId === "document" || detail.regionId === "main-content") {
+      refreshLoader();
+      reset();
+    }
   });
 
   entriesLoaderRegistered = true;
@@ -234,7 +237,12 @@ function registerTimeFormatter() {
   };
 
   document.addEventListener("app:rehydrate", (event) => {
-    run(event?.detail?.target || event?.detail?.context);
+    const regionId = event?.detail?.regionId;
+    if (regionId && regionId !== "document") {
+      run(document.getElementById(regionId) || document);
+      return;
+    }
+    run(document);
   });
 
   document.body.addEventListener("htmx:afterSwap", (event) => {
