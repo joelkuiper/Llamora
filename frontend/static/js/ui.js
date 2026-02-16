@@ -2,7 +2,7 @@ import {
   requestScrollTarget,
   requestScrollTargetConsumed,
   scrollEvents,
-} from "./entries/scroll-manager.js";
+} from "./scroll-manager.js";
 import { motionSafeBehavior } from "./utils/motion.js";
 import { scheduleRafLoop } from "./utils/scheduler.js";
 import { animateMotion } from "./utils/transition.js";

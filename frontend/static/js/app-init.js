@@ -1,7 +1,7 @@
 import { initRegionFeedback } from "./components/region-feedback.js";
 import { getActiveDay } from "./entries/active-day-store.js";
 import { ScrollIntent } from "./entries/scroll-intent.js";
-import { ScrollManager } from "./entries/scroll-manager.js";
+import { ScrollManager } from "./scroll-manager.js";
 import { initGlobalShortcuts } from "./global-shortcuts.js";
 import {
   applyRequestTimeHeaders,

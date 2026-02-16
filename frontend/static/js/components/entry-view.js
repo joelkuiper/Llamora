@@ -3,7 +3,7 @@ import { initDayNav, navigateToDate } from "../day.js";
 import { clearActiveDay, setActiveDay } from "../entries/active-day-store.js";
 import { armEntryAnimations, armInitialEntryAnimations } from "../entries/entry-animations.js";
 import { MarkdownObserver } from "../entries/markdown-observer.js";
-import { scrollEvents } from "../entries/scroll-manager.js";
+import { scrollEvents } from "../scroll-manager.js";
 import { StreamController } from "../entries/stream-controller.js";
 import { renderMarkdownInElement } from "../markdown.js";
 import {

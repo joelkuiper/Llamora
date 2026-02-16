@@ -6,7 +6,7 @@ import {
   scrollEvents,
   TARGET_CONSUMED_EVENT,
   TARGET_EVENT,
-} from "./scroll-manager.js";
+} from "../scroll-manager.js";
 
 const MARKDOWN_EVENT = "markdown:rendered";
 

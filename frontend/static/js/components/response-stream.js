@@ -1,4 +1,4 @@
-import { requestScrollForceEdge } from "../entries/scroll-manager.js";
+import { requestScrollForceEdge } from "../scroll-manager.js";
 import {
   applyTimezoneQuery,
   formatLocalTime,

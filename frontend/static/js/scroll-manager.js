@@ -1,13 +1,13 @@
-import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
-import { createListenerBag } from "../utils/events.js";
-import { motionSafeBehavior, prefersReducedMotion } from "../utils/motion.js";
-import { scheduleFrame, scheduleRafLoop } from "../utils/scheduler.js";
+import { TYPING_INDICATOR_SELECTOR } from "./typing-indicator.js";
+import { createListenerBag } from "./utils/events.js";
+import { motionSafeBehavior, prefersReducedMotion } from "./utils/motion.js";
+import { scheduleFrame, scheduleRafLoop } from "./utils/scheduler.js";
 import {
   applyEdgeMetrics,
   computeEdgeMetrics,
   normalizeEdgeDirection,
-} from "../utils/scroll-edge.js";
-import { isNearBottom, isNearTop } from "./scroll-utils.js";
+} from "./utils/scroll-edge.js";
+import { isNearBottom, isNearTop } from "./entries/scroll-utils.js";
 
 export const scrollEvents = new EventTarget();
 

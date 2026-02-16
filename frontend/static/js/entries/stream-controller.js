@@ -1,4 +1,4 @@
-import { requestScrollForceEdge } from "./scroll-manager.js";
+import { requestScrollForceEdge } from "../scroll-manager.js";
 import { normalizeStreamId } from "./stream-id.js";
 
 const STATUS_IDLE = "idle";
