@@ -40,8 +40,9 @@ const heatmapState = {
   hideTimer: null,
   activeCell: null,
   activeDate: "",
-  requests: new Map(),
   cache: new Map(),
+  fetchController: null,
+  intent: 0,
 };
 
 const HEATMAP_STORAGE_KEY = "tags:heatmap";
@@ -160,6 +161,7 @@ const ensureHeatmapTooltip = () => {
 };
 
 const hideHeatmapTooltip = ({ immediate = false } = {}) => {
+  cancelHeatmapFetch();
   if (heatmapState.timer) {
     clearTimeout(heatmapState.timer);
     heatmapState.timer = null;
@@ -178,6 +180,16 @@ const hideHeatmapTooltip = ({ immediate = false } = {}) => {
     return;
   }
   heatmapState.hideTimer = transitionHide(tooltip, "is-visible", 160);
+};
+
+const nextHeatmapIntent = () => {
+  heatmapState.intent += 1;
+  return heatmapState.intent;
+};
+
+const cancelHeatmapFetch = () => {
+  heatmapState.fetchController?.abort();
+  heatmapState.fetchController = null;
 };
 
 const positionHeatmapTooltip = (tooltip, cell) => {
@@ -205,7 +217,7 @@ const positionHeatmapTooltip = (tooltip, cell) => {
   transitionShow(tooltip, "is-visible");
 };
 
-const fetchHeatmapSummary = async (date) => {
+const fetchHeatmapSummary = async (date, { signal } = {}) => {
   if (!date) return "";
   if (heatmapState.cache.has(date)) {
     return heatmapState.cache.get(date);
@@ -219,10 +231,8 @@ const fetchHeatmapSummary = async (date) => {
     heatmapState.cache.set(date, cached);
     return cached;
   }
-  if (heatmapState.requests.has(date)) {
-    return heatmapState.requests.get(date);
-  }
-  const request = fetch(`/d/${date}/summary`, {
+  return fetch(`/d/${date}/summary`, {
+    signal,
     headers: { Accept: "application/json" },
   })
     .then((res) => (res.ok ? res.json() : null))
@@ -237,15 +247,9 @@ const fetchHeatmapSummary = async (date) => {
           value: summary,
         });
       }
-      heatmapState.requests.delete(date);
       return summary;
     })
-    .catch(() => {
-      heatmapState.requests.delete(date);
-      return "";
-    });
-  heatmapState.requests.set(date, request);
-  return request;
+    .catch(() => "");
 };
 
 const scheduleHeatmapTooltip = (cell) => {
@@ -258,10 +262,12 @@ const scheduleHeatmapTooltip = (cell) => {
   if (heatmapState.timer) {
     clearTimeout(heatmapState.timer);
   }
+  cancelHeatmapFetch();
   heatmapState.activeCell = cell;
   heatmapState.activeDate = date;
+  const intent = nextHeatmapIntent();
   heatmapState.timer = window.setTimeout(async () => {
-    if (heatmapState.activeDate !== date) return;
+    if (heatmapState.activeDate !== date || heatmapState.intent !== intent) return;
     const tooltip = ensureHeatmapTooltip();
     const label = String(cell.dataset.heatmapLabel || cell.getAttribute("aria-label") || "").trim();
     if (heatmapState.dateEl) {
@@ -278,8 +284,15 @@ const scheduleHeatmapTooltip = (cell) => {
     }
     positionHeatmapTooltip(tooltip, cell);
 
-    const summary = await fetchHeatmapSummary(date);
-    if (heatmapState.activeDate !== date) return;
+    const fetchController = new AbortController();
+    heatmapState.fetchController = fetchController;
+    const summary = await fetchHeatmapSummary(date, {
+      signal: fetchController.signal,
+    });
+    if (heatmapState.fetchController === fetchController) {
+      heatmapState.fetchController = null;
+    }
+    if (heatmapState.activeDate !== date || heatmapState.intent !== intent) return;
     if (heatmapState.summaryEl) {
       const text = summary || "Summary unavailable right now.";
       heatmapState.summaryEl.innerHTML = `<p class="summary-fade">${text}</p>`;

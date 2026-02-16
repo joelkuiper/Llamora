@@ -12,12 +12,13 @@ export class CalendarControl extends HTMLElement {
   #btn = null;
   #pop = null;
   #globalListeners = null;
-  #summaryRequests = new Map();
   #tooltip = null;
   #tooltipTimer = null;
   #tooltipHideTimer = null;
   #tooltipDate = null;
   #summaryCell = null;
+  #summaryIntent = 0;
+  #summaryFetchController = null;
 
   connectedCallback() {
     this.#btn = this.querySelector("#calendar-btn");
@@ -258,6 +259,7 @@ export class CalendarControl extends HTMLElement {
   }
 
   #hideTooltip({ immediate = false } = {}) {
+    this.#cancelSummaryFetch();
     if (this.#tooltipTimer) {
       clearTimeout(this.#tooltipTimer);
       this.#tooltipTimer = null;
@@ -286,6 +288,16 @@ export class CalendarControl extends HTMLElement {
       return;
     }
     this.#tooltipHideTimer = transitionHide(tooltip, "is-visible", 160);
+  }
+
+  #nextSummaryIntent() {
+    this.#summaryIntent += 1;
+    return this.#summaryIntent;
+  }
+
+  #cancelSummaryFetch() {
+    this.#summaryFetchController?.abort();
+    this.#summaryFetchController = null;
   }
 
   #positionTooltip(tooltip, cell) {
@@ -323,22 +335,19 @@ export class CalendarControl extends HTMLElement {
     transitionShow(tooltip, "is-visible");
   }
 
-  async #fetchDaySummary(date) {
+  async #fetchDaySummary(date, { digest = "", signal } = {}) {
     if (!date) return "";
-    const summaryDigest = this.#summaryCell?.dataset?.summaryDigest || "";
     const cached = await cacheLoader.read({
       namespace: "summary",
       key: makeDaySummaryKey(date),
-      digest: summaryDigest,
+      digest,
       kind: "text",
     });
     if (cached) {
       return cached;
     }
-    if (this.#summaryRequests.has(date)) {
-      return this.#summaryRequests.get(date);
-    }
-    const request = fetch(`/d/${date}/summary`, {
+    return fetch(`/d/${date}/summary`, {
+      signal,
       headers: { Accept: "application/json" },
     })
       .then((res) => (res.ok ? res.json() : null))
@@ -348,20 +357,16 @@ export class CalendarControl extends HTMLElement {
           void cacheLoader.write({
             namespace: "summary",
             key: makeDaySummaryKey(date),
-            digest: summaryDigest,
+            digest,
             kind: "text",
             value: summary,
           });
         }
-        this.#summaryRequests.delete(date);
         return summary;
       })
       .catch(() => {
-        this.#summaryRequests.delete(date);
         return "";
       });
-    this.#summaryRequests.set(date, request);
-    return request;
   }
 
   #configureCalendarGrid(calendar, popover, pop, signal) {
@@ -606,16 +611,27 @@ export class CalendarControl extends HTMLElement {
     if (this.#summaryCell && this.#summaryCell !== cell) {
       this.#summaryCell.classList.remove("is-summarizing");
     }
+    this.#cancelSummaryFetch();
     this.#summaryCell = cell;
     cell.classList.add("is-summarizing");
     this.#tooltipDate = date;
+    const intent = this.#nextSummaryIntent();
     this.#tooltipTimer = window.setTimeout(async () => {
-      if (this.#tooltipDate !== date) {
+      if (this.#tooltipDate !== date || this.#summaryIntent !== intent) {
         cell.classList.remove("is-summarizing");
         return;
       }
-      const summary = await this.#fetchDaySummary(date);
-      if (!summary || this.#tooltipDate !== date) {
+      const fetchController = new AbortController();
+      this.#summaryFetchController = fetchController;
+      const digest = cell.dataset?.summaryDigest || "";
+      const summary = await this.#fetchDaySummary(date, {
+        digest,
+        signal: fetchController.signal,
+      });
+      if (this.#summaryFetchController === fetchController) {
+        this.#summaryFetchController = null;
+      }
+      if (!summary || this.#tooltipDate !== date || this.#summaryIntent !== intent) {
         cell.classList.remove("is-summarizing");
         return;
       }
