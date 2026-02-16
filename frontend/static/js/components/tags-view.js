@@ -1115,20 +1115,15 @@ const applySearch = (rawQuery) => {
       }
     });
     if (state.list) {
-      const byIndex = [...state.rows].sort((a, b) => {
-        const aIndex = Number.parseInt(a.dataset.tagsIndex || "0", 10);
-        const bIndex = Number.parseInt(b.dataset.tagsIndex || "0", 10);
-        return aIndex - bIndex;
-      });
-      byIndex.forEach((row) => {
-        state.list.appendChild(row);
-      });
-      state.rows = byIndex;
+      _sortRows();
     }
     if (state.empty) {
       state.empty.hidden = true;
     }
     runFlip(state.rows, beforePositions);
+    if (listBody) {
+      scrollActiveRowIntoView(document, "auto");
+    }
     return;
   }
   state.list?.classList.add("is-filtering");
