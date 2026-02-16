@@ -46,7 +46,7 @@ class PresentedTagsViewData:
 
 
 def present_tags_view_data(tags_view: TagsViewData) -> PresentedTagsViewData:
-    detail = _present_archive_detail(tags_view.detail) if tags_view.detail else None
+    detail = present_archive_detail(tags_view.detail) if tags_view.detail else None
     return PresentedTagsViewData(
         tags=tags_view.tags,
         selected_tag=tags_view.selected_tag,
@@ -62,7 +62,7 @@ def present_archive_entries(
     return [_present_archive_entry(item) for item in entries]
 
 
-def _present_archive_detail(detail: TagArchiveDetail) -> PresentedTagArchiveDetail:
+def present_archive_detail(detail: TagArchiveDetail) -> PresentedTagArchiveDetail:
     return PresentedTagArchiveDetail(
         name=detail.name,
         hash=detail.hash,

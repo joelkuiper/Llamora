@@ -75,6 +75,7 @@ class TagIndexItem:
 @dataclass(slots=True)
 class TagRelatedItem:
     name: str
+    hash: str
     count: int
 
 
@@ -352,6 +353,60 @@ class TagService:
             sort_dir=sort_dir,
         )
 
+    async def get_tag_detail(
+        self,
+        user_id: str,
+        dek: bytes,
+        *,
+        tag_name: str | None = None,
+        tag_hash_hex: str | None = None,
+        entry_limit: int = 12,
+        around_entry_id: str | None = None,
+        related_tag_limit: int = 2,
+    ) -> TagArchiveDetail | None:
+        """Return detail data for a single tag without loading the full index.
+
+        When *tag_hash_hex* is provided the tag is resolved via a direct
+        primary-key lookup (O(1)).  Falls back to a name-based scan when only
+        *tag_name* is given.
+        """
+
+        index_item: TagIndexItem | None = None
+
+        if tag_hash_hex:
+            try:
+                tag_hash_bytes = bytes.fromhex(tag_hash_hex)
+            except ValueError:
+                return None
+            info = await self._db.tags.get_tag_info(user_id, tag_hash_bytes, dek)
+            if info:
+                name = str(info.get("name") or "").strip()
+                try:
+                    canonical = self.canonicalize(name)
+                except ValueError:
+                    return None
+                index_item = TagIndexItem(
+                    name=self.display(canonical),
+                    hash=info["hash"],
+                    count=int(info.get("count") or 0),
+                )
+
+        if index_item is None and tag_name:
+            index_item = await self._resolve_index_item_by_name(user_id, dek, tag_name)
+
+        if index_item is None:
+            return None
+
+        return await self._build_archive_detail(
+            user_id,
+            dek,
+            index_item,
+            limit=entry_limit,
+            around_entry_id=around_entry_id,
+            secondary_tag_limit=4,
+            related_tag_limit=related_tag_limit,
+        )
+
     async def get_tags_index_page(
         self,
         user_id: str,
@@ -534,14 +589,29 @@ class TagService:
                 related_tags=(),
             )
         related_counter: Counter[str] = Counter()
+        tag_hash_by_name: dict[str, str] = {}
         for entry in archive_entries:
             for name in entry.related_tags:
                 if name == tag_item.name:
                     continue
                 related_counter[name] += 1
+            for tag_dict in entry.entry.tags:
+                raw = str(tag_dict.get("name") or "").strip()
+                if raw:
+                    try:
+                        can = self.canonicalize(raw)
+                        tag_hash_by_name.setdefault(
+                            self.display(can), str(tag_dict.get("hash") or "")
+                        )
+                    except ValueError:
+                        pass
 
         related = tuple(
-            TagRelatedItem(name=name, count=count)
+            TagRelatedItem(
+                name=name,
+                hash=tag_hash_by_name.get(name, ""),
+                count=count,
+            )
             for name, count in sorted(
                 related_counter.items(), key=lambda item: (-item[1], item[0])
             )[: max(0, related_tag_limit)]

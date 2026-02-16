@@ -6,7 +6,7 @@
 {% set is_entry_today = (today is defined and entry_date == today) %}
 {% set context_query = '?view=tags&day=' ~ (day|urlencode) ~ '&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&entries_limit=' ~ entries_limit %}
 {% set tag_page_template = url_for('days.day', date=day) ~ '?view=tags&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&entries_limit=' ~ entries_limit ~ '&tag=__TAG__&target=tag-index-__TAG__' %}
-{% set tag_fragment_template = url_for('tags.tags_view_fragment', date=day) ~ '?sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&entries_limit=' ~ entries_limit ~ '&tag=__TAG__&target=tag-index-__TAG__' %}
+{% set tag_fragment_template = url_for('tags.tags_view_detail_fragment', date=day) ~ '?sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&entries_limit=' ~ entries_limit ~ '&tag=__TAG__&tag_hash=__TAG_HASH__&target=tag-index-__TAG__' %}
 {% if selected_tag %}
   {% set context_query = context_query ~ '&tag=' ~ (selected_tag|urlencode) %}
 {% endif %}

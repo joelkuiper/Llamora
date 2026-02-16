@@ -964,16 +964,24 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     return String(label.dataset?.tagName || label.textContent || "").trim();
   }
 
-  #resolveTagTemplate(template, tagName) {
+  #resolveTagTemplate(template, tagName, tagHash = "") {
     const raw = String(template || "").trim();
     const tag = String(tagName || "").trim();
     if (!raw || !tag) {
       return "";
     }
-    return raw.replaceAll("__TAG__", encodeURIComponent(tag));
+    let result = raw.replaceAll("__TAG__", encodeURIComponent(tag));
+    if (tagHash) {
+      result = result.replaceAll("__TAG_HASH__", encodeURIComponent(tagHash));
+    } else {
+      result = result.replaceAll("&tag_hash=__TAG_HASH__", "");
+      result = result.replaceAll("tag_hash=__TAG_HASH__&", "");
+      result = result.replaceAll("tag_hash=__TAG_HASH__", "");
+    }
+    return result;
   }
 
-  #navigateToTag(tagName) {
+  #navigateToTag(tagName, tagHash = "") {
     const normalizedTag = String(tagName || "").trim();
     if (!normalizedTag) {
       return;
@@ -984,8 +992,8 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
 
     const fragmentTemplate = this.dataset?.tagNavigateFragmentTemplate || "";
     const pageTemplate = this.dataset?.tagNavigatePageTemplate || "";
-    const fragmentUrl = this.#resolveTagTemplate(fragmentTemplate, normalizedTag);
-    const pageUrl = this.#resolveTagTemplate(pageTemplate, normalizedTag);
+    const fragmentUrl = this.#resolveTagTemplate(fragmentTemplate, normalizedTag, tagHash);
+    const pageUrl = this.#resolveTagTemplate(pageTemplate, normalizedTag, tagHash);
     const target = document.getElementById("tags-view-detail");
 
     if (fragmentUrl && target instanceof HTMLElement && typeof htmx !== "undefined") {
@@ -1021,7 +1029,9 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
 
     event.preventDefault();
     if (this.#getTagClickMode() === "navigate") {
-      this.#navigateToTag(this.#getTagName(label));
+      const tagEl = label.closest(".entry-tag");
+      const tagHash = tagEl?.dataset?.tagHash || "";
+      this.#navigateToTag(this.#getTagName(label), tagHash);
       return;
     }
     void this.#openTagDetail(label);

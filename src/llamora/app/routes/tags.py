@@ -13,6 +13,8 @@ from llamora.app.services.container import (
 from llamora.app.services.auth_helpers import login_required
 from llamora.app.services.tag_service import TagsViewData
 from llamora.app.services.tag_presenter import (
+    PresentedTagsViewData,
+    present_archive_detail,
     present_archive_entries,
     present_tags_view_data,
 )
@@ -560,6 +562,88 @@ async def tag_detail_summary(tag_hash: str):
             field="html",
         )
     return html
+
+
+@tags_bp.get("/fragments/tags/<date>/detail")
+@login_required
+async def tags_view_detail_fragment(date: str):
+    """Return only the detail pane for a single tag.
+
+    Accepts ``tag_hash`` for O(1) lookup or falls back to ``tag`` (name).
+    Much lighter than :func:`tags_view_fragment` which loads the full index.
+    """
+
+    normalized_date = require_iso_date(date)
+    _, user, dek = await require_user_and_dek()
+    services = get_services()
+    tag_service = _tags()
+    sort_kind = tag_service.normalize_tags_sort_kind(request.args.get("sort_kind"))
+    sort_dir = tag_service.normalize_tags_sort_dir(request.args.get("sort_dir"))
+    legacy_sort = tag_service.normalize_legacy_sort(request.args.get("sort"))
+    if legacy_sort is not None:
+        sort_kind, sort_dir = legacy_sort
+    entries_limit = _parse_positive_int(
+        request.args.get("entries_limit"), default=12, min_value=6, max_value=60
+    )
+    restore_entry = (request.args.get("restore_entry") or "").strip() or None
+    tag_name = (request.args.get("tag") or "").strip() or None
+    tag_hash_hex = (request.args.get("tag_hash") or "").strip() or None
+
+    detail = await tag_service.get_tag_detail(
+        user["id"],
+        dek,
+        tag_name=tag_name,
+        tag_hash_hex=tag_hash_hex,
+        entry_limit=entries_limit,
+        around_entry_id=restore_entry,
+    )
+    presented_detail = present_archive_detail(detail) if detail else None
+    selected_tag = detail.name if detail else (tag_name or "")
+
+    heatmap_offset = _parse_positive_int(
+        request.args.get("heatmap_offset"), default=0, min_value=0, max_value=240
+    )
+    activity_heatmap = None
+    if presented_detail:
+        try:
+            tag_hash = bytes.fromhex(presented_detail.hash)
+        except ValueError:
+            tag_hash = b""
+        if tag_hash:
+            min_date = None
+            if presented_detail.first_used:
+                try:
+                    min_date = dt.date.fromisoformat(presented_detail.first_used)
+                except ValueError:
+                    min_date = None
+            activity_heatmap = await get_tag_activity_heatmap(
+                services.db.tags,
+                user["id"],
+                tag_hash,
+                months=12,
+                offset=heatmap_offset,
+                min_date=min_date,
+            )
+
+    presented_tags_view = PresentedTagsViewData(
+        tags=(),
+        selected_tag=selected_tag,
+        detail=presented_detail,
+        sort_kind=sort_kind,
+        sort_dir=sort_dir,
+    )
+    return await render_template(
+        "partials/tags_view_detail.html",
+        day=normalized_date,
+        tags_view=presented_tags_view,
+        selected_tag=selected_tag,
+        tags_sort_kind=sort_kind,
+        tags_sort_dir=sort_dir,
+        entries_limit=entries_limit,
+        heatmap_offset=heatmap_offset,
+        activity_heatmap=activity_heatmap,
+        today=local_date().isoformat(),
+    )
 
 
 @tags_bp.get("/fragments/tags/<date>")

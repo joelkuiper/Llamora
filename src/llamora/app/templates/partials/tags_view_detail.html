@@ -51,7 +51,7 @@
                   {% set related_url = url_for('days.day', date=day) ~ '?view=tags&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&entries_limit=' ~ entries_limit ~ '&tag=' ~ (related.name|urlencode) ~ '&target=' ~ (related_target|urlencode) %}
                   <a href="{{ related_url }}"
                      class="tags-view__related-link entry-tag"
-                     hx-get="{{ url_for('tags.tags_view_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&entries_limit={{ entries_limit }}&tag={{ related.name|urlencode }}&target={{ related_target|urlencode }}"
+                     hx-get="{{ url_for('tags.tags_view_detail_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&entries_limit={{ entries_limit }}&tag={{ related.name|urlencode }}{% if related.hash %}&tag_hash={{ related.hash }}{% endif %}&target={{ related_target|urlencode }}"
                      hx-target="#tags-view-detail"
                      hx-swap="outerHTML"
                      hx-push-url="{{ related_url }}">

@@ -15,7 +15,7 @@
     {% set navigate_page_url = '' %}
   {% endif %}
   {% if tag_click_mode == 'navigate' and tag_navigate_fragment_template %}
-    {% set navigate_fragment_url = tag_navigate_fragment_template|replace('__TAG__', encoded_value) %}
+    {% set navigate_fragment_url = tag_navigate_fragment_template|replace('__TAG__', encoded_value)|replace('__TAG_HASH__', tag_hash) %}
   {% else %}
     {% set navigate_fragment_url = '' %}
   {% endif %}
