@@ -1,13 +1,13 @@
 import { createPopover } from "../popover.js";
+import { cacheLoader } from "../services/cache-loader.js";
+import { syncSummarySkeletons } from "../services/summary-skeleton.js";
 import { formatTimeElements } from "../services/time.js";
 import { scrollToHighlight } from "../ui.js";
 import { AutocompleteHistory } from "../utils/autocomplete-history.js";
 import { parsePositiveInteger } from "../utils/number.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
-import { cacheLoader } from "../services/cache-loader.js";
 import { animateMotion } from "../utils/transition.js";
 import { AutocompleteOverlayMixin } from "./base/autocomplete-overlay.js";
-import { syncSummarySkeletons } from "../services/summary-skeleton.js";
 
 const canonicalizeTag = (value, limit = null) => {
   const raw = `${value ?? ""}`.trim().toLowerCase();

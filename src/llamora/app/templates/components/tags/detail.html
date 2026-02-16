@@ -19,7 +19,7 @@
   <div class="tags-view__detail-inner">
     {% if detail %}
       <header class="tags-view__detail-header">
-        {% set delete_trace_url = url_for('tags.delete_trace', tag_hash=detail.hash) ~ '?day=' ~ day ~ '&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tag=' ~ (detail.name|urlencode) ~ '&include_list=1' %}
+        {% set delete_trace_url = url_for('tags.delete_trace', tag_hash=detail.hash) ~ '?day=' ~ day ~ '&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tag=' ~ (detail.name|urlencode) %}
         <div class="tags-view__title-wrap">
           <div class="tags-view__title-row">
             <h2 class="tags-view__title">{{ detail.name }}</h2>

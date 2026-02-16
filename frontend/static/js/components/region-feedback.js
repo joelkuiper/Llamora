@@ -23,13 +23,6 @@ const REGION_CONFIG = {
     animationClass: "motion-animate-region-enter",
     animationSelector: ".tags-view__detail-inner",
   },
-  "tags-view-list": {
-    indicator: "#tags-view-list-loading",
-    delayMs: 40,
-    spinnerSelector: ".entries-loading__spinner",
-    animationClass: "motion-animate-region-enter-soft",
-    animationSelector: "[data-tags-view-index]",
-  },
 };
 
 const requestRegions = new WeakMap();
@@ -47,56 +40,14 @@ const getRegionState = (id) => {
   return regionState.get(id);
 };
 
-const parsePathname = (path) => {
-  try {
-    return new URL(path, window.location.origin).pathname;
-  } catch (_error) {
-    return "";
-  }
-};
-
-const isTagsQuery = (path) => {
-  if (!path) return false;
-  try {
-    const url = new URL(path, window.location.origin);
-    if (url.pathname === "/t" || url.pathname.startsWith("/t/")) return true;
-    return false;
-  } catch (_error) {
-    return false;
-  }
-};
-
-const shouldRefreshTagsList = (event) => {
-  const path = String(event?.detail?.path || "");
-  if (!path) return false;
-  if (path.includes("include_list=1")) return true;
-  const pathname = parsePathname(path);
-  return (pathname === "/t" || pathname.startsWith("/t/")) && isTagsQuery(path);
-};
-
 const resolveRegions = (event) => {
   const ids = new Set();
   const target = event?.detail?.target;
-  const path = String(event?.detail?.path || "");
-  const pathname = parsePathname(path);
   if (target instanceof Element) {
     const id = String(target.id || "").trim();
     if (id && REGION_CONFIG[id]) {
       ids.add(id);
     }
-  }
-
-  const source = event?.detail?.requestConfig?.elt;
-  if (source instanceof Element && source.closest("#tags-view") && shouldRefreshTagsList(event)) {
-    ids.add("tags-view-list");
-  }
-
-  if (
-    pathname.startsWith("/fragments/tags/") &&
-    path.includes("include_list=1") &&
-    !ids.has("tags-view-list")
-  ) {
-    ids.add("tags-view-list");
   }
 
   return ids;

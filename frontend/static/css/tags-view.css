@@ -260,16 +260,6 @@
   gap: 0.24rem;
 }
 
-.tags-view__list-spinner {
-  margin-left: auto;
-  opacity: 0;
-  transition: opacity var(--motion-gentle) ease;
-}
-
-.tags-view__list-spinner.htmx-request {
-  opacity: 0.9;
-}
-
 .tags-view__sort-btn {
   width: 1.7rem;
   height: 1.7rem;
@@ -301,6 +291,9 @@
 .tags-view__index {
   display: grid;
   gap: 0.32rem;
+  content-visibility: auto;
+  contain: layout paint;
+  contain-intrinsic-size: 480px;
 }
 
 .tags-view__index-row {

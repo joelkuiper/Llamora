@@ -19,7 +19,7 @@ from llamora.app.services.container import (
     get_tag_service,
 )
 from llamora.app.services.auth_helpers import login_required
-from llamora.app.services.tag_service import TagsViewData, TagIndexItem
+from llamora.app.services.tag_service import TagsViewData
 from llamora.app.services.tag_presenter import (
     PresentedTagsViewData,
     present_archive_detail,
@@ -125,6 +125,16 @@ async def _render_tags_page(selected_tag: str | None):
     selected = tag_service.normalize_tag_query(
         selected_tag or (request.args.get("tag") or "")
     )
+    tags_index_items = await tag_service.get_tags_index_items(
+        user["id"],
+        dek,
+        sort_kind=sort_kind,
+        sort_dir=sort_dir,
+    )
+    tags_index_payload = [
+        {"name": item.name, "hash": item.hash, "count": item.count}
+        for item in tags_index_items
+    ]
     target_param = (request.args.get("target") or "").strip() or None
     context = {
         "day": day,
@@ -137,6 +147,7 @@ async def _render_tags_page(selected_tag: str | None):
         "selected_tag": selected,
         "tags_sort_kind": sort_kind,
         "tags_sort_dir": sort_dir,
+        "tags_index_items": tags_index_payload,
         "target": target_param,
         "activity_heatmap": None,
         "heatmap_offset": 0,
@@ -201,38 +212,15 @@ async def _render_tags_detail_and_list_oob_updates(
     )
     presented_tags_view = present_tags_view_data(tags_view)
     return await render_template(
-        "components/tags/fragment.html",
+        "components/tags/detail.html",
         day=str(context["day"]),
         tags_view=presented_tags_view,
         selected_tag=tags_view.selected_tag,
         tags_sort_kind=sort_kind,
         tags_sort_dir=sort_dir,
-        include_list=True,
         entries_limit=entries_limit,
-        target=None,
         oob_detail=True,
         today=local_date().isoformat(),
-    )
-
-
-async def _render_tags_list_oob_updates(
-    user_id: str,
-    dek: bytes,
-    context: dict[str, str | dict[str, str]],
-) -> str:
-    tags_view, sort_kind, sort_dir, entries_limit = await _load_tags_view_from_context(
-        user_id, dek, context
-    )
-    presented_tags_view = present_tags_view_data(tags_view)
-    return await render_template(
-        "components/tags/list_oob.html",
-        day=str(context["day"]),
-        tags_view=presented_tags_view,
-        selected_tag=tags_view.selected_tag,
-        tags_sort_kind=sort_kind,
-        tags_sort_dir=sort_dir,
-        entries_limit=entries_limit,
-        target=None,
     )
 
 
@@ -240,15 +228,11 @@ async def _render_view_oob_updates(
     user_id: str,
     dek: bytes,
     context: dict[str, str | dict[str, str]] | None,
-    *,
-    tags_mode: str = "detail_and_list",
 ) -> str:
     if not context:
         return ""
     view = str(context.get("view") or "").strip().lower()
     if view == "tags":
-        if tags_mode == "list_only":
-            return await _render_tags_list_oob_updates(user_id, dek, context)
         return await _render_tags_detail_and_list_oob_updates(user_id, dek, context)
     return ""
 
@@ -265,15 +249,12 @@ async def remove_tag(entry_id: str, tag_hash: str):
         raise AssertionError("unreachable") from exc
     context = _parse_view_context()
     selected_tag: str | None = None
-    removed_tag_name: str | None = None
     if context and str(context.get("view") or "").strip().lower() == "tags":
         params = context.get("params")
         if isinstance(params, dict):
             selected_tag = _tags().normalize_tag_query(params.get("tag"))
         if selected_tag:
-            tag_info = await db.tags.get_tag_info(user["id"], tag_hash_bytes, dek)
-            if tag_info:
-                removed_tag_name = _tags().normalize_tag_query(tag_info.get("name"))
+            pass
 
     created_date = await db.entries.get_entry_date(user["id"], entry_id)
     changed = await db.tags.unlink_tag_entry(
@@ -293,15 +274,7 @@ async def remove_tag(entry_id: str, tag_hash: str):
         )
     if not context:
         return "<span class='tag-tombstone'></span>"
-    tags_mode = "detail_and_list"
-    if (
-        str(context.get("view") or "").strip().lower() == "tags"
-        and selected_tag
-        and removed_tag_name
-        and selected_tag != removed_tag_name
-    ):
-        tags_mode = "list_only"
-    oob = await _render_view_oob_updates(user["id"], dek, context, tags_mode=tags_mode)
+    oob = await _render_view_oob_updates(user["id"], dek, context)
     if not oob:
         return "<span class='tag-tombstone'></span>"
     return f"<span class='tag-tombstone'></span>\n{oob}"
@@ -351,9 +324,7 @@ async def add_tag(entry_id: str):
     )
     if not context:
         return html
-    oob = await _render_view_oob_updates(
-        user["id"], dek, context, tags_mode="list_only"
-    )
+    oob = await _render_view_oob_updates(user["id"], dek, context)
     if not oob:
         return html
     return f"{html}\n{oob}"
@@ -473,12 +444,6 @@ async def delete_trace(tag_hash: str):
     if legacy_sort is not None:
         sort_kind, sort_dir = legacy_sort
 
-    include_list = str(request.args.get("include_list") or "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
     affected = await get_services().db.tags.delete_tag_everywhere(
         user["id"],
         tag_hash_bytes,
@@ -505,13 +470,12 @@ async def delete_trace(tag_hash: str):
     entries_limit = DEFAULT_TAG_ENTRIES_LIMIT
     presented_tags_view = present_tags_view_data(tags_view)
     return await render_template(
-        "components/tags/fragment.html",
+        "components/tags/detail.html",
         day=day,
         tags_view=presented_tags_view,
         selected_tag=selected_tag,
         tags_sort_kind=sort_kind,
         tags_sort_dir=sort_dir,
-        include_list=include_list,
         entries_limit=entries_limit,
         today=local_date().isoformat(),
     )
@@ -630,7 +594,7 @@ async def tags_view_detail_fragment(date: str):
     """Return only the detail pane for a single tag.
 
     Accepts ``tag_hash`` for O(1) lookup or falls back to ``tag`` (name).
-    Much lighter than :func:`tags_view_fragment` which loads the full index.
+    Much lighter than the full tags view page.
     """
 
     normalized_date = require_iso_date(date)
@@ -646,26 +610,16 @@ async def tags_view_detail_fragment(date: str):
     tag_hash_hex = (request.args.get("tag_hash") or "").strip() or None
 
     if not tag_name and not tag_hash_hex:
-        (
-            tag_items,
-            _list_has_more,
-            _list_next_cursor,
-            selected_tag,
-        ) = await tag_service.get_tags_index_page(
+        tag_items = await tag_service.get_tags_index_items(
             user["id"],
             dek,
             sort_kind=sort_kind,
             sort_dir=sort_dir,
-            cursor=0,
-            limit=1,
-            selected_tag=None,
         )
         if tag_items:
             first_item = tag_items[0]
             tag_name = first_item.name
             tag_hash_hex = first_item.hash
-        elif selected_tag:
-            tag_name = selected_tag
 
     detail = await tag_service.get_tag_detail(
         user["id"],
@@ -718,253 +672,6 @@ async def tags_view_detail_fragment(date: str):
         heatmap_offset=heatmap_offset,
         activity_heatmap=activity_heatmap,
         today=local_date().isoformat(),
-    )
-
-
-@tags_bp.get("/fragments/tags/<date>")
-@login_required
-async def tags_view_fragment(date: str):
-    normalized_date = require_iso_date(date)
-    _, user, dek = await require_user_and_dek()
-    services = get_services()
-    tag_service = _tags()
-    sort_kind = tag_service.normalize_tags_sort_kind(request.args.get("sort_kind"))
-    sort_dir = tag_service.normalize_tags_sort_dir(request.args.get("sort_dir"))
-    legacy_sort = tag_service.normalize_legacy_sort(request.args.get("sort"))
-    if legacy_sort is not None:
-        sort_kind, sort_dir = legacy_sort
-    include_list = str(request.args.get("include_list") or "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
-    entries_limit = DEFAULT_TAG_ENTRIES_LIMIT
-    restore_entry = (request.args.get("restore_entry") or "").strip() or None
-    tags_view = await tag_service.get_tags_view_data(
-        user["id"],
-        dek,
-        request.args.get("tag"),
-        sort_kind=sort_kind,
-        sort_dir=sort_dir,
-        entry_limit=entries_limit,
-        around_entry_id=restore_entry,
-    )
-    selected_tag = tags_view.selected_tag
-    presented_tags_view = present_tags_view_data(tags_view)
-    heatmap_offset = _parse_positive_int(
-        request.args.get("heatmap_offset"), default=0, min_value=0, max_value=240
-    )
-    activity_heatmap = None
-    if presented_tags_view.detail:
-        try:
-            tag_hash = bytes.fromhex(presented_tags_view.detail.hash)
-        except ValueError:
-            tag_hash = b""
-        if tag_hash:
-            min_date = None
-            if presented_tags_view.detail.first_used:
-                try:
-                    min_date = dt.date.fromisoformat(
-                        presented_tags_view.detail.first_used
-                    )
-                except ValueError:
-                    min_date = None
-            activity_heatmap = await get_tag_activity_heatmap(
-                services.db.tags,
-                user["id"],
-                tag_hash,
-                months=12,
-                offset=heatmap_offset,
-                min_date=min_date,
-            )
-    return await render_template(
-        "components/tags/fragment.html",
-        day=normalized_date,
-        tags_view=presented_tags_view,
-        selected_tag=selected_tag,
-        tags_sort_kind=sort_kind,
-        tags_sort_dir=sort_dir,
-        include_list=include_list,
-        entries_limit=entries_limit,
-        heatmap_offset=heatmap_offset,
-        activity_heatmap=activity_heatmap,
-        target=(request.args.get("target") or "").strip() or None,
-        today=local_date().isoformat(),
-    )
-
-
-@tags_bp.get("/fragments/tags/<date>/list")
-@login_required
-async def tags_view_list_fragment(date: str):
-    normalized_date = require_iso_date(date)
-    _, user, dek = await require_user_and_dek()
-    tag_service = _tags()
-    sort_kind = tag_service.normalize_tags_sort_kind(request.args.get("sort_kind"))
-    sort_dir = tag_service.normalize_tags_sort_dir(request.args.get("sort_dir"))
-    legacy_sort = tag_service.normalize_legacy_sort(request.args.get("sort"))
-    if legacy_sort is not None:
-        sort_kind, sort_dir = legacy_sort
-    list_cursor = _parse_positive_int(
-        request.args.get("cursor"), default=0, min_value=0, max_value=100000
-    )
-    list_limit = _parse_positive_int(
-        request.args.get("limit"), default=100, min_value=10, max_value=200
-    )
-    (
-        tag_items,
-        list_has_more,
-        list_next_cursor,
-        selected_tag,
-    ) = await tag_service.get_tags_index_page(
-        user["id"],
-        dek,
-        sort_kind=sort_kind,
-        sort_dir=sort_dir,
-        cursor=list_cursor,
-        limit=list_limit,
-        selected_tag=request.args.get("tag"),
-    )
-    return await render_template(
-        "components/tags/list_fragment.html",
-        day=normalized_date,
-        tag_items=tag_items,
-        selected_tag=selected_tag,
-        tags_sort_kind=sort_kind,
-        tags_sort_dir=sort_dir,
-        list_cursor=list_cursor,
-        list_limit=list_limit,
-        list_has_more=list_has_more,
-        list_next_cursor=list_next_cursor,
-        target=(request.args.get("target") or "").strip() or None,
-        today=local_date().isoformat(),
-    )
-
-
-@tags_bp.get("/fragments/tags/<date>/list/index")
-@login_required
-async def tags_view_list_index(date: str):
-    require_iso_date(date)
-    _, user, dek = await require_user_and_dek()
-    tag_service = _tags()
-    sort_kind = tag_service.normalize_tags_sort_kind(request.args.get("sort_kind"))
-    sort_dir = tag_service.normalize_tags_sort_dir(request.args.get("sort_dir"))
-    legacy_sort = tag_service.normalize_legacy_sort(request.args.get("sort"))
-    if legacy_sort is not None:
-        sort_kind, sort_dir = legacy_sort
-    items = await tag_service.get_tags_index_items(
-        user["id"],
-        dek,
-        sort_kind=sort_kind,
-        sort_dir=sort_dir,
-    )
-    payload = {
-        "items": [
-            {"name": item.name, "hash": item.hash, "count": item.count}
-            for item in items
-        ]
-    }
-    return jsonify(payload)
-
-
-@tags_bp.get("/fragments/tags/<date>/list/rows")
-@login_required
-async def tags_view_list_rows_fragment(date: str):
-    normalized_date = require_iso_date(date)
-    _, user, dek = await require_user_and_dek()
-    tag_service = _tags()
-    sort_kind = tag_service.normalize_tags_sort_kind(request.args.get("sort_kind"))
-    sort_dir = tag_service.normalize_tags_sort_dir(request.args.get("sort_dir"))
-    list_cursor = _parse_positive_int(
-        request.args.get("cursor"), default=0, min_value=0, max_value=100000
-    )
-    list_limit = _parse_positive_int(
-        request.args.get("limit"), default=100, min_value=10, max_value=200
-    )
-    (
-        tag_items,
-        list_has_more,
-        list_next_cursor,
-        selected_tag,
-    ) = await tag_service.get_tags_index_page(
-        user["id"],
-        dek,
-        sort_kind=sort_kind,
-        sort_dir=sort_dir,
-        cursor=list_cursor,
-        limit=list_limit,
-        selected_tag=request.args.get("tag"),
-    )
-    return await render_template(
-        "components/tags/list_rows_fragment.html",
-        day=normalized_date,
-        tag_items=tag_items,
-        selected_tag=selected_tag,
-        tags_sort_kind=sort_kind,
-        tags_sort_dir=sort_dir,
-        list_cursor=list_cursor,
-        list_limit=list_limit,
-        list_has_more=list_has_more,
-        list_next_cursor=list_next_cursor,
-        target=(request.args.get("target") or "").strip() or None,
-        today=local_date().isoformat(),
-    )
-
-
-@tags_bp.get("/fragments/tags/<date>/list/row")
-@login_required
-async def tags_view_list_row_fragment(date: str):
-    normalized_date = require_iso_date(date)
-    _, user, dek = await require_user_and_dek()
-    tag_service = _tags()
-    sort_kind = tag_service.normalize_tags_sort_kind(request.args.get("sort_kind"))
-    sort_dir = tag_service.normalize_tags_sort_dir(request.args.get("sort_dir"))
-    tag_name = (request.args.get("tag") or "").strip() or None
-    tag_hash_hex = (request.args.get("tag_hash") or "").strip() or None
-    if not tag_name and not tag_hash_hex:
-        return ""
-
-    item = None
-    if tag_hash_hex:
-        try:
-            tag_hash_bytes = bytes.fromhex(tag_hash_hex)
-        except ValueError:
-            tag_hash_bytes = b""
-        if tag_hash_bytes:
-            info = await get_services().db.tags.get_tag_info(
-                user["id"], tag_hash_bytes, dek
-            )
-            if info:
-                raw_name = str(info.get("name") or "").strip()
-                try:
-                    canonical = tag_service.canonicalize(raw_name)
-                except ValueError:
-                    canonical = ""
-                if canonical:
-                    item = TagIndexItem(
-                        name=tag_service.display(canonical),
-                        hash=info["hash"],
-                        count=int(info.get("count") or 0),
-                    )
-                    tag_name = item.name
-
-    if item is None and tag_name:
-        item = await tag_service._resolve_index_item_by_name(user["id"], dek, tag_name)
-        if item:
-            tag_name = item.name
-
-    if item is None:
-        return ""
-
-    return await render_template(
-        "components/tags/list_row.html",
-        day=normalized_date,
-        item=item,
-        active_tag=tag_name,
-        sort_kind=sort_kind,
-        sort_dir=sort_dir,
-        today=local_date().isoformat(),
-        target=None,
     )
 
 

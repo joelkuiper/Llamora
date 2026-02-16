@@ -239,7 +239,7 @@ function registerTimeFormatter() {
 
   document.body.addEventListener("htmx:afterSwap", (event) => {
     const target = event?.detail?.target;
-    if (target && target.querySelector?.("time.entry-time")) {
+    if (target?.querySelector?.("time.entry-time")) {
       run(target);
       return;
     }

@@ -1,14 +1,13 @@
 import { armEntryAnimations, armInitialEntryAnimations } from "../entries/entry-animations.js";
-import { formatTimeElements } from "../services/time.js";
 import { cacheLoader } from "../services/cache-loader.js";
+import { syncSummarySkeletons } from "../services/summary-skeleton.js";
+import { formatTimeElements } from "../services/time.js";
 import { clearScrollTarget, flashHighlight } from "../ui.js";
 import { prefersReducedMotion } from "../utils/motion.js";
 import { sessionStore } from "../utils/storage.js";
 import { transitionHide, transitionShow } from "../utils/transition.js";
-import { syncSummarySkeletons } from "../services/summary-skeleton.js";
 
 const BOOT_KEY = "__llamoraTagsViewBooted";
-const MAX_MISSING_FETCH = 48;
 const state = {
   query: "",
   sortKind: "count",
@@ -19,9 +18,9 @@ const state = {
   empty: null,
   list: null,
   indexItems: null,
-  indexPromise: null,
   indexPending: false,
-  missingNames: new Set(),
+  listBuilt: false,
+  indexSignature: "",
   scrollElement: null,
   saveFrame: 0,
   restoreAppliedForLocation: "",
@@ -384,6 +383,9 @@ const findSidebar = (root = document) =>
 const findListBody = (root = document) =>
   root.querySelector?.(".tags-view__list-body") || document.querySelector(".tags-view__list-body");
 
+const findIndexData = (root = document) =>
+  root.querySelector?.("#tags-index-data") || document.getElementById("tags-index-data");
+
 const findEntriesList = (root = document) =>
   findDetail(root)?.querySelector?.("[data-tags-view-entries]") ||
   document.querySelector("#tags-view-detail [data-tags-view-entries]");
@@ -440,43 +442,39 @@ const normalizeTagKey = (value) =>
 
 const resetIndexCache = () => {
   state.indexItems = null;
-  state.indexPromise = null;
   state.indexPending = false;
-  state.missingNames.clear();
+  state.listBuilt = false;
+  state.indexSignature = "";
 };
 
 const loadIndexItems = async () => {
-  if (state.indexPromise) return state.indexPromise;
-  const day = getTagsDay();
-  if (!day) return [];
-  const params = new URLSearchParams({
-    sort_kind: state.sortKind,
-    sort_dir: state.sortDir,
-  });
-  state.indexPromise = fetch(`/fragments/tags/${day}/list/index?${params.toString()}`, {
-    headers: { Accept: "application/json" },
-    credentials: "same-origin",
-  })
-    .then((response) => (response.ok ? response.json() : null))
-    .then((payload) => {
-      const items = Array.isArray(payload?.items) ? payload.items : [];
-      state.indexItems = items
+  if (Array.isArray(state.indexItems)) return state.indexItems;
+  hydrateIndexFromTemplate(document);
+  return Array.isArray(state.indexItems) ? state.indexItems : [];
+};
+
+const hydrateIndexFromTemplate = (root = document) => {
+  const script = findIndexData(root);
+  if (!(script instanceof HTMLElement)) return;
+  const raw = script.textContent || "";
+  if (!raw.trim()) return;
+  if (state.indexSignature === raw) return;
+  try {
+    const payload = JSON.parse(raw);
+    if (Array.isArray(payload)) {
+      state.indexItems = payload
         .map((item) => ({
           name: String(item?.name || "").trim(),
           hash: String(item?.hash || "").trim(),
           count: Number.parseInt(item?.count || "0", 10) || 0,
         }))
         .filter((item) => item.name);
-      return state.indexItems;
-    })
-    .catch(() => {
-      state.indexItems = [];
-      return [];
-    })
-    .finally(() => {
-      state.indexPromise = null;
-    });
-  return state.indexPromise;
+      state.listBuilt = false;
+    }
+  } catch {
+    state.indexItems = [];
+  }
+  state.indexSignature = raw;
 };
 
 const buildTagUrls = (tagName, tagHash) => {
@@ -505,7 +503,7 @@ const buildTagUrls = (tagName, tagHash) => {
   return { tagUrl, fragmentUrl };
 };
 
-const createTransientRow = (item) => {
+const createTagRow = (item, { transient = false } = {}) => {
   const urls = buildTagUrls(item.name, item.hash);
   if (!urls) return null;
   const row = document.createElement("a");
@@ -514,7 +512,9 @@ const createTransientRow = (item) => {
   row.dataset.tagName = item.name;
   row.dataset.tagsName = item.name;
   row.dataset.tagsCount = String(item.count ?? 0);
-  row.dataset.tagsTransient = "true";
+  if (transient) {
+    row.dataset.tagsTransient = "true";
+  }
   row.setAttribute("href", urls.tagUrl);
   row.setAttribute("hx-get", urls.fragmentUrl);
   row.setAttribute("hx-target", "#tags-view-detail");
@@ -559,6 +559,13 @@ const ensureActiveRowPresent = (tagName) => {
     removeTransientRow(tagName);
     return;
   }
+  if (Array.isArray(state.indexItems) && !state.listBuilt) {
+    buildIndexListIfNeeded(document);
+    if (findRowByTagName(tagName)) {
+      removeTransientRow(tagName);
+      return;
+    }
+  }
   if (!state.indexItems && !state.indexPending) {
     state.indexPending = true;
     loadIndexItems().then(() => {
@@ -573,7 +580,7 @@ const ensureActiveRowPresent = (tagName) => {
   const index = list?.querySelector?.("[data-tags-view-index]");
   if (!index) return;
   removeTransientRow(tagName);
-  const transient = createTransientRow(item);
+  const transient = createTagRow(item, { transient: true });
   if (!transient) return;
   const orderMap = getIndexOrderMap();
   const targetIndex = orderMap.get(tagName);
@@ -600,6 +607,42 @@ const ensureActiveRowPresent = (tagName) => {
   if (state.query) {
     applySearch(state.query);
   }
+};
+
+const buildIndexListIfNeeded = (root = document) => {
+  const list = findList(root);
+  const index = list?.querySelector?.("[data-tags-view-index]");
+  if (!index) return;
+  if (index.children.length === 0) {
+    state.listBuilt = false;
+  }
+  if (state.listBuilt) return;
+  if (!Array.isArray(state.indexItems)) return;
+  if (index.children.length) {
+    state.listBuilt = true;
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  state.indexItems.forEach((item) => {
+    const row = createTagRow(item);
+    if (row) frag.appendChild(row);
+  });
+  index.appendChild(frag);
+  if (typeof htmx !== "undefined") {
+    htmx.process(index);
+  }
+  state.listBuilt = true;
+  buildSearchIndex(root);
+  applySearch(state.query);
+};
+
+const rebuildIndexList = (root = document) => {
+  const list = findList(root);
+  const index = list?.querySelector?.("[data-tags-view-index]");
+  if (!index) return;
+  index.innerHTML = "";
+  state.listBuilt = false;
+  buildIndexListIfNeeded(root);
 };
 
 const readStoredEntriesAnchor = () => {
@@ -1311,10 +1354,11 @@ const applySearch = (rawQuery) => {
 
   if (!state.indexItems && !state.indexPending) {
     state.indexPending = true;
-    loadIndexItems().then(() => {
-      state.indexPending = false;
+    const loaded = loadIndexItems();
+    state.indexPending = false;
+    if (loaded?.length) {
       applySearch(state.query);
-    });
+    }
   }
 
   const queryTokens = normalizeQueryTokens(query);
@@ -1331,7 +1375,7 @@ const applySearch = (rawQuery) => {
       }));
 
   const matchesTokens = (key) => queryTokens.every((token) => key.includes(token));
-  let orderedItems = candidates
+  const orderedItems = candidates
     .filter((item) =>
       queryTokens.length ? matchesTokens(item.key) : item.key.includes(normalized),
     )
@@ -1350,18 +1394,7 @@ const applySearch = (rawQuery) => {
 
   const selectedTag = getSelectedTrace();
   if (indexItems && orderedItems.length) {
-    let fetched = 0;
-    for (const item of orderedItems) {
-      if (fetched >= MAX_MISSING_FETCH) break;
-      if (!item.name) continue;
-      if (selectedTag && item.name === selectedTag) continue;
-      if (findRowByTagName(item.name)) continue;
-      const key = normalizeTagKey(item.name);
-      if (state.missingNames.has(key)) continue;
-      state.missingNames.add(key);
-      ensureTagRowVisible(item.name, item.hash);
-      fetched += 1;
-    }
+    ensureActiveRowPresent(selectedTag);
   }
 
   let orderedMatches = orderedItems
@@ -1470,22 +1503,13 @@ const requestSort = (kind, dir) => {
 
   const detail = findDetail();
   const list = findList();
-  const day = getTagsDay();
-  if (!(detail instanceof HTMLElement) || !day || typeof htmx === "undefined") {
+  if (!(detail instanceof HTMLElement)) {
     applySort(nextKind, nextDir, { updateUrl: true });
     return;
   }
 
   const selectedTag =
     String(detail.dataset.selectedTag || "").trim() || getSelectedTrace() || readTagFromUrl();
-
-  const fragmentParams = new URLSearchParams({
-    sort_kind: nextKind,
-    sort_dir: nextDir,
-  });
-  if (selectedTag) {
-    fragmentParams.set("tag", selectedTag);
-  }
 
   const tagPath = selectedTag ? `/t/${encodeURIComponent(selectedTag)}` : "/t";
   const pageParams = new URLSearchParams({
@@ -1498,8 +1522,6 @@ const requestSort = (kind, dir) => {
     pageParams.set("day", dayParam);
   }
   const pageUrl = pageParams.toString() ? `${tagPath}?${pageParams.toString()}` : tagPath;
-
-  const fragmentUrl = `/fragments/tags/${day}/list?${fragmentParams.toString()}`;
 
   state.sortKind = nextKind;
   state.sortDir = nextDir;
@@ -1515,39 +1537,33 @@ const requestSort = (kind, dir) => {
   updateSortButtons();
   refreshDetailLinksForSort(document);
 
-  const target = list instanceof HTMLElement ? list : detail;
-  if (!target) return;
-
-  htmx.ajax("GET", fragmentUrl, {
-    source: target,
-    target,
-    swap: "outerHTML",
-    pushURL: pageUrl,
-  });
-  updateUrlSort();
-};
-
-const ensureTagRowVisible = (tagName, tagHash = "") => {
-  if (!tagName) return;
-  if (findRowByTagName(tagName)) return;
-  const list = findList();
-  const index = list?.querySelector?.("[data-tags-view-index]");
-  const day = getTagsDay();
-  if (!(index instanceof HTMLElement) || !day || typeof htmx === "undefined") return;
-
-  const params = new URLSearchParams({
-    sort_kind: state.sortKind,
-    sort_dir: state.sortDir,
-    tag: tagName,
-  });
-  if (tagHash) {
-    params.set("tag_hash", tagHash);
+  window.history.pushState(window.history.state, "", pageUrl);
+  captureListPositions();
+  hydrateIndexFromTemplate(document);
+  if (Array.isArray(state.indexItems)) {
+    state.indexItems = state.indexItems.slice().sort((a, b) => {
+      const nameA = a.name.toLowerCase();
+      const nameB = b.name.toLowerCase();
+      const countA = Number.parseInt(a.count || "0", 10) || 0;
+      const countB = Number.parseInt(b.count || "0", 10) || 0;
+      if (nextKind === "count") {
+        if (countA !== countB) {
+          return nextDir === "desc" ? countB - countA : countA - countB;
+        }
+        return nameA.localeCompare(nameB);
+      }
+      const alphaCmp = nameA.localeCompare(nameB);
+      return nextDir === "desc" ? -alphaCmp : alphaCmp;
+    });
+    rebuildIndexList(document);
+    animateListReorder();
+  } else {
+    loadIndexItems().then(() => {
+      rebuildIndexList(document);
+      animateListReorder();
+    });
   }
-  const url = `/fragments/tags/${day}/list/row?${params.toString()}`;
-  htmx.ajax("GET", url, {
-    target: index,
-    swap: "afterbegin",
-  });
+  updateUrlSort();
 };
 
 const sync = (root = document) => {
@@ -1558,6 +1574,8 @@ const sync = (root = document) => {
   if (!state.query) {
     state.query = readStoredSearchQuery();
   }
+  hydrateIndexFromTemplate(root);
+  buildIndexListIfNeeded(root);
   syncFromDetail(root);
   syncSummarySkeletons(root);
   void hydrateTagsViewSummary(root);
@@ -1624,6 +1642,8 @@ const syncListOnly = (root = document) => {
   updateHeaderHeight();
   syncSortStateFromDom(root);
   updateSortButtons(root);
+  hydrateIndexFromTemplate(root);
+  buildIndexListIfNeeded(root);
   buildSearchIndex(root);
   applySearch(state.query);
   refreshDetailLinksForSort(root);
@@ -1649,6 +1669,8 @@ const syncListOnly = (root = document) => {
 const syncDetailOnly = (root = document) => {
   syncFromDetail(root);
   syncSummarySkeletons(root);
+  hydrateIndexFromTemplate(root);
+  buildIndexListIfNeeded(root);
   buildSearchIndex(root);
   applySearch(state.query);
   applyStoredHeatmapOffset(root);
@@ -1728,9 +1750,6 @@ if (!globalThis[BOOT_KEY]) {
       return;
     }
     const tagName = String(detailLink.dataset?.tagName || "").trim();
-    const tagHash =
-      String(detailLink.dataset?.tagHash || "").trim() ||
-      String(detailLink.closest?.(".entry-tag")?.dataset?.tagHash || "").trim();
     if (tagName) {
       state.pendingTagHighlight = tagName;
       if (findRowByTagName(tagName)) {

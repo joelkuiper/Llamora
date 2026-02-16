@@ -1,6 +1,6 @@
 import { ReactiveElement } from "../utils/reactive-element.js";
-import { animateMotion } from "../utils/transition.js";
 import { normalizeEdgeDirection } from "../utils/scroll-edge.js";
+import { animateMotion } from "../utils/transition.js";
 
 class ScrollEdgeButtonElement extends ReactiveElement {
   #button = null;
