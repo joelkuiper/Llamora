@@ -1282,6 +1282,7 @@ const requestSort = (kind, dir) => {
     swap: "outerHTML",
     pushURL: pageUrl,
   });
+  updateUrlSort();
 };
 
 const ensureTagRowVisible = (tagName, tagHash = "") => {
