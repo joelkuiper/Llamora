@@ -1534,7 +1534,7 @@ if (!globalThis[BOOT_KEY]) {
     const target = event.detail?.target;
     if (!(target instanceof Element)) return;
     storeHeatmapOffsetFromRoot(target);
-    if (target.id === "tags-view-list" || target.closest?.("#tags-view-list")) {
+    if (target.id === "tags-view-list") {
       animateListReorder(() => {
         scrollActiveRowIntoView(document, "smooth");
       });

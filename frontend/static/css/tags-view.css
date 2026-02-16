@@ -59,37 +59,9 @@
 }
 
 .tags-view__list-more {
-  margin: 0.45rem 0.2rem 0.1rem;
-  display: flex;
-  justify-content: center;
-}
-
-.tags-view__list-more-btn {
-  border: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
-  background: color-mix(in srgb, var(--glass-bg-alt) 92%, transparent);
-  color: color-mix(in srgb, var(--color-text) 72%, transparent);
-  border-radius: 999px;
-  padding: 0.35rem 0.7rem;
-  font-size: 0.72rem;
-  letter-spacing: 0.02em;
-  cursor: pointer;
-  transition:
-    border-color var(--motion-hover) ease,
-    box-shadow var(--motion-hover) ease,
-    color var(--motion-hover) ease,
-    transform var(--motion-press) ease;
-}
-
-.tags-view__list-more-btn:hover,
-.tags-view__list-more-btn:focus-visible {
-  border-color: color-mix(in srgb, var(--accent-20) 60%, var(--border));
-  color: color-mix(in srgb, var(--color-text) 86%, transparent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-10) 40%, transparent);
-  outline: none;
-}
-
-.tags-view__list-more-btn:active {
-  transform: translateY(1px);
+  margin: 0.25rem 0.2rem 0.2rem;
+  padding: 0.45rem 0.4rem;
+  opacity: 0.55;
 }
 
 .tags-view__sidebar-fixed::-webkit-scrollbar {
