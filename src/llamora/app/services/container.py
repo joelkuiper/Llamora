@@ -21,6 +21,7 @@ from llamora.app.services.tag_service import TagService
 from llamora.app.services.service_pulse import ServicePulse
 from llamora.app.services.search_config import SearchConfig
 from llamora.app.services.vector_search import VectorSearchService
+from llamora.app.services.invalidation_coordinator import InvalidationCoordinator
 from llamora.app.services.digest_policy import (
     DIGEST_POLICY_VERSION,
     ENTRY_DIGEST_VERSION,
@@ -96,6 +97,7 @@ class AppLifecycle:
         self._maintenance_task: asyncio.Task | None = None
         self._lock = asyncio.Lock()
         self._started = False
+        self._invalidation_coordinator = None
 
     async def __aenter__(self) -> "AppLifecycle":
         await self.start()
@@ -126,6 +128,15 @@ class AppLifecycle:
             try:
                 await self._services.db.init()
                 db_initialised = True
+                events = self._services.db._events
+                if events is not None:
+                    self._invalidation_coordinator = InvalidationCoordinator(
+                        event_bus=events,
+                        history_cache=self._services.db.history_cache,
+                        lockbox_store=get_lockbox_store(self._services.db),
+                        service_pulse=self._services.service_pulse,
+                    )
+                    self._invalidation_coordinator.subscribe()
                 await self._services.search_api.start()
                 search_started = True
                 await self._services.llm_service.ensure_started()
@@ -177,6 +188,7 @@ class AppLifecycle:
             maintenance_task = self._maintenance_task
             self._maintenance_task = None
             self._started = False
+        self._invalidation_coordinator = None
 
         if maintenance_task is not None:
             maintenance_task.cancel()

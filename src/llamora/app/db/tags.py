@@ -6,7 +6,12 @@ from aiosqlitepool import SQLiteConnectionPool
 from ulid import ULID
 
 from .base import BaseRepository
-from .events import RepositoryEventBus
+from .events import (
+    RepositoryEventBus,
+    TAG_DELETED_EVENT,
+    TAG_LINKED_EVENT,
+    TAG_UNLINKED_EVENT,
+)
 from .utils import cached_tag_name
 from llamora.app.services.crypto import EncryptionContext
 from llamora.app.util.tags import canonicalize, tag_hash
@@ -63,6 +68,8 @@ class TagsRepository(BaseRepository):
         user_id: str,
         tag_hash: bytes,
         entry_id: str,
+        *,
+        created_date: str | None = None,
     ) -> bool:
         changed = False
         async with self.pool.connection() as conn:
@@ -81,6 +88,14 @@ class TagsRepository(BaseRepository):
                     )
 
             await self._run_in_transaction(conn, _tx)
+        if changed and self._event_bus:
+            await self._event_bus.emit(
+                TAG_LINKED_EVENT,
+                user_id=user_id,
+                entry_id=entry_id,
+                tag_hash=tag_hash.hex(),
+                created_date=created_date,
+            )
         return changed
 
     async def unlink_tag_entry(
@@ -88,6 +103,8 @@ class TagsRepository(BaseRepository):
         user_id: str,
         tag_hash: bytes,
         entry_id: str,
+        *,
+        created_date: str | None = None,
     ) -> bool:
         changed = False
         async with self.pool.connection() as conn:
@@ -102,6 +119,14 @@ class TagsRepository(BaseRepository):
                     changed = True
 
             await self._run_in_transaction(conn, _tx)
+        if changed and self._event_bus:
+            await self._event_bus.emit(
+                TAG_UNLINKED_EVENT,
+                user_id=user_id,
+                entry_id=entry_id,
+                tag_hash=tag_hash.hex(),
+                created_date=created_date,
+            )
         return changed
 
     async def delete_tag_everywhere(
@@ -145,6 +170,13 @@ class TagsRepository(BaseRepository):
 
             await self._run_in_transaction(conn, _tx)
 
+        if changed and self._event_bus:
+            await self._event_bus.emit(
+                TAG_DELETED_EVENT,
+                user_id=user_id,
+                tag_hash=tag_hash.hex(),
+                affected_entries=tuple(affected_entries),
+            )
         return affected_entries if changed else []
 
     async def get_tag_activity_counts(

@@ -3,12 +3,36 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import defaultdict
-from typing import Any, Awaitable, Callable, Coroutine, Dict, List, Tuple
+from typing import Any, Awaitable, Callable, Coroutine, Dict, List, Tuple, TypedDict
 
 EventHandler = Callable[..., Awaitable[None]]
 
-ENTRY_TAGS_CHANGED_EVENT = "entry.tags.changed"
-ENTRY_HISTORY_CHANGED_EVENT = "entry.history.changed"
+ENTRY_INSERTED_EVENT = "entry.inserted"
+ENTRY_UPDATED_EVENT = "entry.updated"
+ENTRY_DELETED_EVENT = "entry.deleted"
+TAG_LINKED_EVENT = "tag.linked"
+TAG_UNLINKED_EVENT = "tag.unlinked"
+TAG_DELETED_EVENT = "tag.deleted"
+
+
+class EntryEventPayload(TypedDict):
+    user_id: str
+    entry_id: str
+    created_date: str
+    revision: int
+
+
+class TagMutationPayload(TypedDict):
+    user_id: str
+    entry_id: str
+    tag_hash: str
+    created_date: str | None
+
+
+class TagDeletedPayload(TypedDict):
+    user_id: str
+    tag_hash: str
+    affected_entries: tuple[tuple[str, str | None], ...]
 
 
 class RepositoryEventBus:

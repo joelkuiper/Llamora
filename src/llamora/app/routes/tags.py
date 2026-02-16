@@ -1,5 +1,3 @@
-import asyncio
-import logging
 import datetime as dt
 
 from quart import (
@@ -13,7 +11,6 @@ from quart import (
 )
 from urllib.parse import urlencode
 from llamora.app.services.container import (
-    get_lockbox_store,
     get_services,
     get_summarize_service,
     get_tag_service,
@@ -26,7 +23,6 @@ from llamora.app.services.tag_presenter import (
     present_archive_entries,
     present_tags_view_data,
 )
-from llamora.app.services.tag_effects import after_tag_changed, after_tag_deleted
 from llamora.app.services.tag_summary import generate_tag_summary
 from llamora.app.services.activity_heatmap import get_tag_activity_heatmap
 from llamora.app.services.time import local_date
@@ -42,24 +38,9 @@ from llamora.app.routes.helpers import (
     require_user_and_dek,
 )
 
-logger = logging.getLogger(__name__)
 
 tags_bp = Blueprint("tags", __name__)
 DEFAULT_TAG_ENTRIES_LIMIT = 12
-
-
-async def _run_tag_effects(effect_fn, **kwargs):
-    try:
-        services = get_services()
-        store = get_lockbox_store()
-        await effect_fn(
-            history_cache=services.db.history_cache,
-            tag_recall_store=store,
-            lockbox=store.lockbox,
-            **kwargs,
-        )
-    except Exception:
-        logger.exception("Tag effect failed")
 
 
 def _tags():
@@ -261,21 +242,12 @@ async def remove_tag(entry_id: str, tag_hash: str):
             pass
 
     created_date = await db.entries.get_entry_date(user["id"], entry_id)
-    changed = await db.tags.unlink_tag_entry(
+    await db.tags.unlink_tag_entry(
         user["id"],
         tag_hash_bytes,
         entry_id,
+        created_date=created_date,
     )
-    if changed:
-        asyncio.create_task(
-            _run_tag_effects(
-                after_tag_changed,
-                user_id=user["id"],
-                entry_id=entry_id,
-                tag_hash=tag_hash_bytes,
-                created_date=created_date,
-            )
-        )
     if not context:
         return "<span class='tag-tombstone'></span>"
     oob = await _render_view_oob_updates(user["id"], dek, context)
@@ -302,21 +274,12 @@ async def add_tag(entry_id: str):
     await ensure_entry_exists(db, user["id"], entry_id)
     tag_hash = await db.tags.resolve_or_create_tag(ctx, canonical)
     created_date = await db.entries.get_entry_date(user["id"], entry_id)
-    changed = await db.tags.xref_tag_entry(
+    await db.tags.xref_tag_entry(
         user["id"],
         tag_hash,
         entry_id,
+        created_date=created_date,
     )
-    if changed:
-        asyncio.create_task(
-            _run_tag_effects(
-                after_tag_changed,
-                user_id=user["id"],
-                entry_id=entry_id,
-                tag_hash=tag_hash,
-                created_date=created_date,
-            )
-        )
     context = _parse_view_context()
     context_query = _build_view_context_query(context)
     html = await render_template(
@@ -448,19 +411,10 @@ async def delete_trace(tag_hash: str):
     if legacy_sort is not None:
         sort_kind, sort_dir = legacy_sort
 
-    affected = await get_services().db.tags.delete_tag_everywhere(
+    await get_services().db.tags.delete_tag_everywhere(
         user["id"],
         tag_hash_bytes,
     )
-    if affected:
-        asyncio.create_task(
-            _run_tag_effects(
-                after_tag_deleted,
-                user_id=user["id"],
-                tag_hash=tag_hash_bytes,
-                affected_entries=affected,
-            )
-        )
 
     tags_view = await tag_service.get_tags_view_data(
         user["id"],

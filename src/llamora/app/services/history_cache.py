@@ -5,18 +5,13 @@ from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from logging import getLogger
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 from cachetools import TTLCache
 
 logger = getLogger(__name__)
 
 CacheKey = tuple[str, str]
-
-if TYPE_CHECKING:
-    from llamora.app.db.events import RepositoryEventBus
-    from llamora.app.db.entries import EntriesRepository
-    from llamora.app.services.lockbox import Lockbox
 
 
 @dataclass(slots=True)
@@ -250,58 +245,11 @@ class HistoryCache:
                 logger.exception("History cache listener %r failed", listener)
 
 
-class HistoryCacheSynchronizer:
-    """Bridge repository events with the entry history cache."""
-
-    __slots__ = ("_cache", "_events", "_entries", "_lockbox")
-
-    def __init__(
-        self,
-        *,
-        event_bus: RepositoryEventBus | None,
-        history_cache: HistoryCache | None,
-        entries_repository: EntriesRepository | None,
-        lockbox: "Lockbox | None" = None,
-    ) -> None:
-        self._cache = history_cache
-        self._events = event_bus
-        self._entries = entries_repository
-        self._lockbox = lockbox
-        if not self._events:
-            return
-        from llamora.app.db.events import ENTRY_HISTORY_CHANGED_EVENT
-
-        self._events.subscribe(
-            ENTRY_HISTORY_CHANGED_EVENT, self._handle_history_changed
-        )
-
-    async def _handle_history_changed(
-        self,
-        *,
-        user_id: str,
-        created_date: str,
-        reason: str,
-        revision: int,
-        entry_id: str | None = None,
-        entry: Mapping[str, Any] | None = None,
-    ) -> None:
-        if self._cache:
-            if reason == "insert" and entry is not None:
-                await self._cache.append(
-                    user_id, created_date, entry, revision=revision
-                )
-            else:
-                await self._cache.invalidate(user_id, created_date, revision=revision)
-        if self._lockbox:
-            await self._lockbox.delete(user_id, "digest", f"day:{created_date}")
-
-
 __all__ = [
     "HistoryCache",
     "HistoryCacheEvent",
     "HistoryCacheListener",
     "FrozenHistory",
     "HistoryCacheEntry",
-    "HistoryCacheSynchronizer",
     "default_backend_factory",
 ]

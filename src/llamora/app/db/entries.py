@@ -16,7 +16,12 @@ from llamora.app.services.crypto import EncryptionContext, entry_digest
 from llamora.app.services.digest_policy import ENTRY_DIGEST_VERSION, day_digest
 
 from .base import BaseRepository
-from .events import RepositoryEventBus, ENTRY_HISTORY_CHANGED_EVENT
+from .events import (
+    ENTRY_DELETED_EVENT,
+    ENTRY_INSERTED_EVENT,
+    ENTRY_UPDATED_EVENT,
+    RepositoryEventBus,
+)
 from .utils import cached_tag_name, get_month_bounds
 
 EntryAppendedCallback = Callable[[EncryptionContext, str, str], Awaitable[None]]
@@ -298,11 +303,10 @@ class EntriesRepository(BaseRepository):
 
         if created_date and self._event_bus:
             await self._event_bus.emit_for_entry_date(
-                ENTRY_HISTORY_CHANGED_EVENT,
+                ENTRY_INSERTED_EVENT,
                 user_id=ctx.user_id,
                 created_date=created_date,
                 entry_id=entry_id,
-                reason="insert",
                 entry=entry_record,
             )
 
@@ -380,11 +384,10 @@ class EntriesRepository(BaseRepository):
         if self._event_bus:
             for created_date in created_dates:
                 await self._event_bus.emit_for_entry_date(
-                    ENTRY_HISTORY_CHANGED_EVENT,
+                    ENTRY_DELETED_EVENT,
                     user_id=user_id,
                     created_date=created_date,
                     entry_id=entry_id,
-                    reason="delete",
                 )
 
         return delete_ids, row["role"]
@@ -483,11 +486,10 @@ class EntriesRepository(BaseRepository):
 
         if row["created_date"] and self._event_bus:
             await self._event_bus.emit_for_entry_date(
-                ENTRY_HISTORY_CHANGED_EVENT,
+                ENTRY_UPDATED_EVENT,
                 user_id=ctx.user_id,
                 created_date=row["created_date"],
                 entry_id=entry_id,
-                reason="update",
                 entry=entry_record,
             )
 
@@ -511,11 +513,10 @@ class EntriesRepository(BaseRepository):
 
         if self._event_bus:
             await self._event_bus.emit_for_entry_date(
-                ENTRY_HISTORY_CHANGED_EVENT,
+                ENTRY_UPDATED_EVENT,
                 user_id=user_id,
                 created_date=created_date,
                 entry_id=entry_id,
-                reason=reason,
             )
 
     async def get_latest_entries(
