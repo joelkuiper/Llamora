@@ -7,7 +7,7 @@ import {
   computeEdgeMetrics,
   normalizeEdgeDirection,
 } from "./utils/scroll-edge.js";
-import { isNearBottom, isNearTop } from "./entries/scroll-utils.js";
+import { isNearBottom, isNearTop } from "./scroll-utils.js";
 
 export const scrollEvents = new EventTarget();
 
