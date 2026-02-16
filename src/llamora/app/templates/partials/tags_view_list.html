@@ -4,7 +4,7 @@
 {% set tag_items = tag_items if tag_items is defined else (tags_view.tags if tags_view is defined and tags_view else []) %}
 {% set target = target|default(None) %}
 {% if tag_items %}
-<nav class="tags-view__index" aria-label="Trace index" data-tags-view-index hx-history="false">
+<nav class="tags-view__index" aria-label="Trace index" data-tags-view-index>
     {% include 'partials/tags_view_list_chunk.html' %}
   </nav>
   {% include 'partials/tags_view_list_more.html' %}
