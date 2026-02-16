@@ -1,13 +1,14 @@
 {% set active_tag = selected_tag if selected_tag is defined else (tags_view.selected_tag if tags_view is defined and tags_view else None) %}
 {% set sort_kind = tags_sort_kind if tags_sort_kind is defined else (tags_view.sort_kind if tags_view is defined and tags_view else 'count') %}
 {% set sort_dir = tags_sort_dir if tags_sort_dir is defined else (tags_view.sort_dir if tags_view is defined and tags_view else 'desc') %}
-{% set tag_items = tags_view.tags if tags_view is defined and tags_view else [] %}
+{% set tag_items = tag_items if tag_items is defined else (tags_view.tags if tags_view is defined and tags_view else []) %}
 {% set entries_limit = entries_limit|default(12) %}
 {% set target = target|default(None) %}
 {% if tag_items %}
 <nav class="tags-view__index" aria-label="Trace index" data-tags-view-index hx-history="false">
     {% include 'partials/tags_view_list_chunk.html' %}
   </nav>
+  {% include 'partials/tags_view_list_more.html' %}
   <p class="tags-view__search-empty" data-tags-view-empty hidden>No matching traces.</p>
 {% else %}
   <p class="tags-view__empty-index">No traces yet.</p>

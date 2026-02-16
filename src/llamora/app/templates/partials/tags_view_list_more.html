@@ -1,0 +1,20 @@
+{% set list_has_more = list_has_more|default(false) %}
+{% set list_next_cursor = list_next_cursor|default(None) %}
+{% set list_limit = list_limit|default(200) %}
+{% set active_tag = active_tag|default(selected_tag|default('')) %}
+{% set sort_kind = sort_kind|default(tags_sort_kind|default('count')) %}
+{% set sort_dir = sort_dir|default(tags_sort_dir|default('desc')) %}
+{% if list_has_more and list_next_cursor is not none %}
+  <div id="tags-view-list-more" class="tags-view__list-more">
+    <button type="button"
+            class="tags-view__list-more-btn"
+            hx-get="{{ url_for('tags.tags_view_list_rows_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&entries_limit={{ entries_limit }}&cursor={{ list_next_cursor }}&limit={{ list_limit }}{% if active_tag %}&tag={{ active_tag|urlencode }}{% endif %}{% if target %}&target={{ target|urlencode }}{% endif %}"
+            hx-target="#tags-view-list [data-tags-view-index]"
+            hx-swap="beforeend"
+            hx-indicator="#tags-view-list-loading">
+      Load more
+    </button>
+  </div>
+{% else %}
+  <div id="tags-view-list-more" class="tags-view__list-more"></div>
+{% endif %}

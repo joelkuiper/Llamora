@@ -99,41 +99,49 @@ async def _render_day(date: str, target: str | None, view_kind: str):
     elif view == "tags":
         dek = await session.require_dek()
         selected_tag = services.tag_service.normalize_tag_query(request.args.get("tag"))
-        tags_view = await services.tag_service.get_tags_view_data(
-            user["id"],
-            dek,
-            selected_tag,
-            sort_kind=tags_sort_kind,
-            sort_dir=tags_sort_dir,
-            entry_limit=entries_limit,
-        )
-        tags_view = present_tags_view_data(tags_view)
-        selected_tag = tags_view.selected_tag
-        try:
-            heatmap_offset = int(request.args.get("heatmap_offset") or 0)
-        except (TypeError, ValueError):
-            heatmap_offset = 0
-        heatmap_offset = max(0, heatmap_offset)
-        if tags_view.detail:
+        if (
+            not request.headers.get("HX-Request")
+            or request.headers.get("HX-Target") == "main-content"
+        ):
+            tags_view = None
+        else:
+            tags_view = await services.tag_service.get_tags_view_data(
+                user["id"],
+                dek,
+                selected_tag,
+                sort_kind=tags_sort_kind,
+                sort_dir=tags_sort_dir,
+                entry_limit=entries_limit,
+            )
+            tags_view = present_tags_view_data(tags_view)
+            selected_tag = tags_view.selected_tag
             try:
-                tag_hash = bytes.fromhex(tags_view.detail.hash)
-            except ValueError:
-                tag_hash = b""
-            if tag_hash:
-                min_date = None
-                if tags_view.detail.first_used:
-                    try:
-                        min_date = dt.date.fromisoformat(tags_view.detail.first_used)
-                    except ValueError:
-                        min_date = None
-                activity_heatmap = await get_tag_activity_heatmap(
-                    services.db.tags,
-                    user["id"],
-                    tag_hash,
-                    months=12,
-                    offset=heatmap_offset,
-                    min_date=min_date,
-                )
+                heatmap_offset = int(request.args.get("heatmap_offset") or 0)
+            except (TypeError, ValueError):
+                heatmap_offset = 0
+            heatmap_offset = max(0, heatmap_offset)
+            if tags_view.detail:
+                try:
+                    tag_hash = bytes.fromhex(tags_view.detail.hash)
+                except ValueError:
+                    tag_hash = b""
+                if tag_hash:
+                    min_date = None
+                    if tags_view.detail.first_used:
+                        try:
+                            min_date = dt.date.fromisoformat(
+                                tags_view.detail.first_used
+                            )
+                        except ValueError:
+                            min_date = None
+                    activity_heatmap = await get_tag_activity_heatmap(
+                        services.db.tags,
+                        user["id"],
+                        tag_hash,
+                        months=12,
+                        offset=heatmap_offset,
+                        min_date=min_date,
+                    )
     context = {
         "day": date,
         "is_today": date == today,

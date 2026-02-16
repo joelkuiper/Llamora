@@ -352,6 +352,62 @@ class TagService:
             sort_dir=sort_dir,
         )
 
+    async def get_tags_index_page(
+        self,
+        user_id: str,
+        dek: bytes,
+        *,
+        sort_kind: TagsSortKind = "alpha",
+        sort_dir: TagsSortDirection = "asc",
+        cursor: int = 0,
+        limit: int = 200,
+        selected_tag: str | None = None,
+    ) -> tuple[tuple[TagIndexItem, ...], bool, int | None, str | None]:
+        """Return a paged slice of the tags index for the sidebar."""
+
+        index_cache = await self._get_tags_index_request_cache(user_id, dek)
+        items = list(index_cache.items)
+        items = self._sort_index_items(
+            items,
+            sort_kind=sort_kind,
+            sort_dir=sort_dir,
+        )
+        selected_name = self.normalize_tag_query(selected_tag)
+        selected_item: TagIndexItem | None = None
+        if selected_name:
+            selected_item = index_cache.items_by_name.get(selected_name)
+            if not selected_item:
+                selected_item = await self._resolve_index_item_by_name(
+                    user_id,
+                    dek,
+                    selected_name,
+                    index_cache=index_cache,
+                )
+                if selected_item and not any(
+                    item.name == selected_item.name for item in items
+                ):
+                    items = [selected_item, *items]
+        if not selected_item and items and cursor == 0:
+            selected_item = items[0]
+
+        total = len(items)
+        cursor = max(0, min(cursor, total))
+        limit = max(1, min(limit, total or limit))
+        page = list(items[cursor : cursor + limit])
+        if cursor == 0 and selected_item and selected_item not in page:
+            page = [selected_item, *page]
+            if len(page) > limit:
+                page = page[:limit]
+
+        has_more = cursor + limit < total
+        next_cursor = cursor + limit if has_more else None
+        return (
+            tuple(page),
+            has_more,
+            next_cursor,
+            selected_item.name if selected_item else None,
+        )
+
     async def _resolve_index_item_by_name(
         self,
         user_id: str,

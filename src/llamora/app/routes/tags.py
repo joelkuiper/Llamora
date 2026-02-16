@@ -651,25 +651,87 @@ async def tags_view_list_fragment(date: str):
     entries_limit = _parse_positive_int(
         request.args.get("entries_limit"), default=12, min_value=6, max_value=60
     )
-    tags_view = await tag_service.get_tags_view_data(
+    list_cursor = _parse_positive_int(
+        request.args.get("cursor"), default=0, min_value=0, max_value=100000
+    )
+    list_limit = _parse_positive_int(
+        request.args.get("limit"), default=200, min_value=50, max_value=500
+    )
+    (
+        tag_items,
+        list_has_more,
+        list_next_cursor,
+        selected_tag,
+    ) = await tag_service.get_tags_index_page(
         user["id"],
         dek,
-        request.args.get("tag"),
         sort_kind=sort_kind,
         sort_dir=sort_dir,
-        entry_limit=entries_limit,
+        cursor=list_cursor,
+        limit=list_limit,
+        selected_tag=request.args.get("tag"),
     )
-    presented_tags_view = present_tags_view_data(tags_view)
     return await render_template(
         "partials/tags_view_list_fragment.html",
         day=normalized_date,
-        tags_view=presented_tags_view,
-        selected_tag=tags_view.selected_tag,
+        tag_items=tag_items,
+        selected_tag=selected_tag,
         tags_sort_kind=sort_kind,
         tags_sort_dir=sort_dir,
         entries_limit=entries_limit,
+        list_cursor=list_cursor,
+        list_limit=list_limit,
+        list_has_more=list_has_more,
+        list_next_cursor=list_next_cursor,
         target=(request.args.get("target") or "").strip() or None,
         today=local_date().isoformat(),
+    )
+
+
+@tags_bp.get("/fragments/tags/<date>/list/rows")
+@login_required
+async def tags_view_list_rows_fragment(date: str):
+    normalized_date = require_iso_date(date)
+    _, user, dek = await require_user_and_dek()
+    tag_service = _tags()
+    sort_kind = tag_service.normalize_tags_sort_kind(request.args.get("sort_kind"))
+    sort_dir = tag_service.normalize_tags_sort_dir(request.args.get("sort_dir"))
+    entries_limit = _parse_positive_int(
+        request.args.get("entries_limit"), default=12, min_value=6, max_value=60
+    )
+    list_cursor = _parse_positive_int(
+        request.args.get("cursor"), default=0, min_value=0, max_value=100000
+    )
+    list_limit = _parse_positive_int(
+        request.args.get("limit"), default=200, min_value=50, max_value=500
+    )
+    (
+        tag_items,
+        list_has_more,
+        list_next_cursor,
+        selected_tag,
+    ) = await tag_service.get_tags_index_page(
+        user["id"],
+        dek,
+        sort_kind=sort_kind,
+        sort_dir=sort_dir,
+        cursor=list_cursor,
+        limit=list_limit,
+        selected_tag=request.args.get("tag"),
+    )
+    return await render_template(
+        "partials/tags_view_list_rows_fragment.html",
+        day=normalized_date,
+        tag_items=tag_items,
+        selected_tag=selected_tag,
+        tags_sort_kind=sort_kind,
+        tags_sort_dir=sort_dir,
+        entries_limit=entries_limit,
+        list_cursor=list_cursor,
+        list_limit=list_limit,
+        list_has_more=list_has_more,
+        list_next_cursor=list_next_cursor,
+        target=(request.args.get("target") or "").strip() or None,
     )
 
 

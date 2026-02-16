@@ -1,6 +1,6 @@
 {% set sort_kind = tags_sort_kind if tags_sort_kind is defined else (tags_view.sort_kind if tags_view is defined and tags_view else 'count') %}
 {% set sort_dir = tags_sort_dir if tags_sort_dir is defined else (tags_view.sort_dir if tags_view is defined and tags_view else 'desc') %}
-{% set selected_tag = tags_view.selected_tag if tags_view is defined and tags_view else '' %}
+{% set selected_tag = tags_view.selected_tag if tags_view is defined and tags_view else (selected_tag|default('')) %}
 {% set entries_limit = entries_limit|default(12) %}
 <section id="tags-view" class="tags-view page-grid grid-12" data-day="{{ day }}">
   <aside class="tags-view__sidebar span-3">
@@ -34,13 +34,38 @@
         <div id="tags-view-list"
              class="tags-view__list"
              data-sort-kind="{{ sort_kind }}"
-             data-sort-dir="{{ sort_dir }}">
-          {% include 'partials/tags_view_list.html' %}
+             data-sort-dir="{{ sort_dir }}"
+             hx-get="{{ url_for('tags.tags_view_list_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&entries_limit={{ entries_limit }}{% if selected_tag %}&tag={{ selected_tag|urlencode }}{% endif %}"
+             hx-trigger="load"
+             hx-swap="outerHTML">
+          <p class="tags-view__search-empty" data-tags-view-empty hidden>No matching traces.</p>
         </div>
       </div>
     </div>
   </aside>
-  {% include 'partials/tags_view_detail.html' %}
+  {% if tags_view is defined and tags_view %}
+    {% include 'partials/tags_view_detail.html' %}
+  {% else %}
+    <section id="tags-view-detail"
+             class="tags-view__detail span-9"
+             hx-get="{{ url_for('tags.tags_view_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&entries_limit={{ entries_limit }}{% if selected_tag %}&tag={{ selected_tag|urlencode }}{% endif %}"
+             hx-trigger="load"
+             hx-indicator="#tags-view-detail-loading"
+             hx-swap="outerHTML">
+      <div class="tags-view__detail-inner">
+        <div id="tags-view-detail-loading"
+             class="entries-loading tags-view__loading"
+             hidden
+             aria-hidden="true">
+          <div class="entries-loading__backdrop" aria-hidden="true"></div>
+          <div class="entries-loading__panel" role="status" aria-live="polite">
+            <span class="entries-loading__spinner spinner" aria-hidden="true"></span>
+            <span class="entries-loading__label">Retrieving…</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  {% endif %}
 </section>
 <scroll-edge-button
   data-direction="up"
