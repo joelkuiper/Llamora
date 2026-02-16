@@ -57,7 +57,7 @@ async function ensureShell() {
     importOnce("logo-toggle", () => import("../logo-toggle.js")),
     importOnce("tooltip", () => import("../tooltip.js")),
     importOnce("confirm-modal", () => import("../components/confirm-modal.js")),
-    importOnce("tags-view", () => import("../components/tags-view.js")),
+    importOnce("tags-view", () => import("../components/tags-view/index.js")),
   ]);
 }
 
