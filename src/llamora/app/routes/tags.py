@@ -809,7 +809,7 @@ async def tags_view_list_fragment(date: str):
         request.args.get("cursor"), default=0, min_value=0, max_value=100000
     )
     list_limit = _parse_positive_int(
-        request.args.get("limit"), default=200, min_value=50, max_value=500
+        request.args.get("limit"), default=30, min_value=10, max_value=200
     )
     (
         tag_items,
@@ -879,7 +879,7 @@ async def tags_view_list_rows_fragment(date: str):
         request.args.get("cursor"), default=0, min_value=0, max_value=100000
     )
     list_limit = _parse_positive_int(
-        request.args.get("limit"), default=200, min_value=50, max_value=500
+        request.args.get("limit"), default=30, min_value=10, max_value=200
     )
     (
         tag_items,

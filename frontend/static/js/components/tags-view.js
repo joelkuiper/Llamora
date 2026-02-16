@@ -1121,7 +1121,7 @@ const applySearch = (rawQuery) => {
       state.empty.hidden = true;
     }
     runFlip(state.rows, beforePositions);
-    if (listBody) {
+    if (listBody && previousQuery && !query) {
       scrollActiveRowIntoView(document, "auto");
     }
     return;
