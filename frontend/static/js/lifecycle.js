@@ -1,5 +1,3 @@
-import { ingestSourceEvent, requestRehydrate } from "./runtime/rehydration-coordinator.js";
-
 let currentView = null;
 let initialized = false;
 
@@ -11,14 +9,14 @@ function dispatch(name, detail = {}) {
   document.dispatchEvent(new CustomEvent(name, { detail }));
 }
 
-function updateViewChanged() {
+export function rehydrate(detail = {}) {
   const view = getView();
-  if (view === currentView) {
-    return;
+  if (view !== currentView) {
+    const prev = currentView;
+    currentView = view;
+    dispatch("app:view-changed", { view, previousView: prev });
   }
-  const previousView = currentView;
-  currentView = view;
-  dispatch("app:view-changed", { view, previousView });
+  dispatch("app:rehydrate", { reason: "init", ...detail });
 }
 
 export function teardown(detail = {}) {
@@ -34,52 +32,55 @@ export function init() {
   initialized = true;
 
   currentView = getView();
-  requestRehydrate({ reason: "init", regionId: "document" });
 
-  window.addEventListener("pageshow", (event) => {
-    if (!event.persisted) return;
-    updateViewChanged();
-    requestRehydrate({ reason: "bfcache", regionId: "document" });
+  // bfcache
+  window.addEventListener("pageshow", (e) => {
+    if (!e.persisted) return;
+    currentView = getView();
+    dispatch("app:rehydrate", { reason: "bfcache" });
   });
-
-  window.addEventListener("pagehide", (event) => {
-    if (event.persisted) {
+  window.addEventListener("pagehide", (e) => {
+    if (e.persisted) {
       dispatch("app:teardown", { reason: "bfcache" });
     }
   });
 
+  // htmx history
   document.body.addEventListener("htmx:beforeHistorySave", () => {
     dispatch("app:teardown", { reason: "history-save" });
   });
-
   document.body.addEventListener("htmx:historyRestore", () => {
-    updateViewChanged();
-    requestRehydrate({ reason: "history-restore", regionId: "document" });
+    currentView = getView();
+    dispatch("app:rehydrate", { reason: "history-restore" });
   });
 
+  // htmx swaps targeting major content areas
   const rehydrateTargets = new Set(["content-wrapper", "main-content", "profile-modal-root"]);
-  document.body.addEventListener("htmx:afterSwap", (event) => {
-    const target = event.detail?.target;
+  document.body.addEventListener("htmx:afterSwap", (e) => {
+    const target = e.detail?.target;
     if (!target) return;
-    const regionId = target.id || null;
-
     dispatch("app:region-swapped", {
       reason: "htmx-after-swap",
       target,
-      id: regionId,
+      id: target.id || null,
     });
+    const id = target.id;
+    if (!rehydrateTargets.has(id)) return;
 
-    if (!rehydrateTargets.has(regionId)) return;
-
-    if (regionId === "main-content") {
-      updateViewChanged();
+    if (id === "main-content") {
+      const newView = getView();
+      if (newView !== currentView) {
+        const prev = currentView;
+        currentView = newView;
+        dispatch("app:view-changed", { view: newView, previousView: prev });
+      }
     }
 
-    requestRehydrate({ reason: "swap", regionId });
+    dispatch("app:rehydrate", { reason: "swap", target });
   });
 
-  document.body.addEventListener("htmx:afterSettle", (event) => {
-    const target = event.detail?.target;
+  document.body.addEventListener("htmx:afterSettle", (e) => {
+    const target = e.detail?.target;
     if (!target) return;
     dispatch("app:region-settled", {
       reason: "htmx-after-settle",
@@ -88,17 +89,10 @@ export function init() {
     });
   });
 
+  // visibility
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
-      requestRehydrate({ reason: "visibility", regionId: "document" });
+      dispatch("app:rehydrate", { reason: "visibility" });
     }
   });
-
-  if (!globalThis.appRuntime) {
-    globalThis.appRuntime = {};
-  }
-
-  globalThis.appRuntime.ingestRehydrateSource = (event) => {
-    ingestSourceEvent(event, { reason: "htmx-after-settle" });
-  };
 }

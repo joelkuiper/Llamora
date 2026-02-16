@@ -352,12 +352,7 @@ const initHeatmapTooltip = () => {
   window.addEventListener("blur", hideHeatmapTooltip, { passive: true });
   document.addEventListener("htmx:beforeRequest", hideHeatmapTooltip);
   document.addEventListener("app:teardown", () => hideHeatmapTooltip({ immediate: true }));
-  document.addEventListener("app:rehydrate", (event) => {
-    const detail = event?.detail || {};
-    if (!detail.regionId || detail.regionId === "document" || detail.regionId === "main-content") {
-      hideHeatmapTooltip({ immediate: true });
-    }
-  });
+  document.addEventListener("app:rehydrate", () => hideHeatmapTooltip({ immediate: true }));
 };
 
 const readStoredSearchQuery = () => sessionStore.get("tags:query") ?? "";
@@ -1952,11 +1947,8 @@ if (!globalThis[BOOT_KEY]) {
   });
 
   document.addEventListener("app:rehydrate", (event) => {
-    const regionId = event?.detail?.regionId;
-    const context =
-      regionId && regionId !== "document" ? document.getElementById(regionId) : document;
     state.restoreAppliedForLocation = "";
-    sync(context || document);
+    sync(event?.detail?.context || document);
   });
   document.addEventListener("app:view-changed", (event) => {
     if (event?.detail?.view === "tags") return;

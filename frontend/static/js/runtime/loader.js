@@ -1,6 +1,7 @@
 if (!globalThis.__appRuntime) {
   globalThis.__appRuntime = {
     imports: new Map(),
+    lastContext: null,
   };
 }
 const globalState = globalThis.__appRuntime;
@@ -12,11 +13,18 @@ function importOnce(key, loader) {
   return globalState.imports.get(key);
 }
 
-function resolveScope(regionId) {
-  if (!regionId || regionId === "document") {
+function resolveScope(context) {
+  if (!context || context === document || context === document.body) {
     return document;
   }
-  return document.getElementById(regionId) || document;
+  if (context instanceof Event) {
+    const detail = context.detail || {};
+    return detail.target || detail.elt || document;
+  }
+  if (context instanceof Element || context instanceof DocumentFragment) {
+    return context;
+  }
+  return document;
 }
 
 async function ensureVendors() {
@@ -103,12 +111,21 @@ async function ensureFeatureModules(scope) {
   return Promise.all(loaders);
 }
 
-async function processRegion(regionId = "document") {
-  const scope = resolveScope(regionId);
+async function processContent(context) {
+  const scope = resolveScope(context);
+  globalState.lastContext = scope;
+
   await ensureShell();
   await ensureFeatureModules(scope);
 
   globalThis.appInit?.initGlobalShell?.();
+}
+
+async function rehydrate(context) {
+  await processContent(context);
+
+  const lifecycle = await importOnce("lifecycle", () => import("../lifecycle.js"));
+  lifecycle.rehydrate({ reason: "init", context: resolveScope(context) });
 }
 
 function onReady(fn) {
@@ -119,12 +136,14 @@ function onReady(fn) {
   }
 }
 
-async function handleRehydrateEvent(event) {
-  const regionId = event?.detail?.regionId || "document";
-  await processRegion(regionId);
+onReady(() => rehydrate(document));
+
+if (!globalThis.appRuntime) {
+  globalThis.appRuntime = {};
 }
 
-onReady(async () => {
-  await processRegion("document");
-  document.addEventListener("app:rehydrate", handleRehydrateEvent);
-});
+// hx-on::after-settle calls this for every htmx swap settle.
+// Only ensure modules are loaded — don't dispatch app:rehydrate.
+// Real lifecycle events (bfcache, history, major swaps, visibility)
+// are handled by lifecycle.js directly.
+globalThis.appRuntime.rehydrate = processContent;
