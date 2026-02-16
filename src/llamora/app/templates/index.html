@@ -9,7 +9,7 @@
        aria-label="Return to today"
        data-tooltip-title="Return to today"
        data-tooltip-offset-y="0"
-       hx-get="{{ url_for('days.day_today') }}?view=diary"
+       hx-get="{{ url_for('days.day_today') }}"
        hx-target="#main-content"
        hx-swap="outerHTML"
        hx-push-url="true"
@@ -52,7 +52,8 @@
           <div class="view-mode-panel">
             <a class="view-mode-option{% if view == 'diary' %} is-active{% endif %}"
                role="menuitem"
-               hx-get="{{ url_for('days.day', date=day) }}?view=diary"
+               data-view-mode="diary"
+               hx-get="{{ url_for('days.day', date=day) }}"
                hx-target="#main-content"
                hx-swap="outerHTML"
                hx-push-url="true">
@@ -61,6 +62,7 @@
             </a>
             <a class="view-mode-option{% if view == 'tags' %} is-active{% endif %}"
                role="menuitem"
+               data-view-mode="tags"
                hx-get="{{ url_for('tags.tags_view_page') }}"
                hx-target="#main-content"
                hx-swap="outerHTML"

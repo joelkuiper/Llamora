@@ -86,9 +86,11 @@ def _parse_positive_int(
 def _parse_view_context() -> dict[str, str | dict[str, str]] | None:
     view = str(request.args.get("view") or "").strip().lower()
     if not view:
+        view = "tags" if str(request.args.get("day") or "").strip() else ""
+    if not view:
         return None
     day = _resolve_view_day(request.args.get("day"))
-    params: dict[str, str] = {"view": view, "day": day}
+    params: dict[str, str] = {"day": day}
     for key in ("sort_kind", "sort_dir", "tag", "target"):
         value = str(request.args.get(key) or "").strip()
         if value:

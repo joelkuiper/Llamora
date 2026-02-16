@@ -2,10 +2,10 @@
 {% set entry = item.entry %}
 {% set entry_id = entry['id'] %}
 {% set entry_date = item.created_date or entry['created_at'][:10] %}
-{% set entry_url = url_for('days.day', date=entry_date) ~ '?view=diary&target=entry-' ~ entry_id %}
+{% set entry_url = url_for('days.day', date=entry_date) ~ '?target=entry-' ~ entry_id %}
 {% set is_entry_today = (today is defined and entry_date == today) %}
 {% set include_day_param = include_day_param if include_day_param is defined else (day != today) %}
-{% set context_query = '?view=tags&day=' ~ (day|urlencode) ~ '&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir %}
+{% set context_query = '?day=' ~ (day|urlencode) ~ '&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir %}
 {% set tag_page_template = url_for('tags.tags_view_tag', tag='__TAG__') ~ '?sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir %}
 {% if include_day_param %}
   {% set tag_page_template = tag_page_template ~ '&day=' ~ (day|urlencode) %}

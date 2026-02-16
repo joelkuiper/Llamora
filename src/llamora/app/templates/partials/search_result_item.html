@@ -1,7 +1,7 @@
 {% set item_date = item.created_date or item.created_at[:10] %}
 <li id="search-result-{{ item.id }}" class="{{ item.css_class }}" role="option" data-role="{{ item.role }}" data-key="{{ item.id }}">
-  <a href="{{ url_for('days.day', date=item_date) }}?view=diary&target=entry-{{ item.id }}"
-     hx-get="{{ url_for('days.day', date=item_date) }}?view=diary&target=entry-{{ item.id }}"
+  <a href="{{ url_for('days.day', date=item_date) }}?target=entry-{{ item.id }}"
+     hx-get="{{ url_for('days.day', date=item_date) }}?target=entry-{{ item.id }}"
      hx-target="#main-content"
      hx-swap="outerHTML"
      data-date="{{ item_date }}"

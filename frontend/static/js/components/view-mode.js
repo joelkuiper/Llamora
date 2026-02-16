@@ -52,7 +52,8 @@ const initViewMode = (root = document) => {
     toggle.classList.remove("view-mode-diary", "view-mode-tags", "view-mode-structure");
     toggle.classList.add(`view-mode-${view}`);
     panel.querySelectorAll(".view-mode-option").forEach((option) => {
-      const isActive = option.getAttribute("hx-get")?.includes(`view=${view}`);
+      const mode = String(option.dataset?.viewMode || "").trim();
+      const isActive = mode ? mode === view : false;
       option.classList.toggle("is-active", Boolean(isActive));
       if (isActive) {
         option.setAttribute("aria-current", "true");

@@ -1149,10 +1149,6 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     try {
       const currentUrl = new URL(window.location.href);
       const params = new URLSearchParams();
-      const currentView = currentUrl.searchParams.get("view");
-      if (currentView) {
-        params.set("view", currentView);
-      }
       const contextDay =
         document.getElementById("tags-view")?.dataset?.day?.trim() ||
         document.getElementById("entries")?.dataset?.date?.trim() ||

@@ -32,7 +32,7 @@
                   {% endif %}
                   <a class="activity-heatmap__cell level-{{ cell.level }}{% if not has_entries %} is-empty-day{% endif %}{% if today is defined and cell.date == today %} is-today{% endif %}{% if selected_day and cell.date == selected_day %} is-selected{% endif %}"
                      role="gridcell"
-                     href="{{ url_for('days.day', date=cell.date) }}?view=diary"
+                     href="{{ url_for('days.day', date=cell.date) }}"
                      aria-label="{{ tooltip }}"
                      data-heatmap-date="{{ cell.date }}"
                      data-heatmap-count="{{ cell.count }}"

@@ -60,7 +60,7 @@ const isTagsQuery = (path) => {
   try {
     const url = new URL(path, window.location.origin);
     if (url.pathname === "/t" || url.pathname.startsWith("/t/")) return true;
-    return url.searchParams.get("view") === "tags";
+    return false;
   } catch (_error) {
     return false;
   }

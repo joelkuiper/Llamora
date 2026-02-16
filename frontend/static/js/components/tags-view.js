@@ -402,14 +402,13 @@ const scrollMainContentTop = () => {
 const getTagsLocationKey = (tagOverride) => {
   const url = new URL(window.location.href);
   const pathname = url.pathname;
-  if (!tagOverride && !isTagsPath(pathname) && url.searchParams.get("view") !== "tags") {
+  if (!tagOverride && !isTagsPath(pathname)) {
     return "";
   }
   const tag =
     tagOverride || parseTagFromPath(pathname) || String(url.searchParams.get("tag") || "").trim();
   const nextPath = tag ? `/t/${encodeURIComponent(tag)}` : "/t";
   const params = new URLSearchParams(url.search);
-  params.delete("view");
   params.delete("tag");
   params.delete("target");
   const qs = params.toString();
@@ -1169,7 +1168,6 @@ const updateUrlSort = () => {
   url.pathname = tag ? `/t/${encodeURIComponent(tag)}` : "/t";
   url.searchParams.set("sort_kind", state.sortKind);
   url.searchParams.set("sort_dir", state.sortDir);
-  url.searchParams.delete("view");
   url.searchParams.delete("tag");
   url.searchParams.delete("target");
   window.history.replaceState(window.history.state, "", url.toString());
@@ -1361,6 +1359,11 @@ const syncListOnly = (root = document) => {
   const selectedTag = getSelectedTrace(root);
   if (selectedTag) {
     setActiveTag(selectedTag, root, { behavior: "auto", scroll: false });
+  } else if (state.rows.length) {
+    const fallbackTag = state.rows[0]?.dataset?.tagName || "";
+    if (fallbackTag) {
+      setActiveTag(fallbackTag, root, { behavior: "auto", scroll: false });
+    }
   }
   // Scroll deferred to htmx:afterSettle — runs after FLIP animation completes.
 };
@@ -1544,7 +1547,6 @@ if (!globalThis[BOOT_KEY]) {
       if (selected) {
         event.detail.parameters.tag = selected;
       }
-      event.detail.parameters.view = "tags";
       return;
     }
     if (target.id !== "tags-view-detail") return;
