@@ -1,10 +1,15 @@
 {% set active = item.name == active_tag %}
 {% set list_target = target if target is defined else None %}
 {% set row_target = 'tag-index-' ~ item.name %}
-{% set base_day_url = url_for('days.day', date=day) %}
+{% set include_day_param = include_day_param if include_day_param is defined else (day != today) %}
+{% set base_tag_url = url_for('tags.tags_view_tag', tag=item.name) %}
 {% set base_detail_url = url_for('tags.tags_view_detail_fragment', date=day) %}
-{% set tag_url = base_day_url ~ '?view=tags&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&entries_limit=' ~ entries_limit ~ '&tag=' ~ (item.name|urlencode) %}
-{% set fragment_url = base_detail_url ~ '?sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&entries_limit=' ~ entries_limit ~ '&tag=' ~ (item.name|urlencode) ~ '&tag_hash=' ~ item.hash %}
+{% set tag_params = 'sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir %}
+{% if include_day_param %}
+  {% set tag_params = tag_params ~ '&day=' ~ (day|urlencode) %}
+{% endif %}
+{% set tag_url = base_tag_url ~ '?' ~ tag_params %}
+{% set fragment_url = base_detail_url ~ '?sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tag=' ~ (item.name|urlencode) ~ '&tag_hash=' ~ item.hash %}
 {% if list_target and list_target == row_target %}
   {% set tag_url = tag_url ~ '&target=' ~ (list_target|urlencode) %}
   {% set fragment_url = fragment_url ~ '&target=' ~ (list_target|urlencode) %}

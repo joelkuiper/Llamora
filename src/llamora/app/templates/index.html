@@ -61,7 +61,7 @@
             </a>
             <a class="view-mode-option{% if view == 'tags' %} is-active{% endif %}"
                role="menuitem"
-               hx-get="{{ url_for('days.day', date=day) }}?view=tags"
+               hx-get="{{ url_for('tags.tags_view_page') }}"
                hx-target="#main-content"
                hx-swap="outerHTML"
                hx-push-url="true">

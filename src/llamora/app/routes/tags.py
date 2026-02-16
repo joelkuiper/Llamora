@@ -2,7 +2,15 @@ import asyncio
 import logging
 import datetime as dt
 
-from quart import Blueprint, request, abort, render_template, jsonify, url_for
+from quart import (
+    Blueprint,
+    request,
+    abort,
+    render_template,
+    jsonify,
+    url_for,
+    make_response,
+)
 from urllib.parse import urlencode
 from llamora.app.services.container import (
     get_lockbox_store,
@@ -33,6 +41,7 @@ from llamora.app.routes.helpers import ensure_entry_exists, require_user_and_dek
 logger = logging.getLogger(__name__)
 
 tags_bp = Blueprint("tags", __name__)
+DEFAULT_TAG_ENTRIES_LIMIT = 12
 
 
 async def _run_tag_effects(effect_fn, **kwargs):
@@ -80,7 +89,7 @@ def _parse_view_context() -> dict[str, str | dict[str, str]] | None:
         return None
     day = _resolve_view_day(request.args.get("day"))
     params: dict[str, str] = {"view": view, "day": day}
-    for key in ("sort_kind", "sort_dir", "entries_limit", "tag", "target"):
+    for key in ("sort_kind", "sort_dir", "tag", "target"):
         value = str(request.args.get(key) or "").strip()
         if value:
             params[key] = value
@@ -98,6 +107,59 @@ def _build_view_context_query(
     return f"?{urlencode(payload)}"
 
 
+async def _render_tags_page(selected_tag: str | None):
+    day = _resolve_view_day(request.args.get("day"))
+    _, user, dek = await require_user_and_dek()
+    services = get_services()
+    today = local_date().isoformat()
+    min_date = await services.db.entries.get_first_entry_date(user["id"]) or today
+    is_first_day = day == min_date
+    tag_service = _tags()
+    sort_kind = tag_service.normalize_tags_sort_kind(request.args.get("sort_kind"))
+    sort_dir = tag_service.normalize_tags_sort_dir(request.args.get("sort_dir"))
+    legacy_sort = tag_service.normalize_legacy_sort(request.args.get("sort"))
+    if legacy_sort is not None:
+        sort_kind, sort_dir = legacy_sort
+    selected = tag_service.normalize_tag_query(
+        selected_tag or (request.args.get("tag") or "")
+    )
+    target_param = (request.args.get("target") or "").strip() or None
+    context = {
+        "day": day,
+        "is_today": day == today,
+        "today": today,
+        "min_date": min_date,
+        "is_first_day": is_first_day,
+        "view": "tags",
+        "tags_view": None,
+        "selected_tag": selected,
+        "tags_sort_kind": sort_kind,
+        "tags_sort_dir": sort_dir,
+        "target": target_param,
+        "activity_heatmap": None,
+        "heatmap_offset": 0,
+    }
+    if request.headers.get("HX-Request"):
+        target_id = request.headers.get("HX-Target")
+        if target_id == "main-content":
+            html = await render_template("partials/main_content.html", **context)
+            return await make_response(html, 200)
+    html = await render_template("index.html", **context)
+    return await make_response(html, 200)
+
+
+@tags_bp.get("/t")
+@login_required
+async def tags_view_page():
+    return await _render_tags_page(None)
+
+
+@tags_bp.get("/t/<path:tag>")
+@login_required
+async def tags_view_tag(tag: str):
+    return await _render_tags_page(tag)
+
+
 async def _load_tags_view_from_context(
     user_id: str,
     dek: bytes,
@@ -112,9 +174,7 @@ async def _load_tags_view_from_context(
     legacy_sort = tag_service.normalize_legacy_sort(params.get("sort"))
     if legacy_sort is not None:
         sort_kind, sort_dir = legacy_sort
-    entries_limit = _parse_positive_int(
-        params.get("entries_limit"), default=12, min_value=6, max_value=60
-    )
+    entries_limit = DEFAULT_TAG_ENTRIES_LIMIT
     selected_tag = tag_service.normalize_tag_query(params.get("tag"))
     tags_view = await tag_service.get_tags_view_data(
         user_id,
@@ -189,7 +249,7 @@ async def _render_view_oob_updates(
     return ""
 
 
-@tags_bp.delete("/t/<entry_id>/<tag_hash>")
+@tags_bp.delete("/t/entry/<entry_id>/<tag_hash>")
 @login_required
 async def remove_tag(entry_id: str, tag_hash: str):
     _, user, dek = await require_user_and_dek()
@@ -243,7 +303,7 @@ async def remove_tag(entry_id: str, tag_hash: str):
     return f"<span class='tag-tombstone'></span>\n{oob}"
 
 
-@tags_bp.post("/t/<entry_id>")
+@tags_bp.post("/t/entry/<entry_id>")
 @login_required
 async def add_tag(entry_id: str):
     _, user, dek = await require_user_and_dek()
@@ -295,7 +355,7 @@ async def add_tag(entry_id: str):
     return f"{html}\n{oob}"
 
 
-@tags_bp.get("/t/suggestions/<entry_id>")
+@tags_bp.get("/t/entry/<entry_id>/suggestions")
 @login_required
 async def get_tag_suggestions(entry_id: str):
     _, user, dek = await require_user_and_dek()
@@ -435,14 +495,10 @@ async def delete_trace(tag_hash: str):
         request.args.get("tag"),
         sort_kind=sort_kind,
         sort_dir=sort_dir,
-        entry_limit=_parse_positive_int(
-            request.args.get("entries_limit"), default=12, min_value=6, max_value=60
-        ),
+        entry_limit=DEFAULT_TAG_ENTRIES_LIMIT,
     )
     selected_tag = tags_view.selected_tag
-    entries_limit = _parse_positive_int(
-        request.args.get("entries_limit"), default=12, min_value=6, max_value=60
-    )
+    entries_limit = DEFAULT_TAG_ENTRIES_LIMIT
     presented_tags_view = present_tags_view_data(tags_view)
     return await render_template(
         "partials/tags_view_fragment.html",
@@ -581,23 +637,64 @@ async def tags_view_detail_fragment(date: str):
     legacy_sort = tag_service.normalize_legacy_sort(request.args.get("sort"))
     if legacy_sort is not None:
         sort_kind, sort_dir = legacy_sort
-    entries_limit = _parse_positive_int(
-        request.args.get("entries_limit"), default=12, min_value=6, max_value=60
-    )
     restore_entry = (request.args.get("restore_entry") or "").strip() or None
     tag_name = (request.args.get("tag") or "").strip() or None
     tag_hash_hex = (request.args.get("tag_hash") or "").strip() or None
+
+    if not tag_name and not tag_hash_hex:
+        (
+            tag_items,
+            _list_has_more,
+            _list_next_cursor,
+            selected_tag,
+        ) = await tag_service.get_tags_index_page(
+            user["id"],
+            dek,
+            sort_kind=sort_kind,
+            sort_dir=sort_dir,
+            cursor=0,
+            limit=1,
+            selected_tag=None,
+        )
+        if tag_items:
+            first_item = tag_items[0]
+            tag_name = first_item.name
+            tag_hash_hex = first_item.hash
+        elif selected_tag:
+            tag_name = selected_tag
 
     detail = await tag_service.get_tag_detail(
         user["id"],
         dek,
         tag_name=tag_name,
         tag_hash_hex=tag_hash_hex,
-        entry_limit=entries_limit,
+        entry_limit=DEFAULT_TAG_ENTRIES_LIMIT,
         around_entry_id=restore_entry,
     )
     presented_detail = present_archive_detail(detail) if detail else None
     selected_tag = detail.name if detail else (tag_name or "")
+    activity_heatmap = None
+    heatmap_offset = 0
+    if detail and detail.hash:
+        try:
+            tag_hash = bytes.fromhex(detail.hash)
+        except ValueError:
+            tag_hash = b""
+        if tag_hash:
+            min_date = None
+            if detail.first_used:
+                try:
+                    min_date = dt.date.fromisoformat(detail.first_used)
+                except ValueError:
+                    min_date = None
+            activity_heatmap = await get_tag_activity_heatmap(
+                get_services().db.tags,
+                user["id"],
+                tag_hash,
+                months=12,
+                offset=heatmap_offset,
+                min_date=min_date,
+            )
 
     presented_tags_view = PresentedTagsViewData(
         tags=(),
@@ -613,7 +710,9 @@ async def tags_view_detail_fragment(date: str):
         selected_tag=selected_tag,
         tags_sort_kind=sort_kind,
         tags_sort_dir=sort_dir,
-        entries_limit=entries_limit,
+        entries_limit=DEFAULT_TAG_ENTRIES_LIMIT,
+        heatmap_offset=heatmap_offset,
+        activity_heatmap=activity_heatmap,
         today=local_date().isoformat(),
     )
 
@@ -636,9 +735,7 @@ async def tags_view_fragment(date: str):
         "yes",
         "on",
     }
-    entries_limit = _parse_positive_int(
-        request.args.get("entries_limit"), default=12, min_value=6, max_value=60
-    )
+    entries_limit = DEFAULT_TAG_ENTRIES_LIMIT
     restore_entry = (request.args.get("restore_entry") or "").strip() or None
     tags_view = await tag_service.get_tags_view_data(
         user["id"],
@@ -704,9 +801,6 @@ async def tags_view_list_fragment(date: str):
     legacy_sort = tag_service.normalize_legacy_sort(request.args.get("sort"))
     if legacy_sort is not None:
         sort_kind, sort_dir = legacy_sort
-    entries_limit = _parse_positive_int(
-        request.args.get("entries_limit"), default=12, min_value=6, max_value=60
-    )
     list_cursor = _parse_positive_int(
         request.args.get("cursor"), default=0, min_value=0, max_value=100000
     )
@@ -734,7 +828,6 @@ async def tags_view_list_fragment(date: str):
         selected_tag=selected_tag,
         tags_sort_kind=sort_kind,
         tags_sort_dir=sort_dir,
-        entries_limit=entries_limit,
         list_cursor=list_cursor,
         list_limit=list_limit,
         list_has_more=list_has_more,
@@ -752,9 +845,6 @@ async def tags_view_list_rows_fragment(date: str):
     tag_service = _tags()
     sort_kind = tag_service.normalize_tags_sort_kind(request.args.get("sort_kind"))
     sort_dir = tag_service.normalize_tags_sort_dir(request.args.get("sort_dir"))
-    entries_limit = _parse_positive_int(
-        request.args.get("entries_limit"), default=12, min_value=6, max_value=60
-    )
     list_cursor = _parse_positive_int(
         request.args.get("cursor"), default=0, min_value=0, max_value=100000
     )
@@ -782,12 +872,12 @@ async def tags_view_list_rows_fragment(date: str):
         selected_tag=selected_tag,
         tags_sort_kind=sort_kind,
         tags_sort_dir=sort_dir,
-        entries_limit=entries_limit,
         list_cursor=list_cursor,
         list_limit=list_limit,
         list_has_more=list_has_more,
         list_next_cursor=list_next_cursor,
         target=(request.args.get("target") or "").strip() or None,
+        today=local_date().isoformat(),
     )
 
 

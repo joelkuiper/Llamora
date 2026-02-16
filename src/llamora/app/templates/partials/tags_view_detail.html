@@ -2,6 +2,7 @@
 {% set sort_kind = tags_sort_kind if tags_sort_kind is defined else (tags_view.sort_kind if tags_view is defined and tags_view else 'count') %}
 {% set sort_dir = tags_sort_dir if tags_sort_dir is defined else (tags_view.sort_dir if tags_view is defined and tags_view else 'desc') %}
 {% set selected_tag_name = detail.name if detail else (selected_tag if selected_tag is defined else '') %}
+{% set include_day_param = include_day_param if include_day_param is defined else (day != today) %}
 {% set entries_limit = entries_limit|default(12) %}
 <section id="tags-view-detail"
          class="tags-view__detail span-9"
@@ -18,7 +19,7 @@
   <div class="tags-view__detail-inner">
     {% if detail %}
       <header class="tags-view__detail-header">
-        {% set delete_trace_url = url_for('tags.delete_trace', tag_hash=detail.hash) ~ '?day=' ~ day ~ '&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&entries_limit=' ~ entries_limit ~ '&tag=' ~ (detail.name|urlencode) ~ '&include_list=1' %}
+        {% set delete_trace_url = url_for('tags.delete_trace', tag_hash=detail.hash) ~ '?day=' ~ day ~ '&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tag=' ~ (detail.name|urlencode) ~ '&include_list=1' %}
         <div class="tags-view__title-wrap">
           <div class="tags-view__title-row">
             <h2 class="tags-view__title">{{ detail.name }}</h2>
@@ -47,11 +48,13 @@
               <div class="tags-view__related-row">
                 <span class="tags-view__related-prefix">frequently appears with</span>
                 {% for related in detail.related_tags %}
-                  {% set related_target = 'tag-index-' ~ related.name %}
-                  {% set related_url = url_for('days.day', date=day) ~ '?view=tags&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&entries_limit=' ~ entries_limit ~ '&tag=' ~ (related.name|urlencode) ~ '&target=' ~ (related_target|urlencode) %}
+                  {% set related_url = url_for('tags.tags_view_tag', tag=related.name) ~ '?sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir %}
+                  {% if include_day_param %}
+                    {% set related_url = related_url ~ '&day=' ~ (day|urlencode) %}
+                  {% endif %}
                   <a href="{{ related_url }}"
                      class="tags-view__related-link entry-tag"
-                     hx-get="{{ url_for('tags.tags_view_detail_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&entries_limit={{ entries_limit }}&tag={{ related.name|urlencode }}{% if related.hash %}&tag_hash={{ related.hash }}{% endif %}&target={{ related_target|urlencode }}"
+                     hx-get="{{ url_for('tags.tags_view_detail_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&tag={{ related.name|urlencode }}{% if related.hash %}&tag_hash={{ related.hash }}{% endif %}"
                      hx-target="#tags-view-detail"
                      hx-swap="outerHTML"
                      hx-push-url="{{ related_url }}">

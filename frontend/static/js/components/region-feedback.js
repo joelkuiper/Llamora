@@ -59,6 +59,7 @@ const isTagsQuery = (path) => {
   if (!path) return false;
   try {
     const url = new URL(path, window.location.origin);
+    if (url.pathname === "/t" || url.pathname.startsWith("/t/")) return true;
     return url.searchParams.get("view") === "tags";
   } catch (_error) {
     return false;
@@ -70,7 +71,7 @@ const shouldRefreshTagsList = (event) => {
   if (!path) return false;
   if (path.includes("include_list=1")) return true;
   const pathname = parsePathname(path);
-  return pathname.startsWith("/t/") && isTagsQuery(path);
+  return (pathname === "/t" || pathname.startsWith("/t/")) && isTagsQuery(path);
 };
 
 const resolveRegions = (event) => {

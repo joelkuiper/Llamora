@@ -12,6 +12,7 @@ from quart import (
     request,
     url_for,
 )
+from urllib.parse import urlencode
 
 from llamora.app.routes.entries import render_entries
 from llamora.app.services.auth_helpers import login_required
@@ -65,6 +66,21 @@ async def _render_day(date: str, target: str | None, view_kind: str):
     view = request.args.get("view", "diary")
     if view not in {"diary", "tags", "structure"}:
         view = "diary"
+    if view == "tags":
+        tag = (request.args.get("tag") or "").strip() or None
+        base = (
+            url_for("tags.tags_view_tag", tag=tag)
+            if tag
+            else url_for("tags.tags_view_page")
+        )
+        params: dict[str, str] = {}
+        for key in ("sort_kind", "sort_dir", "target"):
+            value = str(request.args.get(key) or "").strip()
+            if value:
+                params[key] = value
+        params["day"] = date
+        query = f"?{urlencode(params)}" if params else ""
+        return redirect(f"{base}{query}", code=302)
     logger.debug(
         "Render day=%s min_date=%s is_first_day=%s", date, min_date, is_first_day
     )
@@ -82,11 +98,7 @@ async def _render_day(date: str, target: str | None, view_kind: str):
     legacy_sort = services.tag_service.normalize_legacy_sort(request.args.get("sort"))
     if legacy_sort is not None:
         tags_sort_kind, tags_sort_dir = legacy_sort
-    try:
-        entries_limit = int(request.args.get("entries_limit") or 12)
-    except (TypeError, ValueError):
-        entries_limit = 12
-    entries_limit = max(6, min(entries_limit, 60))
+    entries_limit = 12
     target_param = (request.args.get("target") or "").strip() or None
     if view == "diary":
         entries_response = await render_entries(
@@ -156,7 +168,6 @@ async def _render_day(date: str, target: str | None, view_kind: str):
         "selected_tag": selected_tag,
         "tags_sort_kind": tags_sort_kind,
         "tags_sort_dir": tags_sort_dir,
-        "entries_limit": entries_limit,
         "target": target_param,
         "activity_heatmap": activity_heatmap,
         "heatmap_offset": heatmap_offset,

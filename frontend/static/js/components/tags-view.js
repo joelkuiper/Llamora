@@ -401,9 +401,19 @@ const scrollMainContentTop = () => {
 
 const getTagsLocationKey = (tagOverride) => {
   const url = new URL(window.location.href);
-  if (!tagOverride && url.searchParams.get("view") !== "tags") return "";
-  const tag = tagOverride || String(url.searchParams.get("tag") || "").trim();
-  return `${url.pathname}?view=tags&tag=${tag}`;
+  const pathname = url.pathname;
+  if (!tagOverride && !isTagsPath(pathname) && url.searchParams.get("view") !== "tags") {
+    return "";
+  }
+  const tag =
+    tagOverride || parseTagFromPath(pathname) || String(url.searchParams.get("tag") || "").trim();
+  const nextPath = tag ? `/t/${encodeURIComponent(tag)}` : "/t";
+  const params = new URLSearchParams(url.search);
+  params.delete("view");
+  params.delete("tag");
+  params.delete("target");
+  const qs = params.toString();
+  return qs ? `${nextPath}?${qs}` : nextPath;
 };
 
 const getSelectedTrace = (root = document) =>
@@ -705,9 +715,24 @@ const ensureActiveRowVisibleInFilteredSet = (matches, orderedMatches) => {
   return [activeRow, ...orderedMatches];
 };
 
+const parseTagFromPath = (pathname) => {
+  if (!pathname || !pathname.startsWith("/t/")) return "";
+  const raw = pathname.slice(3);
+  if (!raw) return "";
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+};
+
+const isTagsPath = (pathname) => pathname === "/t" || pathname.startsWith("/t/");
+
 const readTagFromUrl = () => {
-  const params = new URLSearchParams(window.location.search);
-  return String(params.get("tag") || "").trim();
+  const url = new URL(window.location.href);
+  const fromPath = parseTagFromPath(url.pathname);
+  if (fromPath) return fromPath;
+  return String(url.searchParams.get("tag") || "").trim();
 };
 
 const readSortFromDom = (root = document) => {
@@ -1140,14 +1165,12 @@ const updateUrlSort = () => {
   const detail = findDetail();
   const selectedTag = detail?.dataset?.selectedTag || "";
   const url = new URL(window.location.href);
-  url.searchParams.set("view", "tags");
+  const tag = selectedTag || parseTagFromPath(url.pathname) || "";
+  url.pathname = tag ? `/t/${encodeURIComponent(tag)}` : "/t";
   url.searchParams.set("sort_kind", state.sortKind);
   url.searchParams.set("sort_dir", state.sortDir);
-  if (selectedTag) {
-    url.searchParams.set("tag", selectedTag);
-  } else {
-    url.searchParams.delete("tag");
-  }
+  url.searchParams.delete("view");
+  url.searchParams.delete("tag");
   url.searchParams.delete("target");
   window.history.replaceState(window.history.state, "", url.toString());
 };
@@ -1187,18 +1210,14 @@ const applySort = (kind, dir, { updateUrl = true, refreshSearch = true } = {}) =
   }
 };
 
-const getTagsDay = () =>
-  String(
-    document.querySelector("#tags-view")?.dataset?.day ||
-      window.location.pathname.match(/\/d\/(\d{4}-\d{2}-\d{2})$/)?.[1] ||
-      "",
-  ).trim();
-
-const getEntriesLimitFromUrl = () => {
-  const params = new URLSearchParams(window.location.search);
-  const raw = String(params.get("entries_limit") || "").trim();
-  const parsed = Number.parseInt(raw, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 12;
+const getTagsDay = () => {
+  const fromDom = String(document.querySelector("#tags-view")?.dataset?.day || "").trim();
+  if (fromDom) return fromDom;
+  const url = new URL(window.location.href);
+  const fromQuery = String(url.searchParams.get("day") || "").trim();
+  if (fromQuery) return fromQuery;
+  const match = url.pathname.match(/\/d\/(\d{4}-\d{2}-\d{2})$/);
+  return String(match?.[1] || "").trim();
 };
 
 const requestSort = (kind, dir) => {
@@ -1213,34 +1232,41 @@ const requestSort = (kind, dir) => {
     return;
   }
 
-  const entriesLimit = getEntriesLimitFromUrl();
   const selectedTag =
     String(detail.dataset.selectedTag || "").trim() || getSelectedTrace() || readTagFromUrl();
 
   const fragmentParams = new URLSearchParams({
     sort_kind: nextKind,
     sort_dir: nextDir,
-    entries_limit: String(entriesLimit),
   });
   if (selectedTag) {
     fragmentParams.set("tag", selectedTag);
   }
 
+  const tagPath = selectedTag ? `/t/${encodeURIComponent(selectedTag)}` : "/t";
   const pageParams = new URLSearchParams({
-    view: "tags",
     sort_kind: nextKind,
     sort_dir: nextDir,
-    entries_limit: String(entriesLimit),
   });
-  if (selectedTag) {
-    pageParams.set("tag", selectedTag);
+  const currentUrl = new URL(window.location.href);
+  const dayParam = String(currentUrl.searchParams.get("day") || "").trim();
+  if (dayParam) {
+    pageParams.set("day", dayParam);
   }
+  const pageUrl = pageParams.toString() ? `${tagPath}?${pageParams.toString()}` : tagPath;
 
-  const fragmentUrl = `/d/${day}?view=tags&${fragmentParams.toString()}`;
-  const pageUrl = `/d/${day}?${pageParams.toString()}`;
+  const fragmentUrl = `/fragments/tags/${day}/list?${fragmentParams.toString()}`;
 
   state.sortKind = nextKind;
   state.sortDir = nextDir;
+  if (detail) {
+    detail.dataset.sortKind = nextKind;
+    detail.dataset.sortDir = nextDir;
+  }
+  if (list) {
+    list.dataset.sortKind = nextKind;
+    list.dataset.sortDir = nextDir;
+  }
   updateSortButtons();
   refreshDetailLinksForSort(document);
 
@@ -1328,6 +1354,7 @@ const animateListReorder = (onFinish) => {
 const syncListOnly = (root = document) => {
   updateHeaderHeight();
   syncSortStateFromDom(root);
+  updateSortButtons(root);
   buildSearchIndex(root);
   applySearch(state.query);
   refreshDetailLinksForSort(root);
@@ -1372,6 +1399,15 @@ if (!globalThis[BOOT_KEY]) {
   document.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
+
+    const sortBtn = target.closest?.("[data-tags-sort-kind][data-tags-sort-dir]");
+    if (sortBtn instanceof HTMLElement) {
+      event.preventDefault();
+      const kind = sortBtn.dataset.tagsSortKind;
+      const dir = sortBtn.dataset.tagsSortDir;
+      requestSort(kind, dir);
+      return;
+    }
 
     const clearBtn = target.closest("[data-tags-view-search-clear]");
     if (clearBtn instanceof HTMLButtonElement) {

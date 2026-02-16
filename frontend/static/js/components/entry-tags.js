@@ -1161,7 +1161,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       if (contextDay) {
         params.set("day", contextDay);
       }
-      for (const key of ["sort_kind", "sort_dir", "entries_limit", "tag", "target"]) {
+      for (const key of ["sort_kind", "sort_dir", "tag", "target"]) {
         const value = currentUrl.searchParams.get(key);
         if (value) {
           params.set(key, value);

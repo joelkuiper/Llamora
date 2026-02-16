@@ -9,7 +9,7 @@
        class="tags-view__list-more load-more"
        role="status"
        aria-live="polite"
-       hx-get="{{ url_for('tags.tags_view_list_rows_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&entries_limit={{ entries_limit }}&cursor={{ list_next_cursor }}&limit={{ list_limit }}{% if active_tag %}&tag={{ active_tag|urlencode }}{% endif %}{% if target %}&target={{ target|urlencode }}{% endif %}"
+       hx-get="{{ url_for('tags.tags_view_list_rows_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&cursor={{ list_next_cursor }}&limit={{ list_limit }}{% if active_tag %}&tag={{ active_tag|urlencode }}{% endif %}{% if target %}&target={{ target|urlencode }}{% endif %}"
        hx-target="#tags-view-list [data-tags-view-index]"
        hx-swap="beforeend"
        hx-trigger="intersect once delay:160ms"
