@@ -580,7 +580,7 @@
 .tags-view__heatmap {
   min-width: 0;
   width: 100%;
-  padding: 0.5rem 0.6rem 0.55rem;
+  padding: 0.5rem 0.6rem 0.35rem;
   border-radius: 0.82rem;
   border: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
   background: color-mix(in srgb, var(--color-surface) 95%, transparent);
@@ -598,7 +598,7 @@
 .tags-view__heatmap-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 0.5rem;
   margin-bottom: 0.35rem;
 }
@@ -656,7 +656,7 @@
 
 .tags-view__heatmap-body {
   position: relative;
-  min-height: 9rem;
+  min-height: 8.2rem;
 }
 
 .tags-view__heatmap.htmx-swapping .tags-view__heatmap-body {
