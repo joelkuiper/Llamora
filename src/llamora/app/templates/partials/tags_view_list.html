@@ -5,7 +5,7 @@
 {% set entries_limit = entries_limit|default(12) %}
 {% set target = target|default(None) %}
 {% if tag_items %}
-  <nav class="tags-view__index" aria-label="Trace index" data-tags-view-index>
+<nav class="tags-view__index" aria-label="Trace index" data-tags-view-index hx-history="false">
     {% include 'partials/tags_view_list_chunk.html' %}
   </nav>
   <p class="tags-view__search-empty" data-tags-view-empty hidden>No matching traces.</p>

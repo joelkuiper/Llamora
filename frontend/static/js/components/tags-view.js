@@ -28,7 +28,6 @@ const state = {
   listPositions: null,
 };
 
-
 const heatmapState = {
   initialized: false,
   tooltip: null,
@@ -60,8 +59,7 @@ const normalizeHeatmapOffset = (value) => {
 const getHeatmapElement = (root = document) =>
   root.querySelector?.(".tags-view__heatmap") || document.querySelector(".tags-view__heatmap");
 
-const getHeatmapTagHash = (heatmap) =>
-  String(heatmap?.dataset?.heatmapTag || "").trim();
+const getHeatmapTagHash = (heatmap) => String(heatmap?.dataset?.heatmapTag || "").trim();
 
 const getHeatmapOffset = (heatmap) => normalizeHeatmapOffset(heatmap?.dataset?.heatmapOffset);
 
@@ -1463,15 +1461,18 @@ if (!globalThis[BOOT_KEY]) {
   });
 
   document.body.addEventListener("htmx:afterRequest", (event) => {
-    const elt = event.detail?.elt;
-    if (!(elt instanceof Element)) return;
-    if (!elt.classList.contains("entry-delete")) return;
     const detailRoot = findDetail(document);
-    if (!detailRoot || !elt.closest("#tags-view-detail")) return;
+    if (!detailRoot || document.getElementById("main-content")?.dataset.view !== "tags") {
+      return;
+    }
     const xhr = event.detail?.xhr;
     if (xhr && (xhr.status < 200 || xhr.status >= 300)) return;
-    const entry = elt.closest(".entry");
-    if (entry && entry.classList.contains("assistant")) return;
+    const requestConfig = event.detail?.requestConfig;
+    const path = String(requestConfig?.path || "");
+    if (requestConfig?.verb !== "delete" || !path.includes("/e/entry/")) return;
+    const target = event.detail?.target || event.detail?.elt;
+    const entry = (target instanceof Element && (target.closest?.(".entry") || target)) || null;
+    if (entry instanceof Element && entry.classList.contains("assistant")) return;
     updateSelectedTagCounts(document, -1);
   });
 
