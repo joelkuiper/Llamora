@@ -28,6 +28,7 @@ const state = {
   saveSuppressed: false,
   pendingDetailScrollTop: false,
   pendingTagHighlight: "",
+  pendingListScroll: false,
   listPositions: null,
 };
 
@@ -426,6 +427,12 @@ const findRowByTagName = (tagName) => {
   return state.rows.find((row) => row.dataset.tagName === tagName) || null;
 };
 
+const getIndexItemByName = (tagName) => {
+  if (!tagName) return null;
+  if (!Array.isArray(state.indexItems)) return null;
+  return state.indexItems.find((item) => item.name === tagName) || null;
+};
+
 const normalizeTagKey = (value) =>
   String(value || "")
     .trim()
@@ -470,6 +477,129 @@ const loadIndexItems = async () => {
       state.indexPromise = null;
     });
   return state.indexPromise;
+};
+
+const buildTagUrls = (tagName, tagHash) => {
+  const day = getTagsDay();
+  if (!day) return null;
+  const baseTagUrl = `/t/${encodeURIComponent(tagName)}`;
+  const params = new URLSearchParams({
+    sort_kind: state.sortKind,
+    sort_dir: state.sortDir,
+  });
+  const currentUrl = new URL(window.location.href);
+  const dayParam = String(currentUrl.searchParams.get("day") || "").trim();
+  if (dayParam) {
+    params.set("day", dayParam);
+  }
+  const tagUrl = params.toString() ? `${baseTagUrl}?${params.toString()}` : baseTagUrl;
+  const fragmentParams = new URLSearchParams({
+    sort_kind: state.sortKind,
+    sort_dir: state.sortDir,
+    tag: tagName,
+  });
+  if (tagHash) {
+    fragmentParams.set("tag_hash", tagHash);
+  }
+  const fragmentUrl = `/fragments/tags/${day}/detail?${fragmentParams.toString()}`;
+  return { tagUrl, fragmentUrl };
+};
+
+const createTransientRow = (item) => {
+  const urls = buildTagUrls(item.name, item.hash);
+  if (!urls) return null;
+  const row = document.createElement("a");
+  row.className = "tags-view__index-row";
+  row.id = `tag-index-${item.name}`;
+  row.dataset.tagName = item.name;
+  row.dataset.tagsName = item.name;
+  row.dataset.tagsCount = String(item.count ?? 0);
+  row.dataset.tagsTransient = "true";
+  row.setAttribute("href", urls.tagUrl);
+  row.setAttribute("hx-get", urls.fragmentUrl);
+  row.setAttribute("hx-target", "#tags-view-detail");
+  row.setAttribute("hx-swap", "outerHTML");
+  row.setAttribute("hx-push-url", urls.tagUrl);
+  const nameEl = document.createElement("span");
+  nameEl.className = "tags-view__index-name";
+  nameEl.textContent = item.name;
+  const countEl = document.createElement("span");
+  countEl.className = "tags-view__index-count";
+  countEl.textContent = String(item.count ?? 0);
+  row.appendChild(nameEl);
+  row.appendChild(countEl);
+  return row;
+};
+
+const getIndexOrderMap = () => {
+  const map = new Map();
+  if (!Array.isArray(state.indexItems)) return map;
+  state.indexItems.forEach((item, idx) => {
+    map.set(item.name, idx);
+  });
+  return map;
+};
+
+const removeTransientRow = (tagName) => {
+  if (!tagName) return;
+  const list = findList();
+  const index = list?.querySelector?.("[data-tags-view-index]");
+  if (!index) return;
+  const rows = index.querySelectorAll('[data-tags-transient="true"]');
+  rows.forEach((row) => {
+    if (row instanceof HTMLElement && row.dataset.tagName === tagName) {
+      row.remove();
+    }
+  });
+};
+
+const ensureActiveRowPresent = (tagName) => {
+  if (!tagName) return;
+  if (findRowByTagName(tagName)) {
+    removeTransientRow(tagName);
+    return;
+  }
+  if (!state.indexItems && !state.indexPending) {
+    state.indexPending = true;
+    loadIndexItems().then(() => {
+      state.indexPending = false;
+      ensureActiveRowPresent(tagName);
+    });
+    return;
+  }
+  const item = getIndexItemByName(tagName);
+  if (!item) return;
+  const list = findList();
+  const index = list?.querySelector?.("[data-tags-view-index]");
+  if (!index) return;
+  removeTransientRow(tagName);
+  const transient = createTransientRow(item);
+  if (!transient) return;
+  const orderMap = getIndexOrderMap();
+  const targetIndex = orderMap.get(tagName);
+  let inserted = false;
+  if (targetIndex != null) {
+    const existingRows = Array.from(index.querySelectorAll(".tags-view__index-row"));
+    for (const row of existingRows) {
+      const rowName = row.dataset.tagName || "";
+      const rowIndex = orderMap.get(rowName);
+      if (rowIndex != null && rowIndex > targetIndex) {
+        index.insertBefore(transient, row);
+        inserted = true;
+        break;
+      }
+    }
+  }
+  if (!inserted) {
+    index.appendChild(transient);
+  }
+  if (typeof htmx !== "undefined" && transient instanceof HTMLElement) {
+    htmx.process(transient);
+  }
+  buildSearchIndex(document);
+  if (state.query) {
+    applySearch(state.query);
+  }
 };
 
 const readStoredEntriesAnchor = () => {
@@ -717,6 +847,20 @@ const setActiveTag = (tagName, root = document, options = {}) => {
   const list = findList(root);
   if (!list) return;
   const targetName = String(tagName || "").trim();
+  const index = list.querySelector?.("[data-tags-view-index]");
+  let removedTransient = false;
+  if (index) {
+    index.querySelectorAll('[data-tags-transient="true"]').forEach((row) => {
+      if (!(row instanceof HTMLElement)) return;
+      if (row.dataset.tagName !== targetName) {
+        row.remove();
+        removedTransient = true;
+      }
+    });
+  }
+  if (removedTransient) {
+    buildSearchIndex(root);
+  }
   let activeRow = null;
   list.querySelectorAll(".tags-view__index-row").forEach((row) => {
     const isActive = targetName !== "" && row.dataset.tagName === targetName;
@@ -733,12 +877,14 @@ const setActiveTag = (tagName, root = document, options = {}) => {
   const listBody = findListBody(root);
   if (listBody instanceof HTMLElement) {
     if (!isRowInView(activeRow, listBody)) {
+      state.pendingListScroll = true;
       scrollRowIntoView(activeRow, listBody, behavior);
     }
     if (behavior === "auto") {
       window.requestAnimationFrame(() => {
         if (!activeRow.isConnected || !listBody.isConnected) return;
         if (isRowInView(activeRow, listBody)) return;
+        state.pendingListScroll = true;
         // Retry after layout settles (htmx swap + row animations can shift geometry).
         scrollRowIntoView(activeRow, listBody, "auto");
       });
@@ -746,6 +892,7 @@ const setActiveTag = (tagName, root = document, options = {}) => {
         window.requestAnimationFrame(() => {
           if (!activeRow.isConnected || !listBody.isConnected) return;
           if (isRowInView(activeRow, listBody)) return;
+          state.pendingListScroll = true;
           scrollRowIntoView(activeRow, listBody, "auto");
         });
       });
@@ -866,6 +1013,9 @@ const syncFromDetail = (root = document) => {
     const selectedTag = detailTag || urlTag;
     if (selectedTag) {
       detail.dataset.selectedTag = selectedTag;
+    }
+    if (selectedTag) {
+      ensureActiveRowPresent(selectedTag);
     }
     if (selectedTag) {
       setActiveTag(selectedTag, root, {
@@ -1039,16 +1189,47 @@ const escapeHtml = (value) =>
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 
-const highlightMatch = (text, query) => {
-  if (!query) return escapeHtml(text);
+const normalizeQueryTokens = (query) =>
+  String(query || "")
+    .toLowerCase()
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+const highlightMatch = (text, queryTokens) => {
+  if (!queryTokens?.length) return escapeHtml(text);
   const lowerText = text.toLowerCase();
-  const lowerQuery = query.toLowerCase();
-  const idx = lowerText.indexOf(lowerQuery);
-  if (idx < 0) return escapeHtml(text);
-  const before = escapeHtml(text.slice(0, idx));
-  const match = escapeHtml(text.slice(idx, idx + query.length));
-  const after = escapeHtml(text.slice(idx + query.length));
-  return `${before}<mark>${match}</mark>${after}`;
+  const ranges = [];
+  queryTokens.forEach((token) => {
+    if (!token) return;
+    let start = 0;
+    while (start < lowerText.length) {
+      const idx = lowerText.indexOf(token, start);
+      if (idx < 0) break;
+      ranges.push([idx, idx + token.length]);
+      start = idx + token.length;
+    }
+  });
+  if (!ranges.length) return escapeHtml(text);
+  ranges.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const merged = [];
+  for (const [start, end] of ranges) {
+    const last = merged[merged.length - 1];
+    if (!last || start > last[1]) {
+      merged.push([start, end]);
+    } else {
+      last[1] = Math.max(last[1], end);
+    }
+  }
+  let out = "";
+  let cursor = 0;
+  merged.forEach(([start, end]) => {
+    out += escapeHtml(text.slice(cursor, start));
+    out += `<mark>${escapeHtml(text.slice(start, end))}</mark>`;
+    cursor = end;
+  });
+  out += escapeHtml(text.slice(cursor));
+  return out;
 };
 
 const captureRowPositions = (rows) => {
@@ -1136,6 +1317,7 @@ const applySearch = (rawQuery) => {
     });
   }
 
+  const queryTokens = normalizeQueryTokens(query);
   const normalized = query.toLowerCase();
   const indexItems =
     Array.isArray(state.indexItems) && state.indexItems.length ? state.indexItems : null;
@@ -1148,22 +1330,31 @@ const applySearch = (rawQuery) => {
         key: normalizeTagKey(row.dataset.tagsName || ""),
       }));
 
+  const matchesTokens = (key) => queryTokens.every((token) => key.includes(token));
   let orderedItems = candidates
-    .filter((item) => item.key.includes(normalized))
+    .filter((item) =>
+      queryTokens.length ? matchesTokens(item.key) : item.key.includes(normalized),
+    )
     .sort((a, b) => {
-      const aIndex = a.key.indexOf(normalized);
-      const bIndex = b.key.indexOf(normalized);
+      const aIndex = queryTokens.length
+        ? Math.min(...queryTokens.map((token) => a.key.indexOf(token)))
+        : a.key.indexOf(normalized);
+      const bIndex = queryTokens.length
+        ? Math.min(...queryTokens.map((token) => b.key.indexOf(token)))
+        : b.key.indexOf(normalized);
       if (aIndex !== bIndex) {
         return aIndex - bIndex;
       }
       return a.key.localeCompare(b.key);
     });
 
+  const selectedTag = getSelectedTrace();
   if (indexItems && orderedItems.length) {
     let fetched = 0;
     for (const item of orderedItems) {
       if (fetched >= MAX_MISSING_FETCH) break;
       if (!item.name) continue;
+      if (selectedTag && item.name === selectedTag) continue;
       if (findRowByTagName(item.name)) continue;
       const key = normalizeTagKey(item.name);
       if (state.missingNames.has(key)) continue;
@@ -1194,7 +1385,7 @@ const applySearch = (rawQuery) => {
         const nameEl = row.querySelector(".tags-view__index-name");
         if (nameEl instanceof HTMLElement) {
           const original = nameEl.dataset.originalText || row.dataset.tagsName || "";
-          nameEl.innerHTML = highlightMatch(original, query);
+          nameEl.innerHTML = highlightMatch(original, queryTokens);
         }
       }
       if (isVisible) visibleCount += 1;
@@ -1443,6 +1634,7 @@ const syncListOnly = (root = document) => {
   } else {
     const selectedTag = getSelectedTrace(root);
     if (selectedTag) {
+      ensureActiveRowPresent(selectedTag);
       setActiveTag(selectedTag, root, { behavior: "auto", scroll: false });
     } else if (state.rows.length) {
       const fallbackTag = state.rows[0]?.dataset?.tagName || "";
@@ -1544,7 +1736,7 @@ if (!globalThis[BOOT_KEY]) {
       if (findRowByTagName(tagName)) {
         setActiveTag(tagName, document, { behavior: "smooth" });
       } else {
-        ensureTagRowVisible(tagName, tagHash);
+        ensureActiveRowPresent(tagName);
       }
     }
     if (!state.saveSuppressed) {
@@ -1573,6 +1765,7 @@ if (!globalThis[BOOT_KEY]) {
     const tag = String(event?.detail?.tag || "").trim();
     if (!tag) return;
     state.pendingTagHighlight = tag;
+    ensureActiveRowPresent(tag);
     setActiveTag(tag, document, { behavior: "smooth" });
   });
 
@@ -1696,7 +1889,10 @@ if (!globalThis[BOOT_KEY]) {
     storeHeatmapOffsetFromRoot(target);
     if (target.id === "tags-view-list") {
       animateListReorder(() => {
-        scrollActiveRowIntoView(document, "smooth");
+        if (state.pendingListScroll) {
+          state.pendingListScroll = false;
+          scrollActiveRowIntoView(document, "smooth");
+        }
       });
     }
     if (target.id !== "tags-view-detail") return;
