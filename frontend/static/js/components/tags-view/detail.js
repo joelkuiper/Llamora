@@ -100,14 +100,7 @@ export const syncFromDetail = (root = document, { ensureActiveRowPresent, setAct
   }
 };
 
-export const updateSelectedTagCounts = (root = document, delta = -1) => {
-  const detail = findDetail(root);
-  if (!detail) return;
-  const rawCount =
-    Number.parseInt(detail.dataset.selectedTagCount || "", 10) ||
-    Number.parseInt(detail.querySelector(".tags-view__meta")?.textContent || "", 10) ||
-    0;
-  const nextCount = Math.max(0, rawCount + delta);
+const applySelectedTagCount = (detail, nextCount) => {
   detail.dataset.selectedTagCount = String(nextCount);
   const metaEl = detail.querySelector(".tags-view__meta");
   if (metaEl) {
@@ -126,6 +119,24 @@ export const updateSelectedTagCounts = (root = document, delta = -1) => {
     }
     activeRow.dataset.tagsCount = String(nextCount);
   }
+};
+
+export const setSelectedTagCount = (root = document, count = 0) => {
+  const detail = findDetail(root);
+  if (!detail) return;
+  const nextCount = Math.max(0, Number.parseInt(String(count), 10) || 0);
+  applySelectedTagCount(detail, nextCount);
+};
+
+export const updateSelectedTagCounts = (root = document, delta = -1) => {
+  const detail = findDetail(root);
+  if (!detail) return;
+  const rawCount =
+    Number.parseInt(detail.dataset.selectedTagCount || "", 10) ||
+    Number.parseInt(detail.querySelector(".tags-view__meta")?.textContent || "", 10) ||
+    0;
+  const nextCount = Math.max(0, rawCount + delta);
+  applySelectedTagCount(detail, nextCount);
 };
 
 export const animateDetailEntries = (root = document) => {

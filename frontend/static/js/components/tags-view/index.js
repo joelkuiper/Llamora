@@ -6,6 +6,7 @@ import {
   refreshDetailLinksForSort,
   syncFromDetail,
   updateSelectedTagCounts,
+  setSelectedTagCount,
   animateDetailEntries,
   highlightRequestedTag,
 } from "./detail.js";
@@ -26,6 +27,7 @@ import {
   hydrateIndexFromTemplate,
   captureListPositions,
   animateListReorder,
+  rebuildIndexList,
 } from "./index-search.js";
 import {
   applyStoredHeatmapOffset,
@@ -52,6 +54,81 @@ const updateHeaderHeight = () => {
   if (!header) return;
   const height = Math.ceil(header.getBoundingClientRect().height);
   document.documentElement.style.setProperty("--app-header-height", `${height}px`);
+};
+
+const escapeSelectorValue = (value) => {
+  if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
+    return CSS.escape(value);
+  }
+  return String(value).replaceAll('"', '\\"');
+};
+
+const applyTagCountUpdate = (payload, root = document) => {
+  if (!payload || typeof payload !== "object") return;
+  const tagName = String(payload.tag || "").trim();
+  if (!tagName) return;
+  const rawCount = Number.parseInt(String(payload.count ?? ""), 10);
+  if (!Number.isFinite(rawCount)) return;
+  const count = Math.max(0, rawCount);
+  const tagHash = String(payload.tag_hash || "").trim();
+  const action = String(payload.action || "")
+    .trim()
+    .toLowerCase();
+  const entryId = String(payload.entry_id || "").trim();
+
+  const listRoot = document.getElementById("tags-view-list");
+  if (!listRoot) return;
+
+  hydrateIndexFromTemplate(root);
+  const items = Array.isArray(state.indexItems) ? [...state.indexItems] : [];
+  const idx = items.findIndex((item) => item?.name === tagName);
+  const row = findRowByTagName(tagName);
+  const shouldRebuild = !row || count <= 0;
+  if (count <= 0) {
+    if (idx >= 0) {
+      items.splice(idx, 1);
+    }
+  } else if (idx >= 0) {
+    items[idx] = {
+      ...items[idx],
+      count,
+      hash: tagHash || items[idx].hash,
+    };
+  } else {
+    items.push({
+      name: tagName,
+      hash: tagHash,
+      count,
+    });
+  }
+  state.indexItems = items;
+  if (shouldRebuild) {
+    state.listBuilt = false;
+    rebuildIndexList(root);
+    const activeTag = getSelectedTrace(root);
+    if (activeTag) {
+      setActiveTag(activeTag, root, { behavior: "auto", scroll: false });
+    }
+  } else if (row instanceof HTMLElement) {
+    const countEl = row.querySelector(".tags-view__index-count");
+    if (countEl) {
+      countEl.textContent = String(count);
+    }
+    row.dataset.tagsCount = String(count);
+  }
+
+  const detail = findDetail(root);
+  const selectedTag = String(detail?.dataset?.selectedTag || "").trim();
+  if (selectedTag && selectedTag === tagName) {
+    setSelectedTagCount(root, count);
+    if (action === "remove" && entryId) {
+      const escapedId = escapeSelectorValue(entryId);
+      const entry = document.querySelector(`.tags-view__entry-item[data-entry-id="${escapedId}"]`);
+      if (entry instanceof HTMLElement) {
+        entry.remove();
+      }
+    }
+  }
 };
 
 const sync = (root = document) => {
@@ -224,6 +301,11 @@ if (!globalThis[BOOT_KEY]) {
     state.pendingTagHighlight = tag;
     ensureActiveRowPresent(tag);
     setActiveTag(tag, document, { behavior: "smooth" });
+  });
+
+  document.body.addEventListener("tags:tag-count-updated", (event) => {
+    if (document.getElementById("main-content")?.dataset.view !== "tags") return;
+    applyTagCountUpdate(event?.detail || {}, document);
   });
 
   document.body.addEventListener("htmx:afterSwap", (event) => {

@@ -1,4 +1,5 @@
 import datetime as dt
+import json
 
 from quart import (
     Blueprint,
@@ -228,13 +229,7 @@ async def remove_tag(entry_id: str, tag_hash: str):
         abort(400, description="invalid tag hash")
         raise AssertionError("unreachable") from exc
     context = _parse_view_context()
-    selected_tag: str | None = None
-    if context and str(context.get("view") or "").strip().lower() == "tags":
-        params = context.get("params")
-        if isinstance(params, dict):
-            selected_tag = _tags().normalize_tag_query(params.get("tag"))
-        if selected_tag:
-            pass
+    context_view = str(context.get("view") or "").strip().lower() if context else ""
 
     created_date = await db.entries.get_entry_date(user["id"], entry_id)
     await db.tags.unlink_tag_entry(
@@ -243,12 +238,30 @@ async def remove_tag(entry_id: str, tag_hash: str):
         entry_id,
         created_date=created_date,
     )
-    if not context:
-        return "<span class='tag-tombstone'></span>"
-    oob = await _render_view_oob_updates(ctx, context)
-    if not oob:
-        return "<span class='tag-tombstone'></span>"
-    return f"<span class='tag-tombstone'></span>\n{oob}"
+    tag_info = await db.tags.get_tag_info(ctx, tag_hash_bytes)
+    tag_name = _tags().display(tag_info.get("name")) if tag_info else ""
+    tag_count = int(tag_info.get("count") or 0) if tag_info else 0
+
+    html = "<span class='tag-tombstone'></span>"
+    if context and context_view != "tags":
+        oob = await _render_view_oob_updates(ctx, context)
+        if oob:
+            html = f"{html}\n{oob}"
+    response = await make_response(html)
+
+    if tag_name:
+        response.headers["HX-Trigger"] = json.dumps(
+            {
+                "tags:tag-count-updated": {
+                    "tag": tag_name,
+                    "tag_hash": tag_hash,
+                    "count": tag_count,
+                    "entry_id": entry_id,
+                    "action": "remove",
+                }
+            }
+        )
+    return response
 
 
 @tags_bp.post("/t/entry/<entry_id>")
@@ -284,12 +297,34 @@ async def add_tag(entry_id: str):
         entry_id=entry_id,
         context_query=context_query,
     )
-    if not context:
-        return html
-    oob = await _render_view_oob_updates(ctx, context)
-    if not oob:
-        return html
-    return f"{html}\n{oob}"
+    tag_info = await db.tags.get_tag_info(ctx, tag_hash)
+    tag_name = (
+        _tags().display(tag_info.get("name"))
+        if tag_info
+        else _tags().display(canonical)
+    )
+    tag_count = int(tag_info.get("count") or 0) if tag_info else 0
+
+    context_view = str(context.get("view") or "").strip().lower() if context else ""
+    if context and context_view != "tags":
+        oob = await _render_view_oob_updates(ctx, context)
+        if oob:
+            html = f"{html}\n{oob}"
+    response = await make_response(html)
+
+    if tag_name:
+        response.headers["HX-Trigger"] = json.dumps(
+            {
+                "tags:tag-count-updated": {
+                    "tag": tag_name,
+                    "tag_hash": tag_hash.hex(),
+                    "count": tag_count,
+                    "entry_id": entry_id,
+                    "action": "add",
+                }
+            }
+        )
+    return response
 
 
 @tags_bp.get("/t/entry/<entry_id>/suggestions")
