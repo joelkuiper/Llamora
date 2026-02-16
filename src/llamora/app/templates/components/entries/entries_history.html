@@ -1,0 +1,15 @@
+<div id="entries"
+     data-date="{{ day }}"
+     data-long-date="{{ day|long_date }}"
+     data-min-date="{{ min_date }}"
+     {% if animate_entries %}data-anim-applied="true"{% endif %}
+     role="log"
+     aria-live="polite"
+     aria-relevant="additions"
+     aria-labelledby="entries-log-label-{{ day }}">
+  <h2 class="visually-hidden" id="entries-log-label-{{ day }}">Entries for {{ day|long_date }}</h2>
+  {% if opening_stream %}
+  {% include 'components/entries/entry_opening_stream.html' %}
+  {% endif %}
+  {% include 'components/entries/entries_list.html' %}
+</div>

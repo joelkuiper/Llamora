@@ -144,9 +144,11 @@ async def _render_tags_page(selected_tag: str | None):
     if request.headers.get("HX-Request"):
         target_id = request.headers.get("HX-Target")
         if target_id == "main-content":
-            html = await render_template("partials/main_content.html", **context)
+            html = await render_template(
+                "components/shared/main_content.html", **context
+            )
             return await make_response(html, 200)
-    html = await render_template("index.html", **context)
+    html = await render_template("pages/index.html", **context)
     return await make_response(html, 200)
 
 
@@ -199,7 +201,7 @@ async def _render_tags_detail_and_list_oob_updates(
     )
     presented_tags_view = present_tags_view_data(tags_view)
     return await render_template(
-        "partials/tags_view_fragment.html",
+        "components/tags/fragment.html",
         day=str(context["day"]),
         tags_view=presented_tags_view,
         selected_tag=tags_view.selected_tag,
@@ -223,7 +225,7 @@ async def _render_tags_list_oob_updates(
     )
     presented_tags_view = present_tags_view_data(tags_view)
     return await render_template(
-        "partials/tags_view_list_oob.html",
+        "components/tags/list_oob.html",
         day=str(context["day"]),
         tags_view=presented_tags_view,
         selected_tag=tags_view.selected_tag,
@@ -341,7 +343,7 @@ async def add_tag(entry_id: str):
     context = _parse_view_context()
     context_query = _build_view_context_query(context)
     html = await render_template(
-        "partials/tag_item.html",
+        "components/tags/tag_item.html",
         tag=canonical,
         tag_hash=tag_hash.hex(),
         entry_id=entry_id,
@@ -407,7 +409,7 @@ async def get_tag_suggestions(entry_id: str):
         return jsonify({"results": payload})
 
     html = await render_template(
-        "partials/tag_suggestions.html",
+        "components/tags/tag_suggestions.html",
         suggestions=suggestions,
         entry_id=entry_id,
         add_tag_url=f"{url_for('tags.add_tag', entry_id=entry_id)}{_build_view_context_query(_parse_view_context())}",
@@ -440,7 +442,7 @@ async def tag_detail(tag_hash: str):
     detail_day = _resolve_view_day(request.args.get("day"))
     context_query = _build_view_context_query(_parse_view_context())
     html = await render_template(
-        "partials/tag_detail_body.html",
+        "components/tags/tag_detail_body.html",
         tag=overview,
         entries=overview.entries,
         has_more=overview.has_more,
@@ -503,7 +505,7 @@ async def delete_trace(tag_hash: str):
     entries_limit = DEFAULT_TAG_ENTRIES_LIMIT
     presented_tags_view = present_tags_view_data(tags_view)
     return await render_template(
-        "partials/tags_view_fragment.html",
+        "components/tags/fragment.html",
         day=day,
         tags_view=presented_tags_view,
         selected_tag=selected_tag,
@@ -544,7 +546,7 @@ async def tag_detail_entries(tag_hash: str):
         return ""
 
     return await render_template(
-        "partials/tag_detail_entries_chunk.html",
+        "components/tags/tag_detail_entries_chunk.html",
         entries=entries,
         has_more=has_more,
         next_cursor=next_cursor,
@@ -606,7 +608,7 @@ async def tag_detail_summary(tag_hash: str):
         num_words=num_words,
     )
     html = await render_template(
-        "partials/tag_detail_summary.html",
+        "components/tags/tag_detail_summary.html",
         summary=summary,
     )
     if summary and summary_digest:
@@ -706,7 +708,7 @@ async def tags_view_detail_fragment(date: str):
         sort_dir=sort_dir,
     )
     return await render_template(
-        "partials/tags_view_detail.html",
+        "components/tags/detail.html",
         day=normalized_date,
         tags_view=presented_tags_view,
         selected_tag=selected_tag,
@@ -777,7 +779,7 @@ async def tags_view_fragment(date: str):
                 min_date=min_date,
             )
     return await render_template(
-        "partials/tags_view_fragment.html",
+        "components/tags/fragment.html",
         day=normalized_date,
         tags_view=presented_tags_view,
         selected_tag=selected_tag,
@@ -824,7 +826,7 @@ async def tags_view_list_fragment(date: str):
         selected_tag=request.args.get("tag"),
     )
     return await render_template(
-        "partials/tags_view_list_fragment.html",
+        "components/tags/list_fragment.html",
         day=normalized_date,
         tag_items=tag_items,
         selected_tag=selected_tag,
@@ -868,7 +870,7 @@ async def tags_view_list_rows_fragment(date: str):
         selected_tag=request.args.get("tag"),
     )
     return await render_template(
-        "partials/tags_view_list_rows_fragment.html",
+        "components/tags/list_rows_fragment.html",
         day=normalized_date,
         tag_items=tag_items,
         selected_tag=selected_tag,
@@ -929,7 +931,7 @@ async def tags_view_list_row_fragment(date: str):
         return ""
 
     return await render_template(
-        "partials/tags_view_list_row.html",
+        "components/tags/list_row.html",
         day=normalized_date,
         item=item,
         active_tag=tag_name,
@@ -973,7 +975,7 @@ async def tags_view_heatmap(date: str):
                 min_date=min_date,
             )
     return await render_template(
-        "partials/tags_view_heatmap.html",
+        "components/tags/heatmap.html",
         day=normalized_date,
         activity_heatmap=activity_heatmap,
         tag_hash=tag_hash_raw,
@@ -1011,7 +1013,7 @@ async def tags_view_detail_entries_chunk(date: str, tag_hash: str):
     if not entries:
         return ""
     return await render_template(
-        "partials/tags_view_entries_chunk.html",
+        "components/tags/entries_chunk.html",
         day=normalized_date,
         entries=present_archive_entries(entries),
         sort_kind=sort_kind,

@@ -1,0 +1,25 @@
+{% extends 'layouts/auth_base.html' %}
+{% from 'components/errors/error.html' import alert %}
+
+{% block title %} | Register{% endblock %}
+
+
+{% block form %}
+  {% if error %}{{ alert(error) }}{% endif %}
+  <form method="post">
+    <input class="input" type="text" name="username" placeholder="Username"
+           value="{{ username | default('', true) }}"
+           required pattern="^[A-Za-z0-9_]+$" maxlength="{{ config.MAX_USERNAME_LENGTH }}" />
+    {% from 'components/shared/password_field.html' import password_field with context %}
+    {{ password_field('password', 'Password') }}
+    <input class="input" type="password"
+           name="confirm_password"
+           placeholder="Confirm password"
+           required />
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <button class="btn btn-primary" type="submit" data-loading="Creating account">Create account</button>
+  </form>
+  <br />
+  <p>Already have an account? <a href="{{ url_for('auth.login') }}">Login</a></p>
+{% endblock %}
+

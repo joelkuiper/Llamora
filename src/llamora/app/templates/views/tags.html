@@ -25,7 +25,7 @@
         </label>
         <div class="tags-view__controls">
           <div id="tags-view-sort-controls">
-            {% include 'partials/tags_view_sort_controls.html' %}
+            {% include 'components/tags/sort_controls.html' %}
           </div>
         </div>
       </div>
@@ -43,7 +43,7 @@
     </div>
   </aside>
   {% if tags_view is defined and tags_view %}
-    {% include 'partials/tags_view_detail.html' %}
+    {% include 'components/tags/detail.html' %}
   {% else %}
     <section id="tags-view-detail"
              class="tags-view__detail span-9"
@@ -72,4 +72,4 @@
   data-edge-center=".tags-view__detail-inner"
   data-edge-avoid=".tags-view__detail-header"
   data-edge-offset="112"></scroll-edge-button>
-{% include 'partials/shared_popovers.html' %}
+{% include 'components/shared/shared_popovers.html' %}

@@ -1,0 +1,151 @@
+{% from 'components/entries/entry_tags.html' import render_entry_tags %}
+{% from 'components/entries/entry_actions.html' import entry_actions %}
+{% from 'components/entries/entry_edit_button.html' import entry_edit_button %}
+{% from 'components/entries/entry_main.html' import render_entry_main %}
+{% macro render_entry(
+  e,
+  day,
+  is_today=True,
+  responses=None,
+  include_responses=True,
+  animate_entries=False,
+  entry_class='',
+  tags_context_query='',
+  tags_click_mode='detail',
+  tags_navigate_page_template='',
+  tags_navigate_fragment_template='',
+  entry_open_url=None,
+  entry_open_variant='footer',
+  entry_open_icon='icon-book-marked',
+  entry_open_hx_get=None,
+  entry_open_hx_target=None,
+  entry_open_hx_swap=None,
+  entry_open_hx_push_url=None
+) -%}
+{% set entry_meta = e.get('meta', {}) %}
+{% set is_error = entry_meta.get('error') %}
+{% set repeat_guard = entry_meta.get('repeat_guard') %}
+{% set is_opening = entry_meta.get('auto_opening') %}
+{% set speaker = 'Your' if e['role'] == 'user' else 'Assistant' %}
+{% set extra_entry_class = entry_class.strip() %}
+<div id="entry-{{ e['id'] }}"
+     class="entry {{ 'assistant' if e['role'] != 'user' else 'user'}}{% if is_error %} entry--error{% endif %}{% if is_opening %} entry--opening{% endif %}{% if animate_entries %} motion-animate-entry{% endif %}{% if extra_entry_class %} {{ extra_entry_class }}{% endif %}"
+     data-entry-id="{{ e['id'] }}"
+     {% if e['role'] == 'assistant' and e.get('reply_to') %}
+     data-response-to="{{ e['reply_to'] }}"
+     {% endif %}
+  {% if repeat_guard %}data-repeat-guard="true"{% endif %}
+     role="article"
+     aria-labelledby="entry-{{ e['id'] }}-speaker entry-{{ e['id'] }}-body">
+  <span class="visually-hidden" id="entry-{{ e['id'] }}-speaker">{{ speaker }} entry</span>
+  {% if e['role'] == 'user' and entry_open_url and entry_open_variant == 'corner' %}
+  <div class="entry-corner-actions">
+    <a class="entry-action entry-open entry-open--corner tags-view__entry-open"
+       href="{{ entry_open_url }}"
+       {% if entry_open_hx_get %}hx-get="{{ entry_open_hx_get }}"{% endif %}
+       {% if entry_open_hx_target %}hx-target="{{ entry_open_hx_target }}"{% endif %}
+       {% if entry_open_hx_swap %}hx-swap="{{ entry_open_hx_swap }}"{% endif %}
+       {% if entry_open_hx_push_url %}hx-push-url="{{ entry_open_hx_push_url }}"{% endif %}
+       aria-label="Go to entry"
+       data-tooltip-title="Go to entry">
+      <span class="icon-mask {{ entry_open_icon }} entry-action__icon" aria-hidden="true"></span>
+    </a>
+  </div>
+  {% endif %}
+  {{ render_entry_main(e, day) }}
+  {% if e['role'] == 'user' and not entry_meta.get('error') %}
+  <div class="entry-footer">
+    {{ render_entry_tags(
+      entry_id=e['id'],
+      tags=e.get('tags', []),
+      context_query=tags_context_query,
+      tag_click_mode=tags_click_mode,
+      tag_navigate_page_template=tags_navigate_page_template,
+      tag_navigate_fragment_template=tags_navigate_fragment_template
+    ) }}
+    <div class="entry-actions-row" aria-label="Entry actions">
+      {% if e.get('created_at') %}
+      <time class="entry-time"
+            datetime="{{ e['created_at'] }}"
+            data-time-raw="{{ e['created_at'] }}"></time>
+      {% endif %}
+      {{ entry_edit_button(e['id'], is_today, mode="view") }}
+      {% if entry_open_url and entry_open_variant == 'footer' %}
+      <a class="entry-action entry-open"
+         href="{{ entry_open_url }}"
+         {% if entry_open_hx_get %}hx-get="{{ entry_open_hx_get }}"{% endif %}
+         {% if entry_open_hx_target %}hx-target="{{ entry_open_hx_target }}"{% endif %}
+         {% if entry_open_hx_swap %}hx-swap="{{ entry_open_hx_swap }}"{% endif %}
+         {% if entry_open_hx_push_url %}hx-push-url="{{ entry_open_hx_push_url }}"{% endif %}
+         aria-label="Go to entry"
+         data-tooltip-title="Go to entry">
+        <span class="icon-mask {{ entry_open_icon }} entry-action__icon" aria-hidden="true"></span>
+      </a>
+      {% endif %}
+      <button class="entry-action entry-delete"
+              type="button"
+              hx-delete="{{ url_for('entries.delete_entry', entry_id=e['id']) }}"
+              hx-target="#entry-{{ e['id'] }}"
+              hx-swap="delete swap:180ms"
+              hx-confirm="Delete this entry?"
+              data-confirm-title="Delete entry?"
+              data-confirm-message="This entry will be removed from your diary."
+              data-confirm-confirm="Delete"
+              data-confirm-cancel="Keep"
+              data-confirm-variant="danger"
+              aria-label="Delete entry"
+              data-tooltip-title="Delete entry"
+              data-ready="true">
+        <span class="icon-mask icon-trash entry-action__icon" aria-hidden="true"></span>
+      </button>
+      {{ entry_actions(e['id'], day, is_today=is_today) }}
+    </div>
+  </div>
+  {% endif %}
+  {% if repeat_guard %}
+  <span class="repeat-guard-indicator repeat-guard-indicator--visible repeat-guard-indicator--calm">
+    <span class="repeat-guard-indicator__label">response trimmed</span>
+    <span class="visually-hidden">Response paused after repeating itself.</span>
+  </span>
+  {% endif %}
+  {% if e['role'] != 'user' %}
+  <div class="entry-actions-inline" aria-label="Assistant entry actions">
+    {% if e.get('created_at') and not is_opening %}
+    <time class="entry-time"
+          datetime="{{ e['created_at'] }}"
+          data-time-raw="{{ e['created_at'] }}"></time>
+    {% endif %}
+    {% if not is_opening %}
+    {% set delete_label = "Delete response" if e['role'] != 'user' else "Delete entry" %}
+    {% set delete_title = "Delete response?" if e['role'] != 'user' else "Delete entry?" %}
+    {% set delete_message = "This response will be removed from your diary." if e['role'] != 'user' else "This entry will be removed from your diary." %}
+    <button class="entry-action entry-delete"
+            type="button"
+            hx-delete="{{ url_for('entries.delete_entry', entry_id=e['id']) }}"
+            hx-target="#entry-{{ e['id'] }}"
+            hx-swap="delete swap:180ms"
+            hx-confirm="{{ delete_title }}"
+            data-confirm-title="{{ delete_title }}"
+            data-confirm-message="{{ delete_message }}"
+            data-confirm-confirm="Delete"
+            data-confirm-cancel="Keep"
+            data-confirm-variant="danger"
+            aria-label="{{ delete_label }}"
+            data-tooltip-title="{{ delete_label }}"
+            data-ready="true">
+      <span class="icon-mask icon-trash entry-action__icon" aria-hidden="true"></span>
+    </button>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% if include_responses and e['role'] == 'user' %}
+<div class="entry-responses"
+     id="entry-responses-{{ e['id'] }}"
+     data-responses-for="{{ e['id'] }}">
+  {% for response in responses or [] %}
+  {{ render_entry(response, day, is_today, animate_entries=animate_entries) }}
+  {% endfor %}
+</div>
+{% endif %}
+{%- endmacro %}

@@ -1,0 +1,59 @@
+{% from 'components/shared/overlay_close_button.html' import overlay_close_button %}
+{% set items = results|default([]) %}
+{% set query_present = has_query|default(false) %}
+{% set total_known = total_known|default(true) %}
+{% set showing_count = showing_count|default(items|length) %}
+{% set truncation_notice = truncation_notice|default('') %}
+{% set warming = warming|default(false) %}
+{% if session_id is defined %}
+<input type="hidden"
+       id="search-session-id"
+       name="cursor"
+       value="{{ session_id|default('') }}"
+       hx-swap-oob="true">
+{% endif %}
+<div class="search-results-status">
+  {% if query_present %}
+  <p class="visually-hidden" aria-live="polite" role="status" aria-atomic="true">
+    {%- if items -%}
+    Showing {{ showing_count }} search result{%- if showing_count != 1 %}s{% endif %}{% if not total_known %}+{% endif %}.
+    {%- else -%}
+    No matches found.
+    {%- endif -%}
+  </p>
+  {% endif %}
+  {% if truncation_notice %}
+  <p class="search-results-notice" role="status" aria-live="polite">{{ truncation_notice }}</p>
+  {% endif %}
+  {% if items %}
+  <div class="sr-panel glass-panel search-results-overlay">
+    <ul class="search-results-list" role="listbox">
+      {% include 'components/search/search_results_chunk.html' %}
+    </ul>
+    {{ overlay_close_button() }}
+  </div>
+  {% elif query_present and warming %}
+  <div class="sr-panel glass-panel search-results-overlay is-empty">
+    <div class="search-results-empty" role="group">
+      <p class="search-results-empty-title">Indexing your journal</p>
+      <p class="search-results-empty-description">Results will appear shortly.</p>
+    </div>
+    {{ overlay_close_button() }}
+  </div>
+  <div class="search-results-poll"
+       hx-get="{{ url_for('search.search') }}"
+       hx-trigger="load delay:900ms"
+       hx-include="#search-form"
+       hx-target="#search-results"
+       hx-swap="morph:innerHTML"
+       aria-hidden="true"></div>
+  {% elif query_present %}
+  <div class="sr-panel glass-panel search-results-overlay is-empty">
+    <div class="search-results-empty" role="group">
+      <p class="search-results-empty-title">No matches found</p>
+      <p class="search-results-empty-description">Try a different search or adjust your filters.</p>
+    </div>
+    {{ overlay_close_button() }}
+  </div>
+  {% endif %}
+</div>

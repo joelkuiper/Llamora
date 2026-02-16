@@ -1,0 +1,54 @@
+<div id="tag-popover-global" class="tag-popover glass-panel" role="dialog" aria-modal="true" hidden>
+  <div class="tp-content">
+    <button type="button" class="overlay-close" aria-label="Close">×</button>
+    <form hx-post="" hx-target="" hx-swap="beforeend">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <span class="inline-autocomplete inline-autocomplete--empty">
+        <input type="text"
+               name="tag"
+               placeholder="Something memorable…"
+               maxlength="{{ config.MAX_TAG_LENGTH }}"
+               autocomplete="off"
+               class="inline-autocomplete__input"
+               autocapitalize="none"
+               autocorrect="off"
+               spellcheck="false"
+               data-lpignore="true"
+               data-1p-ignore="true">
+      </span>
+      <button type="submit" disabled>Add</button>
+    </form>
+    <div class="tag-suggestions"
+         hx-get=""
+         hx-trigger="tag-popover:show"
+         hx-indicator="closest .tag-suggestions"
+         hx-swap="innerHTML swap:120ms">
+      {% for _ in range(6) %}
+      <span class="tag-suggestion tag-suggestion--skeleton" aria-hidden="true"></span>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<template id="tag-suggestions-skeleton-template">
+  {% for _ in range(6) %}
+  <span class="tag-suggestion tag-suggestion--skeleton" aria-hidden="true"></span>
+  {% endfor %}
+</template>
+
+<div id="tag-detail-popover-global" class="tag-popover tag-detail-popover glass-panel" role="dialog" aria-modal="true" hidden>
+  <div class="tp-content tag-detail-panel">
+    <button type="button" class="overlay-close" aria-label="Close">×</button>
+    <div class="tag-detail-body" hx-trigger="tag-detail:show">
+      {% with lines=3 %}
+        {% include 'components/shared/summary_shimmer.html' %}
+      {% endwith %}
+    </div>
+  </div>
+</div>
+
+<template id="summary-skeleton-template">
+  {% with lines=3 %}
+    {% include 'components/shared/summary_shimmer.html' %}
+  {% endwith %}
+</template>

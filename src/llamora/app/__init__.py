@@ -307,9 +307,11 @@ def create_app():
     async def not_found(e):
         message = getattr(e, "description", "Page not found.")
         if request.headers.get("HX-Request"):
-            html = await render_template("partials/error.html", message=message)
+            html = await render_template(
+                "components/errors/error.html", message=message
+            )
             return await make_response(html, 404)
-        html = await render_template("error.html", message=message)
+        html = await render_template("pages/error.html", message=message)
         return await make_response(html, 404)
 
     @app.errorhandler(Exception)
@@ -317,9 +319,11 @@ def create_app():
         app.logger.exception("Unhandled exception: %s", e)
         message = "An unexpected error occurred. Please try again later."
         if request.headers.get("HX-Request"):
-            html = await render_template("partials/error.html", message=message)
+            html = await render_template(
+                "components/errors/error.html", message=message
+            )
             return await make_response(html, 500)
-        html = await render_template("error.html", message=message)
+        html = await render_template("pages/error.html", message=message)
         return await make_response(html, 500)
 
     app.logger.info("Application initialized")

@@ -1,0 +1,2 @@
+{% from 'components/entries/entry_response_stream.html' import entry_response_stream %}
+{{ entry_response_stream(entry_id, day, user_time, stop_url=url_for('entries_stream.stop_response', entry_id=entry_id)) }}

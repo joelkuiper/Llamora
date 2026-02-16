@@ -1,0 +1,25 @@
+{% set ns = namespace(last_date=None) %}
+{% for item in entries -%}
+  {% set entry = item.entry %}
+  {% set item_date = item.created_date or entry['created_at'][:10] %}
+  {% if item_date and item_date != ns.last_date %}
+    {% set divider_date = item_date %}
+    <li class="tags-view__entries-divider" aria-hidden="true">
+      {% include 'components/shared/day_divider.html' %}
+    </li>
+    {% set ns.last_date = item_date %}
+  {% endif %}
+  {% include 'components/tags/entry_item.html' %}
+{%- endfor %}
+{% if has_more and next_cursor and tag_hash %}
+  <li class="load-more tags-view__entries-load-more"
+      hx-get="{{ url_for('tags.tags_view_detail_entries_chunk', date=day, tag_hash=tag_hash) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&limit={{ page_size|default(entries_limit) }}&cursor={{ next_cursor|urlencode }}{% if selected_tag %}&tag={{ selected_tag|urlencode }}{% endif %}"
+      hx-trigger="intersect once delay:140ms"
+      hx-swap="outerHTML"
+      hx-target="this"
+      hx-sync="this:replace"
+      aria-hidden="true">
+    <span class="load-indicator" aria-hidden="true"></span>
+    <span class="visually-hidden">Loading more entries...</span>
+  </li>
+{% endif %}

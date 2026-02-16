@@ -50,7 +50,7 @@ async def render_entries(
     user = await session.require_user()
     context = await get_entries_context(user, date)
     html = await render_template(
-        "partials/entries.html",
+        "components/entries/entries.html",
         day=date,
         oob=oob,
         user=user,
@@ -109,7 +109,7 @@ async def entry_tags(entry_id: str):
     await ensure_entry_exists(db, user["id"], entry_id)
     tags = await db.tags.get_tags_for_entry(user["id"], entry_id, dek)
     html = await render_template(
-        "partials/entry_tags_wrapper.html",
+        "components/entries/entry_tags_wrapper.html",
         entry_id=entry_id,
         tags=tags,
         hidden=True,
@@ -186,7 +186,7 @@ async def update_entry(entry_id: str):
     today = local_date().isoformat()
     day = updated.get("created_date") or today
     return await render_template(
-        "partials/entry_main_only.html",
+        "components/entries/entry_main_only.html",
         entry=entry_payload,
         day=day,
         is_today=day == today,
@@ -220,7 +220,7 @@ async def entry_edit(entry_id: str):
         "created_at": entry.get("created_at"),
     }
     return await render_template(
-        "partials/entry_edit_main_only.html",
+        "components/entries/entry_edit_main_only.html",
         entry=entry_payload,
         day=day,
         is_today=True,
@@ -254,7 +254,7 @@ async def entry_main(entry_id: str):
     today = local_date().isoformat()
     day = entry.get("created_date") or today
     return await render_template(
-        "partials/entry_main_only.html",
+        "components/entries/entry_main_only.html",
         entry=entry_payload,
         day=day,
         is_today=day == today,
@@ -314,7 +314,7 @@ async def send_entry(date):
         "created_at": created_at,
     }
     return await render_template(
-        "partials/entries_list.html",
+        "components/entries/entries_list.html",
         entries=[{"entry": entry_payload, "responses": []}],
         day=created_date,
         is_today=created_date == local_date().isoformat(),
@@ -336,13 +336,13 @@ async def request_response(date, entry_id: str):
         abort(404, description="Entry not found.")
 
     stream_html = await render_template(
-        "partials/entry_response_stream_item.html",
+        "components/entries/entry_response_stream_item.html",
         entry_id=entry_id,
         day=actual_date or normalized_date,
         user_time=user_time,
     )
     actions_html = await render_template(
-        "partials/entry_actions_item.html",
+        "components/entries/entry_actions_item.html",
         entry_id=entry_id,
         day=actual_date or normalized_date,
         is_today=normalized_date == local_date().isoformat(),
@@ -366,7 +366,7 @@ async def entry_actions_item(entry_id: str):
     if actual_date is None:
         abort(404, description="Entry not found.")
     html = await render_template(
-        "partials/entry_actions_item.html",
+        "components/entries/entry_actions_item.html",
         entry_id=entry_id,
         day=actual_date,
         is_today=actual_date == local_date().isoformat(),

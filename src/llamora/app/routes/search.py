@@ -130,14 +130,14 @@ async def search():
         if not page_results:
             return ""
         return await render_template(
-            "partials/search_results_chunk.html",
+            "components/search/search_results_chunk.html",
             results=page_results,
             has_more=has_more,
             session_id=returned_session_id,
         )
 
     return await render_template(
-        "partials/search_results.html",
+        "components/search/search_results.html",
         results=page_results,
         has_query=bool(sanitized_query),
         truncation_notice=truncation_notice,

@@ -87,9 +87,11 @@ async def _render_day(date: str, target: str | None, view_kind: str):
     if request.headers.get("HX-Request"):
         target_id = request.headers.get("HX-Target")
         if target_id == "main-content":
-            html = await render_template("partials/main_content.html", **context)
+            html = await render_template(
+                "components/shared/main_content.html", **context
+            )
             return await make_response(html, 200)
-    html = await render_template("index.html", **context)
+    html = await render_template("pages/index.html", **context)
     return await make_response(html, 200)
 
 
@@ -98,9 +100,9 @@ async def _render_calendar(year: int, month: int, *, today=None, mode="calendar"
     context = await get_month_context(user["id"], year, month, dek, today=today)
     context["mode"] = mode
     template = (
-        "partials/calendar_popover.html"
+        "components/calendar/calendar_popover.html"
         if request.endpoint == "days.calendar_view"
-        else "partials/calendar.html"
+        else "components/calendar/calendar.html"
     )
     return await render_template(
         template,

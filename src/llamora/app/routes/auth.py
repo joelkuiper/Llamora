@@ -124,10 +124,10 @@ def _get_client_ip() -> str:
 
 
 PROFILE_TABS: dict[str, str] = {
-    "account": "partials/profile_tabs/account.html",
-    "security": "partials/profile_tabs/security.html",
-    "data": "partials/profile_tabs/data.html",
-    "privacy": "partials/profile_tabs/privacy.html",
+    "account": "components/profile/tabs/account.html",
+    "security": "components/profile/tabs/security.html",
+    "data": "components/profile/tabs/data.html",
+    "privacy": "components/profile/tabs/privacy.html",
 }
 
 
@@ -146,7 +146,7 @@ async def _render_profile_modal(user: Mapping[str, Any], tab: str, **context):
     context["user"] = user
     active_tab = _resolve_profile_tab(tab)
     context["active_tab"] = active_tab
-    return await render_template("partials/profile_modal.html", **context)
+    return await render_template("components/profile/profile_modal.html", **context)
 
 
 @auth_bp.route("/password_strength", methods=["POST"])
@@ -161,7 +161,7 @@ async def password_strength_check():
         score = 0
         percent = 0
         html = await render_template(
-            "partials/password_strength.html",
+            "components/shared/password_strength.html",
             score=score,
             percent=percent,
             suggestions=[],
@@ -190,7 +190,7 @@ async def password_strength_check():
 
     percent = min(100, score * 25)
     html = await render_template(
-        "partials/password_strength.html",
+        "components/shared/password_strength.html",
         score=score,
         percent=percent,
         suggestions=suggestions,
@@ -218,7 +218,9 @@ async def register():
         # Basic validations
         if not username:
             return await _render_auth_error(
-                "register.html", error="All fields are required", username=username
+                "pages/register.html",
+                error="All fields are required",
+                username=username,
             )
 
         password_error = await validate_password(
@@ -231,7 +233,7 @@ async def register():
         if password_error:
             message = _password_error_message(password_error)
             return await _render_auth_error(
-                "register.html", error=message, username=username
+                "pages/register.html", error=message, username=username
             )
 
         length_error = _length_error(
@@ -239,12 +241,12 @@ async def register():
         )
         if length_error:
             return await _render_auth_error(
-                "register.html", error=length_error, username=username
+                "pages/register.html", error=length_error, username=username
             )
 
         if not re.fullmatch(r"^[A-Za-z0-9_]+$", username):
             return await _render_auth_error(
-                "register.html",
+                "pages/register.html",
                 error="Username may only contain letters, digits, and underscores",
                 username=username,
             )
@@ -252,7 +254,9 @@ async def register():
         db = get_services().db
         if await db.users.get_user_by_username(username):
             return await _render_auth_error(
-                "register.html", error="Username already exists", username=username
+                "pages/register.html",
+                error="Username already exists",
+                username=username,
             )
 
         password_bytes = password.encode("utf-8")
@@ -291,13 +295,13 @@ async def register():
 
         recovery_display = format_recovery_code(recovery_code)
         html = await render_template(
-            "recovery.html",
+            "pages/recovery.html",
             code=recovery_display,
             next_url=url_for("days.index"),
         )
         return await _issue_auth_view_response(user_id, dek, html)
 
-    return await render_template("register.html")
+    return await render_template("pages/register.html")
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
@@ -332,7 +336,7 @@ async def login():
         if length_error:
             _record_login_failure(cache_key)
             return await _render_auth_error(
-                "login.html",
+                "pages/login.html",
                 error="Invalid credentials",
                 return_url=return_url,
                 username=username,
@@ -383,14 +387,14 @@ async def login():
         current_app.logger.debug("Login failed for %s", username)
         _record_login_failure(cache_key)
         return await render_template(
-            "login.html",
+            "pages/login.html",
             error="Invalid credentials",
             return_url=return_url,
             username=username,
         )
 
     return_url = sanitize_return_path(request.args.get("return"))
-    return await render_template("login.html", return_url=return_url)
+    return await render_template("pages/login.html", return_url=return_url)
 
 
 @auth_bp.route("/logout", methods=["POST"])
@@ -424,13 +428,13 @@ async def reset_password():
 
         if not username or not recovery:
             return await _render_auth_error(
-                "reset_password.html", error="Invalid input"
+                "pages/reset_password.html", error="Invalid input"
             )
 
         length_error = _length_error(username, None, max_user=max_user, max_pass=None)
         if length_error:
             return await _render_auth_error(
-                "reset_password.html", error="Invalid input"
+                "pages/reset_password.html", error="Invalid input"
             )
 
         password_error = await validate_password(
@@ -444,14 +448,14 @@ async def reset_password():
         )
         if password_error:
             return await _render_auth_error(
-                "reset_password.html", error="Invalid input"
+                "pages/reset_password.html", error="Invalid input"
             )
 
         db = get_services().db
         user = await db.users.get_user_by_username(username)
         if not user:
             return await _render_auth_error(
-                "reset_password.html", error="Invalid credentials"
+                "pages/reset_password.html", error="Invalid credentials"
             )
 
         try:
@@ -463,7 +467,7 @@ async def reset_password():
             )
         except Exception:
             return await _render_auth_error(
-                "reset_password.html", error="Invalid recovery code"
+                "pages/reset_password.html", error="Invalid recovery code"
             )
 
         password_bytes = password.encode("utf-8")
@@ -480,7 +484,7 @@ async def reset_password():
         invalidate_user_snapshot(user["id"])
         return redirect("/login")
 
-    return await render_template("reset_password.html")
+    return await render_template("pages/reset_password.html")
 
 
 @auth_bp.route("/profile")
