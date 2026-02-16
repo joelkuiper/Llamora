@@ -392,10 +392,11 @@ class EntryIndexStore:
     def _remember_context(self, ctx: CryptoContext | None) -> None:
         if ctx is None:
             return
+        forked = ctx.fork()
         previous = self._contexts.pop(ctx.user_id, None)
         if previous is not None:
             previous.drop()
-        self._contexts[ctx.user_id] = ctx.fork()
+        self._contexts[ctx.user_id] = forked
 
     def _invalidate_coverage(self, user_id: str) -> None:
         self._coverage_cache.pop(user_id, None)
