@@ -262,12 +262,11 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       this.#activateOverlayListeners();
     };
 
-    if (panelWasReplaced && panel.classList.contains("htmx-added")) {
+    if (panelWasReplaced) {
       playAnimation(panel, "pop-enter").then(completeEnter);
     } else {
       completeEnter();
     }
-
     panel.classList.remove("htmx-added");
     this.#addCurrentQueryToAutocomplete();
     this.#loadRecentSearches();
