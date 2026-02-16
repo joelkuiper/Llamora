@@ -593,6 +593,51 @@ class EntriesRepository(BaseRepository):
 
         return self._rows_to_entries(rows, user_id, dek)
 
+    async def get_recall_candidates_by_ids(
+        self,
+        user_id: str,
+        ids: list[str],
+        dek: bytes,
+        *,
+        max_entry_id: str | None = None,
+        max_created_at: str | None = None,
+        limit: int | None = None,
+    ) -> list[dict]:
+        """Return decrypted entry rows for recall planning in one query set."""
+
+        if not ids:
+            return []
+        if limit is not None and limit <= 0:
+            return []
+
+        placeholders = ",".join("?" for _ in ids)
+        params: list[object] = [user_id, *ids]
+        conditions = [f"m.user_id = ? AND m.id IN ({placeholders})"]
+        if max_entry_id:
+            conditions.append("m.id <= ?")
+            params.append(max_entry_id)
+        if max_created_at:
+            conditions.append("m.created_at <= ?")
+            params.append(max_created_at)
+
+        where_clause = " AND ".join(conditions)
+        sql = f"""
+            SELECT m.id, m.created_at, m.updated_at, m.created_date, m.role, m.reply_to,
+                   m.nonce, m.ciphertext, m.alg, m.prompt_tokens, m.digest
+            FROM entries m
+            WHERE {where_clause}
+            ORDER BY m.id DESC
+        """
+        if limit is not None:
+            sql += " LIMIT ?"
+            params.append(limit)
+
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(sql, params)
+            rows = await cursor.fetchall()
+
+        return self._rows_to_entries(rows, user_id, dek)
+
     async def get_entries_by_reply_to_ids(
         self, user_id: str, reply_to_ids: list[str], dek: bytes
     ) -> list[dict]:

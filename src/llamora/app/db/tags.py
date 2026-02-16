@@ -605,6 +605,69 @@ class TagsRepository(BaseRepository):
 
         return [row["entry_id"] for row in rows]
 
+    async def get_recent_entries_by_tag_hashes(
+        self,
+        user_id: str,
+        tag_hashes: Sequence[bytes],
+        *,
+        per_tag_limit: int,
+        max_entry_id: str | None = None,
+        max_created_at: str | None = None,
+    ) -> dict[bytes, list[str]]:
+        """Return recent entry IDs for each tag hash in one query.
+
+        The returned mapping uses the provided tag hashes as keys. Each value
+        is sorted by newest association first and limited to ``per_tag_limit``.
+        Optional cutoff values limit matches to entries at-or-before the entry.
+        """
+
+        tags = [digest for digest in tag_hashes if digest]
+        if not tags or per_tag_limit <= 0:
+            return {}
+
+        tag_placeholders = ",".join("?" * len(tags))
+        conditions = [f"x.user_id = ? AND x.tag_hash IN ({tag_placeholders})"]
+        params: list[object] = [user_id, *tags]
+
+        if max_entry_id:
+            conditions.append("m.id <= ?")
+            params.append(max_entry_id)
+        if max_created_at:
+            conditions.append("m.created_at <= ?")
+            params.append(max_created_at)
+
+        where_clause = " AND ".join(conditions)
+        params.append(per_tag_limit)
+
+        sql = f"""
+            WITH ranked AS (
+                SELECT
+                    x.tag_hash,
+                    x.entry_id,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY x.tag_hash
+                        ORDER BY x.ulid DESC
+                    ) AS rank
+                FROM tag_entry_xref x
+                JOIN entries m
+                  ON m.user_id = x.user_id AND m.id = x.entry_id
+                WHERE {where_clause}
+            )
+            SELECT tag_hash, entry_id
+            FROM ranked
+            WHERE rank <= ?
+            ORDER BY tag_hash ASC, rank ASC
+        """
+
+        grouped: dict[bytes, list[str]] = {}
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(sql, params)
+            rows = await cursor.fetchall()
+        for row in rows:
+            digest = bytes(row["tag_hash"])
+            grouped.setdefault(digest, []).append(str(row["entry_id"]))
+        return grouped
+
     async def get_recent_entries_page_for_tag_hashes(
         self,
         user_id: str,

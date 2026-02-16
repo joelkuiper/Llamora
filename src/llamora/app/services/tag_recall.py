@@ -37,6 +37,31 @@ class TagRecallSnippet(TypedDict):
     text: str
 
 
+@dataclass(frozen=True, slots=True)
+class RecallPlanTagSlice:
+    """Recall inputs prepared for a single tag."""
+
+    tag_hash: bytes
+    tag_label: str
+    snippets: tuple[tuple[str, str, str], ...]
+    summary_lines: tuple[str, ...]
+    digests: tuple[str, ...]
+    timestamps: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RecallPlan:
+    """Prepared per-tag recall candidates for snippet rendering."""
+
+    slices: tuple[RecallPlanTagSlice, ...]
+
+    def get_slice(self, tag_hash: bytes) -> RecallPlanTagSlice | None:
+        for slice_ in self.slices:
+            if slice_.tag_hash == tag_hash:
+                return slice_
+        return None
+
+
 _SUMMARY_CACHE_LIMIT_FALLBACK = 512
 
 
@@ -161,14 +186,14 @@ def _truncate_to_tokens(text: str, max_tokens: int) -> str:
 
 
 def _build_summary_cache_key(
-    entry_digests: Sequence[str],
+    plan_slice: RecallPlanTagSlice,
     *,
     max_chars: int,
     input_max_chars: int,
     max_snippets: int,
 ) -> CacheKey:
     digest = recall_cache_digest_inputs(
-        entry_digests,
+        plan_slice.digests,
         max_chars=max_chars,
         input_max_chars=input_max_chars,
         max_snippets=max_snippets,
@@ -364,6 +389,109 @@ def _build_extractive_snippet(
     return joined.strip()
 
 
+async def _build_recall_plan(
+    db,
+    user_id: str,
+    dek: bytes,
+    *,
+    focus_tags: Sequence[bytes],
+    tag_names: Mapping[bytes, str],
+    history_ids: set[str],
+    current_date: str | None,
+    max_snippets: int,
+    summary_input_max_chars: int,
+    max_entry_id: str | None,
+    max_created_at: str | None,
+) -> RecallPlan:
+    tag_entries = await db.tags.get_recent_entries_by_tag_hashes(
+        user_id,
+        focus_tags,
+        per_tag_limit=max_snippets,
+        max_entry_id=max_entry_id,
+        max_created_at=max_created_at,
+    )
+    all_ids: list[str] = []
+    seen_ids: set[str] = set()
+    for tag_hash in focus_tags:
+        for entry_id in tag_entries.get(tag_hash, []):
+            if entry_id not in seen_ids:
+                seen_ids.add(entry_id)
+                all_ids.append(entry_id)
+
+    if not all_ids:
+        return RecallPlan(slices=tuple())
+
+    candidate_entries = await db.entries.get_recall_candidates_by_ids(
+        user_id,
+        all_ids,
+        dek,
+        max_entry_id=max_entry_id,
+        max_created_at=max_created_at,
+    )
+    by_id = {str(item.get("id")): item for item in candidate_entries if item.get("id")}
+
+    slices: list[RecallPlanTagSlice] = []
+    for tag_hash in focus_tags:
+        ids_for_tag = tag_entries.get(tag_hash, [])
+        if not ids_for_tag:
+            continue
+
+        records: list[tuple[str, str, str, str, str]] = []
+        for entry_id in ids_for_tag:
+            if len(records) >= max_snippets:
+                break
+            entry = by_id.get(str(entry_id))
+            if not entry:
+                continue
+            if str(entry_id) in history_ids:
+                continue
+            created_at = entry.get("created_at")
+            created_date = _extract_date(created_at)
+            if current_date and created_date == current_date:
+                continue
+            text = str(entry.get("text") or "").strip()
+            if not text:
+                continue
+            if summary_input_max_chars > 0:
+                text = _truncate_text(text, summary_input_max_chars)
+                if not text:
+                    continue
+            when = created_date or "Previous day"
+            role = str(entry.get("role") or "assistant").strip().title()
+            digest = str(entry.get("digest") or "").strip() or f"missing:{entry_id}"
+            stamp = str(created_at or "")
+            records.append((when, role, text, digest, stamp))
+
+        if not records:
+            continue
+
+        focus_records = [r for r in records if r[1].lower() == "user"] or records
+        tag_label = tag_names.get(tag_hash, "") or tag_hash.hex()[:8]
+        snippets = tuple(
+            (when, role, text) for when, role, text, _digest, _stamp in focus_records
+        )
+        summary_lines = tuple(
+            f"{when} {role}: {text}"
+            for when, role, text, _digest, _stamp in focus_records
+        )
+        digests = tuple(digest for _when, _role, _text, digest, _stamp in focus_records)
+        timestamps = tuple(
+            stamp for _when, _role, _text, _digest, stamp in focus_records
+        )
+        slices.append(
+            RecallPlanTagSlice(
+                tag_hash=tag_hash,
+                tag_label=tag_label,
+                snippets=snippets,
+                summary_lines=summary_lines,
+                digests=digests,
+                timestamps=timestamps,
+            )
+        )
+
+    return RecallPlan(slices=tuple(slices))
+
+
 async def build_tag_recall_context(
     db,
     user_id: str,
@@ -411,95 +539,43 @@ async def build_tag_recall_context(
     if not focus_tags:
         return None
 
-    store = get_tag_recall_store(db)
-
-    tag_entry_ids: dict[bytes, list[str]] = {}
-    all_ids: list[str] = []
-    seen_ids: set[str] = set()
-    for tag_hash in focus_tags:
-        ids = await db.tags.get_recent_entries_for_tag_hashes(
-            user_id,
-            [tag_hash],
-            limit=cfg.max_snippets,
-            max_entry_id=max_entry_id,
-            max_created_at=max_created_at,
-        )
-        if not ids:
-            continue
-        tag_entry_ids[tag_hash] = ids
-        for entry_id in ids:
-            if entry_id not in seen_ids:
-                seen_ids.add(entry_id)
-                all_ids.append(entry_id)
-
-    if not all_ids:
-        return None
-
     history_ids: set[str] = set()
-    history_map: dict[str, Mapping[str, Any]] = {}
     for entry in history:
         if not isinstance(entry, Mapping):
             continue
         entry_id = entry.get("id")
-        if not entry_id:
-            continue
-        key = str(entry_id)
-        history_ids.add(key)
-        history_map[key] = entry
+        if entry_id:
+            history_ids.add(str(entry_id))
 
-    candidate_entries = await db.entries.get_entries_by_ids(user_id, all_ids, dek)
-
-    if not candidate_entries:
+    focus_slice = focus_tags[: cfg.max_tags]
+    plan = await _build_recall_plan(
+        db,
+        user_id,
+        dek,
+        focus_tags=focus_slice,
+        tag_names=tag_names,
+        history_ids=history_ids,
+        current_date=current_date,
+        max_snippets=cfg.max_snippets,
+        summary_input_max_chars=cfg.summary_input_max_chars,
+        max_entry_id=max_entry_id,
+        max_created_at=max_created_at,
+    )
+    if not plan.slices:
         return None
 
-    by_id = {str(item.get("id")): item for item in candidate_entries if item.get("id")}
-
-    # Aggregate by tag; replies are handled implicitly via tagged entries.
+    store = get_tag_recall_store(db)
 
     async def _build_tag_snippet(tag_digest: bytes) -> TagRecallSnippet | None:
-        ids_for_tag = tag_entry_ids.get(tag_digest, [])
-        if not ids_for_tag:
+        plan_slice = plan.get_slice(tag_digest)
+        if plan_slice is None or not plan_slice.summary_lines:
             return None
+
         tag_hash = tag_digest.hex()
-        tag_items: list[tuple[str, str, str, str]] = []
-        for entry_id in ids_for_tag:
-            if len(tag_items) >= cfg.max_snippets:
-                break
-            entry = by_id.get(str(entry_id))
-            if not entry:
-                continue
-            if str(entry_id) in history_ids:
-                continue
-            created_at = entry.get("created_at")
-            if current_date and _extract_date(created_at) == current_date:
-                continue
-            text = str(entry.get("text") or "").strip()
-            if not text:
-                continue
-            if cfg.summary_input_max_chars > 0:
-                text = _truncate_text(text, cfg.summary_input_max_chars)
-                if not text:
-                    continue
-            when = _extract_date(created_at) or "Previous day"
-            role = str(entry.get("role") or "assistant").strip().title()
-            digest = str(entry.get("digest") or "").strip()
-            if not digest:
-                digest = f"missing:{entry_id}"
-            tag_items.append((when, role, text, digest))
-
-        if not tag_items:
-            return None
-
-        tag_label = tag_names.get(tag_digest, "") or tag_hash[:8]
-        summary_items = [
-            item for item in tag_items if item[1].lower() == "user"
-        ] or tag_items
-        lines = [f"{when} {role}: {text}" for when, role, text, _ in summary_items]
-        aggregate = "\n".join(lines)
-        entry_digests = [digest for *_rest, digest in summary_items]
+        aggregate = "\n".join(plan_slice.summary_lines)
 
         cache_key = _build_summary_cache_key(
-            entry_digests,
+            plan_slice,
             max_chars=cfg.summary_max_chars,
             input_max_chars=cfg.summary_input_max_chars,
             max_snippets=cfg.max_snippets,
@@ -525,16 +601,13 @@ async def build_tag_recall_context(
             )
             if not summary:
                 return None
-            return {"tag": tag_label, "text": summary}
+            return {"tag": plan_slice.tag_label, "text": summary}
 
         if cfg.mode == "hybrid" and cached:
-            return {"tag": tag_label, "text": cached}
+            return {"tag": plan_slice.tag_label, "text": cached}
 
-        extractive_items = [
-            item for item in tag_items if item[1].lower() == "user"
-        ] or tag_items
         snippet = _build_extractive_snippet(
-            items=[(when, role, text) for when, role, text, _ in extractive_items],
+            items=list(plan_slice.snippets),
             max_chars=cfg.snippet_max_chars,
         )
         if not snippet:
@@ -559,7 +632,7 @@ async def build_tag_recall_context(
 
             asyncio.create_task(_background())
 
-        return {"tag": tag_label, "text": snippet}
+        return {"tag": plan_slice.tag_label, "text": snippet}
 
     async def _run_tag_snippet(
         tag_digest: bytes, sem: asyncio.Semaphore
@@ -567,7 +640,6 @@ async def build_tag_recall_context(
         async with sem:
             return await _build_tag_snippet(tag_digest)
 
-    focus_slice = focus_tags[: cfg.max_tags]
     sem = asyncio.Semaphore(min(cfg.summary_parallel, max(len(focus_slice), 1)))
     tasks = [_run_tag_snippet(tag_digest, sem) for tag_digest in focus_slice]
     results = await asyncio.gather(*tasks, return_exceptions=True)
