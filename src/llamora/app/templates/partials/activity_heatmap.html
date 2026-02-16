@@ -1,6 +1,10 @@
 {% if activity_heatmap %}
   {% set selected_day = selected_day|default(day|default("")) %}
-  <div class="activity-heatmap">
+  <div class="activity-heatmap"
+       hx-boost="true"
+       hx-target="#main-content"
+       hx-swap="outerHTML"
+       hx-push-url="true">
     {% for month in activity_heatmap.months %}
       {% set prev_month = activity_heatmap.months[loop.index0 - 1] if loop.index0 > 0 else None %}
       {% set year_break = prev_month and prev_month.year != month.year %}
@@ -29,15 +33,9 @@
                   <a class="activity-heatmap__cell level-{{ cell.level }}{% if not has_entries %} is-empty-day{% endif %}{% if today is defined and cell.date == today %} is-today{% endif %}{% if selected_day and cell.date == selected_day %} is-selected{% endif %}"
                      role="gridcell"
                      href="{{ url_for('days.day', date=cell.date) }}?view=diary"
-                     hx-get="{{ url_for('days.day', date=cell.date) }}?view=diary"
-                     hx-target="#main-content"
-                     hx-swap="outerHTML"
-                     hx-push-url="true"
                      aria-label="{{ tooltip }}"
                      data-heatmap-date="{{ cell.date }}"
                      data-heatmap-count="{{ cell.count }}"
-                     data-heatmap-label="{{ tooltip }}"
-                     data-tooltip-disabled="true"
                      {% if not has_entries %}aria-disabled="true" tabindex="-1"{% endif %}></a>
                 {% else %}
                   <span class="activity-heatmap__cell is-empty" aria-hidden="true"></span>

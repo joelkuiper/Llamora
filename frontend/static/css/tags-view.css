@@ -680,6 +680,11 @@
   will-change: transform;
 }
 
+.tags-view__heatmap.no-animate.htmx-swapping .tags-view__heatmap-body,
+.tags-view__heatmap.no-animate.htmx-settling .tags-view__heatmap-body {
+  animation: none;
+}
+
 @keyframes heatmap-slide-in {
   from {
     opacity: 0;

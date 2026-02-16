@@ -260,7 +260,7 @@ const scheduleHeatmapTooltip = (cell) => {
   heatmapState.timer = window.setTimeout(async () => {
     if (heatmapState.activeDate !== date) return;
     const tooltip = ensureHeatmapTooltip();
-    const label = String(cell.dataset.heatmapLabel || "").trim();
+    const label = String(cell.dataset.heatmapLabel || cell.getAttribute("aria-label") || "").trim();
     if (heatmapState.dateEl) {
       heatmapState.dateEl.textContent = label;
     }
@@ -1457,6 +1457,27 @@ if (!globalThis[BOOT_KEY]) {
     }
     if (target.id === "main-content") {
       sync(document);
+    }
+  });
+
+  document.body.addEventListener("htmx:beforeSwap", (event) => {
+    const target = event.detail?.target;
+    if (!(target instanceof Element)) return;
+    if (!target.classList?.contains("tags-view__heatmap")) return;
+    const elt = event.detail?.requestConfig?.elt;
+    if (!(elt instanceof Element) || !elt.classList.contains("tags-view__heatmap-btn")) {
+      target.classList.add("no-animate");
+    }
+  });
+
+  document.body.addEventListener("htmx:afterSwap", (event) => {
+    const target = event.detail?.target;
+    if (!(target instanceof Element)) return;
+    if (!target.classList?.contains("tags-view__heatmap")) return;
+    const elt = event.detail?.requestConfig?.elt;
+    if (!(elt instanceof Element) || !elt.classList.contains("tags-view__heatmap-btn")) {
+      const fresh = document.querySelector(".tags-view__heatmap");
+      if (fresh) fresh.classList.add("no-animate");
     }
   });
 
