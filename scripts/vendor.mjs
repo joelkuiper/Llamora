@@ -27,12 +27,6 @@ const bundles = [
     outfile: "floating-ui.min.js",
     globalName: "FloatingUIDOM",
   },
-  {
-    name: "fuse",
-    entry: "fuse.js",
-    outfile: "fuse.min.js",
-    globalName: "Fuse",
-  },
 ];
 
 const copies = [
@@ -60,17 +54,6 @@ const copies = [
     name: "dompurify",
     from: path.join(projectRoot, "node_modules", "dompurify", "dist", "purify.min.js"),
     outfile: "purify.min.js",
-  },
-  {
-    name: "idiomorph-ext",
-    from: path.join(
-      projectRoot,
-      "node_modules",
-      "idiomorph",
-      "dist",
-      "idiomorph-ext.min.js",
-    ),
-    outfile: "idiomorph-ext.min.js",
   },
 ];
 

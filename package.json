@@ -9,11 +9,9 @@
     "@floating-ui/dom": "^1.7.5",
     "dompurify": "^3.3.1",
     "esbuild": "^0.24.2",
-    "fuse.js": "^7.1.0",
     "htmx-ext-response-targets": "^2.0.4",
     "htmx-ext-sse": "^2.2.4",
     "htmx.org": "^1.9.12",
-    "idiomorph": "^0.7.4",
     "markdown-it": "^14.1.0",
     "markdown-it-task-lists": "^2.1.1"
   }

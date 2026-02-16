@@ -463,6 +463,25 @@ class TagService:
             selected_item.name if selected_item else None,
         )
 
+    async def get_tags_index_items(
+        self,
+        user_id: str,
+        dek: bytes,
+        *,
+        sort_kind: TagsSortKind = "alpha",
+        sort_dir: TagsSortDirection = "asc",
+    ) -> tuple[TagIndexItem, ...]:
+        """Return the full tag index, sorted for client-side search."""
+
+        index_cache = await self._get_tags_index_request_cache(user_id, dek)
+        items = list(index_cache.items)
+        items = self._sort_index_items(
+            items,
+            sort_kind=sort_kind,
+            sort_dir=sort_dir,
+        )
+        return tuple(items)
+
     async def _resolve_index_item_by_name(
         self,
         user_id: str,

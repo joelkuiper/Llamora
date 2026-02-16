@@ -48,7 +48,6 @@ const vendorSpecs = [
   { path: "markdown-it-task-lists.min.js", globals: ["markdownitTaskLists"] },
   { path: "purify.min.js", globals: ["DOMPurify"] },
   { path: "floating-ui.min.js", globals: ["FloatingUIDOM"] },
-  { path: "fuse.min.js", globals: ["Fuse"] },
 ];
 
 for (const spec of vendorSpecs) {
@@ -56,11 +55,6 @@ for (const spec of vendorSpecs) {
     const url = new URL(spec.path, vendorBase);
     await loadScript(url);
   }
-}
-
-if (globalScope.htmx?.findExtension?.("morph") == null) {
-  const morphUrl = new URL("idiomorph-ext.min.js", vendorBase);
-  await loadScript(morphUrl);
 }
 
 if (globalScope.DOMPurify && globalScope.DOMPurify.default?.sanitize) {
@@ -73,7 +67,6 @@ const resolvedGlobals = {
   markdownitTaskLists: globalScope.markdownitTaskLists,
   DOMPurify: globalScope.DOMPurify,
   FloatingUIDOM: globalScope.FloatingUIDOM?.default || globalScope.FloatingUIDOM,
-  Fuse: globalScope.Fuse?.default || globalScope.Fuse,
 };
 
 const requiredGlobals = [
@@ -82,7 +75,6 @@ const requiredGlobals = [
   ["markdownitTaskLists", resolvedGlobals.markdownitTaskLists],
   ["DOMPurify", resolvedGlobals.DOMPurify],
   ["FloatingUIDOM", resolvedGlobals.FloatingUIDOM],
-  ["Fuse", resolvedGlobals.Fuse],
 ];
 
 for (const [name, value] of requiredGlobals) {
@@ -102,6 +94,4 @@ export const offset = resolvedGlobals.FloatingUIDOM?.offset;
 export const flip = resolvedGlobals.FloatingUIDOM?.flip;
 export const shift = resolvedGlobals.FloatingUIDOM?.shift;
 export const size = resolvedGlobals.FloatingUIDOM?.size;
-export const Fuse = resolvedGlobals.Fuse;
-
 export default resolvedGlobals;

@@ -5,20 +5,23 @@ import { clearScrollTarget, flashHighlight } from "../ui.js";
 import { prefersReducedMotion } from "../utils/motion.js";
 import { sessionStore } from "../utils/storage.js";
 import { transitionHide, transitionShow } from "../utils/transition.js";
-import { Fuse as FuseCtor } from "../vendor/setup-globals.js";
 import { syncSummarySkeletons } from "../services/summary-skeleton.js";
 
 const BOOT_KEY = "__llamoraTagsViewBooted";
+const MAX_MISSING_FETCH = 48;
 const state = {
   query: "",
   sortKind: "count",
   sortDir: "desc",
-  fuse: null,
   rows: [],
   input: null,
   clearBtn: null,
   empty: null,
   list: null,
+  indexItems: null,
+  indexPromise: null,
+  indexPending: false,
+  missingNames: new Set(),
   scrollElement: null,
   saveFrame: 0,
   restoreAppliedForLocation: "",
@@ -421,6 +424,52 @@ const getSelectedTrace = (root = document) =>
 const findRowByTagName = (tagName) => {
   if (!tagName) return null;
   return state.rows.find((row) => row.dataset.tagName === tagName) || null;
+};
+
+const normalizeTagKey = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase();
+
+const resetIndexCache = () => {
+  state.indexItems = null;
+  state.indexPromise = null;
+  state.indexPending = false;
+  state.missingNames.clear();
+};
+
+const loadIndexItems = async () => {
+  if (state.indexPromise) return state.indexPromise;
+  const day = getTagsDay();
+  if (!day) return [];
+  const params = new URLSearchParams({
+    sort_kind: state.sortKind,
+    sort_dir: state.sortDir,
+  });
+  state.indexPromise = fetch(`/fragments/tags/${day}/list/index?${params.toString()}`, {
+    headers: { Accept: "application/json" },
+    credentials: "same-origin",
+  })
+    .then((response) => (response.ok ? response.json() : null))
+    .then((payload) => {
+      const items = Array.isArray(payload?.items) ? payload.items : [];
+      state.indexItems = items
+        .map((item) => ({
+          name: String(item?.name || "").trim(),
+          hash: String(item?.hash || "").trim(),
+          count: Number.parseInt(item?.count || "0", 10) || 0,
+        }))
+        .filter((item) => item.name);
+      return state.indexItems;
+    })
+    .catch(() => {
+      state.indexItems = [];
+      return [];
+    })
+    .finally(() => {
+      state.indexPromise = null;
+    });
+  return state.indexPromise;
 };
 
 const readStoredEntriesAnchor = () => {
@@ -868,8 +917,13 @@ const updateSelectedTagCounts = (root = document, delta = -1) => {
 
 const syncSortStateFromDom = (root = document) => {
   const sortFromDom = readSortFromDom(root);
+  const prevKind = state.sortKind;
+  const prevDir = state.sortDir;
   state.sortKind = sortFromDom.kind;
   state.sortDir = sortFromDom.dir;
+  if (prevKind !== state.sortKind || prevDir !== state.sortDir) {
+    resetIndexCache();
+  }
 };
 
 const animateDetailEntries = (root = document) => {
@@ -962,28 +1016,6 @@ const buildSearchIndex = (root = document) => {
   state.input = sidebar?.querySelector("[data-tags-view-search]") || null;
   state.clearBtn = sidebar?.querySelector("[data-tags-view-search-clear]") || null;
   state.empty = list?.querySelector("[data-tags-view-empty]") || null;
-
-  const searchable = state.rows.map((row) => ({
-    name: row.dataset.tagsName || "",
-    count: Number.parseInt(row.dataset.tagsCount || "0", 10) || 0,
-    row,
-  }));
-
-  if (typeof FuseCtor === "function") {
-    try {
-      state.fuse = new FuseCtor(searchable, {
-        keys: ["name"],
-        threshold: 0.34,
-        ignoreLocation: true,
-        minMatchCharLength: 1,
-      });
-    } catch (error) {
-      console.warn("[tags-view] Fuse init failed, falling back to plain search.", error);
-      state.fuse = null;
-    }
-  } else {
-    state.fuse = null;
-  }
 
   state.rows.forEach((row, index) => {
     const nameEl = row.querySelector(".tags-view__index-name");
@@ -1101,33 +1133,55 @@ const applySearch = (rawQuery) => {
   }
   state.list?.classList.add("is-filtering");
 
-  let matches = new Set();
-  let orderedMatches = [];
-  if (state.fuse) {
-    const results = state.fuse.search(query) || [];
-    orderedMatches = results.map((item) => item.item.row);
-    matches = new Set(orderedMatches);
-  } else {
-    const normalized = query.toLowerCase();
-    state.rows.forEach((row) => {
-      const name = (row.dataset.tagsName || "").toLowerCase();
-      if (name.includes(normalized)) {
-        matches.add(row);
-      }
+  if (!state.indexItems && !state.indexPending) {
+    state.indexPending = true;
+    loadIndexItems().then(() => {
+      state.indexPending = false;
+      applySearch(state.query);
     });
-    orderedMatches = state.rows
-      .filter((row) => matches.has(row))
-      .sort((a, b) => {
-        const aName = (a.dataset.tagsName || "").toLowerCase();
-        const bName = (b.dataset.tagsName || "").toLowerCase();
-        const aIndex = aName.indexOf(normalized);
-        const bIndex = bName.indexOf(normalized);
-        if (aIndex !== bIndex) {
-          return aIndex - bIndex;
-        }
-        return aName.localeCompare(bName);
-      });
   }
+
+  const normalized = query.toLowerCase();
+  const indexItems =
+    Array.isArray(state.indexItems) && state.indexItems.length ? state.indexItems : null;
+  const candidates = indexItems
+    ? indexItems.map((item) => ({ ...item, key: normalizeTagKey(item.name) }))
+    : state.rows.map((row) => ({
+        name: row.dataset.tagsName || "",
+        hash: "",
+        count: Number.parseInt(row.dataset.tagsCount || "0", 10) || 0,
+        key: normalizeTagKey(row.dataset.tagsName || ""),
+      }));
+
+  let orderedItems = candidates
+    .filter((item) => item.key.includes(normalized))
+    .sort((a, b) => {
+      const aIndex = a.key.indexOf(normalized);
+      const bIndex = b.key.indexOf(normalized);
+      if (aIndex !== bIndex) {
+        return aIndex - bIndex;
+      }
+      return a.key.localeCompare(b.key);
+    });
+
+  if (indexItems && orderedItems.length) {
+    let fetched = 0;
+    for (const item of orderedItems) {
+      if (fetched >= MAX_MISSING_FETCH) break;
+      if (!item.name) continue;
+      if (findRowByTagName(item.name)) continue;
+      const key = normalizeTagKey(item.name);
+      if (state.missingNames.has(key)) continue;
+      state.missingNames.add(key);
+      ensureTagRowVisible(item.name, item.hash);
+      fetched += 1;
+    }
+  }
+
+  let orderedMatches = orderedItems
+    .map((item) => findRowByTagName(item.name))
+    .filter((row) => row instanceof HTMLElement);
+  const matches = new Set(orderedMatches);
   orderedMatches = ensureActiveRowVisibleInFilteredSet(matches, orderedMatches);
   const applyFilter = () => {
     if (state.list) {
@@ -1151,7 +1205,7 @@ const applySearch = (rawQuery) => {
       if (isVisible) visibleCount += 1;
     });
     if (state.empty) {
-      state.empty.hidden = visibleCount > 0;
+      state.empty.hidden = visibleCount > 0 || state.indexPending;
     }
     runFlip(state.rows, beforePositions);
   };
@@ -1199,6 +1253,7 @@ const scheduleSearch = (value, { immediate = false } = {}) => {
 const applySort = (kind, dir, { updateUrl = true, refreshSearch = true } = {}) => {
   state.sortKind = normalizeSortKind(kind);
   state.sortDir = normalizeSortDir(dir);
+  resetIndexCache();
   const detail = findDetail();
   if (detail) {
     detail.dataset.sortKind = state.sortKind;
@@ -1262,6 +1317,7 @@ const requestSort = (kind, dir) => {
 
   state.sortKind = nextKind;
   state.sortDir = nextDir;
+  resetIndexCache();
   if (detail) {
     detail.dataset.sortKind = nextKind;
     detail.dataset.sortDir = nextDir;

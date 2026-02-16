@@ -26,7 +26,7 @@
     {% block head_extra %}{% endblock %}
   </head>
   <body
-    hx-ext="response-targets morph"
+    hx-ext="response-targets"
     hx-target-5*="#errors"
     hx-target-4*="#errors"
     hx-on::after-settle="window.appRuntime?.rehydrate(event)"

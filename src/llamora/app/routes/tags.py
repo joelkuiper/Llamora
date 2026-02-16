@@ -841,6 +841,32 @@ async def tags_view_list_fragment(date: str):
     )
 
 
+@tags_bp.get("/fragments/tags/<date>/list/index")
+@login_required
+async def tags_view_list_index(date: str):
+    require_iso_date(date)
+    _, user, dek = await require_user_and_dek()
+    tag_service = _tags()
+    sort_kind = tag_service.normalize_tags_sort_kind(request.args.get("sort_kind"))
+    sort_dir = tag_service.normalize_tags_sort_dir(request.args.get("sort_dir"))
+    legacy_sort = tag_service.normalize_legacy_sort(request.args.get("sort"))
+    if legacy_sort is not None:
+        sort_kind, sort_dir = legacy_sort
+    items = await tag_service.get_tags_index_items(
+        user["id"],
+        dek,
+        sort_kind=sort_kind,
+        sort_dir=sort_dir,
+    )
+    payload = {
+        "items": [
+            {"name": item.name, "hash": item.hash, "count": item.count}
+            for item in items
+        ]
+    }
+    return jsonify(payload)
+
+
 @tags_bp.get("/fragments/tags/<date>/list/rows")
 @login_required
 async def tags_view_list_rows_fragment(date: str):
