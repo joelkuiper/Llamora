@@ -13,9 +13,12 @@ from typing import Dict, Iterable, List
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 STATIC_DIR = PROJECT_ROOT / "frontend" / "static"
 DIST_DIR = PROJECT_ROOT / "frontend" / "dist"
-JS_ENTRIES_DIR = STATIC_DIR / "js" / "entries"
+JS_ENTRY = STATIC_DIR / "js" / "app-entry.js"
 CSS_ENTRIES_DIR = STATIC_DIR / "css" / "entries"
 ESBUILD_BIN = PROJECT_ROOT / "scripts" / "bin" / "esbuild"
+JS_ENTRY_ALIASES = {
+    "app-entry": "app",
+}
 
 PASSTHROUGH_DIRECTORIES = [
     (STATIC_DIR / "img", DIST_DIR / "img"),
@@ -41,6 +44,10 @@ def _discover_entries(directory: Path, suffix: str) -> List[Path]:
     if not directory.exists():
         return []
     return sorted(p for p in directory.glob(f"*.{suffix}") if p.is_file())
+
+
+def _discover_js_entries() -> List[Path]:
+    return [JS_ENTRY] if JS_ENTRY.exists() else []
 
 
 def _esbuild_common_args(mode: str) -> List[str]:
@@ -151,7 +158,8 @@ def _write_manifest() -> None:
 
     for entry_name, output_path in js_meta.items():
         normalized = _normalize_output_path(output_path)
-        manifest["js"][entry_name] = normalized
+        mapped_name = JS_ENTRY_ALIASES.get(entry_name, entry_name)
+        manifest["js"][mapped_name] = normalized
         valid_outputs.add(normalized)
 
     for entry_name, output_path in css_meta.items():
@@ -192,12 +200,10 @@ def build(mode: str) -> None:
     js_out.mkdir(parents=True, exist_ok=True)
     css_out.mkdir(parents=True, exist_ok=True)
 
-    js_entries = _discover_entries(JS_ENTRIES_DIR, "js")
+    js_entries = _discover_js_entries()
     css_entries = _discover_entries(CSS_ENTRIES_DIR, "css")
 
-    _run_esbuild(
-        js_entries, js_out, JS_ENTRIES_DIR, mode, watch=False, meta_path=META_JS
-    )
+    _run_esbuild(js_entries, js_out, JS_ENTRY.parent, mode, watch=False, meta_path=META_JS)
     _run_esbuild(
         css_entries, css_out, CSS_ENTRIES_DIR, mode, watch=False, meta_path=META_CSS
     )
@@ -257,7 +263,7 @@ def watch(mode: str) -> None:
     js_out.mkdir(parents=True, exist_ok=True)
     css_out.mkdir(parents=True, exist_ok=True)
 
-    js_entries = _discover_entries(JS_ENTRIES_DIR, "js")
+    js_entries = _discover_js_entries()
     css_entries = _discover_entries(CSS_ENTRIES_DIR, "css")
 
     stop_event = threading.Event()
@@ -269,7 +275,7 @@ def watch(mode: str) -> None:
     processes: List[subprocess.Popen] = []
     try:
         js_process = _run_esbuild(
-            js_entries, js_out, JS_ENTRIES_DIR, mode, watch=True, meta_path=META_JS
+            js_entries, js_out, JS_ENTRY.parent, mode, watch=True, meta_path=META_JS
         )
         css_process = _run_esbuild(
             css_entries,
