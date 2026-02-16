@@ -1,6 +1,6 @@
 {% set list_has_more = list_has_more|default(false) %}
 {% set list_next_cursor = list_next_cursor|default(None) %}
-{% set list_limit = list_limit|default(30) %}
+{% set list_limit = list_limit|default(100) %}
 {% set active_tag = active_tag|default(selected_tag|default('')) %}
 {% set sort_kind = sort_kind|default(tags_sort_kind|default('count')) %}
 {% set sort_dir = sort_dir|default(tags_sort_dir|default('desc')) %}
