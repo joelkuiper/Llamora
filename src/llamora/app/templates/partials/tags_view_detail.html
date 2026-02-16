@@ -59,6 +59,10 @@
                   </a>
                 {% endfor %}
               </div>
+            {% else %}
+              <div class="tags-view__related-row tags-view__related-row--empty" aria-hidden="true">
+                <span class="tags-view__related-prefix">frequently appears with</span>
+              </div>
             {% endif %}
             {% include 'partials/tags_view_heatmap.html' %}
           </div>

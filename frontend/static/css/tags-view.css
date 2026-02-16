@@ -29,7 +29,8 @@
   top: calc(var(--spacing-lg) + 4.1rem);
   left: calc((100vw - var(--page-width)) / 2 + var(--page-gutter));
   width: var(--sidebar-width);
-  max-height: calc(100dvh - 11rem);
+  height: calc(100dvh - 11rem);
+  min-height: 24rem;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -547,6 +548,10 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem;
+}
+
+.tags-view__related-row--empty {
+  visibility: hidden;
 }
 
 .tags-view__related-prefix {
