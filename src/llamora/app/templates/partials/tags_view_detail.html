@@ -55,6 +55,7 @@
                   <a href="{{ related_url }}"
                      class="tags-view__related-link entry-tag"
                      data-tag-name="{{ related.name }}"
+                     {% if related.hash %}data-tag-hash="{{ related.hash }}"{% endif %}
                      hx-get="{{ url_for('tags.tags_view_detail_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&tag={{ related.name|urlencode }}{% if related.hash %}&tag_hash={{ related.hash }}{% endif %}"
                      hx-target="#tags-view-detail"
                      hx-swap="outerHTML"

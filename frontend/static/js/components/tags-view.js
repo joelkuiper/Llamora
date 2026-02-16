@@ -418,6 +418,11 @@ const getTagsLocationKey = (tagOverride) => {
 const getSelectedTrace = (root = document) =>
   String(findDetail(root)?.dataset?.selectedTag || "").trim();
 
+const findRowByTagName = (tagName) => {
+  if (!tagName) return null;
+  return state.rows.find((row) => row.dataset.tagName === tagName) || null;
+};
+
 const readStoredEntriesAnchor = () => {
   const key = getTagsLocationKey();
   if (!key) return null;
@@ -1279,6 +1284,29 @@ const requestSort = (kind, dir) => {
   });
 };
 
+const ensureTagRowVisible = (tagName, tagHash = "") => {
+  if (!tagName) return;
+  if (findRowByTagName(tagName)) return;
+  const list = findList();
+  const index = list?.querySelector?.("[data-tags-view-index]");
+  const day = getTagsDay();
+  if (!(index instanceof HTMLElement) || !day || typeof htmx === "undefined") return;
+
+  const params = new URLSearchParams({
+    sort_kind: state.sortKind,
+    sort_dir: state.sortDir,
+    tag: tagName,
+  });
+  if (tagHash) {
+    params.set("tag_hash", tagHash);
+  }
+  const url = `/fragments/tags/${day}/list/row?${params.toString()}`;
+  htmx.ajax("GET", url, {
+    target: index,
+    swap: "afterbegin",
+  });
+};
+
 const sync = (root = document) => {
   state.saveSuppressed = false;
   const hadTargetParam = new URLSearchParams(window.location.search).has("target");
@@ -1356,13 +1384,19 @@ const syncListOnly = (root = document) => {
   buildSearchIndex(root);
   applySearch(state.query);
   refreshDetailLinksForSort(root);
-  const selectedTag = getSelectedTrace(root);
-  if (selectedTag) {
-    setActiveTag(selectedTag, root, { behavior: "auto", scroll: false });
-  } else if (state.rows.length) {
-    const fallbackTag = state.rows[0]?.dataset?.tagName || "";
-    if (fallbackTag) {
-      setActiveTag(fallbackTag, root, { behavior: "auto", scroll: false });
+  const pending = state.pendingTagHighlight;
+  if (pending && findRowByTagName(pending)) {
+    setActiveTag(pending, root, { behavior: "smooth", scroll: true });
+    state.pendingTagHighlight = "";
+  } else {
+    const selectedTag = getSelectedTrace(root);
+    if (selectedTag) {
+      setActiveTag(selectedTag, root, { behavior: "auto", scroll: false });
+    } else if (state.rows.length) {
+      const fallbackTag = state.rows[0]?.dataset?.tagName || "";
+      if (fallbackTag) {
+        setActiveTag(fallbackTag, root, { behavior: "auto", scroll: false });
+      }
     }
   }
   // Scroll deferred to htmx:afterSettle — runs after FLIP animation completes.
@@ -1450,9 +1484,16 @@ if (!globalThis[BOOT_KEY]) {
       return;
     }
     const tagName = String(detailLink.dataset?.tagName || "").trim();
+    const tagHash =
+      String(detailLink.dataset?.tagHash || "").trim() ||
+      String(detailLink.closest?.(".entry-tag")?.dataset?.tagHash || "").trim();
     if (tagName) {
       state.pendingTagHighlight = tagName;
-      setActiveTag(tagName, document, { behavior: "smooth" });
+      if (findRowByTagName(tagName)) {
+        setActiveTag(tagName, document, { behavior: "smooth" });
+      } else {
+        ensureTagRowVisible(tagName, tagHash);
+      }
     }
     if (!state.saveSuppressed) {
       storeMainScrollTop();

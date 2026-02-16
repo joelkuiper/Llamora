@@ -19,7 +19,7 @@ from llamora.app.services.container import (
     get_tag_service,
 )
 from llamora.app.services.auth_helpers import login_required
-from llamora.app.services.tag_service import TagsViewData
+from llamora.app.services.tag_service import TagsViewData, TagIndexItem
 from llamora.app.services.tag_presenter import (
     PresentedTagsViewData,
     present_archive_detail,
@@ -880,6 +880,63 @@ async def tags_view_list_rows_fragment(date: str):
         list_next_cursor=list_next_cursor,
         target=(request.args.get("target") or "").strip() or None,
         today=local_date().isoformat(),
+    )
+
+
+@tags_bp.get("/fragments/tags/<date>/list/row")
+@login_required
+async def tags_view_list_row_fragment(date: str):
+    normalized_date = require_iso_date(date)
+    _, user, dek = await require_user_and_dek()
+    tag_service = _tags()
+    sort_kind = tag_service.normalize_tags_sort_kind(request.args.get("sort_kind"))
+    sort_dir = tag_service.normalize_tags_sort_dir(request.args.get("sort_dir"))
+    tag_name = (request.args.get("tag") or "").strip() or None
+    tag_hash_hex = (request.args.get("tag_hash") or "").strip() or None
+    if not tag_name and not tag_hash_hex:
+        return ""
+
+    item = None
+    if tag_hash_hex:
+        try:
+            tag_hash_bytes = bytes.fromhex(tag_hash_hex)
+        except ValueError:
+            tag_hash_bytes = b""
+        if tag_hash_bytes:
+            info = await get_services().db.tags.get_tag_info(
+                user["id"], tag_hash_bytes, dek
+            )
+            if info:
+                raw_name = str(info.get("name") or "").strip()
+                try:
+                    canonical = tag_service.canonicalize(raw_name)
+                except ValueError:
+                    canonical = ""
+                if canonical:
+                    item = TagIndexItem(
+                        name=tag_service.display(canonical),
+                        hash=info["hash"],
+                        count=int(info.get("count") or 0),
+                    )
+                    tag_name = item.name
+
+    if item is None and tag_name:
+        item = await tag_service._resolve_index_item_by_name(user["id"], dek, tag_name)
+        if item:
+            tag_name = item.name
+
+    if item is None:
+        return ""
+
+    return await render_template(
+        "partials/tags_view_list_row.html",
+        day=normalized_date,
+        item=item,
+        active_tag=tag_name,
+        sort_kind=sort_kind,
+        sort_dir=sort_dir,
+        today=local_date().isoformat(),
+        target=None,
     )
 
 
