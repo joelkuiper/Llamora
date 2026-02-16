@@ -31,7 +31,7 @@
     {% if entry_js %}
       <script type="module" defer src="{{ url_for('static', filename=entry_js) }}"></script>
     {% else %}
-      <script type="module" defer src="{{ url_for('static', filename='js/entries/app.js') }}"></script>
+      <script type="module" defer src="{{ url_for('static', filename='js/app-entry.js') }}"></script>
     {% endif %}
     {% block body_scripts %}{% endblock %}
   </body>

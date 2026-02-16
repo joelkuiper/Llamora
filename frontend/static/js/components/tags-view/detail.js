@@ -1,4 +1,4 @@
-import { armEntryAnimations, armInitialEntryAnimations } from "../../entries/entry-animations.js";
+import { armEntryAnimations, armInitialEntryAnimations } from "../entries-view/entry-animations.js";
 import { formatTimeElements } from "../../services/time.js";
 import { clearScrollTarget, flashHighlight } from "../../ui.js";
 import { state } from "./state.js";

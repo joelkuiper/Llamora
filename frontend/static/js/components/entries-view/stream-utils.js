@@ -1,4 +1,4 @@
-import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
+import { TYPING_INDICATOR_SELECTOR } from "../../typing-indicator.js";
 import { normalizeStreamId } from "./stream-id.js";
 
 function escapeAttributeValue(value) {

@@ -64,7 +64,7 @@ async function ensureShell() {
 const FEATURE_IMPORTS = {
   entries: {
     selector: "entry-view",
-    loader: () => import("../entries-entry.js"),
+    loader: () => import("../components/entries-view/index.js"),
   },
   entryTags: {
     selector: "entry-tags",

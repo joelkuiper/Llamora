@@ -1,4 +1,4 @@
-import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
+import { TYPING_INDICATOR_SELECTOR } from "../../typing-indicator.js";
 import { computeSharedPrefixLength } from "./incremental-markdown-utils.js";
 
 const HASH_LIMIT = 512;

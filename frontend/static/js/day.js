@@ -11,7 +11,7 @@ import {
   ACTIVE_DAY_CHANGED_EVENT,
   getActiveDay,
   getActiveDayLabel,
-} from "./entries/active-day-store.js";
+} from "./components/entries-view/active-day-store.js";
 import { getCurrentView } from "./lifecycle.js";
 import { updateClientToday } from "./services/time.js";
 import { triggerLabelFlash } from "./utils/motion.js";

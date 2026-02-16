@@ -2,7 +2,7 @@ import {
   addMarkdownRenderListener,
   removeMarkdownRenderListener,
   renderAllMarkdown,
-} from "../markdown.js";
+} from "../../markdown.js";
 
 export class MarkdownObserver {
   #listener = null;

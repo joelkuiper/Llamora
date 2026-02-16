@@ -1,24 +1,24 @@
-import { appReady } from "../app-init.js";
-import { initDayNav, navigateToDate } from "../day.js";
-import { clearActiveDay, setActiveDay } from "../entries/active-day-store.js";
-import { armEntryAnimations, armInitialEntryAnimations } from "../entries/entry-animations.js";
-import { MarkdownObserver } from "../entries/markdown-observer.js";
-import { scrollEvents } from "../scroll-manager.js";
-import { StreamController } from "../entries/stream-controller.js";
-import { renderMarkdownInElement } from "../markdown.js";
+import { appReady } from "../../app-init.js";
+import { initDayNav, navigateToDate } from "../../day.js";
+import { clearActiveDay, setActiveDay } from "./active-day-store.js";
+import { armEntryAnimations, armInitialEntryAnimations } from "./entry-animations.js";
+import { MarkdownObserver } from "./markdown-observer.js";
+import { scrollEvents } from "../../scroll-manager.js";
+import { StreamController } from "./stream-controller.js";
+import { renderMarkdownInElement } from "../../markdown.js";
 import {
   formatTimeElements,
   getClientToday,
   getTimezone,
   scheduleMidnightRollover,
   updateClientToday,
-} from "../services/time.js";
-import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
-import { scrollToHighlight } from "../ui.js";
-import { ReactiveElement } from "../utils/reactive-element.js";
-import { afterNextFrame, scheduleFrame } from "../utils/scheduler.js";
-import "./entry-form.js";
-import "./response-stream.js";
+} from "../../services/time.js";
+import { TYPING_INDICATOR_SELECTOR } from "../../typing-indicator.js";
+import { scrollToHighlight } from "../../ui.js";
+import { ReactiveElement } from "../../utils/reactive-element.js";
+import { afterNextFrame, scheduleFrame } from "../../utils/scheduler.js";
+import "../entry-form.js";
+import "../response-stream.js";
 
 const activateAnimations = armEntryAnimations;
 const activateInitialEntryAnimations = armInitialEntryAnimations;

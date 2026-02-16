@@ -1,10 +1,10 @@
-import "../vendor/setup-globals.js";
-import "../vendor/htmx-extensions.js";
+import "./vendor/setup-globals.js";
+import "./vendor/htmx-extensions.js";
 
 const ENTRY_LOADERS = {
-  "app-shell": () => import("../runtime/loader.js"),
-  "auth-forms": () => Promise.all([import("../forms.js"), import("../password-strength.js")]),
-  recovery: () => import("../recovery.js"),
+  "app-shell": () => import("./runtime/loader.js"),
+  "auth-forms": () => Promise.all([import("./forms.js"), import("./password-strength.js")]),
+  recovery: () => import("./recovery.js"),
 };
 
 const loadedEntries = new Map();
