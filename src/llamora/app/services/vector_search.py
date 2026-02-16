@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import Any, List, TYPE_CHECKING, overload, Literal
+from typing import Any, TYPE_CHECKING, Literal, overload
 
 if TYPE_CHECKING:
     import numpy as np
@@ -11,7 +11,6 @@ from llamora.app.embed.model import async_embed_texts
 from llamora.app.index.entry_ann import EntryIndexStore
 from llamora.app.services.crypto import EncryptionContext
 from llamora.app.services.search_config import SearchConfig
-
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +40,7 @@ class VectorSearchService:
             service_pulse=service_pulse,
         )
 
-    def _quality_satisfied(self, ids: List[str], cosines: List[float], k2: int) -> bool:
+    def _quality_satisfied(self, ids: list[str], cosines: list[float], k2: int) -> bool:
         if len(ids) < k2:
             return False
         if not cosines:
@@ -49,7 +48,6 @@ class VectorSearchService:
         cfg = self._config.progressive
         max_cos = max(cosines)
         hits = sum(c >= float(cfg.poor_match_max_cos) for c in cosines)
-        # Ensure at least 1 hit is required to avoid always-true check when min_hits=0
         min_hits = max(1, int(cfg.poor_match_min_hits))
         return max_cos >= float(cfg.poor_match_max_cos) and hits >= min_hits
 
@@ -63,8 +61,8 @@ class VectorSearchService:
         self,
         start: float,
         rounds: int,
-        ids: List[str],
-        cosines: List[float],
+        ids: list[str],
+        cosines: list[float],
         k2: int,
     ) -> bool:
         if self._quality_satisfied(ids, cosines, k2):
@@ -92,7 +90,8 @@ class VectorSearchService:
         query_vec: "np.ndarray | None" = None,
         *,
         include_count: Literal[False] = False,
-    ) -> List[dict[str, Any]]: ...
+        include_coverage: bool = False,
+    ) -> list[dict[str, Any]]: ...
 
     @overload
     async def search_candidates(
@@ -104,7 +103,21 @@ class VectorSearchService:
         query_vec: "np.ndarray | None" = None,
         *,
         include_count: Literal[True] = True,
-    ) -> tuple[List[dict[str, Any]], int]: ...
+        include_coverage: bool = False,
+    ) -> tuple[list[dict[str, Any]], int]: ...
+
+    @overload
+    async def search_candidates(
+        self,
+        ctx: EncryptionContext,
+        query: str,
+        k1: int | None = None,
+        k2: int | None = None,
+        query_vec: "np.ndarray | None" = None,
+        *,
+        include_count: bool,
+        include_coverage: Literal[True],
+    ) -> tuple[list[dict[str, Any]], int | None, dict[str, float | int | str]]: ...
 
     async def search_candidates(
         self,
@@ -115,16 +128,16 @@ class VectorSearchService:
         query_vec: "np.ndarray | None" = None,
         *,
         include_count: bool = False,
-    ) -> List[dict[str, Any]] | tuple[List[dict[str, Any]], int]:
+        include_coverage: bool = False,
+    ):
         user_id = ctx.user_id
-        dek = ctx.dek
         cfg = self._config.progressive
         k1 = int(k1) if k1 is not None else cfg.k1
         k2 = int(k2) if k2 is not None else cfg.k2
         logger.debug(
             "Vector search requested by user %s with k1=%d k2=%d", user_id, k1, k2
         )
-        index = await self.index_store.ensure_index(user_id, dek, ctx)
+        index = await self.index_store.ensure_index(user_id, ctx.dek, ctx)
         total_count = len(getattr(index, "entry_to_ids", {}))
         if query_vec is None:
             q_vec = (await async_embed_texts([query])).reshape(1, -1)
@@ -138,19 +151,24 @@ class VectorSearchService:
         logger.debug("Initial vector search returned %d candidates", len(ids))
 
         rounds = 0
-        while self._should_continue(start, rounds, ids, cosines, k2):
-            added = await self.index_store.expand_older(ctx, int(cfg.batch_size))
-            logger.debug("Backfill round %d added %d vectors", rounds + 1, added)
-            if added <= 0:
-                break
-            rounds += 1
-            if rounds == 1:
-                current_k1 = min(2 * current_k1, 512)
-            ids, dists = index.search(q_vec, current_k1)
-            cosines = (1.0 - dists).tolist()
+        if self._config.progressive_inline_backfill:
+            while self._should_continue(start, rounds, ids, cosines, k2):
+                added = await self.index_store.expand_older(
+                    ctx,
+                    int(cfg.batch_size),
+                    embed_missing=False,
+                )
+                logger.debug("Backfill round %d added %d vectors", rounds + 1, added)
+                if added <= 0:
+                    break
+                rounds += 1
+                if rounds == 1:
+                    current_k1 = min(2 * current_k1, 512)
+                ids, dists = index.search(q_vec, current_k1)
+                cosines = (1.0 - dists).tolist()
 
-        seen = set()
-        dedup_ids: List[str] = []
+        seen: set[str] = set()
+        dedup_ids: list[str] = []
         id_cos: dict[str, float] = {}
         for vector_id, cos in zip(ids, cosines):
             if vector_id is None:
@@ -163,10 +181,10 @@ class VectorSearchService:
             if existing is None or cos > existing:
                 id_cos[entry_id] = cos
 
-        rows = await self.index_store.hydrate_entries(user_id, dedup_ids, dek)
+        rows = await self.index_store.hydrate_entries(user_id, dedup_ids, ctx.dek)
         row_map = {r["id"]: r for r in rows}
 
-        results: List[dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
         for entry_id in dedup_ids:
             row = row_map.get(entry_id)
             if not row:
@@ -185,6 +203,12 @@ class VectorSearchService:
 
         results.sort(key=lambda r: r["cosine"], reverse=True)
         logger.debug("Vector search returning %d hydrated candidates", len(results))
+
+        if include_coverage:
+            coverage = await self.index_store.get_index_coverage(ctx, recalculate=True)
+            if include_count:
+                return results, total_count, coverage
+            return results, None, coverage
         if include_count:
             return results, total_count
         return results

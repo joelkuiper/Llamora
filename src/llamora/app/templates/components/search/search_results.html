@@ -5,6 +5,7 @@
 {% set showing_count = showing_count|default(items|length) %}
 {% set truncation_notice = truncation_notice|default('') %}
 {% set warming = warming|default(false) %}
+{% set index_coverage = index_coverage|default(none) %}
 {% if session_id is defined %}
 <input type="hidden"
        id="search-session-id"
@@ -24,6 +25,11 @@
   {% endif %}
   {% if truncation_notice %}
   <p class="search-results-notice" role="status" aria-live="polite">{{ truncation_notice }}</p>
+  {% endif %}
+  {% if index_coverage and index_coverage.percent_recent_indexed is defined and index_coverage.percent_recent_indexed < 100 %}
+  <p class="search-results-notice" role="status" aria-live="polite">
+    Search index is {{ index_coverage.percent_recent_indexed }}% warmed for recent entries.
+  </p>
   {% endif %}
   {% if items %}
   <div class="sr-panel glass-panel search-results-overlay">

@@ -86,6 +86,8 @@ DEFAULTS: dict[str, Any] = {
         "entry_index_max_elements": 100_000,
         "entry_index_allow_growth": False,
         "stream_global_memory_budget_bytes": 32 * 1024 * 1024,
+        "progressive_inline_backfill": True,
+        "include_index_coverage_hints": False,
         "progressive": {
             "k1": 128,
             "k2": 10,
@@ -129,6 +131,14 @@ DEFAULTS: dict[str, Any] = {
         "chunking": {
             "max_chars": 1200,
             "overlap_chars": 200,
+        },
+        "index": {
+            "backfill_batch_size": 64,
+            "backfill_max_users_per_tick": 8,
+            "backfill_wall_budget_ms": 40.0,
+            "backfill_cpu_budget_ms": 40.0,
+            "coverage_recent_limit": 1000,
+            "coverage_emit_interval_s": 30.0,
         },
     },
     "LLM": {

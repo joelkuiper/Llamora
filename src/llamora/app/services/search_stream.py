@@ -56,6 +56,7 @@ class SearchStreamResult:
     showing_count: int
     total_known: bool
     warming: bool = False
+    index_coverage: dict[str, float | int | str] | None = None
 
 
 class SearchStreamManager:
@@ -192,15 +193,31 @@ class SearchStreamManager:
         desired_k2 = max(int(cfg.k2), int(k2) if k2 is not None else 0, desired_limit)
         desired_k1 = max(int(cfg.k1), int(k1) if k1 is not None else 0, desired_k2)
 
+        index_coverage: dict[str, float | int | str] | None = None
         if desired_k2 > session.current_k2:
-            candidates, total_count = await self._vector_search.search_candidates(
-                ctx,
-                normalized_query,
-                desired_k1,
-                desired_k2,
-                query_vec=session.query_vec,
-                include_count=True,
-            )
+            if self._config.include_index_coverage_hints:
+                (
+                    candidates,
+                    total_count,
+                    index_coverage,
+                ) = await self._vector_search.search_candidates(
+                    ctx,
+                    normalized_query,
+                    desired_k1,
+                    desired_k2,
+                    query_vec=session.query_vec,
+                    include_count=True,
+                    include_coverage=True,
+                )
+            else:
+                candidates, total_count = await self._vector_search.search_candidates(
+                    ctx,
+                    normalized_query,
+                    desired_k1,
+                    desired_k2,
+                    query_vec=session.query_vec,
+                    include_count=True,
+                )
             if desired_k2 >= total_count:
                 session.exhausted = True
             for candidate in candidates:
@@ -267,6 +284,7 @@ class SearchStreamManager:
             showing_count=showing_count,
             total_known=total_known,
             warming=self._vector_search.index_store.is_warming(user_id),
+            index_coverage=index_coverage,
         )
 
 

@@ -78,6 +78,7 @@ async def search():
     showing_count = 0
     returned_session_id: str | None = None
     warming = False
+    index_coverage: dict[str, Any] | None = None
 
     if context.query:
         _, user, ctx = await require_encryption_context()
@@ -101,6 +102,7 @@ async def search():
             showing_count = stream_result.showing_count
             total_known = stream_result.total_known
             warming = stream_result.warming
+            index_coverage = stream_result.index_coverage
         except InvalidSearchQuery:
             logger.info("Discarding invalid search query for user %s", user["id"])
             sanitized_query = ""
@@ -143,6 +145,7 @@ async def search():
         has_more=has_more,
         session_id=returned_session_id,
         warming=warming,
+        index_coverage=index_coverage,
     )
 
 

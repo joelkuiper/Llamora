@@ -305,6 +305,27 @@ class EntryIndexStore:
         )
         self._global_memory_budget_bytes = max(int(budget), 0)
         self._service_pulse = service_pulse
+        self.backfill_batch_size = max(int(index_cfg.get("backfill_batch_size", 64)), 1)
+        self.backfill_max_users_per_tick = max(
+            int(index_cfg.get("backfill_max_users_per_tick", 8)), 1
+        )
+        self.backfill_wall_budget_ms = max(
+            float(index_cfg.get("backfill_wall_budget_ms", 40.0)), 1.0
+        )
+        self.backfill_cpu_budget_ms = max(
+            float(index_cfg.get("backfill_cpu_budget_ms", 40.0)), 1.0
+        )
+        self.coverage_recent_limit = max(
+            int(index_cfg.get("coverage_recent_limit", self.warm_limit)), 1
+        )
+        self.coverage_emit_interval = max(
+            float(index_cfg.get("coverage_emit_interval_s", 30.0)), 1.0
+        )
+        self._backfill_order: list[str] = []
+        self._backfill_cursor = 0
+        self._contexts: Dict[str, EncryptionContext] = {}
+        self._coverage_cache: Dict[str, dict[str, float | int | str]] = {}
+        self._last_coverage_emit: Dict[str, float] = {}
 
     def _estimate_total_memory_bytes(self) -> int:
         return sum(index.estimated_memory_bytes() for index in self.indexes.values())
@@ -364,6 +385,119 @@ class EntryIndexStore:
 
     def _get_lock(self, user_id: str) -> asyncio.Lock:
         return self.locks.setdefault(user_id, asyncio.Lock())
+
+    def _remember_context(self, ctx: EncryptionContext | None) -> None:
+        if ctx is None:
+            return
+        self._contexts[ctx.user_id] = ctx
+
+    def _invalidate_coverage(self, user_id: str) -> None:
+        self._coverage_cache.pop(user_id, None)
+
+    def _emit_coverage(
+        self, user_id: str, payload: dict[str, float | int | str]
+    ) -> None:
+        if self._service_pulse is None:
+            return
+        now = time.monotonic()
+        last = self._last_coverage_emit.get(user_id)
+        if last is not None and now - last < self.coverage_emit_interval:
+            return
+        self._last_coverage_emit[user_id] = now
+        body = {"user_id": user_id, **payload}
+        try:
+            self._service_pulse.emit("search.entry_index_coverage", body)
+        except Exception:  # pragma: no cover - defensive
+            logger.exception("Failed to emit entry index coverage pulse")
+
+    async def get_index_coverage(
+        self,
+        ctx: EncryptionContext,
+        *,
+        recalculate: bool = False,
+    ) -> dict[str, float | int | str]:
+        user_id = ctx.user_id
+        if not recalculate:
+            cached = self._coverage_cache.get(user_id)
+            if cached is not None:
+                return cached
+
+        idx = await self.ensure_index(user_id, ctx.dek, ctx)
+        rows = await self.db.entries.get_latest_entries(
+            user_id,
+            self.coverage_recent_limit,
+            ctx.dek,
+        )
+        total_recent = len(rows)
+        indexed_recent = sum(1 for row in rows if idx.contains_entry(row["id"]))
+        percent = (
+            100.0 if total_recent == 0 else (indexed_recent / total_recent) * 100.0
+        )
+        payload: dict[str, float | int | str] = {
+            "total_recent": total_recent,
+            "indexed_recent": indexed_recent,
+            "percent_recent_indexed": round(percent, 2),
+            "cursor": self.cursors.get(user_id) or "",
+        }
+        self._coverage_cache[user_id] = payload
+        self._emit_coverage(user_id, payload)
+        return payload
+
+    def _fair_backfill_users(self) -> list[str]:
+        candidates = [
+            user_id
+            for user_id in self.indexes
+            if self.cursors.get(user_id) and user_id in self._contexts
+        ]
+        if not candidates:
+            return []
+        ordered = sorted(candidates)
+        self._backfill_order = [
+            user_id for user_id in self._backfill_order if user_id in ordered
+        ]
+        for user_id in ordered:
+            if user_id not in self._backfill_order:
+                self._backfill_order.append(user_id)
+        if not self._backfill_order:
+            return []
+        start = self._backfill_cursor % len(self._backfill_order)
+        cycle = self._backfill_order[start:] + self._backfill_order[:start]
+        return cycle[: self.backfill_max_users_per_tick]
+
+    async def process_backfill_batches(self) -> int:
+        users = self._fair_backfill_users()
+        if not users:
+            return 0
+
+        wall_start = time.monotonic()
+        cpu_start = time.process_time()
+        batches = 0
+        for user_id in users:
+            wall_ms = (time.monotonic() - wall_start) * 1000.0
+            cpu_ms = (time.process_time() - cpu_start) * 1000.0
+            if (
+                wall_ms >= self.backfill_wall_budget_ms
+                or cpu_ms >= self.backfill_cpu_budget_ms
+            ):
+                break
+            ctx = self._contexts.get(user_id)
+            if ctx is None:
+                continue
+            added = await self.expand_older(
+                ctx,
+                self.backfill_batch_size,
+                embed_missing=True,
+            )
+            if added > 0:
+                batches += 1
+                await self.get_index_coverage(ctx, recalculate=True)
+            await asyncio.sleep(0)
+
+        if self._backfill_order:
+            self._backfill_cursor = (self._backfill_cursor + max(batches, 1)) % len(
+                self._backfill_order
+            )
+        return batches
 
     async def _get_default_dim(self) -> int:
         if self._default_dim is not None:
@@ -447,12 +581,14 @@ class EntryIndexStore:
         # iteration assigns idx if it was None (line 352).
         assert idx is not None
         self.indexes[ctx.user_id] = idx
+        self._invalidate_coverage(ctx.user_id)
         return idx
 
     async def ensure_index(
         self, user_id: str, dek: bytes, ctx: EncryptionContext | None = None
     ) -> EntryIndex:
         logger.debug("Ensuring index for user %s", user_id)
+        self._remember_context(ctx)
         lock = self._get_lock(user_id)
         async with lock:
             idx = self.indexes.get(user_id)
@@ -478,6 +614,7 @@ class EntryIndexStore:
                 cursor = rows[-1]["entry_id"]
                 self.cursors[user_id] = cursor
                 self.indexes[user_id] = idx
+                self._invalidate_coverage(user_id)
 
                 entries = await self.db.entries.get_latest_entries(
                     user_id, self.warm_limit, dek
@@ -512,6 +649,7 @@ class EntryIndexStore:
                 dim = await self._get_default_dim()
                 idx = EntryIndex(dim, self.max_elements, allow_growth=self.allow_growth)
                 self.indexes[user_id] = idx
+                self._invalidate_coverage(user_id)
                 cursor = entries[-1]["id"]
                 self.cursors[user_id] = cursor
                 if ctx is None:
@@ -558,9 +696,16 @@ class EntryIndexStore:
 
         self._warm_tasks[user_id] = asyncio.create_task(worker())
 
-    async def expand_older(self, ctx: EncryptionContext, batch: int) -> int:
+    async def expand_older(
+        self,
+        ctx: EncryptionContext,
+        batch: int,
+        *,
+        embed_missing: bool = True,
+    ) -> int:
         user_id = ctx.user_id
         dek = ctx.dek
+        self._remember_context(ctx)
         await self.ensure_index(user_id, dek, ctx)
         lock = self._get_lock(user_id)
         async with lock:
@@ -601,7 +746,7 @@ class EntryIndexStore:
             missing = [
                 entry for entry in entries if not idx.contains_entry(entry["id"])
             ]
-            if missing:
+            if missing and embed_missing:
                 logger.debug(
                     "Embedding %d entries older than %s for user %s",
                     len(missing),
@@ -619,6 +764,7 @@ class EntryIndexStore:
             existing = self.cursors.get(user_id)
             if existing is None or new_cursor < existing:
                 self.cursors[user_id] = new_cursor
+            self._invalidate_coverage(user_id)
             return added
 
     async def hydrate_entries(
@@ -699,6 +845,7 @@ class EntryIndexStore:
                     if current is None or entry_id < current:
                         self.cursors[user_id] = entry_id
                 self.indexes[user_id] = idx
+                self._invalidate_coverage(user_id)
 
     def _evict_idle(self) -> None:
         now = time.monotonic()
@@ -720,6 +867,7 @@ class EntryIndexStore:
             return
         self._next_maintenance = now + self.maintenance_interval
         self._evict_idle()
+        await self.process_backfill_batches()
         self._enforce_global_budget()
 
     async def remove_entries(self, user_id: str, entry_ids: Iterable[str]) -> None:
@@ -732,3 +880,4 @@ class EntryIndexStore:
         lock = self._get_lock(user_id)
         async with lock:
             idx.remove_entries(ids)
+            self._invalidate_coverage(user_id)

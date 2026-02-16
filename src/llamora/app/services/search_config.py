@@ -46,6 +46,8 @@ class SearchConfig:
     limits: SearchLimits
     embedding_global_memory_budget_bytes: int
     stream_global_memory_budget_bytes: int
+    progressive_inline_backfill: bool
+    include_index_coverage_hints: bool
 
     @classmethod
     def from_settings(cls, settings: Any) -> "SearchConfig":
@@ -80,6 +82,12 @@ class SearchConfig:
             stream_global_memory_budget_bytes=int(
                 getattr(search_settings, "stream_global_memory_budget_bytes", 0)
             ),
+            progressive_inline_backfill=bool(
+                getattr(search_settings, "progressive_inline_backfill", True)
+            ),
+            include_index_coverage_hints=bool(
+                getattr(search_settings, "include_index_coverage_hints", False)
+            ),
         )
 
     def as_dict(self) -> dict[str, Any]:
@@ -90,6 +98,8 @@ class SearchConfig:
             "limits": self.limits.as_dict(),
             "embedding_global_memory_budget_bytes": self.embedding_global_memory_budget_bytes,
             "stream_global_memory_budget_bytes": self.stream_global_memory_budget_bytes,
+            "progressive_inline_backfill": self.progressive_inline_backfill,
+            "include_index_coverage_hints": self.include_index_coverage_hints,
         }
 
 
