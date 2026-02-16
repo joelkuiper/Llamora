@@ -17,8 +17,8 @@ from werkzeug.exceptions import HTTPException
 
 from llamora.app.routes.helpers import (
     ensure_entry_exists,
+    require_encryption_context,
     require_iso_date,
-    require_user_and_dek,
 )
 from llamora.app.services.auth_helpers import login_required
 from llamora.app.services.container import get_services, get_summarize_service
@@ -55,7 +55,7 @@ def _entry_stream_manager():
 async def stop_response(entry_id: str):
     """Stop an in-progress response stream."""
     logger.info("Stop requested for entry %s", entry_id)
-    _, user, _ = await require_user_and_dek()
+    _, user, enc_ctx = await require_encryption_context()
 
     try:
         await ensure_entry_exists(get_services().db, user["id"], entry_id)
@@ -65,7 +65,7 @@ async def stop_response(entry_id: str):
         raise
 
     manager = _entry_stream_manager()
-    handled, was_pending = await manager.stop(entry_id, user["id"])
+    handled, was_pending = await manager.stop(entry_id, enc_ctx)
     if not was_pending:
         logger.debug("No pending response for %s, aborting active stream", entry_id)
     if not handled:
@@ -83,7 +83,7 @@ async def stop_response(entry_id: str):
 @login_required
 async def sse_opening(date: str):
     """Stream the daily opening message from the assistant."""
-    _, user, dek = await require_user_and_dek()
+    _, user, enc_ctx = await require_encryption_context()
     uid = user["id"]
     tz = get_timezone()
     normalized_date = require_iso_date(date)
@@ -102,19 +102,19 @@ async def sse_opening(date: str):
             tzinfo=tz_info,
         )
     today_iso = target_date.isoformat()
-    ctx = build_llm_context(
+    llm_ctx = build_llm_context(
         user_time=target_dt.isoformat(),
         tz_cookie=tz,
     )
-    date_str = str(ctx.get("date") or "")
-    pod = str(ctx.get("part_of_day") or "")
+    date_str = str(llm_ctx.get("date") or "")
+    pod = str(llm_ctx.get("part_of_day") or "")
     yesterday_iso = (target_date - timedelta(days=1)).isoformat()
     services = get_services()
     db = services.db
     is_new = not await db.entries.user_has_entries(uid)
 
     yesterday_msgs = await db.entries.get_recent_entries(
-        uid, yesterday_iso, dek, limit=20
+        uid, yesterday_iso, enc_ctx.dek, limit=20
     )
     had_yesterday_activity = bool(yesterday_msgs)
 
@@ -123,7 +123,7 @@ async def sse_opening(date: str):
     try:
         yesterday_msgs = await llm_client.trim_history(
             yesterday_msgs,
-            context=ctx,
+            context=llm_ctx,
         )
     except Exception:  # pragma: no cover - defensive
         logger.exception("Failed to trim opening history")
@@ -139,8 +139,7 @@ async def sse_opening(date: str):
         )
         recall_context = await build_tag_recall_context(
             db,
-            uid,
-            dek,
+            enc_ctx,
             history=yesterday_msgs,
             current_date=today_iso,
             llm=llm_client,
@@ -208,10 +207,9 @@ async def sse_opening(date: str):
     try:
         pending = manager.start_stream(
             stream_id,
-            uid,
+            enc_ctx,
             today_iso,
             [],
-            dek,
             context=None,
             messages=opening_messages,
             reply_to=None,
@@ -239,14 +237,14 @@ async def sse_response(entry_id: str, date: str):
     """
     normalized_date = require_iso_date(date)
 
-    _, user, dek = await require_user_and_dek()
+    _, user, enc_ctx = await require_encryption_context()
     uid = user["id"]
     actual_date = await get_services().db.entries.get_entry_date(uid, entry_id)
     if not actual_date:
         logger.warning("Entry date not found for entry %s", entry_id)
         return StreamSession.error("Invalid ID")
     entries = await get_services().db.entries.get_entries_for_date(
-        uid, actual_date, dek
+        uid, actual_date, enc_ctx.dek
     )
     if not entries:
         logger.warning("Entries not found for entry %s", entry_id)
@@ -265,23 +263,22 @@ async def sse_response(entry_id: str, date: str):
     entry_context = await build_entry_context(
         db,
         uid,
-        dek,
+        enc_ctx.dek,
         entry_id=entry_id,
     )
-    ctx = build_llm_context(
+    llm_ctx = build_llm_context(
         user_time=request.args.get("user_time"),
         tz_cookie=request.cookies.get("tz"),
         entry_context=entry_context,
     )
 
     try:
-        pending_response = manager.get(entry_id, uid)
+        pending_response = manager.get(entry_id, enc_ctx)
         if not pending_response:
             llm_client = services.llm_service.llm
             recall_context = await build_tag_recall_context(
                 db,
-                uid,
-                dek,
+                enc_ctx,
                 history=history,
                 current_date=actual_date or normalized_date,
                 llm=llm_client,
@@ -303,7 +300,7 @@ async def sse_response(entry_id: str, date: str):
                 None if has_existing_guidance else recall_context,
                 llm_client=llm_client,
                 params=params,
-                context=ctx,
+                context=llm_ctx,
                 target_entry_id=entry_id,
                 include_tag_metadata=True,
                 tag_recall_date=recall_date,
@@ -322,12 +319,11 @@ async def sse_response(entry_id: str, date: str):
                 pending_response = await start_stream_session(
                     manager=manager,
                     entry_id=entry_id,
-                    uid=uid,
                     date=actual_date or normalized_date,
                     history=history_for_stream,
-                    dek=dek,
+                    ctx=enc_ctx,
                     params=params,
-                    context=ctx,
+                    context=llm_ctx,
                     meta_extra={
                         "tag_recall_applied": recall_applied,
                     },

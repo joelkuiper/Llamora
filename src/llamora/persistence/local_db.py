@@ -16,6 +16,7 @@ from aiosqlitepool.protocols import Connection as SQLitePoolConnection
 from llamora.settings import settings
 
 from llamora.app.services.crypto import (
+    EncryptionContext,
     encrypt_message,
     decrypt_message,
     encrypt_vector,
@@ -250,18 +251,18 @@ class LocalDB:
         return self._require_repository(self._search_history, "Search history")
 
     async def _on_entry_appended(
-        self, user_id: str, entry_id: str, plaintext: str, dek: bytes
+        self, ctx: EncryptionContext, entry_id: str, plaintext: str
     ) -> None:
         if self.search_api:
             asyncio.create_task(
-                self._safe_enqueue_index(user_id, entry_id, plaintext, dek),
+                self._safe_enqueue_index(ctx, entry_id, plaintext),
                 name=f"index-{entry_id}",
             )
 
     async def _safe_enqueue_index(
-        self, user_id: str, entry_id: str, plaintext: str, dek: bytes
+        self, ctx: EncryptionContext, entry_id: str, plaintext: str
     ) -> None:
         try:
-            await self.search_api.enqueue_index_job(user_id, entry_id, plaintext, dek)
+            await self.search_api.enqueue_index_job(ctx, entry_id, plaintext)
         except Exception:
             logger.exception("Failed to enqueue index job for %s", entry_id)

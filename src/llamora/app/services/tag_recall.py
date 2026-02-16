@@ -8,6 +8,7 @@ from typing import Any, Iterable, Mapping, Sequence, TypedDict
 import orjson
 import tiktoken
 
+from llamora.app.services.crypto import EncryptionContext
 from llamora.app.services.tag_recall_cache import (
     CacheKey,
     get_tag_recall_store,
@@ -207,20 +208,19 @@ async def _summarize_with_llm(
     text: str,
     *,
     max_chars: int,
-    user_id: str,
+    ctx: EncryptionContext,
     tag_hash_hex: str,
     max_tokens: int,
     cache_limit: int,
     cache_key: CacheKey,
     store,
-    dek: bytes,
 ) -> str:
     clean = (text or "").strip()
     if not clean:
         return ""
 
     namespace = tag_recall_namespace(tag_hash_hex)
-    cached = await store.get_text(user_id, dek, namespace, cache_key)
+    cached = await store.get_text(ctx.user_id, ctx.dek, namespace, cache_key)
     if cached is not None:
         return cached
 
@@ -286,7 +286,7 @@ async def _summarize_with_llm(
             return ""
     summary = _truncate_text(summary, max_chars)
     if summary and cache_limit > 0:
-        await store.set_text(user_id, dek, namespace, cache_key, summary)
+        await store.set_text(ctx, namespace, cache_key, summary)
     return summary
 
 
@@ -494,8 +494,7 @@ async def _build_recall_plan(
 
 async def build_tag_recall_context(
     db,
-    user_id: str,
-    dek: bytes,
+    ctx: EncryptionContext,
     *,
     history: Sequence[Mapping[str, Any] | dict[str, Any]],
     current_date: str | None,
@@ -528,7 +527,9 @@ async def build_tag_recall_context(
         return None
 
     if target_entry_id:
-        entry_tags = await db.tags.get_tags_for_entry(user_id, target_entry_id, dek)
+        entry_tags = await db.tags.get_tags_for_entry(
+            ctx.user_id, target_entry_id, ctx.dek
+        )
         focus_tags, tag_names = _extract_raw_tags(entry_tags, cfg.max_tags)
     else:
         focus_tags, tag_names = _extract_focus_tags(
@@ -550,8 +551,8 @@ async def build_tag_recall_context(
     focus_slice = focus_tags[: cfg.max_tags]
     plan = await _build_recall_plan(
         db,
-        user_id,
-        dek,
+        ctx.user_id,
+        ctx.dek,
         focus_tags=focus_slice,
         tag_names=tag_names,
         history_ids=history_ids,
@@ -581,7 +582,7 @@ async def build_tag_recall_context(
             max_snippets=cfg.max_snippets,
         )
         namespace = tag_recall_namespace(tag_hash)
-        cached = await store.get_text(user_id, dek, namespace, cache_key)
+        cached = await store.get_text(ctx.user_id, ctx.dek, namespace, cache_key)
 
         if cfg.mode == "summary":
             if llm is None:
@@ -591,13 +592,12 @@ async def build_tag_recall_context(
                 llm,
                 aggregate,
                 max_chars=cfg.summary_max_chars,
-                user_id=user_id,
+                ctx=ctx,
                 tag_hash_hex=tag_hash,
                 max_tokens=cfg.llm_max_tokens,
                 cache_limit=cfg.summary_cache_max,
                 cache_key=cache_key,
                 store=store,
-                dek=dek,
             )
             if not summary:
                 return None
@@ -621,13 +621,12 @@ async def build_tag_recall_context(
                     llm,
                     aggregate,
                     max_chars=cfg.summary_max_chars,
-                    user_id=user_id,
+                    ctx=ctx,
                     tag_hash_hex=tag_hash,
                     max_tokens=cfg.llm_max_tokens,
                     cache_limit=cfg.summary_cache_max,
                     cache_key=cache_key,
                     store=store,
-                    dek=dek,
                 )
 
             asyncio.create_task(_background())

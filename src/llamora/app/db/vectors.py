@@ -6,6 +6,7 @@ import numpy as np
 from aiosqlitepool import SQLiteConnectionPool
 
 from .base import BaseRepository
+from llamora.app.services.crypto import EncryptionContext
 
 
 class VectorsRepository(BaseRepository):
@@ -22,16 +23,14 @@ class VectorsRepository(BaseRepository):
         self,
         vector_id: str,
         entry_id: str,
-        user_id: str,
         vec: np.ndarray,
-        dek: bytes,
+        ctx: EncryptionContext,
         dtype: str = "float32",
     ) -> None:
         dim, nonce, ct, alg = await asyncio.to_thread(
             self._prepare_encrypted_vector,
             vec,
-            dek,
-            user_id,
+            ctx,
             entry_id,
             vector_id,
             dtype,
@@ -54,7 +53,7 @@ class VectorsRepository(BaseRepository):
                 (
                     vector_id,
                     entry_id,
-                    user_id,
+                    ctx.user_id,
                     0,
                     dim,
                     nonce,
@@ -62,15 +61,14 @@ class VectorsRepository(BaseRepository):
                     alg,
                     dtype,
                     entry_id,
-                    user_id,
+                    ctx.user_id,
                 ),
             )
 
     async def store_vectors_batch(
         self,
-        user_id: str,
         vectors: list[tuple[str, str, int, np.ndarray]],
-        dek: bytes,
+        ctx: EncryptionContext,
         dtype: str = "float32",
     ) -> None:
         if not vectors:
@@ -79,8 +77,7 @@ class VectorsRepository(BaseRepository):
         records = await asyncio.to_thread(
             self._prepare_batch_records,
             vectors,
-            dek,
-            user_id,
+            ctx,
             dtype,
         )
 
@@ -177,8 +174,7 @@ class VectorsRepository(BaseRepository):
     def _prepare_encrypted_vector(
         self,
         vec: np.ndarray,
-        dek: bytes,
-        user_id: str,
+        ctx: EncryptionContext,
         entry_id: str,
         vector_id: str,
         dtype: str,
@@ -187,8 +183,7 @@ class VectorsRepository(BaseRepository):
         vec_arr = np.asarray(vec, dtype=np_dtype)
         dim = int(vec_arr.shape[0])
         nonce, ct, alg = self._encrypt_vector(
-            dek,
-            user_id,
+            ctx,
             entry_id,
             vector_id,
             vec_arr.tobytes(),
@@ -198,8 +193,7 @@ class VectorsRepository(BaseRepository):
     def _prepare_batch_records(
         self,
         vectors: list[tuple[str, str, int, np.ndarray]],
-        dek: bytes,
-        user_id: str,
+        ctx: EncryptionContext,
         dtype: str,
     ) -> list[tuple[str, str, str, int, int, bytes, bytes, bytes, str]]:
         records: list[tuple[str, str, str, int, int, bytes, bytes, bytes, str]] = []
@@ -208,14 +202,23 @@ class VectorsRepository(BaseRepository):
             vec_arr = np.asarray(vec, dtype=np_dtype).ravel()
             dim = int(vec_arr.shape[0])
             nonce, ct, alg = self._encrypt_vector(
-                dek,
-                user_id,
+                ctx,
                 entry_id,
                 vector_id,
                 vec_arr.tobytes(),
             )
             records.append(
-                (vector_id, entry_id, user_id, chunk_index, dim, nonce, ct, alg, dtype)
+                (
+                    vector_id,
+                    entry_id,
+                    ctx.user_id,
+                    chunk_index,
+                    dim,
+                    nonce,
+                    ct,
+                    alg,
+                    dtype,
+                )
             )
         return records
 

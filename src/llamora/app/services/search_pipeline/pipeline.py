@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from llamora.app.services.crypto import EncryptionContext
 from .candidate_generator import (
     BaseSearchCandidateGenerator,
     CandidateMap,
@@ -48,8 +49,7 @@ class SearchPipeline:
 
     async def execute(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: EncryptionContext,
         query: str,
         k1: int,
         k2: int,
@@ -58,10 +58,9 @@ class SearchPipeline:
 
         comps = self.components
 
-        normalized = comps.normalizer.normalize(user_id, query)
+        normalized = comps.normalizer.normalize(ctx.user_id, query)
         candidate_map: CandidateMap = await comps.candidate_generator.generate(
-            user_id,
-            dek,
+            ctx,
             normalized.text,
             k1,
             k2,
@@ -69,8 +68,7 @@ class SearchPipeline:
 
         limit = max(k2, len(candidate_map), 1)
         enrichment = await comps.tag_enricher.enrich(
-            user_id,
-            dek,
+            ctx,
             normalized.text,
             candidate_map,
             limit,

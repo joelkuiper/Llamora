@@ -14,7 +14,11 @@ from quart import (
 
 from llamora.app.routes.entries import render_entries
 from llamora.app.services.auth_helpers import login_required
-from llamora.app.routes.helpers import require_iso_date, require_user_and_dek
+from llamora.app.routes.helpers import (
+    require_encryption_context,
+    require_iso_date,
+    require_user_and_dek,
+)
 from llamora.app.services.calendar import get_month_context
 from llamora.app.services.container import get_services, get_summarize_service
 from llamora.app.services.day_summary import generate_day_summary
@@ -177,14 +181,14 @@ async def calendar_month(year: int, month: int):
 @login_required
 async def day_summary(date):
     normalized_date = require_iso_date(date)
-    _, user, dek = await require_user_and_dek()
+    _, user, ctx = await require_encryption_context()
     services = get_services()
     user_id = user["id"]
     summarize = get_summarize_service()
-    digest = await summarize.get_day_digest(user_id, dek, normalized_date)
+    digest = await summarize.get_day_digest(ctx, normalized_date)
 
     cached_summary = await summarize.get_cached(
-        user_id, dek, "summary", f"day:{normalized_date}", digest
+        user_id, ctx.dek, "summary", f"day:{normalized_date}", digest
     )
     if cached_summary is not None:
         payload = {"summary": cached_summary}
@@ -194,12 +198,12 @@ async def day_summary(date):
 
     async def _generate_and_cache_summary() -> str:
         cache_hit = await summarize.get_cached(
-            user_id, dek, "summary", f"day:{normalized_date}", digest
+            user_id, ctx.dek, "summary", f"day:{normalized_date}", digest
         )
         if cache_hit is not None:
             return cache_hit
         entries = await services.db.entries.get_flat_entries_for_date(
-            user_id, normalized_date, dek
+            user_id, normalized_date, ctx.dek
         )
         text = (
             await generate_day_summary(
@@ -208,9 +212,7 @@ async def day_summary(date):
                 entries,
             )
         ).strip()
-        await summarize.cache(
-            user_id, dek, "summary", f"day:{normalized_date}", digest, text
-        )
+        await summarize.cache(ctx, "summary", f"day:{normalized_date}", digest, text)
         return text
 
     summary = await _run_day_summary_singleflight(

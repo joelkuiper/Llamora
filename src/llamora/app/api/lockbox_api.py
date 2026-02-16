@@ -6,7 +6,7 @@ import orjson
 
 from quart import Blueprint, jsonify, request
 
-from llamora.app.routes.helpers import require_user_and_dek
+from llamora.app.routes.helpers import require_encryption_context, require_user_and_dek
 from llamora.app.services.auth_helpers import login_required
 from llamora.app.services.container import get_db
 from llamora.app.services.lockbox import Lockbox, LockboxDecryptionError
@@ -19,9 +19,8 @@ lockbox_bp = Blueprint("lockbox_api", __name__, url_prefix="/api/lockbox")
 @lockbox_bp.put("/<namespace>/<key>")
 @login_required
 async def put_value(namespace: str, key: str):
-    _, user, dek = await require_user_and_dek()
+    _, user, ctx = await require_encryption_context()
     lockbox = _get_lockbox()
-    user_id = str(user["id"])
 
     payload = await request.get_json(silent=True)
     if not isinstance(payload, dict) or "value" not in payload:
@@ -30,7 +29,7 @@ async def put_value(namespace: str, key: str):
 
     try:
         value = orjson.dumps(encoded)
-        await lockbox.set(user_id, dek, namespace, key, value)
+        await lockbox.set(ctx, namespace, key, value)
     except (TypeError, orjson.JSONEncodeError):
         return jsonify({"ok": False}), 400
     except sqlite3.Error:

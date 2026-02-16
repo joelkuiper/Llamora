@@ -10,6 +10,7 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import suppress
 
 from llamora.llm.client import LLMClient
+from llamora.app.services.crypto import EncryptionContext
 from llamora.app.services.service_pulse import ServicePulse
 from llamora.app.services.queues import FairAsyncQueue
 
@@ -32,10 +33,9 @@ class PendingResponse(ResponsePipelineCallbacks):
     def __init__(
         self,
         entry_id: str,
-        uid: str,
+        ctx: EncryptionContext,
         date: str,
         history: list[dict],
-        dek: bytes,
         llm: LLMClient,
         db,
         on_cleanup: Callable[[str], None],
@@ -51,14 +51,13 @@ class PendingResponse(ResponsePipelineCallbacks):
         auto_start: bool = True,
     ) -> None:
         self.entry_id = entry_id
-        self._uid = uid
+        self._ctx = ctx
         self.date = date
         self.text = ""
         self.done = False
         self.error = False
         self.error_message = ""
         self._cond = asyncio.Condition()
-        self.dek = dek
         self.meta: dict | None = None
         self.context = context or {}
         self.messages = messages
@@ -106,11 +105,10 @@ class PendingResponse(ResponsePipelineCallbacks):
             abort=self._abort,
             entry_id=entry_id,
             writer=AssistantEntryWriter(db),
-            uid=uid,
+            ctx=ctx,
             reply_to=self.reply_to,
             date=self.date,
             created_at=created_at,
-            dek=self.dek,
             meta_extra=self.meta_extra,
             config=config,
         )
@@ -124,7 +122,7 @@ class PendingResponse(ResponsePipelineCallbacks):
 
     @property
     def uid(self) -> str:
-        return self._uid
+        return self._ctx.user_id
 
     def _handle_task_result(self, task: asyncio.Task) -> None:
         if task.cancelled():
@@ -300,17 +298,17 @@ class ResponseStreamManager:
     def set_db(self, db) -> None:
         self._db = db
 
-    def get(self, entry_id: str, uid: str) -> PendingResponse | None:
+    def get(self, entry_id: str, ctx: EncryptionContext) -> PendingResponse | None:
         pending = self._pending.get(entry_id)
         if not pending:
             return None
 
-        if pending.uid != uid:
+        if pending.uid != ctx.user_id:
             logger.warning(
                 "UID mismatch for pending response %s (stored=%s, caller=%s)",
                 entry_id,
                 pending.uid,
-                uid,
+                ctx.user_id,
             )
             self._pending.pop(entry_id, None)
             self._schedule_pending_cancellation(entry_id, pending)
@@ -377,10 +375,9 @@ class ResponseStreamManager:
     def start_stream(
         self,
         entry_id: str,
-        uid: str,
+        ctx: EncryptionContext,
         date: str,
         history: list[dict],
-        dek: bytes,
         params: dict | None = None,
         context: dict | None = None,
         *,
@@ -394,14 +391,14 @@ class ResponseStreamManager:
         self._ensure_queue_worker()
         pending = self._pending.get(entry_id)
         if pending:
-            if pending.uid == uid:
+            if pending.uid == ctx.user_id:
                 return pending
 
             logger.warning(
                 "UID mismatch on start for %s (stored=%s, caller=%s)",
                 entry_id,
                 pending.uid,
-                uid,
+                ctx.user_id,
             )
             self._pending.pop(entry_id, None)
             self._schedule_pending_cancellation(entry_id, pending)
@@ -419,10 +416,9 @@ class ResponseStreamManager:
 
             pending = PendingResponse(
                 entry_id,
-                uid,
+                ctx,
                 date,
                 history,
-                dek,
                 self._llm,
                 self._db,
                 self._on_pending_cleanup,
@@ -437,16 +433,15 @@ class ResponseStreamManager:
                 auto_start=False,
             )
             self._register_pending(pending)
-            self._queue.enqueue(uid, pending)
+            self._queue.enqueue(ctx.user_id, pending)
             self._ensure_queue_worker()
             return pending
 
         pending = PendingResponse(
             entry_id,
-            uid,
+            ctx,
             date,
             history,
-            dek,
             self._llm,
             self._db,
             self._on_pending_cleanup,
@@ -464,15 +459,15 @@ class ResponseStreamManager:
         self._activate_pending(pending)
         return pending
 
-    async def stop(self, entry_id: str, uid: str) -> tuple[bool, bool]:
+    async def stop(self, entry_id: str, ctx: EncryptionContext) -> tuple[bool, bool]:
         self._prune_stale_pending()
         pending = self._pending.get(entry_id)
-        if pending and pending.uid != uid:
+        if pending and pending.uid != ctx.user_id:
             logger.warning(
                 "UID mismatch on stop for %s (stored=%s, caller=%s)",
                 entry_id,
                 pending.uid,
-                uid,
+                ctx.user_id,
             )
             self._pending.pop(entry_id, None)
             self._schedule_pending_cancellation(entry_id, pending)

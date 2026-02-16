@@ -36,7 +36,11 @@ from llamora.app.util.frecency import (
     DEFAULT_FRECENCY_DECAY,
     resolve_frecency_lambda,
 )
-from llamora.app.routes.helpers import ensure_entry_exists, require_user_and_dek
+from llamora.app.routes.helpers import (
+    ensure_entry_exists,
+    require_encryption_context,
+    require_user_and_dek,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -283,7 +287,7 @@ async def remove_tag(entry_id: str, tag_hash: str):
 @tags_bp.post("/t/entry/<entry_id>")
 @login_required
 async def add_tag(entry_id: str):
-    _, user, dek = await require_user_and_dek()
+    _, user, ctx = await require_encryption_context()
     form = await request.form
     raw_tag = (form.get("tag") or "").strip()
     max_tag_length = int(settings.LIMITS.max_tag_length)
@@ -296,7 +300,7 @@ async def add_tag(entry_id: str):
         raise AssertionError("unreachable")
     db = get_services().db
     await ensure_entry_exists(db, user["id"], entry_id)
-    tag_hash = await db.tags.resolve_or_create_tag(user["id"], canonical, dek)
+    tag_hash = await db.tags.resolve_or_create_tag(ctx, canonical)
     created_date = await db.entries.get_entry_date(user["id"], entry_id)
     changed = await db.tags.xref_tag_entry(
         user["id"],
@@ -324,7 +328,7 @@ async def add_tag(entry_id: str):
     )
     if not context:
         return html
-    oob = await _render_view_oob_updates(user["id"], dek, context)
+    oob = await _render_view_oob_updates(user["id"], ctx.dek, context)
     if not oob:
         return html
     return f"{html}\n{oob}"
@@ -522,7 +526,7 @@ async def tag_detail_entries(tag_hash: str):
 @tags_bp.get("/t/detail/<tag_hash>/summary")
 @login_required
 async def tag_detail_summary(tag_hash: str):
-    _, user, dek = await require_user_and_dek()
+    _, user, ctx = await require_encryption_context()
     try:
         tag_hash_bytes = bytes.fromhex(tag_hash)
     except ValueError as exc:
@@ -531,7 +535,7 @@ async def tag_detail_summary(tag_hash: str):
 
     overview = await _tags().get_tag_overview(
         user["id"],
-        dek,
+        ctx.dek,
         tag_hash_bytes,
         limit=12,
     )
@@ -553,7 +557,7 @@ async def tag_detail_summary(tag_hash: str):
     if summary_digest:
         cached_html = await summarize.get_cached(
             user["id"],
-            dek,
+            ctx.dek,
             summary_cache_namespace,
             summary_cache_key,
             summary_digest,
@@ -577,8 +581,7 @@ async def tag_detail_summary(tag_hash: str):
     )
     if summary and summary_digest:
         await summarize.cache(
-            user["id"],
-            dek,
+            ctx,
             summary_cache_namespace,
             summary_cache_key,
             summary_digest,

@@ -13,6 +13,7 @@ import orjson
 from quart import Response
 from werkzeug.datastructures import Headers
 
+from llamora.app.services.crypto import EncryptionContext
 from llamora.app.services.tag_recall import TagRecallContext
 
 
@@ -108,10 +109,9 @@ async def start_stream_session(
     *,
     manager,
     entry_id: str,
-    uid: str,
     date: str,
     history: list[dict],
-    dek: bytes,
+    ctx: EncryptionContext,
     params: dict | None = None,
     context: dict | None = None,
     reply_to: str | None = None,
@@ -119,15 +119,14 @@ async def start_stream_session(
     created_at: str | None = None,
     use_default_reply_to: bool = True,
 ):
-    pending = manager.get(entry_id, uid)
+    pending = manager.get(entry_id, ctx)
     if pending:
         return pending
     return manager.start_stream(
         entry_id,
-        uid,
+        ctx,
         date,
         history,
-        dek,
         params,
         context,
         reply_to=reply_to,

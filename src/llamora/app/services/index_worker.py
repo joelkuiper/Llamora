@@ -6,6 +6,8 @@ import logging
 import time
 from typing import TYPE_CHECKING, Tuple
 
+from llamora.app.services.crypto import EncryptionContext
+
 if TYPE_CHECKING:  # pragma: no cover - type checking only
     from llamora.app.api.search import SearchAPI
     from llamora.app.services.search_config import SearchConfig
@@ -14,7 +16,7 @@ if TYPE_CHECKING:  # pragma: no cover - type checking only
 logger = logging.getLogger(__name__)
 
 
-Job = Tuple[str, str, str, bytes]
+Job = Tuple[EncryptionContext, str, str]
 
 
 DEFAULT_MAX_QUEUE_SIZE = 1024
@@ -63,13 +65,13 @@ class IndexWorker:
             self._task = None
 
     async def enqueue(
-        self, user_id: str, entry_id: str, plaintext: str, dek: bytes
+        self, ctx: EncryptionContext, entry_id: str, plaintext: str
     ) -> None:
         """Queue an entry for indexing."""
         try:
-            self._queue.put_nowait((user_id, entry_id, plaintext, dek))
+            self._queue.put_nowait((ctx, entry_id, plaintext))
         except asyncio.QueueFull:
-            job = (user_id, entry_id, plaintext, dek)
+            job = (ctx, entry_id, plaintext)
             self._backpressure_events += 1
             logger.warning(
                 "Index queue full (%s/%s); waiting up to %s seconds",

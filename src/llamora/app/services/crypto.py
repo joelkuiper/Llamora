@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextvars
 from dataclasses import dataclass
+from logging import getLogger
 
 from nacl import pwhash, utils
 import hashlib
@@ -18,6 +19,8 @@ MEMLIMIT = pwhash.argon2id.MEMLIMIT_MODERATE
 ENTRY_DIGEST_CONTEXT = b"llamora:entry-digest:v2"
 
 CURRENT_SUITE = "xchacha20poly1305_ietf/argon2id_moderate/hmac_sha256_v2"
+
+logger = getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Crypto epoch context variable
@@ -76,6 +79,26 @@ class CryptoDescriptor:
     @property
     def algorithm_bytes(self) -> bytes:
         return self.algorithm.encode("utf-8")
+
+
+@dataclass(frozen=True, slots=True)
+class EncryptionContext:
+    """Explicit metadata required for encryption writes."""
+
+    user_id: str
+    dek: bytes
+    epoch: int
+
+
+def _require_epoch(epoch: int | None, *, operation: str) -> int:
+    try:
+        value = int(epoch) if epoch is not None else 0
+    except (TypeError, ValueError):
+        value = 0
+    if value <= 0:
+        logger.warning("Encryption write missing epoch metadata for %s", operation)
+        raise ValueError("missing encryption epoch metadata")
+    return value
 
 
 # ---------------------------------------------------------------------------
@@ -147,15 +170,12 @@ def unwrap_key(ct: bytes, salt: bytes, nonce: bytes, secret: str) -> bytes:
 # ---------------------------------------------------------------------------
 
 
-def encrypt_message(
-    dek: bytes, user_id: str, entry_id: str, plaintext: str, *, epoch: int = 0
-):
-    if epoch <= 0:
-        epoch = get_crypto_epoch()
+def encrypt_message(ctx: EncryptionContext, entry_id: str, plaintext: str):
+    epoch = _require_epoch(ctx.epoch, operation="encrypt_message")
     nonce = utils.random(24)
-    aad = f"{user_id}|{entry_id}|{ALG.decode()}".encode("utf-8")
+    aad = f"{ctx.user_id}|{entry_id}|{ALG.decode()}".encode("utf-8")
     ct = crypto_aead_xchacha20poly1305_ietf_encrypt(
-        plaintext.encode("utf-8"), aad, nonce, dek
+        plaintext.encode("utf-8"), aad, nonce, ctx.dek
     )
     descriptor = CryptoDescriptor(algorithm=ALG.decode(), epoch=epoch)
     return nonce, ct, descriptor.encode_bytes()
@@ -181,13 +201,10 @@ def decrypt_message(
 
 
 def encrypt_vector(
-    dek: bytes,
-    user_id: str,
+    ctx: EncryptionContext,
     entry_id: str,
     vector_id: str,
     vec: bytes,
-    *,
-    epoch: int = 0,
 ):
     """Encrypt a vector embedding for storage.
 
@@ -196,11 +213,10 @@ def encrypt_vector(
     and message identifier.
     """
 
-    if epoch <= 0:
-        epoch = get_crypto_epoch()
+    epoch = _require_epoch(ctx.epoch, operation="encrypt_vector")
     nonce = utils.random(24)
-    aad = f"{user_id}|{entry_id}|{vector_id}|vector|{ALG.decode()}".encode("utf-8")
-    ct = crypto_aead_xchacha20poly1305_ietf_encrypt(vec, aad, nonce, dek)
+    aad = f"{ctx.user_id}|{entry_id}|{vector_id}|vector|{ALG.decode()}".encode("utf-8")
+    ct = crypto_aead_xchacha20poly1305_ietf_encrypt(vec, aad, nonce, ctx.dek)
     descriptor = CryptoDescriptor(algorithm=ALG.decode(), epoch=epoch)
     return nonce, ct, descriptor.encode_bytes()
 

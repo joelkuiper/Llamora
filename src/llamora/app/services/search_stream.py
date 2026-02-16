@@ -10,6 +10,7 @@ import numpy as np
 from ulid import ULID
 
 from llamora.app.embed.model import async_embed_texts
+from llamora.app.services.crypto import EncryptionContext
 from llamora.app.services.search_config import SearchConfig
 from llamora.app.services.search_pipeline import SearchPipelineComponents
 from llamora.app.services.service_pulse import ServicePulse
@@ -146,8 +147,7 @@ class SearchStreamManager:
     async def fetch_page(
         self,
         *,
-        user_id: str,
-        dek: bytes,
+        ctx: EncryptionContext,
         query: str,
         session_id: str | None,
         page_limit: int,
@@ -158,6 +158,8 @@ class SearchStreamManager:
         """Fetch the next page without recomputing earlier candidates."""
 
         self._prune()
+        user_id = ctx.user_id
+        dek = ctx.dek
         normalized = self._components.normalizer.normalize(user_id, query)
         normalized_query = normalized.text
         truncated = normalized.truncated
@@ -192,8 +194,7 @@ class SearchStreamManager:
 
         if desired_k2 > session.current_k2:
             candidates, total_count = await self._vector_search.search_candidates(
-                user_id,
-                dek,
+                ctx,
                 normalized_query,
                 desired_k1,
                 desired_k2,
@@ -216,8 +217,7 @@ class SearchStreamManager:
 
         limit = max(desired_k2, len(session.candidate_map), 1)
         enrichment = await self._components.tag_enricher.enrich(
-            user_id,
-            dek,
+            ctx,
             normalized_query,
             session.candidate_map,
             limit,

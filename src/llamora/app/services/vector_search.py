@@ -9,6 +9,7 @@ else:
 
 from llamora.app.embed.model import async_embed_texts
 from llamora.app.index.entry_ann import EntryIndexStore
+from llamora.app.services.crypto import EncryptionContext
 from llamora.app.services.search_config import SearchConfig
 
 
@@ -84,8 +85,7 @@ class VectorSearchService:
     @overload
     async def search_candidates(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: EncryptionContext,
         query: str,
         k1: int | None = None,
         k2: int | None = None,
@@ -97,8 +97,7 @@ class VectorSearchService:
     @overload
     async def search_candidates(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: EncryptionContext,
         query: str,
         k1: int | None = None,
         k2: int | None = None,
@@ -109,8 +108,7 @@ class VectorSearchService:
 
     async def search_candidates(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: EncryptionContext,
         query: str,
         k1: int | None = None,
         k2: int | None = None,
@@ -118,13 +116,15 @@ class VectorSearchService:
         *,
         include_count: bool = False,
     ) -> List[dict[str, Any]] | tuple[List[dict[str, Any]], int]:
+        user_id = ctx.user_id
+        dek = ctx.dek
         cfg = self._config.progressive
         k1 = int(k1) if k1 is not None else cfg.k1
         k2 = int(k2) if k2 is not None else cfg.k2
         logger.debug(
             "Vector search requested by user %s with k1=%d k2=%d", user_id, k1, k2
         )
-        index = await self.index_store.ensure_index(user_id, dek)
+        index = await self.index_store.ensure_index(user_id, dek, ctx)
         total_count = len(getattr(index, "entry_to_ids", {}))
         if query_vec is None:
             q_vec = (await async_embed_texts([query])).reshape(1, -1)
@@ -139,9 +139,7 @@ class VectorSearchService:
 
         rounds = 0
         while self._should_continue(start, rounds, ids, cosines, k2):
-            added = await self.index_store.expand_older(
-                user_id, dek, int(cfg.batch_size)
-            )
+            added = await self.index_store.expand_older(ctx, int(cfg.batch_size))
             logger.debug("Backfill round %d added %d vectors", rounds + 1, added)
             if added <= 0:
                 break
@@ -192,10 +190,12 @@ class VectorSearchService:
         return results
 
     async def append_entry(
-        self, user_id: str, entry_id: str, content: str, dek: bytes
+        self, ctx: EncryptionContext, entry_id: str, content: str
     ) -> None:
-        logger.debug("Adding entry %s to vector index for user %s", entry_id, user_id)
-        await self.index_store.index_entry(user_id, entry_id, content, dek)
+        logger.debug(
+            "Adding entry %s to vector index for user %s", entry_id, ctx.user_id
+        )
+        await self.index_store.index_entry(ctx, entry_id, content)
 
     async def maintenance_tick(self) -> None:
         logger.debug("Running vector search maintenance")

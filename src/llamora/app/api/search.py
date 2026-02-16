@@ -10,6 +10,7 @@ import orjson
 from llamora.app.services.index_worker import IndexWorker
 from llamora.app.services.lexical_reranker import LexicalReranker
 from llamora.app.services.search_config import SearchConfig
+from llamora.app.services.crypto import EncryptionContext
 from llamora.app.services.search_pipeline import (
     BaseSearchCandidateGenerator,
     BaseSearchNormalizer,
@@ -35,7 +36,7 @@ from llamora.settings import settings
 
 logger = logging.getLogger(__name__)
 
-IndexJob = Tuple[str, str, str, bytes]
+IndexJob = Tuple[EncryptionContext, str, str]
 
 
 class SearchAPI:
@@ -103,21 +104,21 @@ class SearchAPI:
             flush_interval=float(settings.WORKERS.index_worker.flush_interval),
         )
 
-    async def warm_index(self, user_id: str, dek: bytes) -> None:
+    async def warm_index(self, ctx: EncryptionContext) -> None:
         """Ensure the vector index for ``user_id`` is resident in memory."""
 
         start = time.perf_counter()
-        logger.debug("Pre-warming vector index for user %s", user_id)
+        logger.debug("Pre-warming vector index for user %s", ctx.user_id)
         try:
-            await self.vector_search.index_store.ensure_index(user_id, dek)
+            await self.vector_search.index_store.ensure_index(ctx.user_id, ctx.dek, ctx)
         except Exception:  # pragma: no cover - defensive logging
-            logger.exception("Vector index warm-up failed for user %s", user_id)
+            logger.exception("Vector index warm-up failed for user %s", ctx.user_id)
             return
 
         elapsed_ms = (time.perf_counter() - start) * 1000
         logger.info(
             "Vector index warm-up completed for user %s in %.1fms",
-            user_id,
+            ctx.user_id,
             elapsed_ms,
         )
 
@@ -133,12 +134,11 @@ class SearchAPI:
 
     async def enqueue_index_job(
         self,
-        user_id: str,
+        ctx: EncryptionContext,
         entry_id: str,
         plaintext: str,
-        dek: bytes,
     ) -> None:
-        await self._index_worker.enqueue(user_id, entry_id, plaintext, dek)
+        await self._index_worker.enqueue(ctx, entry_id, plaintext)
 
     async def bulk_index(self, jobs: Sequence[IndexJob]) -> None:
         if not jobs:
@@ -147,7 +147,7 @@ class SearchAPI:
         start = time.perf_counter()
         decode_fallbacks = 0
         parsed: list[IndexJob] = []
-        for user_id, entry_id, plaintext, dek in jobs:
+        for ctx, entry_id, plaintext in jobs:
             content = plaintext
             try:
                 record = orjson.loads(plaintext)
@@ -156,11 +156,11 @@ class SearchAPI:
                 logger.debug(
                     "Failed to decode plaintext for entry %s (user %s)",
                     entry_id,
-                    user_id,
+                    ctx.user_id,
                 )
             else:
                 content = record.get("text", content)
-            parsed.append((user_id, entry_id, content, dek))
+            parsed.append((ctx, entry_id, content))
 
         await self.vector_search.index_store.bulk_index(parsed)
 
@@ -168,7 +168,7 @@ class SearchAPI:
         logger.info(
             "Bulk indexed %d entries for %d users in %.1fms (decode_fallbacks=%d, dropped=%d)",
             len(parsed),
-            len({job[0] for job in parsed}),
+            len({job[0].user_id for job in parsed}),
             elapsed_ms,
             decode_fallbacks,
             self._index_worker.dropped_jobs,
@@ -176,8 +176,7 @@ class SearchAPI:
 
     async def search(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: EncryptionContext,
         query: str,
         k1: int | None = None,
         k2: int | None = None,
@@ -187,14 +186,13 @@ class SearchAPI:
         resolved_k2 = int(k2) if k2 is not None else cfg.k2
         logger.debug(
             "Search requested by user %s with k1=%d k2=%d",
-            user_id,
+            ctx.user_id,
             resolved_k1,
             resolved_k2,
         )
 
         result: SearchPipelineResult = await self._pipeline.execute(
-            user_id,
-            dek,
+            ctx,
             query,
             resolved_k1,
             resolved_k2,
@@ -203,17 +201,19 @@ class SearchAPI:
         if not result.candidates:
             logger.debug(
                 "No candidates found for user %s; returning empty result set",
-                user_id,
+                ctx.user_id,
             )
             return result.normalized.text, [], result.truncated
 
         await self._tag_service.hydrate_search_results(
-            user_id,
-            dek,
+            ctx.user_id,
+            ctx.dek,
             result.results,
             result.enrichment.tokens,
         )
-        logger.debug("Returning %d results for user %s", len(result.results), user_id)
+        logger.debug(
+            "Returning %d results for user %s", len(result.results), ctx.user_id
+        )
         return result.normalized.text, result.results, result.truncated
 
     @property
@@ -236,12 +236,11 @@ class SearchAPI:
 
     async def on_entry_appended(
         self,
-        user_id: str,
+        ctx: EncryptionContext,
         entry_id: str,
         plaintext: str,
-        dek: bytes,
     ) -> None:
-        await self.bulk_index([(user_id, entry_id, plaintext, dek)])
+        await self.bulk_index([(ctx, entry_id, plaintext)])
 
     async def maintenance_tick(self) -> None:
         await self.vector_search.maintenance_tick()
@@ -251,8 +250,7 @@ class SearchAPI:
 
     async def search_stream(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: EncryptionContext,
         query: str,
         *,
         session_id: str | None,
@@ -264,8 +262,7 @@ class SearchAPI:
         """Incrementally fetch search results without computing the full window."""
 
         return await self._stream_manager.fetch_page(
-            user_id=user_id,
-            dek=dek,
+            ctx=ctx,
             query=query,
             session_id=session_id,
             page_limit=page_limit,

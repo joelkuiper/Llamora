@@ -8,6 +8,7 @@ from ulid import ULID
 from .base import BaseRepository
 from .events import RepositoryEventBus
 from .utils import cached_tag_name
+from llamora.app.services.crypto import EncryptionContext
 from llamora.app.util.tags import canonicalize, tag_hash
 from llamora.app.util.frecency import DEFAULT_FRECENCY_DECAY, resolve_frecency_lambda
 
@@ -28,10 +29,10 @@ class TagsRepository(BaseRepository):
         self._event_bus = event_bus
 
     async def resolve_or_create_tag(
-        self, user_id: str, tag_name: str, dek: bytes
+        self, ctx: EncryptionContext, tag_name: str
     ) -> bytes:
         canonical = canonicalize(tag_name)
-        digest = tag_hash(user_id, canonical)
+        digest = tag_hash(ctx.user_id, canonical)
         async with self.pool.connection() as conn:
 
             async def _tx():
@@ -41,19 +42,17 @@ class TagsRepository(BaseRepository):
                     VALUES (?, ?, ?, ?, ?)
                     ON CONFLICT(user_id, tag_hash) DO NOTHING
                     """,
-                    (user_id, digest, b"", b"", ""),
+                    (ctx.user_id, digest, b"", b"", ""),
                 )
                 if cursor.rowcount:
-                    nonce, ct, alg = self._encrypt_message(
-                        dek, user_id, digest.hex(), canonical
-                    )
+                    nonce, ct, alg = self._encrypt_message(ctx, digest.hex(), canonical)
                     await conn.execute(
                         """
                         UPDATE tags
                         SET name_ct = ?, name_nonce = ?, alg = ?
                         WHERE user_id = ? AND tag_hash = ?
                         """,
-                        (ct, nonce, alg.decode(), user_id, digest),
+                        (ct, nonce, alg.decode(), ctx.user_id, digest),
                     )
 
             await self._run_in_transaction(conn, _tx)

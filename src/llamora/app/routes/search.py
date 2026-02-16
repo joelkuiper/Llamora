@@ -12,7 +12,7 @@ from llamora.app.util.frecency import (
     resolve_frecency_lambda,
     DEFAULT_FRECENCY_DECAY,
 )
-from llamora.app.routes.helpers import require_user_and_dek
+from llamora.app.routes.helpers import require_encryption_context, require_user_and_dek
 
 
 logger = logging.getLogger(__name__)
@@ -80,13 +80,12 @@ async def search():
     warming = False
 
     if context.query:
-        _, user, dek = await require_user_and_dek()
+        _, user, ctx = await require_encryption_context()
 
         try:
             search_api = get_search_api()
             stream_result = await search_api.search_stream(
-                user["id"],
-                dek,
+                ctx,
                 context.query,
                 session_id=session_id or None,
                 page_limit=page_limit,
@@ -109,9 +108,7 @@ async def search():
             truncated = False
 
         if sanitized_query and not use_cursor:
-            await get_services().db.search_history.record_search(
-                user["id"], sanitized_query, dek
-            )
+            await get_services().db.search_history.record_search(ctx, sanitized_query)
 
         if truncated:
             truncation_notice = (

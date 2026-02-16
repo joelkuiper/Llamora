@@ -8,6 +8,7 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Protocol
 
+from llamora.app.services.crypto import EncryptionContext
 from llamora.app.services.tag_service import TagService
 from llamora.app.util.tags import tag_hash
 from llamora.persistence.local_db import LocalDB
@@ -32,8 +33,7 @@ class BaseTagEnricher(Protocol):
 
     async def enrich(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: EncryptionContext,
         normalized_query: str,
         candidate_map: OrderedDict[str, dict],
         limit: int,
@@ -58,8 +58,7 @@ class DefaultTagEnricher:
 
     async def enrich(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: EncryptionContext,
         normalized_query: str,
         candidate_map: OrderedDict[str, dict],
         limit: int,
@@ -69,9 +68,11 @@ class DefaultTagEnricher:
         if not tokens:
             return TagEnrichment(tokens=tokens, boosts=boosts)
 
-        tag_hashes = [tag_hash(user_id, token) for token in tokens]
-        await self._hydrate_candidates(user_id, dek, candidate_map, tag_hashes, limit)
-        boosts = await self._compute_tag_boosts(user_id, candidate_map, tag_hashes)
+        tag_hashes = [tag_hash(ctx.user_id, token) for token in tokens]
+        await self._hydrate_candidates(
+            ctx.user_id, ctx.dek, candidate_map, tag_hashes, limit
+        )
+        boosts = await self._compute_tag_boosts(ctx.user_id, candidate_map, tag_hashes)
         return TagEnrichment(tokens=tokens, boosts=boosts)
 
     def _tokenize(self, normalized_query: str) -> list[str]:

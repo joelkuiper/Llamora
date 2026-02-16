@@ -8,6 +8,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Protocol
 
+from llamora.app.services.crypto import EncryptionContext
 
 from ..llm_stream_config import LLMStreamConfig
 
@@ -58,9 +59,8 @@ class AssistantEntryWriter:
 
     async def save(
         self,
-        uid: str,
+        ctx: EncryptionContext,
         content: str,
-        dek: bytes,
         meta: dict,
         reply_to: str | None,
         date: str,
@@ -77,10 +77,9 @@ class AssistantEntryWriter:
             )
         try:
             return await append(
-                uid,
+                ctx,
                 "assistant",
                 content,
-                dek,
                 meta,
                 reply_to=reply_to,
                 created_at=created_at,
@@ -196,11 +195,10 @@ class ResponsePipeline:
         abort: Callable[[], Awaitable[None]] | None,
         entry_id: str,
         writer: AssistantEntryWriter,
-        uid: str,
+        ctx: EncryptionContext,
         reply_to: str | None,
         date: str,
         created_at: str | None,
-        dek: bytes,
         meta_extra: dict | None = None,
         config: LLMStreamConfig,
     ) -> None:
@@ -208,11 +206,10 @@ class ResponsePipeline:
         self._abort = abort
         self._entry_id = entry_id
         self._writer = writer
-        self._uid = uid
+        self._ctx = ctx
         self._reply_to = reply_to
         self._date = date
         self._created_at = created_at
-        self._dek = dek
         self._meta_extra = meta_extra or {}
         self._config = config
         self._timeout = config.pending_ttl
@@ -363,9 +360,8 @@ class ResponsePipeline:
         label = "partial assistant entry" if partial else "assistant entry"
         try:
             entry_id = await self._writer.save(
-                self._uid,
+                self._ctx,
                 content,
-                self._dek,
                 meta,
                 self._reply_to,
                 self._date,

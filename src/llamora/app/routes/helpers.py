@@ -4,6 +4,7 @@ from typing import Any, Mapping
 
 from quart import abort
 
+from llamora.app.services.crypto import EncryptionContext
 from llamora.app.services.validators import parse_iso_date
 from llamora.app.services.session_context import SessionContext, get_session_context
 
@@ -27,6 +28,23 @@ async def require_user_and_dek(
     user = await session.require_user()
     dek = await session.require_dek()
     return session, user, dek
+
+
+async def require_encryption_context(
+    session: SessionContext | None = None,
+) -> tuple[SessionContext, Mapping[str, Any], EncryptionContext]:
+    """Require an authenticated user and return an encryption context."""
+
+    session = session or get_session_context()
+    user = await session.require_user()
+    dek = await session.require_dek()
+    epoch_raw = user.get("current_epoch")
+    try:
+        epoch = int(epoch_raw) if epoch_raw is not None else 1
+    except (TypeError, ValueError):
+        epoch = 1
+    ctx = EncryptionContext(user_id=str(user["id"]), dek=dek, epoch=epoch)
+    return session, user, ctx
 
 
 async def ensure_entry_exists(db: Any, user_id: str, entry_id: str) -> None:

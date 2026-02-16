@@ -6,6 +6,7 @@ from aiosqlitepool import SQLiteConnectionPool
 
 from llamora.settings import settings
 from .base import BaseRepository
+from llamora.app.services.crypto import EncryptionContext
 
 
 class SearchHistoryRepository(BaseRepository):
@@ -21,7 +22,7 @@ class SearchHistoryRepository(BaseRepository):
         self._encrypt_message = encrypt_message
         self._decrypt_message = decrypt_message
 
-    async def record_search(self, user_id: str, query: str, dek: bytes) -> None:
+    async def record_search(self, ctx: EncryptionContext, query: str) -> None:
         """Store or update a search query for the given user."""
 
         normalized = (query or "").strip()
@@ -29,11 +30,9 @@ class SearchHistoryRepository(BaseRepository):
             return
 
         query_hash = hashlib.sha256(
-            f"{user_id}:{normalized.lower()}".encode("utf-8")
+            f"{ctx.user_id}:{normalized.lower()}".encode("utf-8")
         ).digest()
-        nonce, ct, alg = self._encrypt_message(
-            dek, user_id, query_hash.hex(), normalized
-        )
+        nonce, ct, alg = self._encrypt_message(ctx, query_hash.hex(), normalized)
 
         async with self.pool.connection() as conn:
 
@@ -50,7 +49,7 @@ class SearchHistoryRepository(BaseRepository):
                         usage_count=usage_count + 1,
                         last_used=CURRENT_TIMESTAMP
                     """,
-                    (user_id, query_hash, nonce, ct, alg.decode()),
+                    (ctx.user_id, query_hash, nonce, ct, alg.decode()),
                 )
                 await conn.execute(
                     """
@@ -63,7 +62,7 @@ class SearchHistoryRepository(BaseRepository):
                         LIMIT ?
                       )
                     """,
-                    (user_id, user_id, int(settings.SEARCH.recent_limit)),
+                    (ctx.user_id, ctx.user_id, int(settings.SEARCH.recent_limit)),
                 )
 
             await self._run_in_transaction(conn, _tx)

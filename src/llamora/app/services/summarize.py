@@ -8,6 +8,7 @@ from typing import Any, Iterable
 
 import orjson
 
+from llamora.app.services.crypto import EncryptionContext
 from llamora.app.services.lockbox import Lockbox
 from llamora.app.services.lockbox_store import LockboxStore
 from llamora.app.services.digest_policy import entry_digest_aggregate, tag_digest
@@ -63,8 +64,7 @@ class SummarizeService:
 
     async def get_or_generate(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: EncryptionContext,
         *,
         prompt: SummaryPrompt,
         cache_namespace: str,
@@ -74,14 +74,14 @@ class SummarizeService:
     ) -> SummaryResult:
         """Full cache-check -> generate -> store pipeline."""
         cached_text = await self.get_cached(
-            user_id, dek, cache_namespace, cache_key, digest, field=cache_field
+            ctx.user_id, ctx.dek, cache_namespace, cache_key, digest, field=cache_field
         )
         if cached_text is not None:
             return SummaryResult(text=cached_text, digest=digest, from_cache=True)
 
         text = await self.generate(prompt)
         await self.cache(
-            user_id, dek, cache_namespace, cache_key, digest, text, field=cache_field
+            ctx, cache_namespace, cache_key, digest, text, field=cache_field
         )
         return SummaryResult(text=text, digest=digest, from_cache=False)
 
@@ -108,8 +108,7 @@ class SummarizeService:
 
     async def cache(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: EncryptionContext,
         namespace: str,
         key: str,
         digest: str,
@@ -118,39 +117,39 @@ class SummarizeService:
         field: str = "text",
     ) -> None:
         """Store a summary in lockbox with its digest."""
-        await self.store.set_json(
-            user_id, dek, namespace, key, {"digest": digest, field: value}
-        )
+        await self.store.set_json(ctx, namespace, key, {"digest": digest, field: value})
 
     # -- Digest cache methods ------------------------------------------------
 
-    async def get_day_digest(self, user_id: str, dek: bytes, date: str) -> str:
+    async def get_day_digest(self, ctx: EncryptionContext, date: str) -> str:
         """Return the aggregate digest for a day, cached in lockbox."""
         cache_key = f"day:{date}"
-        cached = await self.store.get_json(user_id, dek, "digest", cache_key)
+        cached = await self.store.get_json(ctx.user_id, ctx.dek, "digest", cache_key)
         if isinstance(cached, dict):
             value = cached.get("value")
             if isinstance(value, str) and value:
                 return value
 
-        digest = await self.entries_repo.get_day_summary_digest_for_date(user_id, date)
-        await self.store.set_json(user_id, dek, "digest", cache_key, {"value": digest})
+        digest = await self.entries_repo.get_day_summary_digest_for_date(
+            ctx.user_id, date
+        )
+        await self.store.set_json(ctx, "digest", cache_key, {"value": digest})
         return digest
 
-    async def get_tag_digest(self, user_id: str, dek: bytes, tag_hash: bytes) -> str:
+    async def get_tag_digest(self, ctx: EncryptionContext, tag_hash: bytes) -> str:
         """Return the aggregate digest for a tag, cached in lockbox."""
         cache_key = f"tag:{tag_hash.hex()}"
-        cached = await self.store.get_json(user_id, dek, "digest", cache_key)
+        cached = await self.store.get_json(ctx.user_id, ctx.dek, "digest", cache_key)
         if isinstance(cached, dict):
             value = cached.get("value")
             if isinstance(value, str) and value:
                 return value
 
         entry_digests = await self.tags_repo.get_entry_digests_for_tag(
-            user_id, tag_hash
+            ctx.user_id, tag_hash
         )
         digest = tag_digest(entry_digests)
-        await self.store.set_json(user_id, dek, "digest", cache_key, {"value": digest})
+        await self.store.set_json(ctx, "digest", cache_key, {"value": digest})
         return digest
 
     async def invalidate_day_digest(self, user_id: str, date: str) -> None:

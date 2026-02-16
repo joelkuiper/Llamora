@@ -16,7 +16,7 @@ from nacl.utils import random as random_bytes
 from llamora.app.services.crypto import (
     CURRENT_SUITE,
     CryptoDescriptor,
-    get_crypto_epoch,
+    EncryptionContext,
 )
 
 logger = getLogger(__name__)
@@ -35,19 +35,21 @@ class Lockbox:
 
     async def set(
         self,
-        user_id: str,
-        dek: bytes,
+        ctx: EncryptionContext,
         namespace: str,
         key: str,
         value: bytes,
     ) -> None:
-        self._validate_user_id(user_id)
+        self._validate_user_id(ctx.user_id)
         self._validate_name(namespace, "namespace")
         self._validate_name(key, "key")
-        self._validate_dek(dek)
-        scoped_namespace = self._scope_namespace(user_id, namespace)
-        packed = self._encrypt(dek, user_id, namespace, key, value)
-        descriptor = CryptoDescriptor(algorithm=CURRENT_SUITE, epoch=get_crypto_epoch())
+        self._validate_dek(ctx.dek)
+        if ctx.epoch <= 0:
+            logger.warning("Encryption write missing epoch metadata for lockbox.set")
+            raise ValueError("missing encryption epoch metadata")
+        scoped_namespace = self._scope_namespace(ctx.user_id, namespace)
+        packed = self._encrypt(ctx.dek, ctx.user_id, namespace, key, value)
+        descriptor = CryptoDescriptor(algorithm=CURRENT_SUITE, epoch=ctx.epoch)
         alg = descriptor.encode()
         updated_at = int(time())
 

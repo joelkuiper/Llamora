@@ -12,14 +12,14 @@ from ulid import ULID
 from llamora.llm.tokenizers.tokenizer import count_message_tokens
 
 from llamora.app.services.history_cache import HistoryCache
-from llamora.app.services.crypto import entry_digest
+from llamora.app.services.crypto import EncryptionContext, entry_digest
 from llamora.app.services.digest_policy import ENTRY_DIGEST_VERSION, day_digest
 
 from .base import BaseRepository
 from .events import RepositoryEventBus, ENTRY_HISTORY_CHANGED_EVENT
 from .utils import cached_tag_name, get_month_bounds
 
-EntryAppendedCallback = Callable[[str, str, str, bytes], Awaitable[None]]
+EntryAppendedCallback = Callable[[EncryptionContext, str, str], Awaitable[None]]
 
 _FLAG_PATTERN = re.compile(r"^[a-z0-9_]+$")
 _AUTO_OPENING_FLAG = "auto_opening"
@@ -211,10 +211,9 @@ class EntriesRepository(BaseRepository):
 
     async def append_entry(
         self,
-        user_id: str,
+        ctx: EncryptionContext,
         role: str,
         content: str,
-        dek: bytes,
         meta: dict | None = None,
         reply_to: str | None = None,
         created_at: str | None = None,
@@ -223,11 +222,13 @@ class EntriesRepository(BaseRepository):
         entry_id = str(ULID())
         record = {"text": content, "meta": meta or {}}
         plaintext = orjson.dumps(record).decode()
-        nonce, ct, alg = self._encrypt_message(dek, user_id, entry_id, plaintext)
+        nonce, ct, alg = self._encrypt_message(ctx, entry_id, plaintext)
         prompt_tokens = await asyncio.to_thread(
             count_message_tokens, role, record.get("text", "")
         )
-        digest = self._require_entry_digest(dek, entry_id, role, record.get("text", ""))
+        digest = self._require_entry_digest(
+            ctx.dek, entry_id, role, record.get("text", "")
+        )
         flags = build_entry_flags_from_meta(record.get("meta", {}))
 
         async with self.pool.connection() as conn:
@@ -246,7 +247,7 @@ class EntriesRepository(BaseRepository):
             ]
             params: list = [
                 entry_id,
-                user_id,
+                ctx.user_id,
                 role,
                 reply_to,
                 nonce,
@@ -298,7 +299,7 @@ class EntriesRepository(BaseRepository):
         if created_date and self._event_bus:
             await self._event_bus.emit_for_entry_date(
                 ENTRY_HISTORY_CHANGED_EVENT,
-                user_id=user_id,
+                user_id=ctx.user_id,
                 created_date=created_date,
                 entry_id=entry_id,
                 reason="insert",
@@ -306,9 +307,7 @@ class EntriesRepository(BaseRepository):
             )
 
         if self._on_entry_appended:
-            await self._on_entry_appended(
-                user_id, entry_id, record.get("text", ""), dek
-            )
+            await self._on_entry_appended(ctx, entry_id, record.get("text", ""))
 
         return entry_id
 
@@ -392,10 +391,9 @@ class EntriesRepository(BaseRepository):
 
     async def update_entry_text(
         self,
-        user_id: str,
+        ctx: EncryptionContext,
         entry_id: str,
         text: str,
-        dek: bytes,
         *,
         meta: dict | None = None,
     ) -> dict | None:
@@ -406,7 +404,7 @@ class EntriesRepository(BaseRepository):
                 FROM entries
                 WHERE id = ? AND user_id = ?
                 """,
-                (entry_id, user_id),
+                (entry_id, ctx.user_id),
             )
             row = await cursor.fetchone()
             await cursor.close()
@@ -415,8 +413,8 @@ class EntriesRepository(BaseRepository):
 
             if meta is None:
                 record_json = self._decrypt_message(
-                    dek,
-                    user_id,
+                    ctx.dek,
+                    ctx.user_id,
                     row["id"],
                     row["nonce"],
                     row["ciphertext"],
@@ -427,12 +425,12 @@ class EntriesRepository(BaseRepository):
 
             record = {"text": text, "meta": meta or {}}
             plaintext = orjson.dumps(record).decode()
-            nonce, ct, alg = self._encrypt_message(dek, user_id, entry_id, plaintext)
+            nonce, ct, alg = self._encrypt_message(ctx, entry_id, plaintext)
             prompt_tokens = await asyncio.to_thread(
                 count_message_tokens, row["role"], record.get("text", "")
             )
             digest = self._require_entry_digest(
-                dek, entry_id, row["role"], record.get("text", "")
+                ctx.dek, entry_id, row["role"], record.get("text", "")
             )
             flags = build_entry_flags_from_meta(
                 meta or {}, parse_entry_flags(row["flags"])
@@ -462,7 +460,7 @@ class EntriesRepository(BaseRepository):
                         ENTRY_DIGEST_VERSION,
                         flags,
                         entry_id,
-                        user_id,
+                        ctx.user_id,
                     ),
                 )
                 updated_row = await cursor.fetchone()
@@ -486,7 +484,7 @@ class EntriesRepository(BaseRepository):
         if row["created_date"] and self._event_bus:
             await self._event_bus.emit_for_entry_date(
                 ENTRY_HISTORY_CHANGED_EVENT,
-                user_id=user_id,
+                user_id=ctx.user_id,
                 created_date=row["created_date"],
                 entry_id=entry_id,
                 reason="update",

@@ -24,6 +24,7 @@ from nacl.bindings import (
 
 from llamora.app.services.crypto import (
     CURRENT_SUITE,
+    EncryptionContext,
     generate_dek,
     wrap_key,
     encrypt_message,
@@ -171,6 +172,7 @@ async def reencrypt_entries(
                 break
 
             updates: list[tuple] = []
+            ctx = EncryptionContext(user_id=user_id, dek=new_dek, epoch=new_epoch)
             for row in rows:
                 alg_bytes = (
                     row["alg"].encode("utf-8")
@@ -185,9 +187,7 @@ async def reencrypt_entries(
                     row["ciphertext"],
                     alg_bytes,
                 )
-                nonce, ct, new_alg = encrypt_message(
-                    new_dek, user_id, row["id"], pt, epoch=new_epoch
-                )
+                nonce, ct, new_alg = encrypt_message(ctx, row["id"], pt)
                 import orjson
 
                 rec = orjson.loads(pt)
@@ -254,6 +254,7 @@ async def reencrypt_vectors(
                 break
 
             updates: list[tuple] = []
+            ctx = EncryptionContext(user_id=user_id, dek=new_dek, epoch=new_epoch)
             for row in rows:
                 alg_bytes = (
                     row["alg"].encode("utf-8")
@@ -270,12 +271,10 @@ async def reencrypt_vectors(
                     alg_bytes,
                 )
                 nonce, ct, new_alg = encrypt_vector(
-                    new_dek,
-                    user_id,
+                    ctx,
                     row["entry_id"],
                     row["id"],
                     pt,
-                    epoch=new_epoch,
                 )
                 updates.append((nonce, ct, new_alg, row["id"], user_id))
 
@@ -327,6 +326,7 @@ async def reencrypt_tags(
                 break
 
             updates: list[tuple] = []
+            ctx = EncryptionContext(user_id=user_id, dek=new_dek, epoch=new_epoch)
             for row in rows:
                 alg_bytes = (
                     row["alg"].encode("utf-8")
@@ -341,9 +341,7 @@ async def reencrypt_tags(
                     row["name_ct"],
                     alg_bytes,
                 )
-                nonce, ct, new_alg = encrypt_message(
-                    new_dek, user_id, row["tag_hash"].hex(), pt, epoch=new_epoch
-                )
+                nonce, ct, new_alg = encrypt_message(ctx, row["tag_hash"].hex(), pt)
                 updates.append((nonce, ct, new_alg.decode(), row["tag_hash"], user_id))
 
             async def _batch_update():
@@ -394,6 +392,7 @@ async def reencrypt_search_history(
                 break
 
             updates: list[tuple] = []
+            ctx = EncryptionContext(user_id=user_id, dek=new_dek, epoch=new_epoch)
             for row in rows:
                 alg_bytes = (
                     row["alg"].encode("utf-8")
@@ -408,9 +407,7 @@ async def reencrypt_search_history(
                     row["query_ct"],
                     alg_bytes,
                 )
-                nonce, ct, new_alg = encrypt_message(
-                    new_dek, user_id, row["query_hash"].hex(), pt, epoch=new_epoch
-                )
+                nonce, ct, new_alg = encrypt_message(ctx, row["query_hash"].hex(), pt)
                 updates.append(
                     (nonce, ct, new_alg.decode(), row["query_hash"], user_id)
                 )

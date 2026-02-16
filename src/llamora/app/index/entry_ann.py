@@ -8,6 +8,7 @@ import numpy as np
 
 from llamora.app.embed.model import async_embed_texts
 from llamora.app.services.chunking import chunk_text
+from llamora.app.services.crypto import EncryptionContext
 from llamora.settings import settings
 
 
@@ -377,9 +378,8 @@ class EntryIndexStore:
 
     async def _embed_and_store(
         self,
-        user_id: str,
+        ctx: EncryptionContext,
         entries: Iterable[dict],
-        dek: bytes,
         idx: Optional[EntryIndex],
     ) -> EntryIndex:
         """Embed entries, add to index and persist vectors."""
@@ -390,7 +390,7 @@ class EntryIndexStore:
                 return idx
             dim = await self._get_default_dim()
             fresh = EntryIndex(dim, self.max_elements, allow_growth=self.allow_growth)
-            self.indexes[user_id] = fresh
+            self.indexes[ctx.user_id] = fresh
             return fresh
 
         vector_texts: list[str] = []
@@ -427,30 +427,31 @@ class EntryIndexStore:
             idx.add_batch(batch_ids, vecs)
             store_vecs = self._to_storage_vecs(vecs)
             await self.db.vectors.store_vectors_batch(
-                user_id,
                 [
                     (vector_id, entry_id, chunk_index, vec)
                     for vector_id, entry_id, chunk_index, vec in zip(
                         batch_ids, batch_entries, batch_chunks, store_vecs
                     )
                 ],
-                dek,
+                ctx,
                 self.vector_dtype,
             )
             await asyncio.sleep(0)
         if entry_list:
             cursor = entry_list[-1]["id"]
-            existing = self.cursors.get(user_id)
+            existing = self.cursors.get(ctx.user_id)
             if existing is None or cursor < existing:
-                self.cursors[user_id] = cursor
+                self.cursors[ctx.user_id] = cursor
         # idx is guaranteed non-None here: we only reach this point if vector_texts
         # was non-empty (otherwise we returned at line 336), and the first loop
         # iteration assigns idx if it was None (line 352).
         assert idx is not None
-        self.indexes[user_id] = idx
+        self.indexes[ctx.user_id] = idx
         return idx
 
-    async def ensure_index(self, user_id: str, dek: bytes) -> EntryIndex:
+    async def ensure_index(
+        self, user_id: str, dek: bytes, ctx: EncryptionContext | None = None
+    ) -> EntryIndex:
         logger.debug("Ensuring index for user %s", user_id)
         lock = self._get_lock(user_id)
         async with lock:
@@ -490,7 +491,13 @@ class EntryIndexStore:
                         len(missing),
                         user_id,
                     )
-                    self._schedule_warm(user_id, dek, missing)
+                    if ctx is None:
+                        logger.warning(
+                            "Skipping vector warm-up for user %s; missing encryption context",
+                            user_id,
+                        )
+                    else:
+                        self._schedule_warm(ctx, missing)
                 return idx
 
             entries = await self.db.entries.get_latest_entries(
@@ -507,7 +514,13 @@ class EntryIndexStore:
                 self.indexes[user_id] = idx
                 cursor = entries[-1]["id"]
                 self.cursors[user_id] = cursor
-                self._schedule_warm(user_id, dek, entries)
+                if ctx is None:
+                    logger.warning(
+                        "Skipping vector warm-up for user %s; missing encryption context",
+                        user_id,
+                    )
+                else:
+                    self._schedule_warm(ctx, entries)
                 return idx
 
             logger.debug("No existing data for user %s, creating empty index", user_id)
@@ -518,7 +531,8 @@ class EntryIndexStore:
             self.indexes[user_id] = idx
             return idx
 
-    def _schedule_warm(self, user_id: str, dek: bytes, entries: list[dict]) -> None:
+    def _schedule_warm(self, ctx: EncryptionContext, entries: list[dict]) -> None:
+        user_id = ctx.user_id
         existing = self._warm_tasks.get(user_id)
         if existing and not existing.done():
             return
@@ -533,7 +547,7 @@ class EntryIndexStore:
                     lock = self._get_lock(user_id)
                     async with lock:
                         idx = self.indexes.get(user_id)
-                        await self._embed_and_store(user_id, batch, dek, idx)
+                        await self._embed_and_store(ctx, batch, idx)
                     await asyncio.sleep(0)
             except Exception:
                 logger.exception("Warm-up failed for user %s", user_id)
@@ -544,8 +558,10 @@ class EntryIndexStore:
 
         self._warm_tasks[user_id] = asyncio.create_task(worker())
 
-    async def expand_older(self, user_id: str, dek: bytes, batch: int) -> int:
-        await self.ensure_index(user_id, dek)
+    async def expand_older(self, ctx: EncryptionContext, batch: int) -> int:
+        user_id = ctx.user_id
+        dek = ctx.dek
+        await self.ensure_index(user_id, dek, ctx)
         lock = self._get_lock(user_id)
         async with lock:
             cursor = self.cursors.get(user_id)
@@ -592,7 +608,7 @@ class EntryIndexStore:
                     cursor,
                     user_id,
                 )
-                await self._embed_and_store(user_id, missing, dek, idx)
+                await self._embed_and_store(ctx, missing, idx)
                 added += len(missing)
                 new_cursor = missing[-1]["id"]
 
@@ -614,38 +630,38 @@ class EntryIndexStore:
         return rows
 
     async def index_entry(
-        self, user_id: str, entry_id: str, content: str, dek: bytes
+        self, ctx: EncryptionContext, entry_id: str, content: str
     ) -> None:
-        await self.bulk_index([(user_id, entry_id, content, dek)])
+        await self.bulk_index([(ctx, entry_id, content)])
 
-    async def bulk_index(self, entries: Iterable[tuple[str, str, str, bytes]]) -> None:
+    async def bulk_index(
+        self, entries: Iterable[tuple[EncryptionContext, str, str]]
+    ) -> None:
         items = list(entries)
         if not items:
             return
 
-        pending: list[tuple[str, str, str, int, str, bytes]] = []
-        for user_id, entry_id, content, dek in items:
+        pending: list[tuple[EncryptionContext, str, str, int, str]] = []
+        for ctx, entry_id, content in items:
             chunks = self._chunk_entry(content)
             for chunk_index, chunk_part in enumerate(chunks):
                 vector_id = _vector_id(entry_id, chunk_index)
-                pending.append(
-                    (user_id, entry_id, vector_id, chunk_index, chunk_part, dek)
-                )
+                pending.append((ctx, entry_id, vector_id, chunk_index, chunk_part))
 
         if not pending:
             return
 
-        texts = [chunk_text for _, _, _, _, chunk_text, _ in pending]
+        texts = [chunk_text for _, _, _, _, chunk_text in pending]
         vecs = await async_embed_texts(texts)
         if vecs.shape[0] != len(pending):  # pragma: no cover - defensive
             raise ValueError("Embedding count does not match input items")
 
-        per_user_vectors: Dict[str, list[tuple[str, str, int, np.ndarray, bytes]]] = {}
-        for (user_id, entry_id, vector_id, chunk_index, _, dek), vec in zip(
-            pending, vecs
-        ):
-            per_user_vectors.setdefault(user_id, []).append(
-                (vector_id, entry_id, chunk_index, vec, dek)
+        per_user_vectors: Dict[
+            str, list[tuple[str, str, int, np.ndarray, EncryptionContext]]
+        ] = {}
+        for (ctx, entry_id, vector_id, chunk_index, _), vec in zip(pending, vecs):
+            per_user_vectors.setdefault(ctx.user_id, []).append(
+                (vector_id, entry_id, chunk_index, vec, ctx)
             )
 
         logger.debug(
@@ -655,8 +671,8 @@ class EntryIndexStore:
         )
 
         for user_id, user_entries in per_user_vectors.items():
-            dek = user_entries[0][4]
-            idx = await self.ensure_index(user_id, dek)
+            ctx = user_entries[0][4]
+            idx = await self.ensure_index(user_id, ctx.dek, ctx)
             lock = self._get_lock(user_id)
             ids = [vector_id for vector_id, _, _, _, _ in user_entries]
             vec_arr = np.asarray(
@@ -665,7 +681,6 @@ class EntryIndexStore:
             async with lock:
                 store_vecs = self._to_storage_vecs(vec_arr)
                 await self.db.vectors.store_vectors_batch(
-                    user_id,
                     [
                         (vector_id, entry_id, chunk_index, vec)
                         for vector_id, entry_id, chunk_index, vec in zip(
@@ -675,7 +690,7 @@ class EntryIndexStore:
                             store_vecs,
                         )
                     ],
-                    dek,
+                    ctx,
                     self.vector_dtype,
                 )
                 idx.add_batch(ids, vec_arr)

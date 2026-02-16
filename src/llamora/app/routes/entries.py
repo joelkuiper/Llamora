@@ -22,6 +22,7 @@ from quart import (
 
 from llamora.app.routes.helpers import (
     ensure_entry_exists,
+    require_encryption_context,
     require_iso_date,
     require_user_and_dek,
 )
@@ -145,7 +146,7 @@ async def delete_entry(entry_id: str):
 async def update_entry(entry_id: str):
     form = await request.form
     text = form.get("text", "")
-    _, user, dek = await require_user_and_dek()
+    _, user, ctx = await require_encryption_context()
     uid = user["id"]
     db = get_services().db
 
@@ -155,7 +156,7 @@ async def update_entry(entry_id: str):
 
     await ensure_entry_exists(db, uid, entry_id)
 
-    entries = await db.entries.get_entries_by_ids(uid, [entry_id], dek)
+    entries = await db.entries.get_entries_by_ids(uid, [entry_id], ctx.dek)
     if not entries:
         abort(404, description="Entry not found.")
     current = entries[0]
@@ -163,17 +164,17 @@ async def update_entry(entry_id: str):
         abort(403, description="Only user entries can be edited.")
 
     updated = await db.entries.update_entry_text(
-        uid, entry_id, text, dek, meta=current.get("meta", {})
+        ctx, entry_id, text, meta=current.get("meta", {})
     )
     if not updated:
         abort(404, description="Entry not found.")
 
     asyncio.create_task(
-        _safe_search_reindex(uid, entry_id, text, dek),
+        _safe_search_reindex(ctx, entry_id, text),
         name=f"search-reindex-{entry_id}",
     )
 
-    tags = await db.tags.get_tags_for_entry(uid, entry_id, dek)
+    tags = await db.tags.get_tags_for_entry(uid, entry_id, ctx.dek)
     entry_payload = {
         "id": entry_id,
         "role": updated.get("role"),
@@ -267,8 +268,7 @@ async def send_entry(date):
     form = await request.form
     user_text = form.get("text", "").strip()
     user_time = form.get("user_time")
-    _, user, dek = await require_user_and_dek()
-    uid = user["id"]
+    _, user, ctx = await require_encryption_context()
 
     max_len = int(settings.LIMITS.max_message_length)
 
@@ -291,10 +291,9 @@ async def send_entry(date):
             created_date = date
     try:
         entry_id = await get_services().db.entries.append_entry(
-            uid,
+            ctx,
             "user",
             user_text,
-            dek,
             created_at=created_at,
             created_date=created_date,
         )
@@ -383,10 +382,10 @@ async def _safe_search_delete(uid: str, ids: list[str]) -> None:
         logger.exception("Background search delete failed for %s", ids)
 
 
-async def _safe_search_reindex(uid: str, entry_id: str, text: str, dek: bytes) -> None:
+async def _safe_search_reindex(ctx, entry_id: str, text: str) -> None:
     try:
         api = get_services().search_api
-        await api.delete_entries(uid, [entry_id])
-        await api.enqueue_index_job(uid, entry_id, text, dek)
+        await api.delete_entries(ctx.user_id, [entry_id])
+        await api.enqueue_index_job(ctx, entry_id, text)
     except Exception:
         logger.exception("Background search reindex failed for %s", entry_id)
