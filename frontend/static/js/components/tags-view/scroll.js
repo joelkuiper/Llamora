@@ -189,14 +189,14 @@ const escapeSelectorValue = (value) => {
 
 export const maybeRestoreEntriesAnchor = () => {
   const currentLocation = getTagsLocationKey();
-  if (!currentLocation) return;
-  if (state.restoreAppliedForLocation === currentLocation) return;
+  if (!currentLocation) return false;
+  if (state.restoreAppliedForLocation === currentLocation) return false;
   const params = new URLSearchParams(window.location.search);
-  if (params.has("target")) return;
+  if (params.has("target")) return false;
   const selectedTag = getSelectedTrace();
-  if (!selectedTag) return;
+  if (!selectedTag) return false;
 
-  applyStoredMainScrollTop();
+  const restored = applyStoredMainScrollTop();
 
   const anchor = readStoredEntriesAnchor();
   if (anchor && anchor.tag === selectedTag) {
@@ -207,9 +207,12 @@ export const maybeRestoreEntriesAnchor = () => {
       requestAnimationFrame(() => {
         applyEntriesAnchor(entry, anchor.offset);
       });
+      state.restoreAppliedForLocation = currentLocation;
+      return true;
     }
   }
   state.restoreAppliedForLocation = currentLocation;
+  return restored;
 };
 
 export const registerTagsScrollStrategy = () => {
@@ -218,6 +221,13 @@ export const registerTagsScrollStrategy = () => {
   manager.registerStrategy("tags-view", {
     view: "tags",
     containerSelector: "#main-content",
+    beforeSwap: () => {
+      if (!state.saveSuppressed) {
+        storeMainScrollTop();
+        captureEntriesAnchor();
+      }
+      return true;
+    },
     save: () => {
       scheduleEntriesAnchorSave();
       return true;

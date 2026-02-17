@@ -363,6 +363,14 @@ if (!globalThis[BOOT_KEY]) {
     updateSelectedTagCounts(document, -1);
   });
 
+  document.body.addEventListener("htmx:responseError", (event) => {
+    const target = event.detail?.target;
+    if (!(target instanceof Element)) return;
+    if (target.id !== "tags-view-detail") return;
+    state.saveSuppressed = false;
+    state.pendingDetailScrollTop = false;
+  });
+
   document.body.addEventListener("htmx:configRequest", (event) => {
     if (event.detail?.verb !== "get") return;
     const target = event.detail?.target;
@@ -429,13 +437,16 @@ if (!globalThis[BOOT_KEY]) {
     if (target.id !== "tags-view-detail") return;
     if (!state.pendingDetailScrollTop) return;
     state.pendingDetailScrollTop = false;
-    scrollMainContentTop();
     state.saveSuppressed = false;
-    maybeRestoreEntriesAnchor();
+    if (!maybeRestoreEntriesAnchor()) {
+      scrollMainContentTop();
+    }
   });
 
   document.addEventListener("app:rehydrate", (event) => {
-    state.restoreAppliedForLocation = "";
+    if (event?.detail?.reason !== "bfcache") {
+      state.restoreAppliedForLocation = "";
+    }
     sync(event?.detail?.context || document);
   });
   document.addEventListener("app:view-changed", (event) => {
