@@ -212,14 +212,12 @@ export const maybeRestoreEntriesAnchor = () => {
   state.restoreAppliedForLocation = currentLocation;
 };
 
-const isTagsViewActive = () =>
-  String(document.getElementById("main-content")?.dataset?.view || "").trim() === "tags";
-
 export const registerTagsScrollStrategy = () => {
   const manager = window.appInit?.scroll;
   if (!manager || typeof manager.registerStrategy !== "function") return;
   manager.registerStrategy("tags-view", {
-    matches: () => isTagsViewActive(),
+    view: "tags",
+    containerSelector: "#main-content",
     save: () => {
       scheduleEntriesAnchorSave();
       return true;

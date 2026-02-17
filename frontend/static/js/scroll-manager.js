@@ -1,4 +1,5 @@
 import { isNearBottom, isNearTop } from "./scroll-utils.js";
+import { getViewState } from "./services/view-state.js";
 import { TYPING_INDICATOR_SELECTOR } from "./typing-indicator.js";
 import { createListenerBag } from "./utils/events.js";
 import { motionSafeBehavior, prefersReducedMotion } from "./utils/motion.js";
@@ -182,15 +183,38 @@ export class ScrollManager {
       manager: this,
       container: this.container,
       entries: this.entries,
+      key: this.#getKey(),
+      view: getViewState()?.view || "diary",
+      containerSelector: this.containerSelectorOverride || this.containerSelector,
       ...extra,
     };
+  }
+
+  #strategyMatches(strategy, context) {
+    if (!strategy) return false;
+    const views = strategy.view
+      ? (Array.isArray(strategy.view) ? strategy.view : [strategy.view]).map((value) =>
+          String(value || "").trim(),
+        )
+      : [];
+    if (views.length && !views.includes(String(context.view || "").trim())) {
+      return false;
+    }
+    const selector = String(strategy.containerSelector || "").trim();
+    if (selector && selector !== String(context.containerSelector || "").trim()) {
+      return false;
+    }
+    if (typeof strategy.matches === "function" && !strategy.matches(context)) {
+      return false;
+    }
+    return true;
   }
 
   #runStrategyHook(hook, extra = {}) {
     if (!this.#strategies.size) return false;
     const context = this.#buildStrategyContext(extra);
     for (const strategy of this.#strategies.values()) {
-      if (typeof strategy?.matches === "function" && !strategy.matches(context)) {
+      if (!this.#strategyMatches(strategy, context)) {
         continue;
       }
       const fn = strategy?.[hook];
@@ -674,17 +698,31 @@ export class ScrollManager {
     if (!target || !this.container) return;
 
     if (target === this.container) {
-      if (!this.#runStrategyHook("save", { reason: "beforeSwap", event })) {
+      if (
+        !this.#runStrategyHook("beforeSwap", { reason: "beforeSwap", event }) &&
+        !this.#runStrategyHook("save", { reason: "beforeSwap", event })
+      ) {
         this.#safeSet(this.#getKey(), String(this.container.scrollTop || 0));
       }
       return;
     }
 
     if (target instanceof Element && this.container.id && target.id === this.container.id) {
-      if (!this.#runStrategyHook("save", { reason: "beforeSwap", event })) {
+      if (
+        !this.#runStrategyHook("beforeSwap", { reason: "beforeSwap", event }) &&
+        !this.#runStrategyHook("save", { reason: "beforeSwap", event })
+      ) {
         this.#safeSet(this.#getKey(), String(this.container.scrollTop || 0));
       }
     }
+  }
+
+  handleAfterSwap(event) {
+    this.#runStrategyHook("afterSwap", { reason: "afterSwap", event });
+  }
+
+  handleAfterSettle(event) {
+    this.#runStrategyHook("afterSettle", { reason: "afterSettle", event });
   }
 
   handleLoad(event) {
@@ -693,6 +731,10 @@ export class ScrollManager {
     this.ensureElements();
     this.toggleScrollBtn();
     this.alignScrollButton();
+
+    if (this.#runStrategyHook("load", { reason: "load", event })) {
+      return;
+    }
 
     for (const source of possibleSources) {
       const wrapper = this.resolveWrapperFromNode(source);
@@ -731,6 +773,10 @@ export class ScrollManager {
         detail,
       }),
     );
+  }
+
+  handleHistoryRestore(event) {
+    return this.#runStrategyHook("historyRestore", { reason: "historyRestore", event });
   }
 
   handleMarkdownRendered() {

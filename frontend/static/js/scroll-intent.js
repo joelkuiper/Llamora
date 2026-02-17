@@ -49,9 +49,12 @@ export class ScrollIntent {
     };
     const bodyPolicies = {
       "htmx:beforeSwap": (evt) => manager.handleBeforeSwap(evt),
+      "htmx:afterSwap": (evt) => manager.handleAfterSwap(evt),
+      "htmx:afterSettle": (evt) => manager.handleAfterSettle(evt),
       "htmx:load": (evt) => manager.handleLoad(evt),
       "htmx:historyRestore": (evt) => {
         manager.emitHistoryRestore(evt);
+        manager.handleHistoryRestore(evt);
         manager.handleLoad(evt);
       },
     };
