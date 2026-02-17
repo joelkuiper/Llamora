@@ -1,3 +1,4 @@
+import { getTagsCatalogNames } from "../services/tags-catalog.js";
 import { createInlineSpinner, scrollToHighlight } from "../ui.js";
 import { AutocompleteHistory } from "../utils/autocomplete-history.js";
 import { createShortcutBag } from "../utils/global-shortcuts.js";
@@ -71,6 +72,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
   #recentHistory;
   #shortcutBag = null;
   #toggleHandler;
+  #tagsCatalogUpdatedHandler;
   #activePanelEl = null;
 
   constructor() {
@@ -88,6 +90,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#historyRestoreHandler = () => this.#handleHistoryRestore();
     this.#popStateHandler = () => this.#handlePopState();
     this.#toggleHandler = (event) => this.#handleToggle(event);
+    this.#tagsCatalogUpdatedHandler = () => this.#syncTagCatalogCandidates();
     this.#recentHistory = new AutocompleteHistory({
       maxEntries: RECENT_CANDIDATE_MAX,
       normalize: (entry) => this.#normalizeCandidateValue(entry),
@@ -114,6 +117,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       forceRecent: true,
       reason: "connected",
     });
+    this.#syncTagCatalogCandidates();
 
     this.#registerShortcuts();
 
@@ -126,6 +130,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       onEnd: this.#afterRequestHandler,
     });
     listeners.add(this, "htmx:afterSwap", this.#afterSwapHandler);
+    listeners.add(document.body, "tags:tag-count-updated", this.#tagsCatalogUpdatedHandler);
     const form = this.querySelector("#search-form");
     if (form) {
       listeners.add(form, "submit", this.#submitHandler);
@@ -318,11 +323,10 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       }
 
       const recent = Array.isArray(payload.recent) ? payload.recent : [];
-      const frecentTags = Array.isArray(payload.frecent_tags) ? payload.frecent_tags : [];
       const entries = [];
       const seen = new Set();
 
-      for (const candidate of [...recent, ...frecentTags]) {
+      for (const candidate of recent) {
         if (typeof candidate !== "string") continue;
         const entry = buildSearchEntry(candidate);
         if (!entry) continue;
@@ -692,6 +696,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
 
     const input = this.autocompleteInput;
     this.#inputEl = input instanceof HTMLInputElement ? input : null;
+    this.#syncTagCatalogCandidates();
 
     if (!this.#inputEl) {
       return;
@@ -702,6 +707,20 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     } else {
       this.#loadRecentSearches();
     }
+  }
+
+  #syncTagCatalogCandidates() {
+    const candidates = [];
+    const seen = new Set();
+    for (const tagName of getTagsCatalogNames(document)) {
+      const entry = buildSearchEntry(tagName);
+      if (!entry) continue;
+      const key = this.#normalizeCandidateValue(entry);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      candidates.push(entry);
+    }
+    this.setAutocompleteLocalEntries("tags-catalog", candidates);
   }
 
   #handleToggle(event) {

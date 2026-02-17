@@ -6,7 +6,6 @@ from quart import (
     request,
     abort,
     render_template,
-    jsonify,
     url_for,
     make_response,
 )
@@ -30,11 +29,8 @@ from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.time import local_date
 from llamora.settings import settings
 from llamora.app.routes.helpers import require_iso_date
-from llamora.app.util.frecency import (
-    DEFAULT_FRECENCY_DECAY,
-    resolve_frecency_lambda,
-)
 from llamora.app.routes.helpers import (
+    build_tags_catalog_payload,
     build_view_state,
     ensure_entry_exists,
     require_encryption_context,
@@ -116,15 +112,11 @@ async def _render_tags_page(selected_tag: str | None):
     selected = tag_service.normalize_tag_query(
         selected_tag or (request.args.get("tag") or "")
     )
-    tags_index_items = await tag_service.get_tags_index_items(
+    tags_index_payload = await build_tags_catalog_payload(
         ctx,
         sort_kind=sort_kind,
         sort_dir=sort_dir,
     )
-    tags_index_payload = [
-        {"name": item.name, "hash": item.hash, "count": item.count}
-        for item in tags_index_items
-    ]
     target_param = (request.args.get("target") or "").strip() or None
     context = {
         "day": day,
@@ -137,7 +129,7 @@ async def _render_tags_page(selected_tag: str | None):
         "selected_tag": selected,
         "tags_sort_kind": sort_kind,
         "tags_sort_dir": sort_dir,
-        "tags_index_items": tags_index_payload,
+        "tags_catalog_items": tags_index_payload,
         "target": target_param,
         "activity_heatmap": None,
         "heatmap_offset": 0,
@@ -371,20 +363,8 @@ async def add_tag(entry_id: str):
 @tags_bp.get("/t/entry/<entry_id>/suggestions")
 @login_required
 async def get_tag_suggestions(entry_id: str):
-    _, user, ctx = await require_encryption_context()
-    decay_constant = resolve_frecency_lambda(
-        request.args.get("lambda"), default=DEFAULT_FRECENCY_DECAY
-    )
+    _, _user, ctx = await require_encryption_context()
     llm = get_services().llm_service.llm
-
-    max_tag_length = int(settings.LIMITS.max_tag_length)
-    raw_query = (request.args.get("q") or "").strip()[:max_tag_length]
-    query_canonical = ""
-    if raw_query:
-        try:
-            query_canonical = _tags().canonicalize(raw_query)
-        except ValueError:
-            query_canonical = ""
 
     limit = request.args.get("limit")
     clamped_limit: int | None = None
@@ -400,21 +380,12 @@ async def get_tag_suggestions(entry_id: str):
         ctx,
         entry_id,
         llm=llm,
-        query=query_canonical or None,
         limit=clamped_limit,
         frecency_limit=3,
-        decay_constant=decay_constant,
     )
     if suggestions is None:
         abort(404, description="entry not found")
         raise AssertionError("unreachable")
-
-    wants_json = request.accept_mimetypes.best == "application/json"
-    if wants_json:
-        payload = [
-            {"name": tag, "display": _tags().display(tag)} for tag in suggestions
-        ]
-        return jsonify({"results": payload})
 
     suggestion_items = []
     for tag in suggestions:

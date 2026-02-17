@@ -11,9 +11,6 @@ export const findSidebar = (root = document) =>
 export const findListBody = (root = document) =>
   root.querySelector?.(".tags-view__list-body") || document.querySelector(".tags-view__list-body");
 
-export const findIndexData = (root = document) =>
-  root.querySelector?.("#tags-index-data") || document.getElementById("tags-index-data");
-
 export const findEntriesList = (root = document) =>
   findDetail(root)?.querySelector?.("[data-tags-view-entries]") ||
   document.querySelector("#tags-view-detail [data-tags-view-entries]");

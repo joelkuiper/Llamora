@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from dataclasses import dataclass
 from typing import Any
@@ -8,10 +7,6 @@ from llamora.app.api.search import InvalidSearchQuery
 from llamora.app.services.container import get_search_api, get_services
 from llamora.app.services.auth_helpers import login_required
 from llamora.settings import settings
-from llamora.app.util.frecency import (
-    resolve_frecency_lambda,
-    DEFAULT_FRECENCY_DECAY,
-)
 from llamora.app.routes.helpers import require_encryption_context
 
 
@@ -20,13 +15,9 @@ logger = logging.getLogger(__name__)
 search_bp = Blueprint("search", __name__)
 
 
-FRECENT_TAG_LAMBDA = DEFAULT_FRECENCY_DECAY
-
-
 @dataclass(slots=True)
 class SearchContext:
     query: str
-    decay_constant: float
     recent_limit: int
     max_query_length: int
     page_size: int
@@ -36,8 +27,6 @@ class SearchContext:
 
 def resolve_search_context(req: Request) -> SearchContext:
     sanitized_query = (req.args.get("q") or "").strip()
-    lambda_param: Any = req.args.get("lambda")
-    decay_constant = resolve_frecency_lambda(lambda_param, default=FRECENT_TAG_LAMBDA)
     max_query_length = int(settings.LIMITS.max_search_query_length)
     recent_limit = int(settings.SEARCH.recent_suggestion_limit)
     page_size = max(1, int(getattr(settings.SEARCH, "page_size", 40)))
@@ -49,7 +38,6 @@ def resolve_search_context(req: Request) -> SearchContext:
     )
     return SearchContext(
         query=sanitized_query,
-        decay_constant=decay_constant,
         recent_limit=recent_limit,
         max_query_length=max_query_length,
         page_size=page_size,
@@ -153,34 +141,14 @@ async def search():
 @login_required
 async def recent_searches():
     context = resolve_search_context(request)
-    _, user, ctx = await require_encryption_context()
+    _, _user, ctx = await require_encryption_context()
 
     limit = context.recent_limit
-    decay_constant = context.decay_constant
     history_repo = get_services().db.search_history
-    tags_repo = get_services().db.tags
-
-    recent_task = history_repo.get_recent_searches(ctx, limit)
-    frecent_task = tags_repo.get_tag_frecency(ctx, limit, decay_constant)
-
-    queries, frecent_rows = await asyncio.gather(recent_task, frecent_task)
-
-    frecent_tags: list[str] = []
-    seen_tags: set[str] = set()
-    for row in frecent_rows:
-        name = (row.get("name") or "").strip()
-        if not name:
-            continue
-        key = name.lower()
-        if key in seen_tags:
-            continue
-        seen_tags.add(key)
-        frecent_tags.append(name)
+    queries = await history_repo.get_recent_searches(ctx, limit)
 
     return jsonify(
         {
             "recent": queries,
-            "frecent_tags": frecent_tags,
-            "lambda": decay_constant,
         }
     )

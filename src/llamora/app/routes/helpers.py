@@ -4,6 +4,7 @@ from typing import Any, Mapping
 
 from quart import abort, g
 
+from llamora.app.services.container import get_tag_service
 from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.validators import parse_iso_date
 from llamora.app.services.session_context import SessionContext, get_session_context
@@ -76,3 +77,22 @@ def build_view_state(
     if extra:
         state.update(extra)
     return state
+
+
+async def build_tags_catalog_payload(
+    ctx: CryptoContext,
+    *,
+    sort_kind: str = "count",
+    sort_dir: str = "desc",
+) -> list[dict[str, str | int]]:
+    """Build the shared tags catalog payload for frontend consumers."""
+
+    tag_service = get_tag_service()
+    items = await tag_service.get_tags_index_items(
+        ctx,
+        sort_kind=tag_service.normalize_tags_sort_kind(sort_kind),
+        sort_dir=tag_service.normalize_tags_sort_dir(sort_dir),
+    )
+    return [
+        {"name": item.name, "hash": item.hash, "count": item.count} for item in items
+    ]

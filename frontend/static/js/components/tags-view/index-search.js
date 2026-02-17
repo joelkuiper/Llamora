@@ -1,7 +1,8 @@
+import { readTagsCatalog } from "../../services/tags-catalog.js";
 import { prefersReducedMotion } from "../../utils/motion.js";
 import { sessionStore } from "../../utils/storage.js";
 import { getSelectedTrace, refreshDetailLinksForSort } from "./detail.js";
-import { findDetail, findIndexData, findList, findListBody, findSidebar } from "./dom.js";
+import { findDetail, findList, findListBody, findSidebar } from "./dom.js";
 import { getTagsDay, readTagFromUrl, updateUrlSort } from "./router.js";
 import { state } from "./state.js";
 
@@ -49,27 +50,18 @@ export const resetIndexCache = () => {
 };
 
 export const hydrateIndexFromTemplate = (root = document) => {
-  const script = findIndexData(root);
-  if (!(script instanceof HTMLElement)) return;
-  const raw = script.textContent || "";
-  if (!raw.trim()) return;
-  if (state.indexSignature === raw) return;
-  try {
-    const payload = JSON.parse(raw);
-    if (Array.isArray(payload)) {
-      state.indexItems = payload
-        .map((item) => ({
-          name: String(item?.name || "").trim(),
-          hash: String(item?.hash || "").trim(),
-          count: Number.parseInt(item?.count || "0", 10) || 0,
-        }))
-        .filter((item) => item.name);
-      state.listBuilt = false;
-    }
-  } catch {
-    state.indexItems = [];
-  }
-  state.indexSignature = raw;
+  const snapshot = readTagsCatalog(root);
+  const signature = String(snapshot.version);
+  if (state.indexSignature === signature) return;
+  state.indexItems = snapshot.items
+    .map((item) => ({
+      name: String(item?.name || "").trim(),
+      hash: String(item?.hash || "").trim(),
+      count: Number.parseInt(item?.count || "0", 10) || 0,
+    }))
+    .filter((item) => item.name);
+  state.listBuilt = false;
+  state.indexSignature = signature;
 };
 
 const loadIndexItems = async () => {

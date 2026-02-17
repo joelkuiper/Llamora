@@ -752,7 +752,6 @@ class TagService:
         entry_id: str,
         *,
         llm,
-        query: str | None = None,
         limit: int | None = None,
         frecency_limit: int = 3,
         decay_constant: float | None = None,
@@ -766,29 +765,6 @@ class TagService:
         entry = entries[0]
         existing = await self._db.tags.get_tags_for_entry(ctx, entry_id)
         existing_names = self._extract_existing_names(existing)
-
-        query_value = str(query or "").strip()
-        if query_value:
-            matches = await self._db.tags.search_tags(
-                ctx,
-                limit=limit or 12,
-                prefix=query_value,
-                lambda_=decay_constant,
-                exclude_names=existing_names,
-            )
-            suggestions: list[str] = []
-            for entry in matches:
-                name = (entry.get("name") or "").strip()
-                if not name:
-                    continue
-                try:
-                    canonical = self.canonicalize(name)
-                except ValueError:
-                    continue
-                if canonical.lower() in existing_names:
-                    continue
-                suggestions.append(canonical)
-            return suggestions
 
         meta = entry.get("meta") or {}
         tags: Iterable[Any] = meta.get("tags") or []

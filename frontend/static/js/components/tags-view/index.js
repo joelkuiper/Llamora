@@ -1,3 +1,4 @@
+import { applyTagsCatalogCountUpdate } from "../../services/tags-catalog.js";
 import { getViewState } from "../../services/view-state.js";
 import { clearScrollTarget, flashHighlight } from "../../ui.js";
 import {
@@ -91,28 +92,11 @@ const applyTagCountUpdate = (payload, root = document) => {
   if (!listRoot) return;
 
   hydrateIndexFromTemplate(root);
-  const items = Array.isArray(state.indexItems) ? [...state.indexItems] : [];
-  const idx = items.findIndex((item) => item?.name === tagName);
+  const idx = Array.isArray(state.indexItems)
+    ? state.indexItems.findIndex((item) => item?.name === tagName)
+    : -1;
   const row = findRowByTagName(tagName);
   const shouldRebuild = !row || count <= 0;
-  if (count <= 0) {
-    if (idx >= 0) {
-      items.splice(idx, 1);
-    }
-  } else if (idx >= 0) {
-    items[idx] = {
-      ...items[idx],
-      count,
-      hash: tagHash || items[idx].hash,
-    };
-  } else {
-    items.push({
-      name: tagName,
-      hash: tagHash,
-      count,
-    });
-  }
-  state.indexItems = items;
   if (shouldRebuild) {
     state.listBuilt = false;
     rebuildIndexList(root);
@@ -126,6 +110,13 @@ const applyTagCountUpdate = (payload, root = document) => {
       countEl.textContent = String(count);
     }
     row.dataset.tagsCount = String(count);
+    if (idx >= 0 && Array.isArray(state.indexItems)) {
+      state.indexItems[idx] = {
+        ...state.indexItems[idx],
+        count,
+        hash: tagHash || state.indexItems[idx].hash,
+      };
+    }
   }
 
   const detail = findDetail(root);
@@ -322,6 +313,7 @@ if (!globalThis[BOOT_KEY]) {
   });
 
   document.body.addEventListener("tags:tag-count-updated", (event) => {
+    applyTagsCatalogCountUpdate(event?.detail || {}, document);
     if (getViewState()?.view !== "tags") return;
     applyTagCountUpdate(event?.detail || {}, document);
   });

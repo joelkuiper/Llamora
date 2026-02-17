@@ -16,6 +16,7 @@ from llamora.app.routes.entries import render_entries
 from llamora.app.services.auth_helpers import login_required
 from llamora.app.routes.helpers import (
     build_view_state,
+    build_tags_catalog_payload,
     require_encryption_context,
     require_iso_date,
 )
@@ -59,6 +60,7 @@ async def index():
 async def _render_day(date: str, target: str | None, view_kind: str):
     session = get_session_context()
     user = await session.require_user()
+    _, _, ctx = await require_encryption_context(session)
     services = get_services()
     today = local_date().isoformat()
     min_date = await services.db.entries.get_first_entry_date(user["id"]) or today
@@ -76,6 +78,11 @@ async def _render_day(date: str, target: str | None, view_kind: str):
         view_kind=view_kind,
     )
     entries_html = await entries_response.get_data(as_text=True)
+    tags_catalog_items = await build_tags_catalog_payload(
+        ctx,
+        sort_kind="count",
+        sort_dir="desc",
+    )
     context = {
         "day": date,
         "is_today": date == today,
@@ -86,6 +93,7 @@ async def _render_day(date: str, target: str | None, view_kind: str):
         "scroll_target": target,
         "view_kind": view_kind,
         "view": view,
+        "tags_catalog_items": tags_catalog_items,
         "target": target_param,
         "view_state": build_view_state(
             view=view,

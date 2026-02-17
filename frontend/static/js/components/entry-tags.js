@@ -1,6 +1,7 @@
 import { createPopover } from "../popover.js";
 import { cacheLoader } from "../services/cache-loader.js";
 import { syncSummarySkeletons } from "../services/summary-skeleton.js";
+import { getTagsCatalogNames } from "../services/tags-catalog.js";
 import { formatTimeElements } from "../services/time.js";
 import { scrollToHighlight } from "../ui.js";
 import { AutocompleteHistory } from "../utils/autocomplete-history.js";
@@ -812,10 +813,9 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
 
   getAutocompleteStoreOptions() {
     return {
-      debounceMs: 200,
-      fetchCandidates: (query, context = {}) =>
-        this.#fetchTagAutocompleteCandidates(query, context),
-      buildCacheKey: (query, context = {}) => this.#buildAutocompleteCacheKey(query, context),
+      debounceMs: 0,
+      fetchCandidates: async () => [],
+      buildCacheKey: () => "local",
       getCandidateKey: (candidate) => this.#normalizeTagCandidate(candidate),
       mergeCandidates: (remote, localSets, helpers) =>
         this.#mergeAutocompleteCandidates(remote, localSets, helpers),
@@ -846,17 +846,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   buildAutocompleteFetchParams() {
-    const input = this.autocompleteInput;
-    const url = this.#getSuggestionsUrl();
-    if (!input || !url) {
-      return null;
-    }
-    let query = prepareTagAutocompleteValue(input.value ?? "");
-    const maxLength = this.#getInputMaxLength();
-    if (maxLength) {
-      query = query.slice(0, maxLength);
-    }
-    return { query, context: { url } };
+    return null;
   }
 
   onAutocompleteCommit() {
@@ -908,6 +898,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     if (!this.#isActiveOwner()) {
       return;
     }
+    const limit = this.#getCanonicalMaxLength();
     const domValues = [];
     if (this.#suggestions) {
       this.#suggestions.querySelectorAll(".tag-suggestion").forEach((btn) => {
@@ -915,11 +906,25 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
         if (!text) {
           return;
         }
-        const canonical = canonicalizeTag(btn.dataset.tag ?? text, this.#getCanonicalMaxLength());
+        const canonical = canonicalizeTag(btn.dataset.tag ?? text, limit);
         if (!canonical) return;
         domValues.push(canonical);
       });
     }
+    const catalogValues = [];
+    const seenCatalog = new Set();
+    for (const rawName of getTagsCatalogNames(document)) {
+      const canonical = canonicalizeTag(rawName, limit);
+      if (!canonical) continue;
+      const key = canonical.toLowerCase();
+      if (seenCatalog.has(key)) continue;
+      seenCatalog.add(key);
+      catalogValues.push(canonical);
+    }
+    const existing = this.#getExistingTags();
+    const filteredCatalog = catalogValues.filter((tag) => !existing.has(tag.toLowerCase()));
+
+    this.setAutocompleteLocalEntries("catalog", filteredCatalog);
     this.setAutocompleteLocalEntries("dom", domValues);
     this.setAutocompleteLocalEntries("history", this.#tagHistory.values());
     this.applyAutocompleteCandidates();
@@ -929,67 +934,9 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     if (!this.#isActiveOwner()) {
       return;
     }
+    void immediate;
     this.clearAutocompleteCache();
-    if (this.#shouldFetchAutocomplete()) {
-      this.scheduleAutocompleteFetch({ immediate });
-    }
-  }
-
-  async #fetchTagAutocompleteCandidates(query, context = {}) {
-    const url = context.url ?? this.#getSuggestionsUrl();
-    if (!url) {
-      return [];
-    }
-
-    const params = new URLSearchParams();
-    if (query) {
-      params.set("q", query);
-    }
-    const limit = this.#getAutocompleteLimit();
-    if (limit) {
-      const clamped = Math.min(Math.max(limit, 1), 50);
-      params.set("limit", String(clamped));
-    }
-
-    try {
-      const response = await fetch(`${url}?${params.toString()}`, {
-        signal: context.signal,
-        headers: { Accept: "application/json" },
-      });
-      if (!response.ok) {
-        return [];
-      }
-      const body = await response.json().catch(() => null);
-      if (!body) {
-        return [];
-      }
-      const items = Array.isArray(body?.results) ? body.results : [];
-      const values = [];
-      const limitLength = this.#getCanonicalMaxLength();
-      for (const item of items) {
-        let source = null;
-        if (typeof item === "string") {
-          source = item;
-        } else if (item && typeof item.name === "string") {
-          source = item.name;
-        }
-        if (!source) continue;
-        const canonical = canonicalizeTag(source, limitLength);
-        if (!canonical) continue;
-        values.push(canonical);
-      }
-      return values;
-    } catch {
-      return [];
-    }
-  }
-
-  #buildAutocompleteCacheKey(query, context = {}) {
-    const limit = this.#getCanonicalMaxLength();
-    const canonical = canonicalizeTag(query ?? "", limit);
-    const normalized = canonical ? canonical.toLowerCase() : (query ?? "").trim().toLowerCase();
-    const url = context.url ?? this.#getSuggestionsUrl() ?? "";
-    return `${url}::${normalized}`;
+    this.applyAutocompleteCandidates();
   }
 
   #normalizeTagCandidate(candidate) {
@@ -1015,15 +962,6 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     }
     const limit = this.#getCanonicalMaxLength();
     return mergeTagCandidateValues(remote ?? [], locals, limit);
-  }
-
-  #getSuggestionsUrl() {
-    return this.dataset?.suggestionsUrl ?? "";
-  }
-
-  #getAutocompleteLimit() {
-    const raw = this.dataset?.autocompleteLimit ?? "";
-    return parsePositiveInteger(raw, null);
   }
 
   #getInputMaxLength() {
