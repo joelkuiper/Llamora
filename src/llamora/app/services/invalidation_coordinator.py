@@ -12,6 +12,14 @@ from llamora.app.db.events import (
     TAG_UNLINKED_EVENT,
     RepositoryEventBus,
 )
+from llamora.app.services.cache_registry import (
+    CacheInvalidation,
+    invalidations_for_tag_recall,
+    invalidate_day_digest,
+    invalidate_day_summary,
+    invalidate_tag_digest,
+    invalidate_tag_summary,
+)
 from llamora.app.services.history_cache import HistoryCache
 from llamora.app.services.lockbox_store import LockboxStore
 from llamora.app.services.service_pulse import ServicePulse
@@ -166,13 +174,19 @@ class InvalidationCoordinator:
         cause: str,
         **extra: object,
     ) -> None:
-        key = f"day:{created_date}"
-        await self.lockbox_store.delete(user_id, "digest", key)
+        await self._apply_lockbox_invalidations(
+            user_id,
+            [invalidate_day_digest(created_date, reason=cause)],
+        )
+        await self._apply_lockbox_invalidations(
+            user_id,
+            [invalidate_day_summary(created_date, reason=cause)],
+        )
         self._pulse(
             "day_digest",
             user_id=user_id,
             created_date=created_date,
-            key=key,
+            key=f"day:{created_date}",
             cause=cause,
             **extra,
         )
@@ -185,13 +199,19 @@ class InvalidationCoordinator:
         cause: str,
         **extra: object,
     ) -> None:
-        key = f"tag:{tag_hash}"
-        await self.lockbox_store.delete(user_id, "digest", key)
+        await self._apply_lockbox_invalidations(
+            user_id,
+            [invalidate_tag_digest(tag_hash, reason=cause)],
+        )
+        await self._apply_lockbox_invalidations(
+            user_id,
+            [invalidate_tag_summary(tag_hash, reason=cause)],
+        )
         self._pulse(
             "tag_digest",
             user_id=user_id,
             tag_hash=tag_hash,
-            key=key,
+            key=f"tag:{tag_hash}",
             cause=cause,
             **extra,
         )
@@ -204,16 +224,36 @@ class InvalidationCoordinator:
         cause: str,
         **extra: object,
     ) -> None:
-        namespace = tag_recall_namespace(tag_hash)
-        await self.lockbox_store.delete_namespace(user_id, namespace)
+        await self._apply_lockbox_invalidations(
+            user_id,
+            invalidations_for_tag_recall(tag_hash, reason=cause),
+        )
         self._pulse(
             "tag_recall",
             user_id=user_id,
             tag_hash=tag_hash,
-            namespace=namespace,
+            namespace=tag_recall_namespace(tag_hash),
             cause=cause,
             **extra,
         )
+
+    async def _apply_lockbox_invalidations(
+        self, user_id: str, items: list[CacheInvalidation]
+    ) -> None:
+        for item in items:
+            if item.scope not in {"both", "server"}:
+                continue
+            if item.key:
+                await self.lockbox_store.delete(user_id, item.namespace, item.key)
+                continue
+            if item.prefix is None:
+                continue
+            if item.prefix == "":
+                await self.lockbox_store.delete_namespace(user_id, item.namespace)
+            else:
+                await self.lockbox_store.delete_prefix(
+                    user_id, item.namespace, item.prefix
+                )
 
     def _pulse(self, action: str, **payload: object) -> None:
         event_payload = {"action": action, **payload}

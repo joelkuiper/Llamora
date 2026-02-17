@@ -1,5 +1,5 @@
 import { createPopover } from "../popover.js";
-import { getViewState } from "../services/view-state.js";
+import { getViewState, hydrateViewState } from "../services/view-state.js";
 import { createListenerBag } from "../utils/events.js";
 
 let currentInstance = null;
@@ -65,6 +65,7 @@ const initViewMode = (root = document) => {
   };
 
   const syncFromContent = () => {
+    hydrateViewState(document);
     const view = String(getViewState()?.view || "diary").trim() || "diary";
     setActive(view);
   };

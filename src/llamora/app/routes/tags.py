@@ -39,6 +39,10 @@ from llamora.app.routes.helpers import (
     ensure_entry_exists,
     require_encryption_context,
 )
+from llamora.app.services.cache_registry import (
+    invalidations_for_tag_link,
+    to_client_payload,
+)
 
 
 tags_bp = Blueprint("tags", __name__)
@@ -267,21 +271,11 @@ async def remove_tag(entry_id: str, tag_hash: str):
     response = await make_response(html)
 
     if tag_name:
-        invalidation_keys: list[dict[str, str]] = [
-            {
-                "namespace": "summary",
-                "prefix": f"tag:{tag_hash}",
-                "reason": "tag.link.changed",
-            }
-        ]
-        if created_date:
-            invalidation_keys.append(
-                {
-                    "namespace": "summary",
-                    "prefix": f"day:{created_date}",
-                    "reason": "tag.link.changed",
-                }
+        invalidation_keys = to_client_payload(
+            invalidations_for_tag_link(
+                created_date=created_date, tag_hash=tag_hash, reason="tag.link.changed"
             )
+        )
         response.headers["HX-Trigger"] = json.dumps(
             {
                 "tags:tag-count-updated": {
@@ -349,21 +343,13 @@ async def add_tag(entry_id: str):
     response = await make_response(html)
 
     if tag_name:
-        invalidation_keys: list[dict[str, str]] = [
-            {
-                "namespace": "summary",
-                "prefix": f"tag:{tag_hash.hex()}",
-                "reason": "tag.link.changed",
-            }
-        ]
-        if created_date:
-            invalidation_keys.append(
-                {
-                    "namespace": "summary",
-                    "prefix": f"day:{created_date}",
-                    "reason": "tag.link.changed",
-                }
+        invalidation_keys = to_client_payload(
+            invalidations_for_tag_link(
+                created_date=created_date,
+                tag_hash=tag_hash.hex(),
+                reason="tag.link.changed",
             )
+        )
         response.headers["HX-Trigger"] = json.dumps(
             {
                 "tags:tag-count-updated": {

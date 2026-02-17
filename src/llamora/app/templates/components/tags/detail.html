@@ -69,6 +69,7 @@
                      hx-get="{{ url_for('tags.tags_view_detail_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}&tag={{ related.name|urlencode }}{% if related.hash %}&tag_hash={{ related.hash }}{% endif %}"
                      hx-target="#tags-view-detail"
                      hx-swap="outerHTML"
+                     hx-sync="#tags-view-detail:replace"
                      hx-push-url="{{ related_url }}">
                     <span class="tag-label">{{ related.name }}</span>
                   </a>

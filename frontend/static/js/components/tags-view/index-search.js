@@ -121,6 +121,7 @@ const createTagRow = (item, { transient = false } = {}) => {
   row.setAttribute("hx-get", urls.fragmentUrl);
   row.setAttribute("hx-target", "#tags-view-detail");
   row.setAttribute("hx-swap", "outerHTML");
+  row.setAttribute("hx-sync", "#tags-view-detail:replace");
   row.setAttribute("hx-push-url", urls.tagUrl);
   const nameEl = document.createElement("span");
   nameEl.className = "tags-view__index-name";

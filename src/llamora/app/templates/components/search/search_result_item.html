@@ -3,6 +3,7 @@
   <a href="{{ url_for('days.day', date=item_date) }}?target=entry-{{ item.id }}"
      hx-get="{{ url_for('days.day', date=item_date) }}?target=entry-{{ item.id }}"
      hx-target="#main-content"
+     hx-sync="#main-content:replace"
      hx-swap="outerHTML"
      data-date="{{ item_date }}"
      data-target="entry-{{ item.id }}"

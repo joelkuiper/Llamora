@@ -1,5 +1,6 @@
 let cachedState = null;
 let cachedElement = null;
+let cachedRaw = "";
 
 const parseViewStatePayload = (raw) => {
   if (!raw) return null;
@@ -40,12 +41,14 @@ const normalizeViewState = (state) => {
 export const hydrateViewState = (root = document) => {
   const el = readViewStateElement(root);
   if (!el) return cachedState;
-  if (cachedElement === el && cachedState) return cachedState;
-  const payload = parseViewStatePayload(el.textContent || "");
+  const raw = el.textContent || "";
+  if (cachedElement === el && cachedState && raw === cachedRaw) return cachedState;
+  const payload = parseViewStatePayload(raw);
   const normalized = normalizeViewState(payload);
   if (!normalized) return cachedState;
   cachedElement = el;
   cachedState = normalized;
+  cachedRaw = raw;
   document.dispatchEvent(
     new CustomEvent("app:view-state-changed", {
       detail: { state: cachedState },

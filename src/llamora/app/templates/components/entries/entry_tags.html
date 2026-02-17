@@ -26,6 +26,7 @@
          hx-get="{{ navigate_fragment_url }}"
          hx-target="#tags-view-detail"
          hx-swap="outerHTML"
+         hx-sync="#tags-view-detail:replace"
          hx-push-url="{{ navigate_page_url }}"
          data-tag-name="{{ canonical_value }}">{{ canonical_value }}</a>
     {% else %}

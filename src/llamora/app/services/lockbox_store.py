@@ -8,6 +8,12 @@ import orjson
 from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.lockbox import Lockbox, LockboxDecryptionError
 
+"""Lockbox cache semantics:
+- Values are best-effort and must be validated by digest lineage.
+- Invalidation is centralized in cache_registry; callers should not delete
+  arbitrary keys outside of that contract.
+"""
+
 
 @dataclass(slots=True)
 class LockboxStore:
@@ -54,6 +60,15 @@ class LockboxStore:
 
     async def delete_namespace(self, user_id: str, namespace: str) -> None:
         await self.lockbox.delete_namespace(user_id, namespace)
+
+    async def delete_prefix(self, user_id: str, namespace: str, prefix: str) -> int:
+        if prefix is None:
+            return 0
+        keys = await self.list(user_id, namespace)
+        matches = [key for key in keys if key.startswith(prefix)]
+        for key in matches:
+            await self.lockbox.delete(user_id, namespace, key)
+        return len(matches)
 
     async def list(self, user_id: str, namespace: str) -> list[str]:
         return await self.lockbox.list(user_id, namespace)

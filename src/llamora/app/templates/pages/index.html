@@ -11,6 +11,7 @@
        data-tooltip-offset-y="0"
        hx-get="{{ url_for('days.day_today') }}"
        hx-target="#main-content"
+       hx-sync="#main-content:replace"
        hx-swap="outerHTML"
        hx-push-url="true"
        data-logo-toggle>
@@ -55,6 +56,7 @@
                data-view-mode="diary"
                hx-get="{{ url_for('days.day', date=day) }}"
                hx-target="#main-content"
+               hx-sync="#main-content:replace"
                hx-swap="outerHTML"
                hx-push-url="true">
               <span class="icon-mask icon-book-open" aria-hidden="true"></span>
@@ -65,6 +67,7 @@
                data-view-mode="tags"
                hx-get="{{ url_for('tags.tags_view_page') }}"
                hx-target="#main-content"
+               hx-sync="#main-content:replace"
                hx-swap="outerHTML"
                hx-push-url="true">
               <span class="icon-mask icon-tags" aria-hidden="true"></span>

@@ -48,6 +48,7 @@
          type="button"
          hx-get="{{ url_for('entries.entries_htmx_today') }}"
          hx-target="#content-wrapper"
+         hx-sync="#content-wrapper:replace"
          hx-swap="outerHTML"
          hx-push-url="true"
          data-date="{{ today }}">Today</button>
@@ -92,6 +93,7 @@
                  href="{{ url_for('days.day', date=date_str) }}"
                  hx-get="{{ url_for('entries.entries_htmx', date=date_str) }}"
                  hx-target="#content-wrapper"
+                 hx-sync="#content-wrapper:replace"
                  hx-swap="outerHTML"
                  hx-push-url="true"
                  tabindex="-1"

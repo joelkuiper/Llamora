@@ -14,6 +14,7 @@
         data-profile-tab="account"
         hx-get="{{ url_for('auth.profile_tab', tab='account') }}"
         hx-target="#profile-modal-content"
+        hx-sync="#profile-modal-content:replace"
         hx-indicator="#profile-modal-content"
         hx-swap="innerHTML">
         <span class="profile-modal__tab-label">Account</span>
@@ -25,6 +26,7 @@
         data-profile-tab="security"
         hx-get="{{ url_for('auth.profile_tab', tab='security') }}"
         hx-target="#profile-modal-content"
+        hx-sync="#profile-modal-content:replace"
         hx-indicator="#profile-modal-content"
         hx-swap="innerHTML">
         <span class="profile-modal__tab-label">Security</span>
@@ -36,6 +38,7 @@
         data-profile-tab="data"
         hx-get="{{ url_for('auth.profile_tab', tab='data') }}"
         hx-target="#profile-modal-content"
+        hx-sync="#profile-modal-content:replace"
         hx-indicator="#profile-modal-content"
         hx-swap="innerHTML">
         <span class="profile-modal__tab-label">Data</span>
@@ -47,6 +50,7 @@
         data-profile-tab="privacy"
         hx-get="{{ url_for('auth.profile_tab', tab='privacy') }}"
         hx-target="#profile-modal-content"
+        hx-sync="#profile-modal-content:replace"
         hx-indicator="#profile-modal-content"
         hx-swap="innerHTML">
         <span class="profile-modal__tab-label">Privacy</span>

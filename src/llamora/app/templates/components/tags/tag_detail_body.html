@@ -23,6 +23,7 @@
             aria-label="Go to trace {{ tag.name }}"
             hx-get="{{ trace_url }}"
             hx-target="#main-content"
+            hx-sync="#main-content:replace"
             hx-swap="outerHTML"
             hx-push-url="true">
             <span class="icon-mask icon-tag" aria-hidden="true"></span>

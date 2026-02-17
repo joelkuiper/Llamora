@@ -26,6 +26,10 @@ from llamora.app.routes.helpers import (
     require_encryption_context,
     require_iso_date,
 )
+from llamora.app.services.cache_registry import (
+    invalidations_for_entry_change,
+    to_client_payload,
+)
 from llamora.app.services.auth_helpers import login_required
 from llamora.app.services.container import get_services
 from llamora.app.services.entry_context import get_entries_context
@@ -190,23 +194,14 @@ async def update_entry(entry_id: str):
         day=day,
         is_today=day == today,
     )
-    invalidation_keys: list[dict[str, str]] = [
-        {
-            "namespace": "summary",
-            "prefix": f"day:{day}",
-            "reason": "entry.changed",
-        }
-    ]
-    for tag in tags:
-        tag_hash = str(tag.get("hash") or "").strip()
-        if tag_hash:
-            invalidation_keys.append(
-                {
-                    "namespace": "summary",
-                    "prefix": f"tag:{tag_hash}",
-                    "reason": "entry.changed",
-                }
-            )
+    tag_hashes = [str(tag.get("hash") or "").strip() for tag in tags if tag.get("hash")]
+    invalidation_keys = to_client_payload(
+        invalidations_for_entry_change(
+            created_date=day,
+            tag_hashes=tag_hashes,
+            reason="entry.changed",
+        )
+    )
     response = await make_response(html, 200)
     response.headers["HX-Trigger"] = json.dumps(
         {
@@ -344,17 +339,18 @@ async def send_entry(date):
         is_today=created_date == local_date().isoformat(),
     )
     response = await make_response(html, 200)
+    invalidation_keys = to_client_payload(
+        invalidations_for_entry_change(
+            created_date=created_date,
+            tag_hashes=(),
+            reason="entry.created",
+        )
+    )
     response.headers["HX-Trigger"] = json.dumps(
         {
             "cache:invalidate": {
                 "reason": "entry.created",
-                "keys": [
-                    {
-                        "namespace": "summary",
-                        "prefix": f"day:{created_date}",
-                        "reason": "entry.created",
-                    }
-                ],
+                "keys": invalidation_keys,
             }
         }
     )

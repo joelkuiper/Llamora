@@ -5,6 +5,7 @@
      href="{{ url_for('days.day', date=item_date) }}?target=entry-{{ entry.entry_id }}"
      hx-get="{{ url_for('entries.entries_htmx', date=item_date) }}?target=entry-{{ entry.entry_id }}"
      hx-target="#content-wrapper"
+     hx-sync="#content-wrapper:replace"
      hx-swap="outerHTML"
      data-date="{{ item_date }}"
      data-target="entry-{{ entry.entry_id }}"

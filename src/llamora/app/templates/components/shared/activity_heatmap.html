@@ -3,6 +3,7 @@
   <div class="activity-heatmap"
        hx-boost="true"
        hx-target="#main-content"
+       hx-sync="#main-content:replace"
        hx-swap="outerHTML"
        hx-push-url="true">
     {% for month in activity_heatmap.months %}
