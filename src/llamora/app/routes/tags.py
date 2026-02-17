@@ -492,14 +492,41 @@ async def delete_trace(tag_hash: str):
     if legacy_sort is not None:
         sort_kind, sort_dir = legacy_sort
 
+    index_before_delete = await tag_service.get_tags_index_items(
+        ctx,
+        sort_kind=sort_kind,
+        sort_dir=sort_dir,
+    )
+    adjacent_tag: str | None = None
+    for idx, item in enumerate(index_before_delete):
+        if item.hash != tag_hash:
+            continue
+        if idx + 1 < len(index_before_delete):
+            adjacent_tag = index_before_delete[idx + 1].name
+        elif idx > 0:
+            adjacent_tag = index_before_delete[idx - 1].name
+        break
+
+    requested_tag = (request.args.get("tag") or "").strip() or None
+
+    removed_tag_info = await get_services().db.tags.get_tag_info(ctx, tag_hash_bytes)
+    removed_tag_name = (
+        _tags().display(removed_tag_info.get("name")) if removed_tag_info else ""
+    )
     await get_services().db.tags.delete_tag_everywhere(
         user["id"],
         tag_hash_bytes,
     )
 
+    if requested_tag and removed_tag_name:
+        requested_norm = tag_service.normalize_tag_query(requested_tag)
+        removed_norm = tag_service.normalize_tag_query(removed_tag_name)
+        if requested_norm and removed_norm and requested_norm != removed_norm:
+            adjacent_tag = requested_tag
+
     tags_view = await tag_service.get_tags_view_data(
         ctx,
-        request.args.get("tag"),
+        adjacent_tag,
         sort_kind=sort_kind,
         sort_dir=sort_dir,
         entry_limit=DEFAULT_TAG_ENTRIES_LIMIT,
@@ -507,7 +534,7 @@ async def delete_trace(tag_hash: str):
     selected_tag = tags_view.selected_tag
     entries_limit = DEFAULT_TAG_ENTRIES_LIMIT
     presented_tags_view = present_tags_view_data(tags_view)
-    return await render_template(
+    html = await render_template(
         "components/tags/detail.html",
         day=day,
         tags_view=presented_tags_view,
@@ -517,6 +544,23 @@ async def delete_trace(tag_hash: str):
         entries_limit=entries_limit,
         today=local_date().isoformat(),
     )
+    response = await make_response(html)
+    if removed_tag_name:
+        tag_label = emoji_shortcode(removed_tag_name) or ""
+        tag_kind = "emoji" if tag_label else "text"
+        response.headers["HX-Trigger"] = json.dumps(
+            {
+                "tags:tag-count-updated": {
+                    "tag": removed_tag_name,
+                    "tag_hash": tag_hash,
+                    "count": 0,
+                    "action": "delete",
+                    "tag_kind": tag_kind,
+                    "tag_label": tag_label,
+                }
+            }
+        )
+    return response
 
 
 @tags_bp.get("/t/detail/<tag_hash>/entries")
