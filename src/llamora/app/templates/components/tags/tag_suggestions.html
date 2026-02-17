@@ -1,12 +1,14 @@
-{% for tag in suggestions %}
-{% set canonical_value = display(tag) %}
+{% for item in suggestions %}
+{% set canonical_value = display(item.display if item is mapping else item) %}
+{% set suggestion_kind = (item.kind if item is mapping else '') %}
 <button type="button" class="tag-suggestion"
         hx-indicator="closest .tag-suggestion"
         hx-disinherit="hx-indicator"
         data-tag="{{ canonical_value }}"
+        {% if suggestion_kind %}data-suggestion-kind="{{ suggestion_kind }}"{% endif %}
         hx-post="{{ add_tag_url if add_tag_url is defined and add_tag_url else url_for('tags.add_tag', entry_id=entry_id) }}"
         hx-target="#entry-tags-{{ entry_id }}"
         hx-swap="beforeend"
         hx-vals='{"tag": {{ canonical_value|tojson }} }'
-        hx-on:after-request="this.remove()">{{ canonical_value }}</button>
+        hx-on:after-request="this.remove()"><span class="tag-suggestion__label">{{ canonical_value }}</span></button>
 {% endfor %}

@@ -416,9 +416,25 @@ async def get_tag_suggestions(entry_id: str):
         ]
         return jsonify({"results": payload})
 
+    suggestion_items = []
+    for tag in suggestions:
+        name = str(tag or "").strip()
+        if not name:
+            continue
+        is_text = all(
+            ("a" <= ch <= "z") or ("0" <= ch <= "9") or ch == "-" for ch in name
+        )
+        suggestion_items.append(
+            {
+                "name": name,
+                "display": _tags().display(name),
+                "kind": "text" if is_text else "emoji",
+            }
+        )
+
     html = await render_template(
         "components/tags/tag_suggestions.html",
-        suggestions=suggestions,
+        suggestions=suggestion_items,
         entry_id=entry_id,
         add_tag_url=f"{url_for('tags.add_tag', entry_id=entry_id)}{_build_view_context_query(_parse_view_context())}",
     )

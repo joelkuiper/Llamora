@@ -10,14 +10,19 @@ import { animateMotion } from "../utils/transition.js";
 import { AutocompleteOverlayMixin } from "./base/autocomplete-overlay.js";
 
 const canonicalizeTag = (value, limit = null) => {
-  const raw = `${value ?? ""}`.trim().toLowerCase();
-  if (!raw) return "";
+  const rawValue = `${value ?? ""}`.trim();
+  if (!rawValue) return "";
+
+  const emoji = canonicalizeEmojiTag(rawValue, limit);
+  if (emoji) return emoji;
+
+  const raw = rawValue.toLowerCase();
   let text = raw.replace(/[\s_]+/g, "-");
   text = text.replace(/[^a-z0-9-]/g, "");
   text = text.replace(/-{2,}/g, "-").replace(/^-+|-+$/g, "");
   if (!text) return "";
   if (Number.isFinite(limit) && limit > 0) {
-    text = text.slice(0, limit).replace(/^-+|-+$/g, "");
+    text = sliceByCodepoints(text, limit).replace(/^-+|-+$/g, "");
   }
   return text.trim();
 };
@@ -25,6 +30,90 @@ const canonicalizeTag = (value, limit = null) => {
 const displayTag = (canonical) => `${canonical ?? ""}`.trim();
 
 const prepareTagAutocompleteValue = (value) => `${value ?? ""}`.trim();
+
+const sliceByCodepoints = (value, limit) => {
+  if (!Number.isFinite(limit) || limit <= 0) return String(value ?? "");
+  let out = "";
+  let count = 0;
+  for (const ch of String(value ?? "")) {
+    if (count >= limit) break;
+    out += ch;
+    count += 1;
+  }
+  return out;
+};
+
+const isEmojiBaseCodepoint = (cp) => {
+  if (cp >= 0x1f000 && cp <= 0x1faff) return true;
+  if (cp >= 0x2600 && cp <= 0x27bf) return true;
+  if (cp >= 0x2300 && cp <= 0x23ff) return true;
+  if (cp >= 0x2190 && cp <= 0x21ff) return true;
+  if (cp >= 0x2b00 && cp <= 0x2bff) return true;
+  if (cp >= 0x25a0 && cp <= 0x25ff) return true;
+  if (cp === 0x00a9 || cp === 0x00ae || cp === 0x2122) return true;
+  return false;
+};
+
+const canonicalizeEmojiTag = (rawValue, limit = null) => {
+  const value = String(rawValue ?? "").trim();
+  if (!value) return "";
+  if (/\s/.test(value)) return "";
+
+  const VS15 = 0xfe0e;
+  const VS16 = 0xfe0f;
+  const ZWJ = 0x200d;
+  const KEYCAP = 0x20e3;
+
+  let hasEmoji = false;
+  let hasKeycap = false;
+  let hasKeycapBase = false;
+  let cleaned = "";
+
+  for (const ch of value) {
+    const cp = ch.codePointAt(0);
+    if (cp === VS15 || cp === VS16) {
+      continue;
+    }
+    if (cp === ZWJ) {
+      cleaned += ch;
+      continue;
+    }
+    if (cp === KEYCAP) {
+      hasKeycap = true;
+      cleaned += ch;
+      continue;
+    }
+    if (cp >= 0x1f3fb && cp <= 0x1f3ff) {
+      cleaned += ch;
+      continue;
+    }
+    if (cp >= 0x1f1e6 && cp <= 0x1f1ff) {
+      hasEmoji = true;
+      cleaned += ch;
+      continue;
+    }
+    if (ch === "#" || ch === "*" || (ch >= "0" && ch <= "9")) {
+      hasKeycapBase = true;
+      cleaned += ch;
+      continue;
+    }
+    if (isEmojiBaseCodepoint(cp)) {
+      hasEmoji = true;
+      cleaned += ch;
+      continue;
+    }
+    return "";
+  }
+
+  if (!(hasEmoji || (hasKeycap && hasKeycapBase))) return "";
+
+  let result = cleaned.trim();
+  if (!result) return "";
+  if (Number.isFinite(limit) && limit > 0) {
+    result = sliceByCodepoints(result, limit).trim();
+  }
+  return result;
+};
 
 const TAG_HISTORY_MAX = 50;
 const TAG_SUGGESTION_EMPTY_DELAY_MS = 180;

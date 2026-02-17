@@ -14,7 +14,10 @@ from typing import Any, Iterable, Literal, Sequence
 from llamora.app.util.tags import canonicalize as _canonicalize, display as _display
 from llamora.app.services.crypto import CryptoContext
 from llamora.persistence.local_db import LocalDB
-from llamora.app.services.entry_metadata import generate_metadata
+from llamora.app.services.entry_metadata import (
+    DEFAULT_METADATA_EMOJI,
+    generate_metadata,
+)
 from llamora.app.services.digest_policy import tag_digest
 
 
@@ -793,17 +796,35 @@ class TagService:
             cached = self._get_cached_suggestions(ctx.user_id, entry_id)
             if cached is None:
                 meta_payload = await generate_metadata(llm, entry.get("text", ""))
-                tags = meta_payload.get("tags") or []
-                self._set_cached_suggestions(ctx.user_id, entry_id, list(tags))
+                tags_list = list(meta_payload.get("tags") or [])
+                emoji_raw = meta_payload.get("emoji")
+                emoji_value = (
+                    str(emoji_raw).strip() if isinstance(emoji_raw, str) else ""
+                )
+                # Only surface non-default emojis as suggestions unless metadata
+                # produced other tags. This prevents the fallback emoji from
+                # showing up as noisy "suggestion" when the LLM fails.
+                include_emoji = bool(tags_list) or (
+                    emoji_value and emoji_value != DEFAULT_METADATA_EMOJI
+                )
+                if include_emoji and emoji_value:
+                    tags_list.insert(0, emoji_value)
+                tags = tags_list
+                self._set_cached_suggestions(ctx.user_id, entry_id, list(tags_list))
             else:
                 tags = cached
 
         meta_suggestions: set[str] = set()
+        emoji_suggestion: str | None = None
         for tag in tags:
             try:
                 canonical = self.canonicalize(str(tag))
             except ValueError:
                 continue
+            if emoji_suggestion is None:
+                # The metadata emoji is inserted first (see above). Track it so we can
+                # keep ordering stable (emoji first) even after set operations.
+                emoji_suggestion = canonical
             meta_suggestions.add(canonical)
 
         frecent_tags = await self._db.tags.get_tag_frecency(
@@ -820,11 +841,15 @@ class TagService:
                 continue
             frecent_suggestions.add(canonical)
 
-        combined = [
-            suggestion
-            for suggestion in sorted(meta_suggestions | frecent_suggestions)
-            if suggestion.lower() not in existing_names
-        ]
+        combined: list[str] = []
+        if emoji_suggestion and emoji_suggestion.lower() not in existing_names:
+            combined.append(emoji_suggestion)
+        for suggestion in sorted(meta_suggestions | frecent_suggestions):
+            if emoji_suggestion and suggestion == emoji_suggestion:
+                continue
+            if suggestion.lower() in existing_names:
+                continue
+            combined.append(suggestion)
 
         if limit is not None and limit > 0:
             combined = combined[:limit]
