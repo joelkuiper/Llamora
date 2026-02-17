@@ -36,6 +36,7 @@ import {
   updateSortButtons,
 } from "./index-search.js";
 import {
+  cancelEntriesAnchorRestore,
   captureEntriesAnchor,
   getStoredEntriesAnchor,
   maybeRestoreEntriesAnchor,
@@ -418,6 +419,15 @@ if (!globalThis[BOOT_KEY]) {
   document.body.addEventListener("htmx:beforeRequest", (event) => {
     const target = event.detail?.target;
     if (!(target instanceof Element)) return;
+    const requestConfig = event.detail?.requestConfig;
+    const path = String(requestConfig?.path || "");
+    const inEntriesRegion = Boolean(target.closest?.("[data-tags-view-entries]"));
+    const isEntryOrTagMutationPath = path.startsWith("/e/") || path.startsWith("/t/");
+
+    if ((inEntriesRegion || isEntryOrTagMutationPath) && !isEntriesNavigationRequest(event)) {
+      cancelEntriesAnchorRestore();
+    }
+
     if (target.id === "tags-view-list" || target.closest?.("#tags-view-list")) {
       captureListPositions();
       return;

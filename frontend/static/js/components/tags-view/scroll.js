@@ -208,6 +208,10 @@ export const retryAnchorRestore = () => {
   applyEntriesAnchor(element, offset);
 };
 
+export const cancelEntriesAnchorRestore = () => {
+  clearActiveAnchor();
+};
+
 export const maybeRestoreEntriesAnchor = () => {
   const currentLocation = getTagsLocationKey();
   if (!currentLocation) return false;
@@ -224,6 +228,7 @@ export const maybeRestoreEntriesAnchor = () => {
     const escapedId = escapeSelectorValue(anchor.entryId);
     const entry = document.querySelector(`.tags-view__entry-item[data-entry-id="${escapedId}"]`);
     if (entry instanceof HTMLElement) {
+      clearActiveAnchor();
       applyEntriesAnchor(entry, anchor.offset);
       activeAnchorRestore = { element: entry, offset: anchor.offset, locationKey: currentLocation };
       requestAnimationFrame(() => {
