@@ -1073,9 +1073,9 @@ async def _apply_tags(
     headers: dict[str, str],
 ) -> list[str]:
     try:
-        resp = await _get(client, f"/t/suggestions/{entry_id}", headers=headers)
+        resp = await _get(client, f"/t/entry/{entry_id}/suggestions", headers=headers)
         resp.raise_for_status()
-    except httpx.RequestError as exc:
+    except httpx.HTTPError as exc:
         logger.warning(
             "Tag suggestions failed (%s) for %s",
             exc.__class__.__name__,
@@ -1102,9 +1102,11 @@ async def _apply_tags(
         logger.debug("Adding tag '%s' to %s", tag, entry_id)
         data = {"tag": tag}
         try:
-            resp = await _post(client, f"/t/{entry_id}", data=data, headers=headers)
+            resp = await _post(
+                client, f"/t/entry/{entry_id}", data=data, headers=headers
+            )
             resp.raise_for_status()
-        except httpx.RequestError as exc:
+        except httpx.HTTPError as exc:
             logger.warning(
                 "Tag apply failed (%s) for %s", exc.__class__.__name__, entry_id
             )
