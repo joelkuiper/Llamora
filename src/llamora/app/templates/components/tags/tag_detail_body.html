@@ -5,6 +5,7 @@
 {% set next_cursor = next_cursor|default(None) %}
 {% set page_size = page_size|default(12) %}
 {% set detail_day = detail_day|default(None) %}
+{% set tag_shortcode = emoji_shortcode(tag.name) %}
 {% if detail_day %}
   {% set trace_url = url_for('tags.tags_view_tag', tag=tag.name) ~ '?day=' ~ (detail_day|urlencode) %}
 {% else %}
@@ -13,7 +14,12 @@
 <div class="tag-detail" data-tag-hash="{{ tag.hash }}">
   <div class="tag-detail__header">
     <div class="tag-detail__header-row">
-      <div class="tag-detail__title">{{ tag.name }}</div>
+      <div class="tag-detail__title">
+        <span class="tag-detail__title-main">{{ tag.name }}</span>
+        {% if tag_shortcode %}
+          <span class="tag-detail__title-hint">{{ tag_shortcode }}</span>
+        {% endif %}
+      </div>
       <div class="tag-detail__actions">
         {% if trace_url %}
           <a

@@ -396,6 +396,9 @@
 
 .tags-view__index-name {
   min-width: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.34rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -403,8 +406,26 @@
   font-weight: 500;
 }
 
+.tags-view__index-name-main {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tags-view__index-name-hint {
+  font-size: 0.68rem;
+  font-weight: 420;
+  letter-spacing: 0.01em;
+  color: color-mix(in srgb, var(--color-text-muted) 76%, transparent);
+}
+
 .tags-view__index-row.is-active .tags-view__index-name {
   font-weight: 610;
+}
+
+.tags-view__index-row.is-active .tags-view__index-name-hint {
+  color: color-mix(in srgb, var(--accent-active) 20%, var(--color-text-muted));
 }
 
 .tags-view__index-name mark {
@@ -472,6 +493,21 @@
   font-weight: 560;
   letter-spacing: 0.006em;
   color: color-mix(in srgb, var(--color-text) 93%, transparent);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.42rem;
+}
+
+.tags-view__title-main {
+  min-width: 0;
+}
+
+.tags-view__title-hint {
+  font-size: 0.52em;
+  font-weight: 460;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--color-text-muted) 74%, transparent);
+  white-space: nowrap;
 }
 
 .tags-view__title-row {

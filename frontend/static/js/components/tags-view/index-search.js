@@ -58,6 +58,13 @@ export const hydrateIndexFromTemplate = (root = document) => {
       name: String(item?.name || "").trim(),
       hash: String(item?.hash || "").trim(),
       count: Number.parseInt(item?.count || "0", 10) || 0,
+      kind:
+        String(item?.kind || "")
+          .trim()
+          .toLowerCase() === "emoji"
+          ? "emoji"
+          : "text",
+      label: String(item?.label || "").trim(),
     }))
     .filter((item) => item.name);
   state.listBuilt = false;
@@ -116,7 +123,17 @@ const createTagRow = (item, { transient = false } = {}) => {
   row.setAttribute("hx-push-url", urls.tagUrl);
   const nameEl = document.createElement("span");
   nameEl.className = "tags-view__index-name";
-  nameEl.textContent = item.name;
+  const nameMainEl = document.createElement("span");
+  nameMainEl.className = "tags-view__index-name-main";
+  nameMainEl.textContent = item.name;
+  nameEl.appendChild(nameMainEl);
+  const hint = String(item.label || "").trim();
+  if (hint) {
+    const hintEl = document.createElement("span");
+    hintEl.className = "tags-view__index-name-hint";
+    hintEl.textContent = hint;
+    nameEl.appendChild(hintEl);
+  }
   const countEl = document.createElement("span");
   countEl.className = "tags-view__index-count";
   countEl.textContent = String(item.count ?? 0);
@@ -484,7 +501,7 @@ export const buildSearchIndex = (root = document) => {
   state.empty = list?.querySelector("[data-tags-view-empty]") || null;
 
   state.rows.forEach((row, index) => {
-    const nameEl = row.querySelector(".tags-view__index-name");
+    const nameEl = row.querySelector(".tags-view__index-name-main");
     if (nameEl instanceof HTMLElement) {
       nameEl.dataset.originalText = row.dataset.tagsName || nameEl.textContent || "";
     }
@@ -518,7 +535,7 @@ export const applySearch = (rawQuery) => {
     state.rows.forEach((row) => {
       row.classList.remove("is-filtered-out");
       row.removeAttribute("aria-hidden");
-      const nameEl = row.querySelector(".tags-view__index-name");
+      const nameEl = row.querySelector(".tags-view__index-name-main");
       if (nameEl instanceof HTMLElement) {
         const original = nameEl.dataset.originalText || row.dataset.tagsName || "";
         nameEl.textContent = original;
@@ -552,7 +569,14 @@ export const applySearch = (rawQuery) => {
   const indexItems =
     Array.isArray(state.indexItems) && state.indexItems.length ? state.indexItems : null;
   const candidates = indexItems
-    ? indexItems.map((item) => ({ ...item, key: normalizeTagKey(item.name) }))
+    ? indexItems.map((item) => {
+        const label = String(item.label || "").trim();
+        const keyParts = [item.name, label, label.replaceAll(":", " ").replaceAll("_", " ")];
+        return {
+          ...item,
+          key: normalizeTagKey(keyParts.filter(Boolean).join(" ")),
+        };
+      })
     : state.rows.map((row) => ({
         name: row.dataset.tagsName || "",
         hash: "",
@@ -601,10 +625,10 @@ export const applySearch = (rawQuery) => {
       row.classList.toggle("is-filtered-out", !isVisible);
       row.setAttribute("aria-hidden", isVisible ? "false" : "true");
       if (isVisible) {
-        const nameEl = row.querySelector(".tags-view__index-name");
-        if (nameEl instanceof HTMLElement) {
-          const original = nameEl.dataset.originalText || row.dataset.tagsName || "";
-          nameEl.innerHTML = highlightMatch(original, queryTokens);
+        const mainEl = row.querySelector(".tags-view__index-name-main");
+        if (mainEl instanceof HTMLElement) {
+          const original = mainEl.dataset.originalText || row.dataset.tagsName || "";
+          mainEl.innerHTML = highlightMatch(original, queryTokens);
         }
       }
       if (isVisible) visibleCount += 1;

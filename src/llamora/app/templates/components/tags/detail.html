@@ -30,9 +30,15 @@
     {% if detail %}
       <header class="tags-view__detail-header">
         {% set delete_trace_url = url_for('tags.delete_trace', tag_hash=detail.hash) ~ '?day=' ~ day ~ '&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tag=' ~ (detail.name|urlencode) %}
+        {% set detail_shortcode = emoji_shortcode(detail.name) %}
         <div class="tags-view__title-wrap">
           <div class="tags-view__title-row">
-            <h2 class="tags-view__title">{{ detail.name }}</h2>
+            <h2 class="tags-view__title">
+              <span class="tags-view__title-main">{{ detail.name }}</span>
+              {% if detail_shortcode %}
+                <span class="tags-view__title-hint">{{ detail_shortcode }}</span>
+              {% endif %}
+            </h2>
             <button class="entry-action entry-delete tags-view__trace-delete"
                     type="button"
                     hx-delete="{{ delete_trace_url }}"

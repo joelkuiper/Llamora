@@ -14,6 +14,9 @@ const canonicalizeTag = (value, limit = null) => {
   const rawValue = `${value ?? ""}`.trim();
   if (!rawValue) return "";
 
+  const shortcode = canonicalizeEmojiShortcode(rawValue, limit);
+  if (shortcode) return shortcode;
+
   const emoji = canonicalizeEmojiTag(rawValue, limit);
   if (emoji) return emoji;
 
@@ -53,6 +56,18 @@ const isEmojiBaseCodepoint = (cp) => {
   if (cp >= 0x25a0 && cp <= 0x25ff) return true;
   if (cp === 0x00a9 || cp === 0x00ae || cp === 0x2122) return true;
   return false;
+};
+
+const EMOJI_SHORTCODE_RE = /^:[a-z0-9_+-]+:$/i;
+
+const canonicalizeEmojiShortcode = (rawValue, limit = null) => {
+  const value = String(rawValue ?? "").trim();
+  if (!value || !EMOJI_SHORTCODE_RE.test(value)) return "";
+  let result = value.toLowerCase();
+  if (Number.isFinite(limit) && limit > 0) {
+    result = sliceByCodepoints(result, limit);
+  }
+  return result.trim();
 };
 
 const canonicalizeEmojiTag = (rawValue, limit = null) => {

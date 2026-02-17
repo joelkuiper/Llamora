@@ -12,10 +12,17 @@ const findCatalogScript = (root = document) =>
 const normalizeItem = (item) => {
   const name = String(item?.name || "").trim();
   if (!name) return null;
+  const kindRaw = String(item?.kind || "")
+    .trim()
+    .toLowerCase();
+  const kind = kindRaw === "emoji" ? "emoji" : "text";
+  const label = String(item?.label || "").trim();
   return {
     name,
     hash: String(item?.hash || "").trim(),
     count: Math.max(0, Number.parseInt(String(item?.count ?? "0"), 10) || 0),
+    kind,
+    label,
   };
 };
 
@@ -101,7 +108,7 @@ export const applyTagsCatalogCountUpdate = (payload, root = document) => {
       hash: hash || nextItems[index].hash,
     };
   } else {
-    nextItems.push({ name, hash, count });
+    nextItems.push({ name, hash, count, kind: "text", label: "" });
   }
   commit(nextItems, script);
   return toSnapshot();

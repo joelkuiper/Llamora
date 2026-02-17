@@ -8,6 +8,7 @@ from llamora.app.services.container import get_tag_service
 from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.validators import parse_iso_date
 from llamora.app.services.session_context import SessionContext, get_session_context
+from llamora.app.util.tags import emoji_shortcode
 
 
 def require_iso_date(raw: str) -> str:
@@ -93,6 +94,16 @@ async def build_tags_catalog_payload(
         sort_kind=tag_service.normalize_tags_sort_kind(sort_kind),
         sort_dir=tag_service.normalize_tags_sort_dir(sort_dir),
     )
-    return [
-        {"name": item.name, "hash": item.hash, "count": item.count} for item in items
-    ]
+    payload: list[dict[str, str | int]] = []
+    for item in items:
+        short = emoji_shortcode(item.name)
+        payload.append(
+            {
+                "name": item.name,
+                "hash": item.hash,
+                "count": item.count,
+                "kind": "emoji" if short else "text",
+                "label": short or "",
+            }
+        )
+    return payload

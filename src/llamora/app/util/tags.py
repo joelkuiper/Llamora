@@ -6,6 +6,8 @@ import hashlib
 import re
 import unicodedata
 
+import emoji as emoji_lib
+
 from llamora.settings import settings
 
 
@@ -19,6 +21,7 @@ _VS16 = 0xFE0F
 _VS15 = 0xFE0E
 _ZWJ = 0x200D
 _KEYCAP = 0x20E3
+_EMOJI_SHORTCODE = re.compile(r"^:[a-z0-9_+\-]+:$", re.IGNORECASE)
 
 
 def _is_emoji_base_codepoint(cp: int) -> bool:
@@ -102,14 +105,53 @@ def _canonicalize_emoji_tag(raw: str) -> str | None:
     return result or None
 
 
+def _expand_emoji_shortcode(raw: str) -> str | None:
+    value = str(raw or "").strip()
+    if not value or not _EMOJI_SHORTCODE.fullmatch(value):
+        return None
+    expanded = emoji_lib.emojize(value, language="alias")
+    if expanded != value:
+        return expanded
+    expanded = emoji_lib.emojize(value, language="en")
+    if expanded != value:
+        return expanded
+    return None
+
+
+def emoji_shortcode(value: str) -> str | None:
+    """Return ``:shortcode:`` for an emoji tag when available."""
+
+    emoji_value = _canonicalize_emoji_tag(value)
+    if not emoji_value:
+        return None
+    short = emoji_lib.demojize(emoji_value, language="alias")
+    if not short or short == emoji_value:
+        short = emoji_lib.demojize(emoji_value, language="en")
+    short = str(short or "").strip()
+    if not short or short == emoji_value:
+        return None
+    if not _EMOJI_SHORTCODE.fullmatch(short):
+        return None
+    return short
+
+
 def canonicalize(raw: str) -> str:
     """Return the canonical representation of a tag (kebab-case)."""
 
-    emoji = _canonicalize_emoji_tag(raw)
+    raw_value = str(raw or "").strip()
+    expanded = _expand_emoji_shortcode(raw_value)
+    if expanded:
+        emoji = _canonicalize_emoji_tag(expanded)
+        if emoji:
+            return emoji
+    elif _EMOJI_SHORTCODE.fullmatch(raw_value):
+        raise ValueError("Unknown emoji shortcode")
+
+    emoji = _canonicalize_emoji_tag(raw_value)
     if emoji:
         return emoji
 
-    value = str(raw or "").strip().lower()
+    value = raw_value.lower()
     if not value:
         raise ValueError("Empty tag")
     value = re.sub(r"[\s_]+", "-", value)

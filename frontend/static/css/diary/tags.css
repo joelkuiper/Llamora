@@ -528,6 +528,22 @@
   font-weight: 600;
   color: var(--glass-text-stronger);
   letter-spacing: 0.01em;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.32rem;
+  min-width: 0;
+}
+
+.tag-detail__title-main {
+  min-width: 0;
+}
+
+.tag-detail__title-hint {
+  font-size: 0.72rem;
+  font-weight: 480;
+  color: color-mix(in srgb, var(--glass-text-muted) 78%, transparent);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .tag-detail__meta {

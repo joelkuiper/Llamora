@@ -227,7 +227,11 @@ def create_app():
     app.register_blueprint(lockbox_bp)
 
     from datetime import datetime
-    from .util.tags import canonicalize as canonicalize_tag, display as display_tag
+    from .util.tags import (
+        canonicalize as canonicalize_tag,
+        display as display_tag,
+        emoji_shortcode as emoji_shortcode_tag,
+    )
     from .util.tags import tag_hash as compute_tag_hash
     from .services.time import (
         humanize as humanize_filter,
@@ -245,6 +249,7 @@ def create_app():
         return format_date(dt)
 
     app.jinja_env.globals["display"] = display_tag
+    app.jinja_env.globals["emoji_shortcode"] = emoji_shortcode_tag
 
     @app.template_filter("tag_hash")
     def tag_hash_filter(tag, user_id=None):
