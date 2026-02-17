@@ -49,6 +49,17 @@ import { cacheTagsViewSummary, hydrateTagsViewSummary, syncSummarySkeletons } fr
 
 const BOOT_KEY = "__llamoraTagsViewBooted";
 
+const isEntriesNavigationRequest = (event) => {
+  const requestConfig = event?.detail?.requestConfig;
+  const verb = String(requestConfig?.verb || "")
+    .trim()
+    .toLowerCase();
+  if (verb !== "get") return false;
+  const path = String(requestConfig?.path || "").trim();
+  if (!path) return false;
+  return path.includes("/fragments/tags/") && path.includes("/detail/");
+};
+
 const updateHeaderHeight = () => {
   const header = document.getElementById("app-header");
   if (!header) return;
@@ -333,7 +344,7 @@ if (!globalThis[BOOT_KEY]) {
     }
     if (target.id === "tags-view-detail" || inEntries) {
       syncDetailOnly(document);
-      if (inEntries && target.id !== "tags-view-detail") {
+      if (inEntries && target.id !== "tags-view-detail" && isEntriesNavigationRequest(event)) {
         retryAnchorRestore();
       }
       return;
