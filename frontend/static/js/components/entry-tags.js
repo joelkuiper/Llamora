@@ -1,7 +1,12 @@
 import { createPopover } from "../popover.js";
 import { cacheLoader } from "../services/cache-loader.js";
+import {
+  fetchEmojiShortcodeSuggestions,
+  isShortcodeLookupQuery,
+  shortcodeSearchTokens,
+} from "../services/emoji-shortcodes.js";
 import { syncSummarySkeletons } from "../services/summary-skeleton.js";
-import { getTagsCatalogNames } from "../services/tags-catalog.js";
+import { getTagsCatalogItems } from "../services/tags-catalog.js";
 import { formatTimeElements } from "../services/time.js";
 import { scrollToHighlight } from "../ui.js";
 import { AutocompleteHistory } from "../utils/autocomplete-history.js";
@@ -220,6 +225,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   #tagActivationHandler;
   #tagKeydownHandler;
   #tagHistory;
+  #emojiShortcodeMap = new Map();
 
   constructor() {
     super();
@@ -656,7 +662,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       return;
     }
     const limit = this.#getCanonicalMaxLength();
-    const canonical = canonicalizeTag(raw, limit);
+    const canonical = this.#resolveCanonicalTag(raw, limit);
     if (!canonical) {
       this.#submit.disabled = true;
       return;
@@ -676,7 +682,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       return;
     }
     const limit = this.#getCanonicalMaxLength();
-    const canonical = canonicalizeTag(raw, limit);
+    const canonical = this.#resolveCanonicalTag(raw, limit);
     if (!canonical) {
       event.preventDefault();
       return;
@@ -829,8 +835,12 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   getAutocompleteStoreOptions() {
     return {
       debounceMs: 0,
-      fetchCandidates: async () => [],
-      buildCacheKey: () => "local",
+      fetchCandidates: async (query, context = {}) =>
+        this.#fetchEmojiAutocompleteCandidates(query, context?.signal),
+      buildCacheKey: (query, context = {}) =>
+        `${String(context?.mode || "local")}:${String(query || "")
+          .trim()
+          .toLowerCase()}`,
       getCandidateKey: (candidate) => this.#normalizeTagCandidate(candidate),
       mergeCandidates: (remote, localSets, helpers) =>
         this.#mergeAutocompleteCandidates(remote, localSets, helpers),
@@ -854,17 +864,35 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
         }
         const value = canonical;
         const display = displayTag(canonical);
-        return { value, display, tokens: [value] };
+        const extraTokens = Array.isArray(item?.tokens)
+          ? item.tokens
+          : shortcodeSearchTokens(value);
+        return { value, display, tokens: [value, ...extraTokens] };
       })
       .filter(Boolean);
     return entries;
   }
 
   buildAutocompleteFetchParams() {
-    return null;
+    const raw = String(this.#input?.value || "").trim();
+    if (!isShortcodeLookupQuery(raw)) {
+      return null;
+    }
+    return {
+      query: raw,
+      context: { mode: "emoji" },
+    };
   }
 
-  onAutocompleteCommit() {
+  onAutocompleteCommit(committed) {
+    const key = String(committed || "")
+      .trim()
+      .toLowerCase();
+    const emoji = this.#emojiShortcodeMap.get(key);
+    if (emoji && this.#input) {
+      this.#input.value = emoji;
+      this.#input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
     this.#updateSubmitState();
   }
 
@@ -928,9 +956,16 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     }
     const catalogValues = [];
     const seenCatalog = new Set();
-    for (const rawName of getTagsCatalogNames(document)) {
-      const canonical = canonicalizeTag(rawName, limit);
+    for (const item of getTagsCatalogItems(document)) {
+      const canonical = canonicalizeTag(item?.name || "", limit);
       if (!canonical) continue;
+      const label = String(item?.label || "").trim();
+      if (label) {
+        const labelCanonical = canonicalizeTag(label, limit);
+        if (labelCanonical) {
+          this.#emojiShortcodeMap.set(labelCanonical.toLowerCase(), canonical);
+        }
+      }
       const key = canonical.toLowerCase();
       if (seenCatalog.has(key)) continue;
       seenCatalog.add(key);
@@ -945,6 +980,20 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.applyAutocompleteCandidates();
   }
 
+  async #fetchEmojiAutocompleteCandidates(query, signal) {
+    const suggestions = await fetchEmojiShortcodeSuggestions(query, {
+      signal,
+      limit: 24,
+    });
+    if (!Array.isArray(suggestions) || !suggestions.length) {
+      return [];
+    }
+    for (const suggestion of suggestions) {
+      this.#emojiShortcodeMap.set(suggestion.shortcode.toLowerCase(), suggestion.emoji);
+    }
+    return suggestions.map((suggestion) => suggestion.shortcode);
+  }
+
   #invalidateAutocompleteCache({ immediate = false } = {}) {
     if (!this.#isActiveOwner()) {
       return;
@@ -957,14 +1006,23 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
   #normalizeTagCandidate(candidate) {
     const limit = this.#getCanonicalMaxLength();
     if (typeof candidate === "string") {
-      const canonical = canonicalizeTag(candidate, limit);
+      const canonical = this.#resolveCanonicalTag(candidate, limit);
       return canonical ? canonical.toLowerCase() : "";
     }
     if (candidate && typeof candidate.value === "string") {
-      const canonical = canonicalizeTag(candidate.value, limit);
+      const canonical = this.#resolveCanonicalTag(candidate.value, limit);
       return canonical ? canonical.toLowerCase() : "";
     }
     return "";
+  }
+
+  #resolveCanonicalTag(raw, limit = null) {
+    const canonical = canonicalizeTag(raw, limit);
+    if (!canonical) {
+      return "";
+    }
+    const mapped = this.#emojiShortcodeMap.get(canonical.toLowerCase());
+    return mapped || canonical;
   }
 
   #mergeAutocompleteCandidates(remote, localSets, _helpers = {}) {

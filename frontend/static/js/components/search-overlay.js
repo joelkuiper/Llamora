@@ -1,4 +1,9 @@
-import { getTagsCatalogNames } from "../services/tags-catalog.js";
+import {
+  fetchEmojiShortcodeSuggestions,
+  isShortcodeLookupQuery,
+  shortcodeSearchTokens,
+} from "../services/emoji-shortcodes.js";
+import { getTagsCatalogItems } from "../services/tags-catalog.js";
 import { createInlineSpinner, scrollToHighlight } from "../ui.js";
 import { AutocompleteHistory } from "../utils/autocomplete-history.js";
 import { createShortcutBag } from "../utils/global-shortcuts.js";
@@ -22,7 +27,7 @@ const normalizeSearchValue = (value) => {
   return value.trim().replace(/\s+/g, " ");
 };
 
-const buildSearchEntry = (value) => {
+const buildSearchEntry = (value, aliases = []) => {
   const trimmed = typeof value === "string" ? value.trim() : "";
   if (!trimmed) return null;
 
@@ -31,6 +36,18 @@ const buildSearchEntry = (value) => {
   if (collapsed) {
     tokens.add(collapsed);
     collapsed
+      .split(/\s+/)
+      .filter(Boolean)
+      .forEach((part) => {
+        tokens.add(part);
+      });
+  }
+
+  for (const alias of aliases) {
+    const normalizedAlias = normalizeSearchValue(String(alias ?? ""));
+    if (!normalizedAlias) continue;
+    tokens.add(normalizedAlias);
+    normalizedAlias
       .split(/\s+/)
       .filter(Boolean)
       .forEach((part) => {
@@ -74,6 +91,7 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
   #toggleHandler;
   #tagsCatalogUpdatedHandler;
   #activePanelEl = null;
+  #emojiShortcodeMap = new Map();
 
   constructor() {
     super();
@@ -341,6 +359,36 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     } catch {
       return [];
     }
+  }
+
+  async #fetchEmojiAutocompleteCandidates(query, signal) {
+    const suggestions = await fetchEmojiShortcodeSuggestions(query, {
+      signal,
+      limit: RECENT_CANDIDATE_MAX,
+    });
+    if (!Array.isArray(suggestions) || !suggestions.length) {
+      return [];
+    }
+
+    const entries = [];
+    const seen = new Set();
+    for (const suggestion of suggestions) {
+      const shortcode = String(suggestion?.shortcode || "")
+        .trim()
+        .toLowerCase();
+      const emoji = String(suggestion?.emoji || "").trim();
+      if (!shortcode || !emoji || seen.has(shortcode)) {
+        continue;
+      }
+      seen.add(shortcode);
+      this.#emojiShortcodeMap.set(shortcode, emoji);
+      const aliases = [emoji, String(suggestion?.label || ""), ...shortcodeSearchTokens(shortcode)];
+      const entry = buildSearchEntry(shortcode, aliases);
+      if (!entry) continue;
+      entries.push(entry);
+      if (entries.length >= RECENT_CANDIDATE_MAX) break;
+    }
+    return entries;
   }
 
   #addCurrentQueryToAutocomplete() {
@@ -638,9 +686,16 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       debounceMs: 0,
       maxResults: RECENT_CANDIDATE_MAX,
       cacheTimeMs: RECENT_REFRESH_MIN_MS,
-      fetchCandidates: (_, context = {}) =>
-        this.#fetchRecentAutocompleteCandidates(context?.signal),
-      buildCacheKey: () => "recent",
+      fetchCandidates: (query, context = {}) => {
+        if (context?.mode === "emoji") {
+          return this.#fetchEmojiAutocompleteCandidates(query, context?.signal);
+        }
+        return this.#fetchRecentAutocompleteCandidates(context?.signal);
+      },
+      buildCacheKey: (query, context = {}) =>
+        `${String(context?.mode || "recent")}:${String(query || "")
+          .trim()
+          .toLowerCase()}`,
       getCandidateKey: (candidate) => this.#normalizeCandidateValue(candidate),
     };
   }
@@ -653,10 +708,22 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
   }
 
   buildAutocompleteFetchParams() {
-    return { query: "", context: {} };
+    const query = normalizeSearchValue(this.#inputEl?.value ?? "");
+    if (isShortcodeLookupQuery(query)) {
+      return { query, context: { mode: "emoji" } };
+    }
+    return { query: "", context: { mode: "recent" } };
   }
 
-  onAutocompleteCommit() {
+  onAutocompleteCommit(committed) {
+    const key = String(committed || "")
+      .trim()
+      .toLowerCase();
+    const emoji = this.#emojiShortcodeMap.get(key);
+    if (emoji && this.#inputEl) {
+      this.#inputEl.value = emoji;
+      this.#inputEl.dispatchEvent(new Event("input", { bubbles: true }));
+    }
     this.#addCurrentQueryToAutocomplete();
   }
 
@@ -712,13 +779,20 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
   #syncTagCatalogCandidates() {
     const candidates = [];
     const seen = new Set();
-    for (const tagName of getTagsCatalogNames(document)) {
-      const entry = buildSearchEntry(tagName);
+    for (const item of getTagsCatalogItems(document)) {
+      const tagName = String(item?.name || "").trim();
+      if (!tagName) continue;
+      const label = String(item?.label || "").trim();
+      const aliases = label ? shortcodeSearchTokens(label) : [];
+      const entry = buildSearchEntry(tagName, aliases);
       if (!entry) continue;
       const key = this.#normalizeCandidateValue(entry);
       if (!key || seen.has(key)) continue;
       seen.add(key);
       candidates.push(entry);
+      if (label && item?.kind === "emoji") {
+        this.#emojiShortcodeMap.set(label.toLowerCase(), tagName);
+      }
     }
     this.setAutocompleteLocalEntries("tags-catalog", candidates);
   }

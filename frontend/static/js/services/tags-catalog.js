@@ -92,6 +92,11 @@ export const applyTagsCatalogCountUpdate = (payload, root = document) => {
   }
   const count = Math.max(0, Number.parseInt(String(payload.count ?? "0"), 10) || 0);
   const hash = String(payload.tag_hash || "").trim();
+  const kindRaw = String(payload.tag_kind || "")
+    .trim()
+    .toLowerCase();
+  const kind = kindRaw ? (kindRaw === "emoji" ? "emoji" : "text") : "";
+  const label = String(payload.tag_label || "").trim();
 
   const script = findCatalogScript(root);
   const snapshot = readTagsCatalog(root);
@@ -106,9 +111,11 @@ export const applyTagsCatalogCountUpdate = (payload, root = document) => {
       ...nextItems[index],
       count,
       hash: hash || nextItems[index].hash,
+      kind: kind || nextItems[index].kind,
+      label: label || nextItems[index].label,
     };
   } else {
-    nextItems.push({ name, hash, count, kind: "text", label: "" });
+    nextItems.push({ name, hash, count, kind: kind || "text", label });
   }
   commit(nextItems, script);
   return toSnapshot();

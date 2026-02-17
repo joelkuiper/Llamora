@@ -8,6 +8,7 @@ from llamora.app.services.container import get_search_api, get_services
 from llamora.app.services.auth_helpers import login_required
 from llamora.settings import settings
 from llamora.app.routes.helpers import require_encryption_context
+from llamora.app.util.tags import replace_emoji_shortcodes
 
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ class SearchContext:
 
 
 def resolve_search_context(req: Request) -> SearchContext:
-    sanitized_query = (req.args.get("q") or "").strip()
+    sanitized_query = replace_emoji_shortcodes(req.args.get("q") or "").strip()
     max_query_length = int(settings.LIMITS.max_search_query_length)
     recent_limit = int(settings.SEARCH.recent_suggestion_limit)
     page_size = max(1, int(getattr(settings.SEARCH, "page_size", 40)))

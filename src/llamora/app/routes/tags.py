@@ -39,6 +39,7 @@ from llamora.app.services.cache_registry import (
     invalidations_for_tag_link,
     to_client_payload,
 )
+from llamora.app.util.tags import emoji_shortcode, suggest_emoji_shortcodes
 
 
 tags_bp = Blueprint("tags", __name__)
@@ -165,6 +166,18 @@ async def tags_view_tag(tag: str):
     return await _render_tags_page(tag)
 
 
+@tags_bp.get("/emoji/suggest")
+@login_required
+async def emoji_shortcodes_suggest():
+    query = str(request.args.get("q") or "").strip()
+    limit = _parse_positive_int(
+        request.args.get("limit"), default=12, min_value=1, max_value=64
+    )
+    return {
+        "suggestions": suggest_emoji_shortcodes(query, limit=limit),
+    }
+
+
 async def _load_tags_view_from_context(
     ctx: CryptoContext,
     context: dict[str, str | dict[str, str]],
@@ -263,6 +276,8 @@ async def remove_tag(entry_id: str, tag_hash: str):
     response = await make_response(html)
 
     if tag_name:
+        tag_label = emoji_shortcode(tag_name) or ""
+        tag_kind = "emoji" if tag_label else "text"
         invalidation_keys = to_client_payload(
             invalidations_for_tag_link(
                 created_date=created_date, tag_hash=tag_hash, reason="tag.link.changed"
@@ -276,6 +291,8 @@ async def remove_tag(entry_id: str, tag_hash: str):
                     "count": tag_count,
                     "entry_id": entry_id,
                     "action": "remove",
+                    "tag_kind": tag_kind,
+                    "tag_label": tag_label,
                 },
                 "cache:invalidate": {
                     "reason": "tag.link.changed",
@@ -303,6 +320,10 @@ async def add_tag(entry_id: str):
     db = get_services().db
     await ensure_entry_exists(db, user["id"], entry_id)
     tag_hash = await db.tags.resolve_or_create_tag(ctx, canonical)
+    tag_hash_hex = tag_hash.hex()
+    existing_tags = await db.tags.get_tags_for_entry(ctx, entry_id)
+    if any(str(tag.get("hash") or "").strip() == tag_hash_hex for tag in existing_tags):
+        return await make_response("", 200)
     created_date = await db.entries.get_entry_date(user["id"], entry_id)
     await db.tags.xref_tag_entry(
         user["id"],
@@ -315,7 +336,7 @@ async def add_tag(entry_id: str):
     html = await render_template(
         "components/tags/tag_item.html",
         tag=canonical,
-        tag_hash=tag_hash.hex(),
+        tag_hash=tag_hash_hex,
         entry_id=entry_id,
         context_query=context_query,
     )
@@ -335,10 +356,12 @@ async def add_tag(entry_id: str):
     response = await make_response(html)
 
     if tag_name:
+        tag_label = emoji_shortcode(tag_name) or ""
+        tag_kind = "emoji" if tag_label else "text"
         invalidation_keys = to_client_payload(
             invalidations_for_tag_link(
                 created_date=created_date,
-                tag_hash=tag_hash.hex(),
+                tag_hash=tag_hash_hex,
                 reason="tag.link.changed",
             )
         )
@@ -346,10 +369,12 @@ async def add_tag(entry_id: str):
             {
                 "tags:tag-count-updated": {
                     "tag": tag_name,
-                    "tag_hash": tag_hash.hex(),
+                    "tag_hash": tag_hash_hex,
                     "count": tag_count,
                     "entry_id": entry_id,
                     "action": "add",
+                    "tag_kind": tag_kind,
+                    "tag_label": tag_label,
                 },
                 "cache:invalidate": {
                     "reason": "tag.link.changed",

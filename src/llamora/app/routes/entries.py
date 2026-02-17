@@ -35,6 +35,7 @@ from llamora.app.services.container import get_services
 from llamora.app.services.entry_context import get_entries_context
 from llamora.app.services.markdown import render_markdown_to_html
 from llamora.app.services.time import get_timezone, local_date
+from llamora.app.util.tags import replace_emoji_shortcodes
 from llamora.settings import settings
 
 entries_bp = Blueprint("entries", __name__)
@@ -147,7 +148,7 @@ async def delete_entry(entry_id: str):
 @login_required
 async def update_entry(entry_id: str):
     form = await request.form
-    text = form.get("text", "")
+    text = replace_emoji_shortcodes(form.get("text", ""))
     _, user, ctx = await require_encryption_context()
     uid = user["id"]
     db = get_services().db
@@ -286,7 +287,7 @@ async def entry_main(entry_id: str):
 @login_required
 async def send_entry(date):
     form = await request.form
-    user_text = form.get("text", "").strip()
+    user_text = replace_emoji_shortcodes(form.get("text", "")).strip()
     user_time = form.get("user_time")
     _, user, ctx = await require_encryption_context()
 

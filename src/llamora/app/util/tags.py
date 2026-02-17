@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from functools import lru_cache
 import re
 import unicodedata
 
@@ -22,6 +23,8 @@ _VS15 = 0xFE0E
 _ZWJ = 0x200D
 _KEYCAP = 0x20E3
 _EMOJI_SHORTCODE = re.compile(r"^:[a-z0-9_+\-]+:$", re.IGNORECASE)
+_EMOJI_SHORTCODE_IN_TEXT = re.compile(r":[a-z0-9_+\-]+:", re.IGNORECASE)
+_ESCAPED_EMOJI_SHORTCODE_IN_TEXT = re.compile(r"\\(:[a-z0-9_+\-]+:)", re.IGNORECASE)
 
 
 def _is_emoji_base_codepoint(cp: int) -> bool:
@@ -133,6 +136,102 @@ def emoji_shortcode(value: str) -> str | None:
     if not _EMOJI_SHORTCODE.fullmatch(short):
         return None
     return short
+
+
+@lru_cache(maxsize=1)
+def _emoji_shortcode_index() -> tuple[tuple[str, str], ...]:
+    index: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for raw_emoji, metadata in emoji_lib.EMOJI_DATA.items():
+        canonical_emoji = _canonicalize_emoji_tag(str(raw_emoji))
+        if not canonical_emoji:
+            continue
+
+        aliases: list[str] = []
+        alias_values = metadata.get("alias")
+        if isinstance(alias_values, list):
+            aliases.extend(
+                str(value) for value in alias_values if isinstance(value, str)
+            )
+        english_alias = metadata.get("en")
+        if isinstance(english_alias, str):
+            aliases.append(english_alias)
+
+        for alias in aliases:
+            shortcode = alias.strip().lower()
+            if not _EMOJI_SHORTCODE.fullmatch(shortcode):
+                continue
+            if shortcode in seen:
+                continue
+            seen.add(shortcode)
+            index.append((shortcode, canonical_emoji))
+
+    index.sort(key=lambda item: (len(item[0]), item[0]))
+    return tuple(index)
+
+
+def suggest_emoji_shortcodes(query: str, limit: int = 12) -> list[dict[str, str]]:
+    """Return shortcode suggestions for ``query``."""
+
+    normalized = str(query or "").strip().lower()
+    if not normalized:
+        return []
+    if normalized.startswith("\\:"):
+        normalized = normalized[1:]
+    if normalized.startswith(":"):
+        normalized = normalized[1:]
+    if normalized.endswith(":"):
+        normalized = normalized[:-1]
+    normalized = normalized.replace(" ", "_")
+    if not normalized:
+        return []
+
+    max_items = max(1, min(int(limit or 12), 64))
+    suggestions: list[dict[str, str]] = []
+    for shortcode, emoji_value in _emoji_shortcode_index():
+        body = shortcode[1:-1]
+        if not body.startswith(normalized):
+            continue
+        suggestions.append(
+            {
+                "shortcode": shortcode,
+                "emoji": emoji_value,
+                "label": body.replace("_", " "),
+            }
+        )
+        if len(suggestions) >= max_items:
+            break
+    return suggestions
+
+
+def replace_emoji_shortcodes(value: str) -> str:
+    """Expand valid emoji shortcodes in free-form text to Unicode emoji."""
+
+    text = str(value or "")
+    if not text or ":" not in text:
+        return text
+
+    placeholders: dict[str, str] = {}
+
+    def _protect(match: re.Match[str]) -> str:
+        token = f"__llamora_emoji_escape_{len(placeholders)}__"
+        placeholders[token] = match.group(1)
+        return token
+
+    protected = _ESCAPED_EMOJI_SHORTCODE_IN_TEXT.sub(_protect, text)
+
+    def _replace(match: re.Match[str]) -> str:
+        token = match.group(0)
+        expanded = _expand_emoji_shortcode(token)
+        if not expanded:
+            return token
+        emoji_value = _canonicalize_emoji_tag(expanded)
+        return emoji_value or token
+
+    converted = _EMOJI_SHORTCODE_IN_TEXT.sub(_replace, protected)
+    for placeholder, raw_shortcode in placeholders.items():
+        converted = converted.replace(placeholder, raw_shortcode)
+    return converted
 
 
 def canonicalize(raw: str) -> str:
