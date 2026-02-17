@@ -42,6 +42,7 @@ import {
   maybeRestoreEntriesAnchor,
   registerTagsScrollStrategy,
   resetEntriesRestoreState,
+  retryAnchorRestore,
   scrollMainContentTop,
   storeMainScrollTop,
 } from "./scroll.js";
@@ -317,6 +318,7 @@ if (!globalThis[BOOT_KEY]) {
       (target.classList?.contains("tags-view__summary") ? target : null);
     if (summaryEl) {
       cacheTagsViewSummary(summaryEl);
+      retryAnchorRestore();
     }
     const inList = target.closest?.("#tags-view-list");
     const inEntries = target.closest?.("[data-tags-view-entries]");
@@ -326,6 +328,9 @@ if (!globalThis[BOOT_KEY]) {
     }
     if (target.id === "tags-view-detail" || inEntries) {
       syncDetailOnly(document);
+      if (inEntries && target.id !== "tags-view-detail") {
+        retryAnchorRestore();
+      }
       return;
     }
     if (target.id === "main-content") {
@@ -437,16 +442,13 @@ if (!globalThis[BOOT_KEY]) {
     if (target.id !== "tags-view-detail") return;
     if (!state.pendingDetailScrollTop) return;
     state.pendingDetailScrollTop = false;
+    scrollMainContentTop();
     state.saveSuppressed = false;
-    if (!maybeRestoreEntriesAnchor()) {
-      scrollMainContentTop();
-    }
+    maybeRestoreEntriesAnchor();
   });
 
   document.addEventListener("app:rehydrate", (event) => {
-    if (event?.detail?.reason !== "bfcache") {
-      state.restoreAppliedForLocation = "";
-    }
+    state.restoreAppliedForLocation = "";
     sync(event?.detail?.context || document);
   });
   document.addEventListener("app:view-changed", (event) => {

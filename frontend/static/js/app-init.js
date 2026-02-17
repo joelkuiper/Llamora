@@ -291,10 +291,6 @@ export function initGlobalShell() {
 }
 
 function init() {
-  if ("scrollRestoration" in history) {
-    history.scrollRestoration = "manual";
-  }
-
   const csrfToken = document.body.dataset.csrfToken || "";
   registerHtmxHeaderHooks(csrfToken);
   registerOfflineHandler();

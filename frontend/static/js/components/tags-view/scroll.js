@@ -187,6 +187,27 @@ const escapeSelectorValue = (value) => {
   return String(value).replaceAll('"', '\\"');
 };
 
+let activeAnchorRestore = null;
+let anchorRetryTimer = 0;
+
+const clearActiveAnchor = () => {
+  activeAnchorRestore = null;
+  if (anchorRetryTimer) {
+    clearTimeout(anchorRetryTimer);
+    anchorRetryTimer = 0;
+  }
+};
+
+export const retryAnchorRestore = () => {
+  if (!activeAnchorRestore) return;
+  const { element, offset, locationKey } = activeAnchorRestore;
+  if (getTagsLocationKey() !== locationKey || !document.contains(element)) {
+    clearActiveAnchor();
+    return;
+  }
+  applyEntriesAnchor(element, offset);
+};
+
 export const maybeRestoreEntriesAnchor = () => {
   const currentLocation = getTagsLocationKey();
   if (!currentLocation) return false;
@@ -204,13 +225,16 @@ export const maybeRestoreEntriesAnchor = () => {
     const entry = document.querySelector(`.tags-view__entry-item[data-entry-id="${escapedId}"]`);
     if (entry instanceof HTMLElement) {
       applyEntriesAnchor(entry, anchor.offset);
+      activeAnchorRestore = { element: entry, offset: anchor.offset, locationKey: currentLocation };
       requestAnimationFrame(() => {
         applyEntriesAnchor(entry, anchor.offset);
       });
+      anchorRetryTimer = setTimeout(retryAnchorRestore, 120);
       state.restoreAppliedForLocation = currentLocation;
       return true;
     }
   }
+  clearActiveAnchor();
   state.restoreAppliedForLocation = currentLocation;
   return restored;
 };
