@@ -20,9 +20,6 @@ importers:
       esbuild:
         specifier: ^0.24.2
         version: 0.24.2
-      fuse.js:
-        specifier: ^7.1.0
-        version: 7.1.0
       htmx-ext-response-targets:
         specifier: ^2.0.4
         version: 2.0.4
@@ -32,9 +29,6 @@ importers:
       htmx.org:
         specifier: ^1.9.12
         version: 1.9.12
-      idiomorph:
-        specifier: ^0.7.4
-        version: 0.7.4
       markdown-it:
         specifier: ^14.1.0
         version: 14.1.1
@@ -278,10 +272,6 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
-  fuse.js@7.1.0:
-    resolution: {integrity: sha512-trLf4SzuuUxfusZADLINj+dE8clK1frKdmqiJNb1Es75fmI5oY6X2mxLVUciLLjxqw/xr72Dhy+lER6dGd02FQ==}
-    engines: {node: '>=10'}
-
   htmx-ext-response-targets@2.0.4:
     resolution: {integrity: sha512-Q/yfH0N2A40j903mr6ldGV3qLWMQeufROylYIbYQLBGrCpmydflxXmQwDOEhEWdPnBTgiHofkAo0gQ3S1BmyxQ==}
 
@@ -293,9 +283,6 @@ packages:
 
   htmx.org@2.0.8:
     resolution: {integrity: sha512-fm297iru0iWsNJlBrjvtN7V9zjaxd+69Oqjh4F/Vq9Wwi2kFisLcrLCiv5oBX0KLfOX/zG8AUo9ROMU5XUB44Q==}
-
-  idiomorph@0.7.4:
-    resolution: {integrity: sha512-uCdSpLo3uMfqOmrwXTpR1k/sq4sSmKC7l4o/LdJOEU+MMMq+wkevRqOQYn3lP7vfz9Mv+USBEqPvi0XhdL9ENw==}
 
   linkify-it@5.0.0:
     resolution: {integrity: sha512-5aHCbzQRADcdP+ATqnDuhhJ/MRIqDkZX5pyjFHRRysS8vZ5AbqGEoFIb6pYHPZ+L/OC2Lc+xT8uHVVR5CAK/wQ==}
@@ -479,8 +466,6 @@ snapshots:
       '@esbuild/win32-ia32': 0.24.2
       '@esbuild/win32-x64': 0.24.2
 
-  fuse.js@7.1.0: {}
-
   htmx-ext-response-targets@2.0.4:
     dependencies:
       htmx.org: 2.0.8
@@ -492,8 +477,6 @@ snapshots:
   htmx.org@1.9.12: {}
 
   htmx.org@2.0.8: {}
-
-  idiomorph@0.7.4: {}
 
   linkify-it@5.0.0:
     dependencies:
