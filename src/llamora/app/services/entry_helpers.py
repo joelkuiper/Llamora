@@ -15,9 +15,23 @@ from werkzeug.datastructures import Headers
 
 from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.tag_recall import TagRecallContext
+from llamora.settings import settings
 
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_MAX_TARGET_REPLIES = 2
+
+
+def _resolve_max_target_replies() -> int:
+    raw = settings.get("LLM.reply_context.max_prior_replies")
+    if raw is None:
+        return DEFAULT_MAX_TARGET_REPLIES
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_MAX_TARGET_REPLIES
+    return max(0, value)
 
 
 def replace_newline(value: str) -> str:
@@ -89,19 +103,33 @@ def normalize_llm_config(
 def build_entry_history(
     entries: Sequence[Mapping[str, Any]], entry_id: str
 ) -> list[dict[str, Any]]:
-    """Flatten entry aggregates into a linear history up to ``entry_id``."""
+    """Flatten entry aggregates into a linear history up to ``entry_id``.
+
+    Includes up to ``LLM.reply_context.max_prior_replies`` responses for the
+    target entry so repeated replies can use immediate assistant context.
+    """
 
     history: list[dict[str, Any]] = []
     target_id = str(entry_id)
+    max_target_replies = _resolve_max_target_replies()
     for entry in entries:
         entry_item = entry.get("entry")
+        is_target = False
         if isinstance(entry_item, Mapping):
             history.append(dict(entry_item))
-            if str(entry_item.get("id")) == target_id:
-                return history
+            is_target = str(entry_item.get("id")) == target_id
+
+        responses: list[dict[str, Any]] = []
         for response in entry.get("responses") or []:
             if isinstance(response, Mapping):
-                history.append(dict(response))
+                responses.append(dict(response))
+
+        if is_target:
+            if max_target_replies > 0:
+                history.extend(responses[-max_target_replies:])
+            return history
+
+        history.extend(responses)
     return history
 
 
