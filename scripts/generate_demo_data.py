@@ -45,6 +45,21 @@ logger = logging.getLogger(__name__)
 
 HTTP_RETRIES_DEFAULT = 3
 HTTP_RETRY_BASE_DELAY = 0.5
+EMOJI_TAG_RE = re.compile(
+    "["
+    "\U0001f1e6-\U0001f1ff"  # flags
+    "\U0001f300-\U0001f5ff"
+    "\U0001f600-\U0001f64f"
+    "\U0001f680-\U0001f6ff"
+    "\U0001f700-\U0001f77f"
+    "\U0001f780-\U0001f7ff"
+    "\U0001f800-\U0001f8ff"
+    "\U0001f900-\U0001f9ff"
+    "\U0001fa00-\U0001faff"
+    "\u2600-\u26ff"
+    "\u2700-\u27bf"
+    "]"
+)
 
 
 @dataclass(slots=True)
@@ -59,12 +74,15 @@ class DemoConfig:
     day_open_only_rate: float
     day_empty_rate: float
     response_rate: float
+    min_tags: int
     max_tags: int
     tz: str
     seed: int
     persona_hint: str
     llm_max_tokens: int
-    markdown_rate: float
+    small_entry_rate: float
+    medium_entry_rate: float
+    large_entry_rate: float
     multi_response_rate: float
     max_responses_per_entry: int
     min_entry_chars: int
@@ -86,6 +104,7 @@ DEFAULTS: dict[str, Any] = {
     "day_open_only_rate": 0.15,
     "day_empty_rate": 0.1,
     "response_rate": 0.6,
+    "min_tags": 1,
     "max_tags": 4,
     "timezone": "UTC",
     "seed": 1337,
@@ -97,7 +116,9 @@ DEFAULTS: dict[str, Any] = {
     "min_entry_chars": 260,
     "max_entry_chars": 1200,
     "entry_retries": 2,
-    "markdown_rate": 0.3,
+    "small_entry_rate": 0.45,
+    "medium_entry_rate": 0.35,
+    "large_entry_rate": 0.20,
     "entry_context_size": 4,
     "entry_context_chars": 2048,
     "entry_temperature": None,
@@ -140,6 +161,32 @@ def _build_demo_config(
         DEFAULTS["day_empty_rate"],
     )
 
+    min_tags = coerce_int(merged.get("min_tags"), DEFAULTS["min_tags"])
+    max_tags = coerce_int(merged.get("max_tags"), DEFAULTS["max_tags"])
+    if min_tags < 0:
+        raise ValueError("min_tags must be >= 0")
+    if max_tags < 0:
+        raise ValueError("max_tags must be >= 0")
+    if min_tags > max_tags:
+        raise ValueError("min_tags cannot be greater than max_tags")
+
+    small_entry_rate = coerce_float(
+        merged.get("small_entry_rate"), DEFAULTS["small_entry_rate"]
+    )
+    medium_entry_rate = coerce_float(
+        merged.get("medium_entry_rate"), DEFAULTS["medium_entry_rate"]
+    )
+    large_entry_rate = coerce_float(
+        merged.get("large_entry_rate"), DEFAULTS["large_entry_rate"]
+    )
+    if small_entry_rate < 0 or medium_entry_rate < 0 or large_entry_rate < 0:
+        raise ValueError("Entry size rates must be >= 0")
+    size_rate_sum = small_entry_rate + medium_entry_rate + large_entry_rate
+    if abs(size_rate_sum - 1.0) > 1e-6:
+        raise ValueError(
+            "small_entry_rate + medium_entry_rate + large_entry_rate must equal 1.0"
+        )
+
     return DemoConfig(
         base_url=coerce_str(merged.get("base_url"), DEFAULTS["base_url"])
         or DEFAULTS["base_url"],
@@ -154,7 +201,8 @@ def _build_demo_config(
         response_rate=coerce_float(
             merged.get("response_rate"), DEFAULTS["response_rate"]
         ),
-        max_tags=coerce_int(merged.get("max_tags"), DEFAULTS["max_tags"]),
+        min_tags=min_tags,
+        max_tags=max_tags,
         tz=coerce_str(merged.get("timezone"), DEFAULTS["timezone"])
         or DEFAULTS["timezone"],
         seed=coerce_int(merged.get("seed"), DEFAULTS["seed"]),
@@ -163,9 +211,9 @@ def _build_demo_config(
         llm_max_tokens=coerce_int(
             merged.get("llm_max_tokens"), DEFAULTS["llm_max_tokens"]
         ),
-        markdown_rate=coerce_float(
-            merged.get("markdown_rate"), DEFAULTS["markdown_rate"]
-        ),
+        small_entry_rate=small_entry_rate,
+        medium_entry_rate=medium_entry_rate,
+        large_entry_rate=large_entry_rate,
         multi_response_rate=coerce_float(
             merged.get("multi_response_rate"), DEFAULTS["multi_response_rate"]
         ),
@@ -611,13 +659,48 @@ def _humanize_days_ago(delta_days: int) -> str:
     return f"{delta_days} days ago"
 
 
+def _is_emoji_tag(value: str) -> bool:
+    return bool(EMOJI_TAG_RE.search(value or ""))
+
+
+def _parse_tag_selection_payload(raw: str) -> list[str] | None:
+    text = (raw or "").strip()
+    if not text:
+        return None
+    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.IGNORECASE).strip()
+    try:
+        parsed = orjson.loads(text)
+    except Exception:
+        parsed = None
+    if isinstance(parsed, list):
+        return [str(item or "").strip() for item in parsed if str(item or "").strip()]
+
+    # Fallback for lax model output like: [🚫, ai-models, problem-solving]
+    if not (text.startswith("[") and text.endswith("]")):
+        return None
+    inner = text[1:-1].strip()
+    if not inner:
+        return []
+    raw_tokens = re.findall(r'"(?:\\.|[^"])*"|\'(?:\\.|[^\'])*\'|[^,\n]+', inner)
+    tokens: list[str] = []
+    for token in raw_tokens:
+        value = token.strip().strip("`")
+        if not value:
+            continue
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        value = value.strip()
+        if value:
+            tokens.append(value)
+    return tokens
+
+
 async def _generate_entry_text(
     llm: AsyncOpenAI,
     config: DemoConfig,
     entry_date: date,
     entry_time: datetime,
     index: int,
-    include_markdown: bool,
     recent_entries: list[str],
     event_note: str | None,
     followup_note: str | None,
@@ -625,17 +708,51 @@ async def _generate_entry_text(
     persona = config.persona_hint.strip()
     time_label = entry_time.strftime("%H:%M")
 
-    # Soft length variation: sometimes short, sometimes longer.
+    # Soft length variation: quick snippets, normal notes, and very large markdown entries.
     length_mode = random.choices(
-        ["short", "medium", "long"],
-        weights=[0.45, 0.35, 0.20],
+        ["small", "medium", "large"],
+        weights=[
+            config.small_entry_rate,
+            config.medium_entry_rate,
+            config.large_entry_rate,
+        ],
         k=1,
     )[0]
     length_hint = ""
+    target_min_chars = config.min_entry_chars
+    target_max_chars = config.max_entry_chars
+    max_tokens = config.llm_max_tokens
     if length_mode == "medium":
-        length_hint = "Keep rambling.\n"
-    elif length_mode == "long":
-        length_hint = "Write a short essay on a topic.\n"
+        target_min_chars = max(220, min(config.min_entry_chars, 420))
+        target_max_chars = max(
+            target_min_chars + 200, min(config.max_entry_chars, 1400)
+        )
+        length_hint = (
+            "Write a normal journal note with a little depth.\n"
+            f"Target length: about {target_min_chars}-{target_max_chars} characters.\n"
+        )
+    elif length_mode == "large":
+        target_min_chars = max(config.min_entry_chars, 1600)
+        target_max_chars = max(config.max_entry_chars, 3800)
+        max_tokens = max(config.llm_max_tokens, 1200)
+        length_hint = textwrap.dedent(
+            f"""
+            Write a very large markdown entry.
+            Target length: about {target_min_chars}-{target_max_chars} characters.
+            Structure it with:
+            - at least one markdown header (`##` or `###`)
+            - a bullet or numbered list, table, quote, etc.
+            """
+        ).strip()
+    else:
+        # "small": tweet-like entry.
+        target_min_chars = 80
+        target_max_chars = 280
+        max_tokens = min(config.llm_max_tokens, 220)
+        length_hint = (
+            "Write a tweet-length note only. Keep it concise and specific.\n"
+            f"Hard cap: {target_max_chars} characters.\n"
+        )
 
     user_message = textwrap.dedent(
         f"""
@@ -667,15 +784,6 @@ async def _generate_entry_text(
             f"""
 
             Recent event context (lightly reflect on it): {followup_note}
-            """
-        )
-
-    if include_markdown:
-        user_message += textwrap.dedent(
-            """
-
-            You may use markdown if it feels natural
-            (for example tables, formatting, quotes, etc).
             """
         )
 
@@ -713,7 +821,7 @@ async def _generate_entry_text(
         response = await llm.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=config.llm_max_tokens,
+            max_tokens=max_tokens,
             **params,
         )
 
@@ -722,24 +830,24 @@ async def _generate_entry_text(
             continue
         text = strip_outer_quotes(text)
 
-        if len(text) < config.min_entry_chars:
+        if len(text) < target_min_chars:
             extra = (
                 "You can expand slightly on the same situation.\n"
-                if length_mode != "short"
+                if length_mode != "small"
                 else ""
             )
             user_message = textwrap.dedent(
                 f"""
                 {user_message}
 
-                Write a bit more (at least {config.min_entry_chars} characters).
+                Write a bit more (at least {target_min_chars} characters).
                 {extra}Do not add metadata or repeat earlier concerns unless needed.
                 """
             ).strip()
             continue
 
-        if len(text) > config.max_entry_chars:
-            text = text[: config.max_entry_chars].rsplit(" ", 1)[0].rstrip()
+        if len(text) > target_max_chars:
+            text = text[:target_max_chars].rsplit(" ", 1)[0].rstrip()
 
         return text
 
@@ -986,17 +1094,37 @@ async def _select_tags_with_llm(
     config: DemoConfig,
     entry_text: str,
     suggestions: list[str],
+    min_tags: int,
     max_tags: int,
 ) -> list[str]:
     if not suggestions or max_tags <= 0:
         return []
-    # Bias toward fewer tags to keep outputs realistic.
-    if random.random() < 0.25:
+    effective_max = min(max_tags, len(suggestions))
+    if effective_max <= 0:
         return []
-    if random.random() < 0.35:
-        max_tags = min(1, max_tags)
-    elif random.random() < 0.35:
-        max_tags = min(2, max_tags)
+    effective_min = min(max(0, min_tags), effective_max)
+    target_tag_count = random.randint(effective_min, effective_max)
+    if target_tag_count <= 0:
+        return []
+
+    unique_suggestions: list[str] = []
+    seen: set[str] = set()
+    for suggestion in suggestions:
+        value = str(suggestion or "").strip()
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        unique_suggestions.append(value)
+    if not unique_suggestions:
+        return []
+
+    effective_max = min(target_tag_count, len(unique_suggestions))
+    effective_min = min(effective_min, effective_max)
+    if effective_max <= 0:
+        return []
+
+    emoji_suggestions = [tag for tag in unique_suggestions if _is_emoji_tag(tag)]
+    max_emoji_tags = 1
     model = settings.get("LLM.chat.model") or "local"
     params = dict(settings.get("LLM.chat.parameters") or {})
     params["temperature"] = min(0.4, max(0.1, float(params.get("temperature", 0.2))))
@@ -1008,16 +1136,21 @@ async def _select_tags_with_llm(
             "schema": {
                 "type": "array",
                 "items": {"type": "string"},
-                "maxItems": max_tags,
+                "minItems": effective_max,
+                "maxItems": effective_max,
             },
         },
     }
-    tag_lines = "\n".join(f"- {tag}" for tag in suggestions)
+    tag_lines = "\n".join(f"- {tag}" for tag in unique_suggestions)
+    emoji_hint = (
+        "Use at most one emoji tag in the final list." if emoji_suggestions else ""
+    )
     user_message = textwrap.dedent(
         f"""
         Pick the most relevant tags for the entry from the suggestions list.
-        Return a JSON array only (no markdown, no code fences). Choose up to {max_tags} tags.
-        If none fit, return an empty list.
+        Return a JSON array only (no markdown, no code fences).
+        Choose exactly {effective_max} tags.
+        {emoji_hint}
 
         Entry:
         {entry_text}
@@ -1042,24 +1175,68 @@ async def _select_tags_with_llm(
         **params,
     )
     raw = (response.choices[0].message.content or "").strip()
-    try:
-        parsed = orjson.loads(raw)
-    except Exception:
+    parsed = _parse_tag_selection_payload(raw)
+    if parsed is None:
         logger.info("Tag selection raw (truncated): %s", raw[:1200])
         logger.warning("Failed to parse tag selection JSON; skipping tags")
         return []
-    tags = parsed if isinstance(parsed, list) else None
-    if not isinstance(tags, list):
-        return []
-    allowed = {tag.strip() for tag in suggestions}
+    tags = parsed
+    allowed = {tag.strip() for tag in unique_suggestions}
     selected: list[str] = []
     for tag in tags:
         value = str(tag or "").strip()
         if not value or value not in allowed or value in selected:
             continue
         selected.append(value)
-        if len(selected) >= max_tags:
+        if len(selected) >= effective_max:
             break
+    # Enforce the hard cap of one emoji tag.
+    emoji_positions = [
+        idx for idx, value in enumerate(selected) if _is_emoji_tag(value)
+    ]
+    if len(emoji_positions) > max_emoji_tags:
+        non_emoji_pool = [
+            tag
+            for tag in unique_suggestions
+            if not _is_emoji_tag(tag) and tag not in selected
+        ]
+        for idx in emoji_positions[max_emoji_tags:]:
+            if non_emoji_pool:
+                selected[idx] = non_emoji_pool.pop(0)
+            else:
+                selected[idx] = ""
+        selected = [tag for tag in selected if tag]
+
+    # Fill to requested count when model returns too few tags.
+    if len(selected) < effective_max:
+        non_emoji_pool = [
+            tag
+            for tag in unique_suggestions
+            if tag not in selected and not _is_emoji_tag(tag)
+        ]
+        emoji_pool = [tag for tag in emoji_suggestions if tag not in selected]
+        fallback_pool = list(non_emoji_pool)
+        if (
+            emoji_pool
+            and sum(1 for tag in selected if _is_emoji_tag(tag)) < max_emoji_tags
+        ):
+            fallback_pool.append(emoji_pool[0])
+        fallback_pool.extend(
+            tag
+            for tag in unique_suggestions
+            if tag not in selected and tag not in fallback_pool
+        )
+        for tag in fallback_pool:
+            if (
+                _is_emoji_tag(tag)
+                and sum(1 for current in selected if _is_emoji_tag(current))
+                >= max_emoji_tags
+            ):
+                continue
+            selected.append(tag)
+            if len(selected) >= effective_max:
+                break
+
     return selected
 
 
@@ -1069,6 +1246,7 @@ async def _apply_tags(
     client: httpx.AsyncClient,
     entry_id: str,
     entry_text: str,
+    min_tags: int,
     max_tags: int,
     headers: dict[str, str],
 ) -> list[str]:
@@ -1092,6 +1270,7 @@ async def _apply_tags(
         config,
         entry_text,
         suggestions,
+        min_tags,
         max_tags,
     )
     if not selected:
@@ -1120,6 +1299,13 @@ async def generate_dataset(config: DemoConfig) -> None:
     log_header(f"User: {config.username}")
     log_item(f"Range: {config.start_date} to {config.end_date} ({config.tz})")
     log_item(f"Persona: {config.persona_hint}")
+    log_item(f"Tags per entry: {config.min_tags} to {config.max_tags}")
+    log_item(
+        "Entry size rates: "
+        f"small={config.small_entry_rate:.2f}, "
+        f"medium={config.medium_entry_rate:.2f}, "
+        f"large={config.large_entry_rate:.2f}"
+    )
     recent_entries: deque[str] = deque(maxlen=max(0, config.entry_context_size))
     narrative_events = await _generate_narrative_timeline(llm, config)
     if narrative_events:
@@ -1168,6 +1354,7 @@ async def generate_dataset(config: DemoConfig) -> None:
         }
 
         total_entries = 0
+        total_tags = 0
         for day in iter_days(config.start_date, config.end_date):
             log_rule(f"Day {day.isoformat()}")
             headers = {
@@ -1234,14 +1421,12 @@ async def generate_dataset(config: DemoConfig) -> None:
                 logger.debug(
                     "Generating entry %s/%s for %s", idx + 1, entries_today, day
                 )
-                include_markdown = random.random() < config.markdown_rate
                 text = await _generate_entry_text(
                     llm,
                     config,
                     day,
                     entry_time,
                     idx,
-                    include_markdown,
                     list(recent_entries),
                     event_note,
                     followup_note,
@@ -1271,15 +1456,17 @@ async def generate_dataset(config: DemoConfig) -> None:
                     continue
                 total_entries += 1
 
-                await _apply_tags(
+                selected_tags = await _apply_tags(
                     llm,
                     config,
                     client,
                     entry_id,
                     text,
+                    config.min_tags,
                     config.max_tags,
                     headers,
                 )
+                total_tags += len(selected_tags)
 
                 if random.random() < config.response_rate:
                     response_count = 1
@@ -1299,7 +1486,13 @@ async def generate_dataset(config: DemoConfig) -> None:
                             headers,
                         )
 
-        logger.info("Done. Created %d entries.", total_entries)
+        avg_tags = (total_tags / total_entries) if total_entries else 0.0
+        logger.info(
+            "Done. Created %d entries, applied %d tags (avg %.2f per entry).",
+            total_entries,
+            total_tags,
+            avg_tags,
+        )
 
 
 def _setup_logging(verbose: bool) -> None:
@@ -1337,6 +1530,7 @@ def run_cmd(
         help="Chance of opening-only on non-empty days (ignored for event days).",
     ),
     response_rate: float | None = typer.Option(None, help="Chance of responses."),
+    min_tags: int | None = typer.Option(None, help="Minimum tags per entry."),
     max_tags: int | None = typer.Option(None, help="Max tags per entry."),
     timezone: str | None = typer.Option(
         None, help="IANA timezone (e.g. Europe/Amsterdam)."
@@ -1347,8 +1541,14 @@ def run_cmd(
     entry_temperature: float | None = typer.Option(
         None, help="Entry temperature override."
     ),
-    markdown_rate: float | None = typer.Option(
-        None, help="Chance of markdown in entries."
+    small_entry_rate: float | None = typer.Option(
+        None, help="Probability of small (tweet-like) entries."
+    ),
+    medium_entry_rate: float | None = typer.Option(
+        None, help="Probability of medium entries."
+    ),
+    large_entry_rate: float | None = typer.Option(
+        None, help="Probability of large entries."
     ),
     entry_context_size: int | None = typer.Option(
         None, help="Recent entries to include."
@@ -1391,13 +1591,16 @@ def run_cmd(
         "max_entries": max_entries,
         "day_open_only_rate": day_open_only_rate,
         "response_rate": response_rate,
+        "min_tags": min_tags,
         "max_tags": max_tags,
         "timezone": timezone,
         "seed": seed,
         "persona": persona,
         "llm_max_tokens": llm_max_tokens,
         "entry_temperature": entry_temperature,
-        "markdown_rate": markdown_rate,
+        "small_entry_rate": small_entry_rate,
+        "medium_entry_rate": medium_entry_rate,
+        "large_entry_rate": large_entry_rate,
         "entry_context_size": entry_context_size,
         "entry_context_chars": entry_context_chars,
         "min_entry_chars": min_entry_chars,
