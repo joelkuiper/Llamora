@@ -489,14 +489,27 @@ class EntryIndexStore:
             ctx = self._contexts.get(user_id)
             if ctx is None:
                 continue
-            added = await self.expand_older(
-                ctx,
-                self.backfill_batch_size,
-                embed_missing=True,
-            )
-            if added > 0:
-                batches += 1
-                await self.get_index_coverage(ctx, recalculate=True)
+            try:
+                batch_ctx = ctx.fork()
+            except ValueError:
+                if self._contexts.get(user_id) is ctx:
+                    self._contexts.pop(user_id, None)
+                logger.debug(
+                    "Dropped stale cached crypto context for user %s during backfill",
+                    user_id,
+                )
+                continue
+            try:
+                added = await self.expand_older(
+                    batch_ctx,
+                    self.backfill_batch_size,
+                    embed_missing=True,
+                )
+                if added > 0:
+                    batches += 1
+                    await self.get_index_coverage(batch_ctx, recalculate=True)
+            finally:
+                batch_ctx.drop()
             await asyncio.sleep(0)
 
         if self._backfill_order:
