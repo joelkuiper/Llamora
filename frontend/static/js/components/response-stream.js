@@ -40,6 +40,10 @@ class ResponseStreamElement extends HTMLElement {
   #controller = null;
   #deleteButton = null;
 
+  #shouldAutoScrollViewport() {
+    return Boolean(this.closest?.("entry-view"));
+  }
+
   #getStreamController() {
     if (this.dataset?.controller === "off") {
       return null;
@@ -77,7 +81,10 @@ class ResponseStreamElement extends HTMLElement {
       this.#renderer = new StreamRenderer({
         markdown: this.#markdown,
         typingIndicator: this.#typingIndicator,
-        requestScroll: (detail) => requestScrollToBottom({ ...detail, element: this }),
+        requestScroll: (detail) => {
+          if (!this.#shouldAutoScrollViewport()) return;
+          requestScrollToBottom({ ...detail, element: this });
+        },
       });
     } else if (this.#renderer) {
       this.#renderer.setTypingIndicator(this.#typingIndicator);
@@ -185,7 +192,9 @@ class ResponseStreamElement extends HTMLElement {
     if (controller && typeof controller.notifyStreamStart === "function") {
       controller.notifyStreamStart(this, { reason: "stream:start" });
     }
-    requestScrollForceEdge({ source: "stream:start", direction: "down" });
+    if (this.#shouldAutoScrollViewport()) {
+      requestScrollForceEdge({ source: "stream:start", direction: "down" });
+    }
     this.dispatchEvent(
       new CustomEvent("response-stream:start", {
         bubbles: true,

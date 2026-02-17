@@ -66,6 +66,10 @@ const FEATURE_IMPORTS = {
     selector: "entry-view",
     loader: () => import("../components/entries-view/index.js"),
   },
+  responseStream: {
+    selector: "response-stream",
+    loader: () => import("../components/response-stream.js"),
+  },
   entryTags: {
     selector: "entry-tags",
     loader: () => import("../components/entry-tags.js"),
