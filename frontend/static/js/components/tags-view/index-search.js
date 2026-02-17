@@ -42,6 +42,26 @@ const normalizeTagKey = (value) =>
     .trim()
     .toLowerCase();
 
+const normalizeAlphaSortToken = (name, kind = "", label = "") => {
+  const normalizedKind = String(kind || "")
+    .trim()
+    .toLowerCase();
+  const normalizedLabel = String(label || "").trim();
+  if (
+    normalizedKind === "emoji" &&
+    normalizedLabel.startsWith(":") &&
+    normalizedLabel.endsWith(":")
+  ) {
+    const base = normalizedLabel.slice(1, -1).trim();
+    if (base) {
+      return base.replaceAll("_", " ").toLowerCase();
+    }
+  }
+  return String(name || "")
+    .trim()
+    .toLowerCase();
+};
+
 export const resetIndexCache = () => {
   state.indexItems = null;
   state.indexPending = false;
@@ -112,6 +132,8 @@ const createTagRow = (item, { transient = false } = {}) => {
   row.dataset.tagName = item.name;
   row.dataset.tagsName = item.name;
   row.dataset.tagsCount = String(item.count ?? 0);
+  row.dataset.tagsKind = item.kind || "text";
+  row.dataset.tagsLabel = String(item.label || "").trim();
   if (transient) {
     row.dataset.tagsTransient = "true";
   }
@@ -469,8 +491,18 @@ const _sortRows = () => {
   if (!state.list || state.rows.length <= 1) return;
 
   const sorted = [...state.rows].sort((a, b) => {
-    const nameA = (a.dataset.tagsName || "").toLowerCase();
-    const nameB = (b.dataset.tagsName || "").toLowerCase();
+    const nameA = String(a.dataset.tagsName || "").toLowerCase();
+    const nameB = String(b.dataset.tagsName || "").toLowerCase();
+    const alphaA = normalizeAlphaSortToken(
+      a.dataset.tagsName,
+      a.dataset.tagsKind,
+      a.dataset.tagsLabel,
+    );
+    const alphaB = normalizeAlphaSortToken(
+      b.dataset.tagsName,
+      b.dataset.tagsKind,
+      b.dataset.tagsLabel,
+    );
     const countA = Number.parseInt(a.dataset.tagsCount || "0", 10) || 0;
     const countB = Number.parseInt(b.dataset.tagsCount || "0", 10) || 0;
 
@@ -478,11 +510,17 @@ const _sortRows = () => {
       if (countA !== countB) {
         return state.sortDir === "desc" ? countB - countA : countA - countB;
       }
+      const alphaCmp = alphaA.localeCompare(alphaB);
+      if (alphaCmp !== 0) return alphaCmp;
       return nameA.localeCompare(nameB);
     }
 
-    const alphaCmp = nameA.localeCompare(nameB);
-    return state.sortDir === "desc" ? -alphaCmp : alphaCmp;
+    const alphaCmp = alphaA.localeCompare(alphaB);
+    if (alphaCmp !== 0) {
+      return state.sortDir === "desc" ? -alphaCmp : alphaCmp;
+    }
+    const nameCmp = nameA.localeCompare(nameB);
+    return state.sortDir === "desc" ? -nameCmp : nameCmp;
   });
 
   sorted.forEach((row) => {
@@ -775,16 +813,24 @@ export const requestSort = (kind, dir) => {
     state.indexItems = state.indexItems.slice().sort((a, b) => {
       const nameA = a.name.toLowerCase();
       const nameB = b.name.toLowerCase();
+      const alphaA = normalizeAlphaSortToken(a.name, a.kind, a.label);
+      const alphaB = normalizeAlphaSortToken(b.name, b.kind, b.label);
       const countA = Number.parseInt(a.count || "0", 10) || 0;
       const countB = Number.parseInt(b.count || "0", 10) || 0;
       if (nextKind === "count") {
         if (countA !== countB) {
           return nextDir === "desc" ? countB - countA : countA - countB;
         }
+        const alphaCmp = alphaA.localeCompare(alphaB);
+        if (alphaCmp !== 0) return alphaCmp;
         return nameA.localeCompare(nameB);
       }
-      const alphaCmp = nameA.localeCompare(nameB);
-      return nextDir === "desc" ? -alphaCmp : alphaCmp;
+      const alphaCmp = alphaA.localeCompare(alphaB);
+      if (alphaCmp !== 0) {
+        return nextDir === "desc" ? -alphaCmp : alphaCmp;
+      }
+      const nameCmp = nameA.localeCompare(nameB);
+      return nextDir === "desc" ? -nameCmp : nameCmp;
     });
     rebuildIndexList(document);
     finalizeSort();

@@ -11,7 +11,11 @@ import textwrap
 from dataclasses import dataclass
 from typing import Any, Iterable, Literal, Sequence
 
-from llamora.app.util.tags import canonicalize as _canonicalize, display as _display
+from llamora.app.util.tags import (
+    canonicalize as _canonicalize,
+    display as _display,
+    emoji_shortcode,
+)
 from llamora.app.services.crypto import CryptoContext
 from llamora.persistence.local_db import LocalDB
 from llamora.app.services.entry_metadata import (
@@ -491,16 +495,24 @@ class TagService:
         sort_kind: TagsSortKind,
         sort_dir: TagsSortDirection,
     ) -> list[TagIndexItem]:
+        def _alpha_key(item: TagIndexItem) -> str:
+            shortcode = emoji_shortcode(item.name) or ""
+            if shortcode.startswith(":") and shortcode.endswith(":"):
+                base = shortcode[1:-1]
+                if base:
+                    return base.replace("_", " ").lower()
+            return item.name.lower()
+
         if sort_kind == "count":
             if sort_dir == "desc":
-                items.sort(key=lambda item: (-item.count, item.name))
+                items.sort(key=lambda item: (-item.count, _alpha_key(item)))
             else:
-                items.sort(key=lambda item: (item.count, item.name))
+                items.sort(key=lambda item: (item.count, _alpha_key(item)))
             return items
         if sort_dir == "desc":
-            items.sort(key=lambda item: item.name, reverse=True)
+            items.sort(key=_alpha_key, reverse=True)
         else:
-            items.sort(key=lambda item: item.name)
+            items.sort(key=_alpha_key)
         return items
 
     async def _build_archive_detail(
