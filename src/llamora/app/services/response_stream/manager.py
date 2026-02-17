@@ -306,6 +306,11 @@ class ResponseStreamManager:
         if not pending:
             return None
 
+        if pending.done or pending.cancelled:
+            self._pending.pop(entry_id, None)
+            self._schedule_pending_cancellation(entry_id, pending)
+            return None
+
         if pending.uid != ctx.user_id:
             logger.warning(
                 "UID mismatch for pending response %s (stored=%s, caller=%s)",
@@ -394,9 +399,14 @@ class ResponseStreamManager:
         self._ensure_queue_worker()
         pending = self._pending.get(entry_id)
         if pending:
-            if pending.uid == ctx.user_id:
+            if pending.done or pending.cancelled:
+                self._pending.pop(entry_id, None)
+                self._schedule_pending_cancellation(entry_id, pending)
+                pending = None
+            elif pending.uid == ctx.user_id:
                 return pending
 
+        if pending:
             logger.warning(
                 "UID mismatch on start for %s (stored=%s, caller=%s)",
                 entry_id,

@@ -112,24 +112,50 @@ def build_entry_history(
     history: list[dict[str, Any]] = []
     target_id = str(entry_id)
     max_target_replies = _resolve_max_target_replies()
+
+    def _build_target_reply_context(
+        responses: Sequence[Mapping[str, Any] | dict[str, Any]],
+    ) -> dict[str, Any] | None:
+        if max_target_replies <= 0:
+            return None
+        selected = list(responses)[-max_target_replies:]
+        lines: list[str] = []
+        for idx, response in enumerate(selected, start=1):
+            text = str(response.get("text") or "").strip()
+            if not text:
+                continue
+            lines.append(f"{idx}. {text}")
+        if not lines:
+            return None
+        return {
+            "role": "system",
+            "text": (
+                "Previous assistant replies to the same latest user message. "
+                "Use them for continuity and avoid repeating them verbatim.\n\n"
+                + "\n\n".join(lines)
+            ),
+        }
+
     for entry in entries:
         entry_item = entry.get("entry")
         is_target = False
-        if isinstance(entry_item, Mapping):
-            history.append(dict(entry_item))
-            is_target = str(entry_item.get("id")) == target_id
-
-        responses: list[dict[str, Any]] = []
+        responses: list[Mapping[str, Any] | dict[str, Any]] = []
         for response in entry.get("responses") or []:
             if isinstance(response, Mapping):
-                responses.append(dict(response))
+                responses.append(response)
 
-        if is_target:
-            if max_target_replies > 0:
-                history.extend(responses[-max_target_replies:])
-            return history
+        if isinstance(entry_item, Mapping):
+            is_target = str(entry_item.get("id")) == target_id
+            if is_target:
+                target_context = _build_target_reply_context(responses)
+                if target_context:
+                    history.append(target_context)
+                history.append(dict(entry_item))
+                return history
+            history.append(dict(entry_item))
 
-        history.extend(responses)
+        response_items = [dict(response) for response in responses]
+        history.extend(response_items)
     return history
 
 
