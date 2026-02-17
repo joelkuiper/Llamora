@@ -57,6 +57,25 @@ def _resolve_view_day(raw_day: str | None) -> str:
     fallback = local_date().isoformat()
     value = str(raw_day or "").strip()
     if not value:
+        active_day = str(request.headers.get("X-Active-Day") or "").strip()
+        if active_day:
+            try:
+                return require_iso_date(active_day)
+            except Exception:
+                pass
+        view_state_raw = str(request.headers.get("X-View-State") or "").strip()
+        if view_state_raw:
+            try:
+                view_state = json.loads(view_state_raw)
+            except Exception:
+                view_state = None
+            if isinstance(view_state, dict):
+                view_day = str(view_state.get("day") or "").strip()
+                if view_day:
+                    try:
+                        return require_iso_date(view_day)
+                    except Exception:
+                        pass
         return fallback
     try:
         return require_iso_date(value)
