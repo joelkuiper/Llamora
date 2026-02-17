@@ -8,10 +8,11 @@
      data-date="{{ item_date }}"
      data-target="entry-{{ item.id }}"
      hx-trigger="click[!document.getElementById('entries') || document.getElementById('entries').dataset.date !== this.dataset.date]">
-    <div class="search-result-time">
-      {{ item.created_at|humanize }}
-    </div>
     <div class="search-result-body">
+      <time class="entry-time search-result-time"
+            datetime="{{ item.created_at }}"
+            data-time-raw="{{ item.created_at }}"
+            data-time-style="ago-date-time"></time>
       <div class="search-result-content">
         {%- if item.snippet.leading_ellipsis %}…{% endif -%}
         {%- for seg in item.snippet.segments -%}
