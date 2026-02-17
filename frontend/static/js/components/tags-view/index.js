@@ -1,34 +1,15 @@
+import { getViewState } from "../../services/view-state.js";
 import { clearScrollTarget, flashHighlight } from "../../ui.js";
-import { state } from "./state.js";
-import { findDetail } from "./dom.js";
 import {
+  animateDetailEntries,
   getSelectedTrace,
+  highlightRequestedTag,
   refreshDetailLinksForSort,
+  setSelectedTagCount,
   syncFromDetail,
   updateSelectedTagCounts,
-  setSelectedTagCount,
-  animateDetailEntries,
-  highlightRequestedTag,
 } from "./detail.js";
-import {
-  applySearch,
-  buildIndexListIfNeeded,
-  buildSearchIndex,
-  clearSearchForTargetNavigation,
-  ensureActiveRowPresent,
-  findRowByTagName,
-  readStoredSearchQuery,
-  requestSort,
-  scheduleSearch,
-  scrollActiveRowIntoView,
-  setActiveTag,
-  syncSortStateFromDom,
-  updateSortButtons,
-  hydrateIndexFromTemplate,
-  captureListPositions,
-  animateListReorder,
-  rebuildIndexList,
-} from "./index-search.js";
+import { findDetail } from "./dom.js";
 import {
   applyStoredHeatmapOffset,
   handleHeatmapAfterSwap,
@@ -36,6 +17,25 @@ import {
   initHeatmapTooltip,
   storeHeatmapOffsetFromRoot,
 } from "./heatmap.js";
+import {
+  animateListReorder,
+  applySearch,
+  buildIndexListIfNeeded,
+  buildSearchIndex,
+  captureListPositions,
+  clearSearchForTargetNavigation,
+  ensureActiveRowPresent,
+  findRowByTagName,
+  hydrateIndexFromTemplate,
+  readStoredSearchQuery,
+  rebuildIndexList,
+  requestSort,
+  scheduleSearch,
+  scrollActiveRowIntoView,
+  setActiveTag,
+  syncSortStateFromDom,
+  updateSortButtons,
+} from "./index-search.js";
 import {
   captureEntriesAnchor,
   getStoredEntriesAnchor,
@@ -45,6 +45,7 @@ import {
   scrollMainContentTop,
   storeMainScrollTop,
 } from "./scroll.js";
+import { state } from "./state.js";
 import { cacheTagsViewSummary, hydrateTagsViewSummary, syncSummarySkeletons } from "./summary.js";
 
 const BOOT_KEY = "__llamoraTagsViewBooted";
@@ -304,7 +305,7 @@ if (!globalThis[BOOT_KEY]) {
   });
 
   document.body.addEventListener("tags:tag-count-updated", (event) => {
-    if (document.getElementById("main-content")?.dataset.view !== "tags") return;
+    if (getViewState()?.view !== "tags") return;
     applyTagCountUpdate(event?.detail || {}, document);
   });
 
@@ -348,7 +349,7 @@ if (!globalThis[BOOT_KEY]) {
 
   document.body.addEventListener("htmx:afterRequest", (event) => {
     const detailRoot = findDetail(document);
-    if (!detailRoot || document.getElementById("main-content")?.dataset.view !== "tags") {
+    if (!detailRoot || getViewState()?.view !== "tags") {
       return;
     }
     const xhr = event.detail?.xhr;

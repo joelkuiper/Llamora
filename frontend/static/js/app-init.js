@@ -1,13 +1,15 @@
-import { initRegionFeedback } from "./components/region-feedback.js";
 import { getActiveDay } from "./components/entries-view/active-day-store.js";
+import { initRegionFeedback } from "./components/region-feedback.js";
+import { initGlobalShortcuts } from "./global-shortcuts.js";
 import { ScrollIntent } from "./scroll-intent.js";
 import { ScrollManager } from "./scroll-manager.js";
-import { initGlobalShortcuts } from "./global-shortcuts.js";
+import { handleInvalidationEvent } from "./services/invalidation-bus.js";
 import {
   applyRequestTimeHeaders,
   formatTimeElements,
   updateClientToday as syncClientToday,
 } from "./services/time.js";
+import { getViewState, hydrateViewState } from "./services/view-state.js";
 import { createInlineSpinner } from "./ui.js";
 import {
   getAlertContainer,
@@ -48,6 +50,11 @@ function registerHtmxHeaderHooks(csrfToken) {
     const activeDate = getActiveDay();
     if (activeDate) {
       headers["X-Active-Day"] = activeDate;
+    }
+
+    const viewState = getViewState();
+    if (viewState && typeof viewState === "object") {
+      headers["X-View-State"] = JSON.stringify(viewState);
     }
   });
   headersRegistered = true;
@@ -250,6 +257,23 @@ function registerTimeFormatter() {
   timeFormatterRegistered = true;
 }
 
+function registerViewStateHydration() {
+  document.addEventListener("app:rehydrate", (event) => {
+    hydrateViewState(event?.detail?.context || document);
+  });
+
+  document.body.addEventListener("htmx:afterSwap", (event) => {
+    const target = event?.detail?.target;
+    hydrateViewState(target || document);
+  });
+
+  hydrateViewState(document);
+}
+
+function registerInvalidationBus() {
+  document.body.addEventListener("cache:invalidate", handleInvalidationEvent);
+}
+
 function ensureScrollManager() {
   if (!scrollManager) {
     scrollManager = new ScrollManager();
@@ -272,6 +296,8 @@ function init() {
   registerOfflineHandler();
   registerEntryDeleteAnimationHook();
   registerTimeFormatter();
+  registerViewStateHydration();
+  registerInvalidationBus();
   initAlertCenter();
   registerEntriesLoader();
   initRegionFeedback();

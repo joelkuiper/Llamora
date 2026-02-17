@@ -1,0 +1,5 @@
+{% set state = view_state if view_state is defined else {'view': view|default('diary')} %}
+<script type="application/json"
+        id="view-state"
+        data-view-state
+        {% if oob_view_state %}hx-swap-oob="outerHTML"{% endif %}>{{ state|tojson }}</script>

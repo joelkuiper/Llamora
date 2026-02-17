@@ -1,7 +1,7 @@
-import { IncrementalMarkdownRenderer } from "./entries-view/incremental-markdown-renderer.js";
 import { renderMarkdown } from "../markdown.js";
 import { positionTypingIndicator } from "../typing-indicator.js";
 import { scheduleFrame } from "../utils/scheduler.js";
+import { IncrementalMarkdownRenderer } from "./entries-view/incremental-markdown-renderer.js";
 
 const RENDER_COOLDOWN_MS = 16;
 

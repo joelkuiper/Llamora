@@ -34,6 +34,7 @@ class LockboxStore:
         key: str,
         payload: Any,
     ) -> None:
+        ctx.require_write(operation="lockbox_store.set_json")
         data = orjson.dumps(payload)
         await self.lockbox.set(ctx, namespace, key, data)
 

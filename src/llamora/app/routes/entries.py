@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import json
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -183,12 +184,39 @@ async def update_entry(entry_id: str):
     }
     today = local_date().isoformat()
     day = updated.get("created_date") or today
-    return await render_template(
+    html = await render_template(
         "components/entries/entry_main_only.html",
         entry=entry_payload,
         day=day,
         is_today=day == today,
     )
+    invalidation_keys: list[dict[str, str]] = [
+        {
+            "namespace": "summary",
+            "prefix": f"day:{day}",
+            "reason": "entry.changed",
+        }
+    ]
+    for tag in tags:
+        tag_hash = str(tag.get("hash") or "").strip()
+        if tag_hash:
+            invalidation_keys.append(
+                {
+                    "namespace": "summary",
+                    "prefix": f"tag:{tag_hash}",
+                    "reason": "entry.changed",
+                }
+            )
+    response = await make_response(html, 200)
+    response.headers["HX-Trigger"] = json.dumps(
+        {
+            "cache:invalidate": {
+                "reason": "entry.changed",
+                "keys": invalidation_keys,
+            }
+        }
+    )
+    return response
 
 
 @entries_bp.get("/e/entry/<entry_id>/edit")
@@ -309,12 +337,28 @@ async def send_entry(date):
         "tags": [],
         "created_at": created_at,
     }
-    return await render_template(
+    html = await render_template(
         "components/entries/entries_list.html",
         entries=[{"entry": entry_payload, "responses": []}],
         day=created_date,
         is_today=created_date == local_date().isoformat(),
     )
+    response = await make_response(html, 200)
+    response.headers["HX-Trigger"] = json.dumps(
+        {
+            "cache:invalidate": {
+                "reason": "entry.created",
+                "keys": [
+                    {
+                        "namespace": "summary",
+                        "prefix": f"day:{created_date}",
+                        "reason": "entry.created",
+                    }
+                ],
+            }
+        }
+    )
+    return response
 
 
 @entries_bp.route("/e/<date>/response/<entry_id>", methods=["POST"])

@@ -1,3 +1,4 @@
+import { isNearBottom, isNearTop } from "./scroll-utils.js";
 import { TYPING_INDICATOR_SELECTOR } from "./typing-indicator.js";
 import { createListenerBag } from "./utils/events.js";
 import { motionSafeBehavior, prefersReducedMotion } from "./utils/motion.js";
@@ -7,7 +8,6 @@ import {
   computeEdgeMetrics,
   normalizeEdgeDirection,
 } from "./utils/scroll-edge.js";
-import { isNearBottom, isNearTop } from "./scroll-utils.js";
 
 export const scrollEvents = new EventTarget();
 

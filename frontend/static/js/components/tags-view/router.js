@@ -1,3 +1,5 @@
+import { getViewState } from "../../services/view-state.js";
+
 export const parseTagFromPath = (pathname) => {
   if (!pathname || !pathname.startsWith("/t/")) return "";
   const raw = pathname.slice(3);
@@ -12,6 +14,9 @@ export const parseTagFromPath = (pathname) => {
 export const isTagsPath = (pathname) => pathname === "/t" || pathname.startsWith("/t/");
 
 export const readTagFromUrl = () => {
+  const viewState = getViewState();
+  const selected = String(viewState?.selected_tag || "").trim();
+  if (selected) return selected;
   const url = new URL(window.location.href);
   const fromPath = parseTagFromPath(url.pathname);
   if (fromPath) return fromPath;
@@ -53,8 +58,12 @@ export const getTagsLocationKey = (tagOverride) => {
   if (!tagOverride && !isTagsPath(pathname)) {
     return "";
   }
+  const viewState = getViewState();
   const tag =
-    tagOverride || parseTagFromPath(pathname) || String(url.searchParams.get("tag") || "").trim();
+    tagOverride ||
+    String(viewState?.selected_tag || "").trim() ||
+    parseTagFromPath(pathname) ||
+    String(url.searchParams.get("tag") || "").trim();
   const nextPath = tag ? `/t/${encodeURIComponent(tag)}` : "/t";
   const params = new URLSearchParams(url.search);
   params.delete("tag");
@@ -64,6 +73,9 @@ export const getTagsLocationKey = (tagOverride) => {
 };
 
 export const getTagsDay = () => {
+  const viewState = getViewState();
+  const fromState = String(viewState?.day || "").trim();
+  if (fromState) return fromState;
   const fromDom = String(document.querySelector("#tags-view")?.dataset?.day || "").trim();
   if (fromDom) return fromDom;
   const url = new URL(window.location.href);

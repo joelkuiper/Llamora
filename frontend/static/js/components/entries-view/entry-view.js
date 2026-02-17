@@ -1,11 +1,7 @@
 import { appReady } from "../../app-init.js";
 import { initDayNav, navigateToDate } from "../../day.js";
-import { clearActiveDay, setActiveDay } from "./active-day-store.js";
-import { armEntryAnimations, armInitialEntryAnimations } from "./entry-animations.js";
-import { MarkdownObserver } from "./markdown-observer.js";
-import { scrollEvents } from "../../scroll-manager.js";
-import { StreamController } from "./stream-controller.js";
 import { renderMarkdownInElement } from "../../markdown.js";
+import { scrollEvents } from "../../scroll-manager.js";
 import {
   formatTimeElements,
   getClientToday,
@@ -17,6 +13,10 @@ import { TYPING_INDICATOR_SELECTOR } from "../../typing-indicator.js";
 import { scrollToHighlight } from "../../ui.js";
 import { ReactiveElement } from "../../utils/reactive-element.js";
 import { afterNextFrame, scheduleFrame } from "../../utils/scheduler.js";
+import { clearActiveDay, setActiveDay } from "./active-day-store.js";
+import { armEntryAnimations, armInitialEntryAnimations } from "./entry-animations.js";
+import { MarkdownObserver } from "./markdown-observer.js";
+import { StreamController } from "./stream-controller.js";
 import "../entry-form.js";
 import "../response-stream.js";
 

@@ -1,3 +1,4 @@
+import { invalidateCache } from "./invalidation-bus.js";
 import { getValue, setValue } from "./lockbox-store.js";
 
 const inflight = new Map();
@@ -29,15 +30,24 @@ const resolveConfig = (el, overrides = {}) => {
 
 const cacheKeyFor = (namespace, key) => `${namespace}\u0000${key}`;
 
-const extractCachedValue = (payload, digest, kind) => {
-  if (!payload) return "";
-  if (typeof payload === "string") return payload;
-  if (typeof payload !== "object") return "";
-  if (digest && String(payload.digest || "") !== String(digest)) return "";
-  if (kind === "text") {
-    return typeof payload.text === "string" ? payload.text : "";
+const resolveCachedValue = ({ payload, digest, kind, namespace, key }) => {
+  if (!payload) return { value: "", mismatched: false };
+  if (typeof payload === "string") return { value: payload, mismatched: false };
+  if (typeof payload !== "object") return { value: "", mismatched: false };
+  if (digest && String(payload.digest || "") !== String(digest)) {
+    if (namespace && key) {
+      void invalidateCache({
+        namespace,
+        key,
+        reason: "digest-mismatch",
+      });
+    }
+    return { value: "", mismatched: true };
   }
-  return typeof payload.html === "string" ? payload.html : "";
+  if (kind === "text") {
+    return { value: typeof payload.text === "string" ? payload.text : "", mismatched: false };
+  }
+  return { value: typeof payload.html === "string" ? payload.html : "", mismatched: false };
 };
 
 const isCacheableSummary = (el, html) => {
@@ -80,7 +90,14 @@ export const cacheLoader = {
     const k = String(key || "").trim();
     if (!ns || !k) return "";
     const payload = await getValue(ns, k);
-    return extractCachedValue(payload, digest, kind);
+    const resolved = resolveCachedValue({
+      payload,
+      digest,
+      kind,
+      namespace: ns,
+      key: k,
+    });
+    return resolved.value;
   },
 
   async write({ namespace, key, digest, kind, value } = {}) {
@@ -105,7 +122,14 @@ export const cacheLoader = {
       fetchPromise.finally(() => inflight.delete(requestKey));
     }
     const payload = await fetchPromise;
-    const cached = extractCachedValue(payload, digest, kind);
+    const resolved = resolveCachedValue({
+      payload,
+      digest,
+      kind,
+      namespace,
+      key,
+    });
+    const cached = resolved.value;
     if (cached) {
       applyCached(el, cached, stripHtmx);
       return true;

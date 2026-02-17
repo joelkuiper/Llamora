@@ -30,6 +30,7 @@ class TagsRepository(BaseRepository):
         self._event_bus = event_bus
 
     async def resolve_or_create_tag(self, ctx: CryptoContext, tag_name: str) -> bytes:
+        ctx.require_write(operation="tags.resolve_or_create_tag")
         canonical = canonicalize(tag_name)
         digest = tag_hash(ctx.user_id, canonical)
         async with self.pool.connection() as conn:

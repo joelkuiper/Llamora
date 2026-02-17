@@ -4,6 +4,16 @@
 {% set selected_tag_name = detail.name if detail else (selected_tag if selected_tag is defined else '') %}
 {% set include_day_param = include_day_param if include_day_param is defined else (day != today) %}
 {% set entries_limit = entries_limit|default(12) %}
+{% if oob_view_state %}
+  {% set view_state = view_state if view_state is defined else {
+    'view': 'tags',
+    'day': day,
+    'selected_tag': selected_tag_name,
+    'sort_kind': sort_kind,
+    'sort_dir': sort_dir
+  } %}
+  {% include "components/shared/view_state.html" %}
+{% endif %}
 <section id="tags-view-detail"
          class="tags-view__detail span-9"
          {% if oob_detail %}hx-swap-oob="outerHTML"{% endif %}

@@ -1,5 +1,3 @@
-import { createListenerBag } from "./utils/events.js";
-import { scheduleFrame } from "./utils/scheduler.js";
 import {
   FORCE_EDGE_EVENT,
   REFRESH_EVENT,
@@ -7,6 +5,8 @@ import {
   TARGET_CONSUMED_EVENT,
   TARGET_EVENT,
 } from "./scroll-manager.js";
+import { createListenerBag } from "./utils/events.js";
+import { scheduleFrame } from "./utils/scheduler.js";
 
 const MARKDOWN_EVENT = "markdown:rendered";
 

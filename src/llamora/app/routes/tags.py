@@ -35,6 +35,7 @@ from llamora.app.util.frecency import (
     resolve_frecency_lambda,
 )
 from llamora.app.routes.helpers import (
+    build_view_state,
     ensure_entry_exists,
     require_encryption_context,
 )
@@ -136,6 +137,14 @@ async def _render_tags_page(selected_tag: str | None):
         "target": target_param,
         "activity_heatmap": None,
         "heatmap_offset": 0,
+        "view_state": build_view_state(
+            view="tags",
+            day=day,
+            selected_tag=selected,
+            sort_kind=sort_kind,
+            sort_dir=sort_dir,
+            target=target_param,
+        ),
     }
     if request.headers.get("HX-Request"):
         target_id = request.headers.get("HX-Target")
@@ -202,6 +211,14 @@ async def _render_tags_detail_and_list_oob_updates(
         tags_sort_dir=sort_dir,
         entries_limit=entries_limit,
         oob_detail=True,
+        oob_view_state=True,
+        view_state=build_view_state(
+            view="tags",
+            day=str(context["day"]),
+            selected_tag=tags_view.selected_tag,
+            sort_kind=sort_kind,
+            sort_dir=sort_dir,
+        ),
         today=local_date().isoformat(),
     )
 
@@ -250,6 +267,21 @@ async def remove_tag(entry_id: str, tag_hash: str):
     response = await make_response(html)
 
     if tag_name:
+        invalidation_keys: list[dict[str, str]] = [
+            {
+                "namespace": "summary",
+                "prefix": f"tag:{tag_hash}",
+                "reason": "tag.link.changed",
+            }
+        ]
+        if created_date:
+            invalidation_keys.append(
+                {
+                    "namespace": "summary",
+                    "prefix": f"day:{created_date}",
+                    "reason": "tag.link.changed",
+                }
+            )
         response.headers["HX-Trigger"] = json.dumps(
             {
                 "tags:tag-count-updated": {
@@ -258,7 +290,11 @@ async def remove_tag(entry_id: str, tag_hash: str):
                     "count": tag_count,
                     "entry_id": entry_id,
                     "action": "remove",
-                }
+                },
+                "cache:invalidate": {
+                    "reason": "tag.link.changed",
+                    "keys": invalidation_keys,
+                },
             }
         )
     return response
@@ -313,6 +349,21 @@ async def add_tag(entry_id: str):
     response = await make_response(html)
 
     if tag_name:
+        invalidation_keys: list[dict[str, str]] = [
+            {
+                "namespace": "summary",
+                "prefix": f"tag:{tag_hash.hex()}",
+                "reason": "tag.link.changed",
+            }
+        ]
+        if created_date:
+            invalidation_keys.append(
+                {
+                    "namespace": "summary",
+                    "prefix": f"day:{created_date}",
+                    "reason": "tag.link.changed",
+                }
+            )
         response.headers["HX-Trigger"] = json.dumps(
             {
                 "tags:tag-count-updated": {
@@ -321,7 +372,11 @@ async def add_tag(entry_id: str):
                     "count": tag_count,
                     "entry_id": entry_id,
                     "action": "add",
-                }
+                },
+                "cache:invalidate": {
+                    "reason": "tag.link.changed",
+                    "keys": invalidation_keys,
+                },
             }
         )
     return response
@@ -650,6 +705,14 @@ async def tags_view_detail_fragment(date: str):
         entries_limit=DEFAULT_TAG_ENTRIES_LIMIT,
         heatmap_offset=heatmap_offset,
         activity_heatmap=activity_heatmap,
+        oob_view_state=True,
+        view_state=build_view_state(
+            view="tags",
+            day=normalized_date,
+            selected_tag=selected_tag,
+            sort_kind=sort_kind,
+            sort_dir=sort_dir,
+        ),
         today=local_date().isoformat(),
     )
 

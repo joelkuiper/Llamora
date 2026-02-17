@@ -1,9 +1,10 @@
 /* global htmx */
-import { getActiveDayParts } from "./entries-view/active-day-store.js";
+
 import { createPopover } from "../popover.js";
 import { cacheLoader } from "../services/cache-loader.js";
 import { triggerLabelFlash } from "../utils/motion.js";
 import { transitionHide, transitionShow } from "../utils/transition.js";
+import { getActiveDayParts } from "./entries-view/active-day-store.js";
 
 const makeDaySummaryKey = (date) => `day:${String(date || "").trim()}`;
 

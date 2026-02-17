@@ -15,6 +15,7 @@ from quart import (
 from llamora.app.routes.entries import render_entries
 from llamora.app.services.auth_helpers import login_required
 from llamora.app.routes.helpers import (
+    build_view_state,
     require_encryption_context,
     require_iso_date,
 )
@@ -86,6 +87,11 @@ async def _render_day(date: str, target: str | None, view_kind: str):
         "view_kind": view_kind,
         "view": view,
         "target": target_param,
+        "view_state": build_view_state(
+            view=view,
+            day=date,
+            target=target_param,
+        ),
     }
     if request.headers.get("HX-Request"):
         target_id = request.headers.get("HX-Target")

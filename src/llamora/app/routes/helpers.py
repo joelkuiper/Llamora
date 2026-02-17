@@ -32,9 +32,11 @@ async def require_encryption_context(
     dek = await session.require_dek()
     epoch_raw = user.get("current_epoch")
     try:
-        epoch = int(epoch_raw) if epoch_raw is not None else 1
+        epoch = int(epoch_raw) if epoch_raw is not None else 0
     except (TypeError, ValueError):
-        epoch = 1
+        epoch = 0
+    if epoch <= 0:
+        abort(500, description="Missing encryption epoch metadata")
     ctx = CryptoContext(user_id=str(user["id"]), dek=dek, epoch=epoch)
     g._crypto_context = ctx
     return session, user, ctx
@@ -46,3 +48,31 @@ async def ensure_entry_exists(db: Any, user_id: str, entry_id: str) -> None:
     if not await db.entries.entry_exists(user_id, entry_id):
         abort(404, description="entry not found")
         raise AssertionError("unreachable")
+
+
+def build_view_state(
+    *,
+    view: str,
+    day: str | None = None,
+    selected_tag: str | None = None,
+    sort_kind: str | None = None,
+    sort_dir: str | None = None,
+    target: str | None = None,
+    extra: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Return a canonical view-state snapshot for the frontend."""
+
+    state: dict[str, Any] = {"view": view}
+    if day:
+        state["day"] = day
+    if selected_tag:
+        state["selected_tag"] = selected_tag
+    if sort_kind:
+        state["sort_kind"] = sort_kind
+    if sort_dir:
+        state["sort_dir"] = sort_dir
+    if target:
+        state["target"] = target
+    if extra:
+        state.update(extra)
+    return state

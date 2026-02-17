@@ -216,6 +216,7 @@ class EntriesRepository(BaseRepository):
         created_at: str | None = None,
         created_date: str | None = None,
     ) -> str:
+        ctx.require_write(operation="entries.append_entry")
         entry_id = str(ULID())
         record = {"text": content, "meta": meta or {}}
         plaintext = orjson.dumps(record).decode()
@@ -390,6 +391,7 @@ class EntriesRepository(BaseRepository):
         *,
         meta: dict | None = None,
     ) -> dict | None:
+        ctx.require_write(operation="entries.update_entry_text")
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """

@@ -21,6 +21,7 @@ class SearchHistoryRepository(BaseRepository):
         normalized = (query or "").strip()
         if not normalized:
             return
+        ctx.require_write(operation="search_history.record_search")
 
         query_hash = hashlib.sha256(
             f"{ctx.user_id}:{normalized.lower()}".encode("utf-8")

@@ -1,10 +1,10 @@
+import { clearScrollTarget, flashHighlight } from "../../ui.js";
 import { prefersReducedMotion } from "../../utils/motion.js";
 import { sessionStore } from "../../utils/storage.js";
-import { clearScrollTarget, flashHighlight } from "../../ui.js";
-import { state } from "./state.js";
-import { findDetail, findList, findSidebar, findListBody, findIndexData } from "./dom.js";
-import { getTagsDay, readTagFromUrl, updateUrlSort } from "./router.js";
 import { getSelectedTrace, refreshDetailLinksForSort } from "./detail.js";
+import { findDetail, findIndexData, findList, findListBody, findSidebar } from "./dom.js";
+import { getTagsDay, readTagFromUrl, updateUrlSort } from "./router.js";
+import { state } from "./state.js";
 
 export const readStoredSearchQuery = () => sessionStore.get("tags:query") ?? "";
 

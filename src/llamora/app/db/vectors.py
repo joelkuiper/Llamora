@@ -23,6 +23,7 @@ class VectorsRepository(BaseRepository):
         ctx: CryptoContext,
         dtype: str = "float32",
     ) -> None:
+        ctx.require_write(operation="vectors.store_vector")
         dim, nonce, ct, alg = await asyncio.to_thread(
             self._prepare_encrypted_vector,
             vec,
@@ -69,6 +70,7 @@ class VectorsRepository(BaseRepository):
     ) -> None:
         if not vectors:
             return
+        ctx.require_write(operation="vectors.store_vectors_batch")
 
         records = await asyncio.to_thread(
             self._prepare_batch_records,

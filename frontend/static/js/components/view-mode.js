@@ -1,4 +1,5 @@
 import { createPopover } from "../popover.js";
+import { getViewState } from "../services/view-state.js";
 import { createListenerBag } from "../utils/events.js";
 
 let currentInstance = null;
@@ -64,9 +65,7 @@ const initViewMode = (root = document) => {
   };
 
   const syncFromContent = () => {
-    const content =
-      root.querySelector?.("#main-content") || document.getElementById("main-content");
-    const view = content?.dataset?.view || "diary";
+    const view = String(getViewState()?.view || "diary").trim() || "diary";
     setActive(view);
   };
 

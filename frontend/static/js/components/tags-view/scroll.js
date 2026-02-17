@@ -1,8 +1,8 @@
 import { sessionStore } from "../../utils/storage.js";
-import { state } from "./state.js";
+import { getSelectedTrace } from "./detail.js";
 import { findEntriesList } from "./dom.js";
 import { getTagsLocationKey } from "./router.js";
-import { getSelectedTrace } from "./detail.js";
+import { state } from "./state.js";
 
 const readEntriesAnchorMap = () => sessionStore.get("tags:anchor") ?? {};
 const readMainScrollMap = () => sessionStore.get("tags:scroll") ?? {};

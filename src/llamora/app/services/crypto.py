@@ -97,6 +97,12 @@ class CryptoContext:
             raise ValueError("crypto context has been dropped")
         return bytes(self._dek)
 
+    def require_write(self, *, operation: str) -> None:
+        """Validate that this context can be used for encryption writes."""
+
+        _require_epoch(self.epoch, operation=operation)
+        _ = self._require_key()
+
     def encrypt_entry(self, entry_id: str, plaintext: str):
         epoch = _require_epoch(self.epoch, operation="encrypt_entry")
         nonce = utils.random(24)

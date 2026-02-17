@@ -1,9 +1,9 @@
-import { armEntryAnimations, armInitialEntryAnimations } from "../entries-view/entry-animations.js";
 import { formatTimeElements } from "../../services/time.js";
 import { clearScrollTarget, flashHighlight } from "../../ui.js";
-import { state } from "./state.js";
+import { armEntryAnimations, armInitialEntryAnimations } from "../entries-view/entry-animations.js";
 import { findDetail, findList } from "./dom.js";
 import { readTagFromUrl, updateUrlSortParams } from "./router.js";
+import { state } from "./state.js";
 
 export const getSelectedTrace = (root = document) =>
   String(findDetail(root)?.dataset?.selectedTag || "").trim();
