@@ -1,5 +1,4 @@
 import { formatTimeElements } from "../../services/time.js";
-import { clearScrollTarget, flashHighlight } from "../../ui.js";
 import { armEntryAnimations, armInitialEntryAnimations } from "../entries-view/entry-animations.js";
 import { findDetail, findList } from "./dom.js";
 import { readTagFromUrl, updateUrlSortParams } from "./router.js";
@@ -76,8 +75,6 @@ export const syncFromDetail = (root = document, { ensureActiveRowPresent, setAct
   const detail = findDetail(root);
   const sortFromDom = readSortFromDom(root);
   const urlTag = readTagFromUrl();
-  const target = String(new URLSearchParams(window.location.search).get("target") || "").trim();
-  const keepTargetScrollForHighlight = target.startsWith("tag-index-");
 
   state.sortKind = sortFromDom.kind;
   state.sortDir = sortFromDom.dir;
@@ -94,7 +91,7 @@ export const syncFromDetail = (root = document, { ensureActiveRowPresent, setAct
     if (selectedTag && typeof setActiveTag === "function") {
       setActiveTag(selectedTag, root, {
         behavior: "auto",
-        scroll: !keepTargetScrollForHighlight,
+        scroll: true,
       });
     }
   }
@@ -147,19 +144,4 @@ export const animateDetailEntries = (root = document) => {
   const entries = detail.querySelector(".tags-view__entries");
   if (!(entries instanceof HTMLElement)) return;
   armInitialEntryAnimations(entries);
-};
-
-export const highlightRequestedTag = (root = document, { setActiveTag } = {}) => {
-  const params = new URLSearchParams(window.location.search);
-  const target = String(params.get("target") || "").trim();
-  if (!target || !target.startsWith("tag-index-")) return;
-  const row = document.getElementById(target);
-  if (row instanceof HTMLElement) {
-    const tagName = row.dataset.tagName || "";
-    if (tagName && typeof setActiveTag === "function") {
-      setActiveTag(tagName, root, { behavior: "smooth" });
-    }
-    flashHighlight(row);
-  }
-  clearScrollTarget(target, { emitEvent: false });
 };

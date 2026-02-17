@@ -3,7 +3,6 @@ import { clearScrollTarget, flashHighlight } from "../../ui.js";
 import {
   animateDetailEntries,
   getSelectedTrace,
-  highlightRequestedTag,
   refreshDetailLinksForSort,
   setSelectedTagCount,
   syncFromDetail,
@@ -23,7 +22,6 @@ import {
   buildIndexListIfNeeded,
   buildSearchIndex,
   captureListPositions,
-  clearSearchForTargetNavigation,
   ensureActiveRowPresent,
   findRowByTagName,
   hydrateIndexFromTemplate,
@@ -133,9 +131,18 @@ const applyTagCountUpdate = (payload, root = document) => {
   }
 };
 
+const ensureActiveTagVisible = (root = document) => {
+  if (!state.query) return;
+  const activeTag = getSelectedTrace(root);
+  if (!activeTag) return;
+  const row = findRowByTagName(activeTag);
+  if (!(row instanceof HTMLElement)) return;
+  if (!row.classList.contains("is-filtered-out")) return;
+  scheduleSearch("", { immediate: true });
+};
+
 const sync = (root = document) => {
   state.saveSuppressed = false;
-  const hadTargetParam = new URLSearchParams(window.location.search).has("target");
   updateHeaderHeight();
   if (!state.query) {
     state.query = readStoredSearchQuery();
@@ -146,15 +153,12 @@ const sync = (root = document) => {
   syncSummarySkeletons(root);
   void hydrateTagsViewSummary(root);
   buildSearchIndex(root);
-  clearSearchForTargetNavigation();
   applySearch(state.query);
   syncFromDetail(root, { ensureActiveRowPresent, setActiveTag });
   applyStoredHeatmapOffset(root);
   animateDetailEntries(root);
-  highlightRequestedTag(root, { setActiveTag });
-  if (!hadTargetParam) {
-    maybeRestoreEntriesAnchor();
-  }
+  ensureActiveTagVisible(root);
+  maybeRestoreEntriesAnchor();
 };
 
 const syncListOnly = (root = document) => {
@@ -165,6 +169,7 @@ const syncListOnly = (root = document) => {
   buildIndexListIfNeeded(root);
   buildSearchIndex(root);
   applySearch(state.query);
+  ensureActiveTagVisible(root);
   refreshDetailLinksForSort(root);
   const pending = state.pendingTagHighlight;
   if (pending && findRowByTagName(pending)) {
@@ -192,9 +197,9 @@ const syncDetailOnly = (root = document) => {
   buildIndexListIfNeeded(root);
   buildSearchIndex(root);
   applySearch(state.query);
+  ensureActiveTagVisible(root);
   applyStoredHeatmapOffset(root);
   animateDetailEntries(root);
-  highlightRequestedTag(root, { setActiveTag });
   void hydrateTagsViewSummary(root);
   if (state.pendingTagHighlight) {
     const selected = getSelectedTrace(root);

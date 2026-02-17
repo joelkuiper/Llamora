@@ -6,7 +6,7 @@
 {% set page_size = page_size|default(12) %}
 {% set detail_day = detail_day|default(None) %}
 {% if detail_day %}
-  {% set trace_url = url_for('tags.tags_view_tag', tag=tag.name) ~ '?day=' ~ (detail_day|urlencode) ~ '&target=' ~ (('tag-index-' ~ tag.name)|urlencode) %}
+  {% set trace_url = url_for('tags.tags_view_tag', tag=tag.name) ~ '?day=' ~ (detail_day|urlencode) %}
 {% else %}
   {% set trace_url = None %}
 {% endif %}

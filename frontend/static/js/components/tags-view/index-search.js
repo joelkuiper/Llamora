@@ -1,4 +1,3 @@
-import { clearScrollTarget, flashHighlight } from "../../ui.js";
 import { prefersReducedMotion } from "../../utils/motion.js";
 import { sessionStore } from "../../utils/storage.js";
 import { getSelectedTrace, refreshDetailLinksForSort } from "./detail.js";
@@ -633,22 +632,6 @@ export const applySearch = (rawQuery) => {
   }
 };
 
-export const shouldResetSearchForTargetNavigation = () => {
-  const params = new URLSearchParams(window.location.search);
-  const target = String(params.get("target") || "").trim();
-  return target.startsWith("tag-index-");
-};
-
-export const clearSearchForTargetNavigation = () => {
-  if (!shouldResetSearchForTargetNavigation()) return;
-  if (!state.query) return;
-  state.query = "";
-  persistSearchQuery("");
-  if (state.input) {
-    state.input.value = "";
-  }
-};
-
 let searchTimer = null;
 let pendingQuery = "";
 export const scheduleSearch = (value, { immediate = false } = {}) => {
@@ -843,21 +826,6 @@ export const animateListReorder = (onFinish) => {
       onFinish();
     }
   }
-};
-
-export const highlightRequestedTag = (root = document) => {
-  const params = new URLSearchParams(window.location.search);
-  const target = String(params.get("target") || "").trim();
-  if (!target || !target.startsWith("tag-index-")) return;
-  const row = document.getElementById(target);
-  if (row instanceof HTMLElement) {
-    const tagName = row.dataset.tagName || "";
-    if (tagName) {
-      setActiveTag(tagName, root, { behavior: "smooth" });
-    }
-    flashHighlight(row);
-  }
-  clearScrollTarget(target, { emitEvent: false });
 };
 
 export const normalizeSort = {

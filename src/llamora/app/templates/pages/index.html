@@ -65,7 +65,7 @@
             <a class="view-mode-option{% if view == 'tags' %} is-active{% endif %}"
                role="menuitem"
                data-view-mode="tags"
-               hx-get="{{ url_for('tags.tags_view_page') }}"
+               hx-get="{{ url_for('tags.tags_view_page') }}{% if day != today %}?day={{ day|urlencode }}{% endif %}"
                hx-target="#main-content"
                hx-sync="#main-content:replace"
                hx-swap="outerHTML"
