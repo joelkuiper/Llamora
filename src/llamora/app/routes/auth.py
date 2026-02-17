@@ -23,6 +23,7 @@ from llamora.app.routes.helpers import require_encryption_context
 from llamora.app.services.session_context import get_session_context
 from llamora.app.services.validators import validate_password, PasswordValidationError
 from llamora.app.services.crypto import (
+    CryptoContext,
     CURRENT_SUITE,
     generate_dek,
     wrap_key,
@@ -367,11 +368,28 @@ async def login():
                     else:
                         redirect_url = "/"
                 resp = await _issue_auth_response(user["id"], dek, redirect_url)
-                current_app.add_background_task(
-                    services.search_api.warm_index,
-                    str(user["id"]),
-                    dek,
-                )
+                epoch_raw = user.get("current_epoch")
+                try:
+                    epoch = int(epoch_raw) if epoch_raw is not None else 0
+                except (TypeError, ValueError):
+                    epoch = 0
+                if epoch <= 0:
+                    epoch = await db.users.get_current_epoch(str(user["id"]))
+                if epoch > 0:
+                    warm_ctx = CryptoContext(
+                        user_id=str(user["id"]),
+                        dek=dek,
+                        epoch=epoch,
+                    )
+                    current_app.add_background_task(
+                        services.search_api.warm_index,
+                        warm_ctx,
+                    )
+                else:
+                    current_app.logger.warning(
+                        "Skipping search warmup for %s due to missing epoch metadata",
+                        username,
+                    )
                 if cache_key in _login_failures:
                     del _login_failures[cache_key]
                 current_app.logger.debug(
