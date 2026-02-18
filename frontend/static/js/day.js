@@ -181,7 +181,9 @@ function ensureViewSyncListener() {
 }
 
 const applyDayStateToNav = ({ activeDay, label, forceFlash = false }) => {
-  if (getCurrentView() !== "diary") return;
+  const activeView =
+    document.getElementById("main-content")?.dataset?.view || getCurrentView() || "diary";
+  if (activeView !== "diary") return;
 
   const elements = resolveNavElements();
   if (!elements) return;
