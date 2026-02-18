@@ -36,7 +36,9 @@ from llamora.app.routes.helpers import (
     require_encryption_context,
 )
 from llamora.app.services.cache_registry import (
-    invalidations_for_tag_link,
+    MUTATION_TAG_DELETED,
+    MUTATION_TAG_LINK_CHANGED,
+    build_mutation_lineage_plan,
     to_client_payload,
 )
 from llamora.app.util.tags import emoji_shortcode, suggest_emoji_shortcodes
@@ -265,7 +267,7 @@ async def remove_tag(entry_id: str, tag_hash: str):
         created_date=created_date,
     )
     tag_info = await db.tags.get_tag_info(ctx, tag_hash_bytes)
-    tag_name = _tags().display(tag_info.get("name")) if tag_info else ""
+    tag_name = _tags().display(str(tag_info.get("name") or "")) if tag_info else ""
     tag_count = int(tag_info.get("count") or 0) if tag_info else 0
 
     html = "<span class='tag-tombstone'></span>"
@@ -278,11 +280,13 @@ async def remove_tag(entry_id: str, tag_hash: str):
     if tag_name:
         tag_label = emoji_shortcode(tag_name) or ""
         tag_kind = "emoji" if tag_label else "text"
-        invalidation_keys = to_client_payload(
-            invalidations_for_tag_link(
-                created_date=created_date, tag_hash=tag_hash, reason="tag.link.changed"
-            )
+        lineage_plan = build_mutation_lineage_plan(
+            mutation=MUTATION_TAG_LINK_CHANGED,
+            reason="tag.link.changed",
+            created_dates=(created_date,) if created_date else (),
+            tag_hashes=(tag_hash,),
         )
+        invalidation_keys = to_client_payload(lineage_plan.invalidations)
         response.headers["HX-Trigger"] = json.dumps(
             {
                 "tags:tag-count-updated": {
@@ -342,7 +346,7 @@ async def add_tag(entry_id: str):
     )
     tag_info = await db.tags.get_tag_info(ctx, tag_hash)
     tag_name = (
-        _tags().display(tag_info.get("name"))
+        _tags().display(str(tag_info.get("name") or ""))
         if tag_info
         else _tags().display(canonical)
     )
@@ -358,13 +362,13 @@ async def add_tag(entry_id: str):
     if tag_name:
         tag_label = emoji_shortcode(tag_name) or ""
         tag_kind = "emoji" if tag_label else "text"
-        invalidation_keys = to_client_payload(
-            invalidations_for_tag_link(
-                created_date=created_date,
-                tag_hash=tag_hash_hex,
-                reason="tag.link.changed",
-            )
+        lineage_plan = build_mutation_lineage_plan(
+            mutation=MUTATION_TAG_LINK_CHANGED,
+            reason="tag.link.changed",
+            created_dates=(created_date,) if created_date else (),
+            tag_hashes=(tag_hash_hex,),
         )
+        invalidation_keys = to_client_payload(lineage_plan.invalidations)
         response.headers["HX-Trigger"] = json.dumps(
             {
                 "tags:tag-count-updated": {
@@ -511,11 +515,18 @@ async def delete_trace(tag_hash: str):
 
     removed_tag_info = await get_services().db.tags.get_tag_info(ctx, tag_hash_bytes)
     removed_tag_name = (
-        _tags().display(removed_tag_info.get("name")) if removed_tag_info else ""
+        _tags().display(str(removed_tag_info.get("name") or ""))
+        if removed_tag_info
+        else ""
     )
-    await get_services().db.tags.delete_tag_everywhere(
+    affected_entries = await get_services().db.tags.delete_tag_everywhere(
         user["id"],
         tag_hash_bytes,
+    )
+    affected_dates = tuple(
+        sorted(
+            {str(created or "").strip() for _, created in affected_entries if created}
+        )
     )
 
     if requested_tag and removed_tag_name:
@@ -548,6 +559,12 @@ async def delete_trace(tag_hash: str):
     if removed_tag_name:
         tag_label = emoji_shortcode(removed_tag_name) or ""
         tag_kind = "emoji" if tag_label else "text"
+        lineage_plan = build_mutation_lineage_plan(
+            mutation=MUTATION_TAG_DELETED,
+            reason="tag.deleted",
+            created_dates=affected_dates,
+            tag_hashes=(tag_hash,),
+        )
         response.headers["HX-Trigger"] = json.dumps(
             {
                 "tags:tag-count-updated": {
@@ -557,7 +574,11 @@ async def delete_trace(tag_hash: str):
                     "action": "delete",
                     "tag_kind": tag_kind,
                     "tag_label": tag_label,
-                }
+                },
+                "cache:invalidate": {
+                    "reason": "tag.deleted",
+                    "keys": to_client_payload(lineage_plan.invalidations),
+                },
             }
         )
     return response

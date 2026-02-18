@@ -14,16 +14,15 @@ from llamora.app.db.events import (
 )
 from llamora.app.services.cache_registry import (
     CacheInvalidation,
-    invalidations_for_tag_recall,
-    invalidate_day_digest,
-    invalidate_day_summary,
-    invalidate_tag_digest,
-    invalidate_tag_summary,
+    MUTATION_ENTRY_CHANGED,
+    MUTATION_TAG_DELETED,
+    MUTATION_TAG_LINK_CHANGED,
+    MutationLineagePlan,
+    build_mutation_lineage_plan,
 )
 from llamora.app.services.history_cache import HistoryCache
 from llamora.app.services.lockbox_store import LockboxStore
 from llamora.app.services.service_pulse import ServicePulse
-from llamora.app.services.tag_recall_cache import tag_recall_namespace
 
 logger = getLogger(__name__)
 
@@ -52,6 +51,8 @@ class InvalidationCoordinator:
         created_date: str,
         revision: str,
         entry_id: str,
+        entry: dict | None = None,
+        tag_hashes: tuple[str, ...] | list[str] | None = None,
         **_: object,
     ) -> None:
         await self._invalidate_history(
@@ -61,10 +62,14 @@ class InvalidationCoordinator:
             cause="entry.changed",
             entry_id=entry_id,
         )
-        await self._invalidate_day_digest(
+        await self._apply_lineage(
             user_id=user_id,
-            created_date=created_date,
-            cause="entry.changed",
+            plan=build_mutation_lineage_plan(
+                mutation=MUTATION_ENTRY_CHANGED,
+                reason="entry.changed",
+                created_dates=(created_date,),
+                tag_hashes=self._extract_tag_hashes(entry, tag_hashes),
+            ),
             entry_id=entry_id,
         )
 
@@ -85,24 +90,17 @@ class InvalidationCoordinator:
                 entry_id=entry_id,
                 tag_hash=tag_hash,
             )
-            await self._invalidate_day_digest(
-                user_id=user_id,
-                created_date=created_date,
-                cause="tag.link.changed",
-                entry_id=entry_id,
-                tag_hash=tag_hash,
-            )
-        await self._invalidate_tag_digest(
+        await self._apply_lineage(
             user_id=user_id,
-            tag_hash=tag_hash,
-            cause="tag.link.changed",
+            plan=build_mutation_lineage_plan(
+                mutation=MUTATION_TAG_LINK_CHANGED,
+                reason="tag.link.changed",
+                created_dates=(created_date,) if created_date else (),
+                tag_hashes=(tag_hash,),
+            ),
             entry_id=entry_id,
-        )
-        await self._invalidate_tag_recall(
-            user_id=user_id,
+            created_date=created_date,
             tag_hash=tag_hash,
-            cause="tag.link.changed",
-            entry_id=entry_id,
         )
 
     async def _on_tag_deleted(
@@ -123,23 +121,16 @@ class InvalidationCoordinator:
                 cause="tag.deleted",
                 tag_hash=tag_hash,
             )
-            await self._invalidate_day_digest(
-                user_id=user_id,
-                created_date=created_date,
-                cause="tag.deleted",
-                tag_hash=tag_hash,
-            )
-        await self._invalidate_tag_digest(
+        await self._apply_lineage(
             user_id=user_id,
-            tag_hash=tag_hash,
-            cause="tag.deleted",
+            plan=build_mutation_lineage_plan(
+                mutation=MUTATION_TAG_DELETED,
+                reason="tag.deleted",
+                created_dates=tuple(sorted(dates)),
+                tag_hashes=(tag_hash,),
+            ),
             affected_entries=len(affected_entries),
-        )
-        await self._invalidate_tag_recall(
-            user_id=user_id,
             tag_hash=tag_hash,
-            cause="tag.deleted",
-            affected_entries=len(affected_entries),
         )
 
     async def _invalidate_history(
@@ -166,76 +157,49 @@ class InvalidationCoordinator:
             **extra,
         )
 
-    async def _invalidate_day_digest(
+    async def _apply_lineage(
         self,
         *,
         user_id: str,
-        created_date: str,
-        cause: str,
+        plan: MutationLineagePlan,
         **extra: object,
     ) -> None:
-        await self._apply_lockbox_invalidations(
-            user_id,
-            [invalidate_day_digest(created_date, reason=cause)],
-        )
-        await self._apply_lockbox_invalidations(
-            user_id,
-            [invalidate_day_summary(created_date, reason=cause)],
-        )
+        await self._apply_lockbox_invalidations(user_id, list(plan.invalidations))
         self._pulse(
-            "day_digest",
+            "lineage",
             user_id=user_id,
-            created_date=created_date,
-            key=f"day:{created_date}",
-            cause=cause,
+            mutation=plan.mutation,
+            reason=plan.reason,
+            digest_nodes=[node.key for node in plan.digest_nodes],
             **extra,
         )
 
-    async def _invalidate_tag_digest(
-        self,
-        *,
-        user_id: str,
-        tag_hash: str,
-        cause: str,
-        **extra: object,
-    ) -> None:
-        await self._apply_lockbox_invalidations(
-            user_id,
-            [invalidate_tag_digest(tag_hash, reason=cause)],
-        )
-        await self._apply_lockbox_invalidations(
-            user_id,
-            [invalidate_tag_summary(tag_hash, reason=cause)],
-        )
-        self._pulse(
-            "tag_digest",
-            user_id=user_id,
-            tag_hash=tag_hash,
-            key=f"tag:{tag_hash}",
-            cause=cause,
-            **extra,
-        )
-
-    async def _invalidate_tag_recall(
-        self,
-        *,
-        user_id: str,
-        tag_hash: str,
-        cause: str,
-        **extra: object,
-    ) -> None:
-        await self._apply_lockbox_invalidations(
-            user_id,
-            invalidations_for_tag_recall(tag_hash, reason=cause),
-        )
-        self._pulse(
-            "tag_recall",
-            user_id=user_id,
-            tag_hash=tag_hash,
-            namespace=tag_recall_namespace(tag_hash),
-            cause=cause,
-            **extra,
-        )
+    @staticmethod
+    def _extract_tag_hashes(
+        entry: dict | None, tag_hashes: tuple[str, ...] | list[str] | None
+    ) -> tuple[str, ...]:
+        hashes: list[str] = []
+        seen: set[str] = set()
+        for raw in tag_hashes or ():
+            value = str(raw or "").strip()
+            if not value or value in seen:
+                continue
+            seen.add(value)
+            hashes.append(value)
+        if not isinstance(entry, dict):
+            return tuple(hashes)
+        raw_tags = entry.get("tags")
+        if not isinstance(raw_tags, list):
+            return tuple(hashes)
+        for item in raw_tags:
+            if not isinstance(item, dict):
+                continue
+            value = str(item.get("hash") or "").strip()
+            if not value or value in seen:
+                continue
+            seen.add(value)
+            hashes.append(value)
+        return tuple(hashes)
 
     async def _apply_lockbox_invalidations(
         self, user_id: str, items: list[CacheInvalidation]

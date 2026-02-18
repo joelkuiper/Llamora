@@ -172,6 +172,41 @@ class EntriesRepository(BaseRepository):
         return history
 
     @staticmethod
+    def _normalize_tag_hashes(rows) -> tuple[str, ...]:
+        seen: set[str] = set()
+        values: list[str] = []
+        for row in rows:
+            raw = row["tag_hash"] if "tag_hash" in row.keys() else row["tag_hash_hex"]
+            if raw is None:
+                continue
+            if isinstance(raw, bytes):
+                value = raw.hex()
+            else:
+                value = str(raw).strip().lower()
+            if not value or value in seen:
+                continue
+            seen.add(value)
+            values.append(value)
+        values.sort()
+        return tuple(values)
+
+    async def _get_tag_hashes_for_entry(
+        self, user_id: str, entry_id: str
+    ) -> tuple[str, ...]:
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                """
+                SELECT DISTINCT tag_hash
+                FROM tag_entry_xref
+                WHERE user_id = ? AND entry_id = ?
+                """,
+                (user_id, entry_id),
+            )
+            rows = await cursor.fetchall()
+            await cursor.close()
+        return self._normalize_tag_hashes(rows)
+
+    @staticmethod
     def _thread_entries(history: list[dict]) -> list[dict]:
         entries: list[dict] = []
         by_user_id: dict[str, dict] = {}
@@ -318,6 +353,7 @@ class EntriesRepository(BaseRepository):
     async def delete_entry(
         self, user_id: str, entry_id: str
     ) -> tuple[list[str], str | None]:
+        tag_hashes: tuple[str, ...] = ()
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 "SELECT id, role, created_date FROM entries WHERE id = ? AND user_id = ?",
@@ -344,6 +380,19 @@ class EntriesRepository(BaseRepository):
                     delete_ids.append(reply_row["id"])
                     if reply_row["created_date"]:
                         created_dates.add(reply_row["created_date"])
+
+            placeholders = ",".join("?" for _ in delete_ids)
+            tag_cursor = await conn.execute(
+                f"""
+                SELECT DISTINCT tag_hash
+                FROM tag_entry_xref
+                WHERE user_id = ? AND entry_id IN ({placeholders})
+                """,
+                (user_id, *delete_ids),
+            )
+            tag_rows = await tag_cursor.fetchall()
+            await tag_cursor.close()
+            tag_hashes = self._normalize_tag_hashes(tag_rows)
 
             placeholders = ",".join("?" for _ in delete_ids)
 
@@ -379,6 +428,7 @@ class EntriesRepository(BaseRepository):
                     user_id=user_id,
                     created_date=created_date,
                     entry_id=entry_id,
+                    tag_hashes=tag_hashes,
                 )
 
         return delete_ids, row["role"]
@@ -392,6 +442,7 @@ class EntriesRepository(BaseRepository):
         meta: dict | None = None,
     ) -> dict | None:
         ctx.require_write(operation="entries.update_entry_text")
+        tag_hashes: tuple[str, ...] = ()
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
@@ -461,6 +512,17 @@ class EntriesRepository(BaseRepository):
                 return updated_row
 
             updated_row = await self._run_in_transaction(conn, _execute_update)
+            tag_cursor = await conn.execute(
+                """
+                SELECT DISTINCT tag_hash
+                FROM tag_entry_xref
+                WHERE user_id = ? AND entry_id = ?
+                """,
+                (ctx.user_id, entry_id),
+            )
+            tag_rows = await tag_cursor.fetchall()
+            await tag_cursor.close()
+            tag_hashes = self._normalize_tag_hashes(tag_rows)
 
         entry_record = {
             "id": entry_id,
@@ -472,6 +534,7 @@ class EntriesRepository(BaseRepository):
             "text": record.get("text", ""),
             "meta": record.get("meta", {}),
             "prompt_tokens": prompt_tokens,
+            "tags": [{"hash": tag_hash} for tag_hash in tag_hashes],
         }
 
         if row["created_date"] and self._event_bus:
@@ -481,6 +544,7 @@ class EntriesRepository(BaseRepository):
                 created_date=row["created_date"],
                 entry_id=entry_id,
                 entry=entry_record,
+                tag_hashes=tag_hashes,
             )
 
         return entry_record
@@ -500,6 +564,7 @@ class EntriesRepository(BaseRepository):
         created_date = await self.get_entry_date(user_id, entry_id)
         if not created_date:
             return
+        tag_hashes = await self._get_tag_hashes_for_entry(user_id, entry_id)
 
         if self._event_bus:
             await self._event_bus.emit_for_entry_date(
@@ -507,6 +572,7 @@ class EntriesRepository(BaseRepository):
                 user_id=user_id,
                 created_date=created_date,
                 entry_id=entry_id,
+                tag_hashes=tag_hashes,
             )
 
     async def get_latest_entries(self, ctx: CryptoContext, limit: int) -> list[dict]:

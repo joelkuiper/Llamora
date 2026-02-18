@@ -27,7 +27,9 @@ from llamora.app.routes.helpers import (
     require_iso_date,
 )
 from llamora.app.services.cache_registry import (
-    invalidations_for_entry_change,
+    MUTATION_ENTRY_CHANGED,
+    MUTATION_ENTRY_CREATED,
+    build_mutation_lineage_plan,
     to_client_payload,
 )
 from llamora.app.services.auth_helpers import login_required
@@ -196,13 +198,13 @@ async def update_entry(entry_id: str):
         is_today=day == today,
     )
     tag_hashes = [str(tag.get("hash") or "").strip() for tag in tags if tag.get("hash")]
-    invalidation_keys = to_client_payload(
-        invalidations_for_entry_change(
-            created_date=day,
-            tag_hashes=tag_hashes,
-            reason="entry.changed",
-        )
+    lineage_plan = build_mutation_lineage_plan(
+        mutation=MUTATION_ENTRY_CHANGED,
+        reason="entry.changed",
+        created_dates=(day,),
+        tag_hashes=tag_hashes,
     )
+    invalidation_keys = to_client_payload(lineage_plan.invalidations)
     response = await make_response(html, 200)
     response.headers["HX-Trigger"] = json.dumps(
         {
@@ -340,13 +342,13 @@ async def send_entry(date):
         is_today=created_date == local_date().isoformat(),
     )
     response = await make_response(html, 200)
-    invalidation_keys = to_client_payload(
-        invalidations_for_entry_change(
-            created_date=created_date,
-            tag_hashes=(),
-            reason="entry.created",
-        )
+    lineage_plan = build_mutation_lineage_plan(
+        mutation=MUTATION_ENTRY_CREATED,
+        reason="entry.created",
+        created_dates=(created_date,),
+        tag_hashes=(),
     )
+    invalidation_keys = to_client_payload(lineage_plan.invalidations)
     response.headers["HX-Trigger"] = json.dumps(
         {
             "cache:invalidate": {
