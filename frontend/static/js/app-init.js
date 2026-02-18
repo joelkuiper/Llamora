@@ -32,6 +32,13 @@ export const appReady = new Promise((resolve) => {
   resolveAppReady = resolve;
 });
 
+function onRegionSwapped(handler) {
+  document.addEventListener("app:region-swapped", (event) => {
+    const target = event?.detail?.target;
+    handler(target || document, event);
+  });
+}
+
 function updateClientToday() {
   return syncClientToday();
 }
@@ -249,16 +256,8 @@ function registerTimeFormatter() {
     },
   });
 
-  document.body.addEventListener("htmx:afterSwap", (event) => {
-    const target = event?.detail?.target;
-    if (target?.querySelector?.("time.entry-time")) {
-      run(target);
-      return;
-    }
-    run(document);
-  });
+  onRegionSwapped((target) => run(target));
 
-  run(document);
   timeFormatterRegistered = true;
 }
 
@@ -271,16 +270,7 @@ function registerViewStateHydration() {
     },
   });
 
-  document.body.addEventListener("htmx:afterSwap", (event) => {
-    const target = event?.detail?.target;
-    hydrateViewState(target || document);
-  });
-
-  document.body.addEventListener("htmx:historyRestore", () => {
-    hydrateViewState(document);
-  });
-
-  hydrateViewState(document);
+  onRegionSwapped((target) => hydrateViewState(target));
 }
 
 function registerInvalidationBus() {

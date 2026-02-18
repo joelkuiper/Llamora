@@ -27,6 +27,7 @@ body {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
+  --view-content-block-pad: clamp(2.2rem, 4vh, 3rem);
 }
 
 #main-content[data-view="diary"] {

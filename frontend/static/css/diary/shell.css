@@ -3,7 +3,7 @@
   box-shadow: var(--subtle-raised-shadow);
   border: 1px solid var(--border);
   z-index: 1;
-  padding: var(--spacing-xl) var(--spacing-xl) 3rem var(--spacing-xl);
+  padding: var(--view-content-block-pad) var(--spacing-xl) 3rem var(--spacing-xl);
   flex: 1;
   overflow-y: auto;
   width: 100%;
