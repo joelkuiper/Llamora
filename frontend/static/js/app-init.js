@@ -32,10 +32,36 @@ export const appReady = new Promise((resolve) => {
   resolveAppReady = resolve;
 });
 
-function onRegionSwapped(handler) {
+const regionSwapCoalesceState = new Map();
+
+function onRegionSwappedCoalesced(key, handler) {
+  const id = String(key || "").trim();
+  if (!id) {
+    throw new Error("onRegionSwappedCoalesced requires a non-empty key");
+  }
   document.addEventListener("app:region-swapped", (event) => {
-    const target = event?.detail?.target;
-    handler(target || document, event);
+    const target = event?.detail?.target || document;
+    const state = regionSwapCoalesceState.get(id) || {
+      scheduled: false,
+      target: document,
+      event: null,
+    };
+    state.target = target;
+    state.event = event;
+    regionSwapCoalesceState.set(id, state);
+    if (state.scheduled) {
+      return;
+    }
+    state.scheduled = true;
+    const flush = () => {
+      state.scheduled = false;
+      handler(state.target, state.event);
+    };
+    if (typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(flush);
+      return;
+    }
+    queueMicrotask(flush);
   });
 }
 
@@ -256,7 +282,7 @@ function registerTimeFormatter() {
     },
   });
 
-  onRegionSwapped((target) => run(target));
+  onRegionSwappedCoalesced("time-formatter", (target) => run(target));
 
   timeFormatterRegistered = true;
 }
@@ -270,7 +296,7 @@ function registerViewStateHydration() {
     },
   });
 
-  onRegionSwapped((target) => hydrateViewState(target));
+  onRegionSwappedCoalesced("view-state", (target) => hydrateViewState(target));
 }
 
 function registerInvalidationBus() {
