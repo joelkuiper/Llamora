@@ -31,6 +31,11 @@ const bundles = [
 
 const copies = [
   {
+    name: "hyperlist",
+    from: path.join(projectRoot, "node_modules", "hyperlist", "dist", "hyperlist.js"),
+    outfile: "hyperlist.min.js",
+  },
+  {
     name: "htmx-ext-sse",
     from: path.join(projectRoot, "node_modules", "htmx-ext-sse", "sse.js"),
     outfile: "htmx-ext-sse.js",

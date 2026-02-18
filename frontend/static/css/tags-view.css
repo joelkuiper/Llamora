@@ -301,11 +301,16 @@
 }
 
 .tags-view__index {
-  display: grid;
-  gap: 0.32rem;
+  position: relative;
+  display: block;
+  min-height: 100%;
   content-visibility: auto;
   contain: layout paint;
   contain-intrinsic-size: 480px;
+}
+
+.tags-view__index.is-virtual {
+  overflow: hidden;
 }
 
 .tags-view__index-row {
@@ -335,6 +340,12 @@
     box-shadow 180ms ease;
   content-visibility: auto;
   contain-intrinsic-size: 38px;
+}
+
+.tags-view__index.is-virtual .tags-view__index-row {
+  left: 0;
+  right: 0;
+  margin: 0;
 }
 
 .tags-view__index.is-filtering .tags-view__index-row {

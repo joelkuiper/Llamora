@@ -43,6 +43,7 @@ const vendorBase = (() => {
 })();
 
 const vendorSpecs = [
+  { path: "hyperlist.min.js", globals: ["HyperList"] },
   { path: "htmx.min.js", globals: ["htmx"] },
   { path: "markdown-it.min.js", globals: ["MarkdownIt"] },
   { path: "markdown-it-task-lists.min.js", globals: ["markdownitTaskLists"] },
@@ -62,6 +63,7 @@ if (globalScope.DOMPurify && globalScope.DOMPurify.default?.sanitize) {
 }
 
 const resolvedGlobals = {
+  HyperList: globalScope.HyperList?.default || globalScope.HyperList,
   htmx: globalScope.htmx,
   MarkdownIt: globalScope.MarkdownIt,
   markdownitTaskLists: globalScope.markdownitTaskLists,
@@ -70,6 +72,7 @@ const resolvedGlobals = {
 };
 
 const requiredGlobals = [
+  ["HyperList", resolvedGlobals.HyperList],
   ["htmx", resolvedGlobals.htmx],
   ["MarkdownIt", resolvedGlobals.MarkdownIt],
   ["markdownitTaskLists", resolvedGlobals.markdownitTaskLists],
@@ -84,6 +87,7 @@ for (const [name, value] of requiredGlobals) {
 }
 
 export const ready = Promise.resolve(resolvedGlobals);
+export const HyperList = resolvedGlobals.HyperList;
 export const htmx = resolvedGlobals.htmx;
 export const MarkdownIt = resolvedGlobals.MarkdownIt;
 export const markdownitTaskLists = resolvedGlobals.markdownitTaskLists;

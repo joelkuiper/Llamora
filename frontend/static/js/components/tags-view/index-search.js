@@ -1,10 +1,23 @@
 import { readTagsCatalog } from "../../services/tags-catalog.js";
 import { prefersReducedMotion } from "../../utils/motion.js";
 import { sessionStore } from "../../utils/storage.js";
+import { HyperList } from "../../vendor/setup-globals.js";
 import { getSelectedTrace, refreshDetailLinksForSort } from "./detail.js";
 import { findDetail, findList, findListBody, findSidebar } from "./dom.js";
 import { getTagsDay, readTagFromUrl, updateUrlSort } from "./router.js";
 import { requestListScroll, state } from "./state.js";
+
+const VIRTUAL_ITEM_HEIGHT_FALLBACK = 42;
+
+const ensureVirtualState = () => {
+  state.visibleItems ??= [];
+  state.queryTokens ??= [];
+  state.activeTag ??= "";
+  state.hyperList ??= null;
+  state.hyperListRoot ??= null;
+  state.hyperListScroller ??= null;
+  state.rowHeight ??= VIRTUAL_ITEM_HEIGHT_FALLBACK;
+};
 
 export const readStoredSearchQuery = () => sessionStore.get("tags:query") ?? "";
 
@@ -24,19 +37,29 @@ export const setClearButtonVisibility = () => {
   state.clearBtn.tabIndex = hasQuery ? 0 : -1;
 };
 
-const getSelectedTagName = (root = document) => getSelectedTrace(root);
-const getSelectedTagHash = (root = document) =>
-  String(findDetail(root)?.dataset?.selectedTagHash || "").trim();
+const escapeSelectorValue = (value) => {
+  if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
+    return CSS.escape(String(value || ""));
+  }
+  return String(value || "").replaceAll('"', '\\"');
+};
 
-export const findRowByTagName = (tagName) => {
-  if (!tagName) return null;
-  return state.rows.find((row) => row.dataset.tagName === tagName) || null;
+const getSelectedTagName = (root = document) => getSelectedTrace(root);
+
+export const findRowByTagName = (tagName, root = document) => {
+  const normalized = String(tagName || "").trim();
+  if (!normalized) return null;
+  const index = findList(root)?.querySelector?.("[data-tags-view-index]");
+  if (!(index instanceof HTMLElement)) return null;
+  const escaped = escapeSelectorValue(normalized);
+  return index.querySelector?.(`.tags-view__index-row[data-tag-name="${escaped}"]`) || null;
 };
 
 const getIndexItemByName = (tagName) => {
-  if (!tagName) return null;
+  const normalized = String(tagName || "").trim();
+  if (!normalized) return null;
   if (!Array.isArray(state.indexItems)) return null;
-  return state.indexItems.find((item) => item.name === tagName) || null;
+  return state.indexItems.find((item) => item.name === normalized) || null;
 };
 
 const normalizeTagKey = (value) =>
@@ -65,13 +88,17 @@ const normalizeAlphaSortToken = (name, kind = "", label = "") => {
 };
 
 export const resetIndexCache = () => {
+  destroyVirtualList();
   state.indexItems = null;
   state.indexPending = false;
   state.listBuilt = false;
   state.indexSignature = "";
+  state.rows = [];
+  state.visibleItems = [];
 };
 
 export const hydrateIndexFromTemplate = (root = document) => {
+  ensureVirtualState();
   const snapshot = readTagsCatalog(root);
   const signature = String(snapshot.version);
   if (state.indexSignature === signature) return;
@@ -125,291 +152,6 @@ const buildTagUrls = (tagName, tagHash) => {
   return { tagUrl, fragmentUrl };
 };
 
-const createTagRow = (item, { transient = false } = {}) => {
-  const rowHash = String(item.hash || "").trim();
-  const urls = buildTagUrls(item.name, rowHash);
-  if (!urls) return null;
-  const row = document.createElement("a");
-  row.className = "tags-view__index-row";
-  row.id = `tag-index-${item.name}`;
-  row.dataset.tagName = item.name;
-  row.dataset.tagsName = item.name;
-  row.dataset.tagsCount = String(item.count ?? 0);
-  row.dataset.tagHash = rowHash;
-  row.dataset.tagsKind = item.kind || "text";
-  row.dataset.tagsLabel = String(item.label || "").trim();
-  if (transient) {
-    row.dataset.tagsTransient = "true";
-  }
-  row.setAttribute("href", urls.tagUrl);
-  row.setAttribute("hx-get", urls.fragmentUrl);
-  row.setAttribute("hx-target", "#tags-view-detail");
-  row.setAttribute("hx-swap", "outerHTML");
-  row.setAttribute("hx-sync", "#tags-view-detail:replace");
-  row.setAttribute("hx-push-url", urls.tagUrl);
-  const nameEl = document.createElement("span");
-  nameEl.className = "tags-view__index-name";
-  const nameMainEl = document.createElement("span");
-  nameMainEl.className = "tags-view__index-name-main";
-  nameMainEl.textContent = item.name;
-  nameEl.appendChild(nameMainEl);
-  const hint = String(item.label || "").trim();
-  if (hint) {
-    const hintEl = document.createElement("span");
-    hintEl.className = "tags-view__index-name-hint";
-    hintEl.textContent = hint;
-    nameEl.appendChild(hintEl);
-  }
-  const countEl = document.createElement("span");
-  countEl.className = "tags-view__index-count";
-  countEl.textContent = String(item.count ?? 0);
-  row.appendChild(nameEl);
-  row.appendChild(countEl);
-  return row;
-};
-
-const getIndexOrderMap = () => {
-  const map = new Map();
-  if (!Array.isArray(state.indexItems)) return map;
-  state.indexItems.forEach((item, idx) => {
-    map.set(item.name, idx);
-  });
-  return map;
-};
-
-const removeTransientRow = (tagName) => {
-  if (!tagName) return;
-  const list = findList();
-  const index = list?.querySelector?.("[data-tags-view-index]");
-  if (!index) return;
-  const rows = index.querySelectorAll('[data-tags-transient="true"]');
-  rows.forEach((row) => {
-    if (row instanceof HTMLElement && row.dataset.tagName === tagName) {
-      row.remove();
-    }
-  });
-};
-
-export const ensureActiveRowPresent = (tagName, options = {}) => {
-  if (!tagName) return;
-  if (findRowByTagName(tagName)) {
-    removeTransientRow(tagName);
-    return;
-  }
-  if (Array.isArray(state.indexItems) && !state.listBuilt) {
-    buildIndexListIfNeeded(document);
-    if (findRowByTagName(tagName)) {
-      removeTransientRow(tagName);
-      return;
-    }
-  }
-  if (!state.indexItems && !state.indexPending) {
-    state.indexPending = true;
-    loadIndexItems().then(() => {
-      state.indexPending = false;
-      ensureActiveRowPresent(tagName);
-    });
-    return;
-  }
-  const fallbackHash = String(options.tagHash || "").trim();
-  const item = getIndexItemByName(tagName) || {
-    name: tagName,
-    hash: fallbackHash,
-    count: 0,
-    kind: "text",
-    label: "",
-  };
-  const list = findList();
-  const index = list?.querySelector?.("[data-tags-view-index]");
-  if (!index) return;
-  removeTransientRow(tagName);
-  const transient = createTagRow(item, { transient: true });
-  if (!transient) return;
-  const orderMap = getIndexOrderMap();
-  const targetIndex = orderMap.get(tagName);
-  let inserted = false;
-  if (targetIndex != null) {
-    const existingRows = Array.from(index.querySelectorAll(".tags-view__index-row"));
-    for (const row of existingRows) {
-      const rowName = row.dataset.tagName || "";
-      const rowIndex = orderMap.get(rowName);
-      if (rowIndex != null && rowIndex > targetIndex) {
-        index.insertBefore(transient, row);
-        inserted = true;
-        break;
-      }
-    }
-  }
-  if (!inserted) {
-    index.appendChild(transient);
-  }
-  if (typeof htmx !== "undefined" && transient instanceof HTMLElement) {
-    htmx.process(transient);
-  }
-  buildSearchIndex(document);
-  if (state.query) {
-    applySearch(state.query);
-  }
-};
-
-export const buildIndexListIfNeeded = (root = document) => {
-  const list = findList(root);
-  const index = list?.querySelector?.("[data-tags-view-index]");
-  if (!index) return;
-  if (index.children.length === 0) {
-    state.listBuilt = false;
-  }
-  if (state.listBuilt) return;
-  if (!Array.isArray(state.indexItems)) return;
-  if (index.children.length) {
-    state.listBuilt = true;
-    return;
-  }
-  const frag = document.createDocumentFragment();
-  state.indexItems.forEach((item) => {
-    const row = createTagRow(item);
-    if (row) frag.appendChild(row);
-  });
-  index.appendChild(frag);
-  if (typeof htmx !== "undefined") {
-    htmx.process(index);
-  }
-  state.listBuilt = true;
-  buildSearchIndex(root);
-  applySearch(state.query);
-};
-
-export const rebuildIndexList = (root = document) => {
-  const list = findList(root);
-  const index = list?.querySelector?.("[data-tags-view-index]");
-  if (!index) return;
-  index.innerHTML = "";
-  state.listBuilt = false;
-  buildIndexListIfNeeded(root);
-};
-
-const normalizeSortKind = (value) =>
-  String(value || "")
-    .trim()
-    .toLowerCase() === "count"
-    ? "count"
-    : "alpha";
-
-const normalizeSortDir = (value) =>
-  String(value || "")
-    .trim()
-    .toLowerCase() === "desc"
-    ? "desc"
-    : "asc";
-
-const isRowInView = (row, container, padding = 8) => {
-  const rowTop = row.offsetTop;
-  const rowBottom = rowTop + row.offsetHeight;
-  const viewTop = container.scrollTop + padding;
-  const viewBottom = container.scrollTop + container.clientHeight - padding;
-  return rowTop >= viewTop && rowBottom <= viewBottom;
-};
-
-const scrollRowIntoView = (row, container, behavior = "auto") => {
-  const centerTop = row.offsetTop - (container.clientHeight - row.offsetHeight) / 2;
-  const nextTop = Math.max(0, Math.round(centerTop));
-  container.scrollTo({ top: nextTop, behavior });
-};
-
-export const scrollActiveRowIntoView = (root = document, behavior = "smooth") => {
-  const listBody = findListBody(root);
-  const activeRow = getActiveRow();
-  if (!(listBody instanceof HTMLElement) || !(activeRow instanceof HTMLElement)) return;
-  if (isRowInView(activeRow, listBody)) return;
-  const scrollBehavior = prefersReducedMotion() ? "auto" : behavior;
-  const attemptScroll = () => {
-    if (!activeRow.isConnected || !listBody.isConnected) return;
-    if (isRowInView(activeRow, listBody)) return;
-    scrollRowIntoView(activeRow, listBody, scrollBehavior);
-  };
-  window.requestAnimationFrame(() => {
-    attemptScroll();
-    window.requestAnimationFrame(() => {
-      attemptScroll();
-      window.setTimeout(attemptScroll, 120);
-      window.setTimeout(attemptScroll, 240);
-    });
-  });
-};
-
-export const setActiveTag = (tagName, root = document, options = {}) => {
-  const behavior = options.behavior === "smooth" ? "smooth" : "auto";
-  const shouldScroll = options.scroll !== false;
-  const list = findList(root);
-  if (!list) return;
-  const targetName = String(tagName || "").trim();
-  const index = list.querySelector?.("[data-tags-view-index]");
-  let removedTransient = false;
-  if (index) {
-    index.querySelectorAll('[data-tags-transient="true"]').forEach((row) => {
-      if (!(row instanceof HTMLElement)) return;
-      if (row.dataset.tagName !== targetName) {
-        row.remove();
-        removedTransient = true;
-      }
-    });
-  }
-  if (removedTransient) {
-    buildSearchIndex(root);
-  }
-  let activeRow = null;
-  list.querySelectorAll(".tags-view__index-row").forEach((row) => {
-    const isActive = targetName !== "" && row.dataset.tagName === targetName;
-    row.classList.toggle("is-active", isActive);
-    if (isActive) {
-      row.setAttribute("aria-current", "true");
-      activeRow = row;
-    } else {
-      row.removeAttribute("aria-current");
-    }
-  });
-  if (!(activeRow instanceof HTMLElement)) return;
-  if (!shouldScroll) return;
-  const listBody = findListBody(root);
-  if (listBody instanceof HTMLElement) {
-    if (!isRowInView(activeRow, listBody)) {
-      requestListScroll();
-      scrollRowIntoView(activeRow, listBody, behavior);
-    }
-    if (behavior === "auto") {
-      window.requestAnimationFrame(() => {
-        if (!activeRow.isConnected || !listBody.isConnected) return;
-        if (isRowInView(activeRow, listBody)) return;
-        requestListScroll();
-        scrollRowIntoView(activeRow, listBody, "auto");
-      });
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => {
-          if (!activeRow.isConnected || !listBody.isConnected) return;
-          if (isRowInView(activeRow, listBody)) return;
-          requestListScroll();
-          scrollRowIntoView(activeRow, listBody, "auto");
-        });
-      });
-    }
-    return;
-  }
-  activeRow.scrollIntoView({ block: "center", inline: "nearest", behavior });
-};
-
-export const getActiveRow = () => {
-  if (!state.rows.length) return null;
-  return state.rows.find((row) => row.classList.contains("is-active")) || null;
-};
-
-const ensureActiveRowVisibleInFilteredSet = (matches, orderedMatches) => {
-  const activeRow = getActiveRow();
-  if (!(activeRow instanceof HTMLElement)) return orderedMatches;
-  if (matches.has(activeRow)) return orderedMatches;
-  matches.add(activeRow);
-  return [activeRow, ...orderedMatches];
-};
-
 const escapeHtml = (value) =>
   String(value)
     .replaceAll("&", "&amp;")
@@ -461,181 +203,216 @@ const highlightMatch = (text, queryTokens) => {
   return out;
 };
 
-const captureRowPositions = (rows) => {
-  const positions = new Map();
-  rows.forEach((row) => {
-    if (!(row instanceof HTMLElement)) return;
-    if (row.classList.contains("is-filtered-out")) return;
-    positions.set(row, row.getBoundingClientRect());
-  });
-  return positions;
+const createTagRow = (item, { queryTokens = [], activeTag = "" } = {}) => {
+  const rowHash = String(item.hash || "").trim();
+  const urls = buildTagUrls(item.name, rowHash);
+  if (!urls) return null;
+  const row = document.createElement("a");
+  row.className = "tags-view__index-row";
+  row.id = `tag-index-${item.name}`;
+  row.dataset.tagName = item.name;
+  row.dataset.tagsName = item.name;
+  row.dataset.tagsCount = String(item.count ?? 0);
+  row.dataset.tagHash = rowHash;
+  row.dataset.tagsKind = item.kind || "text";
+  row.dataset.tagsLabel = String(item.label || "").trim();
+  row.dataset.hxReady = "0";
+  row.setAttribute("href", urls.tagUrl);
+  row.setAttribute("hx-get", urls.fragmentUrl);
+  row.setAttribute("hx-target", "#tags-view-detail");
+  row.setAttribute("hx-swap", "outerHTML");
+  row.setAttribute("hx-sync", "#tags-view-detail:replace");
+  row.setAttribute("hx-push-url", urls.tagUrl);
+  if (item.name === activeTag) {
+    row.classList.add("is-active");
+    row.setAttribute("aria-current", "true");
+  }
+  const nameEl = document.createElement("span");
+  nameEl.className = "tags-view__index-name";
+  const nameMainEl = document.createElement("span");
+  nameMainEl.className = "tags-view__index-name-main";
+  if (queryTokens.length) {
+    nameMainEl.innerHTML = highlightMatch(item.name, queryTokens);
+  } else {
+    nameMainEl.textContent = item.name;
+  }
+  nameEl.appendChild(nameMainEl);
+  const hint = String(item.label || "").trim();
+  if (hint) {
+    const hintEl = document.createElement("span");
+    hintEl.className = "tags-view__index-name-hint";
+    hintEl.textContent = hint;
+    nameEl.appendChild(hintEl);
+  }
+  const countEl = document.createElement("span");
+  countEl.className = "tags-view__index-count";
+  countEl.textContent = String(item.count ?? 0);
+  row.appendChild(nameEl);
+  row.appendChild(countEl);
+  return row;
 };
 
-const runFlip = (rows, beforePositions) => {
-  if (!beforePositions || beforePositions.size === 0) return;
-  const moves = [];
-  rows.forEach((row) => {
-    if (!(row instanceof HTMLElement)) return;
-    if (row.classList.contains("is-filtered-out")) return;
-    const first = beforePositions.get(row);
-    if (!first) return;
-    const last = row.getBoundingClientRect();
-    const deltaY = first.top - last.top;
-    if (Math.abs(deltaY) < 1) return;
-    moves.push({ row, deltaY });
-  });
-  if (!moves.length) return;
-  moves.forEach(({ row, deltaY }) => {
-    row.style.transform = `translateY(${deltaY}px)`;
-    row.style.transition = "transform 0s";
-  });
-  window.requestAnimationFrame(() => {
-    moves.forEach(({ row }) => {
-      row.style.transition = "";
-      row.style.transform = "";
-    });
-  });
-};
+const normalizeSortKind = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase() === "count"
+    ? "count"
+    : "alpha";
 
-const _sortRows = () => {
-  if (!state.list || state.rows.length <= 1) return;
+const normalizeSortDir = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase() === "desc"
+    ? "desc"
+    : "asc";
 
-  const sorted = [...state.rows].sort((a, b) => {
-    const nameA = String(a.dataset.tagsName || "").toLowerCase();
-    const nameB = String(b.dataset.tagsName || "").toLowerCase();
-    const alphaA = normalizeAlphaSortToken(
-      a.dataset.tagsName,
-      a.dataset.tagsKind,
-      a.dataset.tagsLabel,
-    );
-    const alphaB = normalizeAlphaSortToken(
-      b.dataset.tagsName,
-      b.dataset.tagsKind,
-      b.dataset.tagsLabel,
-    );
-    const countA = Number.parseInt(a.dataset.tagsCount || "0", 10) || 0;
-    const countB = Number.parseInt(b.dataset.tagsCount || "0", 10) || 0;
+const compareItems = (a, b, kind, dir) => {
+  const nameA = a.name.toLowerCase();
+  const nameB = b.name.toLowerCase();
+  const alphaA = normalizeAlphaSortToken(a.name, a.kind, a.label);
+  const alphaB = normalizeAlphaSortToken(b.name, b.kind, b.label);
+  const countA = Number.parseInt(a.count || "0", 10) || 0;
+  const countB = Number.parseInt(b.count || "0", 10) || 0;
 
-    if (state.sortKind === "count") {
-      if (countA !== countB) {
-        return state.sortDir === "desc" ? countB - countA : countA - countB;
-      }
-      const alphaCmp = alphaA.localeCompare(alphaB);
-      if (alphaCmp !== 0) return alphaCmp;
-      return nameA.localeCompare(nameB);
+  if (kind === "count") {
+    if (countA !== countB) {
+      return dir === "desc" ? countB - countA : countA - countB;
     }
-
     const alphaCmp = alphaA.localeCompare(alphaB);
-    if (alphaCmp !== 0) {
-      return state.sortDir === "desc" ? -alphaCmp : alphaCmp;
-    }
-    const nameCmp = nameA.localeCompare(nameB);
-    return state.sortDir === "desc" ? -nameCmp : nameCmp;
-  });
+    if (alphaCmp !== 0) return alphaCmp;
+    return nameA.localeCompare(nameB);
+  }
 
-  sorted.forEach((row) => {
-    state.list.appendChild(row);
-  });
-  state.rows = sorted;
+  const alphaCmp = alphaA.localeCompare(alphaB);
+  if (alphaCmp !== 0) {
+    return dir === "desc" ? -alphaCmp : alphaCmp;
+  }
+  const nameCmp = nameA.localeCompare(nameB);
+  return dir === "desc" ? -nameCmp : nameCmp;
 };
 
-export const buildSearchIndex = (root = document) => {
-  const list = findList(root) || document.querySelector("#tags-view-list");
-  const sidebar = findSidebar(root);
-  state.list = list?.querySelector("[data-tags-view-index]") || null;
-  state.rows = Array.from(state.list?.querySelectorAll(".tags-view__index-row") || []);
-  state.input = sidebar?.querySelector("[data-tags-view-search]") || null;
-  state.clearBtn = sidebar?.querySelector("[data-tags-view-search-clear]") || null;
-  state.empty = list?.querySelector("[data-tags-view-empty]") || null;
-
-  state.rows.forEach((row, index) => {
-    const nameEl = row.querySelector(".tags-view__index-name-main");
-    if (nameEl instanceof HTMLElement) {
-      nameEl.dataset.originalText = row.dataset.tagsName || nameEl.textContent || "";
-    }
-    row.dataset.tagsIndex = String(index);
+const resolveItemHeight = (index) => {
+  if (!(index instanceof HTMLElement)) return VIRTUAL_ITEM_HEIGHT_FALLBACK;
+  const probeItem = state.visibleItems[0] || state.indexItems?.[0];
+  if (!probeItem) return VIRTUAL_ITEM_HEIGHT_FALLBACK;
+  const probe = createTagRow(probeItem, {
+    queryTokens: [],
+    activeTag: state.activeTag,
   });
-
-  if (state.input) {
-    state.input.value = state.query;
-  }
-  setClearButtonVisibility();
+  if (!(probe instanceof HTMLElement)) return VIRTUAL_ITEM_HEIGHT_FALLBACK;
+  probe.style.visibility = "hidden";
+  probe.style.pointerEvents = "none";
+  probe.style.position = "absolute";
+  probe.style.insetInline = "0";
+  index.appendChild(probe);
+  const measured = Math.ceil(probe.getBoundingClientRect().height);
+  probe.remove();
+  return Number.isFinite(measured) && measured > 0 ? measured : VIRTUAL_ITEM_HEIGHT_FALLBACK;
 };
 
-export const applySearch = (rawQuery) => {
-  if (!state.rows.length) {
-    buildSearchIndex();
-  }
-  const previousQuery = state.query;
-  const query = String(rawQuery || "").trim();
-  state.query = query;
-  persistSearchQuery(query);
-  setClearButtonVisibility();
-  const listBody = findListBody();
-  if (!state.rows.length) return;
-  const beforePositions = captureRowPositions(state.rows);
-  if (listBody && query !== previousQuery) {
-    listBody.scrollTop = 0;
-  }
+const processRenderedRows = (index) => {
+  if (!(index instanceof HTMLElement)) return;
+  const rows = Array.from(index.querySelectorAll(".tags-view__index-row"));
+  state.rows = rows;
+  if (typeof htmx === "undefined") return;
+  rows.forEach((row) => {
+    if (!(row instanceof HTMLElement)) return;
+    if (row.dataset.hxReady !== "0") return;
+    htmx.process(row);
+    row.dataset.hxReady = "1";
+  });
+};
 
-  if (!query) {
-    state.list?.classList.remove("is-filtering");
-    state.rows.forEach((row) => {
-      row.classList.remove("is-filtered-out");
-      row.removeAttribute("aria-hidden");
-      const nameEl = row.querySelector(".tags-view__index-name-main");
-      if (nameEl instanceof HTMLElement) {
-        const original = nameEl.dataset.originalText || row.dataset.tagsName || "";
-        nameEl.textContent = original;
-      }
-    });
-    if (state.list) {
-      _sortRows();
-    }
-    if (state.empty) {
-      state.empty.hidden = true;
-    }
-    runFlip(state.rows, beforePositions);
-    if (listBody && previousQuery && !query) {
-      scrollActiveRowIntoView(document, "auto");
-    }
+const destroyVirtualList = () => {
+  if (state.hyperList && typeof state.hyperList.destroy === "function") {
+    state.hyperList.destroy();
+  }
+  state.hyperList = null;
+  state.hyperListRoot = null;
+  state.hyperListScroller = null;
+};
+
+const renderVirtualList = (root = document) => {
+  ensureVirtualState();
+  const list = findList(root);
+  const index = list?.querySelector?.("[data-tags-view-index]");
+  const listBody = findListBody(root);
+  if (!(index instanceof HTMLElement) || !(listBody instanceof HTMLElement)) {
+    destroyVirtualList();
     return;
   }
-  state.list?.classList.add("is-filtering");
 
-  if (!state.indexItems && !state.indexPending) {
-    state.indexPending = true;
-    const loaded = loadIndexItems();
-    state.indexPending = false;
-    if (loaded?.length) {
-      applySearch(state.query);
-    }
+  state.list = index;
+  index.classList.add("is-virtual");
+  const total = Array.isArray(state.visibleItems) ? state.visibleItems.length : 0;
+  const showEmpty = total === 0;
+  if (state.empty) {
+    state.empty.hidden = !showEmpty;
+  }
+  if (showEmpty) {
+    destroyVirtualList();
+    index.innerHTML = "";
+    state.rows = [];
+    return;
   }
 
-  const queryTokens = normalizeQueryTokens(query);
-  const normalized = query.toLowerCase();
-  const indexItems =
-    Array.isArray(state.indexItems) && state.indexItems.length ? state.indexItems : null;
-  const candidates = indexItems
-    ? indexItems.map((item) => {
-        const label = String(item.label || "").trim();
-        const keyParts = [item.name, label, label.replaceAll(":", " ").replaceAll("_", " ")];
-        return {
-          ...item,
-          key: normalizeTagKey(keyParts.filter(Boolean).join(" ")),
-        };
-      })
-    : state.rows.map((row) => ({
-        name: row.dataset.tagsName || "",
-        hash: "",
-        count: Number.parseInt(row.dataset.tagsCount || "0", 10) || 0,
-        key: normalizeTagKey(row.dataset.tagsName || ""),
-      }));
+  if (!Number.isFinite(state.rowHeight) || state.rowHeight <= 0) {
+    state.rowHeight = resolveItemHeight(index);
+  }
 
+  const config = {
+    itemHeight: state.rowHeight,
+    total,
+    scrollerTagName: "div",
+    rowClassName: "tags-view__index-row",
+    scrollContainer: listBody,
+    overrideScrollPosition: () => listBody.scrollTop || 0,
+    generate: (rowIndex) => {
+      const item = state.visibleItems[rowIndex];
+      if (!item) {
+        const el = document.createElement("div");
+        el.className = "tags-view__index-row";
+        return el;
+      }
+      return createTagRow(item, {
+        queryTokens: state.queryTokens,
+        activeTag: state.activeTag,
+      });
+    },
+    afterRender: () => {
+      processRenderedRows(index);
+    },
+  };
+
+  const sameRoot = state.hyperListRoot === index;
+  const sameScroller = state.hyperListScroller === listBody;
+  if (!sameRoot || !sameScroller) {
+    destroyVirtualList();
+    state.hyperList = HyperList.create(index, config);
+    state.hyperListRoot = index;
+    state.hyperListScroller = listBody;
+  } else {
+    state.hyperList.refresh(index, config);
+  }
+};
+
+const computeFilteredItems = (items, query, queryTokens) => {
+  if (!query) {
+    return items.slice().sort((a, b) => compareItems(a, b, state.sortKind, state.sortDir));
+  }
+  const normalized = query.toLowerCase();
+  const candidates = items.map((item) => {
+    const label = String(item.label || "").trim();
+    const keyParts = [item.name, label, label.replaceAll(":", " ").replaceAll("_", " ")];
+    return {
+      item,
+      key: normalizeTagKey(keyParts.filter(Boolean).join(" ")),
+    };
+  });
   const matchesTokens = (key) => queryTokens.every((token) => key.includes(token));
-  const orderedItems = candidates
-    .filter((item) =>
-      queryTokens.length ? matchesTokens(item.key) : item.key.includes(normalized),
+  return candidates
+    .filter((candidate) =>
+      queryTokens.length ? matchesTokens(candidate.key) : candidate.key.includes(normalized),
     )
     .sort((a, b) => {
       const aIndex = queryTokens.length
@@ -644,56 +421,178 @@ export const applySearch = (rawQuery) => {
       const bIndex = queryTokens.length
         ? Math.min(...queryTokens.map((token) => b.key.indexOf(token)))
         : b.key.indexOf(normalized);
-      if (aIndex !== bIndex) {
-        return aIndex - bIndex;
-      }
+      if (aIndex !== bIndex) return aIndex - bIndex;
       return a.key.localeCompare(b.key);
-    });
+    })
+    .map((candidate) => candidate.item);
+};
 
-  const selectedTag = getSelectedTagName();
-  const selectedTagHash = getSelectedTagHash();
-  if (indexItems && orderedItems.length) {
-    ensureActiveRowPresent(selectedTag, { tagHash: selectedTagHash });
+const ensureActiveVisibleInResults = (items, activeTag) => {
+  const normalized = String(activeTag || "").trim();
+  if (!normalized) return items;
+  if (items.some((item) => item.name === normalized)) return items;
+  const activeItem = getIndexItemByName(normalized);
+  if (!activeItem) return items;
+  return [activeItem, ...items];
+};
+
+const isRowInView = (row, container, padding = 8) => {
+  const rowTop = row.offsetTop;
+  const rowBottom = rowTop + row.offsetHeight;
+  const viewTop = container.scrollTop + padding;
+  const viewBottom = container.scrollTop + container.clientHeight - padding;
+  return rowTop >= viewTop && rowBottom <= viewBottom;
+};
+
+const scrollIndexIntoView = (index, container, behavior = "auto") => {
+  const rowHeight = Number.isFinite(state.rowHeight)
+    ? state.rowHeight
+    : VIRTUAL_ITEM_HEIGHT_FALLBACK;
+  const centerTop = index * rowHeight - (container.clientHeight - rowHeight) / 2;
+  const nextTop = Math.max(0, Math.round(centerTop));
+  container.scrollTo({ top: nextTop, behavior });
+};
+
+export const scrollActiveRowIntoView = (root = document, behavior = "smooth") => {
+  ensureVirtualState();
+  const listBody = findListBody(root);
+  if (!(listBody instanceof HTMLElement)) return;
+  const activeTag = String(state.activeTag || "").trim();
+  if (!activeTag) return;
+  const rendered = findRowByTagName(activeTag, root);
+  if (rendered instanceof HTMLElement && isRowInView(rendered, listBody)) return;
+  const itemIndex = state.visibleItems.findIndex((item) => item.name === activeTag);
+  if (itemIndex < 0) return;
+  const scrollBehavior = prefersReducedMotion() ? "auto" : behavior;
+  requestListScroll();
+  scrollIndexIntoView(itemIndex, listBody, scrollBehavior);
+};
+
+export const setActiveTag = (tagName, root = document, options = {}) => {
+  ensureVirtualState();
+  const behavior = options.behavior === "smooth" ? "smooth" : "auto";
+  const shouldScroll = options.scroll !== false;
+  const normalized = String(tagName || "").trim();
+  if (!normalized) return;
+  state.activeTag = normalized;
+  if (state.listBuilt) {
+    renderVirtualList(root);
+  }
+  if (!shouldScroll) return;
+  scrollActiveRowIntoView(root, behavior);
+};
+
+export const getActiveRow = (root = document) => {
+  const activeTag = String(state.activeTag || "").trim();
+  if (!activeTag) return null;
+  return findRowByTagName(activeTag, root);
+};
+
+export const ensureActiveRowPresent = (tagName, options = {}) => {
+  ensureVirtualState();
+  const normalized = String(tagName || "").trim();
+  if (!normalized) return;
+
+  if (!Array.isArray(state.indexItems)) {
+    if (state.indexPending) return;
+    state.indexPending = true;
+    loadIndexItems().finally(() => {
+      state.indexPending = false;
+      ensureActiveRowPresent(normalized, options);
+    });
+    return;
   }
 
-  let orderedMatches = orderedItems
-    .map((item) => findRowByTagName(item.name))
-    .filter((row) => row instanceof HTMLElement);
-  const matches = new Set(orderedMatches);
-  orderedMatches = ensureActiveRowVisibleInFilteredSet(matches, orderedMatches);
-  const applyFilter = () => {
-    if (state.list) {
-      const remainder = state.rows.filter((row) => !matches.has(row));
-      [...orderedMatches, ...remainder].forEach((row) => {
-        state.list.appendChild(row);
-      });
-    }
-    let visibleCount = 0;
-    state.rows.forEach((row) => {
-      const isVisible = matches.has(row);
-      row.classList.toggle("is-filtered-out", !isVisible);
-      row.setAttribute("aria-hidden", isVisible ? "false" : "true");
-      if (isVisible) {
-        const mainEl = row.querySelector(".tags-view__index-name-main");
-        if (mainEl instanceof HTMLElement) {
-          const original = mainEl.dataset.originalText || row.dataset.tagsName || "";
-          mainEl.innerHTML = highlightMatch(original, queryTokens);
-        }
-      }
-      if (isVisible) visibleCount += 1;
+  if (getIndexItemByName(normalized)) return;
+  state.indexItems.push({
+    name: normalized,
+    hash: String(options.tagHash || "").trim(),
+    count: 0,
+    kind: "text",
+    label: "",
+  });
+  state.listBuilt = false;
+  applySearch(state.query);
+};
+
+export const buildIndexListIfNeeded = (root = document) => {
+  ensureVirtualState();
+  const list = findList(root);
+  state.list = list?.querySelector?.("[data-tags-view-index]") || null;
+  if (!(state.list instanceof HTMLElement)) return;
+  if (!Array.isArray(state.indexItems)) return;
+  if (state.listBuilt && state.visibleItems.length) return;
+
+  const selectedTag = getSelectedTagName(root);
+  if (selectedTag) {
+    state.activeTag = selectedTag;
+  }
+  state.queryTokens = normalizeQueryTokens(state.query);
+  state.visibleItems = ensureActiveVisibleInResults(
+    computeFilteredItems(state.indexItems, state.query, state.queryTokens),
+    state.activeTag,
+  );
+  renderVirtualList(root);
+  state.listBuilt = true;
+};
+
+export const rebuildIndexList = (root = document) => {
+  state.listBuilt = false;
+  buildIndexListIfNeeded(root);
+};
+
+export const buildSearchIndex = (root = document) => {
+  ensureVirtualState();
+  const list = findList(root) || document.querySelector("#tags-view-list");
+  const sidebar = findSidebar(root);
+  state.list = list?.querySelector?.("[data-tags-view-index]") || null;
+  state.input = sidebar?.querySelector("[data-tags-view-search]") || null;
+  state.clearBtn = sidebar?.querySelector("[data-tags-view-search-clear]") || null;
+  state.empty = list?.querySelector("[data-tags-view-empty]") || null;
+
+  if (state.input) {
+    state.input.value = state.query;
+  }
+  setClearButtonVisibility();
+};
+
+export const applySearch = (rawQuery) => {
+  ensureVirtualState();
+  const previousQuery = state.query;
+  const query = String(rawQuery || "").trim();
+  state.query = query;
+  persistSearchQuery(query);
+  setClearButtonVisibility();
+
+  if (!Array.isArray(state.indexItems)) {
+    if (state.indexPending) return;
+    state.indexPending = true;
+    loadIndexItems().finally(() => {
+      state.indexPending = false;
+      applySearch(state.query);
     });
-    if (state.empty) {
-      state.empty.hidden = visibleCount > 0 || state.indexPending;
-    }
-    runFlip(state.rows, beforePositions);
-  };
-  if (listBody) {
-    window.requestAnimationFrame(() => {
-      if (!listBody.isConnected) return;
-      applyFilter();
-    });
-  } else {
-    applyFilter();
+    return;
+  }
+
+  const listBody = findListBody();
+  if (listBody && query !== previousQuery) {
+    listBody.scrollTop = 0;
+  }
+
+  const selectedTag = getSelectedTagName();
+  if (selectedTag) {
+    state.activeTag = selectedTag;
+  }
+  state.queryTokens = normalizeQueryTokens(query);
+  state.visibleItems = ensureActiveVisibleInResults(
+    computeFilteredItems(state.indexItems, query, state.queryTokens),
+    state.activeTag,
+  );
+  state.listBuilt = true;
+  renderVirtualList(document);
+
+  if (listBody && previousQuery && !query) {
+    scrollActiveRowIntoView(document, "auto");
   }
 };
 
@@ -729,7 +628,7 @@ export const syncSortStateFromDom = (root = document) => {
   state.sortKind = rawKind ? normalizeSortKind(rawKind) : state.sortKind || "count";
   state.sortDir = rawDir ? normalizeSortDir(rawDir) : state.sortDir || "desc";
   if (prevKind !== state.sortKind || prevDir !== state.sortDir) {
-    resetIndexCache();
+    state.listBuilt = false;
   }
 };
 
@@ -747,13 +646,13 @@ export const updateSortButtons = (root = document) => {
 export const applySort = (kind, dir, { updateUrl = true, refreshSearch = true } = {}) => {
   state.sortKind = normalizeSortKind(kind);
   state.sortDir = normalizeSortDir(dir);
-  resetIndexCache();
   const detail = findDetail();
   if (detail) {
     detail.dataset.sortKind = state.sortKind;
     detail.dataset.sortDir = state.sortDir;
   }
   updateSortButtons();
+  state.listBuilt = false;
   if (refreshSearch) {
     applySearch(state.query);
   }
@@ -794,7 +693,6 @@ export const requestSort = (kind, dir) => {
 
   state.sortKind = nextKind;
   state.sortDir = nextDir;
-  resetIndexCache();
   if (detail) {
     detail.dataset.sortKind = nextKind;
     detail.dataset.sortDir = nextDir;
@@ -805,100 +703,23 @@ export const requestSort = (kind, dir) => {
   }
   updateSortButtons();
   refreshDetailLinksForSort(document);
-
   window.history.pushState(window.history.state, "", pageUrl);
-  captureListPositions();
   hydrateIndexFromTemplate(document);
-  const finalizeSort = () => {
-    if (selectedTag) {
-      ensureActiveRowPresent(selectedTag);
-      setActiveTag(selectedTag, document, { behavior: "auto", scroll: false });
-    }
-    animateListReorder(() => {
-      if (selectedTag) {
-        scrollActiveRowIntoView(document, "smooth");
-      }
-    });
-  };
-  if (Array.isArray(state.indexItems)) {
-    state.indexItems = state.indexItems.slice().sort((a, b) => {
-      const nameA = a.name.toLowerCase();
-      const nameB = b.name.toLowerCase();
-      const alphaA = normalizeAlphaSortToken(a.name, a.kind, a.label);
-      const alphaB = normalizeAlphaSortToken(b.name, b.kind, b.label);
-      const countA = Number.parseInt(a.count || "0", 10) || 0;
-      const countB = Number.parseInt(b.count || "0", 10) || 0;
-      if (nextKind === "count") {
-        if (countA !== countB) {
-          return nextDir === "desc" ? countB - countA : countA - countB;
-        }
-        const alphaCmp = alphaA.localeCompare(alphaB);
-        if (alphaCmp !== 0) return alphaCmp;
-        return nameA.localeCompare(nameB);
-      }
-      const alphaCmp = alphaA.localeCompare(alphaB);
-      if (alphaCmp !== 0) {
-        return nextDir === "desc" ? -alphaCmp : alphaCmp;
-      }
-      const nameCmp = nameA.localeCompare(nameB);
-      return nextDir === "desc" ? -nameCmp : nameCmp;
-    });
-    rebuildIndexList(document);
-    finalizeSort();
-  } else {
-    loadIndexItems().then(() => {
-      rebuildIndexList(document);
-      finalizeSort();
-    });
+  applySearch(state.query);
+  if (selectedTag) {
+    ensureActiveRowPresent(selectedTag);
+    setActiveTag(selectedTag, document, { behavior: "auto", scroll: false });
+    scrollActiveRowIntoView(document, "smooth");
   }
-  updateUrlSort({ sortKind: state.sortKind, sortDir: state.sortDir, selectedTag: selectedTag });
+  updateUrlSort({ sortKind: state.sortKind, sortDir: state.sortDir, selectedTag });
 };
 
 export const captureListPositions = () => {
-  if (prefersReducedMotion()) {
-    state.listPositions = null;
-    return;
-  }
-  const list = findList();
-  if (!list) return;
-  const positions = new Map();
-  list.querySelectorAll(".tags-view__index-row").forEach((row) => {
-    if (!(row instanceof HTMLElement)) return;
-    positions.set(row.dataset.tagName || row.id, row.getBoundingClientRect().top);
-  });
-  state.listPositions = positions;
+  state.listPositions = null;
 };
 
 export const animateListReorder = (onFinish) => {
-  const list = findList();
-  if (!list || !state.listPositions) {
-    if (typeof onFinish === "function") onFinish();
-    return;
-  }
-  const animations = [];
-  list.querySelectorAll(".tags-view__index-row").forEach((row) => {
-    if (!(row instanceof HTMLElement)) return;
-    const key = row.dataset.tagName || row.id;
-    const prevTop = state.listPositions.get(key);
-    if (prevTop == null) return;
-    const nextTop = row.getBoundingClientRect().top;
-    const delta = prevTop - nextTop;
-    if (Math.abs(delta) < 2) return;
-    animations.push(
-      row.animate([{ transform: `translateY(${delta}px)` }, { transform: "translateY(0)" }], {
-        duration: 220,
-        easing: "cubic-bezier(0.22, 0.61, 0.36, 1)",
-      }),
-    );
-  });
-  state.listPositions = null;
-  if (typeof onFinish === "function") {
-    if (animations.length) {
-      Promise.all(animations.map((a) => a.finished.catch(() => {}))).then(onFinish);
-    } else {
-      onFinish();
-    }
-  }
+  if (typeof onFinish === "function") onFinish();
 };
 
 export const normalizeSort = {
