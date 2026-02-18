@@ -2,7 +2,13 @@ import { sessionStore } from "../../utils/storage.js";
 import { getSelectedTrace } from "./detail.js";
 import { findEntriesList } from "./dom.js";
 import { getTagsLocationKey } from "./router.js";
-import { state } from "./state.js";
+import {
+  hasRestoreAppliedLocation,
+  isSaveSuppressed,
+  markRestoreAppliedLocation,
+  resetRestoreAppliedLocation,
+  state,
+} from "./state.js";
 
 const readEntriesAnchorMap = () => sessionStore.get("tags:anchor") ?? {};
 const readMainScrollMap = () => sessionStore.get("tags:scroll") ?? {};
@@ -146,14 +152,14 @@ const scheduleEntriesAnchorSave = () => {
   if (state.saveFrame) return;
   state.saveFrame = window.requestAnimationFrame(() => {
     state.saveFrame = 0;
-    if (state.saveSuppressed) return;
+    if (isSaveSuppressed()) return;
     storeMainScrollTop();
     captureEntriesAnchor();
   });
 };
 
 export const resetEntriesRestoreState = () => {
-  state.restoreAppliedForLocation = "";
+  resetRestoreAppliedLocation();
 };
 
 export const getStoredEntriesAnchor = (tagOverride) => {
@@ -215,7 +221,7 @@ export const cancelEntriesAnchorRestore = () => {
 export const maybeRestoreEntriesAnchor = () => {
   const currentLocation = getTagsLocationKey();
   if (!currentLocation) return false;
-  if (state.restoreAppliedForLocation === currentLocation) return false;
+  if (hasRestoreAppliedLocation(currentLocation)) return false;
   const params = new URLSearchParams(window.location.search);
   if (params.has("target")) return false;
   const selectedTag = getSelectedTrace();
@@ -235,12 +241,12 @@ export const maybeRestoreEntriesAnchor = () => {
         applyEntriesAnchor(entry, anchor.offset);
       });
       anchorRetryTimer = setTimeout(retryAnchorRestore, 120);
-      state.restoreAppliedForLocation = currentLocation;
+      markRestoreAppliedLocation(currentLocation);
       return true;
     }
   }
   clearActiveAnchor();
-  state.restoreAppliedForLocation = currentLocation;
+  markRestoreAppliedLocation(currentLocation);
   return restored;
 };
 
@@ -251,7 +257,7 @@ export const registerTagsScrollStrategy = () => {
     view: "tags",
     containerSelector: "#main-content",
     beforeSwap: () => {
-      if (!state.saveSuppressed) {
+      if (!isSaveSuppressed()) {
         storeMainScrollTop();
         captureEntriesAnchor();
       }

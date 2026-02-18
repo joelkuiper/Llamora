@@ -4,7 +4,7 @@ import { sessionStore } from "../../utils/storage.js";
 import { getSelectedTrace, refreshDetailLinksForSort } from "./detail.js";
 import { findDetail, findList, findListBody, findSidebar } from "./dom.js";
 import { getTagsDay, readTagFromUrl, updateUrlSort } from "./router.js";
-import { state } from "./state.js";
+import { requestListScroll, state } from "./state.js";
 
 export const readStoredSearchQuery = () => sessionStore.get("tags:query") ?? "";
 
@@ -373,21 +373,21 @@ export const setActiveTag = (tagName, root = document, options = {}) => {
   const listBody = findListBody(root);
   if (listBody instanceof HTMLElement) {
     if (!isRowInView(activeRow, listBody)) {
-      state.pendingListScroll = true;
+      requestListScroll();
       scrollRowIntoView(activeRow, listBody, behavior);
     }
     if (behavior === "auto") {
       window.requestAnimationFrame(() => {
         if (!activeRow.isConnected || !listBody.isConnected) return;
         if (isRowInView(activeRow, listBody)) return;
-        state.pendingListScroll = true;
+        requestListScroll();
         scrollRowIntoView(activeRow, listBody, "auto");
       });
       window.requestAnimationFrame(() => {
         window.requestAnimationFrame(() => {
           if (!activeRow.isConnected || !listBody.isConnected) return;
           if (isRowInView(activeRow, listBody)) return;
-          state.pendingListScroll = true;
+          requestListScroll();
           scrollRowIntoView(activeRow, listBody, "auto");
         });
       });

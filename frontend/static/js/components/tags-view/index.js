@@ -47,7 +47,22 @@ import {
   scrollMainContentTop,
   storeMainScrollTop,
 } from "./scroll.js";
-import { state } from "./state.js";
+import {
+  clearPendingDetailScroll,
+  clearPendingTagHighlight,
+  consumePendingDetailScroll,
+  consumePendingListScroll,
+  forcePhase,
+  getPendingTagHighlight,
+  isSaveSuppressed,
+  requestDetailScroll,
+  resetRestoreAppliedLocation,
+  setPendingTagHighlight,
+  setSaveSuppressed,
+  state,
+  TagsViewPhase,
+  transitionPhase,
+} from "./state.js";
 import { cacheTagsViewSummary, hydrateTagsViewSummary, syncSummarySkeletons } from "./summary.js";
 
 const BOOT_KEY = "__llamoraTagsViewBooted";
@@ -146,7 +161,8 @@ const ensureActiveTagVisible = (root = document) => {
 };
 
 const sync = (root = document) => {
-  state.saveSuppressed = false;
+  setSaveSuppressed(false);
+  forcePhase(TagsViewPhase.IDLE, "sync");
   updateHeaderHeight();
   if (!state.query) {
     state.query = readStoredSearchQuery();
@@ -175,10 +191,10 @@ const syncListOnly = (root = document) => {
   applySearch(state.query);
   ensureActiveTagVisible(root);
   refreshDetailLinksForSort(root);
-  const pending = state.pendingTagHighlight;
+  const pending = getPendingTagHighlight();
   if (pending && findRowByTagName(pending)) {
     setActiveTag(pending, root, { behavior: "smooth", scroll: true });
-    state.pendingTagHighlight = "";
+    clearPendingTagHighlight();
   } else {
     const selectedTag = getSelectedTrace(root);
     const selectedTagHash = String(findDetail(root)?.dataset?.selectedTagHash || "").trim();
@@ -206,16 +222,17 @@ const syncDetailOnly = (root = document) => {
   applyStoredHeatmapOffset(root);
   animateDetailEntries(root);
   void hydrateTagsViewSummary(root);
-  if (state.pendingTagHighlight) {
+  const pending = getPendingTagHighlight();
+  if (pending) {
     const selected = getSelectedTrace(root);
-    if (selected && selected === state.pendingTagHighlight) {
+    if (selected && selected === pending) {
       setActiveTag(selected, root, { behavior: "smooth" });
       const linkedRow = document.getElementById(`tag-index-${selected}`);
       if (linkedRow instanceof HTMLElement) {
         scrollActiveRowIntoView(root, "smooth");
         flashHighlight(linkedRow);
       }
-      state.pendingTagHighlight = "";
+      clearPendingTagHighlight();
     }
   }
 };
@@ -260,13 +277,14 @@ if (!globalThis[BOOT_KEY]) {
 
     const row = target.closest("#tags-view-list .tags-view__index-row");
     if (row) {
-      if (!state.saveSuppressed) {
+      transitionPhase(TagsViewPhase.NAVIGATING, "click:index-row");
+      if (!isSaveSuppressed()) {
         storeMainScrollTop();
         captureEntriesAnchor();
-        state.saveSuppressed = true;
+        setSaveSuppressed(true);
       }
       clearScrollTarget(null, { emitEvent: false });
-      state.pendingDetailScrollTop = true;
+      requestDetailScroll();
       return;
     }
 
@@ -282,19 +300,20 @@ if (!globalThis[BOOT_KEY]) {
       String(detailLink.dataset?.tagHash || "").trim() ||
       String(detailLink.closest?.(".entry-tag")?.dataset?.tagHash || "").trim();
     if (tagName) {
-      state.pendingTagHighlight = tagName;
+      setPendingTagHighlight(tagName);
       if (findRowByTagName(tagName)) {
         setActiveTag(tagName, document, { behavior: "smooth" });
       } else {
         ensureActiveRowPresent(tagName, { tagHash });
       }
     }
-    if (!state.saveSuppressed) {
+    transitionPhase(TagsViewPhase.NAVIGATING, "click:detail-tag-link");
+    if (!isSaveSuppressed()) {
       storeMainScrollTop();
       captureEntriesAnchor();
-      state.saveSuppressed = true;
+      setSaveSuppressed(true);
     }
-    state.pendingDetailScrollTop = true;
+    requestDetailScroll();
   });
 
   document.addEventListener("input", (event) => {
@@ -315,7 +334,8 @@ if (!globalThis[BOOT_KEY]) {
     const tag = String(event?.detail?.tag || "").trim();
     const tagHash = String(event?.detail?.tagHash || "").trim();
     if (!tag) return;
-    state.pendingTagHighlight = tag;
+    transitionPhase(TagsViewPhase.NAVIGATING, "event:tags-view-navigate");
+    setPendingTagHighlight(tag);
     ensureActiveRowPresent(tag, { tagHash });
     setActiveTag(tag, document, { behavior: "smooth" });
   });
@@ -339,10 +359,12 @@ if (!globalThis[BOOT_KEY]) {
     const inList = target.closest?.("#tags-view-list");
     const inEntries = target.closest?.("[data-tags-view-entries]");
     if (target.id === "tags-view-list" || inList) {
+      transitionPhase(TagsViewPhase.SETTLING_LIST, "afterSwap:list");
       syncListOnly(document);
       return;
     }
     if (target.id === "tags-view-detail" || inEntries) {
+      transitionPhase(TagsViewPhase.SETTLING_DETAIL, "afterSwap:detail");
       syncDetailOnly(document);
       if (inEntries && target.id !== "tags-view-detail" && isEntriesNavigationRequest(event)) {
         retryAnchorRestore();
@@ -388,8 +410,9 @@ if (!globalThis[BOOT_KEY]) {
     const target = event.detail?.target;
     if (!(target instanceof Element)) return;
     if (target.id !== "tags-view-detail") return;
-    state.saveSuppressed = false;
-    state.pendingDetailScrollTop = false;
+    setSaveSuppressed(false);
+    clearPendingDetailScroll();
+    forcePhase(TagsViewPhase.IDLE, "responseError:detail");
   });
 
   document.body.addEventListener("htmx:configRequest", (event) => {
@@ -436,20 +459,20 @@ if (!globalThis[BOOT_KEY]) {
     }
 
     if (target.id === "tags-view-list" || target.closest?.("#tags-view-list")) {
+      transitionPhase(TagsViewPhase.LOADING_LIST, "beforeRequest:list");
       captureListPositions();
       return;
     }
     if (target.id !== "tags-view-detail") return;
+    transitionPhase(TagsViewPhase.LOADING_DETAIL, "beforeRequest:detail");
     captureListPositions();
-    if (!state.saveSuppressed) {
+    if (!isSaveSuppressed()) {
       storeMainScrollTop();
       captureEntriesAnchor();
-      state.saveSuppressed = true;
+      setSaveSuppressed(true);
     }
-    state.restoreAppliedForLocation = "";
-    if (!state.pendingDetailScrollTop) {
-      state.pendingDetailScrollTop = true;
-    }
+    resetRestoreAppliedLocation();
+    requestDetailScroll();
   });
 
   document.body.addEventListener("htmx:afterSettle", (event) => {
@@ -458,30 +481,34 @@ if (!globalThis[BOOT_KEY]) {
     storeHeatmapOffsetFromRoot(target);
     if (target.id === "tags-view-list") {
       animateListReorder(() => {
-        if (state.pendingListScroll) {
-          state.pendingListScroll = false;
+        if (consumePendingListScroll()) {
           scrollActiveRowIntoView(document, "smooth");
         }
       });
+      if (!transitionPhase(TagsViewPhase.IDLE, "afterSettle:list")) {
+        forcePhase(TagsViewPhase.IDLE, "afterSettle:list:force");
+      }
     }
     if (target.id !== "tags-view-detail") return;
-    if (!state.pendingDetailScrollTop) return;
-    state.pendingDetailScrollTop = false;
+    if (!consumePendingDetailScroll()) return;
     scrollMainContentTop();
-    state.saveSuppressed = false;
+    setSaveSuppressed(false);
     maybeRestoreEntriesAnchor();
+    if (!transitionPhase(TagsViewPhase.IDLE, "afterSettle:detail")) {
+      forcePhase(TagsViewPhase.IDLE, "afterSettle:detail:force");
+    }
   });
 
   registerHydrationOwner({
     id: "tags-view",
     selector: "#tags-view",
     hydrate: (context) => {
-      state.restoreAppliedForLocation = "";
+      resetRestoreAppliedLocation();
       const root = context instanceof Element ? context : document;
       sync(root);
     },
     teardown: () => {
-      if (!state.saveSuppressed) {
+      if (!isSaveSuppressed()) {
         storeMainScrollTop();
         captureEntriesAnchor();
       }
@@ -493,7 +520,7 @@ if (!globalThis[BOOT_KEY]) {
     resetEntriesRestoreState();
   });
   window.addEventListener("pagehide", () => {
-    if (!state.saveSuppressed) {
+    if (!isSaveSuppressed()) {
       storeMainScrollTop();
       captureEntriesAnchor();
     }
