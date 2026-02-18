@@ -102,8 +102,7 @@
                    data-cache-key="tag:{{ detail.hash }}:w72"
                    data-cache-digest="{{ detail.summary_digest }}"
                    data-cache-kind="summary"
-                   data-cache-trigger="tag-summary:load"
-                   data-cache-strip-htmx="1">
+                   data-cache-trigger="tag-summary:load">
             {% with lines=4 %}
               {% include 'components/shared/summary_shimmer.html' %}
             {% endwith %}
