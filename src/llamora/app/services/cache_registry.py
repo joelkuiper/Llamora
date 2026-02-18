@@ -16,6 +16,7 @@ from llamora.app.services.tag_recall_cache import tag_recall_namespace
 
 SUMMARY_NAMESPACE = "summary"
 DIGEST_NAMESPACE = "digest"
+HEATMAP_NAMESPACE = "heatmap"
 
 MUTATION_ENTRY_CREATED = "entry.created"
 MUTATION_ENTRY_CHANGED = "entry.changed"
@@ -149,6 +150,7 @@ def _invalidations_for_digest_node(
     tag_items: list[CacheInvalidation] = [
         invalidate_tag_digest(node.value, reason=reason),
         invalidate_tag_summary(node.value, reason=reason),
+        invalidate_tag_heatmap(node.value, reason=reason),
     ]
     if include_tag_recall:
         tag_items.append(invalidate_tag_recall(node.value, reason=reason))
@@ -244,6 +246,19 @@ def invalidate_tag_recall(tag_hash: str, *, reason: str) -> CacheInvalidation:
     return CacheInvalidation(
         namespace=tag_recall_namespace(tag_hash),
         prefix="",
+        reason=reason,
+        scope="server",
+    )
+
+
+def heatmap_month_cache_key(tag_hash: str, year_month: str) -> str:
+    return f"tag:{tag_hash}:month:{year_month}"
+
+
+def invalidate_tag_heatmap(tag_hash: str, *, reason: str) -> CacheInvalidation:
+    return CacheInvalidation(
+        namespace=HEATMAP_NAMESPACE,
+        prefix=f"tag:{tag_hash}:month:",
         reason=reason,
         scope="server",
     )

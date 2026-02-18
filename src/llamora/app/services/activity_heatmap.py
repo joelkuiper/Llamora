@@ -4,9 +4,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, timedelta
+from logging import getLogger
 import math
 
+from llamora.app.services.cache_registry import (
+    HEATMAP_NAMESPACE,
+    heatmap_month_cache_key,
+)
+from llamora.app.services.crypto import CryptoContext
+from llamora.app.services.lockbox_store import LockboxStore
 from llamora.app.services.time import local_date
+
+logger = getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -63,6 +72,37 @@ def _shift_month(target: date, offset: int) -> date:
     year = target.year + (target.month - 1 + offset) // 12
     month = (target.month - 1 + offset) % 12 + 1
     return date(year, month, 1)
+
+
+def _month_token(target: date) -> str:
+    return target.strftime("%Y-%m")
+
+
+def _parse_cached_month_counts(payload: object) -> dict[str, int] | None:
+    if not isinstance(payload, dict):
+        return None
+    raw_counts = payload.get("counts")
+    if not isinstance(raw_counts, dict):
+        return None
+    parsed: dict[str, int] = {}
+    for raw_date, raw_count in raw_counts.items():
+        key = str(raw_date or "").strip()
+        if not key:
+            continue
+        try:
+            parsed[key] = int(raw_count or 0)
+        except (TypeError, ValueError):
+            return None
+    return parsed
+
+
+def _counts_for_month(counts: dict[str, int], month_start: date) -> dict[str, int]:
+    prefix = f"{_month_token(month_start)}-"
+    return {
+        iso_date: count
+        for iso_date, count in counts.items()
+        if str(iso_date).startswith(prefix)
+    }
 
 
 def build_activity_heatmap(
@@ -138,24 +178,74 @@ def build_activity_heatmap(
 
 async def get_tag_activity_heatmap(
     tags_repo,
-    user_id: str,
+    ctx: CryptoContext,
     tag_hash: bytes,
     *,
+    store: LockboxStore | None = None,
     end: date | None = None,
     months: int = 12,
     offset: int = 0,
     min_date: date | None = None,
 ) -> ActivityHeatmapData:
     end_date = end or local_date()
+    months = max(1, months)
+    offset = max(0, offset)
     end_month = _month_start(end_date)
-    window_end = _shift_month(end_month, -max(0, offset))
-    window_start = _shift_month(window_end, -(max(1, months) - 1))
-    counts = await tags_repo.get_tag_activity_counts(
-        user_id,
-        tag_hash,
-        window_start.isoformat(),
-        _month_end(window_end).isoformat(),
-    )
+    window_end = _shift_month(end_month, -offset)
+    window_start = _shift_month(window_end, -(months - 1))
+    month_starts = tuple(_shift_month(window_start, idx) for idx in range(months))
+    query_start = window_start.isoformat()
+    query_end = _month_end(window_end).isoformat()
+    tag_hash_hex = tag_hash.hex()
+
+    counts: dict[str, int] = {}
+    missing_months: list[date] = []
+    if store is not None:
+        for month_start in month_starts:
+            cache_key = heatmap_month_cache_key(tag_hash_hex, _month_token(month_start))
+            try:
+                cached_payload = await store.get_json(ctx, HEATMAP_NAMESPACE, cache_key)
+            except Exception:
+                logger.debug(
+                    "heatmap cache read failed user=%s tag=%s month=%s",
+                    ctx.user_id,
+                    tag_hash_hex,
+                    _month_token(month_start),
+                    exc_info=True,
+                )
+                missing_months.append(month_start)
+                continue
+            month_counts = _parse_cached_month_counts(cached_payload)
+            if month_counts is None:
+                missing_months.append(month_start)
+                continue
+            counts.update(month_counts)
+
+    if store is None or missing_months:
+        queried_counts = await tags_repo.get_tag_activity_counts(
+            ctx.user_id,
+            tag_hash,
+            query_start,
+            query_end,
+        )
+        counts.update(queried_counts)
+        if store is not None and missing_months:
+            for month_start in missing_months:
+                cache_key = heatmap_month_cache_key(
+                    tag_hash_hex, _month_token(month_start)
+                )
+                payload = {"counts": _counts_for_month(queried_counts, month_start)}
+                try:
+                    await store.set_json(ctx, HEATMAP_NAMESPACE, cache_key, payload)
+                except Exception:
+                    logger.debug(
+                        "heatmap cache write failed user=%s tag=%s month=%s",
+                        ctx.user_id,
+                        tag_hash_hex,
+                        _month_token(month_start),
+                        exc_info=True,
+                    )
+
     return build_activity_heatmap(
         counts,
         end=end_date,

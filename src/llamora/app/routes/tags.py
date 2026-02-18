@@ -12,6 +12,7 @@ from quart import (
 from urllib.parse import urlencode
 from llamora.app.services.container import (
     get_services,
+    get_lockbox_store,
     get_summarize_service,
     get_tag_service,
 )
@@ -121,7 +122,7 @@ def _catalog_payload_from_index_items(
 
 async def _build_activity_heatmap(
     *,
-    user_id: str,
+    ctx: CryptoContext,
     tag_hash_hex: str | None,
     first_used: str | None,
     offset: int,
@@ -142,8 +143,9 @@ async def _build_activity_heatmap(
             min_date = None
     return await get_tag_activity_heatmap(
         get_services().db.tags,
-        user_id,
+        ctx,
         tag_hash,
+        store=get_lockbox_store(),
         months=12,
         offset=offset,
         min_date=min_date,
@@ -177,7 +179,7 @@ async def _render_tags_page(selected_tag: str | None):
     selected = tags_view_data.selected_tag or selected
     heatmap_offset = 0
     activity_heatmap = await _build_activity_heatmap(
-        user_id=user["id"],
+        ctx=ctx,
         tag_hash_hex=tags_view_data.detail.hash if tags_view_data.detail else None,
         first_used=tags_view_data.detail.first_used if tags_view_data.detail else None,
         offset=heatmap_offset,
@@ -803,7 +805,7 @@ async def tags_view_detail_fragment(date: str):
     selected_tag = detail.name if detail else (tag_name or "")
     heatmap_offset = 0
     activity_heatmap = await _build_activity_heatmap(
-        user_id=user["id"],
+        ctx=ctx,
         tag_hash_hex=detail.hash if detail else None,
         first_used=detail.first_used if detail else None,
         offset=heatmap_offset,
@@ -842,7 +844,7 @@ async def tags_view_detail_fragment(date: str):
 @login_required
 async def tags_view_heatmap(date: str):
     normalized_date = require_iso_date(date)
-    _, user, _ctx = await require_encryption_context()
+    _, _user, ctx = await require_encryption_context()
     services = get_services()
     tag_hash_raw = (request.args.get("tag_hash") or "").strip()
     heatmap_offset = _parse_positive_int(
@@ -864,8 +866,9 @@ async def tags_view_heatmap(date: str):
                     min_date = None
             activity_heatmap = await get_tag_activity_heatmap(
                 services.db.tags,
-                user["id"],
+                ctx,
                 tag_hash,
+                store=get_lockbox_store(),
                 months=12,
                 offset=heatmap_offset,
                 min_date=min_date,
