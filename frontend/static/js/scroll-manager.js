@@ -129,9 +129,12 @@ export class ScrollManager {
   #listeners = null;
   #contextListeners = null;
   #resizeObserver = null;
+  #markdownWaitObserver = null;
+  #markdownWaitTimeout = null;
   #storageErrorLogged = false;
   #skipNextRestore = false;
-  #waitingKey = null;
+  #waitingMarkdown = null;
+  #waitingToken = 0;
   #started = false;
   #strategies = new Map();
 
@@ -377,6 +380,7 @@ export class ScrollManager {
 
     this.#resizeObserver?.disconnect();
     this.#resizeObserver = null;
+    this.#cancelMarkdownWait("detach-entries");
 
     this.entries = null;
 
@@ -779,19 +783,11 @@ export class ScrollManager {
     return this.#runStrategyHook("historyRestore", { reason: "historyRestore", event });
   }
 
-  handleMarkdownRendered() {
+  handleMarkdownRendered(event) {
+    const pending = this.#waitingMarkdown;
     const currentKey = this.#getKey();
 
-    if (this.#waitingKey && this.#waitingKey !== currentKey) {
-      this.#waitingKey = null;
-      return;
-    }
-
-    if (this.#waitingKey && this.needsMarkdownRender()) {
-      return;
-    }
-
-    if (!this.#waitingKey) {
+    if (!pending) {
       scrollEvents.dispatchEvent(
         new CustomEvent(MARKDOWN_COMPLETE_EVENT, {
           detail: { key: currentKey, restored: false },
@@ -800,23 +796,16 @@ export class ScrollManager {
       return;
     }
 
-    const saved = this.#safeGet(this.#waitingKey);
-    this.#waitingKey = null;
-
-    if (saved !== null) {
-      this.#applySavedScroll(saved);
-      scrollEvents.dispatchEvent(
-        new CustomEvent(MARKDOWN_COMPLETE_EVENT, {
-          detail: { key: currentKey, restored: true },
-        }),
-      );
-    } else {
-      scrollEvents.dispatchEvent(
-        new CustomEvent(MARKDOWN_COMPLETE_EVENT, {
-          detail: { key: currentKey, restored: false },
-        }),
-      );
+    const renderedElement = event?.detail?.element;
+    if (
+      renderedElement instanceof Element &&
+      this.container &&
+      !this.container.contains(renderedElement)
+    ) {
+      return;
     }
+
+    this.#resolveMarkdownWait(pending.token, "markdown-rendered");
   }
 
   needsMarkdownRender() {
@@ -864,6 +853,8 @@ export class ScrollManager {
       return;
     }
 
+    this.#cancelMarkdownWait("restore-immediate");
+
     const saved = this.#safeGet(key);
     if (saved !== null) {
       this.#applySavedScroll(saved);
@@ -893,7 +884,72 @@ export class ScrollManager {
   }
 
   #waitForMarkdown(key) {
-    this.#waitingKey = key;
+    const token = ++this.#waitingToken;
+    this.#waitingMarkdown = { key, token };
+    this.#connectMarkdownWaitObserver(token);
+  }
+
+  #connectMarkdownWaitObserver(token) {
+    this.#disconnectMarkdownWaitObserver();
+
+    if (typeof ResizeObserver !== "function") return;
+
+    const target = this.entries || this.container;
+    if (!(target instanceof Element)) return;
+
+    this.#markdownWaitObserver = new ResizeObserver(() => {
+      this.#resolveMarkdownWait(token, "resize-observer");
+    });
+    this.#markdownWaitObserver.observe(target);
+  }
+
+  #disconnectMarkdownWaitObserver() {
+    this.#markdownWaitObserver?.disconnect();
+    this.#markdownWaitObserver = null;
+    if (this.#markdownWaitTimeout) {
+      window.clearTimeout(this.#markdownWaitTimeout);
+      this.#markdownWaitTimeout = null;
+    }
+  }
+
+  #cancelMarkdownWait(_reason = "cancel") {
+    this.#waitingMarkdown = null;
+    this.#disconnectMarkdownWaitObserver();
+  }
+
+  #resolveMarkdownWait(expectedToken, _source = "unknown") {
+    const pending = this.#waitingMarkdown;
+    if (!pending) return;
+    if (pending.token !== expectedToken) return;
+
+    const currentKey = this.#getKey();
+    if (pending.key !== currentKey) {
+      this.#cancelMarkdownWait("key-mismatch");
+      return;
+    }
+
+    if (this.needsMarkdownRender()) {
+      return;
+    }
+
+    const saved = this.#safeGet(pending.key);
+    this.#cancelMarkdownWait("resolved");
+
+    if (saved !== null) {
+      this.#applySavedScroll(saved);
+      scrollEvents.dispatchEvent(
+        new CustomEvent(MARKDOWN_COMPLETE_EVENT, {
+          detail: { key: currentKey, restored: true },
+        }),
+      );
+      return;
+    }
+
+    scrollEvents.dispatchEvent(
+      new CustomEvent(MARKDOWN_COMPLETE_EVENT, {
+        detail: { key: currentKey, restored: false },
+      }),
+    );
   }
 
   #applySavedScroll(saved) {

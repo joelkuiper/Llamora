@@ -42,7 +42,7 @@ export class ScrollIntent {
       },
     };
     const documentPolicies = {
-      [MARKDOWN_EVENT]: () => manager.handleMarkdownRendered(),
+      [MARKDOWN_EVENT]: (event) => manager.handleMarkdownRendered(event),
     };
     const windowPolicies = {
       pageshow: (event) => manager.handlePageShow(event),
