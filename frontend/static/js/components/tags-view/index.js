@@ -164,6 +164,8 @@ const sync = (root = document) => {
   setSaveSuppressed(false);
   forcePhase(TagsViewPhase.IDLE, "sync");
   updateHeaderHeight();
+  syncSortStateFromDom(root);
+  updateSortButtons(root);
   if (!state.query) {
     state.query = readStoredSearchQuery();
   }

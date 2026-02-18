@@ -1,7 +1,7 @@
 import { formatTimeElements } from "../../services/time.js";
 import { armEntryAnimations, armInitialEntryAnimations } from "../entries-view/entry-animations.js";
 import { findDetail, findList } from "./dom.js";
-import { readTagFromUrl, updateUrlSortParams } from "./router.js";
+import { normalizeTagsNavUrl, readTagFromUrl } from "./router.js";
 import { state } from "./state.js";
 
 export const getSelectedTrace = (root = document) =>
@@ -39,16 +39,14 @@ const readSortFromDom = (root = document) => {
 export const refreshDetailLinksForSort = (root = document) => {
   const detail = findDetail(root);
   if (!detail) return;
-  const kind = state.sortKind;
-  const dir = state.sortDir;
   detail.querySelectorAll(".tags-view__related-link, .tags-view__entry-tag").forEach((link) => {
     if (!(link instanceof HTMLAnchorElement)) return;
     const href = link.getAttribute("href");
     const hxGet = link.getAttribute("hx-get");
     const hxPush = link.getAttribute("hx-push-url");
-    if (href) link.setAttribute("href", updateUrlSortParams(href, kind, dir));
-    if (hxGet) link.setAttribute("hx-get", updateUrlSortParams(hxGet, kind, dir));
-    if (hxPush) link.setAttribute("hx-push-url", updateUrlSortParams(hxPush, kind, dir));
+    if (href) link.setAttribute("href", normalizeTagsNavUrl(href));
+    if (hxGet) link.setAttribute("hx-get", normalizeTagsNavUrl(hxGet));
+    if (hxPush) link.setAttribute("hx-push-url", normalizeTagsNavUrl(hxPush));
   });
   detail.querySelectorAll("entry-tags").forEach((el) => {
     if (!(el instanceof HTMLElement)) return;
@@ -57,16 +55,16 @@ export const refreshDetailLinksForSort = (root = document) => {
     const addUrl = el.dataset.addTagUrl;
     const suggestUrl = el.dataset.suggestionsUrl;
     if (pageTemplate) {
-      el.dataset.tagNavigatePageTemplate = updateUrlSortParams(pageTemplate, kind, dir);
+      el.dataset.tagNavigatePageTemplate = normalizeTagsNavUrl(pageTemplate);
     }
     if (fragmentTemplate) {
-      el.dataset.tagNavigateFragmentTemplate = updateUrlSortParams(fragmentTemplate, kind, dir);
+      el.dataset.tagNavigateFragmentTemplate = normalizeTagsNavUrl(fragmentTemplate);
     }
     if (addUrl) {
-      el.dataset.addTagUrl = updateUrlSortParams(addUrl, kind, dir);
+      el.dataset.addTagUrl = normalizeTagsNavUrl(addUrl);
     }
     if (suggestUrl) {
-      el.dataset.suggestionsUrl = updateUrlSortParams(suggestUrl, kind, dir);
+      el.dataset.suggestionsUrl = normalizeTagsNavUrl(suggestUrl);
     }
   });
 };

@@ -23,30 +23,34 @@ export const readTagFromUrl = () => {
   return String(url.searchParams.get("tag") || "").trim();
 };
 
-export const updateUrlSortParams = (rawUrl, sortKind, sortDir) => {
+export const normalizeTagsNavUrl = (rawUrl) => {
   if (!rawUrl) return rawUrl;
   try {
     const current = new URL(window.location.href);
     const next = new URL(rawUrl, current.origin);
-    next.searchParams.set("sort_kind", sortKind);
-    next.searchParams.set("sort_dir", sortDir);
+    const day = getTagsDay();
+    if (day && isTagsPath(next.pathname)) {
+      next.searchParams.set("day", day);
+    }
+    next.searchParams.delete("sort_kind");
+    next.searchParams.delete("sort_dir");
     return `${next.pathname}${next.search}${next.hash}`;
   } catch {
     return rawUrl;
   }
 };
 
-export const updateUrlSort = ({ sortKind, sortDir, selectedTag } = {}) => {
+export const syncTagsHistoryUrl = ({ selectedTag } = {}) => {
   const detailTag = String(selectedTag || "").trim();
   const url = new URL(window.location.href);
   const tag = detailTag || parseTagFromPath(url.pathname) || "";
+  const day = getTagsDay();
   url.pathname = tag ? `/t/${encodeURIComponent(tag)}` : "/t";
-  if (sortKind) {
-    url.searchParams.set("sort_kind", sortKind);
+  if (day) {
+    url.searchParams.set("day", day);
   }
-  if (sortDir) {
-    url.searchParams.set("sort_dir", sortDir);
-  }
+  url.searchParams.delete("sort_kind");
+  url.searchParams.delete("sort_dir");
   url.searchParams.delete("tag");
   url.searchParams.delete("target");
   window.history.replaceState(window.history.state, "", url.toString());
@@ -66,6 +70,12 @@ export const getTagsLocationKey = (tagOverride) => {
     String(url.searchParams.get("tag") || "").trim();
   const nextPath = tag ? `/t/${encodeURIComponent(tag)}` : "/t";
   const params = new URLSearchParams(url.search);
+  const day = getTagsDay();
+  if (day) {
+    params.set("day", day);
+  }
+  params.delete("sort_kind");
+  params.delete("sort_dir");
   params.delete("tag");
   params.delete("target");
   const qs = params.toString();
