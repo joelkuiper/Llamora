@@ -146,9 +146,6 @@
 
 {% block content %}
   <div id="content">
-    <script type="application/json" id="tags-catalog-data" data-tags-catalog>
-      {{ (tags_catalog_items if tags_catalog_items is defined else []) | tojson }}
-    </script>
     <div id="entries-loading" class="entries-loading" hidden aria-hidden="true">
       <div class="entries-loading__backdrop" aria-hidden="true"></div>
       <div class="entries-loading__panel" role="status" aria-live="polite">
