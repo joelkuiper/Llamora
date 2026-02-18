@@ -663,6 +663,34 @@ def _is_emoji_tag(value: str) -> bool:
     return bool(EMOJI_TAG_RE.search(value or ""))
 
 
+def _tokenize_text(value: str) -> set[str]:
+    tokens = re.findall(r"[a-z0-9][a-z0-9-]*", (value or "").lower())
+    return {token for token in tokens if token}
+
+
+def _score_tag_candidate(
+    tag: str,
+    *,
+    entry_text_lower: str,
+    entry_tokens: set[str],
+    recent_penalty: Mapping[str, int],
+) -> float:
+    if _is_emoji_tag(tag):
+        # Keep emoji tags possible, but slightly de-prioritize by default.
+        return 0.15 + random.random() * 0.1
+
+    tag_lower = tag.lower()
+    parts = [part for part in re.split(r"[-_\s]+", tag_lower) if part]
+    full_match = 1.2 if tag_lower in entry_text_lower else 0.0
+    part_hits = 0.0
+    for part in parts:
+        if part in entry_tokens or part in entry_text_lower:
+            part_hits += 0.8
+    penalty = float(recent_penalty.get(tag_lower, 0)) * 0.7
+    noise = random.random() * 0.25
+    return full_match + part_hits + noise - penalty
+
+
 def _parse_tag_selection_payload(raw: str) -> list[str] | None:
     text = (raw or "").strip()
     if not text:
@@ -1096,6 +1124,7 @@ async def _select_tags_with_llm(
     suggestions: list[str],
     min_tags: int,
     max_tags: int,
+    recent_tag_penalty: Mapping[str, int] | None = None,
 ) -> list[str]:
     if not suggestions or max_tags <= 0:
         return []
@@ -1117,6 +1146,7 @@ async def _select_tags_with_llm(
         unique_suggestions.append(value)
     if not unique_suggestions:
         return []
+    random.shuffle(unique_suggestions)
 
     effective_max = min(target_tag_count, len(unique_suggestions))
     effective_min = min(effective_min, effective_max)
@@ -1125,9 +1155,17 @@ async def _select_tags_with_llm(
 
     emoji_suggestions = [tag for tag in unique_suggestions if _is_emoji_tag(tag)]
     max_emoji_tags = 1
+    entry_text_lower = (entry_text or "").lower()
+    entry_tokens = _tokenize_text(entry_text)
+    recent_penalty = {
+        str(k).lower(): max(0, int(v))
+        for k, v in (recent_tag_penalty or {}).items()
+        if str(k).strip()
+    }
     model = settings.get("LLM.chat.model") or "local"
     params = dict(settings.get("LLM.chat.parameters") or {})
-    params["temperature"] = min(0.4, max(0.1, float(params.get("temperature", 0.2))))
+    base_temp = float(params.get("temperature", 0.25))
+    params["temperature"] = min(0.65, max(0.18, base_temp + random.uniform(0.0, 0.2)))
     params["response_format"] = {
         "type": "json_schema",
         "json_schema": {
@@ -1145,12 +1183,27 @@ async def _select_tags_with_llm(
     emoji_hint = (
         "Use at most one emoji tag in the final list." if emoji_suggestions else ""
     )
+    recent_hint = ""
+    if recent_penalty:
+        recent_sorted = sorted(
+            recent_penalty.items(),
+            key=lambda item: item[1],
+            reverse=True,
+        )
+        recent_top = [tag for tag, _ in recent_sorted[:8]]
+        if recent_top:
+            recent_hint = (
+                "Recently overused tags (avoid unless strongly relevant): "
+                + ", ".join(recent_top)
+            )
     user_message = textwrap.dedent(
         f"""
         Pick the most relevant tags for the entry from the suggestions list.
         Return a JSON array only (no markdown, no code fences).
         Choose exactly {effective_max} tags.
+        Prefer specific tags tied to this exact entry, not generic persona-level tags.
         {emoji_hint}
+        {recent_hint}
 
         Entry:
         {entry_text}
@@ -1178,8 +1231,8 @@ async def _select_tags_with_llm(
     parsed = _parse_tag_selection_payload(raw)
     if parsed is None:
         logger.info("Tag selection raw (truncated): %s", raw[:1200])
-        logger.warning("Failed to parse tag selection JSON; skipping tags")
-        return []
+        logger.warning("Failed to parse tag selection JSON; using heuristic fallback")
+        parsed = []
     tags = parsed
     allowed = {tag.strip() for tag in unique_suggestions}
     selected: list[str] = []
@@ -1209,22 +1262,15 @@ async def _select_tags_with_llm(
 
     # Fill to requested count when model returns too few tags.
     if len(selected) < effective_max:
-        non_emoji_pool = [
-            tag
-            for tag in unique_suggestions
-            if tag not in selected and not _is_emoji_tag(tag)
-        ]
-        emoji_pool = [tag for tag in emoji_suggestions if tag not in selected]
-        fallback_pool = list(non_emoji_pool)
-        if (
-            emoji_pool
-            and sum(1 for tag in selected if _is_emoji_tag(tag)) < max_emoji_tags
-        ):
-            fallback_pool.append(emoji_pool[0])
-        fallback_pool.extend(
-            tag
-            for tag in unique_suggestions
-            if tag not in selected and tag not in fallback_pool
+        fallback_pool = sorted(
+            (tag for tag in unique_suggestions if tag not in selected),
+            key=lambda tag: _score_tag_candidate(
+                tag,
+                entry_text_lower=entry_text_lower,
+                entry_tokens=entry_tokens,
+                recent_penalty=recent_penalty,
+            ),
+            reverse=True,
         )
         for tag in fallback_pool:
             if (
@@ -1248,6 +1294,7 @@ async def _apply_tags(
     entry_text: str,
     min_tags: int,
     max_tags: int,
+    recent_tag_penalty: Mapping[str, int] | None,
     headers: dict[str, str],
 ) -> list[str]:
     try:
@@ -1272,6 +1319,7 @@ async def _apply_tags(
         suggestions,
         min_tags,
         max_tags,
+        recent_tag_penalty=recent_tag_penalty,
     )
     if not selected:
         logger.info("    tags: (none)")
@@ -1307,6 +1355,9 @@ async def generate_dataset(config: DemoConfig) -> None:
         f"large={config.large_entry_rate:.2f}"
     )
     recent_entries: deque[str] = deque(maxlen=max(0, config.entry_context_size))
+    recent_tag_window: deque[list[str]] = deque()
+    recent_tag_counts: dict[str, int] = {}
+    recent_tag_window_limit = 30
     narrative_events = await _generate_narrative_timeline(llm, config)
     if narrative_events:
         log_rule("Narrative scaffold")
@@ -1464,9 +1515,28 @@ async def generate_dataset(config: DemoConfig) -> None:
                     text,
                     config.min_tags,
                     config.max_tags,
+                    recent_tag_counts,
                     headers,
                 )
                 total_tags += len(selected_tags)
+                if selected_tags:
+                    recent_tag_window.append(list(selected_tags))
+                    for raw_tag in selected_tags:
+                        key = raw_tag.strip().lower()
+                        if not key:
+                            continue
+                        recent_tag_counts[key] = recent_tag_counts.get(key, 0) + 1
+                    while len(recent_tag_window) > recent_tag_window_limit:
+                        removed = recent_tag_window.popleft()
+                        for removed_tag in removed:
+                            key = removed_tag.strip().lower()
+                            if not key:
+                                continue
+                            count = recent_tag_counts.get(key, 0) - 1
+                            if count <= 0:
+                                recent_tag_counts.pop(key, None)
+                            else:
+                                recent_tag_counts[key] = count
 
                 if random.random() < config.response_rate:
                     response_count = 1
