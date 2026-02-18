@@ -70,6 +70,18 @@ class LockboxStore:
             await self.lockbox.delete(user_id, namespace, key)
         return len(matches)
 
+    async def delete_bulk(
+        self,
+        user_id: str,
+        ops: list[tuple[str, str | None, str | None]],
+    ) -> None:
+        """Atomically delete a batch of lockbox entries in a single transaction.
+
+        Each op is ``(namespace, key_or_None, prefix_or_None)``; semantics match
+        :meth:`Lockbox.delete_bulk`.
+        """
+        await self.lockbox.delete_bulk(user_id, ops)
+
     async def list(self, user_id: str, namespace: str) -> list[str]:
         return await self.lockbox.list(user_id, namespace)
 

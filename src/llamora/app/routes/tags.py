@@ -746,6 +746,7 @@ async def tag_detail_summary(tag_hash: str):
     html = await render_template(
         "components/tags/tag_detail_summary.html",
         summary=summary,
+        summary_digest=summary_digest,
     )
     if summary and summary_digest:
         await summarize.cache(

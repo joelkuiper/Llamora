@@ -1,5 +1,5 @@
 {% if summary %}
-<p class="summary-fade">{{ summary }}</p>
+<p class="summary-fade" data-summary-digest="{{ summary_digest }}">{{ summary }}</p>
 {% else %}
 <p class="summary-fade">Summary unavailable right now.</p>
 {% endif %}

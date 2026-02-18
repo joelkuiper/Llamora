@@ -14,6 +14,11 @@ logger = getLogger(__name__)
 _MAX_NAME_LENGTH = 128
 
 
+def _escape_like(prefix: str) -> str:
+    """Escape a prefix string for use in a SQLite LIKE pattern (ESCAPE '\\')."""
+    return prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 class LockboxDecryptionError(Exception):
     pass
 
@@ -101,6 +106,46 @@ class Lockbox:
                 "DELETE FROM lockbox WHERE namespace = ?",
                 (scoped_namespace,),
             )
+            await conn.commit()
+
+    async def delete_bulk(
+        self,
+        user_id: str,
+        ops: list[tuple[str, str | None, str | None]],
+    ) -> None:
+        """Atomically delete a batch of lockbox entries in a single transaction.
+
+        Each op is ``(namespace, key_or_None, prefix_or_None)``:
+        - ``key`` not None  → delete exact key
+        - ``prefix == ""``  → delete entire namespace
+        - ``prefix`` non-empty → delete all keys matching ``prefix*``
+        """
+        if not ops:
+            return
+        self._validate_user_id(user_id)
+        async with self.pool.connection() as conn:
+            await conn.execute("BEGIN")
+            for namespace, key, prefix in ops:
+                self._validate_name(namespace, "namespace")
+                scoped = self._scope_namespace(user_id, namespace)
+                if key is not None:
+                    self._validate_name(key, "key")
+                    await conn.execute(
+                        "DELETE FROM lockbox WHERE namespace = ? AND key = ?",
+                        (scoped, key),
+                    )
+                elif prefix is not None:
+                    if prefix == "":
+                        await conn.execute(
+                            "DELETE FROM lockbox WHERE namespace = ?",
+                            (scoped,),
+                        )
+                    else:
+                        like_pattern = _escape_like(prefix) + "%"
+                        await conn.execute(
+                            "DELETE FROM lockbox WHERE namespace = ? AND key LIKE ? ESCAPE '\\'",
+                            (scoped, like_pattern),
+                        )
             await conn.commit()
 
     async def list(self, user_id: str, namespace: str) -> list[str]:

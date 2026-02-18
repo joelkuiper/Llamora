@@ -227,7 +227,7 @@ def invalidate_day_digest(date: str, *, reason: str) -> CacheInvalidation:
         namespace=DIGEST_NAMESPACE,
         key=f"day:{date}",
         reason=reason,
-        scope="server",
+        scope="both",
     )
 
 

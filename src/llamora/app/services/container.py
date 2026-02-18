@@ -134,6 +134,7 @@ class AppLifecycle:
                         event_bus=events,
                         lockbox_store=get_lockbox_store(self._services.db),
                         service_pulse=self._services.service_pulse,
+                        tag_service=self._services.tag_service,
                     )
                     self._invalidation_coordinator.subscribe()
                 await self._services.search_api.start()

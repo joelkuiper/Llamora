@@ -27,6 +27,7 @@ from llamora.app.services.digest_policy import tag_digest
 
 logger = logging.getLogger(__name__)
 
+_TAG_INDEX_CACHE_MAX = 64
 
 _SENTENCE_END = re.compile(r"[.!?](?:\s|$)")
 _MARKDOWN_PREFIX = re.compile(r"^(?:#{1,6}\s+|>+\s+|[-*+]\s+|\d+\.\s+)")
@@ -152,6 +153,7 @@ class TagService:
         self._db = db
         self._suggestion_cache: dict[tuple[str, str], tuple[float, list[str]]] = {}
         self._suggestion_ttl = 300.0
+        self._tag_index_cache: dict[tuple[str, int], _TagsIndexRequestCache] = {}
 
     def canonicalize(self, raw: str) -> str:
         """Return the canonical representation for ``raw``."""
@@ -464,6 +466,10 @@ class TagService:
         self,
         ctx: CryptoContext,
     ) -> _TagsIndexRequestCache:
+        cache_key = (ctx.user_id, ctx.epoch)
+        hit = self._tag_index_cache.get(cache_key)
+        if hit is not None:
+            return hit
         rows = tuple(await self._db.tags.get_tags_index(ctx))
         items: list[TagIndexItem] = []
         items_by_name: dict[str, TagIndexItem] = {}
@@ -482,11 +488,20 @@ class TagService:
             )
             items.append(item)
             items_by_name.setdefault(canonical, item)
-        return _TagsIndexRequestCache(
+        result = _TagsIndexRequestCache(
             rows=rows,
             items=tuple(items),
             items_by_name=items_by_name,
         )
+        if len(self._tag_index_cache) >= _TAG_INDEX_CACHE_MAX:
+            self._tag_index_cache.clear()
+        self._tag_index_cache[cache_key] = result
+        return result
+
+    def invalidate_tag_index(self, user_id: str) -> None:
+        keys = [k for k in self._tag_index_cache if k[0] == user_id]
+        for k in keys:
+            del self._tag_index_cache[k]
 
     def _sort_index_items(
         self,

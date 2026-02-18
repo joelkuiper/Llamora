@@ -22,6 +22,7 @@ from llamora.app.services.cache_registry import (
 )
 from llamora.app.services.lockbox_store import LockboxStore
 from llamora.app.services.service_pulse import ServicePulse
+from llamora.app.services.tag_service import TagService
 
 logger = getLogger(__name__)
 
@@ -33,6 +34,7 @@ class InvalidationCoordinator:
     event_bus: RepositoryEventBus
     lockbox_store: LockboxStore
     service_pulse: ServicePulse | None = None
+    tag_service: TagService | None = None
 
     def subscribe(self) -> None:
         self.event_bus.subscribe(ENTRY_INSERTED_EVENT, self._on_entry_changed)
@@ -72,6 +74,8 @@ class InvalidationCoordinator:
         tag_hash: str,
         created_date: str | None = None,
     ) -> None:
+        if self.tag_service is not None:
+            self.tag_service.invalidate_tag_index(user_id)
         await self._apply_lineage(
             user_id=user_id,
             plan=build_mutation_lineage_plan(
@@ -92,6 +96,8 @@ class InvalidationCoordinator:
         tag_hash: str,
         affected_entries: tuple[tuple[str, str | None], ...],
     ) -> None:
+        if self.tag_service is not None:
+            self.tag_service.invalidate_tag_index(user_id)
         dates: set[str] = {
             created_date for _, created_date in affected_entries if created_date
         }
@@ -154,20 +160,16 @@ class InvalidationCoordinator:
     async def _apply_lockbox_invalidations(
         self, user_id: str, items: list[CacheInvalidation]
     ) -> None:
+        ops: list[tuple[str, str | None, str | None]] = []
         for item in items:
             if item.scope not in {"both", "server"}:
                 continue
             if item.key:
-                await self.lockbox_store.delete(user_id, item.namespace, item.key)
-                continue
-            if item.prefix is None:
-                continue
-            if item.prefix == "":
-                await self.lockbox_store.delete_namespace(user_id, item.namespace)
-            else:
-                await self.lockbox_store.delete_prefix(
-                    user_id, item.namespace, item.prefix
-                )
+                ops.append((item.namespace, item.key, None))
+            elif item.prefix is not None:
+                ops.append((item.namespace, None, item.prefix))
+        if ops:
+            await self.lockbox_store.delete_bulk(user_id, ops)
 
     def _pulse(self, action: str, **payload: object) -> None:
         event_payload = {"action": action, **payload}
