@@ -290,10 +290,10 @@
   color: color-mix(in srgb, var(--color-text-muted) 64%, transparent);
   opacity: 0.64;
   transition:
-    opacity 180ms ease,
-    color 180ms ease,
-    background-color 180ms ease,
-    box-shadow 180ms ease;
+    opacity var(--motion-fade) ease,
+    color var(--motion-fade) ease,
+    background-color var(--motion-fade) ease,
+    box-shadow var(--motion-fade) ease;
 }
 
 .tags-view__sort-btn:hover,
@@ -345,9 +345,9 @@
     opacity var(--motion-gentle) ease,
     max-height var(--motion-gentle) ease,
     transform var(--motion-gentle) ease,
-    background-color 180ms ease,
-    color 180ms ease,
-    box-shadow 180ms ease;
+    background-color var(--motion-fade) ease,
+    color var(--motion-fade) ease,
+    box-shadow var(--motion-fade) ease;
   content-visibility: auto;
   contain-intrinsic-size: 38px;
 }
@@ -373,16 +373,16 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent-active) 26%, transparent);
   opacity: 0;
-  transition: opacity 180ms ease;
+  transition: opacity var(--motion-fade) ease;
 }
 
 .tags-view__index-row:hover,
 .tags-view__index-row:focus-visible {
   --motion-highlight-end: var(--tags-index-bg-hover);
-  background: var(--tags-index-bg-hover);
+  background: var(--interactive-hover-bg);
   color: color-mix(in srgb, var(--accent-active) 7%, var(--color-text));
   box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--accent-20) 34%, transparent),
+    inset 0 0 0 1px var(--interactive-hover-border),
     0 1px 4px color-mix(in srgb, var(--accent-10) 14%, transparent);
   transform: translateX(0.5px);
   outline: none;
@@ -474,7 +474,7 @@
   color: color-mix(in srgb, var(--color-text-muted) 44%, transparent);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.04em;
-  transition: color 180ms ease;
+  transition: color var(--motion-fade) ease;
 }
 
 .tags-view__index-row:hover .tags-view__index-count,
@@ -640,11 +640,11 @@
 .tags-view__related .entry-tag:hover,
 .tags-view__related .entry-tag:focus-visible {
   opacity: 1;
-  border-color: color-mix(in srgb, var(--accent-20) 44%, var(--border));
-  background: color-mix(in srgb, var(--accent-05) 52%, var(--glass-bg-alt));
+  border-color: var(--interactive-hover-border);
+  background: var(--interactive-hover-bg);
   box-shadow:
     var(--inset-shadow),
-    0 0 0 1px color-mix(in srgb, var(--accent-10) 50%, transparent);
+    0 0 0 1px var(--interactive-hover-ring);
   outline: none;
 }
 
@@ -1022,9 +1022,9 @@
     0 1px 0 color-mix(in srgb, var(--shadow-light) 55%, transparent),
     0 4px 12px color-mix(in srgb, var(--shadow-dark) 4%, transparent);
   transition:
-    border-color 180ms ease,
-    box-shadow 180ms ease,
-    background-color 180ms ease;
+    border-color var(--motion-fade) ease,
+    box-shadow var(--motion-fade) ease,
+    background-color var(--motion-fade) ease;
 }
 
 .tags-view__entry .entry-corner-actions {
@@ -1049,9 +1049,9 @@
   color: color-mix(in srgb, var(--color-text-muted) 80%, transparent);
   transform: translateY(-2px);
   transition:
-    opacity 180ms ease,
-    transform 180ms ease,
-    color 180ms ease;
+    opacity var(--motion-fade) ease,
+    transform var(--motion-fade) ease,
+    color var(--motion-fade) ease;
 }
 
 .tags-view__entry:hover .entry-open--corner,
@@ -1062,7 +1062,7 @@
 
 .tags-view__entry .entry-open--corner .entry-action__icon {
   opacity: 1;
-  transition: opacity 180ms ease;
+  transition: opacity var(--motion-fade) ease;
 }
 
 .tags-view__entry:hover .entry-open--corner .entry-action__icon,
@@ -1150,17 +1150,17 @@
 .tags-view__detail .entry-tags .entry-tag:hover,
 .tags-view__detail .entry-tags .entry-tag:focus-visible {
   opacity: 1;
-  border-color: color-mix(in srgb, var(--accent-20) 44%, var(--border));
-  background: color-mix(in srgb, var(--accent-05) 52%, var(--glass-bg-alt));
+  border-color: var(--interactive-hover-border);
+  background: var(--interactive-hover-bg);
   box-shadow:
     var(--inset-shadow),
-    0 0 0 1px color-mix(in srgb, var(--accent-10) 50%, transparent);
+    0 0 0 1px var(--interactive-hover-ring);
   outline: none;
 }
 
 .tags-view__entry-actions {
   opacity: 0;
-  transition: opacity 180ms ease;
+  transition: opacity var(--motion-fade) ease;
 }
 
 .tags-view__entry-time.entry-time {
@@ -1183,7 +1183,7 @@
 
 .tags-view__entry-actions .entry-action__icon {
   opacity: 0.38;
-  transition: opacity 180ms ease;
+  transition: opacity var(--motion-fade) ease;
 }
 
 .tags-view__entry:hover .tags-view__entry-actions .entry-action__icon,

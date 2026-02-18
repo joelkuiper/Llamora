@@ -25,6 +25,12 @@ body {
   color: var(--brand-text);
 }
 
+:root {
+  --interactive-hover-border: color-mix(in srgb, var(--accent-20) 55%, var(--border));
+  --interactive-hover-bg: color-mix(in srgb, var(--accent-05) 52%, var(--glass-bg-alt));
+  --interactive-hover-ring: color-mix(in srgb, var(--accent-10) 56%, transparent);
+}
+
 /* Accessibility helpers */
 .visually-hidden {
   position: absolute !important;
@@ -41,6 +47,37 @@ body {
 
 .spinner {
   font-weight: normal;
+}
+
+.ui-empty-state {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  text-align: center;
+  color: color-mix(in srgb, var(--color-text-muted) 85%, transparent);
+}
+
+.ui-empty-state--left {
+  text-align: left;
+  align-items: flex-start;
+}
+
+.ui-empty-state__title {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 540;
+  color: color-mix(in srgb, var(--color-text) 86%, transparent);
+}
+
+.ui-empty-state__description {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.ui-meta-text {
+  color: color-mix(in srgb, var(--color-text-muted) 84%, transparent);
+  letter-spacing: 0.02em;
 }
 
 .inline-autocomplete {

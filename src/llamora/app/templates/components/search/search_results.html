@@ -24,10 +24,10 @@
   </p>
   {% endif %}
   {% if truncation_notice %}
-  <p class="search-results-notice" role="status" aria-live="polite">{{ truncation_notice }}</p>
+  <p class="search-results-notice ui-meta-text" role="status" aria-live="polite">{{ truncation_notice }}</p>
   {% endif %}
   {% if index_coverage and index_coverage.percent_recent_indexed is defined and index_coverage.percent_recent_indexed < 100 %}
-  <p class="search-results-notice" role="status" aria-live="polite">
+  <p class="search-results-notice ui-meta-text" role="status" aria-live="polite">
     Search index is {{ index_coverage.percent_recent_indexed }}% warmed for recent entries.
   </p>
   {% endif %}
@@ -40,9 +40,9 @@
   </div>
   {% elif query_present and warming %}
   <div class="sr-panel glass-panel search-results-overlay is-empty">
-    <div class="search-results-empty" role="group">
-      <p class="search-results-empty-title">Indexing your journal</p>
-      <p class="search-results-empty-description">Results will appear shortly.</p>
+    <div class="search-results-empty ui-empty-state" role="group">
+      <p class="search-results-empty-title ui-empty-state__title">Indexing your journal</p>
+      <p class="search-results-empty-description ui-empty-state__description">Results will appear shortly.</p>
     </div>
     {{ overlay_close_button() }}
   </div>
@@ -55,9 +55,9 @@
        aria-hidden="true"></div>
   {% elif query_present %}
   <div class="sr-panel glass-panel search-results-overlay is-empty">
-    <div class="search-results-empty" role="group">
-      <p class="search-results-empty-title">No matches found</p>
-      <p class="search-results-empty-description">Try a different search or adjust your filters.</p>
+    <div class="search-results-empty ui-empty-state" role="group">
+      <p class="search-results-empty-title ui-empty-state__title">No matches found</p>
+      <p class="search-results-empty-description ui-empty-state__description">Try a different search or adjust your filters.</p>
     </div>
     {{ overlay_close_button() }}
   </div>

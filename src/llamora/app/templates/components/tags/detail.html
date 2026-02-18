@@ -56,14 +56,14 @@
               <span class="icon-mask icon-trash entry-action__icon" aria-hidden="true"></span>
             </button>
           </div>
-          <p class="tags-view__meta">
+          <p class="tags-view__meta ui-meta-text">
             {{ detail.count }} {{ "entries" if detail.count != 1 else "entry" }} ·
             {% if detail.first_used_label %}since {{ detail.first_used_label }}{% else %}first used unknown{% endif %}
           </p>
           <div class="tags-view__related{% if not detail.related_tags %} tags-view__related--solo{% endif %}">
             {% if detail.related_tags %}
               <div class="tags-view__related-row">
-                <span class="tags-view__related-prefix">frequently appears with</span>
+                <span class="tags-view__related-prefix ui-meta-text">frequently appears with</span>
                 {% for related in detail.related_tags %}
                   {% set related_url = url_for('tags.tags_view_tag', tag=related.name) ~ '?sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir %}
                   {% if include_day_param %}
@@ -84,7 +84,7 @@
               </div>
             {% else %}
               <div class="tags-view__related-row tags-view__related-row--empty" aria-hidden="true">
-                <span class="tags-view__related-prefix">frequently appears with</span>
+                <span class="tags-view__related-prefix ui-meta-text">frequently appears with</span>
               </div>
             {% endif %}
             {% include 'components/tags/heatmap.html' %}
@@ -122,12 +122,18 @@
         </ol>
       {% else %}
         <div class="tags-view__placeholder is-empty">
-          <p>No entries linked to this trace yet.</p>
+          <div class="ui-empty-state ui-empty-state--left">
+            <p class="ui-empty-state__title">No entries yet</p>
+            <p class="ui-empty-state__description">This trace is not linked to any entries.</p>
+          </div>
         </div>
       {% endif %}
     {% else %}
       <div class="tags-view__placeholder">
-        <p>Select a trace to explore related entries.</p>
+        <div class="ui-empty-state">
+          <p class="ui-empty-state__title">Select a trace</p>
+          <p class="ui-empty-state__description">Explore related entries in context.</p>
+        </div>
       </div>
     {% endif %}
   </div>

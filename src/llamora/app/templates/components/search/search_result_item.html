@@ -9,7 +9,7 @@
      data-target="entry-{{ item.id }}"
      hx-trigger="click[!document.getElementById('entries') || document.getElementById('entries').dataset.date !== this.dataset.date]">
     <div class="search-result-body">
-      <time class="entry-time search-result-time"
+      <time class="entry-time search-result-time ui-meta-text"
             datetime="{{ item.created_at }}"
             data-time-raw="{{ item.created_at }}"
             data-time-style="ago-date-time"></time>

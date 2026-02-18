@@ -185,6 +185,7 @@
     background-color var(--motion-gentle) ease;
   color: var(--glass-text-stronger);
   --icon-size: 0.9rem;
+  line-height: 1;
 
   &:active {
     transform: translateY(1px);
@@ -212,6 +213,8 @@
   flex: 0 0 auto;
   padding: 0;
   --icon-size: 0.9rem;
+  line-height: 1;
+  vertical-align: middle;
 
   &:active {
     transform: translateY(1px);
@@ -234,6 +237,7 @@
   width: var(--icon-size);
   height: var(--icon-size);
   display: block;
+  transform: translateY(0);
 }
 
 .tag-popover {

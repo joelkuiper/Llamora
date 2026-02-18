@@ -1,11 +1,15 @@
 {% from 'components/entries/entry_item.html' import render_entry %}
 {% if not entries|length and not is_today %}
 <div class="no-content">
-  {% if is_future %}
-  The future has yet to come.
-  {% else %}
-  Nothing was written this day.
-  {% endif %}
+  <div class="ui-empty-state">
+    <p class="ui-empty-state__title">
+      {% if is_future %}
+      The future has yet to come.
+      {% else %}
+      Nothing was written this day.
+      {% endif %}
+    </p>
+  </div>
 </div>
 {% endif %}
 {% for item in entries or [] -%}

@@ -227,26 +227,26 @@
 }
 
 .search-result-item + .search-result-item {
-  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--border) 46%, transparent);
 }
 
 .search-result-item a:hover {
-  background: var(--glass-bg-hover);
-  border-color: var(--accent);
+  background: var(--interactive-hover-bg);
+  border-color: var(--interactive-hover-border);
   box-shadow:
-    var(--inset-shadow),
-    0 0 0 2px var(--accent-20),
+    var(--soft-outline-shadow),
+    0 0 0 2px var(--interactive-hover-ring),
     0 8px 24px var(--accent-10);
 }
 
 .search-result-item a:focus-visible {
-  background: var(--glass-bg-hover);
-  border-color: var(--accent);
+  background: var(--interactive-hover-bg);
+  border-color: var(--interactive-hover-border);
   box-shadow:
-    var(--inset-shadow),
-    0 0 0 2px var(--accent-20),
+    var(--soft-outline-shadow),
+    0 0 0 2px var(--interactive-hover-ring),
     0 8px 24px var(--accent-10);
-  outline: 2px solid var(--accent-20);
+  outline: 2px solid var(--interactive-hover-ring);
   outline-offset: 2px;
 }
 
@@ -254,16 +254,16 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.35rem;
-  padding: 0.7rem 1rem;
+  gap: 0.28rem;
+  padding: 0.62rem 0.9rem;
   border-radius: 12px;
   text-decoration: none;
   color: inherit;
   border: 1px solid transparent; /* for a crisp hover edge */
   transition:
-    background var(--motion-hover) ease,
-    border-color var(--motion-hover) ease,
-    box-shadow var(--motion-hover) ease;
+    background var(--motion-fade) ease,
+    border-color var(--motion-fade) ease,
+    box-shadow var(--motion-fade) ease;
 }
 
 .search-result-time.entry-time {
@@ -276,14 +276,14 @@
   transform: none;
   opacity: 0.78;
   white-space: nowrap;
-  color: color-mix(in srgb, var(--color-text-muted) 70%, transparent);
+  color: color-mix(in srgb, var(--color-text-muted) 80%, transparent);
 }
 
 .search-result-body {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.35rem;
+  gap: 0.24rem;
   min-width: 0;
   align-self: baseline;
 }
