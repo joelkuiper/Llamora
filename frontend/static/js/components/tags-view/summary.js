@@ -13,6 +13,8 @@ export const hydrateTagsViewSummary = async (root = document) => {
 
 export const cacheTagsViewSummary = (summaryEl) => {
   if (!(summaryEl instanceof HTMLElement)) return;
+  const newDigest = summaryEl.querySelector("[data-summary-digest]")?.dataset?.summaryDigest;
+  if (newDigest) summaryEl.dataset.cacheDigest = newDigest;
   void cacheLoader.capture(summaryEl);
 };
 
