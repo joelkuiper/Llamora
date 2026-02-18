@@ -10,7 +10,8 @@
   --tags-sidebar-width: 21rem;
   --tags-layout-gap: 1.25rem;
   --tags-inline-pad: var(--page-gutter);
-  --tags-sidebar-top: 5.3rem;
+  --tags-detail-inner-pad-top: 1.4rem;
+  --tags-sidebar-top: calc(5.3rem + var(--tags-detail-inner-pad-top));
   --tags-sidebar-bottom: 5.7rem;
 }
 
@@ -490,7 +491,7 @@
 .tags-view__detail-inner {
   width: 100%;
   margin-inline: 0;
-  padding: 1.4rem clamp(0.5rem, 1.4vw, 1.2rem) 2rem;
+  padding: var(--tags-detail-inner-pad-top) clamp(0.5rem, 1.4vw, 1.2rem) 2rem;
   border-radius: 0.9rem;
   background: color-mix(in srgb, var(--glass-bg-opaque) 72%, transparent);
   box-shadow:
