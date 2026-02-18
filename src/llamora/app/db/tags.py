@@ -285,8 +285,7 @@ class TagsRepository(BaseRepository):
             cursor = await conn.execute(
                 """
                 WITH tag_stats AS (
-                    SELECT COUNT(*) AS seen_count,
-                           MAX(e.created_at) AS last_used,
+                    SELECT MAX(e.created_at) AS last_used,
                            MAX(COALESCE(e.updated_at, e.created_at)) AS last_updated,
                            MIN(e.created_at) AS first_used
                     FROM tag_entry_xref x
@@ -298,8 +297,8 @@ class TagsRepository(BaseRepository):
                        t.name_ct,
                        t.name_nonce,
                        t.alg,
-                       s.seen_count,
-                       s.last_used,
+                       t.seen AS seen_count,
+                       COALESCE(s.last_used, t.last_seen) AS last_used,
                        s.last_updated,
                        s.first_used
                 FROM tags t
@@ -331,7 +330,11 @@ class TagsRepository(BaseRepository):
         }
 
     async def get_tags_index(self, ctx: CryptoContext) -> list[dict[str, Any]]:
-        """Return all tags with usage counts for index-style views."""
+        """Return all tags with usage counts for index-style views.
+
+        Uses the materialized ``tags.seen`` counter to avoid runtime GROUP BY
+        scans over ``tag_entry_xref`` on every read.
+        """
 
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
@@ -340,13 +343,10 @@ class TagsRepository(BaseRepository):
                        t.name_ct,
                        t.name_nonce,
                        t.alg,
-                       COUNT(x.entry_id) AS entry_count
+                       t.seen AS entry_count
                 FROM tags t
-                LEFT JOIN tag_entry_xref x
-                  ON x.user_id = t.user_id AND x.tag_hash = t.tag_hash
                 WHERE t.user_id = ?
-                GROUP BY t.tag_hash, t.name_ct, t.name_nonce, t.alg
-                HAVING entry_count > 0
+                  AND t.seen > 0
                 """,
                 (ctx.user_id,),
             )

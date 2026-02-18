@@ -81,12 +81,13 @@ export const syncFromDetail = (root = document, { ensureActiveRowPresent, setAct
 
   if (detail) {
     const detailTag = String(detail.dataset.selectedTag || "").trim();
+    const detailHash = String(detail.dataset.selectedTagHash || "").trim();
     const selectedTag = detailTag || urlTag;
     if (selectedTag) {
       detail.dataset.selectedTag = selectedTag;
     }
     if (selectedTag && typeof ensureActiveRowPresent === "function") {
-      ensureActiveRowPresent(selectedTag);
+      ensureActiveRowPresent(selectedTag, { tagHash: detailHash });
     }
     if (selectedTag && typeof setActiveTag === "function") {
       setActiveTag(selectedTag, root, {

@@ -52,7 +52,8 @@
     </a>
   </div>
   {% endif %}
-  {{ render_entry_main(e, day) }}
+  {% set include_raw_text_block = (e['role'] == 'user' and is_today) %}
+  {{ render_entry_main(e, day, include_raw_text_block=include_raw_text_block) }}
   {% if e['role'] == 'user' and not entry_meta.get('error') %}
   <div class="entry-footer">
     {{ render_entry_tags(

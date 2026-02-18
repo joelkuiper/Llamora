@@ -181,8 +181,9 @@ const syncListOnly = (root = document) => {
     state.pendingTagHighlight = "";
   } else {
     const selectedTag = getSelectedTrace(root);
+    const selectedTagHash = String(findDetail(root)?.dataset?.selectedTagHash || "").trim();
     if (selectedTag) {
-      ensureActiveRowPresent(selectedTag);
+      ensureActiveRowPresent(selectedTag, { tagHash: selectedTagHash });
       setActiveTag(selectedTag, root, { behavior: "auto", scroll: false });
     } else if (state.rows.length) {
       const fallbackTag = state.rows[0]?.dataset?.tagName || "";
@@ -276,12 +277,15 @@ if (!globalThis[BOOT_KEY]) {
       return;
     }
     const tagName = String(detailLink.dataset?.tagName || "").trim();
+    const tagHash =
+      String(detailLink.dataset?.tagHash || "").trim() ||
+      String(detailLink.closest?.(".entry-tag")?.dataset?.tagHash || "").trim();
     if (tagName) {
       state.pendingTagHighlight = tagName;
       if (findRowByTagName(tagName)) {
         setActiveTag(tagName, document, { behavior: "smooth" });
       } else {
-        ensureActiveRowPresent(tagName);
+        ensureActiveRowPresent(tagName, { tagHash });
       }
     }
     if (!state.saveSuppressed) {
@@ -308,9 +312,10 @@ if (!globalThis[BOOT_KEY]) {
 
   document.addEventListener("tags-view:navigate", (event) => {
     const tag = String(event?.detail?.tag || "").trim();
+    const tagHash = String(event?.detail?.tagHash || "").trim();
     if (!tag) return;
     state.pendingTagHighlight = tag;
-    ensureActiveRowPresent(tag);
+    ensureActiveRowPresent(tag, { tagHash });
     setActiveTag(tag, document, { behavior: "smooth" });
   });
 

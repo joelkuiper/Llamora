@@ -40,29 +40,7 @@
       </div>
     </div>
   </aside>
-  {% if tags_view is defined and tags_view %}
-    {% include 'components/tags/detail.html' %}
-  {% else %}
-    <section id="tags-view-detail"
-             class="tags-view__detail span-9"
-             hx-get="{{ url_for('tags.tags_view_detail_fragment', date=day) }}?sort_kind={{ sort_kind }}&sort_dir={{ sort_dir }}{% if selected_tag %}&tag={{ selected_tag|urlencode }}{% endif %}"
-             hx-trigger="load"
-             hx-indicator="#tags-view-detail-loading"
-             hx-swap="outerHTML">
-      <div class="tags-view__detail-inner">
-        <div id="tags-view-detail-loading"
-             class="entries-loading tags-view__loading"
-             hidden
-             aria-hidden="true">
-          <div class="entries-loading__backdrop" aria-hidden="true"></div>
-          <div class="entries-loading__panel" role="status" aria-live="polite">
-            <span class="entries-loading__spinner spinner" aria-hidden="true"></span>
-            <span class="entries-loading__label">Retrieving…</span>
-          </div>
-        </div>
-      </div>
-    </section>
-  {% endif %}
+  {% include 'components/tags/detail.html' %}
 </section>
 <scroll-edge-button
   data-direction="up"

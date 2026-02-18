@@ -1,5 +1,5 @@
 {% from 'components/entries/entry_raw.html' import entry_raw_text %}
-{% macro render_entry_main(e, day) -%}
+{% macro render_entry_main(e, day, include_raw_text_block=true) -%}
 {% set entry_meta = e.get('meta', {}) %}
 {% set is_opening = entry_meta.get('auto_opening') %}
 {% set rendered = e.get('text_html') %}
@@ -26,7 +26,7 @@
         {% endif %}
       </div>
     </div>
-    {% if e['role'] == 'user' %}
+    {% if e['role'] == 'user' and include_raw_text_block %}
     {{ entry_raw_text(e.get('text', '')) }}
     {% endif %}
   </div>

@@ -30,7 +30,6 @@ from llamora.app.services.time import local_date
 from llamora.settings import settings
 from llamora.app.routes.helpers import require_iso_date
 from llamora.app.routes.helpers import (
-    build_tags_catalog_payload,
     build_view_state,
     ensure_entry_exists,
     require_encryption_context,
@@ -99,6 +98,58 @@ def _build_view_context_query(
     return f"?{urlencode(payload)}"
 
 
+def _catalog_payload_from_index_items(
+    items: tuple[object, ...],
+) -> list[dict[str, str | int]]:
+    payload: list[dict[str, str | int]] = []
+    for item in items:
+        name = str(getattr(item, "name", "") or "").strip()
+        if not name:
+            continue
+        shortcode = emoji_shortcode(name)
+        payload.append(
+            {
+                "name": name,
+                "hash": str(getattr(item, "hash", "") or "").strip(),
+                "count": int(getattr(item, "count", 0) or 0),
+                "kind": "emoji" if shortcode else "text",
+                "label": shortcode or "",
+            }
+        )
+    return payload
+
+
+async def _build_activity_heatmap(
+    *,
+    user_id: str,
+    tag_hash_hex: str | None,
+    first_used: str | None,
+    offset: int,
+):
+    raw_hash = str(tag_hash_hex or "").strip()
+    if not raw_hash:
+        return None
+    try:
+        tag_hash = bytes.fromhex(raw_hash)
+    except ValueError:
+        return None
+    min_date = None
+    first_used_value = str(first_used or "").strip()
+    if first_used_value:
+        try:
+            min_date = dt.date.fromisoformat(first_used_value)
+        except ValueError:
+            min_date = None
+    return await get_tag_activity_heatmap(
+        get_services().db.tags,
+        user_id,
+        tag_hash,
+        months=12,
+        offset=offset,
+        min_date=min_date,
+    )
+
+
 async def _render_tags_page(selected_tag: str | None):
     day = _resolve_view_day(request.args.get("day"))
     _, user, ctx = await require_encryption_context()
@@ -115,11 +166,32 @@ async def _render_tags_page(selected_tag: str | None):
     selected = tag_service.normalize_tag_query(
         selected_tag or (request.args.get("tag") or "")
     )
-    tags_index_payload = await build_tags_catalog_payload(
+    tags_view_data = await tag_service.get_tags_view_data(
         ctx,
+        selected,
         sort_kind=sort_kind,
         sort_dir=sort_dir,
+        entry_limit=DEFAULT_TAG_ENTRIES_LIMIT,
     )
+    presented_tags_view = present_tags_view_data(tags_view_data)
+    selected = tags_view_data.selected_tag or selected
+    heatmap_offset = 0
+    activity_heatmap = await _build_activity_heatmap(
+        user_id=user["id"],
+        tag_hash_hex=tags_view_data.detail.hash if tags_view_data.detail else None,
+        first_used=tags_view_data.detail.first_used if tags_view_data.detail else None,
+        offset=heatmap_offset,
+    )
+
+    is_hx_main_content = bool(
+        request.headers.get("HX-Request")
+        and request.headers.get("HX-Target") == "main-content"
+    )
+
+    tags_index_payload: list[dict[str, str | int]] = []
+    if not is_hx_main_content:
+        tags_index_payload = _catalog_payload_from_index_items(tags_view_data.tags)
+
     target_param = (request.args.get("target") or "").strip() or None
     context = {
         "day": day,
@@ -128,14 +200,14 @@ async def _render_tags_page(selected_tag: str | None):
         "min_date": min_date,
         "is_first_day": is_first_day,
         "view": "tags",
-        "tags_view": None,
+        "tags_view": presented_tags_view,
         "selected_tag": selected,
         "tags_sort_kind": sort_kind,
         "tags_sort_dir": sort_dir,
         "tags_catalog_items": tags_index_payload,
         "target": target_param,
-        "activity_heatmap": None,
-        "heatmap_offset": 0,
+        "activity_heatmap": activity_heatmap,
+        "heatmap_offset": heatmap_offset,
         "view_state": build_view_state(
             view="tags",
             day=day,
@@ -728,28 +800,13 @@ async def tags_view_detail_fragment(date: str):
     )
     presented_detail = present_archive_detail(detail) if detail else None
     selected_tag = detail.name if detail else (tag_name or "")
-    activity_heatmap = None
     heatmap_offset = 0
-    if detail and detail.hash:
-        try:
-            tag_hash = bytes.fromhex(detail.hash)
-        except ValueError:
-            tag_hash = b""
-        if tag_hash:
-            min_date = None
-            if detail.first_used:
-                try:
-                    min_date = dt.date.fromisoformat(detail.first_used)
-                except ValueError:
-                    min_date = None
-            activity_heatmap = await get_tag_activity_heatmap(
-                get_services().db.tags,
-                user["id"],
-                tag_hash,
-                months=12,
-                offset=heatmap_offset,
-                min_date=min_date,
-            )
+    activity_heatmap = await _build_activity_heatmap(
+        user_id=user["id"],
+        tag_hash_hex=detail.hash if detail else None,
+        first_used=detail.first_used if detail else None,
+        offset=heatmap_offset,
+    )
 
     presented_tags_view = PresentedTagsViewData(
         tags=(),

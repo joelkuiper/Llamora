@@ -18,6 +18,7 @@
          class="tags-view__detail span-9"
          {% if oob_detail %}hx-swap-oob="outerHTML"{% endif %}
          data-selected-tag="{{ selected_tag_name }}"
+         data-selected-tag-hash="{{ detail.hash if detail else '' }}"
          data-sort-kind="{{ sort_kind }}"
          data-sort-dir="{{ sort_dir }}"
          {% if detail %}data-selected-tag-count="{{ detail.count }}"{% endif %}>

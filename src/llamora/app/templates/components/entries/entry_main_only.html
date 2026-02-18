@@ -1,4 +1,4 @@
 {% from 'components/entries/entry_main.html' import render_entry_main %}
 {% from 'components/entries/entry_edit_button.html' import entry_edit_button %}
-{{ render_entry_main(entry, day) }}
+{{ render_entry_main(entry, day, include_raw_text_block=is_today and entry['role'] == 'user') }}
 {{ entry_edit_button(entry['id'], is_today, mode="view", oob=True) }}

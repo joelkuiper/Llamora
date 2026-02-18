@@ -25,6 +25,8 @@ export const setClearButtonVisibility = () => {
 };
 
 const getSelectedTagName = (root = document) => getSelectedTrace(root);
+const getSelectedTagHash = (root = document) =>
+  String(findDetail(root)?.dataset?.selectedTagHash || "").trim();
 
 export const findRowByTagName = (tagName) => {
   if (!tagName) return null;
@@ -124,7 +126,8 @@ const buildTagUrls = (tagName, tagHash) => {
 };
 
 const createTagRow = (item, { transient = false } = {}) => {
-  const urls = buildTagUrls(item.name, item.hash);
+  const rowHash = String(item.hash || "").trim();
+  const urls = buildTagUrls(item.name, rowHash);
   if (!urls) return null;
   const row = document.createElement("a");
   row.className = "tags-view__index-row";
@@ -132,6 +135,7 @@ const createTagRow = (item, { transient = false } = {}) => {
   row.dataset.tagName = item.name;
   row.dataset.tagsName = item.name;
   row.dataset.tagsCount = String(item.count ?? 0);
+  row.dataset.tagHash = rowHash;
   row.dataset.tagsKind = item.kind || "text";
   row.dataset.tagsLabel = String(item.label || "").trim();
   if (transient) {
@@ -186,7 +190,7 @@ const removeTransientRow = (tagName) => {
   });
 };
 
-export const ensureActiveRowPresent = (tagName) => {
+export const ensureActiveRowPresent = (tagName, options = {}) => {
   if (!tagName) return;
   if (findRowByTagName(tagName)) {
     removeTransientRow(tagName);
@@ -207,8 +211,14 @@ export const ensureActiveRowPresent = (tagName) => {
     });
     return;
   }
-  const item = getIndexItemByName(tagName);
-  if (!item) return;
+  const fallbackHash = String(options.tagHash || "").trim();
+  const item = getIndexItemByName(tagName) || {
+    name: tagName,
+    hash: fallbackHash,
+    count: 0,
+    kind: "text",
+    label: "",
+  };
   const list = findList();
   const index = list?.querySelector?.("[data-tags-view-index]");
   if (!index) return;
@@ -641,8 +651,9 @@ export const applySearch = (rawQuery) => {
     });
 
   const selectedTag = getSelectedTagName();
+  const selectedTagHash = getSelectedTagHash();
   if (indexItems && orderedItems.length) {
-    ensureActiveRowPresent(selectedTag);
+    ensureActiveRowPresent(selectedTag, { tagHash: selectedTagHash });
   }
 
   let orderedMatches = orderedItems
