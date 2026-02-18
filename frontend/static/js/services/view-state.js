@@ -2,6 +2,14 @@ let cachedState = null;
 let cachedElement = null;
 let cachedRaw = "";
 
+const syncMainContentView = (view) => {
+  const main = document.getElementById("main-content");
+  if (!(main instanceof HTMLElement)) return;
+  const next = String(view || "").trim() || "diary";
+  if (main.dataset.view === next) return;
+  main.dataset.view = next;
+};
+
 const parseViewStatePayload = (raw) => {
   if (!raw) return null;
   try {
@@ -42,10 +50,14 @@ export const hydrateViewState = (root = document) => {
   const el = readViewStateElement(root);
   if (!el) return cachedState;
   const raw = el.textContent || "";
-  if (cachedElement === el && cachedState && raw === cachedRaw) return cachedState;
+  if (cachedElement === el && cachedState && raw === cachedRaw) {
+    syncMainContentView(cachedState.view);
+    return cachedState;
+  }
   const payload = parseViewStatePayload(raw);
   const normalized = normalizeViewState(payload);
   if (!normalized) return cachedState;
+  syncMainContentView(normalized.view);
   cachedElement = el;
   cachedState = normalized;
   cachedRaw = raw;

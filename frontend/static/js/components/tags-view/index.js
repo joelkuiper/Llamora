@@ -222,6 +222,7 @@ const syncDetailOnly = (root = document) => {
 
 if (!globalThis[BOOT_KEY]) {
   globalThis[BOOT_KEY] = true;
+
   window.addEventListener("resize", updateHeaderHeight);
   initHeatmapTooltip();
   registerTagsScrollStrategy();

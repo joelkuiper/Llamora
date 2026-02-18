@@ -5,27 +5,43 @@
   min-height: 0;
   overflow-y: auto;
   padding-block: clamp(2.2rem, 4vh, 3rem);
-  --page-max: 94rem;
+  --tags-shell-max: 94rem;
+  --tags-shell-width: min(100%, var(--tags-shell-max));
+  --tags-sidebar-width: 21rem;
+  --tags-layout-gap: 1.25rem;
+  --tags-inline-pad: var(--page-gutter);
+  --tags-sidebar-top: 5.3rem;
+  --tags-sidebar-bottom: 5.7rem;
 }
 
 .tags-view {
+  display: flex;
+  width: var(--tags-shell-width);
+  max-width: var(--tags-shell-max);
+  margin-inline: auto;
+  padding-inline: var(--tags-inline-pad);
+  gap: var(--tags-layout-gap);
+  box-sizing: border-box;
   min-height: 0;
-  align-items: start;
+  align-items: flex-start;
 }
 
 .tags-view__sidebar {
-  grid-column: span 3;
-  min-width: 0;
+  flex: 0 0 var(--tags-sidebar-width);
+  width: var(--tags-sidebar-width);
+  min-width: var(--tags-sidebar-width);
   position: relative;
   align-self: start;
 }
 
 .tags-view__sidebar-fixed {
-  position: sticky;
-  top: calc(var(--spacing-lg) + 4.1rem);
-  width: 100%;
-  height: calc(100dvh - 11rem);
-  max-height: calc(100dvh - 11rem);
+  position: fixed;
+  top: var(--tags-sidebar-top);
+  bottom: var(--tags-sidebar-bottom);
+  left: calc((100% - var(--tags-shell-width)) / 2 + var(--tags-inline-pad));
+  width: var(--tags-sidebar-width);
+  height: auto;
+  max-height: none;
   min-height: 24rem;
   display: flex;
   flex-direction: column;
@@ -454,9 +470,9 @@
 }
 
 .tags-view__detail {
-  grid-column: span 9;
+  flex: 1 1 auto;
   min-width: 0;
-  min-height: calc(100dvh - 12rem);
+  min-height: 0;
   position: relative;
 }
 
@@ -1235,12 +1251,15 @@
 }
 
 @media (max-width: 1200px) {
-  .tags-view__sidebar {
-    grid-column: span 4;
+  #main-content[data-view="tags"] {
+    --tags-sidebar-width: 19rem;
+    --tags-layout-gap: 1.05rem;
   }
 
-  .tags-view__detail {
-    grid-column: span 8;
+  .tags-view__sidebar {
+    flex-basis: var(--tags-sidebar-width);
+    width: var(--tags-sidebar-width);
+    min-width: var(--tags-sidebar-width);
   }
 }
 
@@ -1249,12 +1268,15 @@
     padding-block: var(--spacing-lg);
   }
 
-  .tags-view__sidebar,
-  .tags-view__detail {
-    grid-column: 1 / -1;
+  .tags-view {
+    display: block;
+    padding-inline: 0;
   }
 
   .tags-view__sidebar {
+    width: 100%;
+    min-width: 0;
+    flex: none;
     position: static;
   }
 

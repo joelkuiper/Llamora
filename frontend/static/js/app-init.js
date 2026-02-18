@@ -276,6 +276,10 @@ function registerViewStateHydration() {
     hydrateViewState(target || document);
   });
 
+  document.body.addEventListener("htmx:historyRestore", () => {
+    hydrateViewState(document);
+  });
+
   hydrateViewState(document);
 }
 
