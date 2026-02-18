@@ -494,7 +494,7 @@
   letter-spacing: 0.006em;
   color: color-mix(in srgb, var(--color-text) 93%, transparent);
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: 0.42rem;
 }
 
@@ -508,6 +508,7 @@
   letter-spacing: 0.02em;
   color: color-mix(in srgb, var(--color-text-muted) 74%, transparent);
   white-space: nowrap;
+  align-self: center;
 }
 
 .tags-view__title-row {
@@ -527,6 +528,7 @@
   --icon-size: 0.92rem;
   border-color: transparent;
   background: transparent;
+  align-self: center;
   flex: 0 0 auto;
   transition:
     opacity var(--motion-hover) ease,
