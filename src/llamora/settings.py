@@ -106,12 +106,6 @@ DEFAULTS: dict[str, Any] = {
     "SESSION": {
         "ttl": 7 * 24 * 60 * 60,
     },
-    "MESSAGES": {
-        "history_cache": {
-            "maxsize": 256,
-            "ttl": 60,
-        }
-    },
     "DATABASE": {
         "path": "state.sqlite3",
         "pool_size": 25,

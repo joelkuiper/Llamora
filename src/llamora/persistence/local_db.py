@@ -18,7 +18,6 @@ from llamora.settings import settings
 from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.migrations import run_db_migrations
 from llamora.app.db.events import RepositoryEventBus
-from llamora.app.services.history_cache import HistoryCache
 from llamora.app.db.users import UsersRepository
 from llamora.app.db.entries import EntriesRepository
 from llamora.app.db.tags import TagsRepository
@@ -46,7 +45,6 @@ class LocalDB:
         self._vectors: VectorsRepository | None = None
         self._search_history: SearchHistoryRepository | None = None
         self._events: RepositoryEventBus | None = None
-        self._history_cache: HistoryCache | None = None
         self._init_lock = asyncio.Lock()
         self._sync_lock = threading.Lock()
 
@@ -110,7 +108,6 @@ class LocalDB:
                 self._vectors = None
                 self._search_history = None
                 self._events = None
-                self._history_cache = None
                 raise
 
     async def close(self) -> None:
@@ -126,7 +123,6 @@ class LocalDB:
             self._vectors = None
             self._search_history = None
             self._events = None
-            self._history_cache = None
 
     async def _create_connection(self) -> aiosqlite.Connection:
         conn = await aiosqlite.connect(
@@ -162,16 +158,10 @@ class LocalDB:
         if not self.pool:
             raise RuntimeError("Connection pool not initialized")
         self._events = RepositoryEventBus()
-        history_cache_cfg = settings.MESSAGES.history_cache
-        self._history_cache = HistoryCache(
-            maxsize=int(history_cache_cfg.maxsize),
-            ttl=int(history_cache_cfg.ttl),
-        )
         self._users = UsersRepository(self.pool)
         self._entries = EntriesRepository(
             self.pool,
             self._events,
-            self._history_cache,
         )
         self._tags = TagsRepository(
             self.pool,
@@ -205,12 +195,6 @@ class LocalDB:
         """Return the entries repository."""
 
         return self._require_repository(self._entries, "Entries")
-
-    @property
-    def history_cache(self) -> HistoryCache:
-        """Expose the shared entry history cache."""
-
-        return self._require_repository(self._history_cache, "History cache")
 
     @property
     def tags(self) -> TagsRepository:

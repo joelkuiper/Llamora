@@ -11,7 +11,6 @@ from ulid import ULID
 
 from llamora.llm.tokenizers.tokenizer import count_message_tokens
 
-from llamora.app.services.history_cache import HistoryCache
 from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.digest_policy import ENTRY_DIGEST_VERSION, day_digest
 
@@ -71,27 +70,13 @@ class EntriesRepository(BaseRepository):
         self,
         pool: SQLiteConnectionPool,
         event_bus: RepositoryEventBus | None = None,
-        history_cache: HistoryCache | None = None,
     ) -> None:
         super().__init__(pool)
         self._on_entry_appended: EntryAppendedCallback | None = None
         self._event_bus = event_bus
-        if history_cache is None:
-            raise ValueError("history_cache must be provided")
-        self._history_cache = history_cache
 
     def set_on_entry_appended(self, callback: EntryAppendedCallback | None) -> None:
         self._on_entry_appended = callback
-
-    async def _get_cached_history(
-        self, user_id: str, created_date: str
-    ) -> list[dict] | None:
-        return await self._history_cache.get(user_id, created_date)
-
-    async def _store_history_cache(
-        self, user_id: str, created_date: str, history: list[dict]
-    ) -> None:
-        await self._history_cache.store(user_id, created_date, history)
 
     def _rows_to_entries(
         self, rows, ctx: CryptoContext
@@ -720,10 +705,6 @@ class EntriesRepository(BaseRepository):
     async def get_flat_entries_for_date(
         self, ctx: CryptoContext, created_date: str
     ) -> list[dict]:
-        cached = await self._get_cached_history(ctx.user_id, created_date)
-        if cached is not None:
-            return list(cached)
-
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
@@ -742,19 +723,13 @@ class EntriesRepository(BaseRepository):
             )
             rows = await cursor.fetchall()
 
-        history = self._rows_to_history(rows, ctx)
-        await self._store_history_cache(ctx.user_id, created_date, history)
-        return history
+        return self._rows_to_history(rows, ctx)
 
     async def get_recent_entries(
         self, ctx: CryptoContext, created_date: str, limit: int
     ) -> list[dict]:
         if limit <= 0:
             return []
-
-        cached = await self._get_cached_history(ctx.user_id, created_date)
-        if cached is not None:
-            return list(cached[-limit:])
 
         async with self.pool.connection() as conn:
             cursor = await conn.execute(

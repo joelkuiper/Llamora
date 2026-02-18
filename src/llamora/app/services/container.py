@@ -132,7 +132,6 @@ class AppLifecycle:
                 if events is not None:
                     self._invalidation_coordinator = InvalidationCoordinator(
                         event_bus=events,
-                        history_cache=self._services.db.history_cache,
                         lockbox_store=get_lockbox_store(self._services.db),
                         service_pulse=self._services.service_pulse,
                     )

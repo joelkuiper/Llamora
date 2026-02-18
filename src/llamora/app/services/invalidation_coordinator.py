@@ -20,7 +20,6 @@ from llamora.app.services.cache_registry import (
     MutationLineagePlan,
     build_mutation_lineage_plan,
 )
-from llamora.app.services.history_cache import HistoryCache
 from llamora.app.services.lockbox_store import LockboxStore
 from llamora.app.services.service_pulse import ServicePulse
 
@@ -32,7 +31,6 @@ class InvalidationCoordinator:
     """Centralized repository-event invalidation handlers."""
 
     event_bus: RepositoryEventBus
-    history_cache: HistoryCache | None
     lockbox_store: LockboxStore
     service_pulse: ServicePulse | None = None
 
@@ -55,13 +53,6 @@ class InvalidationCoordinator:
         tag_hashes: tuple[str, ...] | list[str] | None = None,
         **_: object,
     ) -> None:
-        await self._invalidate_history(
-            user_id=user_id,
-            created_date=created_date,
-            revision=revision,
-            cause="entry.changed",
-            entry_id=entry_id,
-        )
         await self._apply_lineage(
             user_id=user_id,
             plan=build_mutation_lineage_plan(
@@ -81,15 +72,6 @@ class InvalidationCoordinator:
         tag_hash: str,
         created_date: str | None = None,
     ) -> None:
-        if created_date:
-            await self._invalidate_history(
-                user_id=user_id,
-                created_date=created_date,
-                revision=None,
-                cause="tag.link.changed",
-                entry_id=entry_id,
-                tag_hash=tag_hash,
-            )
         await self._apply_lineage(
             user_id=user_id,
             plan=build_mutation_lineage_plan(
@@ -113,14 +95,6 @@ class InvalidationCoordinator:
         dates: set[str] = {
             created_date for _, created_date in affected_entries if created_date
         }
-        for created_date in sorted(dates):
-            await self._invalidate_history(
-                user_id=user_id,
-                created_date=created_date,
-                revision=None,
-                cause="tag.deleted",
-                tag_hash=tag_hash,
-            )
         await self._apply_lineage(
             user_id=user_id,
             plan=build_mutation_lineage_plan(
@@ -131,30 +105,6 @@ class InvalidationCoordinator:
             ),
             affected_entries=len(affected_entries),
             tag_hash=tag_hash,
-        )
-
-    async def _invalidate_history(
-        self,
-        *,
-        user_id: str,
-        created_date: str,
-        revision: str | None,
-        cause: str,
-        **extra: object,
-    ) -> None:
-        if self.history_cache is not None:
-            await self.history_cache.invalidate(
-                user_id,
-                created_date,
-                revision=revision,
-            )
-        self._pulse(
-            "history_cache",
-            user_id=user_id,
-            created_date=created_date,
-            revision=revision,
-            cause=cause,
-            **extra,
         )
 
     async def _apply_lineage(
