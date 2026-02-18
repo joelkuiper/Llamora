@@ -621,7 +621,7 @@
 
 .tags-view__heatmap {
   min-width: 0;
-  width: 100%;
+  width: 97%;
   padding: 0.5rem 0.6rem 0.35rem;
   border-radius: 0.82rem;
   border: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
@@ -699,6 +699,8 @@
 .tags-view__heatmap-body {
   position: relative;
   min-height: 8.2rem;
+  display: flex;
+  justify-content: center;
 }
 
 .tags-view__heatmap.htmx-swapping .tags-view__heatmap-body {
@@ -753,15 +755,18 @@
 .activity-heatmap {
   display: flex;
   flex-wrap: wrap;
-  width: 100%;
+  width: max-content;
+  max-width: 100%;
   gap: 0.5rem 0.6rem;
-  justify-content: space-between;
+  justify-content: flex-start;
+  margin: 0 auto;
 }
 
 .activity-heatmap__month {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
+  flex: 0 0 auto;
 }
 
 .activity-heatmap__month.is-year-break {
