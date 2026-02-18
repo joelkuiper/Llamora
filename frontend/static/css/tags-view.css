@@ -6,10 +6,6 @@
   overflow-y: auto;
   padding-block: clamp(2.2rem, 4vh, 3rem);
   --page-max: 94rem;
-  --page-width: min(100vw, var(--page-max));
-  --content-width: calc(var(--page-width) - (var(--page-gutter) * 2));
-  --col-width: calc((var(--content-width) - (var(--grid-gap) * 11)) / 12);
-  --sidebar-width: calc((var(--col-width) * 3) + (var(--grid-gap) * 2));
 }
 
 .tags-view {
@@ -25,11 +21,11 @@
 }
 
 .tags-view__sidebar-fixed {
-  position: fixed;
+  position: sticky;
   top: calc(var(--spacing-lg) + 4.1rem);
-  left: calc((100vw - var(--page-width)) / 2 + var(--page-gutter));
-  width: var(--sidebar-width);
+  width: 100%;
   height: calc(100dvh - 11rem);
+  max-height: calc(100dvh - 11rem);
   min-height: 24rem;
   display: flex;
   flex-direction: column;
