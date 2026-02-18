@@ -1,3 +1,4 @@
+import { registerHydrationOwner } from "../services/hydration-owners.js";
 import { prefStore } from "../utils/storage.js";
 
 let listenerRegistered = false;
@@ -84,18 +85,14 @@ function handleToggle(event) {
   setDocumentCollapsed(nextCollapsed);
 }
 
-function registerOpeningToggle() {
-  syncOpeningState();
-  if (listenerRegistered) return;
-  document.addEventListener("click", handleToggle);
-  listenerRegistered = true;
-}
-
-registerOpeningToggle();
-document.addEventListener("app:rehydrate", () => {
-  syncOpeningState({ animate: false });
-  if (!listenerRegistered) {
-    document.addEventListener("click", handleToggle);
-    listenerRegistered = true;
-  }
+registerHydrationOwner({
+  id: "day-opening",
+  selector: ".entry--opening",
+  hydrate: () => {
+    syncOpeningState({ animate: false });
+    if (!listenerRegistered) {
+      document.addEventListener("click", handleToggle);
+      listenerRegistered = true;
+    }
+  },
 });

@@ -1,3 +1,5 @@
+import { registerHydrationOwner } from "../services/hydration-owners.js";
+
 const COUNTER_SELECTOR = "[data-char-counter]";
 
 function parseThreshold(counter) {
@@ -76,7 +78,18 @@ document.addEventListener("reset", (event) => {
   }
 });
 
-document.addEventListener("app:rehydrate", () => refreshCounters());
+registerHydrationOwner({
+  id: "char-counter",
+  selector: COUNTER_SELECTOR,
+  hydrate: (context) => {
+    if (context instanceof Element && context.matches(COUNTER_SELECTOR)) {
+      refreshCounter(context);
+      return;
+    }
+    const scope = context && typeof context.querySelectorAll === "function" ? context : document;
+    refreshCounters(scope);
+  },
+});
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", () => refreshCounters(), {

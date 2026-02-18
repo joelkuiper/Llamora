@@ -13,6 +13,7 @@ import {
   getActiveDayLabel,
 } from "./components/entries-view/active-day-store.js";
 import { getCurrentView } from "./lifecycle.js";
+import { registerHydrationOwner } from "./services/hydration-owners.js";
 import { updateClientToday } from "./services/time.js";
 import { triggerLabelFlash } from "./utils/motion.js";
 
@@ -167,9 +168,13 @@ function ensureViewSyncListener() {
     setNavDisabledForView(event.detail?.view === "diary");
   });
 
-  document.addEventListener("app:rehydrate", () => {
-    const view = document.getElementById("main-content")?.dataset?.view || "diary";
-    setNavDisabledForView(view === "diary");
+  registerHydrationOwner({
+    id: "day-nav-view-sync",
+    selector: "#main-content",
+    hydrate: () => {
+      const view = document.getElementById("main-content")?.dataset?.view || "diary";
+      setNavDisabledForView(view === "diary");
+    },
   });
 
   viewChangeListenerRegistered = true;

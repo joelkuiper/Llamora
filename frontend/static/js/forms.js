@@ -1,4 +1,5 @@
 import { getTimezone } from "./services/datetime.js";
+import { registerHydrationOwner } from "./services/hydration-owners.js";
 import { startButtonSpinner, stopButtonSpinner } from "./ui.js";
 import { runWhenDocumentReady } from "./utils/dom-ready.js";
 import { clearAllStores } from "./utils/storage.js";
@@ -104,7 +105,14 @@ if (typeof window !== "undefined") {
   window.appInit.initForms = initForms;
 }
 
-document.addEventListener("app:rehydrate", () => {
-  resetSpinningButtons(document);
-  initForms(document);
+registerHydrationOwner({
+  id: "forms",
+  selector: FORM_SELECTOR,
+  hydrate: (context) => {
+    resetSpinningButtons(context);
+    initForms(context);
+  },
+  teardown: (context) => {
+    resetSpinningButtons(context);
+  },
 });

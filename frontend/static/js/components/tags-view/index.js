@@ -1,3 +1,4 @@
+import { registerHydrationOwner } from "../../services/hydration-owners.js";
 import { applyTagsCatalogCountUpdate } from "../../services/tags-catalog.js";
 import { getViewState } from "../../services/view-state.js";
 import { clearScrollTarget, flashHighlight } from "../../ui.js";
@@ -465,20 +466,25 @@ if (!globalThis[BOOT_KEY]) {
     maybeRestoreEntriesAnchor();
   });
 
-  document.addEventListener("app:rehydrate", (event) => {
-    state.restoreAppliedForLocation = "";
-    sync(event?.detail?.context || document);
+  registerHydrationOwner({
+    id: "tags-view",
+    selector: "#tags-view",
+    hydrate: (context) => {
+      state.restoreAppliedForLocation = "";
+      const root = context instanceof Element ? context : document;
+      sync(root);
+    },
+    teardown: () => {
+      if (!state.saveSuppressed) {
+        storeMainScrollTop();
+        captureEntriesAnchor();
+      }
+      storeHeatmapOffsetFromRoot();
+    },
   });
   document.addEventListener("app:view-changed", (event) => {
     if (event?.detail?.view === "tags") return;
     resetEntriesRestoreState();
-  });
-  document.addEventListener("app:teardown", () => {
-    if (!state.saveSuppressed) {
-      storeMainScrollTop();
-      captureEntriesAnchor();
-    }
-    storeHeatmapOffsetFromRoot();
   });
   window.addEventListener("pagehide", () => {
     if (!state.saveSuppressed) {

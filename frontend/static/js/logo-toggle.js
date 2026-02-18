@@ -1,3 +1,4 @@
+import { registerHydrationOwner } from "./services/hydration-owners.js";
 import { runWhenDocumentReady } from "./utils/dom-ready.js";
 
 const SCHEME_QUERY = "(prefers-color-scheme: dark)";
@@ -227,7 +228,10 @@ export function refreshLogoToggles() {
 runWhenDocumentReady(() => {
   initLogoToggles();
 });
-
-document.addEventListener("app:rehydrate", () => {
-  initLogoToggles();
+registerHydrationOwner({
+  id: "logo-toggle",
+  selector: "[data-logo-toggle]",
+  hydrate: () => {
+    initLogoToggles();
+  },
 });

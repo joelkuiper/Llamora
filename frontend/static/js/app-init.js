@@ -3,6 +3,7 @@ import { initRegionFeedback } from "./components/region-feedback.js";
 import { initGlobalShortcuts } from "./global-shortcuts.js";
 import { ScrollIntent } from "./scroll-intent.js";
 import { ScrollManager } from "./scroll-manager.js";
+import { registerHydrationOwner } from "./services/hydration-owners.js";
 import { handleInvalidationEvent } from "./services/invalidation-bus.js";
 import {
   applyRequestTimeHeaders,
@@ -240,8 +241,12 @@ function registerTimeFormatter() {
     formatTimeElements(document);
   };
 
-  document.addEventListener("app:rehydrate", (event) => {
-    run(event?.detail?.target || event?.detail?.context);
+  registerHydrationOwner({
+    id: "time-formatter",
+    selector: "time.entry-time",
+    hydrate: (context) => {
+      run(context);
+    },
   });
 
   document.body.addEventListener("htmx:afterSwap", (event) => {
@@ -258,8 +263,12 @@ function registerTimeFormatter() {
 }
 
 function registerViewStateHydration() {
-  document.addEventListener("app:rehydrate", (event) => {
-    hydrateViewState(event?.detail?.context || document);
+  registerHydrationOwner({
+    id: "view-state",
+    selector: "#main-content",
+    hydrate: (context) => {
+      hydrateViewState(context || document);
+    },
   });
 
   document.body.addEventListener("htmx:afterSwap", (event) => {

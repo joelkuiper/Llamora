@@ -1,3 +1,4 @@
+import { registerHydrationOwner } from "../../services/hydration-owners.js";
 import { EntryView } from "./entry-view.js";
 import "../day-opening.js";
 import "../search-overlay.js";
@@ -12,5 +13,8 @@ function registerEntryElements() {
   }
 }
 
-registerEntryElements();
-document.addEventListener("app:rehydrate", registerEntryElements);
+registerHydrationOwner({
+  id: "entries-view-elements",
+  selector: "entry-view",
+  hydrate: () => registerEntryElements(),
+});

@@ -3,6 +3,7 @@ import {
   isShortcodeLookupQuery,
   shortcodeSearchTokens,
 } from "../services/emoji-shortcodes.js";
+import { registerHydrationOwner } from "../services/hydration-owners.js";
 import { getTagsCatalogItems } from "../services/tags-catalog.js";
 import { createInlineSpinner, scrollToHighlight } from "../ui.js";
 import { AutocompleteHistory } from "../utils/autocomplete-history.js";
@@ -868,5 +869,8 @@ function registerSearchOverlay() {
   }
 }
 
-registerSearchOverlay();
-document.addEventListener("app:rehydrate", registerSearchOverlay);
+registerHydrationOwner({
+  id: "search-overlay-element",
+  selector: "search-overlay",
+  hydrate: () => registerSearchOverlay(),
+});

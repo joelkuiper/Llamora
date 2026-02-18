@@ -1,5 +1,7 @@
 let currentView = null;
 let initialized = false;
+let rehydrateCycle = 0;
+let teardownCycle = 0;
 
 function getView() {
   return document.getElementById("main-content")?.dataset?.view || "diary";
@@ -9,6 +11,16 @@ function dispatch(name, detail = {}) {
   document.dispatchEvent(new CustomEvent(name, { detail }));
 }
 
+function dispatchRehydrate(detail = {}) {
+  rehydrateCycle += 1;
+  dispatch("app:rehydrate", { cycle: rehydrateCycle, ...detail });
+}
+
+function dispatchTeardown(detail = {}) {
+  teardownCycle += 1;
+  dispatch("app:teardown", { cycle: teardownCycle, ...detail });
+}
+
 export function rehydrate(detail = {}) {
   const view = getView();
   if (view !== currentView) {
@@ -16,11 +28,11 @@ export function rehydrate(detail = {}) {
     currentView = view;
     dispatch("app:view-changed", { view, previousView: prev });
   }
-  dispatch("app:rehydrate", { reason: "init", ...detail });
+  dispatchRehydrate({ reason: "init", ...detail });
 }
 
 export function teardown(detail = {}) {
-  dispatch("app:teardown", detail);
+  dispatchTeardown(detail);
 }
 
 export function getCurrentView() {
@@ -37,21 +49,21 @@ export function init() {
   window.addEventListener("pageshow", (e) => {
     if (!e.persisted) return;
     currentView = getView();
-    dispatch("app:rehydrate", { reason: "bfcache" });
+    dispatchRehydrate({ reason: "bfcache" });
   });
   window.addEventListener("pagehide", (e) => {
     if (e.persisted) {
-      dispatch("app:teardown", { reason: "bfcache" });
+      dispatchTeardown({ reason: "bfcache" });
     }
   });
 
   // htmx history
   document.body.addEventListener("htmx:beforeHistorySave", () => {
-    dispatch("app:teardown", { reason: "history-save" });
+    dispatchTeardown({ reason: "history-save" });
   });
   document.body.addEventListener("htmx:historyRestore", () => {
     currentView = getView();
-    dispatch("app:rehydrate", { reason: "history-restore" });
+    dispatchRehydrate({ reason: "history-restore" });
   });
 
   // htmx swaps targeting major content areas
@@ -76,7 +88,7 @@ export function init() {
       }
     }
 
-    dispatch("app:rehydrate", { reason: "swap", target });
+    dispatchRehydrate({ reason: "swap", target, context: target });
   });
 
   document.body.addEventListener("htmx:afterSettle", (e) => {
@@ -92,7 +104,7 @@ export function init() {
   // visibility
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
-      dispatch("app:rehydrate", { reason: "visibility" });
+      dispatchRehydrate({ reason: "visibility" });
     }
   });
 }

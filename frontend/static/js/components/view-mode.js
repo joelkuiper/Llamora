@@ -1,4 +1,5 @@
 import { createPopover } from "../popover.js";
+import { registerHydrationOwner } from "../services/hydration-owners.js";
 import { getViewState, hydrateViewState } from "../services/view-state.js";
 import { createListenerBag } from "../utils/events.js";
 
@@ -107,7 +108,11 @@ const initViewMode = (root = document) => {
   };
 };
 
-initViewMode(document);
-document.addEventListener("app:rehydrate", (event) => {
-  initViewMode(event?.detail?.context || document);
+registerHydrationOwner({
+  id: "view-mode",
+  selector: "#view-mode-toggle",
+  hydrate: (context) => {
+    const root = context instanceof Element ? context : document;
+    initViewMode(root);
+  },
 });

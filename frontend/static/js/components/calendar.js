@@ -2,6 +2,7 @@
 
 import { createPopover } from "../popover.js";
 import { cacheLoader } from "../services/cache-loader.js";
+import { registerHydrationOwner } from "../services/hydration-owners.js";
 import { triggerLabelFlash } from "../utils/motion.js";
 import { transitionHide, transitionShow } from "../utils/transition.js";
 import { getActiveDayParts } from "./entries-view/active-day-store.js";
@@ -978,5 +979,8 @@ function registerCalendarControl() {
   }
 }
 
-registerCalendarControl();
-document.addEventListener("app:rehydrate", registerCalendarControl);
+registerHydrationOwner({
+  id: "calendar-control-element",
+  selector: "calendar-control",
+  hydrate: () => registerCalendarControl(),
+});
