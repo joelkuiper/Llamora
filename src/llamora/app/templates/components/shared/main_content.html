@@ -1,8 +1,5 @@
-<div id="main-content" data-view="{{ view|default('diary') }}">
+<div id="main-content" data-view="{{ view|default('diary') }}" hx-history-elt>
   {% include "components/shared/view_state.html" %}
-  <script type="application/json" id="tags-catalog-data" data-tags-catalog>
-    {{ (tags_catalog_items if tags_catalog_items is defined else []) | tojson }}
-  </script>
   {% if view == "diary" %}
     {% include "views/diary.html" %}
   {% elif view == "tags" %}
