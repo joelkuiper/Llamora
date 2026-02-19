@@ -74,42 +74,42 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
   #spinnerEl = null;
   #spinnerController = null;
   #inputListeners = null;
-  #beforeRequestHandler;
-  #afterRequestHandler;
-  #afterSwapHandler;
-  #inputHandler;
-  #submitHandler;
-  #keydownHandler;
-  #documentClickHandler;
-  #focusHandler;
-  #pageShowHandler;
-  #pageHideHandler;
-  #historyRestoreHandler;
-  #popStateHandler;
+  #onBeforeRequest;
+  #onAfterRequest;
+  #onAfterSwap;
+  #onInput;
+  #onSubmit;
+  #onKeydown;
+  #onDocumentClick;
+  #onFocus;
+  #onPageShow;
+  #onPageHide;
+  #onHistoryRestore;
+  #onPopState;
   #historyRestoreRemover = null;
   #recentHistory;
   #shortcutBag = null;
-  #toggleHandler;
-  #tagsCatalogUpdatedHandler;
+  #onToggle;
+  #onTagsCatalogUpdated;
   #activePanelEl = null;
   #emojiShortcodeMap = new Map();
 
   constructor() {
     super();
-    this.#beforeRequestHandler = () => this.#handleBeforeRequest();
-    this.#afterRequestHandler = () => this.#handleAfterRequest();
-    this.#afterSwapHandler = (event) => this.#handleAfterSwap(event);
-    this.#inputHandler = () => this.#handleInput();
-    this.#submitHandler = () => this.#handleSubmit();
-    this.#keydownHandler = (event) => this.#handleKeydown(event);
-    this.#documentClickHandler = (event) => this.#handleDocumentClick(event);
-    this.#focusHandler = () => this.#handleInputFocus();
-    this.#pageShowHandler = (event) => this.#handlePageShow(event);
-    this.#pageHideHandler = (event) => this.#handlePageHide(event);
-    this.#historyRestoreHandler = () => this.#handleHistoryRestore();
-    this.#popStateHandler = () => this.#handlePopState();
-    this.#toggleHandler = (event) => this.#handleToggle(event);
-    this.#tagsCatalogUpdatedHandler = () => this.#syncTagCatalogCandidates();
+    this.#onBeforeRequest = () => this.#handleBeforeRequest();
+    this.#onAfterRequest = () => this.#handleAfterRequest();
+    this.#onAfterSwap = (event) => this.#handleAfterSwap(event);
+    this.#onInput = () => this.#handleInput();
+    this.#onSubmit = () => this.#handleSubmit();
+    this.#onKeydown = (event) => this.#handleKeydown(event);
+    this.#onDocumentClick = (event) => this.#handleDocumentClick(event);
+    this.#onFocus = () => this.#handleInputFocus();
+    this.#onPageShow = (event) => this.#handlePageShow(event);
+    this.#onPageHide = (event) => this.#handlePageHide(event);
+    this.#onHistoryRestore = () => this.#handleHistoryRestore();
+    this.#onPopState = () => this.#handlePopState();
+    this.#onToggle = (event) => this.#handleToggle(event);
+    this.#onTagsCatalogUpdated = () => this.#syncTagCatalogCandidates();
     this.#recentHistory = new AutocompleteHistory({
       maxEntries: RECENT_CANDIDATE_MAX,
       normalize: (entry) => this.#normalizeCandidateValue(entry),
@@ -145,30 +145,30 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     this.watchHtmxRequests(eventTarget, {
       bag: listeners,
       withinSelector: "#search-results",
-      onStart: this.#beforeRequestHandler,
-      onEnd: this.#afterRequestHandler,
+      onStart: this.#onBeforeRequest,
+      onEnd: this.#onAfterRequest,
     });
-    listeners.add(this, "htmx:afterSwap", this.#afterSwapHandler);
-    listeners.add(document.body, "tags:tag-count-updated", this.#tagsCatalogUpdatedHandler);
+    listeners.add(this, "htmx:afterSwap", this.#onAfterSwap);
+    listeners.add(document.body, "tags:tag-count-updated", this.#onTagsCatalogUpdated);
     const form = this.querySelector("#search-form");
     if (form) {
-      listeners.add(form, "submit", this.#submitHandler);
+      listeners.add(form, "submit", this.#onSubmit);
     }
 
     if (this.#historyRestoreRemover) {
       this.#historyRestoreRemover();
       this.#historyRestoreRemover = null;
     }
-    eventTarget.addEventListener("htmx:historyRestore", this.#historyRestoreHandler);
+    eventTarget.addEventListener("htmx:historyRestore", this.#onHistoryRestore);
     this.#historyRestoreRemover = () => {
-      eventTarget.removeEventListener("htmx:historyRestore", this.#historyRestoreHandler);
+      eventTarget.removeEventListener("htmx:historyRestore", this.#onHistoryRestore);
     };
 
     const win = eventTarget.defaultView ?? window;
-    win.addEventListener("pageshow", this.#pageShowHandler);
-    win.addEventListener("pagehide", this.#pageHideHandler);
-    win.addEventListener("popstate", this.#popStateHandler);
-    eventTarget.addEventListener("click", this.#toggleHandler);
+    win.addEventListener("pageshow", this.#onPageShow);
+    win.addEventListener("pagehide", this.#onPageHide);
+    win.addEventListener("popstate", this.#onPopState);
+    eventTarget.addEventListener("click", this.#onToggle);
   }
 
   disconnectedCallback() {
@@ -190,10 +190,10 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
 
     const doc = this.ownerDocument ?? document;
     const win = doc.defaultView ?? window;
-    win.removeEventListener("pageshow", this.#pageShowHandler);
-    win.removeEventListener("pagehide", this.#pageHideHandler);
-    win.removeEventListener("popstate", this.#popStateHandler);
-    doc.removeEventListener("click", this.#toggleHandler);
+    win.removeEventListener("pageshow", this.#onPageShow);
+    win.removeEventListener("pagehide", this.#onPageHide);
+    win.removeEventListener("popstate", this.#onPopState);
+    doc.removeEventListener("click", this.#onToggle);
 
     if (this.#historyRestoreRemover) {
       this.#historyRestoreRemover();
@@ -228,8 +228,8 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#overlayListeners = this.disposeListenerBag(this.#overlayListeners);
     const bag = this.createListenerBag();
     const doc = this.ownerDocument ?? document;
-    bag.add(doc, "keydown", this.#keydownHandler);
-    bag.add(doc, "click", this.#documentClickHandler);
+    bag.add(doc, "keydown", this.#onKeydown);
+    bag.add(doc, "click", this.#onDocumentClick);
     this.#overlayListeners = bag;
   }
 
@@ -740,8 +740,8 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
 
     if (next) {
       const bag = this.createListenerBag();
-      bag.add(next, "input", this.#inputHandler);
-      bag.add(next, "focus", this.#focusHandler);
+      bag.add(next, "input", this.#onInput);
+      bag.add(next, "focus", this.#onFocus);
       this.#inputListeners = bag;
     }
 
