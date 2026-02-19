@@ -1,6 +1,6 @@
+import { getFrameState } from "../../services/app-state.js";
 import { registerHydrationOwner } from "../../services/hydration-owners.js";
 import { applyTagsCatalogCountUpdate } from "../../services/tags-catalog.js";
-import { getFrameState } from "../../services/app-state.js";
 import { clearScrollTarget, flashHighlight } from "../../ui.js";
 import {
   animateDetailEntries,
@@ -401,6 +401,38 @@ document.body.addEventListener("htmx:afterRequest", (event) => {
   const entry = (target instanceof Element && (target.closest?.(".entry") || target)) || null;
   if (entry instanceof Element && entry.classList.contains("assistant")) return;
   updateSelectedTagCounts(document, -1);
+
+  // Clean up the orphaned wrapper <li> and day-divider after the entry's
+  // delete animation completes (swap:180ms delay). We capture the elements
+  // now while the target is still connected, then schedule removal after the
+  // animation.
+  const entryItem = target instanceof Element ? target.closest?.(".tags-view__entry-item") : null;
+  if (entryItem instanceof HTMLElement) {
+    let sib = entryItem.previousElementSibling;
+    while (sib && !sib.classList.contains("tags-view__entries-divider")) {
+      sib = sib.previousElementSibling;
+    }
+    const divider =
+      sib instanceof HTMLElement && sib.classList.contains("tags-view__entries-divider")
+        ? sib
+        : null;
+
+    setTimeout(() => {
+      entryItem.remove();
+      if (divider?.isConnected) {
+        let next = divider.nextElementSibling;
+        let hasEntries = false;
+        while (next && !next.classList.contains("tags-view__entries-divider")) {
+          if (next.classList.contains("tags-view__entry-item")) {
+            hasEntries = true;
+            break;
+          }
+          next = next.nextElementSibling;
+        }
+        if (!hasEntries) divider.remove();
+      }
+    }, 200);
+  }
 });
 
 document.body.addEventListener("htmx:responseError", (event) => {
