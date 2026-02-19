@@ -1,83 +1,29 @@
-let cachedState = null;
-let cachedElement = null;
-let cachedRaw = "";
+/**
+ * view-state.js — Backwards-compat adapter over app-state.js frame state.
+ *
+ * Returns the legacy snake_case view-state shape so existing callers
+ * (scroll-manager.js, tags-view/index.js) do not need changes.
+ * New code should import from app-state.js directly.
+ */
 
-const syncMainContentView = (view) => {
-  const main = document.getElementById("main-content");
-  if (!(main instanceof HTMLElement)) return;
-  const next = String(view || "").trim() || "diary";
-  if (main.dataset.view === next) return;
-  main.dataset.view = next;
-};
+import { getFrameState, hydrateFrame } from "./app-state.js";
 
-const parseViewStatePayload = (raw) => {
-  if (!raw) return null;
-  try {
-    const data = JSON.parse(raw);
-    return data && typeof data === "object" ? data : null;
-  } catch {
-    return null;
-  }
-};
-
-const readViewStateElement = (root = document) => {
-  const fromRoot = root?.querySelector?.("#view-state");
-  if (fromRoot instanceof HTMLScriptElement) return fromRoot;
-  const global = document.getElementById("view-state");
-  return global instanceof HTMLScriptElement ? global : null;
-};
-
-const normalizeViewState = (state) => {
-  if (!state || typeof state !== "object") return null;
-  const view = String(state.view || "").trim() || "diary";
-  const day = String(state.day || "").trim() || null;
-  const selectedTag = String(state.selected_tag || "").trim() || null;
-  const sortKind = String(state.sort_kind || "").trim() || null;
-  const sortDir = String(state.sort_dir || "").trim() || null;
-  const target = String(state.target || "").trim() || null;
-  return {
-    ...state,
-    view,
-    day,
-    selected_tag: selectedTag,
-    sort_kind: sortKind,
-    sort_dir: sortDir,
-    target,
-  };
-};
+const toSnakeCase = (frame) => ({
+  view: frame.view,
+  day: frame.day || null,
+  selected_tag: frame.selectedTag || null,
+  // sort is preference state — never in frame/view-state
+  sort_kind: null,
+  sort_dir: null,
+  target: frame.target || null,
+});
 
 export const hydrateViewState = (root = document) => {
-  const el = readViewStateElement(root);
-  if (!el) return cachedState;
-  const raw = el.textContent || "";
-  if (cachedElement === el && cachedState && raw === cachedRaw) {
-    syncMainContentView(cachedState.view);
-    return cachedState;
-  }
-  const payload = parseViewStatePayload(raw);
-  const normalized = normalizeViewState(payload);
-  if (!normalized) return cachedState;
-  syncMainContentView(normalized.view);
-  cachedElement = el;
-  cachedState = normalized;
-  cachedRaw = raw;
-  document.dispatchEvent(
-    new CustomEvent("app:view-state-changed", {
-      detail: { state: cachedState },
-    }),
-  );
-  document.dispatchEvent(
-    new CustomEvent("app:view-changed", {
-      detail: { view: cachedState.view },
-    }),
-  );
-  return cachedState;
+  hydrateFrame(root);
+  return toSnakeCase(getFrameState());
 };
 
-export const getViewState = () => {
-  if (cachedState) return cachedState;
-  return hydrateViewState(document) || { view: "diary" };
-};
+export const getViewState = () => toSnakeCase(getFrameState());
 
 export const getViewStateValue = (key, fallback = "") => {
   const state = getViewState();

@@ -1,3 +1,5 @@
+import { getFrameState, hydrateFrame, resetFrameCache } from "./services/app-state.js";
+
 let currentView = null;
 let initialized = false;
 let rehydrateCycle = 0;
@@ -11,9 +13,16 @@ function dispatch(name, detail = {}) {
   document.dispatchEvent(new CustomEvent(name, { detail }));
 }
 
+/**
+ * Hydrates frame state from `scope` then dispatches app:rehydrate.
+ * The `frame` field in the event detail reflects the freshly hydrated state,
+ * so component handlers can read it directly without importing app-state.js.
+ */
 function dispatchRehydrate(detail = {}) {
+  const scope = detail.context || detail.target || document;
+  hydrateFrame(scope);
   rehydrateCycle += 1;
-  dispatch("app:rehydrate", { cycle: rehydrateCycle, ...detail });
+  dispatch("app:rehydrate", { cycle: rehydrateCycle, frame: getFrameState(), ...detail });
 }
 
 function dispatchTeardown(detail = {}) {
@@ -49,6 +58,12 @@ export function init() {
   window.addEventListener("pageshow", (e) => {
     if (!e.persisted) return;
     currentView = getView();
+    // Reset the raw-JSON cache so hydrateFrame() re-parses even if the restored
+    // DOM content is identical to what _frameRaw last held. The JS module
+    // singleton persists across bfcache save/restore; without this reset, the
+    // raw === _frameRaw early-return prevents the frame from re-hydrating to the
+    // restored page's actual view state.
+    resetFrameCache();
     dispatchRehydrate({ reason: "bfcache" });
   });
   window.addEventListener("pagehide", (e) => {
@@ -63,6 +78,9 @@ export function init() {
   });
   document.body.addEventListener("htmx:historyRestore", () => {
     currentView = getView();
+    // Same reason as bfcache: restored HTML may represent a different view than
+    // the current module-level _frameRaw; reset so hydrateFrame() re-parses.
+    resetFrameCache();
     dispatchRehydrate({ reason: "history-restore" });
   });
 

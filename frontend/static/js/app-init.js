@@ -3,6 +3,7 @@ import { initRegionFeedback } from "./components/region-feedback.js";
 import { initGlobalShortcuts } from "./global-shortcuts.js";
 import { ScrollIntent } from "./scroll-intent.js";
 import { ScrollManager } from "./scroll-manager.js";
+import { getFrameState, hydrateFrame } from "./services/app-state.js";
 import { registerHydrationOwner } from "./services/hydration-owners.js";
 import { handleInvalidationEvent } from "./services/invalidation-bus.js";
 import {
@@ -10,7 +11,6 @@ import {
   formatTimeElements,
   updateClientToday as syncClientToday,
 } from "./services/time.js";
-import { getViewState, hydrateViewState } from "./services/view-state.js";
 import { createInlineSpinner } from "./ui.js";
 import {
   getAlertContainer,
@@ -81,15 +81,23 @@ function registerHtmxHeaderHooks(csrfToken) {
       headers["X-CSRFToken"] = csrfToken;
     }
 
+    // X-Active-Day: diary-view-scoped active day (may differ from frame state
+    // when navigation happened via the /e/<date> fragment endpoint, which does
+    // not embed a view-state JSON; active-day-store is updated by entry-view.js
+    // after every render and is always current for the diary view).
     const activeDate = getActiveDay();
     if (activeDate) {
       headers["X-Active-Day"] = activeDate;
     }
 
-    const viewState = getViewState();
-    if (viewState && typeof viewState === "object") {
-      headers["X-View-State"] = JSON.stringify(viewState);
-    }
+    // X-View-State: 🟢 frame state in server-expected snake_case format.
+    const frame = getFrameState();
+    headers["X-View-State"] = JSON.stringify({
+      view: frame.view,
+      day: frame.day,
+      selected_tag: frame.selectedTag,
+      target: frame.target,
+    });
   });
   headersRegistered = true;
 }
@@ -292,11 +300,11 @@ function registerViewStateHydration() {
     id: "view-state",
     selector: "#main-content",
     hydrate: (context) => {
-      hydrateViewState(context || document);
+      hydrateFrame(context || document);
     },
   });
 
-  onRegionSwappedCoalesced("view-state", (target) => hydrateViewState(target));
+  onRegionSwappedCoalesced("view-state", (target) => hydrateFrame(target));
 }
 
 function registerInvalidationBus() {

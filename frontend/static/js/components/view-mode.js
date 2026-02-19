@@ -1,7 +1,7 @@
 import { createPopover } from "../popover.js";
-import { normalizeIsoDay, resolveCurrentDay } from "../services/day-resolution.js";
+import { normalizeIsoDay } from "../services/day-resolution.js";
+import { getFrameState, hydrateFrame } from "../services/app-state.js";
 import { registerHydrationOwner } from "../services/hydration-owners.js";
-import { getViewState, hydrateViewState } from "../services/view-state.js";
 import { createListenerBag } from "../utils/events.js";
 import { sessionStore } from "../utils/storage.js";
 import { getActiveDay } from "./entries-view/active-day-store.js";
@@ -27,12 +27,20 @@ const writeStoredTagsContext = (context) => {
   });
 };
 
-const resolveNavigationDay = () =>
-  resolveCurrentDay({
-    viewState: getViewState(),
-    activeDay: getActiveDay(),
-    url: window.location.href,
-  });
+/**
+ * Resolves the navigation day for view-mode switching.
+ *
+ * 🟢 Frame state is authoritative when in the tags view (day always present in URL).
+ * 🔵 active-day-store is the fallback for the diary view: the /e/<date> fragment
+ *    endpoint does not embed a view-state JSON, so frame state can lag behind
+ *    after in-page calendar navigation. The active-day-store is updated by
+ *    entry-view.js after every render and is always current in that case.
+ */
+const resolveNavigationDay = () => {
+  const frame = getFrameState();
+  if (frame.view === "tags") return frame.day;
+  return getActiveDay() || frame.day;
+};
 
 const buildDiaryUrl = (day) => {
   const resolved = normalizeIsoDay(day);
@@ -42,10 +50,10 @@ const buildDiaryUrl = (day) => {
 const buildTagsUrl = ({ selectedTag = "", day = "" } = {}) => buildTagPageUrl(selectedTag, { day });
 
 const getLiveTagsContext = () => {
-  const viewState = getViewState();
+  const frame = getFrameState();
   const stored = readStoredTagsContext();
   const selectedTag =
-    String(viewState?.view === "tags" ? viewState?.selected_tag : "").trim() ||
+    (frame.view === "tags" ? frame.selectedTag : "") ||
     parseTagFromPath(window.location.pathname) ||
     String(stored?.selectedTag || "").trim();
   const day = resolveNavigationDay() || normalizeIsoDay(stored?.day);
@@ -55,13 +63,11 @@ const getLiveTagsContext = () => {
 };
 
 const persistTagsContextFromState = () => {
-  const viewState = getViewState();
-  if (String(viewState?.view || "").trim() !== "tags") {
-    return;
-  }
+  const frame = getFrameState();
+  if (frame.view !== "tags") return;
   writeStoredTagsContext({
-    selectedTag: String(viewState?.selected_tag || "").trim(),
-    day: resolveNavigationDay() || normalizeIsoDay(viewState?.day),
+    selectedTag: frame.selectedTag,
+    day: frame.day,
   });
 };
 
@@ -126,9 +132,9 @@ const initViewMode = (root = document) => {
   };
 
   const syncFromContent = () => {
-    hydrateViewState(document);
-    const view = String(getViewState()?.view || "diary").trim() || "diary";
-    setActive(view);
+    hydrateFrame(document);
+    const { view } = getFrameState();
+    setActive(view || "diary");
     persistTagsContextFromState();
   };
 

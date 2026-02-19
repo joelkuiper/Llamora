@@ -1,50 +1,22 @@
-import { sessionStore } from "../utils/storage.js";
+/**
+ * tags-sort-store.js — Backwards-compat shim over app-state.js preference state.
+ * New code should import getTagsSort / setTagsSort from app-state.js directly.
+ */
 
-const TAGS_SORT_KEY = "tags:sort";
+import {
+  getTagsSort,
+  normalizeTagsSortDir,
+  normalizeTagsSortKind,
+  setTagsSort,
+} from "./app-state.js";
 
-export const normalizeTagsSortKind = (value, fallback = "count") => {
-  const raw = String(value || "")
-    .trim()
-    .toLowerCase();
-  if (raw === "alpha") return "alpha";
-  if (raw === "count") return "count";
-  return fallback === "alpha" ? "alpha" : "count";
-};
-
-export const normalizeTagsSortDir = (value, fallback = "desc") => {
-  const raw = String(value || "")
-    .trim()
-    .toLowerCase();
-  if (raw === "asc") return "asc";
-  if (raw === "desc") return "desc";
-  return fallback === "asc" ? "asc" : "desc";
-};
+export { normalizeTagsSortDir, normalizeTagsSortKind };
+export { setTagsSort as writeTagsSortState };
 
 export const readTagsSortState = ({ fallbackKind = "count", fallbackDir = "desc" } = {}) => {
-  const raw = sessionStore.get(TAGS_SORT_KEY);
-  if (!raw || typeof raw !== "object") {
-    return {
-      sortKind: normalizeTagsSortKind("", fallbackKind),
-      sortDir: normalizeTagsSortDir("", fallbackDir),
-    };
-  }
+  const { sortKind, sortDir } = getTagsSort();
   return {
-    sortKind: normalizeTagsSortKind(raw.sortKind, fallbackKind),
-    sortDir: normalizeTagsSortDir(raw.sortDir, fallbackDir),
+    sortKind: sortKind || normalizeTagsSortKind(fallbackKind),
+    sortDir: sortDir || normalizeTagsSortDir(fallbackDir),
   };
-};
-
-export const writeTagsSortState = ({ sortKind, sortDir } = {}) => {
-  const normalized = {
-    sortKind: normalizeTagsSortKind(sortKind),
-    sortDir: normalizeTagsSortDir(sortDir),
-  };
-  const current = readTagsSortState();
-  const changed =
-    current.sortKind !== normalized.sortKind || current.sortDir !== normalized.sortDir;
-  if (!changed) {
-    return normalized;
-  }
-  sessionStore.set(TAGS_SORT_KEY, normalized);
-  return normalized;
 };
