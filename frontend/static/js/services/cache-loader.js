@@ -4,6 +4,19 @@ import { getValue, setValue } from "./lockbox-store.js";
 const inflight = new Map();
 const CACHE_FRESH_WINDOW_MS = 1500;
 let requestGateRegistered = false;
+const CACHE_ATTRS = Object.freeze({
+  APPLIED_AT: "cacheAppliedAt",
+  APPLIED_NAMESPACE: "cacheAppliedNamespace",
+  APPLIED_KEY: "cacheAppliedKey",
+  APPLIED_DIGEST: "cacheAppliedDigest",
+  HYDRATING: "cacheHydrating",
+  REQUESTED: "cacheRequested",
+  NAMESPACE: "cacheNamespace",
+  KEY: "cacheKey",
+  DIGEST: "cacheDigest",
+  TRIGGER: "cacheTrigger",
+  KIND: "cacheKind",
+});
 
 const parseTimestamp = (value) => {
   const parsed = Number.parseInt(String(value ?? ""), 10);
@@ -12,31 +25,33 @@ const parseTimestamp = (value) => {
 
 const clearCacheAppliedMark = (el) => {
   if (!(el instanceof HTMLElement)) return;
-  delete el.dataset.cacheAppliedAt;
-  delete el.dataset.cacheAppliedNamespace;
-  delete el.dataset.cacheAppliedKey;
-  delete el.dataset.cacheAppliedDigest;
+  delete el.dataset[CACHE_ATTRS.APPLIED_AT];
+  delete el.dataset[CACHE_ATTRS.APPLIED_NAMESPACE];
+  delete el.dataset[CACHE_ATTRS.APPLIED_KEY];
+  delete el.dataset[CACHE_ATTRS.APPLIED_DIGEST];
 };
 
 const markCacheApplied = (el, { namespace, key, digest }) => {
   if (!(el instanceof HTMLElement)) return;
-  el.dataset.cacheAppliedAt = String(Date.now());
-  el.dataset.cacheAppliedNamespace = String(namespace || "").trim();
-  el.dataset.cacheAppliedKey = String(key || "").trim();
-  el.dataset.cacheAppliedDigest = String(digest || "").trim();
+  el.dataset[CACHE_ATTRS.APPLIED_AT] = String(Date.now());
+  el.dataset[CACHE_ATTRS.APPLIED_NAMESPACE] = String(namespace || "").trim();
+  el.dataset[CACHE_ATTRS.APPLIED_KEY] = String(key || "").trim();
+  el.dataset[CACHE_ATTRS.APPLIED_DIGEST] = String(digest || "").trim();
 };
 
 const isFreshCacheApplied = (el, { namespace, key, digest }) => {
   if (!(el instanceof HTMLElement)) return false;
-  const appliedAt = parseTimestamp(el.dataset.cacheAppliedAt);
+  const appliedAt = parseTimestamp(el.dataset[CACHE_ATTRS.APPLIED_AT]);
   if (appliedAt == null) return false;
   if (Date.now() - appliedAt > CACHE_FRESH_WINDOW_MS) {
     clearCacheAppliedMark(el);
     return false;
   }
-  if (String(el.dataset.cacheAppliedNamespace || "") !== String(namespace || "")) return false;
-  if (String(el.dataset.cacheAppliedKey || "") !== String(key || "")) return false;
-  const appliedDigest = String(el.dataset.cacheAppliedDigest || "");
+  if (String(el.dataset[CACHE_ATTRS.APPLIED_NAMESPACE] || "") !== String(namespace || "")) {
+    return false;
+  }
+  if (String(el.dataset[CACHE_ATTRS.APPLIED_KEY] || "") !== String(key || "")) return false;
+  const appliedDigest = String(el.dataset[CACHE_ATTRS.APPLIED_DIGEST] || "");
   const activeDigest = String(digest || "");
   if (appliedDigest && activeDigest && appliedDigest !== activeDigest) return false;
   return true;
@@ -45,29 +60,29 @@ const isFreshCacheApplied = (el, { namespace, key, digest }) => {
 const markHydrating = (el, active) => {
   if (!(el instanceof HTMLElement)) return;
   if (active) {
-    el.dataset.cacheHydrating = "1";
+    el.dataset[CACHE_ATTRS.HYDRATING] = "1";
     return;
   }
-  delete el.dataset.cacheHydrating;
+  delete el.dataset[CACHE_ATTRS.HYDRATING];
 };
 
 const markRequestQueued = (el) => {
   if (!(el instanceof HTMLElement)) return;
-  el.dataset.cacheRequested = "1";
+  el.dataset[CACHE_ATTRS.REQUESTED] = "1";
 };
 
 const clearRequestQueued = (el) => {
   if (!(el instanceof HTMLElement)) return;
-  delete el.dataset.cacheRequested;
+  delete el.dataset[CACHE_ATTRS.REQUESTED];
 };
 
 const resolveConfig = (el, overrides = {}) => {
   const dataset = el?.dataset || {};
-  const namespace = String(overrides.namespace ?? dataset.cacheNamespace ?? "").trim();
-  const key = String(overrides.key ?? dataset.cacheKey ?? "").trim();
-  const digest = String(overrides.digest ?? dataset.cacheDigest ?? "").trim();
-  const triggerEvent = String(overrides.triggerEvent ?? dataset.cacheTrigger ?? "").trim();
-  const kind = String(overrides.kind ?? dataset.cacheKind ?? "").trim();
+  const namespace = String(overrides.namespace ?? dataset[CACHE_ATTRS.NAMESPACE] ?? "").trim();
+  const key = String(overrides.key ?? dataset[CACHE_ATTRS.KEY] ?? "").trim();
+  const digest = String(overrides.digest ?? dataset[CACHE_ATTRS.DIGEST] ?? "").trim();
+  const triggerEvent = String(overrides.triggerEvent ?? dataset[CACHE_ATTRS.TRIGGER] ?? "").trim();
+  const kind = String(overrides.kind ?? dataset[CACHE_ATTRS.KIND] ?? "").trim();
   return {
     namespace,
     key,
@@ -137,7 +152,7 @@ const ensureRequestGate = () => {
       if (!(source instanceof HTMLElement)) return;
       const { namespace, key, digest } = resolveConfig(source);
       if (!namespace || !key) return;
-      if (source.dataset.cacheHydrating === "1") {
+      if (source.dataset[CACHE_ATTRS.HYDRATING] === "1") {
         event.preventDefault();
         return;
       }
@@ -252,7 +267,7 @@ export const cacheLoader = {
     }
     clearCacheAppliedMark(el);
     if (!triggerEvent) return false;
-    if (el.dataset?.cacheRequested === "1") return false;
+    if (el.dataset?.[CACHE_ATTRS.REQUESTED] === "1") return false;
     markRequestQueued(el);
     triggerLoadEvent(el, triggerEvent);
     return false;
