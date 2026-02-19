@@ -1,22 +1,3 @@
-<script>
-  (() => {
-    try {
-      const key = "opening_collapsed_{{ day }}";
-      document.documentElement.classList.add("opening-syncing");
-      if (localStorage.getItem(key) === "1") {
-        document.documentElement.dataset.openingCollapsed = "1";
-      } else {
-        delete document.documentElement.dataset.openingCollapsed;
-      }
-      requestAnimationFrame(() => {
-        document.documentElement.classList.remove("opening-syncing");
-      });
-    } catch (error) {
-      delete document.documentElement.dataset.openingCollapsed;
-      document.documentElement.classList.remove("opening-syncing");
-    }
-  })();
-</script>
 <main
   id="content-wrapper"
   {% if oob %} hx-swap-oob="true" {% endif %}>
