@@ -355,6 +355,7 @@ async def remove_tag(entry_id: str, tag_hash: str):
         if oob:
             html = f"{html}\n{oob}"
     response = await make_response(html)
+    trigger_payload: dict[str, object] = {"entries:changed": True}
 
     if tag_name:
         tag_label = emoji_shortcode(tag_name) or ""
@@ -366,23 +367,20 @@ async def remove_tag(entry_id: str, tag_hash: str):
             tag_hashes=(tag_hash,),
         )
         invalidation_keys = to_client_payload(lineage_plan.invalidations)
-        response.headers["HX-Trigger"] = json.dumps(
-            {
-                "tags:tag-count-updated": {
-                    "tag": tag_name,
-                    "tag_hash": tag_hash,
-                    "count": tag_count,
-                    "entry_id": entry_id,
-                    "action": "remove",
-                    "tag_kind": tag_kind,
-                    "tag_label": tag_label,
-                },
-                "cache:invalidate": {
-                    "reason": "tag.link.changed",
-                    "keys": invalidation_keys,
-                },
-            }
-        )
+        trigger_payload["tags:tag-count-updated"] = {
+            "tag": tag_name,
+            "tag_hash": tag_hash,
+            "count": tag_count,
+            "entry_id": entry_id,
+            "action": "remove",
+            "tag_kind": tag_kind,
+            "tag_label": tag_label,
+        }
+        trigger_payload["cache:invalidate"] = {
+            "reason": "tag.link.changed",
+            "keys": invalidation_keys,
+        }
+    response.headers["HX-Trigger"] = json.dumps(trigger_payload)
     return response
 
 
@@ -437,6 +435,7 @@ async def add_tag(entry_id: str):
         if oob:
             html = f"{html}\n{oob}"
     response = await make_response(html)
+    trigger_payload: dict[str, object] = {"entries:changed": True}
 
     if tag_name:
         tag_label = emoji_shortcode(tag_name) or ""
@@ -448,23 +447,20 @@ async def add_tag(entry_id: str):
             tag_hashes=(tag_hash_hex,),
         )
         invalidation_keys = to_client_payload(lineage_plan.invalidations)
-        response.headers["HX-Trigger"] = json.dumps(
-            {
-                "tags:tag-count-updated": {
-                    "tag": tag_name,
-                    "tag_hash": tag_hash_hex,
-                    "count": tag_count,
-                    "entry_id": entry_id,
-                    "action": "add",
-                    "tag_kind": tag_kind,
-                    "tag_label": tag_label,
-                },
-                "cache:invalidate": {
-                    "reason": "tag.link.changed",
-                    "keys": invalidation_keys,
-                },
-            }
-        )
+        trigger_payload["tags:tag-count-updated"] = {
+            "tag": tag_name,
+            "tag_hash": tag_hash_hex,
+            "count": tag_count,
+            "entry_id": entry_id,
+            "action": "add",
+            "tag_kind": tag_kind,
+            "tag_label": tag_label,
+        }
+        trigger_payload["cache:invalidate"] = {
+            "reason": "tag.link.changed",
+            "keys": invalidation_keys,
+        }
+    response.headers["HX-Trigger"] = json.dumps(trigger_payload)
     return response
 
 

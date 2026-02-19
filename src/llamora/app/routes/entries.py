@@ -154,7 +154,9 @@ async def delete_entry(entry_id: str):
         f'<div id="{target_id}" hx-swap-oob="delete"></div>'
         for target_id in oob_targets
     )
-    return Response(oob_deletes, status=200, mimetype="text/html")
+    response = await make_response(oob_deletes, 200)
+    response.headers["HX-Trigger"] = json.dumps({"entries:changed": True})
+    return response
 
 
 @entries_bp.route("/e/entry/<entry_id>", methods=["PUT", "PATCH"])

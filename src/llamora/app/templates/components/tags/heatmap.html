@@ -5,6 +5,7 @@
 <div class="tags-view__heatmap"
      hx-get="{{ url_for('tags.tags_view_heatmap', date=day) }}?tag_hash={{ heatmap_tag_hash }}&heatmap_offset={{ heatmap_offset }}"
      hx-trigger="{% if not heatmap_loaded %}load, {% endif %}entries:changed from:body"
+     hx-sync="closest .tags-view__heatmap:replace"
      hx-swap="outerHTML"
      data-heatmap-tag="{{ heatmap_tag_hash }}"
      data-heatmap-offset="{{ heatmap_offset }}">
