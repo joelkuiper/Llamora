@@ -28,6 +28,20 @@ EntryAppendedCallback = Callable[[CryptoContext, str, str], Awaitable[None]]
 _FLAG_PATTERN = re.compile(r"^[a-z0-9_]+$")
 _AUTO_OPENING_FLAG = "auto_opening"
 
+_ENTRY_COLUMNS: tuple[str, ...] = (
+    "m.id",
+    "m.created_at",
+    "m.updated_at",
+    "m.created_date",
+    "m.role",
+    "m.reply_to",
+    "m.nonce",
+    "m.ciphertext",
+    "m.alg",
+    "m.prompt_tokens",
+    "m.digest",
+)
+
 
 def parse_entry_flags(value: str | None) -> set[str]:
     if not value:
@@ -78,39 +92,45 @@ class EntriesRepository(BaseRepository):
     def set_on_entry_appended(self, callback: EntryAppendedCallback | None) -> None:
         self._on_entry_appended = callback
 
+    @staticmethod
+    def _decrypt_row_to_record(
+        ctx: CryptoContext, row, *, alg_col: str = "alg"
+    ) -> dict:
+        record_json = ctx.decrypt_entry(
+            row["id"],
+            row["nonce"],
+            row["ciphertext"],
+            row[alg_col],
+        )
+        return orjson.loads(record_json)
+
+    @staticmethod
+    def _collect_digests(rows) -> list[str]:
+        digests: list[str] = []
+        for row in rows:
+            digest = str(row["digest"] or "").strip()
+            if digest:
+                digests.append(digest)
+        return digests
+
     def _rows_to_entries(
         self, rows, ctx: CryptoContext
     ) -> list[dict]:  # pragma: no cover - trivial helper
         entries: list[dict] = []
         for row in rows:
-            created_date = None
-            updated_at = None
-            digest = None
-            if "created_date" in row.keys():
-                created_date = row["created_date"]
-            if "updated_at" in row.keys():
-                updated_at = row["updated_at"]
-            if "digest" in row.keys():
-                digest = row["digest"]
-            record_json = ctx.decrypt_entry(
-                row["id"],
-                row["nonce"],
-                row["ciphertext"],
-                row["alg"],
-            )
-            rec = orjson.loads(record_json)
+            rec = self._decrypt_row_to_record(ctx, row)
             entries.append(
                 {
                     "id": row["id"],
                     "created_at": row["created_at"],
-                    "updated_at": updated_at,
-                    "created_date": created_date,
+                    "updated_at": row["updated_at"],
+                    "created_date": row["created_date"],
                     "role": row["role"],
                     "reply_to": row["reply_to"],
                     "text": rec.get("text", ""),
                     "meta": rec.get("meta", {}),
                     "prompt_tokens": int(row["prompt_tokens"] or 0),
-                    "digest": digest,
+                    "digest": row["digest"],
                 }
             )
         return entries
@@ -121,20 +141,11 @@ class EntriesRepository(BaseRepository):
         for row in rows:
             entry_id = row["id"]
             if not history or history[-1]["id"] != entry_id:
-                updated_at = None
-                if "updated_at" in row.keys():
-                    updated_at = row["updated_at"]
-                record_json = ctx.decrypt_entry(
-                    entry_id,
-                    row["nonce"],
-                    row["ciphertext"],
-                    row["msg_alg"],
-                )
-                rec = orjson.loads(record_json)
+                rec = self._decrypt_row_to_record(ctx, row, alg_col="msg_alg")
                 current = {
                     "id": entry_id,
                     "created_at": row["created_at"],
-                    "updated_at": updated_at,
+                    "updated_at": row["updated_at"],
                     "role": row["role"],
                     "reply_to": row["reply_to"],
                     "text": rec.get("text", ""),
@@ -443,23 +454,17 @@ class EntriesRepository(BaseRepository):
                 return None
 
             if meta is None:
-                record_json = ctx.decrypt_entry(
-                    row["id"],
-                    row["nonce"],
-                    row["ciphertext"],
-                    row["alg"],
-                )
-                record = orjson.loads(record_json)
-                meta = record.get("meta", {})
+                existing_record = self._decrypt_row_to_record(ctx, row)
+                meta = existing_record.get("meta", {})
 
-            record = {"text": text, "meta": meta or {}}
-            plaintext = orjson.dumps(record).decode()
+            payload = {"text": text, "meta": meta or {}}
+            plaintext = orjson.dumps(payload).decode()
             nonce, ct, alg = ctx.encrypt_entry(entry_id, plaintext)
             prompt_tokens = await asyncio.to_thread(
-                count_message_tokens, row["role"], record.get("text", "")
+                count_message_tokens, row["role"], payload.get("text", "")
             )
             digest = self._require_entry_digest(
-                ctx, entry_id, row["role"], record.get("text", "")
+                ctx, entry_id, row["role"], payload.get("text", "")
             )
             flags = build_entry_flags_from_meta(
                 meta or {}, parse_entry_flags(row["flags"])
@@ -516,8 +521,8 @@ class EntriesRepository(BaseRepository):
             "created_date": row["created_date"],
             "role": row["role"],
             "reply_to": row["reply_to"],
-            "text": record.get("text", ""),
-            "meta": record.get("meta", {}),
+            "text": payload.get("text", ""),
+            "meta": payload.get("meta", {}),
             "prompt_tokens": prompt_tokens,
             "tags": [{"hash": tag_hash} for tag_hash in tag_hashes],
         }
@@ -543,9 +548,7 @@ class EntriesRepository(BaseRepository):
             row = await cursor.fetchone()
         return row["created_date"] if row else None
 
-    async def invalidate_history_for_entry(
-        self, user_id: str, entry_id: str, *, reason: str = "invalidate"
-    ) -> None:
+    async def broadcast_entry_changed(self, user_id: str, entry_id: str) -> None:
         created_date = await self.get_entry_date(user_id, entry_id)
         if not created_date:
             return
@@ -563,9 +566,8 @@ class EntriesRepository(BaseRepository):
     async def get_latest_entries(self, ctx: CryptoContext, limit: int) -> list[dict]:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
-                """
-                SELECT m.id, m.role, m.reply_to, m.nonce, m.ciphertext, m.alg,
-                       m.created_at, m.updated_at, m.created_date, m.prompt_tokens
+                f"""
+                SELECT {", ".join(_ENTRY_COLUMNS)}
                 FROM entries m
                 WHERE m.user_id = ?
                 ORDER BY m.id DESC
@@ -582,9 +584,8 @@ class EntriesRepository(BaseRepository):
     ) -> list[dict]:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
-                """
-                SELECT m.id, m.role, m.reply_to, m.nonce, m.ciphertext, m.alg,
-                       m.created_at, m.updated_at, m.created_date, m.prompt_tokens
+                f"""
+                SELECT {", ".join(_ENTRY_COLUMNS)}
                 FROM entries m
                 WHERE m.user_id = ? AND m.id < ?
                 ORDER BY m.id DESC
@@ -620,8 +621,7 @@ class EntriesRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 f"""
-                SELECT m.id, m.created_at, m.updated_at, m.created_date, m.role, m.reply_to,
-                       m.nonce, m.ciphertext, m.alg, m.prompt_tokens, m.digest
+                SELECT {", ".join(_ENTRY_COLUMNS)}
                 FROM entries m
                 WHERE m.user_id = ? AND m.id IN ({placeholders})
                 """,
@@ -659,8 +659,7 @@ class EntriesRepository(BaseRepository):
 
         where_clause = " AND ".join(conditions)
         sql = f"""
-            SELECT m.id, m.created_at, m.updated_at, m.created_date, m.role, m.reply_to,
-                   m.nonce, m.ciphertext, m.alg, m.prompt_tokens, m.digest
+            SELECT {", ".join(_ENTRY_COLUMNS)}
             FROM entries m
             WHERE {where_clause}
             ORDER BY m.id DESC
@@ -684,8 +683,7 @@ class EntriesRepository(BaseRepository):
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 f"""
-                SELECT m.id, m.created_at, m.updated_at, m.created_date, m.role, m.reply_to,
-                       m.nonce, m.ciphertext, m.alg, m.prompt_tokens, m.digest
+                SELECT {", ".join(_ENTRY_COLUMNS)}
                 FROM entries m
                 WHERE m.user_id = ? AND m.reply_to IN ({placeholders})
                 ORDER BY m.id ASC
@@ -706,6 +704,7 @@ class EntriesRepository(BaseRepository):
         self, ctx: CryptoContext, created_date: str
     ) -> list[dict]:
         async with self.pool.connection() as conn:
+            # `msg_alg` avoids collision with `tag_alg` from the joined tags table.
             cursor = await conn.execute(
                 """
                 SELECT m.id, m.created_at, m.updated_at, m.role, m.reply_to, m.nonce,
@@ -732,6 +731,7 @@ class EntriesRepository(BaseRepository):
             return []
 
         async with self.pool.connection() as conn:
+            # `msg_alg` avoids collision with `tag_alg` from the joined tags table.
             cursor = await conn.execute(
                 """
                 WITH recent AS (
@@ -824,11 +824,9 @@ class EntriesRepository(BaseRepository):
                 day = _date_type.fromisoformat(created_date).day
             except (TypeError, ValueError):
                 continue
-            digest = str(row["digest"] or "").strip()
-            if digest:
-                digests_by_day.setdefault(day, []).append(digest)
+            digests_by_day.setdefault(day, []).append(row)
         for day, digests in digests_by_day.items():
-            summary_digests[day] = day_digest(digests)
+            summary_digests[day] = day_digest(self._collect_digests(digests))
         return summary_digests
 
     async def get_day_summary_digest_for_date(
@@ -845,13 +843,7 @@ class EntriesRepository(BaseRepository):
             )
             rows = await cursor.fetchall()
 
-        digests: list[str] = []
-        for row in rows:
-            digest = str(row["digest"] or "").strip()
-            if digest:
-                digests.append(digest)
-
-        return day_digest(digests)
+        return day_digest(self._collect_digests(rows))
 
     async def get_first_entry_date(self, user_id: str) -> str | None:
         async with self.pool.connection() as conn:
