@@ -1,9 +1,8 @@
-import { getActiveDay } from "./components/entries-view/active-day-store.js";
 import { initRegionFeedback } from "./components/region-feedback.js";
 import { initGlobalShortcuts } from "./global-shortcuts.js";
 import { ScrollIntent } from "./scroll-intent.js";
 import { ScrollManager } from "./scroll-manager.js";
-import { getFrameState, hydrateFrame } from "./services/app-state.js";
+import { hydrateFrame } from "./services/app-state.js";
 import { registerHydrationOwner } from "./services/hydration-owners.js";
 import { handleInvalidationEvent } from "./services/invalidation-bus.js";
 import {
@@ -80,24 +79,6 @@ function registerHtmxHeaderHooks(csrfToken) {
     if (csrfToken) {
       headers["X-CSRFToken"] = csrfToken;
     }
-
-    // X-Active-Day: diary-view-scoped active day (may differ from frame state
-    // when navigation happened via the /e/<date> fragment endpoint, which does
-    // not embed a view-state JSON; active-day-store is updated by entry-view.js
-    // after every render and is always current for the diary view).
-    const activeDate = getActiveDay();
-    if (activeDate) {
-      headers["X-Active-Day"] = activeDate;
-    }
-
-    // X-View-State: 🟢 frame state in server-expected snake_case format.
-    const frame = getFrameState();
-    headers["X-View-State"] = JSON.stringify({
-      view: frame.view,
-      day: frame.day,
-      selected_tag: frame.selectedTag,
-      target: frame.target,
-    });
   });
   headersRegistered = true;
 }

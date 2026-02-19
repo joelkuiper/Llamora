@@ -1,5 +1,5 @@
-import { getActiveDay } from "./components/entries-view/active-day-store.js";
 import { formatIsoDate, navigateToDate, parseDateFromSource } from "./day.js";
+import { getFrameState } from "./services/app-state.js";
 import { requestScrollForceEdge } from "./scroll-manager.js";
 import { registerShortcut } from "./utils/global-shortcuts.js";
 import { motionSafeBehavior } from "./utils/motion.js";
@@ -50,7 +50,7 @@ const clickIfEnabled = (selector) => {
 };
 
 const getActiveDate = () => {
-  const source = getActiveDay() || "";
+  const source = getFrameState().day || "";
   const parsed = parseDateFromSource(source);
   return parsed?.date ?? null;
 };

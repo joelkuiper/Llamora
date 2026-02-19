@@ -7,11 +7,7 @@ import {
 
 export { formatIsoDate, parseDateFromSource } from "./services/datetime.js";
 
-import {
-  ACTIVE_DAY_CHANGED_EVENT,
-  getActiveDay,
-  getActiveDayLabel,
-} from "./components/entries-view/active-day-store.js";
+import { getFrameState, subscribeFrameState } from "./services/app-state.js";
 import { getCurrentView } from "./lifecycle.js";
 import { registerHydrationOwner } from "./services/hydration-owners.js";
 import { updateClientToday } from "./services/time.js";
@@ -155,7 +151,7 @@ function setNavDisabledForView(isDiary) {
       calBtn.removeAttribute("aria-disabled");
       calBtn.dataset.tooltipTitle = "Change day";
     }
-    applyDayStateToNav({ activeDay: getActiveDay(), label: getActiveDayLabel() });
+    applyDayStateToNav({ activeDay: getFrameState().day });
   }
 }
 
@@ -253,19 +249,10 @@ const applyDayStateToNav = ({ activeDay, label, forceFlash = false }) => {
   });
 };
 
-const handleActiveDayChange = (event) => {
-  const detail = event?.detail || {};
-  const activeDay = typeof detail.activeDay === "string" ? detail.activeDay : getActiveDay();
-  const label =
-    typeof detail.activeDayLabel === "string" ? detail.activeDayLabel : getActiveDayLabel();
-  const forceFlash = Boolean(detail.forceFlash);
-  applyDayStateToNav({ activeDay, label, forceFlash });
-};
-
 export function initDayNav(entries, options = {}) {
   const { forceFlash = false, activeDay, label } = options;
-  const currentDay = activeDay || getActiveDay() || entries?.dataset?.date || "";
-  const currentLabel = label || getActiveDayLabel() || entries?.dataset?.longDate || null;
+  const currentDay = activeDay || getFrameState().day || entries?.dataset?.date || "";
+  const currentLabel = label || entries?.dataset?.longDate || null;
 
   applyDayStateToNav({
     activeDay: currentDay,
@@ -274,7 +261,9 @@ export function initDayNav(entries, options = {}) {
   });
 
   if (!navListenerRegistered) {
-    document.addEventListener(ACTIVE_DAY_CHANGED_EVENT, handleActiveDayChange);
+    subscribeFrameState((frame) => {
+      applyDayStateToNav({ activeDay: frame.day });
+    });
     navListenerRegistered = true;
   }
 

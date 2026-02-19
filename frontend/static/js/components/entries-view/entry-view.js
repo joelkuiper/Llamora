@@ -13,7 +13,6 @@ import { TYPING_INDICATOR_SELECTOR } from "../../typing-indicator.js";
 import { scrollToHighlight } from "../../ui.js";
 import { ReactiveElement } from "../../utils/reactive-element.js";
 import { afterNextFrame, scheduleFrame } from "../../utils/scheduler.js";
-import { clearActiveDay, setActiveDay } from "./active-day-store.js";
 import { armEntryAnimations, armInitialEntryAnimations } from "./entry-animations.js";
 import { MarkdownObserver } from "./markdown-observer.js";
 import { StreamController } from "./stream-controller.js";
@@ -201,7 +200,6 @@ export class EntryView extends ReactiveElement {
       this.#entries = null;
       this.#lastRenderedDay = null;
       this.#forceNavFlash = false;
-      clearActiveDay();
       return;
     }
 
@@ -234,9 +232,6 @@ export class EntryView extends ReactiveElement {
 
     this.#lastRenderedDay = activeDay;
 
-    setActiveDay(activeDay, activeDayLabel, {
-      detail: { source: "entry-view" },
-    });
     if (minDate && document?.body?.dataset) {
       document.body.dataset.minDate = minDate;
     }

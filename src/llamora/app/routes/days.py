@@ -19,6 +19,7 @@ from llamora.app.routes.helpers import (
     build_view_state,
     build_tags_catalog_payload,
     get_summary_timeout_seconds,
+    is_htmx_request,
     require_encryption_context,
     require_iso_date,
 )
@@ -74,7 +75,6 @@ async def _render_day(date: str, target: str | None, view_kind: str):
     logger.debug(
         "Render day=%s min_date=%s is_first_day=%s", date, min_date, is_first_day
     )
-    entries_html = None
     target_param = (request.args.get("target") or "").strip() or None
     entries_response = await render_entries(
         date,
@@ -102,13 +102,9 @@ async def _render_day(date: str, target: str | None, view_kind: str):
             target=target_param,
         ),
     }
-    if request.headers.get("HX-Request"):
-        target_id = request.headers.get("HX-Target")
-        if target_id == "main-content":
-            html = await render_template(
-                "components/shared/main_content.html", **context
-            )
-            return await make_response(html, 200)
+    if is_htmx_request() and request.headers.get("HX-Target") == "main-content":
+        html = await render_template("components/shared/main_content.html", **context)
+        return await make_response(html, 200)
     html = await render_template("pages/index.html", **context)
     return await make_response(html, 200)
 

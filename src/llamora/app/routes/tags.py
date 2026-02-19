@@ -29,7 +29,6 @@ from llamora.app.services.activity_heatmap import get_tag_activity_heatmap
 from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.time import local_date
 from llamora.settings import settings
-from llamora.app.routes.helpers import require_iso_date
 from llamora.app.routes.helpers import (
     DEFAULT_TAGS_SORT_DIR,
     DEFAULT_TAGS_SORT_KIND,
@@ -37,8 +36,10 @@ from llamora.app.routes.helpers import (
     build_view_state,
     ensure_entry_exists,
     get_summary_timeout_seconds,
+    is_htmx_request,
     normalize_tags_sort,
     require_encryption_context,
+    require_iso_date,
 )
 from llamora.app.services.cache_registry import (
     MUTATION_TAG_DELETED,
@@ -191,9 +192,8 @@ async def _render_tags_page(selected_tag: str | None):
         offset=heatmap_offset,
     )
 
-    is_hx_main_content = bool(
-        request.headers.get("HX-Request")
-        and request.headers.get("HX-Target") == "main-content"
+    is_hx_main_content = (
+        is_htmx_request() and request.headers.get("HX-Target") == "main-content"
     )
 
     tags_index_payload: list[dict[str, str | int]] = []
@@ -225,13 +225,9 @@ async def _render_tags_page(selected_tag: str | None):
             target=target_param,
         ),
     }
-    if request.headers.get("HX-Request"):
-        target_id = request.headers.get("HX-Target")
-        if target_id == "main-content":
-            html = await render_template(
-                "components/shared/main_content.html", **context
-            )
-            return await make_response(html, 200)
+    if is_hx_main_content:
+        html = await render_template("components/shared/main_content.html", **context)
+        return await make_response(html, 200)
     html = await render_template("pages/index.html", **context)
     return await make_response(html, 200)
 

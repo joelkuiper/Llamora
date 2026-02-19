@@ -1,5 +1,5 @@
 import { isNearBottom, isNearTop } from "./scroll-utils.js";
-import { getViewState } from "./services/view-state.js";
+import { getFrameState } from "./services/app-state.js";
 import { TYPING_INDICATOR_SELECTOR } from "./typing-indicator.js";
 import { createListenerBag } from "./utils/events.js";
 import { motionSafeBehavior, prefersReducedMotion } from "./utils/motion.js";
@@ -187,7 +187,7 @@ export class ScrollManager {
       container: this.container,
       entries: this.entries,
       key: this.#getKey(),
-      view: getViewState()?.view || "diary",
+      view: getFrameState().view,
       containerSelector: this.containerSelectorOverride || this.containerSelector,
       ...extra,
     };

@@ -1,6 +1,6 @@
 import { registerHydrationOwner } from "../../services/hydration-owners.js";
 import { applyTagsCatalogCountUpdate } from "../../services/tags-catalog.js";
-import { getViewState } from "../../services/view-state.js";
+import { getFrameState } from "../../services/app-state.js";
 import { clearScrollTarget, flashHighlight } from "../../ui.js";
 import {
   animateDetailEntries,
@@ -64,8 +64,6 @@ import {
   transitionPhase,
 } from "./state.js";
 import { cacheTagsViewSummary, hydrateTagsViewSummary, syncSummarySkeletons } from "./summary.js";
-
-const BOOT_KEY = "__llamoraTagsViewBooted";
 
 const isEntriesNavigationRequest = (event) => {
   const requestConfig = event?.detail?.requestConfig;
@@ -239,295 +237,290 @@ const syncDetailOnly = (root = document) => {
   }
 };
 
-if (!globalThis[BOOT_KEY]) {
-  globalThis[BOOT_KEY] = true;
+window.addEventListener("resize", updateHeaderHeight);
+initHeatmapTooltip();
+registerTagsScrollStrategy();
 
-  window.addEventListener("resize", updateHeaderHeight);
-  initHeatmapTooltip();
-  registerTagsScrollStrategy();
+document.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
 
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    if (!(target instanceof Element)) return;
+  const sortBtn = target.closest?.("[data-tags-sort-kind][data-tags-sort-dir]");
+  if (sortBtn instanceof HTMLElement) {
+    event.preventDefault();
+    const kind = sortBtn.dataset.tagsSortKind;
+    const dir = sortBtn.dataset.tagsSortDir;
+    requestSort(kind, dir);
+    return;
+  }
 
-    const sortBtn = target.closest?.("[data-tags-sort-kind][data-tags-sort-dir]");
-    if (sortBtn instanceof HTMLElement) {
-      event.preventDefault();
-      const kind = sortBtn.dataset.tagsSortKind;
-      const dir = sortBtn.dataset.tagsSortDir;
-      requestSort(kind, dir);
-      return;
+  const clearBtn = target.closest("[data-tags-view-search-clear]");
+  if (clearBtn instanceof HTMLButtonElement) {
+    event.preventDefault();
+    scheduleSearch("", { immediate: true });
+    if (state.input instanceof HTMLInputElement) {
+      state.input.value = "";
+      state.input.focus();
     }
+    return;
+  }
 
-    const clearBtn = target.closest("[data-tags-view-search-clear]");
-    if (clearBtn instanceof HTMLButtonElement) {
-      event.preventDefault();
-      scheduleSearch("", { immediate: true });
-      if (state.input instanceof HTMLInputElement) {
-        state.input.value = "";
-        state.input.focus();
-      }
-      return;
-    }
+  const entryLink = target.closest("#tags-view-detail .tags-view__entry-open");
+  if (entryLink) {
+    storeMainScrollTop();
+    captureEntriesAnchor();
+    return;
+  }
 
-    const entryLink = target.closest("#tags-view-detail .tags-view__entry-open");
-    if (entryLink) {
-      storeMainScrollTop();
-      captureEntriesAnchor();
-      return;
-    }
-
-    const row = target.closest("#tags-view-list .tags-view__index-row");
-    if (row) {
-      transitionPhase(TagsViewPhase.NAVIGATING, "click:index-row");
-      if (!isSaveSuppressed()) {
-        storeMainScrollTop();
-        captureEntriesAnchor();
-        setSaveSuppressed(true);
-      }
-      clearScrollTarget(null, { emitEvent: false });
-      requestDetailScroll();
-      return;
-    }
-
-    const detailLink = target.closest(
-      "#tags-view-detail .tags-view__related-link, #tags-view-detail .tags-view__entry-tag, #tags-view-detail .entry-tag .tag-label",
-    );
-    if (!(detailLink instanceof HTMLElement)) return;
-    if (detailLink.closest?.(".tag-remove")) {
-      return;
-    }
-    const tagName = String(detailLink.dataset?.tagName || "").trim();
-    const tagHash =
-      String(detailLink.dataset?.tagHash || "").trim() ||
-      String(detailLink.closest?.(".entry-tag")?.dataset?.tagHash || "").trim();
-    if (tagName) {
-      setPendingTagHighlight(tagName);
-      if (findRowByTagName(tagName)) {
-        setActiveTag(tagName, document, { behavior: "smooth" });
-      } else {
-        ensureActiveRowPresent(tagName, { tagHash });
-      }
-    }
-    transitionPhase(TagsViewPhase.NAVIGATING, "click:detail-tag-link");
+  const row = target.closest("#tags-view-list .tags-view__index-row");
+  if (row) {
+    transitionPhase(TagsViewPhase.NAVIGATING, "click:index-row");
     if (!isSaveSuppressed()) {
       storeMainScrollTop();
       captureEntriesAnchor();
       setSaveSuppressed(true);
     }
+    clearScrollTarget(null, { emitEvent: false });
     requestDetailScroll();
-  });
+    return;
+  }
 
-  document.addEventListener("input", (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLInputElement)) return;
-    if (!target.matches("[data-tags-view-search]")) return;
-    scheduleSearch(target.value);
-  });
+  const detailLink = target.closest(
+    "#tags-view-detail .tags-view__related-link, #tags-view-detail .tags-view__entry-tag, #tags-view-detail .entry-tag .tag-label",
+  );
+  if (!(detailLink instanceof HTMLElement)) return;
+  if (detailLink.closest?.(".tag-remove")) {
+    return;
+  }
+  const tagName = String(detailLink.dataset?.tagName || "").trim();
+  const tagHash =
+    String(detailLink.dataset?.tagHash || "").trim() ||
+    String(detailLink.closest?.(".entry-tag")?.dataset?.tagHash || "").trim();
+  if (tagName) {
+    setPendingTagHighlight(tagName);
+    if (findRowByTagName(tagName)) {
+      setActiveTag(tagName, document, { behavior: "smooth" });
+    } else {
+      ensureActiveRowPresent(tagName, { tagHash });
+    }
+  }
+  transitionPhase(TagsViewPhase.NAVIGATING, "click:detail-tag-link");
+  if (!isSaveSuppressed()) {
+    storeMainScrollTop();
+    captureEntriesAnchor();
+    setSaveSuppressed(true);
+  }
+  requestDetailScroll();
+});
 
-  document.addEventListener("search", (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLInputElement)) return;
-    if (!target.matches("[data-tags-view-search]")) return;
-    scheduleSearch(target.value, { immediate: true });
-  });
+document.addEventListener("input", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) return;
+  if (!target.matches("[data-tags-view-search]")) return;
+  scheduleSearch(target.value);
+});
 
-  document.addEventListener("tags-view:navigate", (event) => {
-    const tag = String(event?.detail?.tag || "").trim();
-    const tagHash = String(event?.detail?.tagHash || "").trim();
-    if (!tag) return;
-    transitionPhase(TagsViewPhase.NAVIGATING, "event:tags-view-navigate");
-    setPendingTagHighlight(tag);
-    ensureActiveRowPresent(tag, { tagHash });
-    setActiveTag(tag, document, { behavior: "smooth" });
-  });
+document.addEventListener("search", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) return;
+  if (!target.matches("[data-tags-view-search]")) return;
+  scheduleSearch(target.value, { immediate: true });
+});
 
-  document.body.addEventListener("tags:tag-count-updated", (event) => {
-    applyTagsCatalogCountUpdate(event?.detail || {}, document);
-    if (getViewState()?.view !== "tags") return;
-    applyTagCountUpdate(event?.detail || {}, document);
-  });
+document.addEventListener("tags-view:navigate", (event) => {
+  const tag = String(event?.detail?.tag || "").trim();
+  const tagHash = String(event?.detail?.tagHash || "").trim();
+  if (!tag) return;
+  transitionPhase(TagsViewPhase.NAVIGATING, "event:tags-view-navigate");
+  setPendingTagHighlight(tag);
+  ensureActiveRowPresent(tag, { tagHash });
+  setActiveTag(tag, document, { behavior: "smooth" });
+});
 
-  document.body.addEventListener("htmx:afterSwap", (event) => {
-    const target = event.detail?.target;
-    if (!(target instanceof Element)) return;
-    const summaryEl =
-      target.closest?.(".tags-view__summary") ||
-      (target.classList?.contains("tags-view__summary") ? target : null);
-    if (summaryEl) {
-      cacheTagsViewSummary(summaryEl);
+document.body.addEventListener("tags:tag-count-updated", (event) => {
+  applyTagsCatalogCountUpdate(event?.detail || {}, document);
+  if (getFrameState().view !== "tags") return;
+  applyTagCountUpdate(event?.detail || {}, document);
+});
+
+document.body.addEventListener("htmx:afterSwap", (event) => {
+  const target = event.detail?.target;
+  if (!(target instanceof Element)) return;
+  const summaryEl =
+    target.closest?.(".tags-view__summary") ||
+    (target.classList?.contains("tags-view__summary") ? target : null);
+  if (summaryEl) {
+    cacheTagsViewSummary(summaryEl);
+    retryAnchorRestore();
+  }
+  const inList = target.closest?.("#tags-view-list");
+  const inEntries = target.closest?.("[data-tags-view-entries]");
+  if (target.id === "tags-view-list" || inList) {
+    transitionPhase(TagsViewPhase.SETTLING_LIST, "afterSwap:list");
+    syncListOnly(document);
+    return;
+  }
+  if (target.id === "tags-view-detail" || inEntries) {
+    transitionPhase(TagsViewPhase.SETTLING_DETAIL, "afterSwap:detail");
+    syncDetailOnly(document);
+    if (inEntries && target.id !== "tags-view-detail" && isEntriesNavigationRequest(event)) {
       retryAnchorRestore();
     }
-    const inList = target.closest?.("#tags-view-list");
-    const inEntries = target.closest?.("[data-tags-view-entries]");
-    if (target.id === "tags-view-list" || inList) {
-      transitionPhase(TagsViewPhase.SETTLING_LIST, "afterSwap:list");
-      syncListOnly(document);
-      return;
+    return;
+  }
+  if (target.id === "main-content") {
+    sync(document);
+  }
+});
+
+document.body.addEventListener("htmx:beforeSwap", (event) => {
+  const target = event.detail?.target;
+  if (!(target instanceof Element)) return;
+  if (!target.classList?.contains("tags-view__heatmap")) return;
+  handleHeatmapBeforeSwap(target, event.detail?.requestConfig);
+});
+
+document.body.addEventListener("htmx:afterSwap", (event) => {
+  const target = event.detail?.target;
+  if (!(target instanceof Element)) return;
+  if (!target.classList?.contains("tags-view__heatmap")) return;
+  handleHeatmapAfterSwap(target, event.detail?.requestConfig);
+});
+
+document.body.addEventListener("htmx:afterRequest", (event) => {
+  const detailRoot = findDetail(document);
+  if (!detailRoot || getFrameState().view !== "tags") {
+    return;
+  }
+  const xhr = event.detail?.xhr;
+  if (xhr && (xhr.status < 200 || xhr.status >= 300)) return;
+  const requestConfig = event.detail?.requestConfig;
+  const path = String(requestConfig?.path || "");
+  if (requestConfig?.verb !== "delete" || !path.includes("/e/entry/")) return;
+  const target = event.detail?.target || event.detail?.elt;
+  const entry = (target instanceof Element && (target.closest?.(".entry") || target)) || null;
+  if (entry instanceof Element && entry.classList.contains("assistant")) return;
+  updateSelectedTagCounts(document, -1);
+});
+
+document.body.addEventListener("htmx:responseError", (event) => {
+  const target = event.detail?.target;
+  if (!(target instanceof Element)) return;
+  if (target.id !== "tags-view-detail") return;
+  setSaveSuppressed(false);
+  clearPendingDetailScroll();
+  forcePhase(TagsViewPhase.IDLE, "responseError:detail");
+});
+
+document.body.addEventListener("htmx:configRequest", (event) => {
+  if (event.detail?.verb !== "get") return;
+  const target = event.detail?.target;
+  if (!(target instanceof Element)) return;
+  if (target.id === "tags-view-list") {
+    const selectedInput = document.getElementById("tags-view-selected-tag");
+    const selected = String(selectedInput?.value || "").trim() || getSelectedTrace(document) || "";
+    if (selected) {
+      event.detail.parameters.tag = selected;
     }
-    if (target.id === "tags-view-detail" || inEntries) {
-      transitionPhase(TagsViewPhase.SETTLING_DETAIL, "afterSwap:detail");
-      syncDetailOnly(document);
-      if (inEntries && target.id !== "tags-view-detail" && isEntriesNavigationRequest(event)) {
-        retryAnchorRestore();
-      }
-      return;
-    }
-    if (target.id === "main-content") {
-      sync(document);
-    }
-  });
+    return;
+  }
+  if (target.id !== "tags-view-detail") return;
 
-  document.body.addEventListener("htmx:beforeSwap", (event) => {
-    const target = event.detail?.target;
-    if (!(target instanceof Element)) return;
-    if (!target.classList?.contains("tags-view__heatmap")) return;
-    handleHeatmapBeforeSwap(target, event.detail?.requestConfig);
-  });
+  const path = event.detail?.path || "";
+  let destTag = "";
+  try {
+    const url = new URL(path, window.location.origin);
+    destTag = url.searchParams.get("tag") || "";
+  } catch {
+    return;
+  }
+  if (!destTag) return;
 
-  document.body.addEventListener("htmx:afterSwap", (event) => {
-    const target = event.detail?.target;
-    if (!(target instanceof Element)) return;
-    if (!target.classList?.contains("tags-view__heatmap")) return;
-    handleHeatmapAfterSwap(target, event.detail?.requestConfig);
-  });
+  const stored = getStoredEntriesAnchor(destTag);
+  if (stored?.entryId && stored?.tag === destTag) {
+    event.detail.parameters.restore_entry = stored.entryId;
+  }
+});
 
-  document.body.addEventListener("htmx:afterRequest", (event) => {
-    const detailRoot = findDetail(document);
-    if (!detailRoot || getViewState()?.view !== "tags") {
-      return;
-    }
-    const xhr = event.detail?.xhr;
-    if (xhr && (xhr.status < 200 || xhr.status >= 300)) return;
-    const requestConfig = event.detail?.requestConfig;
-    const path = String(requestConfig?.path || "");
-    if (requestConfig?.verb !== "delete" || !path.includes("/e/entry/")) return;
-    const target = event.detail?.target || event.detail?.elt;
-    const entry = (target instanceof Element && (target.closest?.(".entry") || target)) || null;
-    if (entry instanceof Element && entry.classList.contains("assistant")) return;
-    updateSelectedTagCounts(document, -1);
-  });
+document.body.addEventListener("htmx:beforeRequest", (event) => {
+  const target = event.detail?.target;
+  if (!(target instanceof Element)) return;
+  const requestConfig = event.detail?.requestConfig;
+  const path = String(requestConfig?.path || "");
+  const inEntriesRegion = Boolean(target.closest?.("[data-tags-view-entries]"));
+  const isEntryOrTagMutationPath = path.startsWith("/e/") || path.startsWith("/t/");
 
-  document.body.addEventListener("htmx:responseError", (event) => {
-    const target = event.detail?.target;
-    if (!(target instanceof Element)) return;
-    if (target.id !== "tags-view-detail") return;
-    setSaveSuppressed(false);
-    clearPendingDetailScroll();
-    forcePhase(TagsViewPhase.IDLE, "responseError:detail");
-  });
+  if ((inEntriesRegion || isEntryOrTagMutationPath) && !isEntriesNavigationRequest(event)) {
+    cancelEntriesAnchorRestore();
+  }
 
-  document.body.addEventListener("htmx:configRequest", (event) => {
-    if (event.detail?.verb !== "get") return;
-    const target = event.detail?.target;
-    if (!(target instanceof Element)) return;
-    if (target.id === "tags-view-list") {
-      const selectedInput = document.getElementById("tags-view-selected-tag");
-      const selected =
-        String(selectedInput?.value || "").trim() || getSelectedTrace(document) || "";
-      if (selected) {
-        event.detail.parameters.tag = selected;
-      }
-      return;
-    }
-    if (target.id !== "tags-view-detail") return;
-
-    const path = event.detail?.path || "";
-    let destTag = "";
-    try {
-      const url = new URL(path, window.location.origin);
-      destTag = url.searchParams.get("tag") || "";
-    } catch {
-      return;
-    }
-    if (!destTag) return;
-
-    const stored = getStoredEntriesAnchor(destTag);
-    if (stored?.entryId && stored?.tag === destTag) {
-      event.detail.parameters.restore_entry = stored.entryId;
-    }
-  });
-
-  document.body.addEventListener("htmx:beforeRequest", (event) => {
-    const target = event.detail?.target;
-    if (!(target instanceof Element)) return;
-    const requestConfig = event.detail?.requestConfig;
-    const path = String(requestConfig?.path || "");
-    const inEntriesRegion = Boolean(target.closest?.("[data-tags-view-entries]"));
-    const isEntryOrTagMutationPath = path.startsWith("/e/") || path.startsWith("/t/");
-
-    if ((inEntriesRegion || isEntryOrTagMutationPath) && !isEntriesNavigationRequest(event)) {
-      cancelEntriesAnchorRestore();
-    }
-
-    if (target.id === "tags-view-list" || target.closest?.("#tags-view-list")) {
-      transitionPhase(TagsViewPhase.LOADING_LIST, "beforeRequest:list");
-      captureListPositions();
-      return;
-    }
-    if (target.id !== "tags-view-detail") return;
-    transitionPhase(TagsViewPhase.LOADING_DETAIL, "beforeRequest:detail");
+  if (target.id === "tags-view-list" || target.closest?.("#tags-view-list")) {
+    transitionPhase(TagsViewPhase.LOADING_LIST, "beforeRequest:list");
     captureListPositions();
-    if (!isSaveSuppressed()) {
-      storeMainScrollTop();
-      captureEntriesAnchor();
-      setSaveSuppressed(true);
+    return;
+  }
+  if (target.id !== "tags-view-detail") return;
+  transitionPhase(TagsViewPhase.LOADING_DETAIL, "beforeRequest:detail");
+  captureListPositions();
+  if (!isSaveSuppressed()) {
+    storeMainScrollTop();
+    captureEntriesAnchor();
+    setSaveSuppressed(true);
+  }
+  resetRestoreAppliedLocation();
+  requestDetailScroll();
+});
+
+document.body.addEventListener("htmx:afterSettle", (event) => {
+  const target = event.detail?.target;
+  if (!(target instanceof Element)) return;
+  storeHeatmapOffsetFromRoot(target);
+  if (target.id === "tags-view-list") {
+    animateListReorder(() => {
+      if (consumePendingListScroll()) {
+        scrollActiveRowIntoView(document, "smooth");
+      }
+    });
+    if (!transitionPhase(TagsViewPhase.IDLE, "afterSettle:list")) {
+      forcePhase(TagsViewPhase.IDLE, "afterSettle:list:force");
     }
+  }
+  if (target.id !== "tags-view-detail") return;
+  if (!consumePendingDetailScroll()) return;
+  scrollMainContentTop();
+  setSaveSuppressed(false);
+  maybeRestoreEntriesAnchor();
+  if (!transitionPhase(TagsViewPhase.IDLE, "afterSettle:detail")) {
+    forcePhase(TagsViewPhase.IDLE, "afterSettle:detail:force");
+  }
+});
+
+registerHydrationOwner({
+  id: "tags-view",
+  selector: "#tags-view",
+  hydrate: (context) => {
     resetRestoreAppliedLocation();
-    requestDetailScroll();
-  });
-
-  document.body.addEventListener("htmx:afterSettle", (event) => {
-    const target = event.detail?.target;
-    if (!(target instanceof Element)) return;
-    storeHeatmapOffsetFromRoot(target);
-    if (target.id === "tags-view-list") {
-      animateListReorder(() => {
-        if (consumePendingListScroll()) {
-          scrollActiveRowIntoView(document, "smooth");
-        }
-      });
-      if (!transitionPhase(TagsViewPhase.IDLE, "afterSettle:list")) {
-        forcePhase(TagsViewPhase.IDLE, "afterSettle:list:force");
-      }
-    }
-    if (target.id !== "tags-view-detail") return;
-    if (!consumePendingDetailScroll()) return;
-    scrollMainContentTop();
-    setSaveSuppressed(false);
-    maybeRestoreEntriesAnchor();
-    if (!transitionPhase(TagsViewPhase.IDLE, "afterSettle:detail")) {
-      forcePhase(TagsViewPhase.IDLE, "afterSettle:detail:force");
-    }
-  });
-
-  registerHydrationOwner({
-    id: "tags-view",
-    selector: "#tags-view",
-    hydrate: (context) => {
-      resetRestoreAppliedLocation();
-      const root = context instanceof Element ? context : document;
-      sync(root);
-    },
-    teardown: () => {
-      if (!isSaveSuppressed()) {
-        storeMainScrollTop();
-        captureEntriesAnchor();
-      }
-      storeHeatmapOffsetFromRoot();
-    },
-  });
-  document.addEventListener("app:view-changed", (event) => {
-    if (event?.detail?.view === "tags") return;
-    resetEntriesRestoreState();
-  });
-  window.addEventListener("pagehide", () => {
+    const root = context instanceof Element ? context : document;
+    sync(root);
+  },
+  teardown: () => {
     if (!isSaveSuppressed()) {
       storeMainScrollTop();
       captureEntriesAnchor();
     }
     storeHeatmapOffsetFromRoot();
-  });
+  },
+});
+document.addEventListener("app:view-changed", (event) => {
+  if (event?.detail?.view === "tags") return;
+  resetEntriesRestoreState();
+});
+window.addEventListener("pagehide", () => {
+  if (!isSaveSuppressed()) {
+    storeMainScrollTop();
+    captureEntriesAnchor();
+  }
+  storeHeatmapOffsetFromRoot();
+});
 
-  sync(document);
-}
+sync(document);

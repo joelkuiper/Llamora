@@ -22,7 +22,9 @@ from quart import (
 )
 
 from llamora.app.routes.helpers import (
+    build_view_state,
     ensure_entry_exists,
+    is_htmx_request,
     require_encryption_context,
     require_iso_date,
 )
@@ -55,6 +57,7 @@ async def render_entries(
 ) -> Response:
     _, user, ctx = await require_encryption_context()
     context = await get_entries_context(ctx, user, date)
+    is_htmx = is_htmx_request()
     html = await render_template(
         "components/entries/entries.html",
         day=date,
@@ -62,8 +65,16 @@ async def render_entries(
         user=user,
         scroll_target=scroll_target,
         view_kind=view_kind,
+        is_htmx=is_htmx,
         **context,
     )
+    if is_htmx:
+        vs_html = await render_template(
+            "components/shared/view_state.html",
+            view_state=build_view_state(view="diary", day=date, target=scroll_target),
+            oob_view_state=True,
+        )
+        html = html + "\n" + vs_html
 
     resp = await make_response(html, 200)
     assert isinstance(resp, Response)

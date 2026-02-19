@@ -5,7 +5,7 @@ import { cacheLoader } from "../services/cache-loader.js";
 import { registerHydrationOwner } from "../services/hydration-owners.js";
 import { triggerLabelFlash } from "../utils/motion.js";
 import { transitionHide, transitionShow } from "../utils/transition.js";
-import { getActiveDayParts } from "./entries-view/active-day-store.js";
+import { getFrameState } from "../services/app-state.js";
 
 const makeDaySummaryKey = (date) => `day:${String(date || "").trim()}`;
 
@@ -103,9 +103,13 @@ export class CalendarControl extends HTMLElement {
     const calendarUrl = pop.dataset.calendarUrl || pop.getAttribute("hx-get") || null;
 
     const getActiveDateParts = () => {
-      const parts = getActiveDayParts();
-      if (!parts) return null;
-      return { year: parts.year, month: parts.month };
+      const day = getFrameState().day;
+      if (!day) return null;
+      const [yearStr, monthStr] = day.split("-");
+      const year = Number(yearStr);
+      const month = Number(monthStr);
+      if (!Number.isInteger(year) || !Number.isInteger(month)) return null;
+      return { year, month };
     };
 
     const loadCalendarContent = (params = {}) => {

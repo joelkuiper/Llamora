@@ -108,13 +108,7 @@ export const hydrateFrame = (_scope = document) => {
     target: String(parsed.target || "").trim(),
   };
 
-  // Keep body[data-active-day] in sync.
-  // NOTE: body[data-active-day] has TWO write paths that can diverge:
-  //   1. Here (frame state from server view-state JSON, set on every full swap)
-  //   2. active-day-store.js setActiveDay() (set by entry-view.js after render,
-  //      needed because /e/<date> fragment responses do not include view-state JSON)
-  // Path 2 is always correct for the diary view. Path 1 is always correct for the
-  // tags view. They are the same value in the common case (full navigation).
+  // Keep body[data-active-day] in sync with the server-authoritative day.
   if (next.day && document.body?.dataset) {
     document.body.dataset.activeDay = next.day;
   }

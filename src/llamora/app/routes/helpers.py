@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 from urllib.parse import urlencode
 
-from quart import abort, g
+from quart import abort, g, request
 
 from llamora.app.services.container import get_tag_service
 from llamora.app.services.crypto import CryptoContext
@@ -59,13 +59,16 @@ async def ensure_entry_exists(db: Any, user_id: str, entry_id: str) -> None:
         raise AssertionError("unreachable")
 
 
+def is_htmx_request() -> bool:
+    """Return True if the current request was issued by HTMX."""
+    return request.headers.get("HX-Request") == "true"
+
+
 def build_view_state(
     *,
     view: str,
     day: str | None = None,
     selected_tag: str | None = None,
-    sort_kind: str | None = None,
-    sort_dir: str | None = None,
     target: str | None = None,
     extra: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -76,10 +79,6 @@ def build_view_state(
         state["day"] = day
     if selected_tag:
         state["selected_tag"] = selected_tag
-    if sort_kind:
-        state["sort_kind"] = sort_kind
-    if sort_dir:
-        state["sort_dir"] = sort_dir
     if target:
         state["target"] = target
     if extra:

@@ -1,10 +1,9 @@
 import { createPopover } from "../popover.js";
-import { normalizeIsoDay } from "../services/day-resolution.js";
 import { getFrameState, hydrateFrame } from "../services/app-state.js";
+import { normalizeIsoDay } from "../services/day-resolution.js";
 import { registerHydrationOwner } from "../services/hydration-owners.js";
 import { createListenerBag } from "../utils/events.js";
 import { sessionStore } from "../utils/storage.js";
-import { getActiveDay } from "./entries-view/active-day-store.js";
 import { buildTagPageUrl, parseTagFromPath } from "./tags-view/tags-nav-url.js";
 
 let currentInstance = null;
@@ -29,18 +28,9 @@ const writeStoredTagsContext = (context) => {
 
 /**
  * Resolves the navigation day for view-mode switching.
- *
- * 🟢 Frame state is authoritative when in the tags view (day always present in URL).
- * 🔵 active-day-store is the fallback for the diary view: the /e/<date> fragment
- *    endpoint does not embed a view-state JSON, so frame state can lag behind
- *    after in-page calendar navigation. The active-day-store is updated by
- *    entry-view.js after every render and is always current in that case.
+ * Frame state is always authoritative — /e/<date> responses include OOB view-state.
  */
-const resolveNavigationDay = () => {
-  const frame = getFrameState();
-  if (frame.view === "tags") return frame.day;
-  return getActiveDay() || frame.day;
-};
+const resolveNavigationDay = () => getFrameState().day;
 
 const buildDiaryUrl = (day) => {
   const resolved = normalizeIsoDay(day);
