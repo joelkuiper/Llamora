@@ -24,6 +24,7 @@ class ActivityHeatmapCell:
     count: int
     level: int
     in_month: bool
+    target_entry_id: str | None = None
 
 
 @dataclass(slots=True)
@@ -78,11 +79,16 @@ def _month_token(target: date) -> str:
     return target.strftime("%Y-%m")
 
 
-def _parse_cached_month_counts(payload: object) -> dict[str, int] | None:
+def _parse_cached_month_payload(
+    payload: object,
+) -> tuple[dict[str, int], dict[str, str]] | None:
     if not isinstance(payload, dict):
         return None
     raw_counts = payload.get("counts")
     if not isinstance(raw_counts, dict):
+        return None
+    raw_first_entries = payload.get("first_entries")
+    if not isinstance(raw_first_entries, dict):
         return None
     parsed: dict[str, int] = {}
     for raw_date, raw_count in raw_counts.items():
@@ -93,7 +99,15 @@ def _parse_cached_month_counts(payload: object) -> dict[str, int] | None:
             parsed[key] = int(raw_count or 0)
         except (TypeError, ValueError):
             return None
-    return parsed
+    first_entries: dict[str, str] = {}
+    for raw_date, raw_entry_id in raw_first_entries.items():
+        key = str(raw_date or "").strip()
+        if not key:
+            continue
+        entry_id = str(raw_entry_id or "").strip()
+        if entry_id:
+            first_entries[key] = entry_id
+    return parsed, first_entries
 
 
 def _counts_for_month(counts: dict[str, int], month_start: date) -> dict[str, int]:
@@ -105,9 +119,22 @@ def _counts_for_month(counts: dict[str, int], month_start: date) -> dict[str, in
     }
 
 
+def _first_entries_for_month(
+    first_entries: dict[str, str],
+    month_start: date,
+) -> dict[str, str]:
+    prefix = f"{_month_token(month_start)}-"
+    return {
+        iso_date: entry_id
+        for iso_date, entry_id in first_entries.items()
+        if str(iso_date).startswith(prefix)
+    }
+
+
 def build_activity_heatmap(
     counts: dict[str, int],
     *,
+    first_entries: dict[str, str] | None = None,
     end: date | None = None,
     months: int = 12,
     offset: int = 0,
@@ -138,12 +165,16 @@ def build_activity_heatmap(
                 in_month = month_start <= current <= month_end
                 count = int(counts.get(iso_date, 0)) if in_month else 0
                 level = _level_for_count(count, max_count) if in_month else 0
+                target_entry_id = None
+                if in_month and count > 0 and first_entries:
+                    target_entry_id = first_entries.get(iso_date)
                 days.append(
                     ActivityHeatmapCell(
                         date=iso_date,
                         count=count,
                         level=level,
                         in_month=in_month,
+                        target_entry_id=target_entry_id,
                     )
                 )
             weeks.append(ActivityHeatmapWeek(days=tuple(days)))
@@ -199,6 +230,7 @@ async def get_tag_activity_heatmap(
     tag_hash_hex = tag_hash.hex()
 
     counts: dict[str, int] = {}
+    first_entries: dict[str, str] = {}
     missing_months: list[date] = []
     if store is not None:
         for month_start in month_starts:
@@ -215,26 +247,37 @@ async def get_tag_activity_heatmap(
                 )
                 missing_months.append(month_start)
                 continue
-            month_counts = _parse_cached_month_counts(cached_payload)
-            if month_counts is None:
+            month_payload = _parse_cached_month_payload(cached_payload)
+            if month_payload is None:
                 missing_months.append(month_start)
                 continue
+            month_counts, month_first_entries = month_payload
             counts.update(month_counts)
+            first_entries.update(month_first_entries)
 
     if store is None or missing_months:
-        queried_counts = await tags_repo.get_tag_activity_counts(
+        (
+            queried_counts,
+            queried_first_entries,
+        ) = await tags_repo.get_tag_activity_snapshot(
             ctx.user_id,
             tag_hash,
             query_start,
             query_end,
         )
         counts.update(queried_counts)
+        first_entries.update(queried_first_entries)
         if store is not None and missing_months:
             for month_start in missing_months:
                 cache_key = heatmap_month_cache_key(
                     tag_hash_hex, _month_token(month_start)
                 )
-                payload = {"counts": _counts_for_month(queried_counts, month_start)}
+                payload = {
+                    "counts": _counts_for_month(queried_counts, month_start),
+                    "first_entries": _first_entries_for_month(
+                        queried_first_entries, month_start
+                    ),
+                }
                 try:
                     await store.set_json(ctx, HEATMAP_NAMESPACE, cache_key, payload)
                 except Exception:
@@ -248,6 +291,7 @@ async def get_tag_activity_heatmap(
 
     return build_activity_heatmap(
         counts,
+        first_entries=first_entries,
         end=end_date,
         months=months,
         offset=offset,

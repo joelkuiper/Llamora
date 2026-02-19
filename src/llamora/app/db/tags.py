@@ -181,30 +181,66 @@ class TagsRepository(BaseRepository):
         start_date: str,
         end_date: str,
     ) -> dict[str, int]:
+        counts, _ = await self.get_tag_activity_snapshot(
+            user_id,
+            tag_hash,
+            start_date,
+            end_date,
+        )
+        return counts
+
+    async def get_tag_activity_snapshot(
+        self,
+        user_id: str,
+        tag_hash: bytes,
+        start_date: str,
+        end_date: str,
+    ) -> tuple[dict[str, int], dict[str, str]]:
         async with self.pool.connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT e.created_date AS created_date,
-                       COUNT(*) AS total_entries
-                FROM tag_entry_xref x
-                JOIN entries e
-                  ON e.user_id = x.user_id AND e.id = x.entry_id
-                WHERE x.user_id = ?
-                  AND x.tag_hash = ?
-                  AND e.created_date >= ?
-                  AND e.created_date <= ?
-                GROUP BY e.created_date
+                WITH tagged AS (
+                  SELECT e.created_date AS created_date,
+                         e.id AS entry_id,
+                         e.created_at AS created_at
+                  FROM tag_entry_xref x
+                  JOIN entries e
+                    ON e.user_id = x.user_id AND e.id = x.entry_id
+                  WHERE x.user_id = ?
+                    AND x.tag_hash = ?
+                    AND e.created_date >= ?
+                    AND e.created_date <= ?
+                ),
+                ranked AS (
+                  SELECT created_date,
+                         entry_id,
+                         ROW_NUMBER() OVER (
+                           PARTITION BY created_date
+                           ORDER BY created_at ASC, entry_id ASC
+                         ) AS row_num
+                  FROM tagged
+                )
+                SELECT created_date,
+                       COUNT(*) AS total_entries,
+                       MAX(CASE WHEN row_num = 1 THEN entry_id END) AS first_entry_id
+                FROM ranked
+                GROUP BY created_date
                 """,
                 (user_id, tag_hash, start_date, end_date),
             )
             rows = await cursor.fetchall()
         counts: dict[str, int] = {}
+        first_entries: dict[str, str] = {}
         for row in rows:
             created_date = row["created_date"]
             if not created_date:
                 continue
-            counts[str(created_date)] = int(row["total_entries"] or 0)
-        return counts
+            day = str(created_date)
+            counts[day] = int(row["total_entries"] or 0)
+            entry_id = str(row["first_entry_id"] or "").strip()
+            if entry_id:
+                first_entries[day] = entry_id
+        return counts, first_entries
 
     async def get_tags_for_entry(self, ctx: CryptoContext, entry_id: str) -> list[dict]:
         async with self.pool.connection() as conn:

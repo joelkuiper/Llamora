@@ -26,6 +26,10 @@
                 {% if cell.in_month %}
                   {% set has_entries = cell.count > 0 %}
                   {% set entry_label = "entry" if cell.count == 1 else "entries" %}
+                  {% set day_url = url_for('days.day', date=cell.date) %}
+                  {% if has_entries and cell.target_entry_id %}
+                    {% set day_url = day_url ~ '?target=entry-' ~ cell.target_entry_id %}
+                  {% endif %}
                   {% if has_entries %}
                     {% set tooltip = (cell.date|long_date) ~ ' · ' ~ cell.count ~ ' ' ~ entry_label %}
                   {% else %}
@@ -33,10 +37,11 @@
                   {% endif %}
                   <a class="activity-heatmap__cell level-{{ cell.level }}{% if not has_entries %} is-empty-day{% endif %}{% if today is defined and cell.date == today %} is-today{% endif %}{% if selected_day and cell.date == selected_day %} is-selected{% endif %}"
                      role="gridcell"
-                     href="{{ url_for('days.day', date=cell.date) }}"
+                     href="{{ day_url }}"
                      aria-label="{{ tooltip }}"
                      data-heatmap-date="{{ cell.date }}"
                      data-heatmap-count="{{ cell.count }}"
+                     {% if cell.target_entry_id %}data-heatmap-target="entry-{{ cell.target_entry_id }}"{% endif %}
                      {% if not has_entries %}aria-disabled="true" tabindex="-1"{% endif %}></a>
                 {% else %}
                   <span class="activity-heatmap__cell is-empty" aria-hidden="true"></span>
