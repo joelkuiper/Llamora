@@ -1,3 +1,21 @@
+"""Bridge repository mutation events into cache invalidation side effects.
+
+Event flow:
+1) Repositories emit typed events via ``RepositoryEventBus.emit_for_entry_date``.
+2) ``InvalidationCoordinator`` subscribes to those event types and normalizes
+   event payloads to mutation lineage plans.
+3) The lineage plan (mutation -> digest nodes -> cache invalidations) is built
+   via ``cache_registry.build_mutation_lineage_plan``.
+4) Server-scope invalidations are applied to lockbox cache keys; routes emit
+   client invalidation payloads separately from the same lineage model.
+
+Why this layer exists:
+- Repositories stay storage-focused and unaware of cache namespaces/lineage.
+- Cache registry stays pure policy/data; this coordinator owns runtime wiring
+  to event bus subscriptions and lockbox side effects.
+- Event-type filtering and payload normalization are centralized in one place.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -29,7 +47,7 @@ logger = getLogger(__name__)
 
 @dataclass(slots=True)
 class InvalidationCoordinator:
-    """Centralized repository-event invalidation handlers."""
+    """Runtime adapter from repository events to cache invalidation actions."""
 
     event_bus: RepositoryEventBus
     lockbox_store: LockboxStore
@@ -37,12 +55,24 @@ class InvalidationCoordinator:
     tag_service: TagService | None = None
 
     def subscribe(self) -> None:
-        self.event_bus.subscribe(ENTRY_INSERTED_EVENT, self._on_entry_changed)
-        self.event_bus.subscribe(ENTRY_UPDATED_EVENT, self._on_entry_changed)
-        self.event_bus.subscribe(ENTRY_DELETED_EVENT, self._on_entry_changed)
-        self.event_bus.subscribe(TAG_LINKED_EVENT, self._on_tag_link_changed)
-        self.event_bus.subscribe(TAG_UNLINKED_EVENT, self._on_tag_link_changed)
-        self.event_bus.subscribe(TAG_DELETED_EVENT, self._on_tag_deleted)
+        """Wire supported repository events to coordinator handlers.
+
+        Mapping:
+        - ``entry.inserted``, ``entry.updated``, ``entry.deleted`` -> entry lineage
+        - ``tag.linked``, ``tag.unlinked`` -> tag-link lineage
+        - ``tag.deleted`` -> tag-deleted lineage
+        """
+
+        subscriptions = (
+            (ENTRY_INSERTED_EVENT, self._on_entry_changed),
+            (ENTRY_UPDATED_EVENT, self._on_entry_changed),
+            (ENTRY_DELETED_EVENT, self._on_entry_changed),
+            (TAG_LINKED_EVENT, self._on_tag_link_changed),
+            (TAG_UNLINKED_EVENT, self._on_tag_link_changed),
+            (TAG_DELETED_EVENT, self._on_tag_deleted),
+        )
+        for event_name, handler in subscriptions:
+            self.event_bus.subscribe(event_name, handler)
 
     async def _on_entry_changed(
         self,
