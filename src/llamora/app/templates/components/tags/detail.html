@@ -3,13 +3,13 @@
 {% set sort_dir = tags_sort_dir if tags_sort_dir is defined else (tags_view.sort_dir if tags_view is defined and tags_view else 'desc') %}
 {% set selected_tag_name = detail.name if detail else (selected_tag if selected_tag is defined else '') %}
 {% set entries_limit = entries_limit|default(12) %}
+{% set tags_day_query = tags_day_query|default('?day=' ~ (day|urlencode)) %}
+{% set tags_selected_query = tags_selected_query|default(tags_day_query ~ (('&tag=' ~ (selected_tag_name|urlencode)) if selected_tag_name else '')) %}
 {% if oob_view_state %}
   {% set view_state = view_state if view_state is defined else {
     'view': 'tags',
     'day': day,
-    'selected_tag': selected_tag_name,
-    'sort_kind': sort_kind,
-    'sort_dir': sort_dir
+    'selected_tag': selected_tag_name
   } %}
   {% include "components/shared/view_state.html" %}
 {% endif %}
@@ -29,7 +29,7 @@
   <div class="tags-view__detail-inner">
     {% if detail %}
       <header class="tags-view__detail-header">
-        {% set delete_trace_url = url_for('tags.delete_trace', tag_hash=detail.hash) ~ '?day=' ~ day ~ '&sort_kind=' ~ sort_kind ~ '&sort_dir=' ~ sort_dir ~ '&tag=' ~ (detail.name|urlencode) %}
+        {% set delete_trace_url = url_for('tags.delete_trace', tag_hash=detail.hash) ~ tags_selected_query %}
         {% set detail_shortcode = emoji_shortcode(detail.name) %}
         <div class="tags-view__title-wrap">
           <div class="tags-view__title-row">
@@ -64,7 +64,7 @@
               <div class="tags-view__related-row">
                 <span class="tags-view__related-prefix ui-meta-text">frequently appears with</span>
                 {% for related in detail.related_tags %}
-                  {% set related_url = url_for('tags.tags_view_tag', tag=related.name) ~ '?day=' ~ (day|urlencode) %}
+                  {% set related_url = url_for('tags.tags_view_tag', tag=related.name) ~ tags_day_query %}
                   <a href="{{ related_url }}"
                      class="tags-view__related-link entry-tag"
                      data-tag-name="{{ related.name }}"

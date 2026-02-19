@@ -1,14 +1,20 @@
 import { readTagsCatalog } from "../../services/tags-catalog.js";
+import {
+  normalizeTagsSortDir,
+  normalizeTagsSortKind,
+  readTagsSortState,
+  writeTagsSortState,
+} from "../../services/tags-sort-store.js";
 import { prefersReducedMotion } from "../../utils/motion.js";
 import { sessionStore } from "../../utils/storage.js";
 import { HyperList } from "../../vendor/setup-globals.js";
-import { getSelectedTrace, refreshDetailLinksForSort } from "./detail.js";
+import { getSelectedTrace, refreshDetailLinksForNav } from "./detail.js";
 import { findDetail, findList, findListBody, findSidebar } from "./dom.js";
 import { getTagsDay, readTagFromUrl, syncTagsHistoryUrl } from "./router.js";
 import { requestListScroll, state } from "./state.js";
+import { buildTagDetailFragmentUrl, buildTagPageUrl } from "./tags-nav-url.js";
 
 const VIRTUAL_ITEM_HEIGHT_FALLBACK = 42;
-const TAGS_SORT_KEY = "tags:sort";
 
 const ensureVirtualState = () => {
   state.visibleItems ??= [];
@@ -21,32 +27,6 @@ const ensureVirtualState = () => {
 };
 
 export const readStoredSearchQuery = () => sessionStore.get("tags:query") ?? "";
-
-const readStoredSort = () => {
-  const raw = sessionStore.get(TAGS_SORT_KEY);
-  if (!raw || typeof raw !== "object") {
-    return null;
-  }
-  return {
-    sortKind: normalizeSortKind(raw.sortKind),
-    sortDir: normalizeSortDir(raw.sortDir),
-  };
-};
-
-const persistStoredSort = (sortKind, sortDir) => {
-  sessionStore.set(TAGS_SORT_KEY, {
-    sortKind: normalizeSortKind(sortKind),
-    sortDir: normalizeSortDir(sortDir),
-  });
-  document.dispatchEvent(
-    new CustomEvent("tags:sort-changed", {
-      detail: {
-        sortKind: normalizeSortKind(sortKind),
-        sortDir: normalizeSortDir(sortDir),
-      },
-    }),
-  );
-};
 
 export const persistSearchQuery = (value) => {
   if (value) {
@@ -156,18 +136,11 @@ const loadIndexItems = async () => {
 const buildTagUrls = (tagName, tagHash) => {
   const day = getTagsDay();
   if (!day) return null;
-  const baseTagUrl = `/t/${encodeURIComponent(tagName)}`;
-  const params = new URLSearchParams({
-    day,
+  const tagUrl = buildTagPageUrl(tagName, { day });
+  const fragmentUrl = buildTagDetailFragmentUrl(day, tagName, {
+    tagHash,
   });
-  const tagUrl = params.toString() ? `${baseTagUrl}?${params.toString()}` : baseTagUrl;
-  const fragmentParams = new URLSearchParams({
-    tag: tagName,
-  });
-  if (tagHash) {
-    fragmentParams.set("tag_hash", tagHash);
-  }
-  const fragmentUrl = `/fragments/tags/${day}/detail?${fragmentParams.toString()}`;
+  if (!fragmentUrl) return null;
   return { tagUrl, fragmentUrl };
 };
 
@@ -270,20 +243,6 @@ const createTagRow = (item, { queryTokens = [], activeTag = "" } = {}) => {
   row.appendChild(countEl);
   return row;
 };
-
-const normalizeSortKind = (value) =>
-  String(value || "")
-    .trim()
-    .toLowerCase() === "count"
-    ? "count"
-    : "alpha";
-
-const normalizeSortDir = (value) =>
-  String(value || "")
-    .trim()
-    .toLowerCase() === "desc"
-    ? "desc"
-    : "asc";
 
 const compareItems = (a, b, kind, dir) => {
   const nameA = a.name.toLowerCase();
@@ -640,13 +599,13 @@ export const syncSortStateFromDom = (root = document) => {
   const detailDir = detail?.dataset?.sortDir;
   const listKind = list?.dataset?.sortKind;
   const listDir = list?.dataset?.sortDir;
-  const stored = readStoredSort();
+  const stored = readTagsSortState();
   const rawKind = stored?.sortKind || listKind || detailKind;
   const rawDir = stored?.sortDir || listDir || detailDir;
   const prevKind = state.sortKind;
   const prevDir = state.sortDir;
-  state.sortKind = rawKind ? normalizeSortKind(rawKind) : state.sortKind || "count";
-  state.sortDir = rawDir ? normalizeSortDir(rawDir) : state.sortDir || "desc";
+  state.sortKind = rawKind ? normalizeTagsSortKind(rawKind) : state.sortKind || "count";
+  state.sortDir = rawDir ? normalizeTagsSortDir(rawDir) : state.sortDir || "desc";
   if (detail) {
     detail.dataset.sortKind = state.sortKind;
     detail.dataset.sortDir = state.sortDir;
@@ -655,7 +614,10 @@ export const syncSortStateFromDom = (root = document) => {
     list.dataset.sortKind = state.sortKind;
     list.dataset.sortDir = state.sortDir;
   }
-  persistStoredSort(state.sortKind, state.sortDir);
+  writeTagsSortState({
+    sortKind: state.sortKind,
+    sortDir: state.sortDir,
+  });
   if (prevKind !== state.sortKind || prevDir !== state.sortDir) {
     state.listBuilt = false;
   }
@@ -666,16 +628,19 @@ export const updateSortButtons = (root = document) => {
   if (!sidebar) return;
   sidebar.querySelectorAll("[data-tags-sort-kind][data-tags-sort-dir]").forEach((button) => {
     const isActive =
-      normalizeSortKind(button.dataset.tagsSortKind) === state.sortKind &&
-      normalizeSortDir(button.dataset.tagsSortDir) === state.sortDir;
+      normalizeTagsSortKind(button.dataset.tagsSortKind) === state.sortKind &&
+      normalizeTagsSortDir(button.dataset.tagsSortDir) === state.sortDir;
     button.classList.toggle("is-active", isActive);
   });
 };
 
 export const applySort = (kind, dir, { updateUrl = true, refreshSearch = true } = {}) => {
-  state.sortKind = normalizeSortKind(kind);
-  state.sortDir = normalizeSortDir(dir);
-  persistStoredSort(state.sortKind, state.sortDir);
+  state.sortKind = normalizeTagsSortKind(kind);
+  state.sortDir = normalizeTagsSortDir(dir);
+  writeTagsSortState({
+    sortKind: state.sortKind,
+    sortDir: state.sortDir,
+  });
   const detail = findDetail();
   if (detail) {
     detail.dataset.sortKind = state.sortKind;
@@ -692,8 +657,8 @@ export const applySort = (kind, dir, { updateUrl = true, refreshSearch = true } 
 };
 
 export const requestSort = (kind, dir) => {
-  const nextKind = normalizeSortKind(kind);
-  const nextDir = normalizeSortDir(dir);
+  const nextKind = normalizeTagsSortKind(kind);
+  const nextDir = normalizeTagsSortDir(dir);
 
   const detail = findDetail();
   const list = findList();
@@ -707,7 +672,10 @@ export const requestSort = (kind, dir) => {
 
   state.sortKind = nextKind;
   state.sortDir = nextDir;
-  persistStoredSort(state.sortKind, state.sortDir);
+  writeTagsSortState({
+    sortKind: state.sortKind,
+    sortDir: state.sortDir,
+  });
   if (detail) {
     detail.dataset.sortKind = nextKind;
     detail.dataset.sortDir = nextDir;
@@ -717,7 +685,7 @@ export const requestSort = (kind, dir) => {
     list.dataset.sortDir = nextDir;
   }
   updateSortButtons();
-  refreshDetailLinksForSort(document);
+  refreshDetailLinksForNav(document);
   hydrateIndexFromTemplate(document);
   applySearch(state.query);
   if (selectedTag) {
@@ -737,6 +705,6 @@ export const animateListReorder = (onFinish) => {
 };
 
 export const normalizeSort = {
-  kind: normalizeSortKind,
-  dir: normalizeSortDir,
+  kind: normalizeTagsSortKind,
+  dir: normalizeTagsSortDir,
 };

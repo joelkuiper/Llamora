@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Mapping
+from urllib.parse import urlencode
 
 from quart import abort, g
 
@@ -9,6 +10,9 @@ from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.validators import parse_iso_date
 from llamora.app.services.session_context import SessionContext, get_session_context
 from llamora.app.util.tags import emoji_shortcode
+
+DEFAULT_TAGS_SORT_KIND = "count"
+DEFAULT_TAGS_SORT_DIR = "desc"
 
 
 def require_iso_date(raw: str) -> str:
@@ -80,19 +84,57 @@ def build_view_state(
     return state
 
 
+def normalize_tags_sort(
+    *,
+    sort_kind: str | None = None,
+    sort_dir: str | None = None,
+) -> tuple[str, str]:
+    """Return canonical tags sort values."""
+
+    tag_service = get_tag_service()
+    return (
+        tag_service.normalize_tags_sort_kind(sort_kind or DEFAULT_TAGS_SORT_KIND),
+        tag_service.normalize_tags_sort_dir(sort_dir or DEFAULT_TAGS_SORT_DIR),
+    )
+
+
+def build_tags_context_query(
+    *,
+    day: str | None = None,
+    tag: str | None = None,
+    target: str | None = None,
+) -> str:
+    """Build canonical tags context query string."""
+
+    params: dict[str, str] = {}
+    if day:
+        params["day"] = day
+    if tag:
+        params["tag"] = tag
+    if target:
+        params["target"] = target
+    if not params:
+        return ""
+    return f"?{urlencode(params)}"
+
+
 async def build_tags_catalog_payload(
     ctx: CryptoContext,
     *,
-    sort_kind: str = "count",
-    sort_dir: str = "desc",
+    sort_kind: str = DEFAULT_TAGS_SORT_KIND,
+    sort_dir: str = DEFAULT_TAGS_SORT_DIR,
 ) -> list[dict[str, str | int]]:
     """Build the shared tags catalog payload for frontend consumers."""
 
     tag_service = get_tag_service()
+    normalized_kind, normalized_dir = normalize_tags_sort(
+        sort_kind=sort_kind,
+        sort_dir=sort_dir,
+    )
     items = await tag_service.get_tags_index_items(
         ctx,
-        sort_kind=tag_service.normalize_tags_sort_kind(sort_kind),
-        sort_dir=tag_service.normalize_tags_sort_dir(sort_dir),
+        sort_kind=normalized_kind,
+        sort_dir=normalized_dir,
     )
     payload: list[dict[str, str | int]] = []
     for item in items:

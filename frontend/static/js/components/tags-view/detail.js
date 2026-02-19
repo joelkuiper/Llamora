@@ -1,3 +1,4 @@
+import { normalizeTagsSortDir, normalizeTagsSortKind } from "../../services/tags-sort-store.js";
 import { formatTimeElements } from "../../services/time.js";
 import { armEntryAnimations, armInitialEntryAnimations } from "../entries-view/entry-animations.js";
 import { findDetail, findList } from "./dom.js";
@@ -6,20 +7,6 @@ import { state } from "./state.js";
 
 export const getSelectedTrace = (root = document) =>
   String(findDetail(root)?.dataset?.selectedTag || "").trim();
-
-const normalizeSortKind = (value) =>
-  String(value || "")
-    .trim()
-    .toLowerCase() === "count"
-    ? "count"
-    : "alpha";
-
-const normalizeSortDir = (value) =>
-  String(value || "")
-    .trim()
-    .toLowerCase() === "desc"
-    ? "desc"
-    : "asc";
 
 const readSortFromDom = (root = document) => {
   const detail = findDetail(root);
@@ -31,12 +18,12 @@ const readSortFromDom = (root = document) => {
   const rawKind = listKind || detailKind;
   const rawDir = listDir || detailDir;
   return {
-    kind: rawKind ? normalizeSortKind(rawKind) : state.sortKind || "count",
-    dir: rawDir ? normalizeSortDir(rawDir) : state.sortDir || "desc",
+    kind: rawKind ? normalizeTagsSortKind(rawKind) : state.sortKind || "count",
+    dir: rawDir ? normalizeTagsSortDir(rawDir) : state.sortDir || "desc",
   };
 };
 
-export const refreshDetailLinksForSort = (root = document) => {
+export const refreshDetailLinksForNav = (root = document) => {
   const detail = findDetail(root);
   if (!detail) return;
   detail.querySelectorAll(".tags-view__related-link, .tags-view__entry-tag").forEach((link) => {

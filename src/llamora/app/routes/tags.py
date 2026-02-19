@@ -9,7 +9,6 @@ from quart import (
     url_for,
     make_response,
 )
-from urllib.parse import urlencode
 from llamora.app.services.container import (
     get_services,
     get_lockbox_store,
@@ -31,8 +30,12 @@ from llamora.app.services.time import local_date
 from llamora.settings import settings
 from llamora.app.routes.helpers import require_iso_date
 from llamora.app.routes.helpers import (
+    DEFAULT_TAGS_SORT_DIR,
+    DEFAULT_TAGS_SORT_KIND,
+    build_tags_context_query,
     build_view_state,
     ensure_entry_exists,
+    normalize_tags_sort,
     require_encryption_context,
 )
 from llamora.app.services.cache_registry import (
@@ -74,18 +77,16 @@ def _parse_positive_int(
 
 
 def _parse_view_context() -> dict[str, str | dict[str, str]] | None:
-    view = str(request.args.get("view") or "").strip().lower()
-    if not view:
-        view = "tags" if str(request.args.get("day") or "").strip() else ""
-    if not view:
+    raw_day = str(request.args.get("day") or "").strip()
+    if not raw_day:
         return None
-    day = _resolve_view_day(request.args.get("day"))
+    day = _resolve_view_day(raw_day)
     params: dict[str, str] = {"day": day}
-    for key in ("sort_kind", "sort_dir", "tag", "target"):
+    for key in ("tag", "target"):
         value = str(request.args.get(key) or "").strip()
         if value:
             params[key] = value
-    return {"view": view, "day": day, "params": params}
+    return {"view": "tags", "day": day, "params": params}
 
 
 def _build_view_context_query(
@@ -96,7 +97,11 @@ def _build_view_context_query(
     payload = context.get("params")
     if not isinstance(payload, dict):
         return ""
-    return f"?{urlencode(payload)}"
+    return build_tags_context_query(
+        day=str(payload.get("day") or ""),
+        tag=str(payload.get("tag") or ""),
+        target=str(payload.get("target") or ""),
+    )
 
 
 def _catalog_payload_from_index_items(
@@ -160,11 +165,10 @@ async def _render_tags_page(selected_tag: str | None):
     min_date = await services.db.entries.get_first_entry_date(user["id"]) or today
     is_first_day = day == min_date
     tag_service = _tags()
-    sort_kind = tag_service.normalize_tags_sort_kind(request.args.get("sort_kind"))
-    sort_dir = tag_service.normalize_tags_sort_dir(request.args.get("sort_dir"))
-    legacy_sort = tag_service.normalize_legacy_sort(request.args.get("sort"))
-    if legacy_sort is not None:
-        sort_kind, sort_dir = legacy_sort
+    sort_kind, sort_dir = normalize_tags_sort(
+        sort_kind=DEFAULT_TAGS_SORT_KIND,
+        sort_dir=DEFAULT_TAGS_SORT_DIR,
+    )
     selected = tag_service.normalize_tag_query(
         selected_tag or (request.args.get("tag") or "")
     )
@@ -208,14 +212,14 @@ async def _render_tags_page(selected_tag: str | None):
         "tags_sort_dir": sort_dir,
         "tags_catalog_items": tags_index_payload,
         "target": target_param,
+        "tags_day_query": build_tags_context_query(day=day),
+        "tags_selected_query": build_tags_context_query(day=day, tag=selected),
         "activity_heatmap": activity_heatmap,
         "heatmap_offset": heatmap_offset,
         "view_state": build_view_state(
             view="tags",
             day=day,
             selected_tag=selected,
-            sort_kind=sort_kind,
-            sort_dir=sort_dir,
             target=target_param,
         ),
     }
@@ -257,34 +261,34 @@ async def emoji_shortcodes_suggest():
 async def _load_tags_view_from_context(
     ctx: CryptoContext,
     context: dict[str, str | dict[str, str]],
-) -> tuple[TagsViewData, str, str, int]:
+) -> tuple[TagsViewData, int]:
     params = context.get("params")
     if not isinstance(params, dict):
         raise ValueError("invalid context params")
-    tag_service = _tags()
-    sort_kind = tag_service.normalize_tags_sort_kind(params.get("sort_kind"))
-    sort_dir = tag_service.normalize_tags_sort_dir(params.get("sort_dir"))
-    legacy_sort = tag_service.normalize_legacy_sort(params.get("sort"))
-    if legacy_sort is not None:
-        sort_kind, sort_dir = legacy_sort
+    sort_kind, sort_dir = normalize_tags_sort(
+        sort_kind=DEFAULT_TAGS_SORT_KIND,
+        sort_dir=DEFAULT_TAGS_SORT_DIR,
+    )
     entries_limit = DEFAULT_TAG_ENTRIES_LIMIT
-    selected_tag = tag_service.normalize_tag_query(params.get("tag"))
-    tags_view = await tag_service.get_tags_view_data(
+    selected_tag = _tags().normalize_tag_query(params.get("tag"))
+    tags_view = await _tags().get_tags_view_data(
         ctx,
         selected_tag,
         sort_kind=sort_kind,
         sort_dir=sort_dir,
         entry_limit=entries_limit,
     )
-    return tags_view, sort_kind, sort_dir, entries_limit
+    return tags_view, entries_limit
 
 
 async def _render_tags_detail_and_list_oob_updates(
     ctx: CryptoContext,
     context: dict[str, str | dict[str, str]],
 ) -> str:
-    tags_view, sort_kind, sort_dir, entries_limit = await _load_tags_view_from_context(
-        ctx, context
+    tags_view, entries_limit = await _load_tags_view_from_context(ctx, context)
+    sort_kind, sort_dir = normalize_tags_sort(
+        sort_kind=DEFAULT_TAGS_SORT_KIND,
+        sort_dir=DEFAULT_TAGS_SORT_DIR,
     )
     presented_tags_view = present_tags_view_data(tags_view)
     return await render_template(
@@ -297,12 +301,15 @@ async def _render_tags_detail_and_list_oob_updates(
         entries_limit=entries_limit,
         oob_detail=True,
         oob_view_state=True,
+        tags_day_query=build_tags_context_query(day=str(context["day"])),
+        tags_selected_query=build_tags_context_query(
+            day=str(context["day"]),
+            tag=tags_view.selected_tag,
+        ),
         view_state=build_view_state(
             view="tags",
             day=str(context["day"]),
             selected_tag=tags_view.selected_tag,
-            sort_kind=sort_kind,
-            sort_dir=sort_dir,
         ),
         today=local_date().isoformat(),
     )
@@ -564,11 +571,10 @@ async def delete_trace(tag_hash: str):
         raise AssertionError("unreachable") from exc
 
     tag_service = _tags()
-    sort_kind = tag_service.normalize_tags_sort_kind(request.args.get("sort_kind"))
-    sort_dir = tag_service.normalize_tags_sort_dir(request.args.get("sort_dir"))
-    legacy_sort = tag_service.normalize_legacy_sort(request.args.get("sort"))
-    if legacy_sort is not None:
-        sort_kind, sort_dir = legacy_sort
+    sort_kind, sort_dir = normalize_tags_sort(
+        sort_kind=DEFAULT_TAGS_SORT_KIND,
+        sort_dir=DEFAULT_TAGS_SORT_DIR,
+    )
 
     index_before_delete = await tag_service.get_tags_index_items(
         ctx,
@@ -627,6 +633,8 @@ async def delete_trace(tag_hash: str):
         tags_sort_kind=sort_kind,
         tags_sort_dir=sort_dir,
         entries_limit=entries_limit,
+        tags_day_query=build_tags_context_query(day=day),
+        tags_selected_query=build_tags_context_query(day=day, tag=selected_tag),
         today=local_date().isoformat(),
     )
     response = await make_response(html)
@@ -774,11 +782,10 @@ async def tags_view_detail_fragment(date: str):
     normalized_date = require_iso_date(date)
     _, user, ctx = await require_encryption_context()
     tag_service = _tags()
-    sort_kind = tag_service.normalize_tags_sort_kind(request.args.get("sort_kind"))
-    sort_dir = tag_service.normalize_tags_sort_dir(request.args.get("sort_dir"))
-    legacy_sort = tag_service.normalize_legacy_sort(request.args.get("sort"))
-    if legacy_sort is not None:
-        sort_kind, sort_dir = legacy_sort
+    sort_kind, sort_dir = normalize_tags_sort(
+        sort_kind=DEFAULT_TAGS_SORT_KIND,
+        sort_dir=DEFAULT_TAGS_SORT_DIR,
+    )
     restore_entry = (request.args.get("restore_entry") or "").strip() or None
     tag_name = (request.args.get("tag") or "").strip() or None
     tag_hash_hex = (request.args.get("tag_hash") or "").strip() or None
@@ -828,13 +835,16 @@ async def tags_view_detail_fragment(date: str):
         entries_limit=DEFAULT_TAG_ENTRIES_LIMIT,
         heatmap_offset=heatmap_offset,
         activity_heatmap=activity_heatmap,
+        tags_day_query=build_tags_context_query(day=normalized_date),
+        tags_selected_query=build_tags_context_query(
+            day=normalized_date,
+            tag=selected_tag,
+        ),
         oob_view_state=True,
         view_state=build_view_state(
             view="tags",
             day=normalized_date,
             selected_tag=selected_tag,
-            sort_kind=sort_kind,
-            sort_dir=sort_dir,
         ),
         today=local_date().isoformat(),
     )
@@ -897,11 +907,10 @@ async def tags_view_detail_entries_chunk(date: str, tag_hash: str):
         raise AssertionError("unreachable") from exc
 
     tag_service = _tags()
-    sort_kind = tag_service.normalize_tags_sort_kind(request.args.get("sort_kind"))
-    sort_dir = tag_service.normalize_tags_sort_dir(request.args.get("sort_dir"))
     entries_limit = _parse_positive_int(
         request.args.get("limit"), default=12, min_value=6, max_value=60
     )
+    selected_tag = tag_service.normalize_tag_query(request.args.get("tag"))
     entries, next_cursor, has_more = await tag_service.get_archive_entries_page(
         ctx,
         [tag_hash_bytes],
@@ -914,13 +923,16 @@ async def tags_view_detail_entries_chunk(date: str, tag_hash: str):
         "components/tags/entries_chunk.html",
         day=normalized_date,
         entries=present_archive_entries(entries),
-        sort_kind=sort_kind,
-        sort_dir=sort_dir,
-        selected_tag=tag_service.normalize_tag_query(request.args.get("tag")),
+        selected_tag=selected_tag,
         tag_hash=tag_hash,
         has_more=has_more,
         next_cursor=next_cursor,
         entries_limit=entries_limit,
         page_size=entries_limit,
+        tags_day_query=build_tags_context_query(day=normalized_date),
+        tags_selected_query=build_tags_context_query(
+            day=normalized_date,
+            tag=selected_tag,
+        ),
         today=local_date().isoformat(),
     )

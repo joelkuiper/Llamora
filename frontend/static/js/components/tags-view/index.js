@@ -5,7 +5,7 @@ import { clearScrollTarget, flashHighlight } from "../../ui.js";
 import {
   animateDetailEntries,
   getSelectedTrace,
-  refreshDetailLinksForSort,
+  refreshDetailLinksForNav,
   setSelectedTagCount,
   syncFromDetail,
   updateSelectedTagCounts,
@@ -192,7 +192,7 @@ const syncListOnly = (root = document) => {
   buildSearchIndex(root);
   applySearch(state.query);
   ensureActiveTagVisible(root);
-  refreshDetailLinksForSort(root);
+  refreshDetailLinksForNav(root);
   const pending = getPendingTagHighlight();
   if (pending && findRowByTagName(pending)) {
     setActiveTag(pending, root, { behavior: "smooth", scroll: true });

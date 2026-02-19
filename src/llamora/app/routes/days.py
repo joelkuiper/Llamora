@@ -78,11 +78,7 @@ async def _render_day(date: str, target: str | None, view_kind: str):
         view_kind=view_kind,
     )
     entries_html = await entries_response.get_data(as_text=True)
-    tags_catalog_items = await build_tags_catalog_payload(
-        ctx,
-        sort_kind="count",
-        sort_dir="desc",
-    )
+    tags_catalog_items = await build_tags_catalog_payload(ctx)
     context = {
         "day": date,
         "is_today": date == today,
