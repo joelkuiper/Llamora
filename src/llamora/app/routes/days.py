@@ -1,5 +1,5 @@
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable, Coroutine
 from logging import getLogger
 
 import orjson
@@ -39,7 +39,7 @@ _day_summary_singleflight_lock = asyncio.Lock()
 
 async def _run_day_summary_singleflight(
     key: tuple[str, str, str],
-    producer: Callable[[], Awaitable[str]],
+    producer: Callable[[], Coroutine[object, object, str]],
 ) -> str:
     async with _day_summary_singleflight_lock:
         task = _day_summary_singleflight.get(key)

@@ -7,14 +7,15 @@ from quart import abort, g, request
 
 from llamora.app.services.container import get_tag_service
 from llamora.app.services.crypto import CryptoContext
+from llamora.app.services.tag_service import TagsSortDirection, TagsSortKind
 from llamora.app.services.validators import parse_iso_date
 from llamora.app.services.session_context import SessionContext, get_session_context
 from llamora.app.util.tags import emoji_shortcode
 from llamora.app.util.number import parse_positive_float
 from llamora.settings import settings
 
-DEFAULT_TAGS_SORT_KIND = "count"
-DEFAULT_TAGS_SORT_DIR = "desc"
+DEFAULT_TAGS_SORT_KIND: TagsSortKind = "count"
+DEFAULT_TAGS_SORT_DIR: TagsSortDirection = "desc"
 DEFAULT_SUMMARY_TIMEOUT_SECONDS = 30.0
 
 
@@ -90,7 +91,7 @@ def normalize_tags_sort(
     *,
     sort_kind: str | None = None,
     sort_dir: str | None = None,
-) -> tuple[str, str]:
+) -> tuple[TagsSortKind, TagsSortDirection]:
     """Return canonical tags sort values."""
 
     tag_service = get_tag_service()
@@ -132,8 +133,8 @@ def get_summary_timeout_seconds() -> float:
 async def build_tags_catalog_payload(
     ctx: CryptoContext,
     *,
-    sort_kind: str = DEFAULT_TAGS_SORT_KIND,
-    sort_dir: str = DEFAULT_TAGS_SORT_DIR,
+    sort_kind: TagsSortKind = DEFAULT_TAGS_SORT_KIND,
+    sort_dir: TagsSortDirection = DEFAULT_TAGS_SORT_DIR,
 ) -> list[dict[str, str | int]]:
     """Build the shared tags catalog payload for frontend consumers."""
 

@@ -99,7 +99,7 @@ async def rotate_dek(
     await db.users.update_password_wrap(
         user_id, password_hash, pw_salt, pw_nonce, pw_cipher
     )
-    if rc_salt is not None:
+    if rc_salt is not None and rc_nonce is not None and rc_cipher is not None:
         await db.users.update_recovery_wrap(user_id, rc_salt, rc_nonce, rc_cipher)
 
     await db.users.set_current_epoch(user_id, new_epoch)

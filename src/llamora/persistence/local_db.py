@@ -228,7 +228,10 @@ class LocalDB:
         self, ctx: CryptoContext, entry_id: str, plaintext: str
     ) -> None:
         try:
-            await self.search_api.enqueue_index_job(ctx, entry_id, plaintext)
+            search_api = self.search_api
+            if search_api is None:
+                return
+            await search_api.enqueue_index_job(ctx, entry_id, plaintext)
         except Exception:
             logger.exception("Failed to enqueue index job for %s", entry_id)
         finally:

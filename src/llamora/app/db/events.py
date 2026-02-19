@@ -3,11 +3,11 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import defaultdict
-from typing import Any, Awaitable, Callable, Coroutine, Dict, List, Tuple, TypedDict
+from typing import Any, Callable, Coroutine, Dict, List, Tuple, TypedDict
 
 from ulid import ULID
 
-EventHandler = Callable[..., Awaitable[None]]
+EventHandler = Callable[..., Coroutine[Any, Any, None]]
 
 ENTRY_INSERTED_EVENT = "entry.inserted"
 ENTRY_UPDATED_EVENT = "entry.updated"

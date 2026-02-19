@@ -90,7 +90,7 @@ class VectorSearchService:
         query_vec: "np.ndarray | None" = None,
         *,
         include_count: Literal[False] = False,
-        include_coverage: bool = False,
+        include_coverage: Literal[False] = False,
     ) -> list[dict[str, Any]]: ...
 
     @overload
@@ -103,7 +103,7 @@ class VectorSearchService:
         query_vec: "np.ndarray | None" = None,
         *,
         include_count: Literal[True] = True,
-        include_coverage: bool = False,
+        include_coverage: Literal[False] = False,
     ) -> tuple[list[dict[str, Any]], int]: ...
 
     @overload
@@ -115,9 +115,22 @@ class VectorSearchService:
         k2: int | None = None,
         query_vec: "np.ndarray | None" = None,
         *,
-        include_count: bool,
+        include_count: Literal[False] = False,
         include_coverage: Literal[True],
-    ) -> tuple[list[dict[str, Any]], int | None, dict[str, float | int | str]]: ...
+    ) -> tuple[list[dict[str, Any]], None, dict[str, float | int | str]]: ...
+
+    @overload
+    async def search_candidates(
+        self,
+        ctx: CryptoContext,
+        query: str,
+        k1: int | None = None,
+        k2: int | None = None,
+        query_vec: "np.ndarray | None" = None,
+        *,
+        include_count: Literal[True],
+        include_coverage: Literal[True],
+    ) -> tuple[list[dict[str, Any]], int, dict[str, float | int | str]]: ...
 
     async def search_candidates(
         self,
@@ -129,6 +142,11 @@ class VectorSearchService:
         *,
         include_count: bool = False,
         include_coverage: bool = False,
+    ) -> (
+        list[dict[str, Any]]
+        | tuple[list[dict[str, Any]], int]
+        | tuple[list[dict[str, Any]], None, dict[str, float | int | str]]
+        | tuple[list[dict[str, Any]], int, dict[str, float | int | str]]
     ):
         user_id = ctx.user_id
         cfg = self._config.progressive
