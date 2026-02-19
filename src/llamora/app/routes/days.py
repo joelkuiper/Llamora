@@ -5,6 +5,7 @@ from logging import getLogger
 import orjson
 from quart import (
     Blueprint,
+    abort,
     make_response,
     redirect,
     render_template,
@@ -17,6 +18,7 @@ from llamora.app.services.auth_helpers import login_required
 from llamora.app.routes.helpers import (
     build_view_state,
     build_tags_catalog_payload,
+    get_summary_timeout_seconds,
     require_encryption_context,
     require_iso_date,
 )
@@ -29,6 +31,7 @@ from llamora.app.services.time import local_date
 days_bp = Blueprint("days", __name__)
 logger = getLogger(__name__)
 
+# Process-local deduplication only; not shared across multiple workers/processes.
 _day_summary_singleflight: dict[tuple[str, str, str], asyncio.Task[str]] = {}
 _day_summary_singleflight_lock = asyncio.Lock()
 
@@ -39,6 +42,9 @@ async def _run_day_summary_singleflight(
 ) -> str:
     async with _day_summary_singleflight_lock:
         task = _day_summary_singleflight.get(key)
+        if task is not None and task.done():
+            _day_summary_singleflight.pop(key, None)
+            task = None
         if task is None:
             task = asyncio.create_task(producer())
             _day_summary_singleflight[key] = task
@@ -47,8 +53,7 @@ async def _run_day_summary_singleflight(
         return await task
     finally:
         async with _day_summary_singleflight_lock:
-            if _day_summary_singleflight.get(key) is task:
-                _day_summary_singleflight.pop(key, None)
+            _day_summary_singleflight.pop(key, None)
 
 
 @days_bp.route("/")
@@ -194,6 +199,7 @@ async def day_summary(date):
     services = get_services()
     user_id = user["id"]
     summarize = get_summarize_service()
+    summary_timeout_seconds = get_summary_timeout_seconds()
     digest = await summarize.get_day_digest(ctx, normalized_date)
 
     cached_summary = await summarize.get_cached(
@@ -215,19 +221,27 @@ async def day_summary(date):
             ctx, normalized_date
         )
         text = (
-            await generate_day_summary(
-                services.llm_service.llm,
-                normalized_date,
-                entries,
+            await asyncio.wait_for(
+                generate_day_summary(
+                    services.llm_service.llm,
+                    normalized_date,
+                    entries,
+                ),
+                timeout=summary_timeout_seconds,
             )
         ).strip()
         await summarize.cache(ctx, "summary", f"day:{normalized_date}", digest, text)
         return text
 
-    summary = await _run_day_summary_singleflight(
-        (user_id, normalized_date, digest),
-        _generate_and_cache_summary,
-    )
+    try:
+        summary = await _run_day_summary_singleflight(
+            (user_id, normalized_date, digest),
+            _generate_and_cache_summary,
+        )
+    except asyncio.TimeoutError as exc:
+        logger.warning("Day summary generation timed out for date=%s", normalized_date)
+        abort(504, description="Summary generation timed out.")
+        raise AssertionError("unreachable") from exc
     payload = {"summary": summary or ""}
     resp = await make_response(orjson.dumps(payload), 200)
     resp.mimetype = "application/json"

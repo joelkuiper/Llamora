@@ -10,9 +10,12 @@ from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.validators import parse_iso_date
 from llamora.app.services.session_context import SessionContext, get_session_context
 from llamora.app.util.tags import emoji_shortcode
+from llamora.app.util.number import parse_positive_float
+from llamora.settings import settings
 
 DEFAULT_TAGS_SORT_KIND = "count"
 DEFAULT_TAGS_SORT_DIR = "desc"
+DEFAULT_SUMMARY_TIMEOUT_SECONDS = 30.0
 
 
 def require_iso_date(raw: str) -> str:
@@ -116,6 +119,15 @@ def build_tags_context_query(
     if not params:
         return ""
     return f"?{urlencode(params)}"
+
+
+def get_summary_timeout_seconds() -> float:
+    """Return the configured timeout for synchronous summary generation."""
+
+    configured = parse_positive_float(settings.get("LLM.summary.timeout_seconds"))
+    if configured is None:
+        return DEFAULT_SUMMARY_TIMEOUT_SECONDS
+    return min(configured, 300.0)
 
 
 async def build_tags_catalog_payload(

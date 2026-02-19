@@ -62,6 +62,18 @@ def _validate_llm_chat_settings() -> Iterable[str]:
                 yield "LLM.chat.max_retries must be between 0 and 10."
 
 
+def _validate_llm_summary_settings() -> Iterable[str]:
+    timeout = _get_value(settings, "LLM.summary.timeout_seconds")
+    if timeout is None:
+        return
+    timeout_value = coerce_float(timeout)
+    if timeout_value is None:
+        yield "LLM.summary.timeout_seconds must be a number."
+        return
+    if timeout_value <= 0 or timeout_value > 300:
+        yield "LLM.summary.timeout_seconds must be between 1 and 300 seconds."
+
+
 def _validate_secrets() -> Iterable[str]:
     secret_key = _normalise_text(settings.get("SECRET_KEY"))
     if not secret_key:
@@ -88,6 +100,7 @@ def validate_settings() -> list[str]:
     errors: list[str] = []
     errors.extend(_validate_llm_upstream())
     errors.extend(_validate_llm_chat_settings())
+    errors.extend(_validate_llm_summary_settings())
     errors.extend(_validate_secrets())
     return errors
 

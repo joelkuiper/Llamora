@@ -308,10 +308,10 @@ async def send_entry(date):
                 dt = dt.replace(tzinfo=ZoneInfo(tz))
             created_at = dt.isoformat()
             created_date = dt.astimezone(ZoneInfo(tz)).date().isoformat()
-        except Exception:
-            logger.exception("Failed to parse user_time; falling back to server time")
-            created_at = None
-            created_date = date
+        except Exception as exc:
+            logger.warning("Invalid user_time format: %s", user_time)
+            abort(400, description="Invalid user_time timestamp.")
+            raise AssertionError("unreachable") from exc
     try:
         entry_id = await get_services().db.entries.append_entry(
             ctx,

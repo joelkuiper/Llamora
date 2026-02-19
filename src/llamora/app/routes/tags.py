@@ -1,3 +1,4 @@
+import asyncio
 import datetime as dt
 import json
 
@@ -35,6 +36,7 @@ from llamora.app.routes.helpers import (
     build_tags_context_query,
     build_view_state,
     ensure_entry_exists,
+    get_summary_timeout_seconds,
     normalize_tags_sort,
     require_encryption_context,
 )
@@ -729,6 +731,7 @@ async def tag_detail_summary(tag_hash: str):
     num_words = max(18, min(num_words, 160))
 
     summarize = get_summarize_service()
+    summary_timeout_seconds = get_summary_timeout_seconds()
     summary_cache_key = f"tag:{tag_hash}:w{num_words}"
     summary_cache_namespace = "summary"
     summary_digest = overview.summary_digest
@@ -745,14 +748,21 @@ async def tag_detail_summary(tag_hash: str):
             return cached_html
 
     llm = get_services().llm_service.llm
-    summary = await generate_tag_summary(
-        llm,
-        overview.name,
-        overview.count,
-        overview.last_used,
-        overview.entries,
-        num_words=num_words,
-    )
+    try:
+        summary = await asyncio.wait_for(
+            generate_tag_summary(
+                llm,
+                overview.name,
+                overview.count,
+                overview.last_used,
+                overview.entries,
+                num_words=num_words,
+            ),
+            timeout=summary_timeout_seconds,
+        )
+    except asyncio.TimeoutError as exc:
+        abort(504, description="Summary generation timed out.")
+        raise AssertionError("unreachable") from exc
     html = await render_template(
         "components/tags/tag_detail_summary.html",
         summary=summary,
