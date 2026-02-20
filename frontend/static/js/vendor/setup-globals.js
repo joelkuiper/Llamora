@@ -49,6 +49,7 @@ const vendorSpecs = [
   { path: "markdown-it-task-lists.min.js", globals: ["markdownitTaskLists"] },
   { path: "purify.min.js", globals: ["DOMPurify"] },
   { path: "floating-ui.min.js", globals: ["FloatingUIDOM"] },
+  { path: "emoji-mart.min.js", globals: ["EmojiMart"] },
 ];
 
 for (const spec of vendorSpecs) {
@@ -69,6 +70,7 @@ const resolvedGlobals = {
   markdownitTaskLists: globalScope.markdownitTaskLists,
   DOMPurify: globalScope.DOMPurify,
   FloatingUIDOM: globalScope.FloatingUIDOM?.default || globalScope.FloatingUIDOM,
+  EmojiMart: globalScope.EmojiMart,
 };
 
 const requiredGlobals = [
@@ -98,4 +100,5 @@ export const offset = resolvedGlobals.FloatingUIDOM?.offset;
 export const flip = resolvedGlobals.FloatingUIDOM?.flip;
 export const shift = resolvedGlobals.FloatingUIDOM?.shift;
 export const size = resolvedGlobals.FloatingUIDOM?.size;
+export const EmojiMart = resolvedGlobals.EmojiMart;
 export default resolvedGlobals;

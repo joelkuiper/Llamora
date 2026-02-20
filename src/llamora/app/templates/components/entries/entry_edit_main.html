@@ -16,6 +16,13 @@
                 maxlength="{{ config.MAX_MESSAGE_LENGTH }}"
                 autofocus>{{- e.get('text', '') | e -}}</textarea>
       <div class="entry-edit-strip">
+        <button type="button"
+                class="entry-edit-emoji"
+                data-entry-emoji-trigger
+                aria-label="Insert emoji">
+          <span aria-hidden="true">🙂</span>
+          <span class="entry-edit-label">Emoji</span>
+        </button>
         <button type="submit"
                 class="entry-edit-save"
                 aria-label="Save entry">

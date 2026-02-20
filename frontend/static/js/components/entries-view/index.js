@@ -5,6 +5,7 @@ import "../search-overlay.js";
 import "../scroll-edge-button.js";
 import "../entry-tags.js";
 import "../entry-edit-autosize.js";
+import "../entry-emoji-picker.js";
 import "../char-counter.js";
 
 function registerEntryElements() {

@@ -30,7 +30,7 @@ class EntryFormElement extends ReactiveElement {
     this.#connected = true;
     this.#form = this.querySelector("form");
     this.#textarea = this.#form?.querySelector("textarea");
-    this.#button = this.#form?.querySelector("button");
+    this.#button = this.#form?.querySelector("button[type='submit']");
     this.#errors = getAlertContainer();
     if (!this.#date && this.dataset.date) {
       this.#date = this.dataset.date;

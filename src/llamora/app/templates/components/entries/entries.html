@@ -24,6 +24,13 @@
                     maxlength="{{ config.MAX_MESSAGE_LENGTH }}"></textarea>
           <input type="hidden" name="user_time" id="user-time" />
           <div class="entry-submit-stack">
+            <button class="btn entry-emoji-btn"
+                    type="button"
+                    data-entry-emoji-trigger
+                    aria-label="Insert emoji"
+                    title="Insert emoji">
+              <span class="entry-emoji-btn__glyph" aria-hidden="true">🙂</span>
+            </button>
             <button id="send-btn" class="btn" type="submit" aria-label="Send"{% if not is_today %} disabled{% endif %}>
               <span class="icon-mask icon-feather send-icon" aria-hidden="true"></span>
             </button>
