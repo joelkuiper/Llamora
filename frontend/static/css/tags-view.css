@@ -514,10 +514,17 @@
   font-size: 0.8rem;
 }
 
-.tags-view__detail {
+/* Stable flex-child wrapper that survives #tags-view-detail outerHTML swaps.
+   The loader lives here as position:absolute so it is always correctly sized
+   without any JS geometry measurement. */
+.tags-view__detail-area {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
+  position: relative;
+}
+
+.tags-view__detail {
   position: relative;
 }
 
@@ -1268,8 +1275,16 @@
   border-radius: 0.72rem;
 }
 
-.tags-view__detail > .tags-view__loading {
-  border-radius: 0.9rem;
+.tags-view__loading--anchored {
+  /* Covers exactly .tags-view__detail-area — no JS geometry needed. */
+  position: absolute;
+  inset: 0;
+  z-index: 24;
+  /* overflow:clip clips the backdrop without creating a scroll container,
+     so position:sticky on the panel still uses #main-content. */
+  overflow: clip;
+  /* Override display:flex from .entries-loading; the panel uses sticky. */
+  display: block;
 }
 
 .tags-view__loading .entries-loading__backdrop {
@@ -1284,6 +1299,21 @@
 
 .tags-view__loading .entries-loading__label {
   font-size: 0.78rem;
+}
+
+/* Keep the spinner panel centred in the visible viewport regardless of how
+   tall the detail content is or how far the user has scrolled.
+   - position:sticky makes the panel track the scroll container viewport.
+   - top:50vh keeps it near the vertical centre of the visible window.
+   - left:50% + translateX(-50%) centres it horizontally in the detail area.
+   - translateY(-50%) centres the panel on the sticky threshold.
+   This rule intentionally overrides the transform:translateY(0) above. */
+.tags-view__loading--anchored .entries-loading__panel {
+  position: sticky;
+  top: 38vh;
+  width: max-content;
+  margin-inline: auto;
+  transform: translateY(-50%);
 }
 
 #main-content[data-view="tags"].htmx-added .tags-view__sidebar-fixed,

@@ -40,7 +40,19 @@
       </div>
     </div>
   </aside>
-  {% include 'components/tags/detail.html' %}
+  <div class="tags-view__detail-area">
+    {% include 'components/tags/detail.html' %}
+    <div id="tags-view-detail-loading"
+         class="entries-loading tags-view__loading tags-view__loading--anchored"
+         hidden
+         aria-hidden="true">
+      <div class="entries-loading__backdrop" aria-hidden="true"></div>
+      <div class="entries-loading__panel" role="status" aria-live="polite">
+        <span class="entries-loading__spinner spinner" aria-hidden="true"></span>
+        <span class="entries-loading__label">Retrieving…</span>
+      </div>
+    </div>
+  </div>
 </section>
 <scroll-edge-button
   data-direction="up"
