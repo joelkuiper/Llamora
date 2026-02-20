@@ -468,6 +468,12 @@
   border-radius: 0.2em;
 }
 
+@media (prefers-color-scheme: dark) {
+  .tags-view__index-name mark {
+    color: color-mix(in srgb, var(--color-white) 86%, var(--color-text) 14%);
+  }
+}
+
 .tags-view__index-count {
   justify-self: end;
   font-size: 0.64rem;
