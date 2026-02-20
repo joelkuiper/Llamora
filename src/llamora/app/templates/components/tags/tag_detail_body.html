@@ -21,6 +21,18 @@
         {% endif %}
       </div>
       <div class="tag-detail__actions">
+        {% if entry_id %}
+          <button
+            class="tag-detail__action tag-detail__remove"
+            type="button"
+            data-tooltip-title="Remove trace"
+            aria-label="Remove trace {{ tag.name }}"
+            hx-delete="{{ url_for('tags.remove_tag', entry_id=entry_id, tag_hash=tag_hash) }}{{ context_query|default('') }}"
+            hx-target="entry-tags[data-entry-id='{{ entry_id }}'] .entry-tag[data-tag-hash='{{ tag_hash }}']"
+            hx-swap="outerHTML swap:0.15s">
+            <span class="icon-mask icon-bookmark-x" aria-hidden="true"></span>
+          </button>
+        {% endif %}
         {% if trace_url %}
           <a
             class="tag-detail__action tag-detail__goto"
@@ -34,18 +46,6 @@
             hx-push-url="true">
             <span class="icon-mask icon-tag" aria-hidden="true"></span>
           </a>
-        {% endif %}
-        {% if entry_id %}
-          <button
-            class="tag-detail__action tag-detail__remove"
-            type="button"
-            data-tooltip-title="Remove trace"
-            aria-label="Remove trace {{ tag.name }}"
-            hx-delete="{{ url_for('tags.remove_tag', entry_id=entry_id, tag_hash=tag_hash) }}{{ context_query|default('') }}"
-            hx-target="entry-tags[data-entry-id='{{ entry_id }}'] .entry-tag[data-tag-hash='{{ tag_hash }}']"
-            hx-swap="outerHTML swap:0.15s">
-            <span class="icon-mask icon-bookmark-x" aria-hidden="true"></span>
-          </button>
         {% endif %}
       </div>
     </div>
