@@ -15,6 +15,9 @@ import { requestListScroll, state } from "./state.js";
 import { buildTagDetailFragmentUrl, buildTagPageUrl } from "./tags-nav-url.js";
 
 const VIRTUAL_ITEM_HEIGHT_FALLBACK = 42;
+const SIDEBAR_REORDER_CLASS = "is-reordering";
+const SIDEBAR_REORDER_DURATION_MS = 180;
+let reorderAnimationTimer = 0;
 
 const ensureVirtualState = () => {
   state.visibleItems ??= [];
@@ -568,6 +571,9 @@ export const applySearch = (rawQuery) => {
   );
   state.listBuilt = true;
   renderVirtualList(document);
+  if (query !== previousQuery) {
+    animateListReorder();
+  }
 
   if (listBody && previousQuery && !query) {
     scrollActiveRowIntoView(document, "auto");
@@ -688,11 +694,13 @@ export const requestSort = (kind, dir) => {
   refreshDetailLinksForNav(document);
   hydrateIndexFromTemplate(document);
   applySearch(state.query);
-  if (selectedTag) {
-    ensureActiveRowPresent(selectedTag);
-    setActiveTag(selectedTag, document, { behavior: "auto", scroll: false });
-    scrollActiveRowIntoView(document, "smooth");
-  }
+  animateListReorder(() => {
+    if (selectedTag) {
+      ensureActiveRowPresent(selectedTag);
+      setActiveTag(selectedTag, document, { behavior: "auto", scroll: false });
+      scrollActiveRowIntoView(document, "smooth");
+    }
+  });
   syncTagsHistoryUrl({ selectedTag });
 };
 
@@ -701,7 +709,20 @@ export const captureListPositions = () => {
 };
 
 export const animateListReorder = (onFinish) => {
-  if (typeof onFinish === "function") onFinish();
+  const listBody = findListBody();
+  if (!(listBody instanceof HTMLElement) || prefersReducedMotion()) {
+    if (typeof onFinish === "function") onFinish();
+    return;
+  }
+  window.clearTimeout(reorderAnimationTimer);
+  listBody.classList.remove(SIDEBAR_REORDER_CLASS);
+  // Ensure restart when sorts are changed quickly in succession.
+  void listBody.offsetWidth;
+  listBody.classList.add(SIDEBAR_REORDER_CLASS);
+  reorderAnimationTimer = window.setTimeout(() => {
+    listBody.classList.remove(SIDEBAR_REORDER_CLASS);
+    if (typeof onFinish === "function") onFinish();
+  }, SIDEBAR_REORDER_DURATION_MS);
 };
 
 export const normalizeSort = {

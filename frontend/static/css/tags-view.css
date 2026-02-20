@@ -126,6 +126,24 @@
   transition: opacity var(--motion-gentle) ease;
 }
 
+.tags-view__list-body.is-reordering .tags-view__index-row {
+  animation: tags-sidebar-reorder 240ms ease both;
+}
+
+@keyframes tags-sidebar-reorder {
+  from {
+    opacity: 0.5;
+    filter: saturate(0.88);
+  }
+  60% {
+    opacity: 0.86;
+  }
+  to {
+    opacity: 1;
+    filter: saturate(1);
+  }
+}
+
 /* search animations handled via list row transitions */
 
 /* search transitions are defined on the main index row block below */
