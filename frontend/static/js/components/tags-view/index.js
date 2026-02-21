@@ -90,6 +90,45 @@ const escapeSelectorValue = (value) => {
   return String(value).replaceAll('"', '\\"');
 };
 
+const removeEntryItemWithAnimation = (entryItem, durationMs = 200) => {
+  if (!(entryItem instanceof HTMLElement)) return;
+  if (entryItem.dataset.removing === "true") return;
+  entryItem.dataset.removing = "true";
+  entryItem.classList.add("motion-animate-entry-delete");
+  const leadEntry = entryItem.querySelector(".tags-view__entry");
+  if (leadEntry instanceof HTMLElement) {
+    leadEntry.classList.add("motion-animate-entry-delete");
+  }
+
+  let sibling = entryItem.previousElementSibling;
+  while (sibling && !sibling.classList.contains("tags-view__entries-divider")) {
+    sibling = sibling.previousElementSibling;
+  }
+  const divider =
+    sibling instanceof HTMLElement && sibling.classList.contains("tags-view__entries-divider")
+      ? sibling
+      : null;
+
+  window.setTimeout(() => {
+    if (entryItem.isConnected) {
+      entryItem.remove();
+    }
+    if (!divider?.isConnected) return;
+    let next = divider.nextElementSibling;
+    let hasEntries = false;
+    while (next && !next.classList.contains("tags-view__entries-divider")) {
+      if (next.classList.contains("tags-view__entry-item")) {
+        hasEntries = true;
+        break;
+      }
+      next = next.nextElementSibling;
+    }
+    if (!hasEntries) {
+      divider.remove();
+    }
+  }, durationMs);
+};
+
 const applyTagCountUpdate = (payload, root = document) => {
   if (!payload || typeof payload !== "object") return;
   const tagName = String(payload.tag || "").trim();
@@ -140,10 +179,10 @@ const applyTagCountUpdate = (payload, root = document) => {
     setSelectedTagCount(root, count);
     if (action === "remove" && entryId) {
       const escapedId = escapeSelectorValue(entryId);
-      const entry = document.querySelector(`.tags-view__entry-item[data-entry-id="${escapedId}"]`);
-      if (entry instanceof HTMLElement) {
-        entry.remove();
-      }
+      const entryItem = document.querySelector(
+        `.tags-view__entry-item[data-entry-id="${escapedId}"]`,
+      );
+      removeEntryItemWithAnimation(entryItem, 200);
     }
   }
 };
