@@ -76,6 +76,19 @@ const clearRequestQueued = (el) => {
   delete el.dataset[CACHE_ATTRS.REQUESTED];
 };
 
+const clearTransientRequestState = (scope = document) => {
+  const root =
+    scope instanceof Element || scope instanceof DocumentFragment || scope === document
+      ? scope
+      : document;
+  const nodes = root.querySelectorAll?.("[data-cache-trigger]") || [];
+  nodes.forEach((el) => {
+    if (!(el instanceof HTMLElement)) return;
+    clearRequestQueued(el);
+    markHydrating(el, false);
+  });
+};
+
 const resolveConfig = (el, overrides = {}) => {
   const dataset = el?.dataset || {};
   const namespace = String(overrides.namespace ?? dataset[CACHE_ATTRS.NAMESPACE] ?? "").trim();
@@ -169,6 +182,26 @@ const ensureRequestGate = () => {
     document.body.addEventListener("htmx:responseError", releaseQueueMark);
     document.body.addEventListener("htmx:sendError", releaseQueueMark);
     document.body.addEventListener("htmx:sendAbort", releaseQueueMark);
+    document.addEventListener(
+      "app:teardown",
+      (event) => {
+        const reason = String(event?.detail?.reason || "").trim();
+        if (reason !== "history-save" && reason !== "bfcache") return;
+        const context = event?.detail?.context || event?.detail?.target || document;
+        clearTransientRequestState(context);
+      },
+      { capture: true },
+    );
+    document.addEventListener(
+      "app:rehydrate",
+      (event) => {
+        const reason = String(event?.detail?.reason || "").trim();
+        if (reason !== "history-restore" && reason !== "bfcache") return;
+        const context = event?.detail?.context || event?.detail?.target || document;
+        clearTransientRequestState(context);
+      },
+      { capture: true },
+    );
     requestGateRegistered = true;
   };
   if (document.body) {
