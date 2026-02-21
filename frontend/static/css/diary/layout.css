@@ -141,7 +141,7 @@ html[data-opening-collapsed="1"] #entries .entry.entry--opening .entry-opening-h
 
 #entries .entry.entry--opening .opening-content {
   padding: var(--spacing-md) 0 var(--spacing-sm);
-  max-height: 60vh;
+  max-height: 999rem;
   opacity: 1;
   transform: translateY(0);
   transition:
