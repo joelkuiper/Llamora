@@ -262,12 +262,12 @@ All available sections and their defaults are documented inline in [`config/sett
 ## Development
 
 ```bash
-uv sync                              # Install
-uv run llamora-server dev             # Run with live reload
+uv sync                                   # Install
+uv run llamora-server dev                 # Run with live reload
 
-uv run pyright                        # Type check
+uv run pyright                            # Type check
 uv run ruff check && uv run ruff format   # Backend lint + format
-biome check && biome format --write   # Frontend lint + format
+biome check && biome format --write       # Frontend lint + format
 ```
 
 Set `QUART_DEBUG=1` for Quart debug output. Add `--no-reload` to disable the file watcher.
