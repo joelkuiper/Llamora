@@ -59,6 +59,13 @@
 </details>
 
 <details>
+<summary><strong>Edit entries</strong></summary>
+
+![Calendar](./doc/screenshots/entry-edit.png)
+
+</details>
+
+<details>
 <summary><strong>Traces</strong> — tag overview with frequency and co-occurrence</summary>
 
 ![Trace view](./doc/screenshots/trace-view2.png)
@@ -67,7 +74,6 @@
 <details>
 <summary><strong>Search</strong> — semantic + phrase search across all entries</summary>
 
-![Search traces](./doc/screenshots/search.png)
 ![Search diary](./doc/screenshots/diary-search.png)
 
 </details>
