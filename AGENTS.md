@@ -2,15 +2,14 @@
 
 ### Runtime & Tooling
 
-* Fully offline. Local LLM only (`llama.cpp` or `llamafile`).
-* Use Python 3.11+, managed via `uv`. Always `uv run …`.
-* No tests. Manual QA only.
-* No bundler. ES modules + CSS are handcrafted.
+* Fully offline by default. Any OpenAI-compatible endpoint (`llama.cpp` default).
+* Python 3.11+, managed via `uv`. Always `uv run …`.
+* Frontend bundled with `esbuild` (`scripts/build_assets.py`). Native ES modules in development.
 * Logs via `logger = getLogger(__name__)`, not `print`.
 * Lint/format:
   * Frontend: `biome check`, `biome format --write`.
   * Backend: `uv run ruff check`, `uv run ruff format`.
-  * Git hooks live in `.githooks/` (enable with `git config core.hooksPath .githooks`).
+  * Git hooks in `.githooks/` run both (enable with `git config core.hooksPath .githooks`).
 
 ---
 
@@ -21,7 +20,7 @@
 * `migrations/`: schema + migrations (encrypt-safe).
 * `scripts/`: CLI helpers.
 * `frontend/static/`: JS/CSS/assets.
-* `templates/partials/`: server-rendered HTML.
+* `src/llamora/app/templates/`: server-rendered HTML (`pages/`, `views/`, `components/`, `layouts/`).
 
 ---
 
@@ -40,8 +39,8 @@
 
 * SSR HTML with HTMX. Prefer `hx-*` over fetch().
 * Streams via `hx-ext="sse"`.
-* JS = native ES modules (`type="module"`). No deps.
-* Use `frontend/static/js/components` for isolated UI.
+* JS = native ES modules (`type="module"`). Web Components for stateful UI (`extends HTMLElement`).
+* Use `frontend/static/js/components/` for isolated UI.
 * CSS uses custom tokens (`--color-*`), nesting allowed.
 * Avoid duplicating markup. Partial everything.
 
