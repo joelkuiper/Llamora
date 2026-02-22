@@ -29,7 +29,7 @@
 
 ![Diary view](./doc/screenshots/diary.png)
 
-![Respond](./doc/screenshots/respond.png)
+![Respond](./doc/screenshots/respond-detail.png)
 
 ![Trace view](./doc/screenshots/trace-view.png)
 
