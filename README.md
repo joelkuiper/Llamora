@@ -61,13 +61,15 @@
 <details>
 <summary><strong>Traces</strong> — tag overview with frequency and co-occurrence</summary>
 
-![Trace view](./doc/screenshots/trace-view.png)
+![Trace view](./doc/screenshots/trace-view2.png)
 </details>
 
 <details>
 <summary><strong>Search</strong> — semantic + phrase search across all entries</summary>
 
-![Search](./doc/screenshots/search.png)
+![Search traces](./doc/screenshots/search.png)
+![Search diary](./doc/screenshots/diary-search.png)
+
 </details>
 
 <details>
@@ -85,7 +87,9 @@
 <details>
 <summary><strong>Calendar</strong></summary>
 
-![Calendar](./doc/screenshots/calendar-popover.png)
+![Calendar](./doc/screenshots/diary-calendar.png)
+![Calendar](./doc/screenshots/diary-calendar-yearmonth.png)
+
 </details>
 
 ---
