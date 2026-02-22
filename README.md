@@ -237,10 +237,11 @@ uv run python scripts/migrate.py up
 
 ## Limitations
 
-- Designed for single-user, local use. There is no multi-user mode.
+- No two-factor authentication (e.g. WebAuth) or captcha protection yet.
+- Designed for single-user, local use.
 - Requires a locally running model server. Inference speed depends on available hardware; a dedicated GPU makes a significant difference.
-- Model weights are several gigabytes and are downloaded by llama.cpp on first use. The sentence embedding model (~130 MB) is downloaded separately on first search.
-- Output quality is directly determined by the local model. A model that does not follow instructions reliably will produce poor tags, openings, and summaries.
+- Model weights are several gigabytes and are downloaded by llama.cpp on first use. The sentence embedding model is downloaded separately.
+- Output quality is directly determined by the local model. A model that does not follow instructions reliably will produce poor responses, traces, openings, and summaries.
 - Loss of both password and recovery code makes stored data unrecoverable.
 - No content moderation or prompt filtering. Local, personal use is assumed.
 - Not production-ready. Deploying outside a personal context is not recommended.
