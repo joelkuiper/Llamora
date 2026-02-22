@@ -4,13 +4,16 @@ APP_NAME = "Llamora"
 SECRET_KEY = "O7T_mOBS765PydhqWAhH1RArhWBEp6hu28Uhf2gN0Xs"
 LOG_LEVEL = "INFO"
 
+# --- Server -----------------------------------------------------------
 [default.APP]
 host = "127.0.0.1"
 port = 5000
 
+# --- Feature flags -----------------------------------------------------
 [default.FEATURES]
 disable_registration = false
 
+# --- Input constraints --------------------------------------------------
 [default.LIMITS]
 max_tag_length = 64
 max_username_length = 30
@@ -19,6 +22,7 @@ min_password_length = 8
 max_message_length = 12000
 max_search_query_length = 512
 
+# --- Trace recall & summarisation ---------------------------------------
 [default.TAG_RECALL]
 summary_max_chars = 900
 summary_input_max_chars = 600
@@ -32,6 +36,7 @@ summary_parallel = 1
 background_summarize = true
 summary_cache_max = 512
 
+# --- Search (semantic + lexical) ----------------------------------------
 [default.SEARCH]
 recent_limit = 50
 recent_suggestion_limit = 8
@@ -53,14 +58,17 @@ max_ms = 1500
 poor_match_max_cos = 0.28
 poor_match_min_hits = 3
 
+# --- Authentication -----------------------------------------------------
 [default.AUTH]
 max_login_attempts = 5
 login_lockout_ttl = 900
 login_failure_cache_size = 2048
 
+# --- Session ------------------------------------------------------------
 [default.SESSION]
 ttl = 604800
 
+# --- Database -----------------------------------------------------------
 [default.DATABASE]
 path = "state.sqlite3"
 pool_size = 25
@@ -69,11 +77,13 @@ timeout = 5.0
 busy_timeout = 5000
 mmap_size = 10485760
 
+# --- Migrations ---------------------------------------------------------
 [default.MIGRATIONS]
 path = "migrations"
 baseline_version = 1
 allow_enroll_existing = false
 
+# --- Embedding model & indexing -----------------------------------------
 [default.EMBEDDING]
 model = "BAAI/bge-small-en-v1.5"
 concurrency = 0
@@ -91,6 +101,7 @@ warm_entry_batch = 200
 dtype = "float16"
 
 
+# --- LLM ---------------------------------------------------------------
 [default.LLM.upstream]
 host = ""
 parallel = 1
@@ -128,6 +139,7 @@ allowed_config_keys = ["temperature"]
 [default.LLM.summary]
 timeout_seconds = 30.0
 
+# --- UI preferences -----------------------------------------------------
 [default.UI]
 clock_format = "24h"
 
@@ -162,19 +174,23 @@ parameter_allowlist = [
 ]
 parameters = {}
 
+# --- Prompt templates ---------------------------------------------------
 [default.PROMPTS]
 template_dir = "../src/llamora/llm/templates"
 
+# --- Cookies & encryption -----------------------------------------------
 [default.COOKIES]
 name = "llamora"
 # Development default; replace with your own value in production.
 secret = "K3aRvB6X6lXe9iWvL99XQqSlqSkJ3YTaxqz81uB_ihw="
 force_secure = false
 
+# --- Crypto (DEK storage) -----------------------------------------------
 [default.CRYPTO]
 dek_storage = "cookie" # or "session"
 
 
+# --- Background workers -------------------------------------------------
 [default.WORKERS.index_worker]
 max_queue_size = 1024
 batch_size = 32

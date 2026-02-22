@@ -98,6 +98,8 @@
 
 </details>
 
+More screenshots in [`doc/screenshots/`](doc/screenshots/).
+
 ---
 
 ## Quick Start
@@ -173,8 +175,8 @@ Many AI interfaces are built around an ongoing back-and-forth. Here, the model i
 
 | Layer | Technology |
 | --- | --- |
-| **Backend** | Async Python ([Quart](https://quart.palletsprojects.com/)), SSE streaming, [Dynaconf](https://www.dynaconf.com/) config, [uv](https://docs.astral.sh/uv/) |
-| **Frontend** | [HTMX](https://htmx.org/) + server-rendered HTML fragments. No JS framework. [esbuild](https://esbuild.github.io/) for production. [Biome](https://biomejs.dev/) for lint/format |
+| **Backend** | Async Python ([Quart](https://quart.palletsprojects.com/)), SSE streaming, [Dynaconf](https://www.dynaconf.com/) config, [uv](https://docs.astral.sh/uv/), [Ruff](https://docs.astral.sh/ruff/) for lint/format |
+| **Frontend** | [HTMX](https://htmx.org/) + server-rendered HTML fragments + [Web Components](https://developer.mozilla.org/en-US/docs/Web/API/Web_Components). No JS framework. [esbuild](https://esbuild.github.io/) for production. [Biome](https://biomejs.dev/) for lint/format |
 | **Storage** | SQLite, no ORM, incremental migrations |
 | **Encryption** | [libsodium](https://doc.libsodium.org/) via PyNaCl — per-user symmetric DEK, password-derived wrapping + recovery code |
 | **Inference** | Any [OpenAI-compatible](https://platform.openai.com/docs/api-reference/chat) `/v1/chat/completions` endpoint (default: [llama.cpp](https://github.com/ggerganov/llama.cpp)) |
@@ -250,26 +252,7 @@ Any OpenAI-compatible provider works — substitute `base_url`, `model`, and `ap
 
 </details>
 
-<details>
-<summary><strong>Configuration sections reference</strong></summary>
-
-| Section | Purpose |
-| --- | --- |
-| `APP` | Host, port, runtime |
-| `FEATURES` | Toggle optional functionality |
-| `AUTH` | Login limits and timeouts |
-| `DATABASE` | SQLite path and pool |
-| `LLM.chat` | Chat client and parameter settings |
-| `LLM.upstream` | Upstream connection |
-| `LLM.generation` | Default generation parameters |
-| `LLM.tokenizer` | Token counting and safety margin |
-| `SEARCH` | Semantic search and ANN limits |
-| `CRYPTO` | DEK storage method |
-| `COOKIES` | Cookie name and encryption secret |
-
-llama.cpp-specific parameters (`top_k`, `mirostat`, etc.) can be passed via `LLM.chat.parameters`, but only keys in `LLM.chat.parameter_allowlist` are forwarded upstream.
-
-</details>
+All available sections and their defaults are documented inline in [`config/settings.toml`](config/settings.toml). llama.cpp-specific parameters (`top_k`, `mirostat`, etc.) can be passed via `LLM.chat.parameters`, but only keys in `LLM.chat.parameter_allowlist` are forwarded upstream.
 
 **Prompt templates** are Jinja2 files in `src/llamora/llm/templates` (`system.txt.j2`, `opening_system.txt.j2`, `opening_recap.txt.j2`). Edit them directly — no Python changes needed. Changes take effect on restart. Override the directory with `LLAMORA_PROMPTS__TEMPLATE_DIR`.
 
@@ -280,7 +263,7 @@ llama.cpp-specific parameters (`top_k`, `mirostat`, etc.) can be passed via `LLM
 ```bash
 uv sync                              # Install
 uv run llamora-server dev             # Run with live reload
-uv run llamora-server --workers 4     # Run for production
+uv run llamora-server prod --workers 4   # Run for production
 
 uv run pyright                        # Type check
 uv run ruff check && uv run ruff format   # Backend lint + format
@@ -303,7 +286,7 @@ The server uses bundled outputs when `frontend/dist/manifest.json` exists. Remov
 pnpm install && pnpm vendor
 ```
 
-**Git hooks** — enable with `git config core.hooksPath .githooks` (pre-commit runs Ruff on staged Python files).
+**Git hooks** — enable with `git config core.hooksPath .githooks` (pre-commit runs Ruff on staged Python files and Biome on staged JS/CSS files).
 
 **Migrations** — applied automatically at startup. Manual inspection:
 
