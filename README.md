@@ -200,18 +200,21 @@ Llamora uses a zero-knowledge architecture: the server stores and queries cipher
 
 **Key hierarchy:**
 
-```
-Password ──→ Argon2ID ──→ Wrapping key ──→ unwraps DEK
-Recovery code ──→ Argon2ID ──→ Wrapping key ──┘
-                                               ↓
-                               DEK (32 bytes, in memory only)
-                                               ↓
-                              XChaCha20-Poly1305 per record
+```mermaid
+flowchart LR
+    pw[Password] --> kdf1[Argon2ID] --> wk1[Wrapping key]
+    rc[Recovery code] --> kdf2[Argon2ID] --> wk2[Wrapping key]
+    wk1 -- unwraps --> dek[DEK · 32 bytes\nin memory only]
+    wk2 -- unwraps --> dek
+    dek -- encrypts --> data[XChaCha20-Poly1305\nper record]
+
+    style dek fill:#2d6a4f,stroke:#40916c,color:#fff
+    style data fill:#1b4332,stroke:#40916c,color:#fff
 ```
 
 - A random 32-byte **data-encryption key (DEK)** is generated at registration.
 - The DEK is wrapped twice — once with the password, once with a recovery code — and only the wrapped forms are stored.
-- At login the password unwraps the DEK into memory. It is held in an encrypted cookie for the session duration and never written to disk, `sessionStorage`, or `localStorage`.
+- At login the password unwraps the DEK into memory. It is held in an encrypted cookie or in session storage.
 - Key material is zeroised on logout and session expiry.
 
 **What is encrypted:**
