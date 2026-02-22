@@ -29,14 +29,14 @@
     width: 1.2rem;
     height: 1.2rem;
     font-size: 0.95rem;
-    border-color: transparent;
-    background: color-mix(in srgb, var(--glass-bg) 55%, transparent);
-    opacity: 0.7;
+    border-color: color-mix(in srgb, var(--border) 58%, transparent);
+    background: color-mix(in srgb, var(--overlay-close-bg) 90%, var(--glass-bg));
+    opacity: 0.9;
 
     &:hover {
-      border-color: transparent;
-      background: color-mix(in srgb, var(--glass-bg-hover) 65%, transparent);
-      opacity: 0.95;
+      border-color: color-mix(in srgb, var(--border) 72%, transparent);
+      background: color-mix(in srgb, var(--overlay-close-hover-bg) 88%, var(--glass-bg-hover));
+      opacity: 1;
     }
   }
 }
