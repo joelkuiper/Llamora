@@ -43,6 +43,22 @@
 
 ---
 
+## Conceptual Notes
+
+Llamora is organised around time, not conversation. The primary navigation is a calendar. You write entries inside a daily page.
+
+Many AI interfaces are organised around an ongoing back-and-forth. In Llamora, entries are anchored to a date. You add text to a day. The model may respond, but those responses sit inside the same page. The day contains the exchange rather than the exchange defining the structure.
+
+The model is part of that daily flow. It opens each day, can respond to entries, and suggests traces that describe the exchange. Those suggestions are optional. When kept, they become part of the archive rather than temporary output. Over time, both your writing and the model’s contributions accumulate in the same log.
+
+Traces are lightweight labels proposed by the model to make later return easier. When added, they allow you to see where something recurs, what it tends to appear alongside, and which entries it touches. The aim is not interpretation, but legibility.
+
+A diary is a personal, private artifact with strong security expectations. You do not expect it to send data elsewhere, depend on a remote service, or expose its contents by default. Llamora follows those constraints. The model runs on your machine, and the archive remains there.
+
+The system does not attempt to evaluate you. The model can respond and suggest traces, but it does not score entries, infer traits, or generate behavioural profiles. Nothing is surfaced as an assessment. The record is yours to interpret.
+
+---
+
 ## Quick Start
 
 **Requirements:** [uv](https://docs.astral.sh/uv/) and a running [llama.cpp](https://github.com/ggerganov/llama.cpp) server.
@@ -75,22 +91,6 @@ LLAMORA_LLM__UPSTREAM__HOST=http://127.0.0.1:8081 uv run llamora-server dev
 Open [http://localhost:5000](http://localhost:5000). On first run, register an account — the database is created automatically.
 
 The first time search is used, a small sentence embedding model (~130 MB) is downloaded and cached locally.
-
----
-
-## Conceptual Notes
-
-Llamora is organised around time, not conversation. The primary navigation is a calendar. You write entries inside a daily page.
-
-Many AI interfaces are organised around an ongoing back-and-forth. In Llamora, entries are anchored to a date. You add text to a day. The model may respond, but those responses sit inside the same page. The day contains the exchange rather than the exchange defining the structure.
-
-The model is part of that daily flow. It opens each day, can respond to entries, and suggests traces that describe the exchange. Those suggestions are optional. When kept, they become part of the archive rather than temporary output. Over time, both your writing and the model’s contributions accumulate in the same log.
-
-Traces are lightweight labels proposed by the model to make later return easier. When added, they allow you to see where something recurs, what it tends to appear alongside, and which entries it touches. The aim is not interpretation, but legibility.
-
-A diary is a personal, private artifact with strong security expectations. You do not expect it to send data elsewhere, depend on a remote service, or expose its contents by default. Llamora follows those constraints. The model runs on your machine, and the archive remains there.
-
-The system does not attempt to evaluate you. The model can respond and suggest traces, but it does not score entries, infer traits, or generate behavioural profiles. Nothing is surfaced as an assessment. The record is yours to interpret.
 
 ---
 
