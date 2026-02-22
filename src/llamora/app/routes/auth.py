@@ -412,6 +412,15 @@ async def login():
             username=username,
         )
 
+    # Already authenticated — redirect rather than showing the login form.
+    # This covers the browser-back-after-login case: if bfcache is bypassed
+    # and the page is re-fetched, authenticated users are sent to the app
+    # instead of seeing a (potentially stale) login screen.
+    ctx = get_session_context()
+    if await ctx.current_user() is not None:
+        dest = sanitize_return_path(request.args.get("return")) or url_for("days.index")
+        return redirect(dest)
+
     return_url = sanitize_return_path(request.args.get("return"))
     return await render_template("pages/login.html", return_url=return_url)
 

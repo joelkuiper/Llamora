@@ -103,6 +103,15 @@ runWhenDocumentReady(onReady);
 if (typeof window !== "undefined") {
   window.appInit = window.appInit || {};
   window.appInit.initForms = initForms;
+
+  // Reset spinning buttons when bfcache restores this page (e.g. browser back
+  // after a native form POST). lifecycle.js is only loaded for the app-shell
+  // entry, so auth pages need their own pageshow handler here.
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted) {
+      resetSpinningButtons(document);
+    }
+  });
 }
 
 registerHydrationOwner({
