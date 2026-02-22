@@ -145,7 +145,7 @@ Log in with `demo_user` / `demo_user_test_password12345!`
 
 ## Design Philosophy
 
-Llamora is organised around **time, not conversation**. The primary navigation is a calendar. Entries are anchored to dates, not threads.
+Llamora is organised around time, not conversation sessions. The primary navigation is a calendar. Entries are anchored to dates, not threads.
 
 Many AI interfaces are built around an ongoing back-and-forth. Here, the model is part of a daily flow: it opens each day, can respond to entries, and suggests traces. Those suggestions are optional. When kept, they become part of the archive — not temporary output. Over time, both your writing and the model's contributions accumulate in the same log.
 
