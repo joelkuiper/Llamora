@@ -168,7 +168,7 @@ Many AI interfaces are built around an ongoing back-and-forth. Here, the model i
 - **Encryption at rest.** All content is encrypted with a per-user DEK wrapped by your password. A recovery code provides a second unwrap path. Loss of both means the data cannot be recovered.
 - **Local embeddings.** The sentence model runs on your machine. Embeddings are stored encrypted alongside everything else.
 - **SQLite-backed.** All state lives in a single file. Migrations are applied automatically.
-- **Single-user.** Multi-user and admin interfaces are not implemented.
+- **Single-user by default.** Multi-user should work but is not extensively tested. No admin interface.
 
 ---
 
@@ -299,7 +299,7 @@ uv run python scripts/migrate.py up
 
 ## Production
 
-> **Caveat:** Llamora is designed for single-user, local use. Exposing it to the network or running it as a persistent service is not recommended at this stage. If you do, the steps below are the minimum.
+> **Caveat:** Llamora should work with multiple users but this has not been extensively tested, and there is no two-factor authentication. Keep this in mind before exposing it beyond your local network.
 
 ### 1. Generate secrets
 
