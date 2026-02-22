@@ -3,7 +3,7 @@
 
 > Llamora is an experimental, local-first journaling environment that attempts to make continuity visible.
 >
-> You write in daily pages. The system helps you move through what accumulates over time, with lightweight structure and recall views that make it easier to notice threads you would otherwise miss. A model running on your own machine is part of that flow, producing day openings, tag recaps, and reflective responses inside the journal itself.
+> You write in daily pages. The system helps you move through what accumulates over time. A model running on your own machine is part of that flow, producing day openings, recaps, and reflective responses inside the journal itself.
 >
 > Llamora is not designed to be a chat wrapper. It is an attempt to treat a journal as a navigable archive, built around time and return, rather than a stream of disconnected entries.
 
@@ -11,11 +11,11 @@
 
 ## What It Does
 
-**Daily pages.** A new page opens each day. You write; the model responds inline if you want it to (and only then). This exchange is stored as a persistent log that accumulates over time.
+**Daily pages.** A new page opens each day. You write; the model responds if you want it to (and only then). This exchange is stored as a persistent log that accumulates over time.
 
 **Day openings.** At the start of each day, the model generates a short opening. It draws on a rolling window of recent entries and a digest of the previous day's exchange, and becomes the first message on the new page.
 
-**Traces.** After each exchange, the model suggests relevant tags. These tags (called traces in the app) accumulate in a dedicated view showing frequency over time, co-occurrence with other traces, chronological entry history, and a model-generated summary of what the trace represents. An activity heatmap shows usage across the past year. Tags also allow you to attach context for the model responses.
+**Traces.** After each exchange, the model suggests relevant tags. These tags (called traces in the app) accumulate in a dedicated view showing frequency over time, co-occurrence with other traces, chronological entry history, and a model-generated summary of what the trace represents. An activity heatmap shows usage across the past year. Traces also allow you to attach context to the model for responses.
 
 **Search.** Entries are embedded locally using a small sentence model. Search combines semantic nearest-neighbour retrieval with phrase matching and returns ranked results across the full log.
 
