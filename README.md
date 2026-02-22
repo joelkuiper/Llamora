@@ -22,6 +22,7 @@
 - [Stack](#stack)
 - [Configuration](#configuration)
 - [Development](#development)
+- [Production](#production)
 - [Limitations](#limitations)
 
 ---
@@ -263,7 +264,6 @@ All available sections and their defaults are documented inline in [`config/sett
 ```bash
 uv sync                              # Install
 uv run llamora-server dev             # Run with live reload
-uv run llamora-server prod --workers 4   # Run for production
 
 uv run pyright                        # Type check
 uv run ruff check && uv run ruff format   # Backend lint + format
@@ -272,10 +272,10 @@ biome check && biome format --write   # Frontend lint + format
 
 Set `QUART_DEBUG=1` for Quart debug output. Add `--no-reload` to disable the file watcher.
 
-**Frontend assets** — native ES modules in development, bundled for production:
+**Frontend assets** — bundle the assets and watch for changes:
 
 ```bash
-uv run python scripts/build_assets.py build --mode prod
+uv run python scripts/build_assets.py watch --mode dev
 ```
 
 The server uses bundled outputs when `frontend/dist/manifest.json` exists. Remove `frontend/dist/` to revert.
@@ -293,6 +293,43 @@ pnpm install && pnpm vendor
 ```bash
 uv run python scripts/migrate.py status
 uv run python scripts/migrate.py up
+```
+
+---
+
+## Production
+
+> **Caveat:** Llamora is designed for single-user, local use. Exposing it to the network or running it as a persistent service is not recommended at this stage. If you do, the steps below are the minimum.
+
+### 1. Generate secrets
+
+The shipped `SECRET_KEY` and `COOKIES.secret` are public defaults. Replace both before running outside development:
+
+```bash
+export LLAMORA_SECRET_KEY=$(openssl rand -base64 32)
+export LLAMORA_COOKIES__SECRET=$(openssl rand -base64 32)
+```
+
+Or persist them in `config/.secrets.toml` (not committed):
+
+```toml
+[default]
+SECRET_KEY = "..."
+
+[default.COOKIES]
+secret = "..."
+```
+
+### 2. Build frontend assets
+
+```bash
+uv run python scripts/build_assets.py build --mode prod
+```
+
+### 3. Run
+
+```bash
+uv run llamora-server prod --workers 4
 ```
 
 ---
