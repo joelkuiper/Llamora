@@ -50,10 +50,15 @@
 **1. Start a local model.**
 
 ```bash
-llama-server -hf Qwen/Qwen3-4B-Instruct-2507 --port 8081 --jinja
+llama-server \
+  -hf bartowski/Meta-Llama-3.1-8B-Instruct-GGUF \
+  -hff Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf \
+  --port 8081 --jinja
 ```
 
-Qwen3-4B-Instruct is the baseline model: it follows instructions reliably and fits on consumer hardware. The first invocation downloads the weights (~2.5 GB in default quantisation). The `--jinja` flag enables llama.cpp's internal chat-template rendering, which Llamora requires.
+Meta-Llama-3.1-8B-Instruct is the current baseline. The Q4_K_M quantisation (~5 GB) balances quality and memory footprint. The first invocation downloads the weights. The `--jinja` flag enables llama.cpp's internal chat-template rendering, which Llamora requires.
+
+Any instruction-tuned model that follows system prompts reliably will work. The [bartowski recommended small models](https://huggingface.co/collections/bartowski/recommended-small-models) collection is a useful starting point for alternatives.
 
 **2. Install dependencies.**
 
@@ -75,26 +80,17 @@ The first time search is used, a small sentence embedding model (~130 MB) is dow
 
 ## Conceptual Notes
 
-Llamora is organised around time, not conversation.
-The primary navigation is a calendar. The primary unit is a daily page.
+Llamora is organised around time, not conversation. The primary navigation is a calendar. You write entries inside a daily page.
 
-In most writing tools, AI is something you invoke.
-In Llamora, the model participates in the structure of the day: it opens each page, optionally responds to entries, suggests tags for the exchange, and later recaps what those tags represent.
-These outputs enter the record — they are not session artifacts that disappear.
-Over months, the model's contributions become part of the longitudinal shape of the log.
+Many AI interfaces are organised around an ongoing back-and-forth. The conversation grows as a continuous thread. In Llamora, entries are anchored to a date. You add text to a day. The model may respond, but those responses sit inside the same page. The day contains the exchange rather than the exchange defining the structure.
 
-Traces are the mechanism for this.
-Every exchange is tagged automatically by the model.
-Those tags accumulate into views that show how often a theme recurs, what else it tends to appear alongside, and which entries it touches.
-The intention is to make patterns in your own writing legible without requiring you to curate them manually.
+The model is part of that daily flow. It opens each day, can respond to entries, and suggests traces that describe the exchange. Those suggestions are optional. When kept, they become part of the archive rather than temporary output. Over time, both your writing and the model’s contributions accumulate in the same log.
 
-Local inference is not incidental.
-A journal's value depends on candour, and candour depends on trust about where the record goes.
-Running the model on your machine means nothing leaves it.
+Traces are lightweight labels proposed by the model to make later return easier. When added, they allow you to see where something recurs, what it tends to appear alongside, and which entries it touches. The aim is not interpretation, but legibility.
 
-The system makes no attempt to evaluate your writing.
-The model responds and tags; it does not score, surface behavioural insights, or summarise you.
-The record is yours to interpret.
+A diary is a personal, private artifact with strong security expectations. You do not expect it to send data elsewhere, depend on a remote service, or expose its contents by default. Llamora follows those constraints. The model runs on your machine, and the archive remains there.
+
+The system does not attempt to evaluate you. The model can respond and suggest traces, but it does not score entries, infer traits, or generate behavioural profiles. Nothing is surfaced as an assessment. The record is yours to interpret.
 
 ---
 
@@ -107,6 +103,29 @@ The record is yours to interpret.
 - **Embeddings are local.** The sentence model runs on your machine. Embeddings are stored in encrypted form alongside the rest of the data.
 - **SQLite-backed.** All persistent state is a single file. Migrations are applied automatically at startup.
 - **Single-user.** Multi-user and administrative interfaces are not implemented.
+
+---
+
+## Stack
+
+**Backend:** Async Python ([Quart](https://quart.palletsprojects.com/)) with server-sent events for response streaming. Configuration via [Dynaconf](https://www.dynaconf.com/). Package management via [uv](https://docs.astral.sh/uv/).
+
+**Frontend:** [HTMX](https://htmx.org/) with server-rendered HTML fragments. No JavaScript framework. Native ES modules in development; [esbuild](https://esbuild.github.io/) for production bundles (vendored binary, driven by Python). Formatting and linting via [Biome](https://biomejs.dev/).
+
+**Storage:** SQLite. Single-file database, no ORM. Schema managed with lightweight incremental migrations.
+
+**Encryption:** [libsodium](https://doc.libsodium.org/) (via PyNaCl). Per-user symmetric key (DEK) wrapped by a password-derived key and a separate recovery code.
+
+**Inference:** Any [OpenAI-compatible](https://platform.openai.com/docs/api-reference/chat) `/v1/chat/completions` endpoint — in practice, [llama.cpp](https://github.com/ggerganov/llama.cpp) running locally. The client is the OpenAI Python SDK pointed at `127.0.0.1`.
+
+**Embeddings:** [FlagEmbedding](https://huggingface.co/BAAI/bge-small-en-v1.5) (bge-small-en-v1.5) for local sentence embeddings. [HNSWlib](https://github.com/nmslib/hnswlib) for approximate nearest-neighbour retrieval.
+
+**Key design decisions:**
+
+- *Server-rendered HTML over an SPA.* The server is the source of truth for all state. HTMX handles partial updates and navigation; the client manages transitions and feedback only. This keeps the frontend auditable and avoids a separate API layer.
+- *OpenAI-compatible abstraction.* Llamora is not tied to a specific model or runtime. Any locally running server that speaks `/v1/chat/completions` works. Swapping models requires no code changes.
+- *SQLite + per-user encryption.* No external database, no cloud dependency. The entire journal is a single file. Encryption happens at the application layer before writes.
+- *SSE for streaming.* Model output is pushed to the browser incrementally via server-sent events as it is generated, without polling or websockets.
 
 ---
 
