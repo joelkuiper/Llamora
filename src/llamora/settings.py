@@ -50,6 +50,8 @@ DEFAULT_UPSTREAM_CONFIG: dict[str, Any] = {
     "host": "",
     "parallel": 1,
     "ctx_size": 8192,
+    "health_ttl": 10.0,
+    "skip_health_check": False,
 }
 
 DEFAULT_LLM_GENERATION: dict[str, Any] = {

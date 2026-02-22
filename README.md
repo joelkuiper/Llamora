@@ -154,6 +154,38 @@ temperature = 0.7
 top_p = 0.8
 ```
 
+**External API.** Llamora can also connect to any hosted OpenAI-compatible endpoint. Set `base_url` and `api_key` in `config/settings.local.toml` (or store the key in `config/.secrets.toml` to keep it out of version control), and enable `skip_health_check` to bypass the llama.cpp-specific health probe:
+
+```toml
+[default.LLM.upstream]
+skip_health_check = true
+
+[default.LLM.chat]
+base_url = "https://api.openai.com/v1"
+model = "gpt-4o-mini"
+
+[default.LLM.generation]
+stop = []
+```
+
+```toml
+# config/.secrets.toml — not committed
+[default.LLM.chat]
+api_key = "sk-..."
+```
+
+Equivalently via environment variables:
+
+```bash
+LLAMORA_LLM__UPSTREAM__SKIP_HEALTH_CHECK=true \
+LLAMORA_LLM__CHAT__BASE_URL=https://api.openai.com/v1 \
+LLAMORA_LLM__CHAT__MODEL=gpt-4o-mini \
+LLAMORA_LLM__CHAT__API_KEY=sk-... \
+uv run llamora-server dev
+```
+
+Any OpenAI-compatible provider works the same way — substitute `base_url`, `model`, and `api_key` as appropriate.
+
 llama.cpp-specific parameters (such as `top_k` or `mirostat`) can be passed through via `LLM.chat.parameters`, but only keys listed in `LLM.chat.parameter_allowlist` are forwarded to the upstream. This prevents accidental leakage of unknown parameters.
 
 | Section             | Purpose                              |

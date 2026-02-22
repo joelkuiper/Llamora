@@ -95,6 +95,7 @@ dtype = "float16"
 host = ""
 parallel = 1
 ctx_size = 8192
+# skip_health_check = false  # set to true when using an external API
 
 [default.LLM.generation]
 n_predict       = 2084
@@ -140,8 +141,12 @@ min_tokens = 128
 [default.LLM.chat]
 endpoint = "/v1/chat/completions"
 model = "local"
+# For local llama.cpp (default):
 # base_url = "http://127.0.0.1:8081/v1"
-# api_key = ""
+# For external APIs, set base_url, model, and api_key (in .secrets.toml or via env):
+# base_url = "https://api.openai.com/v1"
+# model = "gpt-4o-mini"
+# api_key = ""  # prefer .secrets.toml or LLAMORA_LLM__CHAT__API_KEY
 timeout_seconds = 30.0
 max_retries = 2
 parameter_allowlist = [

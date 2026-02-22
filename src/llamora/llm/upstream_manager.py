@@ -74,6 +74,7 @@ class UpstreamProcessManager:
         configured_parallel = upstream_cfg.get("parallel")
         self._parallel_slots = _coerce_parallel(configured_parallel, default=1)
         self._health_ttl = float(upstream_cfg.get("health_ttl", 10.0))
+        self._skip_health_check = bool(upstream_cfg.get("skip_health_check", False))
         self._last_healthy: float = 0.0
 
     @property
@@ -92,6 +93,8 @@ class UpstreamProcessManager:
         return self._parallel_slots
 
     def ensure_upstream_ready(self) -> None:
+        if self._skip_health_check:
+            return
         if not self._is_upstream_healthy():
             raise RuntimeError("LLM upstream is unavailable")
         if self._upstream_props is None or self._ctx_size is None:
@@ -101,8 +104,10 @@ class UpstreamProcessManager:
         """Non-blocking variant of :meth:`ensure_upstream_ready`.
 
         Skips the health check if the upstream was healthy within the last
-        ``health_ttl`` seconds.
+        ``health_ttl`` seconds, or if ``skip_health_check`` is enabled.
         """
+        if self._skip_health_check:
+            return
         now = time.monotonic()
         if (now - self._last_healthy) < self._health_ttl:
             return
