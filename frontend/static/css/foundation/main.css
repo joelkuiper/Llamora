@@ -2,7 +2,7 @@
    Theme Tokens
    ========================================================================= */
 
-@import url("./tokens/base.css");
+@import url("../tokens/base.css");
 @import url("./motion.css");
 @import url("./grid.css");
 
@@ -552,103 +552,103 @@ input[type="checkbox"]:focus {
 }
 
 .icon-chevron-left {
-  --icon: url("../icons/chevron-left.svg");
+  --icon: url("../../icons/chevron-left.svg");
 }
 .icon-chevron-right {
-  --icon: url("../icons/chevron-right.svg");
+  --icon: url("../../icons/chevron-right.svg");
 }
 .icon-circle-arrow-left {
-  --icon: url("../icons/circle-arrow-left.svg");
+  --icon: url("../../icons/circle-arrow-left.svg");
 }
 .icon-circle-arrow-right {
-  --icon: url("../icons/circle-arrow-right.svg");
+  --icon: url("../../icons/circle-arrow-right.svg");
 }
 .icon-chevron-up {
-  --icon: url("../icons/chevron-up.svg");
+  --icon: url("../../icons/chevron-up.svg");
 }
 .icon-chevron-down {
-  --icon: url("../icons/chevron-down.svg");
+  --icon: url("../../icons/chevron-down.svg");
 }
 .icon-search {
-  --icon: url("../icons/search.svg");
+  --icon: url("../../icons/search.svg");
 }
 .icon-calendar-days {
-  --icon: url("../icons/calendar-days.svg");
+  --icon: url("../../icons/calendar-days.svg");
 }
 .icon-arrow-down-a-z {
-  --icon: url("../icons/arrow-down-a-z.svg");
+  --icon: url("../../icons/arrow-down-a-z.svg");
 }
 .icon-arrow-up-a-z {
-  --icon: url("../icons/arrow-up-a-z.svg");
+  --icon: url("../../icons/arrow-up-a-z.svg");
 }
 .icon-arrow-up-0-1 {
-  --icon: url("../icons/arrow-up-0-1.svg");
+  --icon: url("../../icons/arrow-up-0-1.svg");
 }
 .icon-arrow-up-1-0 {
-  --icon: url("../icons/arrow-up-1-0.svg");
+  --icon: url("../../icons/arrow-up-1-0.svg");
 }
 .icon-arrow-down-1-0 {
-  --icon: url("../icons/arrow-down-1-0.svg");
+  --icon: url("../../icons/arrow-down-1-0.svg");
 }
 .icon-chevrons-down-up {
-  --icon: url("../icons/chevrons-down-up.svg");
+  --icon: url("../../icons/chevrons-down-up.svg");
 }
 .icon-book-open {
-  --icon: url("../icons/book-open.svg");
+  --icon: url("../../icons/book-open.svg");
 }
 .icon-book-marked {
-  --icon: url("../icons/book-marked.svg");
+  --icon: url("../../icons/book-marked.svg");
 }
 .icon-tags {
-  --icon: url("../icons/tags.svg");
+  --icon: url("../../icons/tags.svg");
 }
 .icon-chart-column {
-  --icon: url("../icons/chart-column.svg");
+  --icon: url("../../icons/chart-column.svg");
 }
 .icon-user-round {
-  --icon: url("../icons/user-round.svg");
+  --icon: url("../../icons/user-round.svg");
 }
 .icon-log-out {
-  --icon: url("../icons/log-out.svg");
+  --icon: url("../../icons/log-out.svg");
 }
 .icon-bookmark {
-  --icon: url("../icons/bookmark.svg");
+  --icon: url("../../icons/bookmark.svg");
 }
 .icon-bookmark-x {
-  --icon: url("../icons/bookmark-x.svg");
+  --icon: url("../../icons/bookmark-x.svg");
 }
 .icon-tag {
-  --icon: url("../icons/tag.svg");
+  --icon: url("../../icons/tag.svg");
 }
 .icon-trash {
-  --icon: url("../icons/trash.svg");
+  --icon: url("../../icons/trash.svg");
 }
 .icon-reply {
-  --icon: url("../icons/reply.svg");
+  --icon: url("../../icons/reply.svg");
 }
 .icon-entry-actions {
-  --icon: url("../icons/message-circle-more.svg");
+  --icon: url("../../icons/message-circle-more.svg");
 }
 .icon-corner-down-left {
-  --icon: url("../icons/corner-down-left.svg");
+  --icon: url("../../icons/corner-down-left.svg");
 }
 .icon-heart {
-  --icon: url("../icons/heart.svg");
+  --icon: url("../../icons/heart.svg");
 }
 .icon-eye {
-  --icon: url("../icons/eye.svg");
+  --icon: url("../../icons/eye.svg");
 }
 .icon-feather {
-  --icon: url("../icons/feather.svg");
+  --icon: url("../../icons/feather.svg");
 }
 .icon-square {
-  --icon: url("../icons/square.svg");
+  --icon: url("../../icons/square.svg");
 }
 .icon-circle-arrow-right {
-  --icon: url("../icons/circle-arrow-right.svg");
+  --icon: url("../../icons/circle-arrow-right.svg");
 }
 .icon-square-chevron-right {
-  --icon: url("../icons/square-chevron-right.svg");
+  --icon: url("../../icons/square-chevron-right.svg");
 }
 
 .icon-btn.active {

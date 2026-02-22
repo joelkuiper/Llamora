@@ -14,7 +14,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 STATIC_DIR = PROJECT_ROOT / "frontend" / "static"
 DIST_DIR = PROJECT_ROOT / "frontend" / "dist"
 JS_ENTRY = STATIC_DIR / "js" / "app-entry.js"
-CSS_ENTRIES_DIR = STATIC_DIR / "css" / "entries"
+CSS_ENTRYPOINTS_DIR = STATIC_DIR / "css" / "entrypoints"
 ESBUILD_BIN = PROJECT_ROOT / "scripts" / "bin" / "esbuild"
 JS_ENTRY_ALIASES = {
     "app-entry": "app",
@@ -201,11 +201,13 @@ def build(mode: str) -> None:
     css_out.mkdir(parents=True, exist_ok=True)
 
     js_entries = _discover_js_entries()
-    css_entries = _discover_entries(CSS_ENTRIES_DIR, "css")
+    css_entries = _discover_entries(CSS_ENTRYPOINTS_DIR, "css")
 
-    _run_esbuild(js_entries, js_out, JS_ENTRY.parent, mode, watch=False, meta_path=META_JS)
     _run_esbuild(
-        css_entries, css_out, CSS_ENTRIES_DIR, mode, watch=False, meta_path=META_CSS
+        js_entries, js_out, JS_ENTRY.parent, mode, watch=False, meta_path=META_JS
+    )
+    _run_esbuild(
+        css_entries, css_out, CSS_ENTRYPOINTS_DIR, mode, watch=False, meta_path=META_CSS
     )
 
     _copy_passthrough_assets()
@@ -264,7 +266,7 @@ def watch(mode: str) -> None:
     css_out.mkdir(parents=True, exist_ok=True)
 
     js_entries = _discover_js_entries()
-    css_entries = _discover_entries(CSS_ENTRIES_DIR, "css")
+    css_entries = _discover_entries(CSS_ENTRYPOINTS_DIR, "css")
 
     stop_event = threading.Event()
     watcher_thread = threading.Thread(
@@ -280,7 +282,7 @@ def watch(mode: str) -> None:
         css_process = _run_esbuild(
             css_entries,
             css_out,
-            CSS_ENTRIES_DIR,
+            CSS_ENTRYPOINTS_DIR,
             mode,
             watch=True,
             meta_path=META_CSS,

@@ -11,8 +11,7 @@
         <link rel="stylesheet" href="{{ url_for('static', filename=auth_css) }}" />
       {% endif %}
     {% else %}
-      <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
-      <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}" />
+      <link rel="stylesheet" href="{{ url_for('static', filename='css/entrypoints/auth-forms.css') }}" />
     {% endif %}
     <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}" type="image/x-icon" />
     {% block head_extra %}{% endblock %}

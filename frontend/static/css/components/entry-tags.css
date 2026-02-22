@@ -1,5 +1,5 @@
 @import url("../tokens/base.css");
-@import url("../motion.css");
+@import url("../foundation/motion.css");
 
 .entry-tags {
   --entry-tag-max-width: 32ch;

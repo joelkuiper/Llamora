@@ -13,7 +13,7 @@
     {% endif %}
 
     {% if not app_css %}
-      {% set app_css = 'css/app.css' %}
+      {% set app_css = 'css/entrypoints/app-shell.css' %}
     {% endif %}
 
     <link rel="stylesheet" href="{{ url_for('static', filename=app_css) }}">

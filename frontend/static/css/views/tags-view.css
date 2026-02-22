@@ -1,4 +1,4 @@
-@import url("./tokens/base.css");
+@import url("../tokens/base.css");
 
 #main-content[data-view="tags"] {
   flex: 1 1 auto;
