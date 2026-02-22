@@ -204,9 +204,9 @@ Llamora uses a zero-knowledge architecture: the server stores and queries cipher
 flowchart LR
     pw[Password] --> kdf1[Argon2ID] --> wk1[Wrapping key]
     rc[Recovery code] --> kdf2[Argon2ID] --> wk2[Wrapping key]
-    wk1 -- unwraps --> dek[DEK · 32 bytes\nin memory only]
+    wk1 -- unwraps --> dek[DEK · 32 bytes<br>in memory only]
     wk2 -- unwraps --> dek
-    dek -- encrypts --> data[XChaCha20-Poly1305\nper record]
+    dek -- encrypts --> data[XChaCha20-Poly1305<br>per record]
 
     style dek fill:#2d6a4f,stroke:#40916c,color:#fff
     style data fill:#1b4332,stroke:#40916c,color:#fff
