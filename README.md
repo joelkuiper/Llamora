@@ -82,7 +82,7 @@ The first time search is used, a small sentence embedding model (~130 MB) is dow
 
 Llamora is organised around time, not conversation. The primary navigation is a calendar. You write entries inside a daily page.
 
-Many AI interfaces are organised around an ongoing back-and-forth. The conversation grows as a continuous thread. In Llamora, entries are anchored to a date. You add text to a day. The model may respond, but those responses sit inside the same page. The day contains the exchange rather than the exchange defining the structure.
+Many AI interfaces are organised around an ongoing back-and-forth. In Llamora, entries are anchored to a date. You add text to a day. The model may respond, but those responses sit inside the same page. The day contains the exchange rather than the exchange defining the structure.
 
 The model is part of that daily flow. It opens each day, can respond to entries, and suggests traces that describe the exchange. Those suggestions are optional. When kept, they become part of the archive rather than temporary output. Over time, both your writing and the model’s contributions accumulate in the same log.
 
