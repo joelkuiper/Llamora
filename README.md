@@ -2,30 +2,25 @@
 
 > Llamora is an experimental, local-first journaling environment that attempts to make continuity visible.
 >
-> You write in daily pages.
-> Over time, those pages accumulate into timelines, tag views, and summaries.
-> A locally running model participates in this process — generating day openings, tag recaps, and reflective responses — as part of the structure of the system.
+> You write in daily pages. The system helps you move through what accumulates over time, with lightweight structure and recall views that make it easier to notice threads you would otherwise miss. A model running on your own machine is part of that flow, producing day openings, tag recaps, and reflective responses inside the journal itself.
 >
-> It runs entirely on your machine.
->
-> Llamora is not a chat wrapper.
-> It is an attempt to build a longitudinal writing interface where time, repetition, and reflection are first-class.
+> Llamora is not designed to be a chat wrapper. It is an attempt to treat a journal as a navigable archive, built around time and return, rather than a stream of disconnected entries.
 
 ---
 
 ## What It Does
 
-**Daily pages.** A new page opens each day. You write; the model responds inline. The exchange — your entries and the model's replies — is stored as a persistent log that accumulates over time.
+**Daily pages.** A new page opens each day. You write; the model responds inline if you want it to (and only then). This exchange is stored as a persistent log that accumulates over time.
 
 **Day openings.** At the start of each day, the model generates a short opening. It draws on a rolling window of recent entries and a digest of the previous day's exchange, and becomes the first message on the new page.
 
-**Traces.** After each exchange, the model tags the entry with hashtags and an emoji. These tags — called traces — accumulate in a dedicated view showing frequency over time, co-occurrence with other traces, chronological entry history, and a model-generated summary of what the trace represents. An activity heatmap shows usage across the past year.
+**Traces.** After each exchange, the model suggests relevant tags. These tags (called traces in the app) accumulate in a dedicated view showing frequency over time, co-occurrence with other traces, chronological entry history, and a model-generated summary of what the trace represents. An activity heatmap shows usage across the past year. Tags also allow you to attach context for the model responses.
 
 **Search.** Entries are embedded locally using a small sentence model. Search combines semantic nearest-neighbour retrieval with phrase matching and returns ranked results across the full log.
 
 **Calendar.** All dates with entries are marked in a navigable calendar. Jumping to any date loads its page.
 
-**Encryption.** All stored content — entries, model responses, embeddings, derived data — is encrypted at rest with a per-user key derived from your password and sealed with a recovery code.
+**Encryption.** All stored content (entries, model responses, embeddings, derived data) is encrypted at rest with a per-user key derived from your password and sealed with a recovery code.
 
 ---
 
@@ -69,7 +64,7 @@ uv sync
 LLAMORA_LLM__UPSTREAM__HOST=http://127.0.0.1:8081 uv run llamora-server dev
 ```
 
-Open [http://localhost:5000](http://localhost:5000). On first run, register an account — the database is created automatically and the registration page is shown until at least one user exists.
+Open [http://localhost:5000](http://localhost:5000). On first run, register an account — the database is created automatically.
 
 The first time search is used, a small sentence embedding model (~130 MB) is downloaded and cached locally.
 
@@ -81,7 +76,7 @@ Llamora is organised around time, not conversation.
 The primary navigation is a calendar. The primary unit is a daily page.
 
 In most writing tools, AI is something you invoke.
-In Llamora, the model participates in the structure of the day: it opens each page, responds to entries, tags the exchange, and later recaps what those tags represent.
+In Llamora, the model participates in the structure of the day: it opens each page, optionally responds to entries, suggests tags for the exchange, and later recaps what those tags represent.
 These outputs enter the record — they are not session artifacts that disappear.
 Over months, the model's contributions become part of the longitudinal shape of the log.
 
