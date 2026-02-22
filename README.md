@@ -51,7 +51,7 @@ Many AI interfaces are organised around an ongoing back-and-forth. In Llamora, e
 
 The model is part of that daily flow. It opens each day, can respond to entries, and suggests traces that describe the exchange. Those suggestions are optional. When kept, they become part of the archive rather than temporary output. Over time, both your writing and the model’s contributions accumulate in the same log.
 
-Traces are lightweight labels proposed by the model to make later return easier. When added, they allow you to see where something recurs, what it tends to appear alongside, and which entries it touches. The aim is not interpretation, but legibility.
+Traces are lightweight labels proposed by the model to make later return easier. When added, they allow you to see where something recurs, what it tends to appear alongside, and which entries it touches.
 
 A diary is a personal, private artifact with strong security expectations. You do not expect it to send data elsewhere, depend on a remote service, or expose its contents by default. Llamora follows those constraints. The model runs on your machine, and the archive remains there.
 
