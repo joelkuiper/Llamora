@@ -11,7 +11,7 @@
 
 ## What It Does
 
-**Daily pages.** A new page opens each day. You write; the model responds if you want it to (and only then). This exchange is stored as a persistent log that accumulates over time.
+**Daily pages.** A new page opens each day. You write; the model responds if you want it to (and only then). The exchange becomes part of a persistent record that accumulates over time.
 
 **Day openings.** At the start of each day, the model generates a short opening. It draws on a rolling window of recent entries and a digest of the previous day's exchange, and becomes the first message on the new page.
 
