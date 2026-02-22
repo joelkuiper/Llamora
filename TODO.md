@@ -1,8 +1,10 @@
 # TODO
-- [ ] README
+- [x] README
+- [ ] Better emoji integration
 - [ ] Help / introduction flow (also check new user, clean state flow!)
 - [ ] User settings (font, theme, prompts?, llm settings?, etc)
 - [ ] Keyboard accessibility rethink
+- [ ] WebAuth / 2FA
 Later
 - [ ] Structure or other fancy viz view
 - [ ] Better model than Qwen4B, find something that's a bit more chatty
@@ -15,5 +17,5 @@ Later
 - [ ] Image support?
 - [ ] Generic attachment support?
 Maybe
-- [ ] Github / squarespace page, domain, etc
+- [ ] Github / SquareSpace / custom page
 - [ ] Desktop app (Electron/Tauri)
