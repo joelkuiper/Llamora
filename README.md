@@ -96,8 +96,7 @@
 
 ```bash
 llama-server \
-  -hf bartowski/Meta-Llama-3.1-8B-Instruct-GGUF \
-  -hff Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf \
+  -hf bartowski/Meta-Llama-3.1-8B-Instruct-GGUF:Q4_K_M \
   --port 8081 --jinja
 ```
 
