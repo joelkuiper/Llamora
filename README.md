@@ -39,7 +39,7 @@
 
 - **Calendar navigation** — all dates with entries appear in a navigable calendar. Jump to any date to load its page.
 
-- **Zero-knowledge encryption** — all stored content is encrypted before it touches the database. The server never sees plaintext entries, tags, embeddings, or search queries. Your password unwraps a per-user key that exists only in memory for the duration of the session. No unecrypted data is ever written to disk, session storage, or local storage.
+- **Encryption at rest** — all stored content is encrypted before it reaches the database. Your password unwraps a per-user key that exists only in memory for the duration of the session — plaintext is never written to disk, session storage, or local storage. Entries, responses, embeddings, tags, and search queries are all covered.
 
 - **Markdown and rich text** — entries and model responses are rendered as formatted text. Write naturally with headings, lists, emphasis, and links.
 
@@ -165,7 +165,7 @@ Many AI interfaces are built around an ongoing back-and-forth. Here, the model i
 - **No network access required.** All inference, embedding, and storage happens locally.
 - **No telemetry.** The application makes no outbound requests.
 - **Streamed responses.** Model output appears incrementally via server-sent events.
-- **Zero-knowledge encryption.** The server operates on ciphertext only. A per-user data-encryption key (DEK) is unwrapped from your password at login and held in memory — never persisted in plaintext. A recovery code provides a second unwrap path. Loss of both means the data cannot be recovered.
+- **Encryption at rest.** All content is encrypted before it reaches the database. A per-user data-encryption key (DEK) is unwrapped from your password at login and held in memory — never persisted in plaintext. A recovery code provides a second unwrap path. Loss of both means the data cannot be recovered.
 - **Local embeddings.** The sentence model runs on your machine. Embeddings are stored encrypted alongside everything else.
 - **SQLite-backed.** All state lives in a single file. Migrations are applied automatically.
 - **Single-user by default.** Multi-user should work but is not extensively tested. No admin interface.
@@ -196,7 +196,7 @@ Many AI interfaces are built around an ongoing back-and-forth. Here, the model i
 <details>
 <summary><strong>Encryption design</strong></summary>
 
-Llamora uses a zero-knowledge architecture: the server stores and queries ciphertext, but never has access to plaintext content.
+All content is encrypted at the application layer before it reaches the database. The server decrypts in memory to serve pages and run inference, but nothing is ever stored or logged in plaintext.
 
 **Key hierarchy:**
 
