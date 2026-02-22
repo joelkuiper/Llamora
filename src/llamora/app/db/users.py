@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+
 import orjson
 from aiosqlitepool import SQLiteConnectionPool
 from ulid import ULID
@@ -265,10 +267,26 @@ class UsersRepository(BaseRepository):
             )
 
     async def delete_user(self, user_id: str) -> None:
+        lockbox_prefix = hashlib.sha256(user_id.encode("utf-8")).hexdigest() + ":"
         async with self.pool.connection() as conn:
-            await self._run_in_transaction(
-                conn,
-                conn.execute,
-                "DELETE FROM users WHERE id = ?",
-                (user_id,),
-            )
+
+            async def _tx() -> None:
+                # These tables are user-scoped but not FK-linked to users.
+                await conn.execute(
+                    "DELETE FROM search_history WHERE user_id = ?",
+                    (user_id,),
+                )
+                await conn.execute(
+                    "DELETE FROM tags WHERE user_id = ?",
+                    (user_id,),
+                )
+                await conn.execute(
+                    "DELETE FROM lockbox WHERE namespace LIKE ?",
+                    (lockbox_prefix + "%",),
+                )
+                await conn.execute(
+                    "DELETE FROM users WHERE id = ?",
+                    (user_id,),
+                )
+
+            await self._run_in_transaction(conn, _tx)

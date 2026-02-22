@@ -68,7 +68,8 @@ CREATE TABLE IF NOT EXISTS search_history (
     alg TEXT NOT NULL,
     usage_count INTEGER DEFAULT 1,
     last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY(user_id, query_hash)
+    PRIMARY KEY(user_id, query_hash),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_entries_user_date ON entries(user_id, created_date);
