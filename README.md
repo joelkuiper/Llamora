@@ -1,61 +1,90 @@
 ![Llamora logo](./doc/brand/logo.png)
 
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.12+-3776AB.svg)](https://www.python.org/)
 
-> Llamora is an experimental, local-first journaling environment that attempts to make continuity visible.
->
-> You write in daily pages. The system helps you move through what accumulates over time. A model running on your own machine is part of that flow, producing day openings, recaps, and reflective responses inside the journal itself.
->
-> Llamora is not designed to be a chat wrapper. It is an attempt to treat a journal as a navigable archive, built around time and return, rather than a stream of disconnected entries.
+> A local-first journaling environment that makes continuity visible.
+> Write in daily pages. A model running on your machine produces day openings, recaps, and reflective responses — all inside the journal itself.
+> Not a chat wrapper. A navigable archive built around time and return.
 
 ---
 
-## What It Does
+## Table of Contents
 
-**Daily pages.** A new page opens each day. You write; the model responds if you want it to (and only then). The exchange becomes part of a persistent record that accumulates over time.
+- [Features](#features)
+- [Screenshots](#screenshots)
+- [Quick Start](#quick-start)
+- [Try the Demo](#try-the-demo)
+- [Design Philosophy](#design-philosophy)
+- [System Properties](#system-properties)
+- [Stack](#stack)
+- [Configuration](#configuration)
+- [Development](#development)
+- [Limitations](#limitations)
 
-**Day openings.** At the start of each day, the model generates a short opening. It draws on a rolling window of recent entries and a digest of the previous day's exchange, and becomes the first message on the new page.
+---
 
-**Traces.** After each exchange, the model suggests relevant tags. These tags (called traces in the app) accumulate in a dedicated view showing frequency over time, co-occurrence with other traces, chronological entry history, and a model-generated summary of what the trace represents. An activity heatmap shows usage across the past year. Traces also allow you to attach context to the model for responses.
+## Features
 
-**Search.** Entries are embedded locally using a small sentence model. Search combines semantic nearest-neighbour retrieval with phrase matching and returns ranked results across the full log.
+- **Daily pages** — a new page opens each day. You write; the model responds only when asked. The exchange becomes part of a persistent, date-anchored record.
 
-**Calendar.** All dates with entries are marked in a navigable calendar. Jumping to any date loads its page.
+- **Day openings** — the model generates a short opening each morning, drawing on recent entries and a digest of the previous day.
 
-**Encryption.** All stored content (entries, model responses, embeddings, derived data) is encrypted at rest with a per-user key derived from your password and sealed with a recovery code.
+- **Traces** — after each exchange, the model suggests lightweight tags. Kept traces accumulate in a dedicated view: frequency over time, co-occurrence, chronological history, model-generated summaries, and a year-long activity heatmap. Attach traces as context for future responses.
+
+- **Search** — find past entries by meaning, not just exact words. Search understands what you wrote about, not only how you phrased it, and returns ranked results across your entire journal.
+
+- **Calendar navigation** — all dates with entries appear in a navigable calendar. Jump to any date to load its page.
+
+- **Encryption at rest** — all stored content is encrypted with a per-user key derived from your password and sealed with a recovery code. Entries, responses, embeddings, and derived data are all covered.
+
+- **Markdown and rich text** — entries and model responses are rendered as formatted text. Write naturally with headings, lists, emphasis, and links.
 
 ---
 
 ## Screenshots
 
+<details>
+<summary><strong>Diary view</strong> — daily page with entries and model responses</summary>
+
 ![Diary view](./doc/screenshots/diary.png)
+</details>
+
+<details>
+<summary><strong>Respond</strong> — model response detail</summary>
 
 ![Respond](./doc/screenshots/respond-detail.png)
+</details>
+
+<details>
+<summary><strong>Traces</strong> — tag overview with frequency and co-occurrence</summary>
 
 ![Trace view](./doc/screenshots/trace-view.png)
+</details>
+
+<details>
+<summary><strong>Search</strong> — semantic + phrase search across all entries</summary>
 
 ![Search](./doc/screenshots/search.png)
+</details>
+
+<details>
+<summary><strong>Trace detail</strong> — history and summary for a single trace</summary>
 
 ![Trace detail](./doc/screenshots/trace-detail.png)
+</details>
+
+<details>
+<summary><strong>Trace popover</strong></summary>
 
 ![Trace popover](./doc/screenshots/trace-popover.png)
+</details>
+
+<details>
+<summary><strong>Calendar</strong></summary>
 
 ![Calendar](./doc/screenshots/calendar-popover.png)
-
----
-
-## Conceptual Notes
-
-Llamora is organised around time, not conversation. The primary navigation is a calendar. You write entries inside a daily page.
-
-Many AI interfaces are organised around an ongoing back-and-forth. In Llamora, entries are anchored to a date. You add text to a day. The model may respond, but those responses sit inside the same page.
-
-The model is part of that daily flow. It opens each day, can respond to entries, and suggests traces that describe the exchange. Those suggestions are optional. When kept, they become part of the archive rather than temporary output. Over time, both your writing and the model’s contributions accumulate in the same log.
-
-Traces are lightweight labels proposed by the model to make later return easier. When added, they allow you to see where something recurs, what it tends to appear alongside, and which entries it touches.
-
-A diary is a personal, private artifact with strong security expectations. You do not expect it to send data elsewhere, depend on a remote service, or expose its contents by default. Llamora follows those constraints. The model runs on your machine, and the archive remains there.
-
-The system does not attempt to evaluate you. The model can respond and suggest traces, but it does not score entries, infer traits, or generate behavioural profiles. Nothing is surfaced as an assessment. The record is yours to interpret.
+</details>
 
 ---
 
@@ -63,7 +92,7 @@ The system does not attempt to evaluate you. The model can respond and suggest t
 
 **Requirements:** [uv](https://docs.astral.sh/uv/) and a running [llama.cpp](https://github.com/ggerganov/llama.cpp) server.
 
-**1. Start a local model.**
+### 1. Start a local model
 
 ```bash
 llama-server \
@@ -72,25 +101,48 @@ llama-server \
   --port 8081 --jinja
 ```
 
-Meta-Llama-3.1-8B-Instruct is the current baseline. The Q4_K_M quantisation (~5 GB) balances quality and memory footprint. The first invocation downloads the weights. The `--jinja` flag enables llama.cpp's internal chat-template rendering, which Llamora requires.
+The Q4_K_M quantisation (~5 GB) is the current baseline. Weights are downloaded on first run. The `--jinja` flag is required for chat-template rendering. Any instruction-tuned model works — see the [bartowski recommended small models](https://huggingface.co/collections/bartowski/recommended-small-models) for alternatives.
 
-Any instruction-tuned model that follows system prompts reliably will work. The [bartowski recommended small models](https://huggingface.co/collections/bartowski/recommended-small-models) collection is a useful starting point for alternatives.
-
-**2. Install dependencies.**
+### 2. Install and run
 
 ```bash
 uv sync
-```
-
-**3. Start the server.**
-
-```bash
 LLAMORA_LLM__UPSTREAM__HOST=http://127.0.0.1:8081 uv run llamora-server dev
 ```
 
-Open [http://localhost:5000](http://localhost:5000). On first run, register an account — the database is created automatically.
+Open [http://localhost:5000](http://localhost:5000) and register an account. The database is created automatically. The first search downloads a small embedding model (~130 MB).
 
-The first time search is used, a small sentence embedding model (~130 MB) is downloaded and cached locally.
+---
+
+## Try the Demo
+
+A pre-generated database ships with the repo (`data/demo_data.sqlite3.lzma`) — simulated entries, responses, and traces from January 2025 to February 2026. This is the fastest way to explore the interface.
+
+```bash
+# Extract the demo database
+uv run python scripts/extract_demo_db.py
+
+# Start with demo data
+LLAMORA_DATABASE__PATH=data/demo_data.sqlite3 \
+LLAMORA_LLM__UPSTREAM__HOST=http://127.0.0.1:8081 \
+uv run llamora-server dev
+```
+
+Log in with `demo_user` / `demo_user_test_password12345!`
+
+---
+
+## Design Philosophy
+
+Llamora is organised around **time, not conversation**. The primary navigation is a calendar. Entries are anchored to dates, not threads.
+
+Many AI interfaces are built around an ongoing back-and-forth. Here, the model is part of a daily flow: it opens each day, can respond to entries, and suggests traces. Those suggestions are optional. When kept, they become part of the archive — not temporary output. Over time, both your writing and the model's contributions accumulate in the same log.
+
+**Traces** are lightweight labels proposed by the model to make later return easier. They let you see where something recurs, what it tends to appear alongside, and which entries it touches.
+
+**Privacy is structural.** A diary is a personal artifact with strong security expectations. You don't expect it to send data elsewhere, depend on a remote service, or expose its contents by default. In Llamora, the model runs on your machine and the archive stays there, locked behind a key.
+
+**No evaluation.** The model can respond and suggest traces, but it does not score entries, infer traits, or generate behavioural profiles. Nothing is surfaced as an assessment. The record is yours to interpret.
 
 ---
 
@@ -98,49 +150,44 @@ The first time search is used, a small sentence embedding model (~130 MB) is dow
 
 - **No network access required.** All inference, embedding, and storage happens locally.
 - **No telemetry.** The application makes no outbound requests.
-- **Streamed responses.** Model output is delivered via server-sent events and appears incrementally as it is generated.
-- **Encryption at rest.** All content is encrypted with a per-user Data Encryption Key (DEK) wrapped by your password. A recovery code provides a second unwrap path. Loss of both means the data cannot be recovered by anyone.
-- **Embeddings are local.** The sentence model runs on your machine. Embeddings are stored in encrypted form alongside the rest of the data.
-- **SQLite-backed.** All persistent state is a single file. Migrations are applied automatically at startup.
-- **Single-user.** Multi-user and administrative interfaces are not implemented.
+- **Streamed responses.** Model output appears incrementally via server-sent events.
+- **Encryption at rest.** All content is encrypted with a per-user DEK wrapped by your password. A recovery code provides a second unwrap path. Loss of both means the data cannot be recovered.
+- **Local embeddings.** The sentence model runs on your machine. Embeddings are stored encrypted alongside everything else.
+- **SQLite-backed.** All state lives in a single file. Migrations are applied automatically.
+- **Single-user.** Multi-user and admin interfaces are not implemented.
 
 ---
 
 ## Stack
 
-**Backend:** Async Python ([Quart](https://quart.palletsprojects.com/)) with server-sent events for response streaming. Configuration via [Dynaconf](https://www.dynaconf.com/). Package management via [uv](https://docs.astral.sh/uv/).
+| Layer | Technology |
+| --- | --- |
+| **Backend** | Async Python ([Quart](https://quart.palletsprojects.com/)), SSE streaming, [Dynaconf](https://www.dynaconf.com/) config, [uv](https://docs.astral.sh/uv/) |
+| **Frontend** | [HTMX](https://htmx.org/) + server-rendered HTML fragments. No JS framework. [esbuild](https://esbuild.github.io/) for production. [Biome](https://biomejs.dev/) for lint/format |
+| **Storage** | SQLite, no ORM, incremental migrations |
+| **Encryption** | [libsodium](https://doc.libsodium.org/) via PyNaCl — per-user symmetric DEK, password-derived wrapping + recovery code |
+| **Inference** | Any [OpenAI-compatible](https://platform.openai.com/docs/api-reference/chat) `/v1/chat/completions` endpoint (default: [llama.cpp](https://github.com/ggerganov/llama.cpp)) |
+| **Embeddings** | [bge-small-en-v1.5](https://huggingface.co/BAAI/bge-small-en-v1.5) via FlagEmbedding + [HNSWlib](https://github.com/nmslib/hnswlib) ANN |
 
-**Frontend:** [HTMX](https://htmx.org/) with server-rendered HTML fragments. No JavaScript framework. Native ES modules in development; [esbuild](https://esbuild.github.io/) for production bundles (vendored binary, driven by Python). Formatting and linting via [Biome](https://biomejs.dev/).
+<details>
+<summary><strong>Key design decisions</strong></summary>
 
-**Storage:** SQLite. Single-file database, no ORM. Schema managed with lightweight incremental migrations.
+- **Server-rendered HTML over an SPA.** The server is the source of truth. HTMX handles partial updates; the client manages transitions and feedback only. No separate API layer.
+- **OpenAI-compatible abstraction.** Not tied to a specific model or runtime. Swapping models requires no code changes.
+- **SQLite + per-user encryption.** No external database, no cloud dependency. The entire journal is a single file, encrypted at the application layer before writes.
+- **SSE for streaming.** Model output is pushed incrementally without polling or websockets.
 
-**Encryption:** [libsodium](https://doc.libsodium.org/) (via PyNaCl). Per-user symmetric key (DEK) wrapped by a password-derived key and a separate recovery code.
-
-**Inference:** Any [OpenAI-compatible](https://platform.openai.com/docs/api-reference/chat) `/v1/chat/completions` endpoint — in practice, [llama.cpp](https://github.com/ggerganov/llama.cpp) running locally. The client is the OpenAI Python SDK pointed at `127.0.0.1`.
-
-**Embeddings:** [FlagEmbedding](https://huggingface.co/BAAI/bge-small-en-v1.5) (bge-small-en-v1.5) for local sentence embeddings. [HNSWlib](https://github.com/nmslib/hnswlib) for approximate nearest-neighbour retrieval.
-
-**Key design decisions:**
-
-- *Server-rendered HTML over an SPA.* The server is the source of truth for all state. HTMX handles partial updates and navigation; the client manages transitions and feedback only. This keeps the frontend auditable and avoids a separate API layer.
-- *OpenAI-compatible abstraction.* Llamora is not tied to a specific model or runtime. Any locally running server that speaks `/v1/chat/completions` works. Swapping models requires no code changes.
-- *SQLite + per-user encryption.* No external database, no cloud dependency. The entire journal is a single file. Encryption happens at the application layer before writes.
-- *SSE for streaming.* Model output is pushed to the browser incrementally via server-sent events as it is generated, without polling or websockets.
+</details>
 
 ---
 
 ## Configuration
 
 Values are read in order: built-in defaults → `config/settings.local.toml` → `.env` → environment variables.
-Environment variables use double-underscore separators to represent nesting:
 
-```
-LLAMORA_LLM__UPSTREAM__HOST=http://127.0.0.1:8081
-LLAMORA_LLM__CHAT__MODEL=local
-LLAMORA_APP__PORT=5050
-```
+Environment variables use double-underscore separators for nesting (e.g. `LLAMORA_LLM__UPSTREAM__HOST`).
 
-`config/settings.local.toml` is the preferred method for persistent local overrides:
+`config/settings.local.toml` is preferred for persistent overrides:
 
 ```toml
 [default.LLM.upstream]
@@ -154,7 +201,10 @@ temperature = 0.7
 top_p = 0.8
 ```
 
-**External API.** Llamora can also connect to any hosted OpenAI-compatible endpoint. Set `base_url` and `api_key` in `config/settings.local.toml` (or store the key in `config/.secrets.toml` to keep it out of version control), and enable `skip_health_check` to bypass the llama.cpp-specific health probe:
+<details>
+<summary><strong>Using an external API</strong> (OpenAI, etc.)</summary>
+
+Llamora can connect to any hosted OpenAI-compatible endpoint. Set `base_url` and `api_key`, and enable `skip_health_check` to bypass the llama.cpp-specific probe:
 
 ```toml
 [default.LLM.upstream]
@@ -168,13 +218,14 @@ model = "gpt-4o-mini"
 stop = []
 ```
 
+Store the API key separately in `config/.secrets.toml` (not committed):
+
 ```toml
-# config/.secrets.toml — not committed
 [default.LLM.chat]
 api_key = "sk-..."
 ```
 
-Equivalently via environment variables:
+Or equivalently via environment variables:
 
 ```bash
 LLAMORA_LLM__UPSTREAM__SKIP_HEALTH_CHECK=true \
@@ -184,81 +235,66 @@ LLAMORA_LLM__CHAT__API_KEY=sk-... \
 uv run llamora-server dev
 ```
 
-Any OpenAI-compatible provider works the same way — substitute `base_url`, `model`, and `api_key` as appropriate.
+Any OpenAI-compatible provider works — substitute `base_url`, `model`, and `api_key` as appropriate.
 
-llama.cpp-specific parameters (such as `top_k` or `mirostat`) can be passed through via `LLM.chat.parameters`, but only keys listed in `LLM.chat.parameter_allowlist` are forwarded to the upstream. This prevents accidental leakage of unknown parameters.
+</details>
 
-| Section             | Purpose                              |
-| ------------------- | ------------------------------------ |
-| `APP`               | Host, port, runtime                  |
-| `FEATURES`          | Toggle optional functionality        |
-| `AUTH`              | Login limits and timeouts            |
-| `DATABASE`          | SQLite path and pool                 |
-| `LLM.chat`          | Chat client and parameter settings   |
-| `LLM.upstream`      | Upstream connection                  |
-| `LLM.generation`    | Default generation parameters        |
-| `LLM.tokenizer`     | Token counting and safety margin     |
-| `SEARCH`            | Semantic search and ANN limits       |
-| `CRYPTO`            | DEK storage method                   |
-| `COOKIES`           | Cookie name and encryption secret    |
+<details>
+<summary><strong>Configuration sections reference</strong></summary>
 
-**Prompt templates** are Jinja2 files in `src/llamora/llm/templates`.
-The three active templates are `system.txt.j2`, `opening_system.txt.j2`, and `opening_recap.txt.j2`.
-Editing them does not require touching Python. Changes take effect on restart.
+| Section | Purpose |
+| --- | --- |
+| `APP` | Host, port, runtime |
+| `FEATURES` | Toggle optional functionality |
+| `AUTH` | Login limits and timeouts |
+| `DATABASE` | SQLite path and pool |
+| `LLM.chat` | Chat client and parameter settings |
+| `LLM.upstream` | Upstream connection |
+| `LLM.generation` | Default generation parameters |
+| `LLM.tokenizer` | Token counting and safety margin |
+| `SEARCH` | Semantic search and ANN limits |
+| `CRYPTO` | DEK storage method |
+| `COOKIES` | Cookie name and encryption secret |
 
-To point Llamora at a different template directory, set `LLAMORA_PROMPTS__TEMPLATE_DIR`.
+llama.cpp-specific parameters (`top_k`, `mirostat`, etc.) can be passed via `LLM.chat.parameters`, but only keys in `LLM.chat.parameter_allowlist` are forwarded upstream.
+
+</details>
+
+**Prompt templates** are Jinja2 files in `src/llamora/llm/templates` (`system.txt.j2`, `opening_system.txt.j2`, `opening_recap.txt.j2`). Edit them directly — no Python changes needed. Changes take effect on restart. Override the directory with `LLAMORA_PROMPTS__TEMPLATE_DIR`.
 
 ---
 
 ## Development
 
 ```bash
-# Install
-uv sync
+uv sync                              # Install
+uv run llamora-server dev             # Run with live reload
+uv run llamora-server --workers 4     # Run for production
 
-# Run with live reload
-uv run llamora-server dev
-
-# Run for production
-uv run llamora-server --workers 4
-
-# Type check
-uv run pyright
-
-# Backend lint and format
-uv run ruff check
-uv run ruff format
-
-# Frontend lint and format
-biome check
-biome format --write
+uv run pyright                        # Type check
+uv run ruff check && uv run ruff format   # Backend lint + format
+biome check && biome format --write   # Frontend lint + format
 ```
 
-Set `QUART_DEBUG=1` to enable Quart's debug output. Append `--no-reload` to `dev` to disable the file watcher.
+Set `QUART_DEBUG=1` for Quart debug output. Add `--no-reload` to disable the file watcher.
 
-**Frontend assets** are served as native ES modules in development and can be bundled for production:
+**Frontend assets** — native ES modules in development, bundled for production:
 
 ```bash
 uv run python scripts/build_assets.py build --mode prod
 ```
 
-When `frontend/dist/manifest.json` exists the server uses bundled outputs. Remove `frontend/dist/` to revert to unbundled files.
+The server uses bundled outputs when `frontend/dist/manifest.json` exists. Remove `frontend/dist/` to revert.
 
-**Vendored JS dependencies** are committed under `frontend/static/js/vendor/` and can be regenerated:
+**Vendored JS** — committed under `frontend/static/js/vendor/`, regenerated with:
 
 ```bash
 pnpm install && pnpm vendor
 ```
 
-**Git hooks** are in `.githooks/`:
+**Git hooks** — enable with `git config core.hooksPath .githooks` (pre-commit runs Ruff on staged Python files).
 
-```bash
-git config core.hooksPath .githooks
-```
-
-The pre-commit hook formats and checks staged Python files with Ruff before each commit.
-
-**Migrations** are applied automatically at startup. To inspect or apply manually:
+**Migrations** — applied automatically at startup. Manual inspection:
 
 ```bash
 uv run python scripts/migrate.py status
@@ -269,11 +305,17 @@ uv run python scripts/migrate.py up
 
 ## Limitations
 
-- No two-factor authentication (e.g. WebAuth) or captcha protection yet.
-- Designed for single-user, local use.
-- Requires a locally running model server. Inference speed depends on available hardware; a dedicated GPU makes a significant difference.
-- Model weights are several gigabytes and are downloaded by llama.cpp on first use. The sentence embedding model is downloaded separately.
-- Output quality is directly determined by the local model. A model that does not follow instructions reliably will produce poor responses, traces, openings, and summaries.
-- Loss of both password and recovery code makes stored data unrecoverable.
-- No content moderation or prompt filtering. Local, personal use is assumed.
+- No two-factor authentication or captcha protection.
+- Designed for single-user, local use only.
+- Requires a locally running model server. A dedicated GPU makes a significant difference for inference speed.
+- Model weights are several GB, downloaded by llama.cpp on first use. The embedding model (~130 MB) is downloaded separately.
+- Output quality depends entirely on the local model. Unreliable instruction-following produces poor results.
+- Loss of both password and recovery code makes stored data **unrecoverable**.
+- No content moderation or prompt filtering — local, personal use is assumed.
 - Not production-ready. Deploying outside a personal context is not recommended.
+
+---
+
+## License
+
+[GPL-3.0](LICENSE)
