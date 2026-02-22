@@ -5,7 +5,8 @@
 - [ ] User settings (font, theme, prompts?, llm settings?, etc)
 - [ ] Keyboard accessibility rethink
 - [ ] WebAuth / 2FA
-Later
+
+# Later
 - [ ] Structure or other fancy viz view
 - [ ] Better model than Qwen4B, find something that's a bit more chatty
   - [ ] https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF seems to work better
@@ -16,6 +17,7 @@ Later
   - [ ] Versioning / CI / releases, etc
 - [ ] Image support?
 - [ ] Generic attachment support?
-Maybe
+
+# Maybe
 - [ ] Github / SquareSpace / custom page
 - [ ] Desktop app (Electron/Tauri)
