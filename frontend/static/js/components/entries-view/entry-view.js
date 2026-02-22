@@ -2,10 +2,9 @@ import { appReady } from "../../app-init.js";
 import { initDayNav, navigateToDate } from "../../day.js";
 import { renderMarkdownInElement } from "../../markdown.js";
 import { scrollEvents } from "../../scroll-manager.js";
+import { getClientToday, getTimezone } from "../../services/datetime.js";
 import {
   formatTimeElements,
-  getClientToday,
-  getTimezone,
   scheduleMidnightRollover,
   updateClientToday,
 } from "../../services/time.js";

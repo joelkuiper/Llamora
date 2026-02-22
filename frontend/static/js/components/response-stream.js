@@ -1,10 +1,6 @@
 import { requestScrollForceEdge } from "../scroll-manager.js";
-import {
-  applyTimezoneQuery,
-  formatLocalTime,
-  formatLocalTimestamp,
-  getClientToday,
-} from "../services/time.js";
+import { formatLocalTime, formatLocalTimestamp, getClientToday } from "../services/datetime.js";
+import { applyTimezoneQuery } from "../services/time.js";
 import { TYPING_INDICATOR_SELECTOR } from "../typing-indicator.js";
 import { isMotionReduced } from "../utils/motion.js";
 import { StreamRenderer } from "./stream-renderer.js";

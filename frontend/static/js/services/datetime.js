@@ -155,3 +155,133 @@ export function parseDateFromSource(value) {
 export function parseIsoDate(value) {
   return parseDateFromSource(value);
 }
+
+function normalizeTimeValue(value) {
+  if (value instanceof Date) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const raw = value.trim();
+    if (!raw) {
+      return new Date("");
+    }
+    // SQLite CURRENT_TIMESTAMP produces space-delimited UTC strings (e.g. "2025-01-15 14:30:00").
+    // Append "Z" to interpret them as UTC.
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/.test(raw)) {
+      return new Date(`${raw.replace(" ", "T")}Z`);
+    }
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+    const fallback = raw.replace(/([+-]\d{2}):(\d{2})$/, "$1$2");
+    return new Date(fallback);
+  }
+  return new Date(value);
+}
+
+export function getClientToday(now = new Date()) {
+  return formatIsoDate(now);
+}
+
+export function getClockFormat() {
+  const raw = document?.body?.dataset?.clockFormat ?? "";
+  return raw === "12h" ? "12h" : "24h";
+}
+
+function getLocaleForTime() {
+  const docLocale = document?.documentElement?.lang ?? "";
+  if (docLocale) {
+    return docLocale;
+  }
+  if (typeof navigator !== "undefined" && navigator.language) {
+    return navigator.language;
+  }
+  return "en-US";
+}
+
+export function formatLocalTime(value) {
+  const date = normalizeTimeValue(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const hour12 = getClockFormat() === "12h";
+  const locale = getLocaleForTime();
+  return new Intl.DateTimeFormat(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12,
+  }).format(date);
+}
+
+export function formatLocalTimestamp(value) {
+  const date = normalizeTimeValue(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const hour12 = getClockFormat() === "12h";
+  const locale = getLocaleForTime();
+  return new Intl.DateTimeFormat(locale, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12,
+  }).format(date);
+}
+
+function getRelativeFormatter() {
+  const locale = getLocaleForTime();
+  return new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+}
+
+function resolveRelativeUnit(diffMs) {
+  const absMs = Math.abs(diffMs);
+  const minute = 60_000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  const week = 7 * day;
+  const month = 30 * day;
+  const year = 365 * day;
+
+  if (absMs < minute) return { unit: "second", size: 1_000 };
+  if (absMs < hour) return { unit: "minute", size: minute };
+  if (absMs < day) return { unit: "hour", size: hour };
+  if (absMs < week) return { unit: "day", size: day };
+  if (absMs < month) return { unit: "week", size: week };
+  if (absMs < year) return { unit: "month", size: month };
+  return { unit: "year", size: year };
+}
+
+export function formatRelativeTime(value, now = new Date()) {
+  const date = normalizeTimeValue(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const diffMs = date.getTime() - now.getTime();
+  const { unit, size } = resolveRelativeUnit(diffMs);
+  const amount = Math.round(diffMs / size);
+  return getRelativeFormatter().format(amount, unit);
+}
+
+export function formatLocalDateTimeContext(value, now = new Date()) {
+  const date = normalizeTimeValue(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const relative = formatRelativeTime(date, now);
+  const hour12 = getClockFormat() === "12h";
+  const locale = getLocaleForTime();
+  const absolute = new Intl.DateTimeFormat(locale, {
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12,
+  }).format(date);
+  if (!relative) {
+    return absolute;
+  }
+  return `${relative} · ${absolute}`;
+}
