@@ -39,7 +39,7 @@
 
 - **Calendar navigation** — all dates with entries appear in a navigable calendar. Jump to any date to load its page.
 
-- **Encryption at rest** — all stored content is encrypted with a per-user key derived from your password and sealed with a recovery code. Entries, responses, embeddings, and derived data are all covered.
+- **Zero-knowledge encryption** — all stored content is encrypted before it touches the database. The server never sees plaintext entries, tags, embeddings, or search queries. Your password unwraps a per-user key that exists only in memory for the duration of the session. No unecrypted data is ever written to disk, session storage, or local storage.
 
 - **Markdown and rich text** — entries and model responses are rendered as formatted text. Write naturally with headings, lists, emphasis, and links.
 
@@ -165,7 +165,7 @@ Many AI interfaces are built around an ongoing back-and-forth. Here, the model i
 - **No network access required.** All inference, embedding, and storage happens locally.
 - **No telemetry.** The application makes no outbound requests.
 - **Streamed responses.** Model output appears incrementally via server-sent events.
-- **Encryption at rest.** All content is encrypted with a per-user DEK wrapped by your password. A recovery code provides a second unwrap path. Loss of both means the data cannot be recovered.
+- **Zero-knowledge encryption.** The server operates on ciphertext only. A per-user data-encryption key (DEK) is unwrapped from your password at login and held in memory — never persisted in plaintext. A recovery code provides a second unwrap path. Loss of both means the data cannot be recovered.
 - **Local embeddings.** The sentence model runs on your machine. Embeddings are stored encrypted alongside everything else.
 - **SQLite-backed.** All state lives in a single file. Migrations are applied automatically.
 - **Single-user by default.** Multi-user should work but is not extensively tested. No admin interface.
@@ -190,6 +190,45 @@ Many AI interfaces are built around an ongoing back-and-forth. Here, the model i
 - **OpenAI-compatible abstraction.** Not tied to a specific model or runtime. Swapping models requires no code changes.
 - **SQLite + per-user encryption.** No external database, no cloud dependency. The entire journal is a single file, encrypted at the application layer before writes.
 - **SSE for streaming.** Model output is pushed incrementally without polling or websockets.
+
+</details>
+
+<details>
+<summary><strong>Encryption design</strong></summary>
+
+Llamora uses a zero-knowledge architecture: the server stores and queries ciphertext, but never has access to plaintext content.
+
+**Key hierarchy:**
+
+```
+Password ──→ Argon2ID ──→ Wrapping key ──→ unwraps DEK
+Recovery code ──→ Argon2ID ──→ Wrapping key ──┘
+                                               ↓
+                               DEK (32 bytes, in memory only)
+                                               ↓
+                              XChaCha20-Poly1305 per record
+```
+
+- A random 32-byte **data-encryption key (DEK)** is generated at registration.
+- The DEK is wrapped twice — once with the password, once with a recovery code — and only the wrapped forms are stored.
+- At login the password unwraps the DEK into memory. It is held in an encrypted cookie for the session duration and never written to disk, `sessionStorage`, or `localStorage`.
+- Key material is zeroised on logout and session expiry.
+
+**What is encrypted:**
+
+| Data | Encrypted | Visible to server |
+| --- | --- | --- |
+| Entries & responses | XChaCha20-Poly1305 + AAD | Ciphertext, timestamps, role |
+| Embeddings | XChaCha20-Poly1305 + AAD | Ciphertext only |
+| Tag names | XChaCha20-Poly1305 + AAD | Deterministic hash (for grouping) |
+| Search queries | XChaCha20-Poly1305 + AAD | Deterministic hash (for dedup) |
+| Passwords | Argon2ID hash | Non-reversible hash |
+
+Each record carries its own random nonce and authenticated additional data (AAD) binding it to the user and entry, preventing ciphertext reuse across contexts.
+
+**Digests** — each entry stores an HMAC-SHA256 digest derived from the DEK, entry ID, role, and plaintext. The server can compare digests for caching and deduplication without decrypting content.
+
+**DEK rotation** — when triggered, a new DEK is generated. The old DEK is chain-encrypted under the new one, and all stored data — including digests — is incrementally re-encrypted. The process is resumable if interrupted.
 
 </details>
 
