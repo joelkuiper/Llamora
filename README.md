@@ -18,7 +18,6 @@
 - [Quick Start](#quick-start)
 - [Try the Demo](#try-the-demo)
 - [Design Philosophy](#design-philosophy)
-- [System Properties](#system-properties)
 - [Stack](#stack)
 - [Configuration](#configuration)
 - [Development](#development)
@@ -154,21 +153,9 @@ Many AI interfaces are built around an ongoing back-and-forth. Here, the model i
 
 **Traces** are lightweight labels proposed by the model to make later return easier. They let you see where something recurs, what it tends to appear alongside, and which entries it touches.
 
-**Privacy is structural.** A diary is a personal artifact with strong security expectations. You don't expect it to send data elsewhere, depend on a remote service, or expose its contents by default. In Llamora, the model runs on your machine and the archive stays there, locked behind a key.
+**Privacy is structural.** A diary is a personal artifact with strong security expectations. You don't expect it to send data elsewhere, depend on a remote service, or expose its contents by default. In Llamora, the model runs on your machine and the archive stays there, locked behind a key. The application makes no outbound requests — no telemetry, no analytics, no phoning home.
 
 **No evaluation.** The model can respond and suggest traces, but it does not score entries, infer traits, or generate behavioural profiles. Nothing is surfaced as an assessment. The record is yours to interpret.
-
----
-
-## System Properties
-
-- **No network access required.** All inference, embedding, and storage happens locally.
-- **No telemetry.** The application makes no outbound requests.
-- **Streamed responses.** Model output appears incrementally via server-sent events.
-- **Encryption at rest.** All content is encrypted before it reaches the database. A per-user data-encryption key (DEK) is unwrapped from your password at login and held in memory — never persisted in plaintext. A recovery code provides a second unwrap path. Loss of both means the data cannot be recovered.
-- **Local embeddings.** The sentence model runs on your machine. Embeddings are stored encrypted alongside everything else.
-- **SQLite-backed.** All state lives in a single file. Migrations are applied automatically.
-- **Single-user by default.** Multi-user should work but is not extensively tested. No admin interface.
 
 ---
 
@@ -379,13 +366,12 @@ uv run llamora-server prod --workers 4
 ## Limitations
 
 - No two-factor authentication or captcha protection.
-- Designed for single-user, local use only.
-- Requires a locally running model server. A dedicated GPU makes a significant difference for inference speed.
+- Multi-user should work but is not extensively tested. No admin interface.
+- Requires a running model server. A dedicated GPU makes a significant difference for inference speed.
 - Model weights are several GB, downloaded by llama.cpp on first use. The embedding model (~130 MB) is downloaded separately.
-- Output quality depends entirely on the local model. Unreliable instruction-following produces poor results.
+- Output quality depends entirely on the model. Unreliable instruction-following produces poor results.
 - Loss of both password and recovery code makes stored data **unrecoverable**.
-- No content moderation or prompt filtering — local, personal use is assumed.
-- Not production-ready. Deploying outside a personal context is not recommended.
+- No content moderation or prompt filtering — personal use is assumed.
 
 ---
 
