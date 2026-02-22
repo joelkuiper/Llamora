@@ -1,4 +1,5 @@
-# Llamora
+![Llamora logo](./doc/brand/logo.png)
+
 
 > Llamora is an experimental, local-first journaling environment that attempts to make continuity visible.
 >
@@ -28,13 +29,15 @@
 
 ![Diary view](./doc/screenshots/diary.png)
 
+![Respond](./doc/screenshots/respond.png)
+
 ![Trace view](./doc/screenshots/trace-view.png)
+
+![Search](./doc/screenshots/search.png)
 
 ![Trace detail](./doc/screenshots/trace-detail.png)
 
-![Activity heatmap](./doc/screenshots/trace-heatmap.png)
-
-![Search](./doc/screenshots/search.png)
+![Trace popover](./doc/screenshots/trace-popover.png)
 
 ![Calendar](./doc/screenshots/calendar-popover.png)
 
