@@ -61,10 +61,6 @@ login_failure_cache_size = 2048
 [default.SESSION]
 ttl = 604800
 
-[default.MESSAGES.history_cache]
-maxsize = 256
-ttl = 60
-
 [default.DATABASE]
 path = "state.sqlite3"
 pool_size = 25
@@ -171,7 +167,7 @@ secret = "K3aRvB6X6lXe9iWvL99XQqSlqSkJ3YTaxqz81uB_ihw="
 force_secure = false
 
 [default.CRYPTO]
-dek_storage = "cookie"
+dek_storage = "cookie" # or "session"
 
 
 [default.WORKERS.index_worker]
