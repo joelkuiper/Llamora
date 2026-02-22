@@ -7,6 +7,8 @@
 > Write in daily pages. A model running on your machine produces day openings, recaps, and reflective responses — all inside the journal itself.
 > Not a chat wrapper. A navigable archive built around time and return.
 
+![Llamora diary view with trace popover](./doc/screenshots/diary-tags2.png)
+
 ---
 
 ## Table of Contents
