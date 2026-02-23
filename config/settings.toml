@@ -62,7 +62,6 @@ poor_match_min_hits = 3
 [default.AUTH]
 max_login_attempts = 5
 login_lockout_ttl = 900
-login_failure_cache_size = 2048
 
 # --- Session ------------------------------------------------------------
 [default.SESSION]

@@ -14,6 +14,8 @@ if TYPE_CHECKING:
 from llamora.app.embed.model import async_embed_texts, _cached_model
 
 from llamora.persistence.local_db import LocalDB
+from llamora.app.db.ttl_store import TTLStore
+from llamora.app.db.login_failures import LoginFailuresRepository
 from llamora.app.api.search import SearchAPI
 from llamora.app.services.lexical_reranker import LexicalReranker
 from llamora.app.services.llm_service import LLMService
@@ -46,6 +48,8 @@ class AppServices:
     search_api: SearchAPI
     llm_service: LLMService
     service_pulse: ServicePulse
+    ttl_store: TTLStore | None = None
+    login_failures: LoginFailuresRepository | None = None
 
     @classmethod
     def create(cls) -> "AppServices":
@@ -132,15 +136,23 @@ class AppLifecycle:
                 await self._services.db.init()
                 db_initialised = True
 
+                assert self._services.db.pool is not None
+                ttl_store = TTLStore(self._services.db.pool)
+                self._services.ttl_store = ttl_store
+
                 if self._cookie_manager.dek_storage == "session":
                     from llamora.app.db.sessions import SessionsRepository
 
-                    assert self._services.db.pool is not None
                     self._cookie_manager._sessions_repo = SessionsRepository(
-                        pool=self._services.db.pool,
+                        store=ttl_store,
                         box=self._cookie_manager.cookie_box,
                         ttl=self._cookie_manager._session_ttl,
                     )
+
+                self._services.login_failures = LoginFailuresRepository(
+                    store=ttl_store,
+                    ttl=int(settings.AUTH.login_lockout_ttl),
+                )
 
                 events = self._services.db._events
                 if events is not None:
@@ -246,12 +258,12 @@ class AppLifecycle:
         try:
             while True:
                 await asyncio.sleep(self._maintenance_interval)
-                repo = self._cookie_manager._sessions_repo
-                if repo is not None:
+                store = self._services.ttl_store
+                if store is not None:
                     with suppress(Exception):
-                        removed = await repo.purge_expired()
+                        removed = await store.purge_expired()
                         if removed:
-                            logger.debug("Purged %d expired DEK sessions", removed)
+                            logger.debug("Purged %d expired TTL store entries", removed)
                 try:
                     await self._services.search_api.maintenance_tick()
                 except Exception:  # pragma: no cover - defensive logging

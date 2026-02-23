@@ -13,7 +13,6 @@ from quart import (
 )
 from typing import Any, Mapping
 from nacl import pwhash
-from cachetools import TTLCache
 from llamora.app.services.auth_helpers import (
     invalidate_user_snapshot,
     login_required,
@@ -38,19 +37,6 @@ import orjson
 from zxcvbn import zxcvbn
 
 auth_bp = Blueprint("auth", __name__)
-
-_login_failures: TTLCache = TTLCache(
-    maxsize=int(settings.AUTH.login_failure_cache_size),
-    ttl=int(settings.AUTH.login_lockout_ttl),
-)
-
-
-def _record_login_failure(cache_key: tuple[str, str]) -> int:
-    """Atomically increment and return the failure count for *cache_key*."""
-    current = _login_failures.get(cache_key, 0)
-    new_count = current + 1
-    _login_failures[cache_key] = new_count
-    return new_count
 
 
 PASSWORD_ERROR_MESSAGES: dict[PasswordValidationError, str] = {
@@ -318,8 +304,11 @@ async def login():
         current_app.logger.debug("Login attempt for %s", username)
 
         client_ip = _get_client_ip()
-        cache_key = (username or "", client_ip)
-        attempts = _login_failures.get(cache_key, 0)
+        cache_key = f"{username or ''}:{client_ip}"
+        services = get_services()
+        login_failures = services.login_failures
+        assert login_failures is not None
+        attempts = await login_failures.get_attempts(cache_key)
         if attempts >= int(settings.AUTH.max_login_attempts):
             current_app.logger.warning(
                 "Login locked for %s from %s after %s attempts",
@@ -336,7 +325,7 @@ async def login():
             username, password, max_user=max_user, max_pass=max_pass
         )
         if length_error:
-            _record_login_failure(cache_key)
+            await login_failures.record_failure(cache_key)
             return await _render_auth_error(
                 "pages/login.html",
                 error="Invalid credentials",
@@ -344,7 +333,6 @@ async def login():
                 username=username,
             )
 
-        services = get_services()
         db = services.db
         user = await db.users.get_user_by_username(username)
         if user:
@@ -390,8 +378,7 @@ async def login():
                         "Skipping search warmup for %s due to missing epoch metadata",
                         username,
                     )
-                if cache_key in _login_failures:
-                    del _login_failures[cache_key]
+                await login_failures.clear(cache_key)
                 current_app.logger.debug(
                     "Login succeeded for %s, redirecting to %s", username, redirect_url
                 )
@@ -404,7 +391,7 @@ async def login():
                     "Login verification failed for %s", username, exc_info=True
                 )
         current_app.logger.debug("Login failed for %s", username)
-        _record_login_failure(cache_key)
+        await login_failures.record_failure(cache_key)
         return await render_template(
             "pages/login.html",
             error="Invalid credentials",

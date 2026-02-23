@@ -103,7 +103,6 @@ DEFAULTS: dict[str, Any] = {
     "AUTH": {
         "max_login_attempts": 5,
         "login_lockout_ttl": 15 * 60,
-        "login_failure_cache_size": 2048,
     },
     "SESSION": {
         "ttl": 7 * 24 * 60 * 60,
