@@ -41,14 +41,7 @@ export class CalendarControl extends HTMLElement {
       "app:teardown",
       () => {
         this.#teardownState();
-        if (this.#btn) {
-          this.#btn.classList.remove("active");
-          this.#btn.setAttribute("aria-expanded", "false");
-        }
-        if (this.#pop) {
-          this.#pop.hidden = true;
-          this.#pop.innerHTML = "";
-        }
+        this.#resetPopoverUi();
       },
       { signal },
     );
@@ -58,6 +51,7 @@ export class CalendarControl extends HTMLElement {
 
   disconnectedCallback() {
     this.#teardownState();
+    this.#resetPopoverUi();
     this.#globalListeners?.abort();
     this.#globalListeners = null;
     this.#btn = null;
@@ -277,16 +271,7 @@ export class CalendarControl extends HTMLElement {
     this.#tooltipDate = null;
     const tooltip = this.#tooltip;
     if (!tooltip) return;
-    const calendar = document.querySelector("#calendar");
-    if (calendar) {
-      calendar.querySelectorAll("[data-calendar-cell].is-summarizing").forEach((cell) => {
-        cell.classList.remove("is-summarizing");
-      });
-    }
-    if (this.#summaryCell) {
-      this.#summaryCell.classList.remove("is-summarizing");
-      this.#summaryCell = null;
-    }
+    this.#clearSummaryHoverState();
     if (immediate) {
       tooltip.classList.remove("is-visible");
       tooltip.hidden = true;
@@ -304,6 +289,31 @@ export class CalendarControl extends HTMLElement {
   #cancelSummaryFetch() {
     this.#summaryFetchController?.abort();
     this.#summaryFetchController = null;
+  }
+
+  #resetPopoverUi() {
+    if (this.#btn) {
+      this.#btn.classList.remove("active");
+      this.#btn.setAttribute("aria-expanded", "false");
+    }
+    if (this.#pop) {
+      this.#pop.hidden = true;
+      this.#pop.innerHTML = "";
+    }
+    this.#hideTooltip({ immediate: true });
+  }
+
+  #clearSummaryHoverState() {
+    const calendar = document.querySelector("#calendar");
+    if (calendar) {
+      calendar.querySelectorAll("[data-calendar-cell].is-summarizing").forEach((cell) => {
+        cell.classList.remove("is-summarizing");
+      });
+    }
+    if (this.#summaryCell) {
+      this.#summaryCell.classList.remove("is-summarizing");
+      this.#summaryCell = null;
+    }
   }
 
   #positionTooltip(tooltip, cell) {
@@ -615,7 +625,7 @@ export class CalendarControl extends HTMLElement {
       clearTimeout(this.#tooltipTimer);
     }
     if (this.#summaryCell && this.#summaryCell !== cell) {
-      this.#summaryCell.classList.remove("is-summarizing");
+      this.#clearSummaryHoverState();
     }
     this.#cancelSummaryFetch();
     this.#summaryCell = cell;

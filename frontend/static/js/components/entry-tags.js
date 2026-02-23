@@ -229,6 +229,15 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
 
   constructor() {
     super();
+    this.#bindHandlers();
+    this.#tagHistory = new AutocompleteHistory({
+      maxEntries: TAG_HISTORY_MAX,
+      prepare: (value) => this.#prepareTagHistoryValue(value),
+      normalize: (value) => this.#normalizeTagHistoryValue(value),
+    });
+  }
+
+  #bindHandlers() {
     this.#buttonClickHandler = () => this.#togglePopover();
     this.#closeClickHandler = (event) => this.#handleCloseClick(event);
     this.#detailCloseClickHandler = (event) => this.#handleDetailCloseClick(event);
@@ -253,30 +262,29 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
     this.#suggestionsSwapHandler = () => this.#handleSuggestionsSwap();
     this.#tagActivationHandler = (event) => this.#handleTagActivation(event);
     this.#tagKeydownHandler = (event) => this.#handleTagKeydown(event);
-    this.#tagHistory = new AutocompleteHistory({
-      maxEntries: TAG_HISTORY_MAX,
-      prepare: (value) => {
-        const limit = this.#getCanonicalMaxLength();
-        if (typeof value === "string") {
-          return canonicalizeTag(value, limit) || null;
-        }
-        if (value && typeof value.value === "string") {
-          return canonicalizeTag(value.value, limit) || null;
-        }
-        return null;
-      },
-      normalize: (value) => {
-        if (typeof value === "string") {
-          return value.trim().toLowerCase();
-        }
-        if (value && typeof value.value === "string") {
-          const limit = this.#getCanonicalMaxLength();
-          const canonical = canonicalizeTag(value.value, limit);
-          return canonical ? canonical.toLowerCase() : "";
-        }
-        return "";
-      },
-    });
+  }
+
+  #canonicalizeHistoryCandidate(value) {
+    const limit = this.#getCanonicalMaxLength();
+    if (typeof value === "string") {
+      return canonicalizeTag(value, limit) || "";
+    }
+    if (value && typeof value.value === "string") {
+      return canonicalizeTag(value.value, limit) || "";
+    }
+    return "";
+  }
+
+  #prepareTagHistoryValue(value) {
+    const canonical = this.#canonicalizeHistoryCandidate(value);
+    return canonical || null;
+  }
+
+  #normalizeTagHistoryValue(value) {
+    if (typeof value === "string") {
+      return value.trim().toLowerCase();
+    }
+    return this.#canonicalizeHistoryCandidate(value).toLowerCase();
   }
 
   connectedCallback() {
