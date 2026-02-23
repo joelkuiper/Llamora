@@ -32,7 +32,7 @@ CREATE TABLE key_epochs (
     retired_at      TIMESTAMP,
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, epoch)
-);
+) WITHOUT ROWID;
 
 -- Entries -----------------------------------------------------------------
 
@@ -53,10 +53,12 @@ CREATE TABLE entries (
     updated_at      TIMESTAMP
 );
 
-CREATE INDEX idx_entries_user_date       ON entries(user_id, created_date);
-CREATE INDEX idx_entries_user_created_at ON entries(user_id, created_at DESC, id DESC);
-CREATE INDEX idx_entries_user_reply_to   ON entries(user_id, reply_to);
-CREATE INDEX idx_entries_user_date_flags ON entries(user_id, created_date, flags);
+-- Ordered retrieval: WHERE user_id = ? ORDER BY id DESC (ULIDs are time-sorted)
+CREATE INDEX idx_entries_user_id       ON entries(user_id, id DESC);
+-- Date range queries: calendar, daily entries, day summaries
+CREATE INDEX idx_entries_user_date     ON entries(user_id, created_date);
+-- Cascade deletion of AI responses when a user entry is deleted
+CREATE INDEX idx_entries_user_reply_to ON entries(user_id, reply_to);
 
 CREATE TRIGGER trg_entries_updated_at_insert
 AFTER INSERT ON entries FOR EACH ROW WHEN NEW.updated_at IS NULL
@@ -112,16 +114,16 @@ CREATE INDEX idx_vectors_entry_id ON vectors(entry_id);
 -- Tags --------------------------------------------------------------------
 
 CREATE TABLE tags (
-    user_id    TEXT     NOT NULL,
-    tag_hash   BLOB    NOT NULL,
-    name_ct    BLOB    NOT NULL,
-    name_nonce BLOB    NOT NULL,
-    alg        TEXT    NOT NULL,
+    user_id    TEXT    NOT NULL,
+    tag_hash   BLOB   NOT NULL,
+    name_ct    BLOB   NOT NULL,
+    name_nonce BLOB   NOT NULL,
+    alg        TEXT   NOT NULL,
     seen       INTEGER DEFAULT 0,
     last_seen  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP,
     PRIMARY KEY (user_id, tag_hash)
-);
+) WITHOUT ROWID;
 
 CREATE INDEX idx_tags_user_seen_positive
     ON tags(user_id, seen DESC, tag_hash) WHERE seen > 0;
@@ -150,7 +152,7 @@ CREATE TABLE tag_entry_xref (
     FOREIGN KEY (entry_id)          REFERENCES entries(id)             ON DELETE CASCADE
 );
 
-CREATE INDEX idx_tag_xref_hash  ON tag_entry_xref(user_id, tag_hash);
+-- PK prefix already covers (user_id, tag_hash) lookups.
 CREATE INDEX idx_tag_xref_entry ON tag_entry_xref(user_id, entry_id);
 CREATE INDEX idx_tag_xref_ulid  ON tag_entry_xref(user_id, tag_hash, ulid DESC);
 
@@ -178,7 +180,7 @@ CREATE TABLE search_history (
     usage_count INTEGER   DEFAULT 1,
     last_used   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, query_hash)
-);
+) WITHOUT ROWID;
 
 CREATE INDEX idx_search_history_last_used
     ON search_history(user_id, last_used DESC);
@@ -189,7 +191,7 @@ CREATE TABLE lockbox (
     namespace  TEXT    NOT NULL,
     key        TEXT    NOT NULL,
     value      BLOB   NOT NULL,
-    alg        TEXT   NOT NULL DEFAULT 'xchacha20poly1305_ietf/argon2id_moderate/hmac_sha256_v2',
+    alg        TEXT    NOT NULL DEFAULT 'xchacha20poly1305_ietf/argon2id_moderate/hmac_sha256_v2',
     updated_at INTEGER NOT NULL,
     PRIMARY KEY (namespace, key)
 ) WITHOUT ROWID;
