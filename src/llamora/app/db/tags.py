@@ -33,27 +33,22 @@ class TagsRepository(BaseRepository):
         ctx.require_write(operation="tags.resolve_or_create_tag")
         canonical = canonicalize(tag_name)
         digest = tag_hash(ctx.user_id, canonical)
+        nonce, ct, alg = ctx.encrypt_entry(digest.hex(), canonical)
         async with self.pool.connection() as conn:
 
             async def _tx():
-                cursor = await conn.execute(
+                await conn.execute(
                     """
                     INSERT INTO tags (user_id, tag_hash, name_ct, name_nonce, alg)
                     VALUES (?, ?, ?, ?, ?)
-                    ON CONFLICT(user_id, tag_hash) DO NOTHING
+                    ON CONFLICT(user_id, tag_hash) DO UPDATE SET
+                        name_ct = excluded.name_ct,
+                        name_nonce = excluded.name_nonce,
+                        alg = excluded.alg
+                    WHERE name_ct = X''
                     """,
-                    (ctx.user_id, digest, b"", b"", ""),
+                    (ctx.user_id, digest, ct, nonce, alg.decode()),
                 )
-                if cursor.rowcount:
-                    nonce, ct, alg = ctx.encrypt_entry(digest.hex(), canonical)
-                    await conn.execute(
-                        """
-                        UPDATE tags
-                        SET name_ct = ?, name_nonce = ?, alg = ?
-                        WHERE user_id = ? AND tag_hash = ?
-                        """,
-                        (ct, nonce, alg.decode(), ctx.user_id, digest),
-                    )
 
             await self._run_in_transaction(conn, _tx)
         return digest
