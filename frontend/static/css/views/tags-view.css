@@ -995,6 +995,10 @@
   margin: 1.18rem 0 0;
   padding-top: 0.38rem;
   border-top: 1px solid color-mix(in srgb, var(--border) 52%, transparent);
+  /* Lock to the skeleton's height so that swapping in shorter real content
+     never shrinks the header — prevents scroll-clamping layout shift.
+     The extra space reads as generous bottom-padding inside the card. */
+  min-height: calc(var(--tag-summary-line-height) * 4 + var(--tag-summary-line-gap) * 3 + 0.34rem);
 }
 
 .tags-view__summary > p {
@@ -1316,9 +1320,21 @@
   transform: translateY(-50%);
 }
 
-#main-content[data-view="tags"].htmx-added .tags-view__sidebar-fixed,
-#main-content[data-view="tags"].htmx-added .tags-view__detail-inner {
+/* Override the global region-enter animation (lull-in) on #main-content itself.
+   lull-in starts with translate3d(0,-6px,0) which shifts the entire tags layout
+   upward for the duration of the animation — visible as a jarring header jump.
+   Fade-only on the container; the sidebar keeps its own lull-in since it's
+   position:fixed and immune to the parent transform. */
+#main-content[data-view="tags"].motion-animate-region-enter {
+  animation: fade-in var(--motion-lull) ease both;
+}
+
+#main-content[data-view="tags"].htmx-added .tags-view__sidebar-fixed {
   animation: lull-in var(--motion-lull) ease both;
+}
+
+#main-content[data-view="tags"].htmx-added .tags-view__detail-inner {
+  animation: fade-in var(--motion-lull) ease both;
 }
 
 @media (max-width: 1200px) {
