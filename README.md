@@ -374,7 +374,7 @@ uv run python scripts/build_assets.py build --mode prod
 ### 4. Run
 
 ```bash
-uv run llamora-server prod --workers 4
+uv run llamora-server prod
 ```
 
 ---
