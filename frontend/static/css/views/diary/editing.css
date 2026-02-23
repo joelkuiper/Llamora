@@ -160,6 +160,11 @@
   display: inline-flex !important;
 }
 
+#entries .entry-edit-form.is-saving .entry-edit-area {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 #entries .entry-edit-save:hover,
 #entries .entry-edit-save:focus-visible {
   color: var(--color-success-text);

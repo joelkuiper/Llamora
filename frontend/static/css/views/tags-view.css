@@ -1340,7 +1340,8 @@
   }
 
   .tags-view {
-    display: block;
+    display: flex;
+    flex-direction: column;
     padding-inline: 0;
   }
 
@@ -1356,6 +1357,17 @@
     width: 100%;
     max-height: none;
     overflow: visible;
+  }
+
+  /* Constrain the tag list so it doesn't push the detail pane off-screen. */
+  .tags-view__list-body {
+    max-height: 40vh;
+    overflow-y: auto;
+  }
+
+  /* Collapse the sidebar when a tag is selected (detail is visible). */
+  .tags-view:has(.tags-view__detail-inner) .tags-view__list-body {
+    max-height: 22vh;
   }
 
   .tags-view__detail {
