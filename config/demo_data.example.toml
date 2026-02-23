@@ -7,12 +7,12 @@ max_entries = 10
 # Chance of no opening + no entries (ignored on event/followup days).
 day_empty_rate = 0.125
 # Chance of opening-only on non-empty days (ignored on event/followup days).
-day_open_only_rate = 0.15
+day_open_only_rate = 0.05
 response_rate = 0.5
 min_tags = 0
 max_tags = 4
 timezone = "UTC"
-seed = 38
+seed = 42
 persona = "An AI app developer with a keen eye for detail, focused on everyday specifics, life, the universe, and everything 🫠."
 llm_max_tokens = 4096
 min_entry_chars = 60

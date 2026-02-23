@@ -753,6 +753,24 @@ async def _generate_entry_text(
 ) -> str:
     persona = config.persona_hint.strip()
     time_label = entry_time.strftime("%H:%M")
+    day_name = entry_date.strftime("%A")  # e.g. "Monday"
+    is_weekend = entry_date.weekday() >= 5
+    hour = entry_time.hour
+
+    if hour < 10:
+        time_feel = "early morning, before the day gets going"
+    elif hour < 13:
+        time_feel = "midday, a pause in the middle of things"
+    elif hour < 17:
+        time_feel = "afternoon" + (", unhurried" if is_weekend else ", between tasks")
+    elif hour < 20:
+        time_feel = "early evening, winding down"
+    else:
+        time_feel = "late at night, reflective"
+
+    day_context = f"{day_name} {time_feel}"
+    if is_weekend:
+        day_context += " (weekend — more relaxed pace, personal time)"
 
     # Soft length variation: quick snippets, normal notes, and very large markdown entries.
     length_mode = random.choices(
@@ -803,15 +821,21 @@ async def _generate_entry_text(
     user_message = textwrap.dedent(
         f"""
         You are using a journaling / diary app to write a personal note for yourself.
-        Write the note directly, without restating the date, time, entry number, or persona.
+        Write the note directly, without restating the date, time, day, entry number, or persona.
         Use normal, everyday language.
         Do not add a title.
         Do not wrap the entry in quotation marks or start with a quote.
         It is fine to write about only one small thing, or nothing important at all.
 
+        Let the time of day and day of week subtly shape the tone and subject matter —
+        morning entries might mention plans, coffee, weather; evening entries might reflect
+        on what happened; weekend entries might be more leisurely or personal.
+        Do not explicitly state the day or time.
+
         Context (do NOT include this information in the entry):
         - Date: {entry_date.isoformat()}
         - Time: {time_label}
+        - Moment: {day_context}
         - Entry number today: {index + 1}
         - Persona: {persona}
 
