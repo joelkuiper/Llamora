@@ -186,6 +186,56 @@ class EntriesRepository(BaseRepository):
         values.sort()
         return tuple(values)
 
+    @staticmethod
+    def _build_entry_event_record(
+        *,
+        entry_id: str,
+        created_at: str | None,
+        role: str,
+        reply_to: str | None,
+        text: str,
+        meta: Mapping[str, object] | None,
+        prompt_tokens: int,
+        updated_at: str | None = None,
+        created_date: str | None = None,
+        tag_hashes: tuple[str, ...] = (),
+    ) -> dict:
+        return {
+            "id": entry_id,
+            "created_at": created_at,
+            "updated_at": updated_at,
+            "created_date": created_date,
+            "role": role,
+            "reply_to": reply_to,
+            "text": text,
+            "meta": meta or {},
+            "prompt_tokens": prompt_tokens,
+            "tags": [{"hash": tag_hash} for tag_hash in tag_hashes],
+        }
+
+    async def _emit_entry_date_event(
+        self,
+        event_name: str,
+        *,
+        user_id: str,
+        created_date: str | None,
+        entry_id: str,
+        entry: Mapping[str, object] | None = None,
+        tag_hashes: tuple[str, ...] = (),
+    ) -> None:
+        if not created_date or not self._event_bus:
+            return
+        kwargs: dict[str, object] = {
+            "user_id": user_id,
+            "created_date": created_date,
+            "entry_id": entry_id,
+        }
+        if entry is not None:
+            kwargs["entry"] = dict(entry)
+        if tag_hashes:
+            kwargs["tag_hashes"] = tag_hashes
+        await self._event_bus.emit_for_entry_date(event_name, **kwargs)
+
     async def _get_tag_hashes_for_entry(
         self, user_id: str, entry_id: str
     ) -> tuple[str, ...]:
@@ -312,25 +362,22 @@ class EntriesRepository(BaseRepository):
         created_at = row["created_at"] if row else None
         created_date = row["created_date"] if row else created_date
 
-        entry_record = {
-            "id": entry_id,
-            "created_at": created_at,
-            "role": role,
-            "reply_to": reply_to,
-            "text": record.get("text", ""),
-            "meta": record.get("meta", {}),
-            "prompt_tokens": prompt_tokens,
-            "tags": [],
-        }
-
-        if created_date and self._event_bus:
-            await self._event_bus.emit_for_entry_date(
-                ENTRY_INSERTED_EVENT,
-                user_id=ctx.user_id,
-                created_date=created_date,
-                entry_id=entry_id,
-                entry=entry_record,
-            )
+        entry_record = self._build_entry_event_record(
+            entry_id=entry_id,
+            created_at=created_at,
+            role=role,
+            reply_to=reply_to,
+            text=str(record.get("text", "")),
+            meta=record.get("meta", {}),
+            prompt_tokens=prompt_tokens,
+        )
+        await self._emit_entry_date_event(
+            ENTRY_INSERTED_EVENT,
+            user_id=ctx.user_id,
+            created_date=created_date,
+            entry_id=entry_id,
+            entry=entry_record,
+        )
 
         if self._on_entry_appended:
             await self._on_entry_appended(ctx, entry_id, record.get("text", ""))
@@ -390,8 +437,6 @@ class EntriesRepository(BaseRepository):
             await tag_cursor.close()
             tag_hashes = self._normalize_tag_hashes(tag_rows)
 
-            placeholders = ",".join("?" for _ in delete_ids)
-
             async def _execute_deletes():
                 await conn.execute(
                     f"""
@@ -417,15 +462,14 @@ class EntriesRepository(BaseRepository):
 
             await self._run_in_transaction(conn, _execute_deletes)
 
-        if self._event_bus:
-            for created_date in created_dates:
-                await self._event_bus.emit_for_entry_date(
-                    ENTRY_DELETED_EVENT,
-                    user_id=user_id,
-                    created_date=created_date,
-                    entry_id=entry_id,
-                    tag_hashes=tag_hashes,
-                )
+        for created_date in created_dates:
+            await self._emit_entry_date_event(
+                ENTRY_DELETED_EVENT,
+                user_id=user_id,
+                created_date=created_date,
+                entry_id=entry_id,
+                tag_hashes=tag_hashes,
+            )
 
         return delete_ids, row["role"]
 
@@ -514,28 +558,26 @@ class EntriesRepository(BaseRepository):
             await tag_cursor.close()
             tag_hashes = self._normalize_tag_hashes(tag_rows)
 
-        entry_record = {
-            "id": entry_id,
-            "created_at": row["created_at"],
-            "updated_at": updated_row["updated_at"] if updated_row else None,
-            "created_date": row["created_date"],
-            "role": row["role"],
-            "reply_to": row["reply_to"],
-            "text": payload.get("text", ""),
-            "meta": payload.get("meta", {}),
-            "prompt_tokens": prompt_tokens,
-            "tags": [{"hash": tag_hash} for tag_hash in tag_hashes],
-        }
-
-        if row["created_date"] and self._event_bus:
-            await self._event_bus.emit_for_entry_date(
-                ENTRY_UPDATED_EVENT,
-                user_id=ctx.user_id,
-                created_date=row["created_date"],
-                entry_id=entry_id,
-                entry=entry_record,
-                tag_hashes=tag_hashes,
-            )
+        entry_record = self._build_entry_event_record(
+            entry_id=entry_id,
+            created_at=row["created_at"],
+            updated_at=updated_row["updated_at"] if updated_row else None,
+            created_date=row["created_date"],
+            role=row["role"],
+            reply_to=row["reply_to"],
+            text=str(payload.get("text", "")),
+            meta=payload.get("meta", {}),
+            prompt_tokens=prompt_tokens,
+            tag_hashes=tag_hashes,
+        )
+        await self._emit_entry_date_event(
+            ENTRY_UPDATED_EVENT,
+            user_id=ctx.user_id,
+            created_date=row["created_date"],
+            entry_id=entry_id,
+            entry=entry_record,
+            tag_hashes=tag_hashes,
+        )
 
         return entry_record
 
@@ -554,14 +596,13 @@ class EntriesRepository(BaseRepository):
             return
         tag_hashes = await self._get_tag_hashes_for_entry(user_id, entry_id)
 
-        if self._event_bus:
-            await self._event_bus.emit_for_entry_date(
-                ENTRY_UPDATED_EVENT,
-                user_id=user_id,
-                created_date=created_date,
-                entry_id=entry_id,
-                tag_hashes=tag_hashes,
-            )
+        await self._emit_entry_date_event(
+            ENTRY_UPDATED_EVENT,
+            user_id=user_id,
+            created_date=created_date,
+            entry_id=entry_id,
+            tag_hashes=tag_hashes,
+        )
 
     async def get_latest_entries(self, ctx: CryptoContext, limit: int) -> list[dict]:
         async with self.pool.connection() as conn:

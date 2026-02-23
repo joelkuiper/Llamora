@@ -67,6 +67,15 @@ async def _render_auth_error(template: str, error: str, **context: Any):
     return await render_template(template, error=error, **context)
 
 
+async def _render_password_strength(score: int, suggestions: list[str]):
+    return await render_template(
+        "components/shared/password_strength.html",
+        score=score,
+        percent=min(100, score * 25),
+        suggestions=suggestions,
+    )
+
+
 async def _issue_auth_response(
     user_id: str | int, dek: bytes, redirect_url: str
 ) -> Response:
@@ -88,6 +97,27 @@ async def _issue_authenticated_response(
     manager = session.manager
     manager.set_secure_cookie(resp, "uid", str(user_id))
     await manager.set_dek(resp, dek)
+    return resp
+
+
+async def _issue_logged_out_response(
+    *,
+    body: Any,
+    status: int | None = None,
+    hx_redirect: str | None = None,
+) -> Response:
+    session = get_session_context()
+    manager = session.manager
+    resp = (
+        await make_response(body, status)
+        if status is not None
+        else await make_response(body)
+    )
+    assert isinstance(resp, Response)
+    await manager.clear_session_dek()
+    manager.clear_secure_cookie(resp)
+    if hx_redirect:
+        resp.headers["HX-Redirect"] = hx_redirect
     return resp
 
 
@@ -233,15 +263,7 @@ async def password_strength_check():
 
     # Short-circuit obviously empty input to avoid zxcvbn edge-case crashes
     if not pw:
-        score = 0
-        percent = 0
-        html = await render_template(
-            "components/shared/password_strength.html",
-            score=score,
-            percent=percent,
-            suggestions=[],
-        )
-        return html
+        return await _render_password_strength(0, [])
 
     suggestions: list[str] = []
     try:
@@ -263,14 +285,7 @@ async def password_strength_check():
         score = 0
         suggestions = []
 
-    percent = min(100, score * 25)
-    html = await render_template(
-        "components/shared/password_strength.html",
-        score=score,
-        percent=percent,
-        suggestions=suggestions,
-    )
-    return html
+    return await _render_password_strength(score, suggestions)
 
 
 @auth_bp.route("/register", methods=["GET", "POST"])
@@ -465,17 +480,9 @@ async def login():
 @auth_bp.route("/logout", methods=["POST"])
 async def logout():
     session = get_session_context()
-    manager = session.manager
     user = await session.current_user()
     current_app.logger.debug("Logout for user %s", user["id"] if user else None)
-    next_url = "/login"
-    redirect_value = redirect(next_url)
-    resp = await make_response(redirect_value)
-    assert isinstance(resp, Response)
-
-    await manager.clear_session_dek()
-    manager.clear_secure_cookie(resp)
-    return resp
+    return await _issue_logged_out_response(body=redirect("/login"))
 
 
 @auth_bp.route("/reset", methods=["GET", "POST"])
@@ -653,13 +660,9 @@ async def delete_profile():
     manager = session.manager
     user = await session.require_user()
     await get_services().db.users.delete_user(user["id"])
-    resp = await make_response("", 204)
-    assert isinstance(resp, Response)
-    await manager.clear_session_dek()
+    resp = await _issue_logged_out_response(body="", status=204, hx_redirect="/login")
     if manager.dek_storage == "session":
         current_app.logger.debug(
             "Purged session DEK for deleted account %s", user["id"]
         )
-    manager.clear_secure_cookie(resp)
-    resp.headers["HX-Redirect"] = "/login"
     return resp

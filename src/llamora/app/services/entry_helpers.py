@@ -60,10 +60,7 @@ def _serialize_payload(payload: Any) -> tuple[str, bool]:
         try:
             serialized = orjson.dumps(payload).decode()
         except TypeError:
-            if isinstance(payload, Mapping):
-                serialized = "{}"
-            else:
-                serialized = "[]"
+            serialized = "{}" if isinstance(payload, Mapping) else "[]"
         return serialized, False
 
     return str(payload), True
@@ -113,29 +110,6 @@ def build_entry_history(
     target_id = str(entry_id)
     max_target_replies = _resolve_max_target_replies()
 
-    def _build_target_reply_context(
-        responses: Sequence[Mapping[str, Any] | dict[str, Any]],
-    ) -> dict[str, Any] | None:
-        if max_target_replies <= 0:
-            return None
-        selected = list(responses)[-max_target_replies:]
-        lines: list[str] = []
-        for idx, response in enumerate(selected, start=1):
-            text = str(response.get("text") or "").strip()
-            if not text:
-                continue
-            lines.append(f"{idx}. {text}")
-        if not lines:
-            return None
-        return {
-            "role": "system",
-            "text": (
-                "Previous assistant replies to the same latest user message. "
-                "Use them for continuity and avoid repeating them verbatim.\n\n"
-                + "\n\n".join(lines)
-            ),
-        }
-
     for entry in entries:
         entry_item = entry.get("entry")
         is_target = False
@@ -147,7 +121,10 @@ def build_entry_history(
         if isinstance(entry_item, Mapping):
             is_target = str(entry_item.get("id")) == target_id
             if is_target:
-                target_context = _build_target_reply_context(responses)
+                target_context = _build_target_reply_context(
+                    responses,
+                    max_target_replies=max_target_replies,
+                )
                 if target_context:
                     history.append(target_context)
                 history.append(dict(entry_item))
@@ -157,6 +134,32 @@ def build_entry_history(
         response_items = [dict(response) for response in responses]
         history.extend(response_items)
     return history
+
+
+def _build_target_reply_context(
+    responses: Sequence[Mapping[str, Any] | dict[str, Any]],
+    *,
+    max_target_replies: int,
+) -> dict[str, Any] | None:
+    if max_target_replies <= 0:
+        return None
+    selected = list(responses)[-max_target_replies:]
+    lines: list[str] = []
+    for idx, response in enumerate(selected, start=1):
+        text = str(response.get("text") or "").strip()
+        if not text:
+            continue
+        lines.append(f"{idx}. {text}")
+    if not lines:
+        return None
+    return {
+        "role": "system",
+        "text": (
+            "Previous assistant replies to the same latest user message. "
+            "Use them for continuity and avoid repeating them verbatim.\n\n"
+            + "\n\n".join(lines)
+        ),
+    }
 
 
 async def start_stream_session(

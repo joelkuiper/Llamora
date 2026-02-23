@@ -213,6 +213,49 @@ class TagService:
             return ("alpha", "asc")
         return None
 
+    def _tag_index_item_from_row(self, row: dict[str, Any]) -> TagIndexItem | None:
+        raw_name = str(row.get("name") or "").strip()
+        if not raw_name:
+            return None
+        try:
+            canonical = self.canonicalize(raw_name)
+        except ValueError:
+            return None
+        return TagIndexItem(
+            name=self.display(canonical),
+            hash=str(row.get("hash") or ""),
+            count=int(row.get("count") or 0),
+        )
+
+    def _tag_index_item_from_info(self, info: dict[str, Any]) -> TagIndexItem | None:
+        name = str(info.get("name") or "").strip()
+        if not name:
+            return None
+        try:
+            canonical = self.canonicalize(name)
+        except ValueError:
+            return None
+        return TagIndexItem(
+            name=self.display(canonical),
+            hash=str(info.get("hash") or ""),
+            count=int(info.get("count") or 0),
+        )
+
+    async def _get_sorted_index_items(
+        self,
+        ctx: CryptoContext,
+        *,
+        sort_kind: TagsSortKind,
+        sort_dir: TagsSortDirection,
+    ) -> tuple[_TagsIndexRequestCache, list[TagIndexItem]]:
+        index_cache = await self._get_tags_index_request_cache(ctx)
+        items = self._sort_index_items(
+            list(index_cache.items),
+            sort_kind=sort_kind,
+            sort_dir=sort_dir,
+        )
+        return index_cache, items
+
     async def get_tag_overview(
         self,
         ctx: CryptoContext,
@@ -310,10 +353,8 @@ class TagService:
         related_tag_limit: int = 2,
     ) -> TagsViewData:
         """Return data for the two-column archival tags view."""
-        index_cache = await self._get_tags_index_request_cache(ctx)
-        index_items = list(index_cache.items)
-        index_items = self._sort_index_items(
-            index_items,
+        index_cache, index_items = await self._get_sorted_index_items(
+            ctx,
             sort_kind=sort_kind,
             sort_dir=sort_dir,
         )
@@ -384,16 +425,7 @@ class TagService:
                 return None
             info = await self._db.tags.get_tag_info(ctx, tag_hash_bytes)
             if info:
-                name = str(info.get("name") or "").strip()
-                try:
-                    canonical = self.canonicalize(name)
-                except ValueError:
-                    return None
-                index_item = TagIndexItem(
-                    name=self.display(canonical),
-                    hash=info["hash"],
-                    count=int(info.get("count") or 0),
-                )
+                index_item = self._tag_index_item_from_info(info)
 
         if index_item is None and tag_name:
             index_item = await self._resolve_index_item_by_name(ctx, tag_name)
@@ -419,10 +451,8 @@ class TagService:
     ) -> tuple[TagIndexItem, ...]:
         """Return the full tag index, sorted for client-side search."""
 
-        index_cache = await self._get_tags_index_request_cache(ctx)
-        items = list(index_cache.items)
-        items = self._sort_index_items(
-            items,
+        _index_cache, items = await self._get_sorted_index_items(
+            ctx,
             sort_kind=sort_kind,
             sort_dir=sort_dir,
         )
@@ -455,11 +485,9 @@ class TagService:
                 continue
             if canonical != target:
                 continue
-            return TagIndexItem(
-                name=self.display(canonical),
-                hash=str(row.get("hash") or ""),
-                count=int(row.get("count") or 0),
-            )
+            item = self._tag_index_item_from_row(row)
+            if item is not None:
+                return item
         return None
 
     async def _get_tags_index_request_cache(
@@ -474,20 +502,13 @@ class TagService:
         items: list[TagIndexItem] = []
         items_by_name: dict[str, TagIndexItem] = {}
         for row in rows:
-            raw_name = str(row.get("name") or "").strip()
-            if not raw_name:
+            item = self._tag_index_item_from_row(row)
+            if item is None:
                 continue
-            try:
-                canonical = self.canonicalize(raw_name)
-            except ValueError:
-                continue
-            item = TagIndexItem(
-                name=self.display(canonical),
-                hash=str(row.get("hash") or ""),
-                count=int(row.get("count") or 0),
-            )
             items.append(item)
-            items_by_name.setdefault(canonical, item)
+            canonical_key = self.normalize_tag_query(str(row.get("name") or ""))
+            if canonical_key:
+                items_by_name.setdefault(canonical_key, item)
         result = _TagsIndexRequestCache(
             rows=rows,
             items=tuple(items),

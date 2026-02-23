@@ -50,6 +50,13 @@ def _entry_stream_manager():
     return get_services().llm_service.response_stream_manager
 
 
+def _backpressure_response(exc: StreamCapacityError):
+    return StreamSession.backpressure(
+        "The assistant is busy. Please try again in a moment.",
+        exc.retry_after,
+    )
+
+
 def _resolve_target_datetime(normalized_date: str, tz: str) -> tuple[datetime, str]:
     target_date = datetime.fromisoformat(normalized_date).date()
     tz_info = ZoneInfo(tz)
@@ -122,6 +129,22 @@ async def _build_opening_stream_payload(
     recall_inserted = augmentation.recall_inserted
     recall_index = augmentation.recall_index
 
+    _enforce_opening_prompt_budget(
+        llm_client,
+        opening_messages,
+        recall_inserted=recall_inserted,
+        recall_index=recall_index,
+    )
+    return target_dt, today_iso, opening_messages
+
+
+def _enforce_opening_prompt_budget(
+    llm_client,
+    opening_messages: list[dict[str, object]],
+    *,
+    recall_inserted: bool,
+    recall_index: int | None,
+) -> None:
     budget = llm_client.prompt_budget
     prompt_tokens = estimate_entry_messages_tokens(opening_messages)
     snapshot = budget.diagnostics(
@@ -134,38 +157,38 @@ async def _build_opening_stream_payload(
         },
     )
     max_tokens = snapshot.max_tokens
-    if max_tokens is not None and prompt_tokens > max_tokens:
-        if recall_inserted:
-            logger.info(
-                "Dropping tag recall context from opening prompt due to budget (%s > %s)",
-                prompt_tokens,
-                max_tokens,
-            )
-            drop_index = recall_index if recall_index is not None else 1
-            if 0 <= drop_index < len(opening_messages):
-                opening_messages.pop(drop_index)
-            prompt_tokens = estimate_entry_messages_tokens(opening_messages)
-            budget.diagnostics(
-                prompt_tokens=prompt_tokens,
-                label="entry:opening",
-                extra={
-                    "phase": "after-recall-drop",
-                    "messages": len(opening_messages),
-                    "recall_inserted": False,
-                },
-            )
-        if prompt_tokens > max_tokens:
-            budget.diagnostics(
-                prompt_tokens=prompt_tokens,
-                label="entry:opening",
-                extra={
-                    "phase": "overflow-after-trim",
-                    "messages": len(opening_messages),
-                    "recall_inserted": False,
-                },
-            )
-            raise ValueError("Opening prompt exceeds context window")
-    return target_dt, today_iso, opening_messages
+    if max_tokens is None or prompt_tokens <= max_tokens:
+        return
+    if recall_inserted:
+        logger.info(
+            "Dropping tag recall context from opening prompt due to budget (%s > %s)",
+            prompt_tokens,
+            max_tokens,
+        )
+        drop_index = recall_index if recall_index is not None else 1
+        if 0 <= drop_index < len(opening_messages):
+            opening_messages.pop(drop_index)
+        prompt_tokens = estimate_entry_messages_tokens(opening_messages)
+        budget.diagnostics(
+            prompt_tokens=prompt_tokens,
+            label="entry:opening",
+            extra={
+                "phase": "after-recall-drop",
+                "messages": len(opening_messages),
+                "recall_inserted": False,
+            },
+        )
+    if prompt_tokens > max_tokens:
+        budget.diagnostics(
+            prompt_tokens=prompt_tokens,
+            label="entry:opening",
+            extra={
+                "phase": "overflow-after-trim",
+                "messages": len(opening_messages),
+                "recall_inserted": False,
+            },
+        )
+        raise ValueError("Opening prompt exceeds context window")
 
 
 async def _load_response_history_or_error(enc_ctx, uid: str, entry_id: str):
@@ -312,10 +335,7 @@ async def sse_opening(date: str):
             use_default_reply_to=False,
         )
     except StreamCapacityError as exc:
-        return StreamSession.backpressure(
-            "The assistant is busy. Please try again in a moment.",
-            exc.retry_after,
-        )
+        return _backpressure_response(exc)
 
     return StreamSession.pending(pending)
 
@@ -373,10 +393,7 @@ async def sse_response(entry_id: str, date: str):
         )
         return StreamSession.pending(pending_response)
     except StreamCapacityError as exc:
-        return StreamSession.backpressure(
-            "The assistant is busy. Please try again in a moment.",
-            exc.retry_after,
-        )
+        return _backpressure_response(exc)
     except HTTPException:
         raise
     except Exception:
