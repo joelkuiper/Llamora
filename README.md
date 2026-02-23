@@ -349,13 +349,24 @@ SECRET_KEY = "..."
 secret = "..."
 ```
 
-### 2. Build frontend assets
+### 2. DEK storage
+
+By default the per-user data-encryption key (DEK) is held in an encrypted cookie. In production you can keep it server-side instead, so no key material leaves the server:
+
+```toml
+[default.CRYPTO]
+dek_storage = "session"   # DEK stays in server memory; only a session ID is sent to the browser
+```
+
+The trade-off: sessions live in memory, so a server restart logs everyone out. With `--workers 1` this is fine; with multiple workers the setting is ignored and cookie mode is used automatically. For development, `cookie` (the default) is more convenient since logins survive restarts.
+
+### 3. Build frontend assets
 
 ```bash
 uv run python scripts/build_assets.py build --mode prod
 ```
 
-### 3. Run
+### 4. Run
 
 ```bash
 uv run llamora-server prod --workers 4
