@@ -70,4 +70,6 @@
 * Embeddings are generated via `fastembed` (`TextEmbedding`) and indexed with HNSW.
 * Embedding model warm-up runs once in background via `AppLifecycle`.
 * Migrations must not break existing encrypted content.
-* DEK storage modes: `session` (default, SQLite-backed, works across workers) or `cookie` (stateless, DEK in encrypted cookie).
+* DEK storage modes: `session` (SQLite-backed server-side DEK) or `cookie` (stateless, DEK in encrypted cookie). Session mode can work across workers because `dek_sessions` live in SQLite.
+* Session inactivity policy is configured under `SESSION` (`idle_ttl`, `cookie_touch_interval`, `csrf_ttl`); auth cookies are refreshed on activity and expire after inactivity.
+* `dek_sessions` are cleared on app startup/shutdown in `session` mode; cleanup is global to the shared DB, so restarts/worker shutdowns log out session-mode users.

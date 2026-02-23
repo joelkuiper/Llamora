@@ -146,8 +146,13 @@ class AppLifecycle:
                     self._cookie_manager._sessions_repo = SessionsRepository(
                         store=ttl_store,
                         box=self._cookie_manager.cookie_box,
-                        ttl=self._cookie_manager._session_ttl,
+                        ttl=self._cookie_manager._session_idle_ttl,
                     )
+                    cleared = await self._cookie_manager.clear_all_session_deks()
+                    if cleared:
+                        logger.info("Cleared %d DEK sessions on startup", cleared)
+                    else:
+                        logger.debug("No DEK sessions to clear on startup")
 
                 self._services.login_failures = LoginFailuresRepository(
                     store=ttl_store,
@@ -241,6 +246,17 @@ class AppLifecycle:
             await self._services.search_api.stop()
         except Exception as exc:  # pragma: no cover - defensive logging occurs below
             logger.exception("Failed to stop search API cleanly")
+            errors.append(exc)
+
+        try:
+            cleared = await self._cookie_manager.clear_all_session_deks()
+            if self._cookie_manager.dek_storage == "session":
+                if cleared:
+                    logger.info("Cleared %d DEK sessions on shutdown", cleared)
+                else:
+                    logger.debug("No DEK sessions to clear on shutdown")
+        except Exception as exc:
+            logger.exception("Failed to clear DEK sessions during shutdown")
             errors.append(exc)
 
         try:

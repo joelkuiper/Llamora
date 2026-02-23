@@ -404,7 +404,7 @@ async def login():
     # and the page is re-fetched, authenticated users are sent to the app
     # instead of seeing a (potentially stale) login screen.
     ctx = get_session_context()
-    if await ctx.current_user() is not None:
+    if await ctx.current_user() is not None and await ctx.dek() is not None:
         dest = sanitize_return_path(request.args.get("return")) or url_for("days.index")
         return redirect(dest)
 

@@ -89,6 +89,17 @@ class TTLStore(BaseRepository):
             )
             await conn.commit()
 
+    async def remove_namespace(self, namespace: str) -> int:
+        """Delete all entries in a namespace and return the number removed."""
+
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                "DELETE FROM ttl_store WHERE namespace = ?",
+                (namespace,),
+            )
+            await conn.commit()
+            return cursor.rowcount or 0
+
     async def increment(
         self,
         namespace: str,

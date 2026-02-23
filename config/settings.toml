@@ -65,7 +65,9 @@ login_lockout_ttl = 900
 
 # --- Session ------------------------------------------------------------
 [default.SESSION]
-ttl = 604800
+idle_ttl = 28800
+cookie_touch_interval = 300
+csrf_ttl = 28800
 
 # --- Database -----------------------------------------------------------
 [default.DATABASE]

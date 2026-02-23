@@ -4,7 +4,6 @@ import logging
 import json
 import secrets
 import os
-import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -36,27 +35,6 @@ def create_app():
 
     from .util.number import parse_positive_int
 
-    def _detect_worker_count() -> int:
-        env_keys = (
-            "WEB_CONCURRENCY",
-            "HYPERCORN_WORKERS",
-            "UVICORN_WORKERS",
-            "GUNICORN_WORKERS",
-        )
-        for key in env_keys:
-            parsed = parse_positive_int(os.getenv(key))
-            if parsed:
-                return parsed
-        cmd_args = os.getenv("GUNICORN_CMD_ARGS", "")
-        if cmd_args:
-            match = re.search(r"(?:--workers|-w)\\s+(\\d+)", cmd_args)
-            if match:
-                parsed = parse_positive_int(match.group(1))
-                if parsed:
-                    return parsed
-        parsed = parse_positive_int(settings.get("APP.workers"))
-        return parsed or 1
-
     dek_storage = str(settings.CRYPTO.dek_storage or "cookie").lower()
 
     from .services.auth_helpers import (
@@ -69,7 +47,8 @@ def create_app():
         cookie_secret=str(settings.COOKIES.secret or ""),
         dek_storage=dek_storage,
         force_secure=bool(settings.COOKIES.force_secure),
-        session_ttl=int(settings.SESSION.ttl),
+        session_idle_ttl=int(settings.SESSION.idle_ttl),
+        cookie_touch_interval=int(settings.SESSION.cookie_touch_interval),
     )
 
     lifecycle = AppLifecycle(services, cookie_manager)
@@ -158,7 +137,8 @@ def create_app():
         MAX_TAG_LENGTH=int(settings.LIMITS.max_tag_length),
         MAX_SEARCH_QUERY_LENGTH=int(settings.LIMITS.max_search_query_length),
         ALLOWED_LLM_CONFIG_KEYS=set(settings.LLM.allowed_config_keys),
-        SESSION_TTL=int(settings.SESSION.ttl),
+        SESSION_IDLE_TTL=int(settings.SESSION.idle_ttl),
+        SESSION_COOKIE_TOUCH_INTERVAL=int(settings.SESSION.cookie_touch_interval),
         PERMANENT_SESSION_LIFETIME=settings.SESSION.permanent_lifetime,
         WTF_CSRF_TIME_LIMIT=settings.SESSION.csrf_time_limit,
         EMBED_MODEL=settings.EMBEDDING.model,
@@ -256,7 +236,7 @@ def create_app():
             return ""
         return compute_tag_hash(uid, canonical).hex()
 
-    from .services.auth_helpers import load_user
+    from .services.auth_helpers import finalize_auth_session, load_user
 
     async def _refresh_manifest() -> None:
         if not app.config.get("DEBUG"):
@@ -277,6 +257,10 @@ def create_app():
 
     app.before_request(load_user)
     app.before_request(_refresh_manifest)
+
+    @app.after_request
+    async def _finalize_auth_session(response):
+        return await finalize_auth_session(response)
 
     @app.teardown_request
     async def _drop_crypto_context(_exc=None):  # type: ignore[override]

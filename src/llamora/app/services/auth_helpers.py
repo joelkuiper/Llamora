@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import secrets
+import time
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Mapping
@@ -26,6 +27,9 @@ class SecureCookieManager:
 
     _cookie_state_attr = "_secure_cookie_state"
     _current_user_attr = "_current_user"
+    _cookie_touch_key = "_last_seen"
+    _cookie_touch_flag_attr = "_secure_cookie_touch_pending"
+    _cookie_clear_flag_attr = "_secure_cookie_clear_pending"
 
     def __init__(
         self,
@@ -34,7 +38,8 @@ class SecureCookieManager:
         cookie_secret: str,
         dek_storage: str,
         force_secure: bool = False,
-        session_ttl: int,
+        session_idle_ttl: int,
+        cookie_touch_interval: int,
         user_cache_ttl: int = 60,
         user_cache_maxsize: int = 2048,
     ) -> None:
@@ -43,7 +48,8 @@ class SecureCookieManager:
         self.cookie_box = secret.SecretBox(key)
         self.dek_storage = dek_storage.lower()
         self.force_secure = bool(force_secure)
-        self._session_ttl = max(0, int(session_ttl))
+        self._session_idle_ttl = max(0, int(session_idle_ttl))
+        self._cookie_touch_interval = max(0, int(cookie_touch_interval))
         self._sessions_repo: SessionsRepository | None = None
         self._user_snapshot_cache: TTLCache[tuple[str, str], Any] = TTLCache(
             maxsize=user_cache_maxsize,
@@ -98,27 +104,80 @@ class SecureCookieManager:
             setattr(g, self._cookie_state_attr, self._get_cookie_data())
         return getattr(g, self._cookie_state_attr)
 
+    @staticmethod
+    def _coerce_timestamp(value: Any) -> int | None:
+        try:
+            timestamp = int(value)
+        except (TypeError, ValueError):
+            return None
+        return timestamp if timestamp >= 0 else None
+
+    def _annotate_cookie_payload(self, data: dict[str, Any]) -> dict[str, Any]:
+        payload = dict(data)
+        if payload and self._session_idle_ttl > 0:
+            payload[self._cookie_touch_key] = int(time.time())
+        else:
+            payload.pop(self._cookie_touch_key, None)
+        return payload
+
+    def _should_refresh_cookie(self) -> bool:
+        if self._session_idle_ttl <= 0:
+            return False
+        state = self._cookie_state()
+        if not state or not state.get("uid"):
+            return False
+        if self._cookie_touch_interval <= 0:
+            return True
+        now = int(time.time())
+        last_seen = self._coerce_timestamp(state.get(self._cookie_touch_key))
+        if last_seen is None:
+            return True
+        return (now - last_seen) >= self._cookie_touch_interval
+
+    def mark_authenticated_activity(self) -> None:
+        if self._should_refresh_cookie():
+            setattr(g, self._cookie_touch_flag_attr, True)
+
+    def request_cookie_clear(self) -> None:
+        setattr(g, self._cookie_clear_flag_attr, True)
+
+    def finalize_response(self, response: Response) -> Response:
+        if getattr(g, self._cookie_clear_flag_attr, False):
+            self.clear_secure_cookie(response)
+            return response
+
+        if getattr(g, self._cookie_touch_flag_attr, False):
+            state = self._cookie_state()
+            if state:
+                return self._set_cookie_data(response, state)
+        return response
+
     def _set_cookie_data(self, response: Response, data: dict[str, Any]) -> Response:
         if not data:
             current_app.logger.debug("Clearing %s cookie", self.cookie_name)
             response.delete_cookie(self.cookie_name, path="/", samesite="Lax")
             if hasattr(g, self._cookie_state_attr):
                 setattr(g, self._cookie_state_attr, {})
+            setattr(g, self._cookie_touch_flag_attr, False)
+            setattr(g, self._cookie_clear_flag_attr, False)
             return response
 
-        token = self.cookie_box.encrypt(orjson.dumps(data))
+        payload = self._annotate_cookie_payload(data)
+        token = self.cookie_box.encrypt(orjson.dumps(payload))
         b64 = base64.urlsafe_b64encode(token).decode("utf-8")
         current_app.logger.debug(
             "Setting %s cookie (secure=%s) with keys %s",
             self.cookie_name,
             request.is_secure or self.force_secure,
-            list(data.keys()),
+            list(payload.keys()),
         )
         max_age: int | None = None
         expires: datetime | None = None
-        if self._session_ttl > 0:
-            max_age = self._session_ttl
-            expires = datetime.now(timezone.utc) + timedelta(seconds=self._session_ttl)
+        if self._session_idle_ttl > 0:
+            max_age = self._session_idle_ttl
+            expires = datetime.now(timezone.utc) + timedelta(
+                seconds=self._session_idle_ttl
+            )
 
         response.set_cookie(
             self.cookie_name,
@@ -130,7 +189,9 @@ class SecureCookieManager:
             max_age=max_age,
             expires=expires,
         )
-        setattr(g, self._cookie_state_attr, data)
+        setattr(g, self._cookie_state_attr, payload)
+        setattr(g, self._cookie_touch_flag_attr, False)
+        setattr(g, self._cookie_clear_flag_attr, False)
         return response
 
     def get_secure_cookie(self, name: str) -> str | None:
@@ -155,6 +216,8 @@ class SecureCookieManager:
         response.delete_cookie(self.cookie_name, path="/", samesite="Lax")
         if hasattr(g, self._cookie_state_attr):
             setattr(g, self._cookie_state_attr, {})
+        setattr(g, self._cookie_touch_flag_attr, False)
+        setattr(g, self._cookie_clear_flag_attr, False)
 
     async def set_dek(self, response: Response, dek: bytes) -> None:
         if self.dek_storage == "session":
@@ -173,6 +236,12 @@ class SecureCookieManager:
             sid = self.get_secure_cookie("sid")
             if sid:
                 await self._sessions_repo.remove(sid)
+
+    async def clear_all_session_deks(self) -> int:
+        if self.dek_storage != "session":
+            return 0
+        assert self._sessions_repo is not None
+        return await self._sessions_repo.clear_all()
 
     def invalidate_user_snapshot(self, uid: str) -> None:
         """Remove all cached snapshots for *uid* so the next lookup hits the DB."""
@@ -265,7 +334,15 @@ class SecureCookieManager:
 
         user = await self.get_current_user()
         if user:
-            _ = await self.get_dek()
+            dek = await self.get_dek()
+            if dek is None:
+                self.request_cookie_clear()
+                current_app.logger.debug(
+                    "User %s has no valid DEK for request; scheduling logout",
+                    user["id"],
+                )
+                return
+            self.mark_authenticated_activity()
             current_app.logger.debug("Loaded user %s for request", user["id"])
         else:
             current_app.logger.debug("No user loaded for request")
@@ -338,6 +415,8 @@ def login_required(f):
         user = await manager.get_current_user()
         dek = (await manager.get_dek()) if user else None
         if not user or dek is None:
+            if user and dek is None:
+                manager.request_cookie_clear()
             current_app.logger.debug(
                 "Unauthenticated access or missing DEK to %s", request.path
             )
@@ -354,3 +433,7 @@ def login_required(f):
 
 async def load_user() -> None:
     await get_secure_cookie_manager().load_user()
+
+
+async def finalize_auth_session(response: Response) -> Response:
+    return get_secure_cookie_manager().finalize_response(response)

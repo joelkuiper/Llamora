@@ -49,3 +49,8 @@ class SessionsRepository:
         """Delete a specific session."""
 
         await self._store.remove(NAMESPACE, sid)
+
+    async def clear_all(self) -> int:
+        """Delete all DEK sessions."""
+
+        return await self._store.remove_namespace(NAMESPACE)

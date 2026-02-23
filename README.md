@@ -353,14 +353,27 @@ secret = "..."
 
 After login the per-user data-encryption key (DEK) needs to be available on every request. There are two modes:
 
-- **`session`** (default) — only an opaque session ID is sent to the browser; the DEK itself is encrypted and stored in SQLite. Nothing secret leaves the server. Sessions survive restarts and work across multiple workers.
-- **`cookie`** — the DEK is encrypted with `COOKIES.secret` and stored in an httpOnly cookie. The browser sends it back on each request. No database access needed for DEK retrieval.
+- **`cookie`** (default) — the DEK is encrypted with `COOKIES.secret` and stored in an httpOnly cookie. The browser sends it back on each request. No database lookup is needed for DEK retrieval.
+- **`session`** — only an opaque session ID is sent to the browser; the DEK itself is encrypted and stored server-side in `ttl_store` (`dek_sessions`). Sessions expire after inactivity (sliding timeout, default 8 hours).
 
-The default is safe for both development and production. Switch to `cookie` if you prefer stateless sessions:
+Llamora refreshes authenticated sessions on activity and logs users out after the configured inactivity window. Session-mode DEKs are cleared on application startup and shutdown, so logins do not survive restarts.
+
+Because `dek_sessions` are stored in SQLite (`ttl_store`), session mode works across workers. Session cleanup is global to the shared database, so process restarts/shutdowns clear active session-mode logins.
+
+Switch to `session` if you prefer server-side DEK storage:
 
 ```toml
 [default.CRYPTO]
-dek_storage = "cookie"
+dek_storage = "session"
+```
+
+Session inactivity and refresh behavior are configured separately:
+
+```toml
+[default.SESSION]
+idle_ttl = 28800              # 8h inactivity logout
+cookie_touch_interval = 300   # refresh cookie at most every 5m
+csrf_ttl = 28800              # CSRF token lifetime
 ```
 
 ### 3. Build frontend assets

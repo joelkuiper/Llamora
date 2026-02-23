@@ -105,7 +105,9 @@ DEFAULTS: dict[str, Any] = {
         "login_lockout_ttl": 15 * 60,
     },
     "SESSION": {
-        "ttl": 7 * 24 * 60 * 60,
+        "idle_ttl": 8 * 60 * 60,
+        "cookie_touch_interval": 5 * 60,
+        "csrf_ttl": 8 * 60 * 60,
     },
     "DATABASE": {
         "path": "state.sqlite3",
@@ -366,11 +368,11 @@ settings.set(
 # Normalise a few derived values that are used by the Quart application.
 settings.set(
     "SESSION.permanent_lifetime",
-    timedelta(seconds=int(settings.get("SESSION.ttl", 0))),
+    timedelta(seconds=int(settings.get("SESSION.idle_ttl", 0))),
 )
 settings.set(
     "SESSION.csrf_time_limit",
-    int(settings.get("SESSION.ttl", 0)),
+    int(settings.get("SESSION.csrf_ttl", 0)),
 )
 embedding_concurrency = int(settings.get("EMBEDDING.concurrency", 0))
 if embedding_concurrency <= 0:

@@ -94,6 +94,32 @@ def _validate_secrets() -> Iterable[str]:
         yield "Set LLAMORA_COOKIE_SECRET to a 32-byte base64 string."
 
 
+def _validate_session_settings() -> Iterable[str]:
+    idle_raw = _get_value(settings, "SESSION.idle_ttl")
+    idle_ttl = coerce_int(idle_raw)
+    if idle_ttl is None or idle_ttl <= 0:
+        yield "SESSION.idle_ttl must be a positive integer (seconds)."
+        idle_ttl = None
+
+    touch_raw = _get_value(settings, "SESSION.cookie_touch_interval")
+    touch_interval = coerce_int(touch_raw)
+    if touch_interval is None or touch_interval < 0:
+        yield "SESSION.cookie_touch_interval must be a non-negative integer (seconds)."
+        touch_interval = None
+
+    csrf_raw = _get_value(settings, "SESSION.csrf_ttl")
+    csrf_ttl = coerce_int(csrf_raw)
+    if csrf_ttl is None or csrf_ttl <= 0:
+        yield "SESSION.csrf_ttl must be a positive integer (seconds)."
+
+    if (
+        idle_ttl is not None
+        and touch_interval is not None
+        and touch_interval > idle_ttl
+    ):
+        yield "SESSION.cookie_touch_interval must not exceed SESSION.idle_ttl."
+
+
 def validate_settings() -> list[str]:
     """Return a list of configuration validation error messages."""
 
@@ -102,6 +128,7 @@ def validate_settings() -> list[str]:
     errors.extend(_validate_llm_chat_settings())
     errors.extend(_validate_llm_summary_settings())
     errors.extend(_validate_secrets())
+    errors.extend(_validate_session_settings())
     return errors
 
 
