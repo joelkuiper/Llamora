@@ -351,14 +351,19 @@ secret = "..."
 
 ### 2. DEK storage
 
-By default the per-user data-encryption key (DEK) is held in an encrypted cookie. In production you can keep it server-side instead, so no key material leaves the server:
+After login the per-user data-encryption key (DEK) needs to be available on every request. There are two modes:
+
+- **`cookie`** (default) — the DEK is encrypted with `COOKIES.secret` and stored in an httpOnly cookie. The browser sends it back on each request. Logins survive server restarts, and multiple workers work out of the box.
+- **`session`** — only an opaque session ID is sent to the browser; the DEK itself stays in server memory. Nothing secret leaves the server, but because the store is in-process memory it is lost on restart (logging everyone out) and is not shared across workers, so this mode requires `--workers 1`.
+
+For production with a single worker, session mode is the stronger choice:
 
 ```toml
 [default.CRYPTO]
-dek_storage = "session"   # DEK stays in server memory; only a session ID is sent to the browser
+dek_storage = "session"
 ```
 
-The trade-off: sessions live in memory, so a server restart logs everyone out. With `--workers 1` this is fine; with multiple workers the setting is ignored and cookie mode is used automatically. For development, `cookie` (the default) is more convenient since logins survive restarts.
+For development the default (`cookie`) is more practical since logins survive restarts and live-reload cycles.
 
 ### 3. Build frontend assets
 
