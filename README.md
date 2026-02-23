@@ -1,7 +1,7 @@
 ![Llamora logo](./doc/brand/logo.png)
 
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.12+-3776AB.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB.svg)](https://www.python.org/)
 
 > A local-first journaling environment that makes continuity visible.
 > Write in daily pages. A model running on your machine produces day openings, recaps, and reflective responses.
@@ -168,7 +168,7 @@ Many AI interfaces are built around an ongoing back-and-forth. Here, the model i
 | **Storage** | SQLite, no ORM, incremental migrations |
 | **Encryption** | [libsodium](https://doc.libsodium.org/) via PyNaCl — per-user symmetric DEK, password-derived wrapping + recovery code |
 | **Inference** | Any [OpenAI-compatible](https://platform.openai.com/docs/api-reference/chat) `/v1/chat/completions` endpoint (default: [llama.cpp](https://github.com/ggerganov/llama.cpp)) |
-| **Embeddings** | [bge-small-en-v1.5](https://huggingface.co/BAAI/bge-small-en-v1.5) via FlagEmbedding + [HNSWlib](https://github.com/nmslib/hnswlib) ANN |
+| **Embeddings** | [bge-small-en-v1.5](https://huggingface.co/BAAI/bge-small-en-v1.5) via FastEmbed + [HNSWlib](https://github.com/nmslib/hnswlib) ANN |
 
 <details>
 <summary><strong>Key design decisions</strong></summary>
