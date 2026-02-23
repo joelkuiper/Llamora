@@ -1,6 +1,5 @@
 import asyncio
 import datetime as dt
-import json
 
 from quart import (
     Blueprint,
@@ -47,8 +46,6 @@ from llamora.app.routes.helpers import (
 from llamora.app.services.cache_registry import (
     MUTATION_TAG_DELETED,
     MUTATION_TAG_LINK_CHANGED,
-    build_mutation_lineage_plan,
-    to_client_payload,
 )
 from llamora.app.util.tags import emoji_shortcode, suggest_emoji_shortcodes
 
@@ -189,6 +186,13 @@ def _tag_kind_meta(tag_name: str) -> tuple[str, str]:
     return ("emoji" if tag_label else "text", tag_label)
 
 
+def _parse_tag_hash_bytes_or_400(tag_hash: str) -> bytes:
+    try:
+        return bytes.fromhex(tag_hash)
+    except ValueError:
+        abort_http(400, "invalid tag hash")
+
+
 def _build_tag_link_changed_trigger_payload(
     *,
     action: str,
@@ -216,6 +220,36 @@ def _build_tag_link_changed_trigger_payload(
             mutation=MUTATION_TAG_LINK_CHANGED,
             reason="tag.link.changed",
             created_dates=(created_date,) if created_date else (),
+            tag_hashes=(tag_hash,),
+        )
+    )
+    return payload
+
+
+def _build_tag_deleted_trigger_payload(
+    *,
+    removed_tag_name: str,
+    tag_hash: str,
+    affected_dates: tuple[str, ...],
+) -> dict[str, object]:
+    if not removed_tag_name:
+        return {}
+    tag_kind, tag_label = _tag_kind_meta(removed_tag_name)
+    payload: dict[str, object] = {
+        "tags:tag-count-updated": {
+            "tag": removed_tag_name,
+            "tag_hash": tag_hash,
+            "count": 0,
+            "action": "delete",
+            "tag_kind": tag_kind,
+            "tag_label": tag_label,
+        }
+    }
+    payload.update(
+        build_cache_invalidation_trigger(
+            mutation=MUTATION_TAG_DELETED,
+            reason="tag.deleted",
+            created_dates=affected_dates,
             tag_hashes=(tag_hash,),
         )
     )
@@ -559,10 +593,7 @@ async def tag_detail(tag_hash: str):
 async def delete_trace(tag_hash: str):
     day = _resolve_view_day(request.args.get("day"))
     _, user, ctx = await require_encryption_context()
-    try:
-        tag_hash_bytes = bytes.fromhex(tag_hash)
-    except ValueError:
-        abort_http(400, "invalid tag hash")
+    tag_hash_bytes = _parse_tag_hash_bytes_or_400(tag_hash)
 
     tag_service = _tags()
     sort_kind, sort_dir = normalize_tags_sort(
@@ -609,15 +640,17 @@ async def delete_trace(tag_hash: str):
         if requested_norm and removed_norm and requested_norm != removed_norm:
             adjacent_tag = requested_tag
 
-    tags_view = await tag_service.get_tags_view_data(
+    (
+        tags_view,
+        sort_kind,
+        sort_dir,
+        entries_limit,
+        _normalized_selected,
+    ) = await _resolve_tags_view(
         ctx,
-        adjacent_tag,
-        sort_kind=sort_kind,
-        sort_dir=sort_dir,
-        entry_limit=DEFAULT_TAG_ENTRIES_LIMIT,
+        selected_tag=adjacent_tag,
     )
     selected_tag = tags_view.selected_tag
-    entries_limit = DEFAULT_TAG_ENTRIES_LIMIT
     presented_tags_view = present_tags_view_data(tags_view)
     html = await render_template(
         "components/tags/detail.html",
@@ -632,31 +665,13 @@ async def delete_trace(tag_hash: str):
         today=local_date().isoformat(),
     )
     response = await make_response(html)
-    if removed_tag_name:
-        tag_label = emoji_shortcode(removed_tag_name) or ""
-        tag_kind = "emoji" if tag_label else "text"
-        lineage_plan = build_mutation_lineage_plan(
-            mutation=MUTATION_TAG_DELETED,
-            reason="tag.deleted",
-            created_dates=affected_dates,
-            tag_hashes=(tag_hash,),
-        )
-        response.headers["HX-Trigger"] = json.dumps(
-            {
-                "tags:tag-count-updated": {
-                    "tag": removed_tag_name,
-                    "tag_hash": tag_hash,
-                    "count": 0,
-                    "action": "delete",
-                    "tag_kind": tag_kind,
-                    "tag_label": tag_label,
-                },
-                "cache:invalidate": {
-                    "reason": "tag.deleted",
-                    "keys": to_client_payload(lineage_plan.invalidations),
-                },
-            }
-        )
+    trigger_payload = _build_tag_deleted_trigger_payload(
+        removed_tag_name=removed_tag_name,
+        tag_hash=tag_hash,
+        affected_dates=affected_dates,
+    )
+    if trigger_payload:
+        response.headers["HX-Trigger"] = dump_hx_trigger_header(trigger_payload)
     return response
 
 
@@ -853,7 +868,6 @@ async def tags_view_detail_fragment(date: str):
 async def tags_view_heatmap(date: str):
     normalized_date = require_iso_date(date)
     _, _user, ctx = await require_encryption_context()
-    services = get_services()
     tag_hash_raw = (request.args.get("tag_hash") or "").strip()
     heatmap_offset = _parse_positive_int(
         request.args.get("heatmap_offset"), default=0, min_value=0, max_value=240
@@ -861,26 +875,12 @@ async def tags_view_heatmap(date: str):
     min_date_raw = (request.args.get("min_date") or "").strip()
     activity_heatmap = None
     if tag_hash_raw:
-        try:
-            tag_hash = bytes.fromhex(tag_hash_raw)
-        except ValueError:
-            tag_hash = b""
-        if tag_hash:
-            min_date = None
-            if min_date_raw:
-                try:
-                    min_date = dt.date.fromisoformat(min_date_raw)
-                except ValueError:
-                    min_date = None
-            activity_heatmap = await get_tag_activity_heatmap(
-                services.db.tags,
-                ctx,
-                tag_hash,
-                store=get_lockbox_store(),
-                months=12,
-                offset=heatmap_offset,
-                min_date=min_date,
-            )
+        activity_heatmap = await _build_activity_heatmap(
+            ctx=ctx,
+            tag_hash_hex=tag_hash_raw,
+            first_used=min_date_raw,
+            offset=heatmap_offset,
+        )
     return await render_template(
         "components/tags/heatmap.html",
         day=normalized_date,

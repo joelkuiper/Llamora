@@ -5,7 +5,6 @@ from logging import getLogger
 import orjson
 from quart import (
     Blueprint,
-    abort,
     make_response,
     redirect,
     render_template,
@@ -16,6 +15,7 @@ from quart import (
 from llamora.app.routes.entries import render_entries
 from llamora.app.services.auth_helpers import login_required
 from llamora.app.routes.helpers import (
+    abort_http,
     build_view_state,
     build_tags_catalog_payload,
     get_summary_timeout_seconds,
@@ -55,6 +55,36 @@ async def _run_day_summary_singleflight(
     finally:
         async with _day_summary_singleflight_lock:
             _day_summary_singleflight.pop(key, None)
+
+
+async def _json_response(payload: dict[str, object], status: int = 200):
+    resp = await make_response(orjson.dumps(payload), status)
+    resp.mimetype = "application/json"
+    return resp
+
+
+def _resolve_calendar_request(
+    *,
+    default_year: int,
+    default_month: int,
+) -> tuple[int, int, str]:
+    requested_year = request.args.get("year", type=int)
+    requested_month = request.args.get("month", type=int)
+    mode = request.args.get("mode", "calendar")
+    if (
+        requested_year is not None
+        and requested_month is not None
+        and requested_year >= 1
+        and 1 <= requested_month <= 12
+    ):
+        target_year = requested_year
+        target_month = requested_month
+    else:
+        target_year = default_year
+        target_month = default_month
+    if mode not in {"calendar", "picker"}:
+        mode = "calendar"
+    return target_year, target_month, mode
 
 
 @days_bp.route("/")
@@ -144,22 +174,10 @@ async def day(date):
 @login_required
 async def calendar_view():
     today = local_date()
-    requested_year = request.args.get("year", type=int)
-    requested_month = request.args.get("month", type=int)
-    mode = request.args.get("mode", "calendar")
-    if (
-        requested_year is not None
-        and requested_month is not None
-        and requested_year >= 1
-        and 1 <= requested_month <= 12
-    ):
-        target_year = requested_year
-        target_month = requested_month
-    else:
-        target_year = today.year
-        target_month = today.month
-    if mode not in {"calendar", "picker"}:
-        mode = "calendar"
+    target_year, target_month, mode = _resolve_calendar_request(
+        default_year=today.year,
+        default_month=today.month,
+    )
     html = await _render_calendar(target_year, target_month, today=today, mode=mode)
     return await make_response(html)
 
@@ -167,22 +185,10 @@ async def calendar_view():
 @days_bp.route("/calendar/<int:year>/<int:month>")
 @login_required
 async def calendar_month(year: int, month: int):
-    requested_year = request.args.get("year", type=int)
-    requested_month = request.args.get("month", type=int)
-    mode = request.args.get("mode", "calendar")
-    if (
-        requested_year is not None
-        and requested_month is not None
-        and requested_year >= 1
-        and 1 <= requested_month <= 12
-    ):
-        target_year = requested_year
-        target_month = requested_month
-    else:
-        target_year = year
-        target_month = month
-    if mode not in {"calendar", "picker"}:
-        mode = "calendar"
+    target_year, target_month, mode = _resolve_calendar_request(
+        default_year=year,
+        default_month=month,
+    )
     html = await _render_calendar(target_year, target_month, mode=mode)
     return await make_response(html)
 
@@ -202,10 +208,7 @@ async def day_summary(date):
         ctx, "summary", f"day:{normalized_date}", digest
     )
     if cached_summary is not None:
-        payload = {"summary": cached_summary}
-        resp = await make_response(orjson.dumps(payload), 200)
-        resp.mimetype = "application/json"
-        return resp
+        return await _json_response({"summary": cached_summary})
 
     async def _generate_and_cache_summary() -> str:
         cache_hit = await summarize.get_cached(
@@ -234,11 +237,7 @@ async def day_summary(date):
             (user_id, normalized_date, digest),
             _generate_and_cache_summary,
         )
-    except asyncio.TimeoutError as exc:
+    except asyncio.TimeoutError:
         logger.warning("Day summary generation timed out for date=%s", normalized_date)
-        abort(504, description="Summary generation timed out.")
-        raise AssertionError("unreachable") from exc
-    payload = {"summary": summary or ""}
-    resp = await make_response(orjson.dumps(payload), 200)
-    resp.mimetype = "application/json"
-    return resp
+        abort_http(504, "Summary generation timed out.")
+    return await _json_response({"summary": summary or ""})

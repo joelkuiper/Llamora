@@ -70,26 +70,113 @@ async def _render_auth_error(template: str, error: str, **context: Any):
 async def _issue_auth_response(
     user_id: str | int, dek: bytes, redirect_url: str
 ) -> Response:
-    redirect_value = redirect(redirect_url)
-    resp = await make_response(redirect_value)
-    assert isinstance(resp, Response)
-    session = get_session_context()
-    manager = session.manager
-    manager.set_secure_cookie(resp, "uid", str(user_id))
-    await manager.set_dek(resp, dek)
-    return resp
+    return await _issue_authenticated_response(user_id, dek, redirect(redirect_url))
 
 
 async def _issue_auth_view_response(
     user_id: str | int, dek: bytes, html: str
 ) -> Response:
-    resp = await make_response(html)
+    return await _issue_authenticated_response(user_id, dek, html)
+
+
+async def _issue_authenticated_response(
+    user_id: str | int, dek: bytes, body: Any
+) -> Response:
+    resp = await make_response(body)
     assert isinstance(resp, Response)
     session = get_session_context()
     manager = session.manager
     manager.set_secure_cookie(resp, "uid", str(user_id))
     await manager.set_dek(resp, dek)
     return resp
+
+
+async def _render_login_error(username: str, return_url: str | None, error: str):
+    return await _render_auth_error(
+        "pages/login.html",
+        error=error,
+        return_url=return_url,
+        username=username,
+    )
+
+
+async def _render_security_error(user: Mapping[str, Any], message: str):
+    return await _render_profile_tab(user, "security", pw_error=message)
+
+
+async def _render_register_error(username: str, error: str):
+    return await _render_auth_error(
+        "pages/register.html", error=error, username=username
+    )
+
+
+async def _render_reset_error(error: str):
+    return await _render_auth_error("pages/reset_password.html", error=error)
+
+
+async def _render_reset_invalid_input():
+    return await _render_reset_error("Invalid input")
+
+
+async def _resolve_login_redirect_url(
+    db: Any,
+    *,
+    user_id: str | int,
+    return_url: str | None,
+) -> str:
+    if return_url:
+        return return_url
+    state = await db.users.get_state(user_id)
+    active_date = state.get("active_date")
+    if active_date:
+        return url_for("days.day", date=active_date)
+    return "/"
+
+
+async def _resolve_user_epoch(db: Any, user: Mapping[str, Any]) -> int:
+    epoch_raw = user.get("current_epoch")
+    try:
+        epoch = int(epoch_raw) if epoch_raw is not None else 0
+    except (TypeError, ValueError):
+        epoch = 0
+    if epoch <= 0:
+        epoch = await db.users.get_current_epoch(str(user["id"]))
+    return epoch
+
+
+def _schedule_search_warmup(
+    services: Any,
+    *,
+    user: Mapping[str, Any],
+    dek: bytes,
+    epoch: int,
+    username: str,
+) -> None:
+    if epoch <= 0:
+        current_app.logger.warning(
+            "Skipping search warmup for %s due to missing epoch metadata",
+            username,
+        )
+        return
+    warm_ctx = CryptoContext(user_id=str(user["id"]), dek=dek, epoch=epoch)
+    current_app.add_background_task(services.search_api.warm_index, warm_ctx)
+
+
+async def _update_user_password_wrap(
+    db: Any,
+    *,
+    user_id: str | int,
+    dek: bytes,
+    password: str,
+) -> None:
+    password_hash = (await _hash_password(password.encode("utf-8"))).decode("utf-8")
+    pw_salt, pw_nonce, pw_cipher = wrap_key(dek, password)
+    await db.users.update_password_wrap(
+        user_id, password_hash, pw_salt, pw_nonce, pw_cipher
+    )
+    epoch = await db.users.get_current_epoch(user_id)
+    await db.users.update_key_epoch_pw(user_id, epoch, pw_salt, pw_nonce, pw_cipher)
+    invalidate_user_snapshot(user_id)
 
 
 async def _hash_password(password: bytes) -> bytes:
@@ -220,32 +307,22 @@ async def register():
         )
         if password_error:
             message = _password_error_message(password_error)
-            return await _render_auth_error(
-                "pages/register.html", error=message, username=username
-            )
+            return await _render_register_error(username, message)
 
         length_error = _length_error(
             username, password, max_user=max_user, max_pass=max_pass
         )
         if length_error:
-            return await _render_auth_error(
-                "pages/register.html", error=length_error, username=username
-            )
+            return await _render_register_error(username, length_error)
 
         if not re.fullmatch(r"^[A-Za-z0-9_]+$", username):
-            return await _render_auth_error(
-                "pages/register.html",
-                error="Username may only contain letters, digits, and underscores",
-                username=username,
+            return await _render_register_error(
+                username, "Username may only contain letters, digits, and underscores"
             )
 
         db = get_services().db
         if await db.users.get_user_by_username(username):
-            return await _render_auth_error(
-                "pages/register.html",
-                error="Username already exists",
-                username=username,
-            )
+            return await _render_register_error(username, "Username already exists")
 
         password_bytes = password.encode("utf-8")
         hash_bytes = await _hash_password(password_bytes)
@@ -326,11 +403,8 @@ async def login():
         )
         if length_error:
             await login_failures.record_failure(cache_key)
-            return await _render_auth_error(
-                "pages/login.html",
-                error="Invalid credentials",
-                return_url=return_url,
-                username=username,
+            return await _render_login_error(
+                username, return_url, "Invalid credentials"
             )
 
         db = services.db
@@ -347,37 +421,18 @@ async def login():
                     user["dek_pw_nonce"],
                     password,
                 )
-                redirect_url = return_url
-                if not redirect_url:
-                    state = await db.users.get_state(user["id"])
-                    active_date = state.get("active_date")
-                    if active_date:
-                        redirect_url = url_for("days.day", date=active_date)
-                    else:
-                        redirect_url = "/"
+                redirect_url = await _resolve_login_redirect_url(
+                    db, user_id=user["id"], return_url=return_url
+                )
                 resp = await _issue_auth_response(user["id"], dek, redirect_url)
-                epoch_raw = user.get("current_epoch")
-                try:
-                    epoch = int(epoch_raw) if epoch_raw is not None else 0
-                except (TypeError, ValueError):
-                    epoch = 0
-                if epoch <= 0:
-                    epoch = await db.users.get_current_epoch(str(user["id"]))
-                if epoch > 0:
-                    warm_ctx = CryptoContext(
-                        user_id=str(user["id"]),
-                        dek=dek,
-                        epoch=epoch,
-                    )
-                    current_app.add_background_task(
-                        services.search_api.warm_index,
-                        warm_ctx,
-                    )
-                else:
-                    current_app.logger.warning(
-                        "Skipping search warmup for %s due to missing epoch metadata",
-                        username,
-                    )
+                epoch = await _resolve_user_epoch(db, user)
+                _schedule_search_warmup(
+                    services,
+                    user=user,
+                    dek=dek,
+                    epoch=epoch,
+                    username=username,
+                )
                 await login_failures.clear(cache_key)
                 current_app.logger.debug(
                     "Login succeeded for %s, redirecting to %s", username, redirect_url
@@ -392,12 +447,7 @@ async def login():
                 )
         current_app.logger.debug("Login failed for %s", username)
         await login_failures.record_failure(cache_key)
-        return await render_template(
-            "pages/login.html",
-            error="Invalid credentials",
-            return_url=return_url,
-            username=username,
-        )
+        return await _render_login_error(username, return_url, "Invalid credentials")
 
     # Already authenticated — redirect rather than showing the login form.
     # This covers the browser-back-after-login case: if bfcache is bypassed
@@ -442,15 +492,11 @@ async def reset_password():
         min_pass = int(settings.LIMITS.min_password_length)
 
         if not username or not recovery:
-            return await _render_auth_error(
-                "pages/reset_password.html", error="Invalid input"
-            )
+            return await _render_reset_invalid_input()
 
         length_error = _length_error(username, None, max_user=max_user, max_pass=None)
         if length_error:
-            return await _render_auth_error(
-                "pages/reset_password.html", error="Invalid input"
-            )
+            return await _render_reset_invalid_input()
 
         password_error = await validate_password(
             password,
@@ -462,16 +508,12 @@ async def reset_password():
             require_digit=True,
         )
         if password_error:
-            return await _render_auth_error(
-                "pages/reset_password.html", error="Invalid input"
-            )
+            return await _render_reset_invalid_input()
 
         db = get_services().db
         user = await db.users.get_user_by_username(username)
         if not user:
-            return await _render_auth_error(
-                "pages/reset_password.html", error="Invalid credentials"
-            )
+            return await _render_reset_error("Invalid credentials")
 
         try:
             dek = unwrap_key(
@@ -481,22 +523,11 @@ async def reset_password():
                 recovery,
             )
         except Exception:
-            return await _render_auth_error(
-                "pages/reset_password.html", error="Invalid recovery code"
-            )
+            return await _render_reset_error("Invalid recovery code")
 
-        password_bytes = password.encode("utf-8")
-        hash_bytes = await _hash_password(password_bytes)
-        password_hash = hash_bytes.decode("utf-8")
-        pw_salt, pw_nonce, pw_cipher = wrap_key(dek, password)
-        await db.users.update_password_wrap(
-            user["id"], password_hash, pw_salt, pw_nonce, pw_cipher
+        await _update_user_password_wrap(
+            db, user_id=user["id"], dek=dek, password=password
         )
-        epoch = await db.users.get_current_epoch(user["id"])
-        await db.users.update_key_epoch_pw(
-            user["id"], epoch, pw_salt, pw_nonce, pw_cipher
-        )
-        invalidate_user_snapshot(user["id"])
         return redirect("/login")
 
     return await render_template("pages/reset_password.html")
@@ -557,14 +588,10 @@ async def change_password():
 
     max_pass = int(settings.LIMITS.max_password_length)
     if not current:
-        return await _render_profile_tab(
-            user, "security", pw_error="All fields are required"
-        )
+        return await _render_security_error(user, "All fields are required")
 
     if len(current) > max_pass:
-        return await _render_profile_tab(
-            user, "security", pw_error="Input exceeds max length"
-        )
+        return await _render_security_error(user, "Input exceeds max length")
 
     password_error = await validate_password(
         new,
@@ -575,34 +602,21 @@ async def change_password():
     )
     if password_error:
         message = _password_error_message(password_error)
-        return await _render_profile_tab(user, "security", pw_error=message)
+        return await _render_security_error(user, message)
 
     try:
         await _verify_password(
             user["password_hash"].encode("utf-8"), current.encode("utf-8")
         )
     except Exception:
-        return await _render_profile_tab(
-            user, "security", pw_error="Invalid current password"
-        )
+        return await _render_security_error(user, "Invalid current password")
 
     dek = await session.dek()
     if dek is None:
-        return await _render_profile_tab(
-            user, "security", pw_error="Missing encryption key"
-        )
+        return await _render_security_error(user, "Missing encryption key")
 
-    password_bytes = new.encode("utf-8")
-    hash_bytes = await _hash_password(password_bytes)
-    password_hash = hash_bytes.decode("utf-8")
-    pw_salt, pw_nonce, pw_cipher = wrap_key(dek, new)
     db = get_services().db
-    await db.users.update_password_wrap(
-        user["id"], password_hash, pw_salt, pw_nonce, pw_cipher
-    )
-    epoch = await db.users.get_current_epoch(user["id"])
-    await db.users.update_key_epoch_pw(user["id"], epoch, pw_salt, pw_nonce, pw_cipher)
-    invalidate_user_snapshot(user["id"])
+    await _update_user_password_wrap(db, user_id=user["id"], dek=dek, password=new)
 
     return await _render_profile_tab(user, "security", pw_success=True)
 

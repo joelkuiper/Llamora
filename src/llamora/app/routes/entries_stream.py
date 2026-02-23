@@ -50,6 +50,204 @@ def _entry_stream_manager():
     return get_services().llm_service.response_stream_manager
 
 
+def _resolve_target_datetime(normalized_date: str, tz: str) -> tuple[datetime, str]:
+    target_date = datetime.fromisoformat(normalized_date).date()
+    tz_info = ZoneInfo(tz)
+    now = datetime.now(tz_info)
+    if target_date == now.date():
+        return now, target_date.isoformat()
+    return (
+        datetime(
+            target_date.year,
+            target_date.month,
+            target_date.day,
+            12,
+            0,
+            tzinfo=tz_info,
+        ),
+        target_date.isoformat(),
+    )
+
+
+async def _build_opening_stream_payload(
+    *,
+    user_id: str,
+    enc_ctx,
+    normalized_date: str,
+    tz: str,
+) -> tuple[datetime, str, list[dict[str, object]]]:
+    target_dt, today_iso = _resolve_target_datetime(normalized_date, tz)
+    target_date = datetime.fromisoformat(today_iso).date()
+    llm_ctx = build_llm_context(user_time=target_dt.isoformat(), tz_cookie=tz)
+    date_str = str(llm_ctx.get("date") or "")
+    pod = str(llm_ctx.get("part_of_day") or "")
+    yesterday_iso = (target_date - timedelta(days=1)).isoformat()
+    services = get_services()
+    db = services.db
+    is_new = not await db.entries.user_has_entries(user_id)
+    yesterday_msgs = await db.entries.get_recent_entries(
+        enc_ctx, yesterday_iso, limit=20
+    )
+    had_yesterday_activity = bool(yesterday_msgs)
+    llm_client = services.llm_service.llm
+
+    try:
+        yesterday_msgs = await llm_client.trim_history(yesterday_msgs, context=llm_ctx)
+    except Exception:  # pragma: no cover - defensive
+        logger.exception("Failed to trim opening history")
+
+    has_no_activity = not is_new and not had_yesterday_activity
+    opening_messages = build_opening_messages(
+        yesterday_messages=yesterday_msgs,
+        date=date_str,
+        part_of_day=pod,
+        is_new=is_new,
+        has_no_activity=has_no_activity,
+    )
+    recall_context = await build_tag_recall_context(
+        db,
+        enc_ctx,
+        history=yesterday_msgs,
+        current_date=today_iso,
+        llm=llm_client,
+        summarize_service=get_summarize_service(),
+    )
+    augmentation = await augment_opening_with_recall(
+        opening_messages,
+        recall_context,
+        llm_client=None,
+        insert_index=1,
+    )
+    opening_messages = augmentation.messages
+    recall_inserted = augmentation.recall_inserted
+    recall_index = augmentation.recall_index
+
+    budget = llm_client.prompt_budget
+    prompt_tokens = estimate_entry_messages_tokens(opening_messages)
+    snapshot = budget.diagnostics(
+        prompt_tokens=prompt_tokens,
+        label="entry:opening",
+        extra={
+            "phase": "initial",
+            "messages": len(opening_messages),
+            "recall_inserted": recall_inserted,
+        },
+    )
+    max_tokens = snapshot.max_tokens
+    if max_tokens is not None and prompt_tokens > max_tokens:
+        if recall_inserted:
+            logger.info(
+                "Dropping tag recall context from opening prompt due to budget (%s > %s)",
+                prompt_tokens,
+                max_tokens,
+            )
+            drop_index = recall_index if recall_index is not None else 1
+            if 0 <= drop_index < len(opening_messages):
+                opening_messages.pop(drop_index)
+            prompt_tokens = estimate_entry_messages_tokens(opening_messages)
+            budget.diagnostics(
+                prompt_tokens=prompt_tokens,
+                label="entry:opening",
+                extra={
+                    "phase": "after-recall-drop",
+                    "messages": len(opening_messages),
+                    "recall_inserted": False,
+                },
+            )
+        if prompt_tokens > max_tokens:
+            budget.diagnostics(
+                prompt_tokens=prompt_tokens,
+                label="entry:opening",
+                extra={
+                    "phase": "overflow-after-trim",
+                    "messages": len(opening_messages),
+                    "recall_inserted": False,
+                },
+            )
+            raise ValueError("Opening prompt exceeds context window")
+    return target_dt, today_iso, opening_messages
+
+
+async def _load_response_history_or_error(enc_ctx, uid: str, entry_id: str):
+    db = get_services().db
+    actual_date = await db.entries.get_entry_date(uid, entry_id)
+    if not actual_date:
+        logger.warning("Entry date not found for entry %s", entry_id)
+        return None, None
+    entries = await db.entries.get_entries_for_date(enc_ctx, actual_date)
+    if not entries:
+        logger.warning("Entries not found for entry %s", entry_id)
+        return None, None
+    return actual_date, build_entry_history(entries, entry_id)
+
+
+async def _get_or_start_pending_response(
+    *,
+    services,
+    manager,
+    db,
+    enc_ctx,
+    entry_id: str,
+    actual_date: str,
+    normalized_date: str,
+    history: list[dict[str, object]],
+    params: dict[str, object] | None,
+    llm_ctx: dict[str, object],
+    created_at: str | None,
+):
+    pending_response = manager.get(entry_id, enc_ctx)
+    if pending_response:
+        return pending_response
+
+    llm_client = services.llm_service.llm
+    recall_context = await build_tag_recall_context(
+        db,
+        enc_ctx,
+        history=history,
+        current_date=actual_date or normalized_date,
+        llm=llm_client,
+        summarize_service=get_summarize_service(),
+        max_entry_id=entry_id,
+        target_entry_id=entry_id,
+    )
+    recall_date = actual_date or normalized_date
+    recall_tags = tuple(recall_context.tags) if recall_context else ()
+    has_existing_guidance = bool(
+        recall_context
+        and recall_tags
+        and history_has_tag_recall(history, tags=recall_tags, date=recall_date)
+    )
+    augmentation = await augment_history_with_recall(
+        history,
+        None if has_existing_guidance else recall_context,
+        llm_client=llm_client,
+        params=params,
+        context=llm_ctx,
+        target_entry_id=entry_id,
+        include_tag_metadata=True,
+        tag_recall_date=recall_date,
+    )
+    history_for_stream = augmentation.messages
+    recall_applied = bool(
+        recall_context
+        and recall_tags
+        and history_has_tag_recall(
+            history_for_stream, tags=recall_tags, date=recall_date
+        )
+    )
+    return await start_stream_session(
+        manager=manager,
+        entry_id=entry_id,
+        date=actual_date or normalized_date,
+        history=history_for_stream,
+        ctx=enc_ctx,
+        params=params,
+        context=llm_ctx,
+        meta_extra={"tag_recall_applied": recall_applied},
+        created_at=created_at,
+    )
+
+
 @entries_stream_bp.route("/e/response/stop/<entry_id>", methods=["POST"])
 @login_required
 async def stop_response(entry_id: str):
@@ -87,123 +285,19 @@ async def sse_opening(date: str):
     uid = user["id"]
     tz = get_timezone()
     normalized_date = require_iso_date(date)
-    target_date = datetime.fromisoformat(normalized_date).date()
-    tz_info = ZoneInfo(tz)
-    now = datetime.now(tz_info)
-    if target_date == now.date():
-        target_dt = now
-    else:
-        target_dt = datetime(
-            target_date.year,
-            target_date.month,
-            target_date.day,
-            12,
-            0,
-            tzinfo=tz_info,
-        )
-    today_iso = target_date.isoformat()
-    llm_ctx = build_llm_context(
-        user_time=target_dt.isoformat(),
-        tz_cookie=tz,
-    )
-    date_str = str(llm_ctx.get("date") or "")
-    pod = str(llm_ctx.get("part_of_day") or "")
-    yesterday_iso = (target_date - timedelta(days=1)).isoformat()
-    services = get_services()
-    db = services.db
-    is_new = not await db.entries.user_has_entries(uid)
-
-    yesterday_msgs = await db.entries.get_recent_entries(
-        enc_ctx, yesterday_iso, limit=20
-    )
-    had_yesterday_activity = bool(yesterday_msgs)
-
-    llm_client = services.llm_service.llm
-
     try:
-        yesterday_msgs = await llm_client.trim_history(
-            yesterday_msgs,
-            context=llm_ctx,
+        target_dt, today_iso, opening_messages = await _build_opening_stream_payload(
+            user_id=uid,
+            enc_ctx=enc_ctx,
+            normalized_date=normalized_date,
+            tz=tz,
         )
-    except Exception:  # pragma: no cover - defensive
-        logger.exception("Failed to trim opening history")
-
-    has_no_activity = not is_new and not had_yesterday_activity
-    try:
-        opening_messages = build_opening_messages(
-            yesterday_messages=yesterday_msgs,
-            date=date_str,
-            part_of_day=pod,
-            is_new=is_new,
-            has_no_activity=has_no_activity,
-        )
-        recall_context = await build_tag_recall_context(
-            db,
-            enc_ctx,
-            history=yesterday_msgs,
-            current_date=today_iso,
-            llm=llm_client,
-            summarize_service=get_summarize_service(),
-        )
-        augmentation = await augment_opening_with_recall(
-            opening_messages,
-            recall_context,
-            llm_client=None,
-            insert_index=1,
-        )
-        opening_messages = augmentation.messages
-        recall_inserted = augmentation.recall_inserted
-        recall_index = augmentation.recall_index
-
-        budget = llm_client.prompt_budget
-        prompt_tokens = estimate_entry_messages_tokens(opening_messages)
-        snapshot = budget.diagnostics(
-            prompt_tokens=prompt_tokens,
-            label="entry:opening",
-            extra={
-                "phase": "initial",
-                "messages": len(opening_messages),
-                "recall_inserted": recall_inserted,
-            },
-        )
-        max_tokens = snapshot.max_tokens
-        if max_tokens is not None and prompt_tokens > max_tokens:
-            if recall_inserted:
-                logger.info(
-                    "Dropping tag recall context from opening prompt due to budget (%s > %s)",
-                    prompt_tokens,
-                    max_tokens,
-                )
-                drop_index = recall_index if recall_index is not None else 1
-                if 0 <= drop_index < len(opening_messages):
-                    opening_messages.pop(drop_index)
-                prompt_tokens = estimate_entry_messages_tokens(opening_messages)
-                budget.diagnostics(
-                    prompt_tokens=prompt_tokens,
-                    label="entry:opening",
-                    extra={
-                        "phase": "after-recall-drop",
-                        "messages": len(opening_messages),
-                        "recall_inserted": False,
-                    },
-                )
-            if prompt_tokens > max_tokens:
-                budget.diagnostics(
-                    prompt_tokens=prompt_tokens,
-                    label="entry:opening",
-                    extra={
-                        "phase": "overflow-after-trim",
-                        "messages": len(opening_messages),
-                        "recall_inserted": False,
-                    },
-                )
-                raise ValueError("Opening prompt exceeds context window")
     except Exception:
         logger.exception("Failed to prepare opening prompt")
         return StreamSession.error("⚠️ Unable to prepare the day opening.")
 
-    stream_id = f"opening:{uid}:{today_iso}"
     manager = _entry_stream_manager()
+    stream_id = f"opening:{uid}:{today_iso}"
     try:
         pending = manager.start_stream(
             stream_id,
@@ -239,15 +333,9 @@ async def sse_response(entry_id: str, date: str):
 
     _, user, enc_ctx = await require_encryption_context()
     uid = user["id"]
-    actual_date = await get_services().db.entries.get_entry_date(uid, entry_id)
-    if not actual_date:
-        logger.warning("Entry date not found for entry %s", entry_id)
+    actual_date, history = await _load_response_history_or_error(enc_ctx, uid, entry_id)
+    if not actual_date or history is None:
         return StreamSession.error("Invalid ID")
-    entries = await get_services().db.entries.get_entries_for_date(enc_ctx, actual_date)
-    if not entries:
-        logger.warning("Entries not found for entry %s", entry_id)
-        return StreamSession.error("Invalid ID")
-    history = build_entry_history(entries, entry_id)
 
     params_raw = normalize_llm_config(
         request.args.get("config"),
@@ -270,68 +358,25 @@ async def sse_response(entry_id: str, date: str):
     )
 
     try:
-        pending_response = manager.get(entry_id, enc_ctx)
-        if not pending_response:
-            llm_client = services.llm_service.llm
-            recall_context = await build_tag_recall_context(
-                db,
-                enc_ctx,
-                history=history,
-                current_date=actual_date or normalized_date,
-                llm=llm_client,
-                summarize_service=get_summarize_service(),
-                max_entry_id=entry_id,
-                target_entry_id=entry_id,
-            )
-            recall_date = actual_date or normalized_date
-            recall_tags = tuple(recall_context.tags) if recall_context else ()
-            has_existing_guidance = False
-            if recall_context and recall_tags:
-                has_existing_guidance = history_has_tag_recall(
-                    history,
-                    tags=recall_tags,
-                    date=recall_date,
-                )
-            augmentation = await augment_history_with_recall(
-                history,
-                None if has_existing_guidance else recall_context,
-                llm_client=llm_client,
-                params=params,
-                context=llm_ctx,
-                target_entry_id=entry_id,
-                include_tag_metadata=True,
-                tag_recall_date=recall_date,
-            )
-            history_for_stream = augmentation.messages
-            recall_applied = False
-            if recall_context and recall_tags:
-                recall_applied = history_has_tag_recall(
-                    history_for_stream,
-                    tags=recall_tags,
-                    date=recall_date,
-                )
-            else:
-                recall_applied = False
-            try:
-                pending_response = await start_stream_session(
-                    manager=manager,
-                    entry_id=entry_id,
-                    date=actual_date or normalized_date,
-                    history=history_for_stream,
-                    ctx=enc_ctx,
-                    params=params,
-                    context=llm_ctx,
-                    meta_extra={
-                        "tag_recall_applied": recall_applied,
-                    },
-                    created_at=request.args.get("user_time"),
-                )
-            except StreamCapacityError as exc:
-                return StreamSession.backpressure(
-                    "The assistant is busy. Please try again in a moment.",
-                    exc.retry_after,
-                )
+        pending_response = await _get_or_start_pending_response(
+            services=services,
+            manager=manager,
+            db=db,
+            enc_ctx=enc_ctx,
+            entry_id=entry_id,
+            actual_date=actual_date,
+            normalized_date=normalized_date,
+            history=history,
+            params=params,
+            llm_ctx=llm_ctx,
+            created_at=request.args.get("user_time"),
+        )
         return StreamSession.pending(pending_response)
+    except StreamCapacityError as exc:
+        return StreamSession.backpressure(
+            "The assistant is busy. Please try again in a moment.",
+            exc.retry_after,
+        )
     except HTTPException:
         raise
     except Exception:
