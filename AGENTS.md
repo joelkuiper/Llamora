@@ -70,4 +70,4 @@
 * Embeddings are generated via `fastembed` (`TextEmbedding`) and indexed with HNSW.
 * Embedding model warm-up runs once in background via `AppLifecycle`.
 * Migrations must not break existing encrypted content.
-* DEK storage modes are `cookie` (default) or `session`; multi-worker + `session` is forced back to `cookie`.
+* DEK storage modes: `session` (default, SQLite-backed, works across workers) or `cookie` (stateless, DEK in encrypted cookie).

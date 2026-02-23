@@ -201,7 +201,7 @@ flowchart LR
 
 - A random 32-byte **data-encryption key (DEK)** is generated at registration.
 - The DEK is wrapped twice — once with the password, once with a recovery code — and only the wrapped forms are stored.
-- At login the password unwraps the DEK into memory. It is held in an encrypted cookie or in session storage.
+- At login the password unwraps the DEK into memory. Depending on the storage mode, it is either kept server-side in encrypted SQLite or sent to the browser in an encrypted cookie.
 - Key material is zeroised on logout and session expiry.
 
 **What is encrypted:**
