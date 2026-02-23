@@ -26,6 +26,23 @@ class SearchContext:
     result_window: int
 
 
+@dataclass(slots=True)
+class SearchViewModel:
+    results: list
+    truncation_notice: str | None = None
+    sanitized_query: str = ""
+    has_more: bool = False
+    total_known: bool = False
+    showing_count: int = 0
+    returned_session_id: str | None = None
+    warming: bool = False
+    index_coverage: dict[str, Any] | None = None
+
+
+def _empty_search_view_model() -> SearchViewModel:
+    return SearchViewModel(results=[])
+
+
 def resolve_search_context(req: Request) -> SearchContext:
     sanitized_query = replace_emoji_shortcodes(req.args.get("q") or "").strip()
     max_query_length = int(settings.LIMITS.max_search_query_length)
@@ -47,6 +64,53 @@ def resolve_search_context(req: Request) -> SearchContext:
     )
 
 
+async def _run_search(
+    *,
+    context: SearchContext,
+    use_cursor: bool,
+    cursor: str,
+) -> SearchViewModel:
+    model = _empty_search_view_model()
+    if not context.query:
+        return model
+
+    _, user, ctx = await require_encryption_context()
+    page_limit = context.page_size if use_cursor else context.initial_page_size
+
+    try:
+        search_api = get_search_api()
+        stream_result = await search_api.search_stream(
+            ctx,
+            context.query,
+            session_id=cursor or None,
+            page_limit=page_limit,
+            result_window=context.result_window,
+        )
+        model.returned_session_id = stream_result.session_id
+        if use_cursor and model.returned_session_id != cursor:
+            return model
+        model.sanitized_query = stream_result.normalized_query
+        model.results = stream_result.results
+        model.has_more = stream_result.has_more
+        model.showing_count = stream_result.showing_count
+        model.total_known = stream_result.total_known
+        model.warming = stream_result.warming
+        model.index_coverage = stream_result.index_coverage
+        if stream_result.truncated:
+            model.truncation_notice = (
+                "Your search was truncated to the first "
+                f"{context.max_query_length} characters."
+            )
+    except InvalidSearchQuery:
+        logger.info("Discarding invalid search query for user %s", user["id"])
+        model.sanitized_query = ""
+        model.results = []
+
+    if model.sanitized_query and not use_cursor:
+        await get_services().db.search_history.record_search(ctx, model.sanitized_query)
+    return model
+
+
 @search_bp.get("/search")
 @login_required
 async def search():
@@ -57,61 +121,14 @@ async def search():
     search_mode = (request.args.get("search_mode") or "").strip()
     cursor = (request.args.get("cursor") or "").strip()
     use_cursor = bool(cursor) and search_mode == "chunk"
-    page_limit = context.page_size if use_cursor else context.initial_page_size
-    session_id = cursor if use_cursor else ""
-    results: list = []
-    truncation_notice: str | None = None
-    sanitized_query = ""
-    has_more = False
-    total_known = False
-    showing_count = 0
-    returned_session_id: str | None = None
-    warming = False
-    index_coverage: dict[str, Any] | None = None
-
-    if context.query:
-        _, user, ctx = await require_encryption_context()
-
-        try:
-            search_api = get_search_api()
-            stream_result = await search_api.search_stream(
-                ctx,
-                context.query,
-                session_id=session_id or None,
-                page_limit=page_limit,
-                result_window=context.result_window,
-            )
-            returned_session_id = stream_result.session_id
-            if use_cursor and returned_session_id != cursor:
-                return ""
-            sanitized_query = stream_result.normalized_query
-            results = stream_result.results
-            truncated = stream_result.truncated
-            has_more = stream_result.has_more
-            showing_count = stream_result.showing_count
-            total_known = stream_result.total_known
-            warming = stream_result.warming
-            index_coverage = stream_result.index_coverage
-        except InvalidSearchQuery:
-            logger.info("Discarding invalid search query for user %s", user["id"])
-            sanitized_query = ""
-            results = []
-            truncated = False
-
-        if sanitized_query and not use_cursor:
-            await get_services().db.search_history.record_search(ctx, sanitized_query)
-
-        if truncated:
-            truncation_notice = (
-                "Your search was truncated to the first "
-                f"{context.max_query_length} characters."
-            )
-
-    page_results = results
+    vm = await _run_search(context=context, use_cursor=use_cursor, cursor=cursor)
+    if use_cursor and vm.returned_session_id and vm.returned_session_id != cursor:
+        return ""
+    page_results = vm.results
     logger.debug(
         "Route returning %d results (has_more=%s)",
         len(page_results),
-        has_more,
+        vm.has_more,
     )
 
     if use_cursor:
@@ -120,21 +137,21 @@ async def search():
         return await render_template(
             "components/search/search_results_chunk.html",
             results=page_results,
-            has_more=has_more,
-            session_id=returned_session_id,
+            has_more=vm.has_more,
+            session_id=vm.returned_session_id,
         )
 
     return await render_template(
         "components/search/search_results.html",
         results=page_results,
-        has_query=bool(sanitized_query),
-        truncation_notice=truncation_notice,
-        total_known=total_known,
-        showing_count=showing_count,
-        has_more=has_more,
-        session_id=returned_session_id,
-        warming=warming,
-        index_coverage=index_coverage,
+        has_query=bool(vm.sanitized_query),
+        truncation_notice=vm.truncation_notice,
+        total_known=vm.total_known,
+        showing_count=vm.showing_count,
+        has_more=vm.has_more,
+        session_id=vm.returned_session_id,
+        warming=vm.warming,
+        index_coverage=vm.index_coverage,
     )
 
 

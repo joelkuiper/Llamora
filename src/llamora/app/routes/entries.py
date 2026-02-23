@@ -6,10 +6,11 @@ For SSE streaming endpoints, see entries_stream.py.
 from __future__ import annotations
 
 import asyncio
-import logging
 import json
+import logging
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
+from typing import Any, Mapping
 
 from quart import (
     Blueprint,
@@ -22,7 +23,10 @@ from quart import (
 )
 
 from llamora.app.routes.helpers import (
+    abort_http,
     build_view_state,
+    build_cache_invalidation_trigger,
+    dump_hx_trigger_header,
     ensure_entry_exists,
     is_htmx_request,
     require_encryption_context,
@@ -31,8 +35,6 @@ from llamora.app.routes.helpers import (
 from llamora.app.services.cache_registry import (
     MUTATION_ENTRY_CHANGED,
     MUTATION_ENTRY_CREATED,
-    build_mutation_lineage_plan,
-    to_client_payload,
 )
 from llamora.app.services.auth_helpers import login_required
 from llamora.app.services.container import get_services
@@ -45,6 +47,77 @@ from llamora.settings import settings
 entries_bp = Blueprint("entries", __name__)
 
 logger = logging.getLogger(__name__)
+
+
+def _entry_day(entry: Mapping[str, Any], *, today: str) -> str:
+    return str(entry.get("created_date") or today)
+
+
+def _entry_text_html(entry: Mapping[str, Any]) -> str:
+    return str(entry.get("text_html") or render_markdown_to_html(entry.get("text", "")))
+
+
+def _build_entry_payload(
+    entry_id: str,
+    entry: Mapping[str, Any],
+    *,
+    tags: list[Mapping[str, Any]] | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "id": entry_id,
+        "role": entry.get("role"),
+        "text": entry.get("text", ""),
+        "text_html": _entry_text_html(entry),
+        "meta": entry.get("meta", {}),
+        "created_at": entry.get("created_at"),
+    }
+    if tags is not None:
+        payload["tags"] = tags
+    return payload
+
+
+async def _load_entry_or_404(
+    *,
+    db: Any,
+    ctx: Any,
+    user_id: str,
+    entry_id: str,
+) -> Mapping[str, Any]:
+    await ensure_entry_exists(db, user_id, entry_id)
+    entries = await db.entries.get_entries_by_ids(ctx, [entry_id])
+    if not entries:
+        abort_http(404, "Entry not found.")
+    return entries[0]
+
+
+def _require_user_entry(
+    entry: Mapping[str, Any], *, editable_only_today: bool = False
+) -> None:
+    if entry.get("role") != "user":
+        abort_http(403, "Only user entries can be edited.")
+    if editable_only_today:
+        today = local_date().isoformat()
+        day = _entry_day(entry, today=today)
+        if day != today:
+            abort_http(403, "Editing is available on the current day only.")
+
+
+def _set_cache_invalidation_header(
+    response: Response,
+    *,
+    mutation: str,
+    reason: str,
+    created_dates: tuple[str, ...],
+    tag_hashes: tuple[str, ...],
+) -> None:
+    response.headers["HX-Trigger"] = dump_hx_trigger_header(
+        build_cache_invalidation_trigger(
+            mutation=mutation,
+            reason=reason,
+            created_dates=created_dates,
+            tag_hashes=tag_hashes,
+        )
+    )
 
 
 async def render_entries(
@@ -172,14 +245,8 @@ async def update_entry(entry_id: str):
     if not text.strip() or len(text) > max_len:
         abort(400, description="Entry is empty or too long.")
 
-    await ensure_entry_exists(db, uid, entry_id)
-
-    entries = await db.entries.get_entries_by_ids(ctx, [entry_id])
-    if not entries:
-        abort(404, description="Entry not found.")
-    current = entries[0]
-    if current.get("role") != "user":
-        abort(403, description="Only user entries can be edited.")
+    current = await _load_entry_or_404(db=db, ctx=ctx, user_id=uid, entry_id=entry_id)
+    _require_user_entry(current)
 
     updated = await db.entries.update_entry_text(
         ctx, entry_id, text, meta=current.get("meta", {})
@@ -193,39 +260,25 @@ async def update_entry(entry_id: str):
     )
 
     tags = await db.tags.get_tags_for_entry(ctx, entry_id)
-    entry_payload = {
-        "id": entry_id,
-        "role": updated.get("role"),
-        "text": updated.get("text", ""),
-        "text_html": render_markdown_to_html(updated.get("text", "")),
-        "meta": updated.get("meta", {}),
-        "tags": tags,
-        "created_at": updated.get("created_at"),
-    }
     today = local_date().isoformat()
-    day = updated.get("created_date") or today
+    day = _entry_day(updated, today=today)
+    entry_payload = _build_entry_payload(entry_id, updated, tags=tags)
     html = await render_template(
         "components/entries/entry_main_only.html",
         entry=entry_payload,
         day=day,
         is_today=day == today,
     )
-    tag_hashes = [str(tag.get("hash") or "").strip() for tag in tags if tag.get("hash")]
-    lineage_plan = build_mutation_lineage_plan(
+    tag_hashes = tuple(
+        str(tag.get("hash") or "").strip() for tag in tags if tag.get("hash")
+    )
+    response = await make_response(html, 200)
+    _set_cache_invalidation_header(
+        response,
         mutation=MUTATION_ENTRY_CHANGED,
         reason="entry.changed",
         created_dates=(day,),
         tag_hashes=tag_hashes,
-    )
-    invalidation_keys = to_client_payload(lineage_plan.invalidations)
-    response = await make_response(html, 200)
-    response.headers["HX-Trigger"] = json.dumps(
-        {
-            "cache:invalidate": {
-                "reason": "entry.changed",
-                "keys": invalidation_keys,
-            }
-        }
     )
     return response
 
@@ -236,26 +289,11 @@ async def entry_edit(entry_id: str):
     _, user, ctx = await require_encryption_context()
     uid = user["id"]
     db = get_services().db
-    await ensure_entry_exists(db, uid, entry_id)
-    entries = await db.entries.get_entries_by_ids(ctx, [entry_id])
-    if not entries:
-        abort(404, description="Entry not found.")
-    entry = entries[0]
-    if entry.get("role") != "user":
-        abort(403, description="Only user entries can be edited.")
+    entry = await _load_entry_or_404(db=db, ctx=ctx, user_id=uid, entry_id=entry_id)
+    _require_user_entry(entry, editable_only_today=True)
     today = local_date().isoformat()
-    day = entry.get("created_date") or today
-    if day != today:
-        abort(403, description="Editing is available on the current day only.")
-    text_html = entry.get("text_html") or render_markdown_to_html(entry.get("text", ""))
-    entry_payload = {
-        "id": entry_id,
-        "role": entry.get("role"),
-        "text": entry.get("text", ""),
-        "text_html": text_html,
-        "meta": entry.get("meta", {}),
-        "created_at": entry.get("created_at"),
-    }
+    day = _entry_day(entry, today=today)
+    entry_payload = _build_entry_payload(entry_id, entry)
     return await render_template(
         "components/entries/entry_edit_main_only.html",
         entry=entry_payload,
@@ -270,26 +308,13 @@ async def entry_main(entry_id: str):
     _, user, ctx = await require_encryption_context()
     uid = user["id"]
     db = get_services().db
-    await ensure_entry_exists(db, uid, entry_id)
-    entries = await db.entries.get_entries_by_ids(ctx, [entry_id])
-    if not entries:
-        abort(404, description="Entry not found.")
-    entry = entries[0]
-    tags = []
+    entry = await _load_entry_or_404(db=db, ctx=ctx, user_id=uid, entry_id=entry_id)
+    tags: list[Mapping[str, Any]] = []
     if entry.get("role") == "user":
         tags = await db.tags.get_tags_for_entry(ctx, entry_id)
-    text_html = entry.get("text_html") or render_markdown_to_html(entry.get("text", ""))
-    entry_payload = {
-        "id": entry_id,
-        "role": entry.get("role"),
-        "text": entry.get("text", ""),
-        "text_html": text_html,
-        "meta": entry.get("meta", {}),
-        "tags": tags,
-        "created_at": entry.get("created_at"),
-    }
     today = local_date().isoformat()
-    day = entry.get("created_date") or today
+    day = _entry_day(entry, today=today)
+    entry_payload = _build_entry_payload(entry_id, entry, tags=tags)
     return await render_template(
         "components/entries/entry_main_only.html",
         entry=entry_payload,
@@ -321,10 +346,9 @@ async def send_entry(date):
                 dt = dt.replace(tzinfo=ZoneInfo(tz))
             created_at = dt.isoformat()
             created_date = dt.astimezone(ZoneInfo(tz)).date().isoformat()
-        except Exception as exc:
+        except Exception:
             logger.warning("Invalid user_time format: %s", user_time)
-            abort(400, description="Invalid user_time timestamp.")
-            raise AssertionError("unreachable") from exc
+            abort_http(400, "Invalid user_time timestamp.")
     try:
         entry_id = await get_services().db.entries.append_entry(
             ctx,
@@ -355,20 +379,12 @@ async def send_entry(date):
         is_today=created_date == local_date().isoformat(),
     )
     response = await make_response(html, 200)
-    lineage_plan = build_mutation_lineage_plan(
+    _set_cache_invalidation_header(
+        response,
         mutation=MUTATION_ENTRY_CREATED,
         reason="entry.created",
         created_dates=(created_date,),
         tag_hashes=(),
-    )
-    invalidation_keys = to_client_payload(lineage_plan.invalidations)
-    response.headers["HX-Trigger"] = json.dumps(
-        {
-            "cache:invalidate": {
-                "reason": "entry.created",
-                "keys": invalidation_keys,
-            }
-        }
     )
     return response
 

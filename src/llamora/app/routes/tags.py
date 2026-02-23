@@ -5,7 +5,6 @@ import json
 from quart import (
     Blueprint,
     request,
-    abort,
     render_template,
     url_for,
     make_response,
@@ -30,10 +29,14 @@ from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.time import local_date
 from llamora.settings import settings
 from llamora.app.routes.helpers import (
+    abort_http,
+    build_cache_invalidation_trigger,
+    build_tags_catalog_payload,
     DEFAULT_TAGS_SORT_DIR,
     DEFAULT_TAGS_SORT_KIND,
     build_tags_context_query,
     build_view_state,
+    dump_hx_trigger_header,
     ensure_entry_exists,
     get_summary_timeout_seconds,
     is_htmx_request,
@@ -56,6 +59,14 @@ DEFAULT_TAG_ENTRIES_LIMIT = 12
 
 def _tags():
     return get_tag_service()
+
+
+def _normalize_context_view_name(
+    context: dict[str, str | dict[str, str]] | None,
+) -> str:
+    if not context:
+        return ""
+    return str(context.get("view") or "").strip().lower()
 
 
 def _resolve_view_day(raw_day: str | None) -> str:
@@ -107,27 +118,6 @@ def _build_view_context_query(
     )
 
 
-def _catalog_payload_from_index_items(
-    items: tuple[object, ...],
-) -> list[dict[str, str | int]]:
-    payload: list[dict[str, str | int]] = []
-    for item in items:
-        name = str(getattr(item, "name", "") or "").strip()
-        if not name:
-            continue
-        shortcode = emoji_shortcode(name)
-        payload.append(
-            {
-                "name": name,
-                "hash": str(getattr(item, "hash", "") or "").strip(),
-                "count": int(getattr(item, "count", 0) or 0),
-                "kind": "emoji" if shortcode else "text",
-                "label": shortcode or "",
-            }
-        )
-    return payload
-
-
 async def _build_activity_heatmap(
     *,
     ctx: CryptoContext,
@@ -160,6 +150,78 @@ async def _build_activity_heatmap(
     )
 
 
+async def _resolve_tags_view(
+    ctx: CryptoContext,
+    *,
+    selected_tag: str | None,
+) -> tuple[TagsViewData, str, str, int, str]:
+    sort_kind, sort_dir = normalize_tags_sort(
+        sort_kind=DEFAULT_TAGS_SORT_KIND,
+        sort_dir=DEFAULT_TAGS_SORT_DIR,
+    )
+    entries_limit = DEFAULT_TAG_ENTRIES_LIMIT
+    normalized_selected = _tags().normalize_tag_query(selected_tag)
+    tags_view = await _tags().get_tags_view_data(
+        ctx,
+        normalized_selected,
+        sort_kind=sort_kind,
+        sort_dir=sort_dir,
+        entry_limit=entries_limit,
+    )
+    return tags_view, sort_kind, sort_dir, entries_limit, normalized_selected
+
+
+async def _build_tag_mutation_html(
+    *,
+    ctx: CryptoContext,
+    base_html: str,
+    context: dict[str, str | dict[str, str]] | None,
+) -> str:
+    if context and _normalize_context_view_name(context) != "tags":
+        oob = await _render_view_oob_updates(ctx, context)
+        if oob:
+            return f"{base_html}\n{oob}"
+    return base_html
+
+
+def _tag_kind_meta(tag_name: str) -> tuple[str, str]:
+    tag_label = emoji_shortcode(tag_name) or ""
+    return ("emoji" if tag_label else "text", tag_label)
+
+
+def _build_tag_link_changed_trigger_payload(
+    *,
+    action: str,
+    tag_name: str,
+    tag_hash: str,
+    tag_count: int,
+    entry_id: str,
+    created_date: str | None,
+) -> dict[str, object]:
+    payload: dict[str, object] = {"entries:changed": True}
+    if not tag_name:
+        return payload
+    tag_kind, tag_label = _tag_kind_meta(tag_name)
+    payload["tags:tag-count-updated"] = {
+        "tag": tag_name,
+        "tag_hash": tag_hash,
+        "count": tag_count,
+        "entry_id": entry_id,
+        "action": action,
+        "tag_kind": tag_kind,
+        "tag_label": tag_label,
+    }
+    payload.update(
+        build_cache_invalidation_trigger(
+            mutation=MUTATION_TAG_LINK_CHANGED,
+            reason="tag.link.changed",
+            created_dates=(created_date,) if created_date else (),
+            tag_hashes=(tag_hash,),
+        )
+    )
+    return payload
+
+
 async def _render_tags_page(selected_tag: str | None):
     day = _resolve_view_day(request.args.get("day"))
     _, user, ctx = await require_encryption_context()
@@ -167,20 +229,15 @@ async def _render_tags_page(selected_tag: str | None):
     today = local_date().isoformat()
     min_date = await services.db.entries.get_first_entry_date(user["id"]) or today
     is_first_day = day == min_date
-    tag_service = _tags()
-    sort_kind, sort_dir = normalize_tags_sort(
-        sort_kind=DEFAULT_TAGS_SORT_KIND,
-        sort_dir=DEFAULT_TAGS_SORT_DIR,
-    )
-    selected = tag_service.normalize_tag_query(
-        selected_tag or (request.args.get("tag") or "")
-    )
-    tags_view_data = await tag_service.get_tags_view_data(
-        ctx,
+    (
+        tags_view_data,
+        sort_kind,
+        sort_dir,
+        _entries_limit,
         selected,
-        sort_kind=sort_kind,
-        sort_dir=sort_dir,
-        entry_limit=DEFAULT_TAG_ENTRIES_LIMIT,
+    ) = await _resolve_tags_view(
+        ctx,
+        selected_tag=selected_tag or (request.args.get("tag") or ""),
     )
     presented_tags_view = present_tags_view_data(tags_view_data)
     selected = tags_view_data.selected_tag or selected
@@ -198,7 +255,11 @@ async def _render_tags_page(selected_tag: str | None):
 
     tags_index_payload: list[dict[str, str | int]] = []
     if not is_hx_main_content:
-        tags_index_payload = _catalog_payload_from_index_items(tags_view_data.tags)
+        tags_index_payload = await build_tags_catalog_payload(
+            ctx,
+            sort_kind=sort_kind,
+            sort_dir=sort_dir,
+        )
 
     target_param = (request.args.get("target") or "").strip() or None
     context = {
@@ -259,34 +320,22 @@ async def emoji_shortcodes_suggest():
 async def _load_tags_view_from_context(
     ctx: CryptoContext,
     context: dict[str, str | dict[str, str]],
-) -> tuple[TagsViewData, int]:
+) -> tuple[TagsViewData, str, str, int]:
     params = context.get("params")
     if not isinstance(params, dict):
         raise ValueError("invalid context params")
-    sort_kind, sort_dir = normalize_tags_sort(
-        sort_kind=DEFAULT_TAGS_SORT_KIND,
-        sort_dir=DEFAULT_TAGS_SORT_DIR,
+    tags_view, sort_kind, sort_dir, entries_limit, _selected = await _resolve_tags_view(
+        ctx, selected_tag=str(params.get("tag") or "")
     )
-    entries_limit = DEFAULT_TAG_ENTRIES_LIMIT
-    selected_tag = _tags().normalize_tag_query(params.get("tag"))
-    tags_view = await _tags().get_tags_view_data(
-        ctx,
-        selected_tag,
-        sort_kind=sort_kind,
-        sort_dir=sort_dir,
-        entry_limit=entries_limit,
-    )
-    return tags_view, entries_limit
+    return tags_view, sort_kind, sort_dir, entries_limit
 
 
 async def _render_tags_detail_and_list_oob_updates(
     ctx: CryptoContext,
     context: dict[str, str | dict[str, str]],
 ) -> str:
-    tags_view, entries_limit = await _load_tags_view_from_context(ctx, context)
-    sort_kind, sort_dir = normalize_tags_sort(
-        sort_kind=DEFAULT_TAGS_SORT_KIND,
-        sort_dir=DEFAULT_TAGS_SORT_DIR,
+    tags_view, sort_kind, sort_dir, entries_limit = await _load_tags_view_from_context(
+        ctx, context
     )
     presented_tags_view = present_tags_view_data(tags_view)
     return await render_template(
@@ -332,11 +381,9 @@ async def remove_tag(entry_id: str, tag_hash: str):
     db = get_services().db
     try:
         tag_hash_bytes = bytes.fromhex(tag_hash)
-    except ValueError as exc:
-        abort(400, description="invalid tag hash")
-        raise AssertionError("unreachable") from exc
+    except ValueError:
+        abort_http(400, "invalid tag hash")
     context = _parse_view_context()
-    context_view = str(context.get("view") or "").strip().lower() if context else ""
 
     created_date = await db.entries.get_entry_date(user["id"], entry_id)
     await db.tags.unlink_tag_entry(
@@ -350,37 +397,17 @@ async def remove_tag(entry_id: str, tag_hash: str):
     tag_count = int(tag_info.get("count") or 0) if tag_info else 0
 
     html = "<span class='tag-tombstone'></span>"
-    if context and context_view != "tags":
-        oob = await _render_view_oob_updates(ctx, context)
-        if oob:
-            html = f"{html}\n{oob}"
+    html = await _build_tag_mutation_html(ctx=ctx, base_html=html, context=context)
     response = await make_response(html)
-    trigger_payload: dict[str, object] = {"entries:changed": True}
-
-    if tag_name:
-        tag_label = emoji_shortcode(tag_name) or ""
-        tag_kind = "emoji" if tag_label else "text"
-        lineage_plan = build_mutation_lineage_plan(
-            mutation=MUTATION_TAG_LINK_CHANGED,
-            reason="tag.link.changed",
-            created_dates=(created_date,) if created_date else (),
-            tag_hashes=(tag_hash,),
-        )
-        invalidation_keys = to_client_payload(lineage_plan.invalidations)
-        trigger_payload["tags:tag-count-updated"] = {
-            "tag": tag_name,
-            "tag_hash": tag_hash,
-            "count": tag_count,
-            "entry_id": entry_id,
-            "action": "remove",
-            "tag_kind": tag_kind,
-            "tag_label": tag_label,
-        }
-        trigger_payload["cache:invalidate"] = {
-            "reason": "tag.link.changed",
-            "keys": invalidation_keys,
-        }
-    response.headers["HX-Trigger"] = json.dumps(trigger_payload)
+    trigger_payload = _build_tag_link_changed_trigger_payload(
+        action="remove",
+        tag_name=tag_name,
+        tag_hash=tag_hash,
+        tag_count=tag_count,
+        entry_id=entry_id,
+        created_date=created_date,
+    )
+    response.headers["HX-Trigger"] = dump_hx_trigger_header(trigger_payload)
     return response
 
 
@@ -396,8 +423,7 @@ async def add_tag(entry_id: str):
     try:
         canonical = _tags().canonicalize(raw_tag)
     except ValueError:
-        abort(400, description="empty tag")
-        raise AssertionError("unreachable")
+        abort_http(400, "empty tag")
     db = get_services().db
     await ensure_entry_exists(db, user["id"], entry_id)
     tag_hash = await db.tags.resolve_or_create_tag(ctx, canonical)
@@ -429,38 +455,17 @@ async def add_tag(entry_id: str):
     )
     tag_count = int(tag_info.get("count") or 0) if tag_info else 0
 
-    context_view = str(context.get("view") or "").strip().lower() if context else ""
-    if context and context_view != "tags":
-        oob = await _render_view_oob_updates(ctx, context)
-        if oob:
-            html = f"{html}\n{oob}"
+    html = await _build_tag_mutation_html(ctx=ctx, base_html=html, context=context)
     response = await make_response(html)
-    trigger_payload: dict[str, object] = {"entries:changed": True}
-
-    if tag_name:
-        tag_label = emoji_shortcode(tag_name) or ""
-        tag_kind = "emoji" if tag_label else "text"
-        lineage_plan = build_mutation_lineage_plan(
-            mutation=MUTATION_TAG_LINK_CHANGED,
-            reason="tag.link.changed",
-            created_dates=(created_date,) if created_date else (),
-            tag_hashes=(tag_hash_hex,),
-        )
-        invalidation_keys = to_client_payload(lineage_plan.invalidations)
-        trigger_payload["tags:tag-count-updated"] = {
-            "tag": tag_name,
-            "tag_hash": tag_hash_hex,
-            "count": tag_count,
-            "entry_id": entry_id,
-            "action": "add",
-            "tag_kind": tag_kind,
-            "tag_label": tag_label,
-        }
-        trigger_payload["cache:invalidate"] = {
-            "reason": "tag.link.changed",
-            "keys": invalidation_keys,
-        }
-    response.headers["HX-Trigger"] = json.dumps(trigger_payload)
+    trigger_payload = _build_tag_link_changed_trigger_payload(
+        action="add",
+        tag_name=tag_name,
+        tag_hash=tag_hash_hex,
+        tag_count=tag_count,
+        entry_id=entry_id,
+        created_date=created_date,
+    )
+    response.headers["HX-Trigger"] = dump_hx_trigger_header(trigger_payload)
     return response
 
 
@@ -475,9 +480,8 @@ async def get_tag_suggestions(entry_id: str):
     if limit is not None:
         try:
             clamped_limit = int(limit)
-        except (TypeError, ValueError) as exc:
-            abort(400, description="invalid limit")
-            raise AssertionError("unreachable") from exc
+        except (TypeError, ValueError):
+            abort_http(400, "invalid limit")
         clamped_limit = max(1, min(clamped_limit, 50))
 
     suggestions = await _tags().suggest_for_entry(
@@ -488,8 +492,7 @@ async def get_tag_suggestions(entry_id: str):
         frecency_limit=3,
     )
     if suggestions is None:
-        abort(404, description="entry not found")
-        raise AssertionError("unreachable")
+        abort_http(404, "entry not found")
 
     suggestion_items = []
     for tag in suggestions:
@@ -522,9 +525,8 @@ async def tag_detail(tag_hash: str):
     _, user, ctx = await require_encryption_context()
     try:
         tag_hash_bytes = bytes.fromhex(tag_hash)
-    except ValueError as exc:
-        abort(400, description="invalid tag hash")
-        raise AssertionError("unreachable") from exc
+    except ValueError:
+        abort_http(400, "invalid tag hash")
 
     page_size = 12
     overview = await _tags().get_tag_overview(
@@ -533,8 +535,7 @@ async def tag_detail(tag_hash: str):
         limit=page_size,
     )
     if overview is None:
-        abort(404, description="tag not found")
-        raise AssertionError("unreachable")
+        abort_http(404, "tag not found")
 
     entry_id = (request.args.get("entry_id") or "").strip() or None
     detail_day = _resolve_view_day(request.args.get("day"))
@@ -560,9 +561,8 @@ async def delete_trace(tag_hash: str):
     _, user, ctx = await require_encryption_context()
     try:
         tag_hash_bytes = bytes.fromhex(tag_hash)
-    except ValueError as exc:
-        abort(400, description="invalid tag hash")
-        raise AssertionError("unreachable") from exc
+    except ValueError:
+        abort_http(400, "invalid tag hash")
 
     tag_service = _tags()
     sort_kind, sort_dir = normalize_tags_sort(
@@ -666,9 +666,8 @@ async def tag_detail_entries(tag_hash: str):
     _, user, ctx = await require_encryption_context()
     try:
         tag_hash_bytes = bytes.fromhex(tag_hash)
-    except ValueError as exc:
-        abort(400, description="invalid tag hash")
-        raise AssertionError("unreachable") from exc
+    except ValueError:
+        abort_http(400, "invalid tag hash")
 
     cursor = (request.args.get("cursor") or "").strip() or None
     try:
@@ -703,9 +702,8 @@ async def tag_detail_summary(tag_hash: str):
     _, user, ctx = await require_encryption_context()
     try:
         tag_hash_bytes = bytes.fromhex(tag_hash)
-    except ValueError as exc:
-        abort(400, description="invalid tag hash")
-        raise AssertionError("unreachable") from exc
+    except ValueError:
+        abort_http(400, "invalid tag hash")
 
     overview = await _tags().get_tag_overview(
         ctx,
@@ -713,8 +711,7 @@ async def tag_detail_summary(tag_hash: str):
         limit=12,
     )
     if overview is None:
-        abort(404, description="tag not found")
-        raise AssertionError("unreachable")
+        abort_http(404, "tag not found")
 
     try:
         num_words = int(request.args.get("num_words") or 28)
@@ -752,9 +749,8 @@ async def tag_detail_summary(tag_hash: str):
             ),
             timeout=summary_timeout_seconds,
         )
-    except asyncio.TimeoutError as exc:
-        abort(504, description="Summary generation timed out.")
-        raise AssertionError("unreachable") from exc
+    except asyncio.TimeoutError:
+        abort_http(504, "Summary generation timed out.")
     html = await render_template(
         "components/tags/tag_detail_summary.html",
         summary=summary,
@@ -904,9 +900,8 @@ async def tags_view_detail_entries_chunk(date: str, tag_hash: str):
     _, user, ctx = await require_encryption_context()
     try:
         tag_hash_bytes = bytes.fromhex(tag_hash)
-    except ValueError as exc:
-        abort(400, description="invalid tag hash")
-        raise AssertionError("unreachable") from exc
+    except ValueError:
+        abort_http(400, "invalid tag hash")
 
     tag_service = _tags()
     entries_limit = _parse_positive_int(

@@ -70,19 +70,16 @@ export class StreamController {
 
   notifyStreamStart(stream, { reason: _reason = "stream:start" } = {}) {
     const id = normalizeStreamId(stream?.entryId);
-    const previous = { ...this.#state };
-    this.#state = {
-      status: STATUS_STREAMING,
-      currentMsgId: id,
-    };
-    this.#handleStatusChange(
-      buildSnapshotDetail(this.#state, {
-        type: "begin",
-        previousStatus: previous.status,
-        previousMsgId: previous.currentMsgId,
+    this.#transition(
+      "begin",
+      {
+        status: STATUS_STREAMING,
+        currentMsgId: id,
+      },
+      {
         currentMsgId: id,
         entryId: id,
-      }),
+      },
     );
     requestScrollForceEdge({ source: "stream:start", direction: "down" });
   }
@@ -93,39 +90,34 @@ export class StreamController {
       return;
     }
     const targetId = id || this.#state.currentMsgId;
-    const previous = { ...this.#state };
-    this.#state = {
-      status: STATUS_ABORTING,
-      currentMsgId: null,
-    };
-    this.#handleStatusChange(
-      buildSnapshotDetail(this.#state, {
-        type: "abort",
-        previousStatus: previous.status,
-        previousMsgId: previous.currentMsgId,
+    this.#transition(
+      "abort",
+      {
+        status: STATUS_ABORTING,
+        currentMsgId: null,
+      },
+      {
         currentMsgId: null,
         entryId: targetId,
-      }),
+      },
     );
   }
 
   notifyStreamComplete(stream, { status, reason: _reason, entryId } = {}) {
     const id = normalizeStreamId(entryId ?? stream?.entryId);
-    const previous = { ...this.#state };
     const nextStatus = status === "done" ? STATUS_IDLE : status || STATUS_IDLE;
-    this.#state = {
-      status: nextStatus,
-      currentMsgId: null,
-    };
-    this.#handleStatusChange(
-      buildSnapshotDetail(this.#state, {
-        type: "complete",
-        previousStatus: previous.status,
-        previousMsgId: previous.currentMsgId,
+    const previousMsgId = this.#state.currentMsgId;
+    this.#transition(
+      "complete",
+      {
+        status: nextStatus,
         currentMsgId: null,
-        entryId: id ?? previous.currentMsgId,
+      },
+      {
+        currentMsgId: null,
+        entryId: id ?? previousMsgId,
         result: status || "done",
-      }),
+      },
     );
     if (status !== "aborted") {
       requestScrollForceEdge({ source: "stream:complete", direction: "down" });
@@ -146,6 +138,19 @@ export class StreamController {
       }
     });
     return detail;
+  }
+
+  #transition(type, nextState, detailOverrides = {}) {
+    const previous = { ...this.#state };
+    this.#state = nextState;
+    return this.#handleStatusChange(
+      buildSnapshotDetail(this.#state, {
+        type,
+        previousStatus: previous.status,
+        previousMsgId: previous.currentMsgId,
+        ...detailOverrides,
+      }),
+    );
   }
 
   #syncEntriesDataset(msgId) {

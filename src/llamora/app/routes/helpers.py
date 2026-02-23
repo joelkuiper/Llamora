@@ -1,11 +1,16 @@
 from __future__ import annotations
 
-from typing import Any, Mapping
+import json
+from typing import Any, Mapping, NoReturn
 from urllib.parse import urlencode
 
 from quart import abort, g, request
 
 from llamora.app.services.container import get_tag_service
+from llamora.app.services.cache_registry import (
+    build_mutation_lineage_plan,
+    to_client_payload,
+)
 from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.tag_service import TagsSortDirection, TagsSortKind
 from llamora.app.services.validators import parse_iso_date
@@ -24,9 +29,8 @@ def require_iso_date(raw: str) -> str:
 
     try:
         return parse_iso_date(raw)
-    except ValueError as exc:
-        abort(400, description="Invalid date")
-        raise AssertionError("unreachable") from exc
+    except ValueError:
+        abort_http(400, "Invalid date")
 
 
 async def require_encryption_context(
@@ -56,13 +60,19 @@ async def ensure_entry_exists(db: Any, user_id: str, entry_id: str) -> None:
     """Ensure the given entry exists for the user or abort with 404."""
 
     if not await db.entries.entry_exists(user_id, entry_id):
-        abort(404, description="entry not found")
-        raise AssertionError("unreachable")
+        abort_http(404, "entry not found")
 
 
 def is_htmx_request() -> bool:
     """Return True if the current request was issued by HTMX."""
     return request.headers.get("HX-Request") == "true"
+
+
+def abort_http(status_code: int, description: str) -> NoReturn:
+    """Abort the current request with a typed non-returning helper."""
+
+    abort(status_code, description=description)
+    raise AssertionError("unreachable")
 
 
 def build_view_state(
@@ -128,6 +138,36 @@ def get_summary_timeout_seconds() -> float:
     if configured is None:
         return DEFAULT_SUMMARY_TIMEOUT_SECONDS
     return min(configured, 300.0)
+
+
+def build_cache_invalidation_trigger(
+    *,
+    mutation: str,
+    reason: str,
+    created_dates: tuple[str, ...],
+    tag_hashes: tuple[str, ...],
+) -> dict[str, object]:
+    """Build a canonical HX trigger payload for cache invalidation."""
+
+    lineage_plan = build_mutation_lineage_plan(
+        mutation=mutation,
+        reason=reason,
+        created_dates=created_dates,
+        tag_hashes=tag_hashes,
+    )
+    invalidation_keys = to_client_payload(lineage_plan.invalidations)
+    return {
+        "cache:invalidate": {
+            "reason": reason,
+            "keys": invalidation_keys,
+        }
+    }
+
+
+def dump_hx_trigger_header(payload: Mapping[str, object]) -> str:
+    """Serialize an HX-Trigger payload consistently."""
+
+    return json.dumps(dict(payload))
 
 
 async def build_tags_catalog_payload(
