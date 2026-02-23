@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import base64
 import secrets
 from datetime import datetime, timedelta, timezone
 from functools import wraps
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
 
 import orjson
 from cachetools import TTLCache
@@ -11,6 +13,9 @@ from urllib.parse import quote, urlparse
 from nacl import secret
 
 from llamora.app.services.container import get_services
+
+if TYPE_CHECKING:
+    from llamora.app.db.sessions import SessionsRepository
 
 SECURE_COOKIE_MANAGER_KEY = "llamora_secure_cookie_manager"
 _MISSING_USER = object()
@@ -39,9 +44,7 @@ class SecureCookieManager:
         self.dek_storage = dek_storage.lower()
         self.force_secure = bool(force_secure)
         self._session_ttl = max(0, int(session_ttl))
-        self.dek_store: TTLCache[str, bytes] = TTLCache(
-            maxsize=1024, ttl=self._session_ttl
-        )
+        self._sessions_repo: SessionsRepository | None = None
         self._user_snapshot_cache: TTLCache[tuple[str, str], Any] = TTLCache(
             maxsize=user_cache_maxsize,
             ttl=user_cache_ttl,
@@ -153,21 +156,23 @@ class SecureCookieManager:
         if hasattr(g, self._cookie_state_attr):
             setattr(g, self._cookie_state_attr, {})
 
-    def set_dek(self, response: Response, dek: bytes) -> None:
+    async def set_dek(self, response: Response, dek: bytes) -> None:
         if self.dek_storage == "session":
+            assert self._sessions_repo is not None
             sid = secrets.token_urlsafe(32)
-            self.dek_store[sid] = dek
+            await self._sessions_repo.store(sid, dek)
             self.set_secure_cookie(response, "sid", sid)
             self.set_secure_cookie(response, "dek", None)
         else:
             encoded = base64.b64encode(dek).decode("utf-8")
             self.set_secure_cookie(response, "dek", encoded)
 
-    def clear_session_dek(self) -> None:
+    async def clear_session_dek(self) -> None:
         if self.dek_storage == "session":
+            assert self._sessions_repo is not None
             sid = self.get_secure_cookie("sid")
             if sid:
-                self.dek_store.pop(sid, None)
+                await self._sessions_repo.remove(sid)
 
     def invalidate_user_snapshot(self, uid: str) -> None:
         """Remove all cached snapshots for *uid* so the next lookup hits the DB."""
@@ -204,16 +209,13 @@ class SecureCookieManager:
         setattr(g, self._current_user_attr, user)
         return user
 
-    def get_dek(self) -> bytes | None:
+    async def get_dek(self) -> bytes | None:
         if self.dek_storage == "session":
+            assert self._sessions_repo is not None
             sid = self.get_secure_cookie("sid")
             if not sid:
                 return None
-            self.dek_store.expire()
-            dek = self.dek_store.get(sid)
-            if dek is not None:
-                self.dek_store[sid] = dek
-            return dek
+            return await self._sessions_repo.load(sid)
 
         state = self._cookie_state()
         data = state.get("dek")
@@ -232,7 +234,7 @@ class SecureCookieManager:
             if self.dek_storage == "session":
                 sid = state.get("sid") or ""
                 state.pop("sid", None)
-                self.clear_session_dek()
+                await self.clear_session_dek()
                 cache_key_sid: str | None = sid
             else:
                 cache_key_sid = None
@@ -263,7 +265,7 @@ class SecureCookieManager:
 
         user = await self.get_current_user()
         if user:
-            _ = self.get_dek()
+            _ = await self.get_dek()
             current_app.logger.debug("Loaded user %s for request", user["id"])
         else:
             current_app.logger.debug("No user loaded for request")
@@ -288,12 +290,12 @@ def clear_secure_cookie(response: Response) -> None:
     get_secure_cookie_manager().clear_secure_cookie(response)
 
 
-def set_dek(response: Response, dek: bytes) -> None:
-    get_secure_cookie_manager().set_dek(response, dek)
+async def set_dek(response: Response, dek: bytes) -> None:
+    await get_secure_cookie_manager().set_dek(response, dek)
 
 
-def clear_session_dek() -> None:
-    get_secure_cookie_manager().clear_session_dek()
+async def clear_session_dek() -> None:
+    await get_secure_cookie_manager().clear_session_dek()
 
 
 def invalidate_user_snapshot(uid: str) -> None:
@@ -304,8 +306,8 @@ async def get_current_user() -> Mapping[str, Any] | None:
     return await get_secure_cookie_manager().get_current_user()
 
 
-def get_dek() -> bytes | None:
-    return get_secure_cookie_manager().get_dek()
+async def get_dek() -> bytes | None:
+    return await get_secure_cookie_manager().get_dek()
 
 
 def sanitize_return_path(raw: str | None) -> str | None:
@@ -334,7 +336,7 @@ def login_required(f):
         login_url = f"/login?return={quote(return_path, safe='')}"
 
         user = await manager.get_current_user()
-        dek = manager.get_dek() if user else None
+        dek = (await manager.get_dek()) if user else None
         if not user or dek is None:
             current_app.logger.debug(
                 "Unauthenticated access or missing DEK to %s", request.path

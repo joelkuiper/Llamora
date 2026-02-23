@@ -90,7 +90,7 @@ async def _issue_auth_response(
     session = get_session_context()
     manager = session.manager
     manager.set_secure_cookie(resp, "uid", str(user_id))
-    manager.set_dek(resp, dek)
+    await manager.set_dek(resp, dek)
     return resp
 
 
@@ -102,7 +102,7 @@ async def _issue_auth_view_response(
     session = get_session_context()
     manager = session.manager
     manager.set_secure_cookie(resp, "uid", str(user_id))
-    manager.set_dek(resp, dek)
+    await manager.set_dek(resp, dek)
     return resp
 
 
@@ -436,7 +436,7 @@ async def logout():
     resp = await make_response(redirect_value)
     assert isinstance(resp, Response)
 
-    manager.clear_session_dek()
+    await manager.clear_session_dek()
     manager.clear_secure_cookie(resp)
     return resp
 
@@ -654,7 +654,7 @@ async def delete_profile():
     await get_services().db.users.delete_user(user["id"])
     resp = await make_response("", 204)
     assert isinstance(resp, Response)
-    manager.clear_session_dek()
+    await manager.clear_session_dek()
     if manager.dek_storage == "session":
         current_app.logger.debug(
             "Purged session DEK for deleted account %s", user["id"]

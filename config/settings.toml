@@ -187,7 +187,7 @@ force_secure = false
 
 # --- Crypto (DEK storage) -----------------------------------------------
 [default.CRYPTO]
-dek_storage = "cookie" # or "session"
+dek_storage = "session" # or "cookie"
 
 
 # --- Background workers -------------------------------------------------

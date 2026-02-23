@@ -6,7 +6,10 @@ import asyncio
 import logging
 from contextlib import suppress
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from llamora.app.services.auth_helpers import SecureCookieManager
 
 from llamora.app.embed.model import async_embed_texts, _get_model
 
@@ -88,11 +91,11 @@ class AppLifecycle:
     def __init__(
         self,
         services: AppServices,
-        dek_store: Any,
+        cookie_manager: SecureCookieManager,
         maintenance_interval: float = 60.0,
     ) -> None:
         self._services = services
-        self._dek_store = dek_store
+        self._cookie_manager = cookie_manager
         self._maintenance_interval = maintenance_interval
         self._maintenance_task: asyncio.Task | None = None
         self._lock = asyncio.Lock()
@@ -128,6 +131,17 @@ class AppLifecycle:
             try:
                 await self._services.db.init()
                 db_initialised = True
+
+                if self._cookie_manager.dek_storage == "session":
+                    from llamora.app.db.sessions import SessionsRepository
+
+                    assert self._services.db.pool is not None
+                    self._cookie_manager._sessions_repo = SessionsRepository(
+                        pool=self._services.db.pool,
+                        box=self._cookie_manager.cookie_box,
+                        ttl=self._cookie_manager._session_ttl,
+                    )
+
                 events = self._services.db._events
                 if events is not None:
                     self._invalidation_coordinator = InvalidationCoordinator(
@@ -232,8 +246,12 @@ class AppLifecycle:
         try:
             while True:
                 await asyncio.sleep(self._maintenance_interval)
-                with suppress(Exception):
-                    self._dek_store.expire()
+                repo = self._cookie_manager._sessions_repo
+                if repo is not None:
+                    with suppress(Exception):
+                        removed = await repo.purge_expired()
+                        if removed:
+                            logger.debug("Purged %d expired DEK sessions", removed)
                 try:
                     await self._services.search_api.maintenance_tick()
                 except Exception:  # pragma: no cover - defensive logging

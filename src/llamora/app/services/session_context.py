@@ -41,9 +41,9 @@ class SessionContext:
             raise AssertionError("unreachable")
         return user
 
-    def _resolve_dek(self) -> bytes | None:
+    async def _resolve_dek(self) -> bytes | None:
         if not self._dek_resolved:
-            self._dek = self.manager.get_dek()
+            self._dek = await self.manager.get_dek()
             self._dek_resolved = True
         return self._dek
 
@@ -51,13 +51,13 @@ class SessionContext:
         """Return the cached data encryption key, if available."""
 
         await self.current_user()
-        return self._resolve_dek()
+        return await self._resolve_dek()
 
     async def require_dek(self) -> bytes:
         """Return the DEK or abort if it is unavailable."""
 
         await self.require_user()
-        dek = self._resolve_dek()
+        dek = await self._resolve_dek()
         if dek is None:
             abort(401, description="Missing encryption key")
             raise AssertionError("unreachable")

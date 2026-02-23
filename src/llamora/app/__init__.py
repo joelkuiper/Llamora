@@ -57,14 +57,7 @@ def create_app():
         parsed = parse_positive_int(settings.get("APP.workers"))
         return parsed or 1
 
-    worker_count = _detect_worker_count()
     dek_storage = str(settings.CRYPTO.dek_storage or "cookie").lower()
-    if worker_count > 1 and dek_storage == "session":
-        logger.warning(
-            "Multi-worker (%d) detected; forcing CRYPTO.dek_storage=cookie",
-            worker_count,
-        )
-        dek_storage = "cookie"
 
     from .services.auth_helpers import (
         SecureCookieManager,
@@ -79,7 +72,7 @@ def create_app():
         session_ttl=int(settings.SESSION.ttl),
     )
 
-    lifecycle = AppLifecycle(services, cookie_manager.dek_store)
+    lifecycle = AppLifecycle(services, cookie_manager)
 
     async def _ensure_registration_token(app: Quart) -> None:
         if not app.config.get("DISABLE_REGISTRATION"):

@@ -191,7 +191,7 @@ DEFAULTS: dict[str, Any] = {
         "trusted_hops": 0,
     },
     "CRYPTO": {
-        "dek_storage": "cookie",
+        "dek_storage": "session",
     },
     "WORKERS": {
         "index_worker": {
