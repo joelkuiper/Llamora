@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from llamora.app.services.auth_helpers import SecureCookieManager
 
-from llamora.app.embed.model import async_embed_texts, _get_model
+from llamora.app.embed.model import async_embed_texts, _cached_model
 
 from llamora.persistence.local_db import LocalDB
 from llamora.app.api.search import SearchAPI
@@ -335,9 +335,7 @@ def get_summarize_service() -> Any:
 async def _warmup_embeddings() -> None:
     """Prime the embedding model cache in the background."""
 
-    cache_info = _get_model.cache_info()
-
-    if cache_info.currsize > 0:
+    if _cached_model is not None:
         logger.debug("Skipping embedding warm-up; model already cached")
         return
 
