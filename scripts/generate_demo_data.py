@@ -629,20 +629,38 @@ def _build_llm_client() -> AsyncOpenAI:
     )
 
 
+_WEEKDAY_SLOTS = [(7, 8), (12, 13), (18, 23)]
+_WEEKDAY_WEIGHTS = [0.15, 0.15, 0.70]
+
+_WEEKEND_SLOTS = [(8, 12), (13, 17), (19, 23)]
+_WEEKEND_WEIGHTS = [0.40, 0.30, 0.30]
+
+_MIN_GAP_MINUTES = 20
+
+
 def _choose_entry_times(count: int, day: date) -> list[datetime]:
     if count <= 0:
         return []
-    slots = [(8, 11), (12, 15), (19, 23)]
-    weights = [0.35, 0.2, 0.45]
+
+    is_weekend = day.weekday() >= 5
+    slots = _WEEKEND_SLOTS if is_weekend else _WEEKDAY_SLOTS
+    weights = _WEEKEND_WEIGHTS if is_weekend else _WEEKDAY_WEIGHTS
+
     times: list[datetime] = []
     for _ in range(count):
         window = random.choices(slots, weights=weights, k=1)[0]
         hour = random.randint(window[0], window[1])
-        minute = random.choice([0, 5, 10, 15, 20, 25, 30, 40, 50])
-        second = random.randint(0, 50)
+        minute = random.randint(0, 59)
+        second = random.randint(0, 59)
         dt = datetime.combine(day, time(hour, minute, second), tzinfo=timezone.utc)
         times.append(dt)
     times.sort()
+
+    # Enforce a minimum gap between consecutive entries.
+    gap = timedelta(minutes=_MIN_GAP_MINUTES)
+    for i in range(1, len(times)):
+        if times[i] - times[i - 1] < gap:
+            times[i] = times[i - 1] + gap + timedelta(seconds=random.randint(0, 120))
     return times
 
 
