@@ -13,16 +13,30 @@
 
 ## Table of Contents
 
+- [Design Philosophy](#design-philosophy)
 - [Features](#features)
 - [Screenshots](#screenshots)
 - [Quick Start](#quick-start)
 - [Try the Demo](#try-the-demo)
-- [Design Philosophy](#design-philosophy)
 - [Stack](#stack)
 - [Configuration](#configuration)
 - [Development](#development)
 - [Production](#production)
 - [Limitations](#limitations)
+
+---
+
+## Design Philosophy
+
+Llamora is organised around time, not conversation sessions. The primary navigation is a calendar. Entries are anchored to dates, not threads.
+
+Many AI interfaces are built around an ongoing back-and-forth. Here, the model is part of a daily flow: it opens each day, can respond to entries, and suggests traces. Those suggestions are optional. When kept, they become part of the archive — not temporary output. Over time, both your writing and the model's contributions accumulate in the same log.
+
+**Privacy is structural.** A diary is a personal artifact with strong security expectations. You don't expect it to send data elsewhere, depend on a remote service, or expose its contents by default. In Llamora, the model runs on your machine and the archive stays there, locked behind a key. The application makes no outbound requests — no telemetry, no analytics, no phoning home.
+
+**No evaluation.** The model can respond and suggest traces, but it does not score entries, infer traits, or generate behavioural profiles. Nothing is surfaced as an assessment. The record is yours to interpret.
+
+**Traces** are lightweight labels proposed by the model to make later return easier. They let you see where something recurs, what it tends to appear alongside, and which entries it touches.
 
 ---
 
@@ -34,13 +48,11 @@
 
 - **Traces** — after each exchange, the model suggests lightweight tags. Kept traces accumulate in a dedicated view: frequency over time, co-occurrence, chronological history, model-generated summaries, and a year-long activity heatmap. Attach traces as context for future responses.
 
-- **Search** — find past entries by meaning, not just exact words. Search understands what you wrote about, not only how you phrased it, and returns ranked results across your entire journal.
+- **Search** — find past entries by meaning, not just exact words. Search tries to be semantic, not only how you phrased it, and returns ranked results across your entire journal.
 
 - **Calendar navigation** — all dates with entries appear in a navigable calendar. Jump to any date to load its page.
 
 - **Encryption at rest** — all stored content is encrypted before it reaches the database. Your password unwraps a per-user key that exists only in memory for the duration of the session — plaintext is never written to disk, session storage, or local storage. Entries, responses, embeddings, tags, and search queries are all covered.
-
-- **Markdown and rich text** — entries and model responses are rendered as formatted text. Write naturally with headings, lists, emphasis, and links.
 
 ---
 
@@ -123,7 +135,7 @@ uv sync
 LLAMORA_LLM__UPSTREAM__HOST=http://127.0.0.1:8081 uv run llamora-server dev
 ```
 
-Open [http://localhost:5000](http://localhost:5000) and register an account. The database is created automatically. The first search downloads a small embedding model (~130 MB).
+Open [http://localhost:5000](http://localhost:5000) and register an account. The database is created automatically.
 
 ---
 
@@ -145,20 +157,6 @@ Log in with `demo_user` / `demo_user_test_password12345!`
 
 ---
 
-## Design Philosophy
-
-Llamora is organised around time, not conversation sessions. The primary navigation is a calendar. Entries are anchored to dates, not threads.
-
-Many AI interfaces are built around an ongoing back-and-forth. Here, the model is part of a daily flow: it opens each day, can respond to entries, and suggests traces. Those suggestions are optional. When kept, they become part of the archive — not temporary output. Over time, both your writing and the model's contributions accumulate in the same log.
-
-**Privacy is structural.** A diary is a personal artifact with strong security expectations. You don't expect it to send data elsewhere, depend on a remote service, or expose its contents by default. In Llamora, the model runs on your machine and the archive stays there, locked behind a key. The application makes no outbound requests — no telemetry, no analytics, no phoning home.
-
-**No evaluation.** The model can respond and suggest traces, but it does not score entries, infer traits, or generate behavioural profiles. Nothing is surfaced as an assessment. The record is yours to interpret.
-
-**Traces** are lightweight labels proposed by the model to make later return easier. They let you see where something recurs, what it tends to appear alongside, and which entries it touches.
-
----
-
 ## Stack
 
 | Layer | Technology |
@@ -169,16 +167,6 @@ Many AI interfaces are built around an ongoing back-and-forth. Here, the model i
 | **Encryption** | [libsodium](https://doc.libsodium.org/) via PyNaCl — per-user symmetric DEK, password-derived wrapping + recovery code |
 | **Inference** | Any [OpenAI-compatible](https://platform.openai.com/docs/api-reference/chat) `/v1/chat/completions` endpoint (default: [llama.cpp](https://github.com/ggerganov/llama.cpp)) |
 | **Embeddings** | [bge-small-en-v1.5](https://huggingface.co/BAAI/bge-small-en-v1.5) via FastEmbed + [HNSWlib](https://github.com/nmslib/hnswlib) ANN |
-
-<details>
-<summary><strong>Key design decisions</strong></summary>
-
-- **Server-rendered HTML over an SPA.** The server is the source of truth. HTMX handles partial updates; the client manages transitions and feedback only. No separate API layer.
-- **OpenAI-compatible abstraction.** Not tied to a specific model or runtime. Swapping models requires no code changes.
-- **SQLite + per-user encryption.** No external database, no cloud dependency. The entire journal is a single file, encrypted at the application layer before writes.
-- **SSE for streaming.** Model output is pushed incrementally without polling or websockets.
-
-</details>
 
 <details>
 <summary><strong>Encryption design</strong></summary>
