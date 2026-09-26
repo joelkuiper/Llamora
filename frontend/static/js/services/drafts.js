@@ -1,5 +1,5 @@
 // Unsent drafts, per day: the text and the ids of images already uploaded
-// for it (spec §10.1). Stored in sessionStorage via draftStore; drafts saved
+// for it. Stored in sessionStorage via draftStore; drafts saved
 // before images existed were plain strings and still read as text.
 
 import { draftStore } from "../utils/storage.js";

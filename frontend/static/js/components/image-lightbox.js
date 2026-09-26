@@ -1,4 +1,4 @@
-// Lightbox for entry images (spec §10.3).
+// Lightbox for entry images.
 //
 // A fixed overlay stacked with nextModalZ() instead of a native <dialog>:
 // the confirm modal (a stacked overlay too) must be able to open above it to

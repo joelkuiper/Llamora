@@ -1,4 +1,4 @@
-"""Editing an entry's images (spec §10.4).
+"""Editing an entry's images.
 
 The edit form shows the entry's images as a tray. Taking an existing image
 out only applies when the edit is saved (cancelling keeps it); images added

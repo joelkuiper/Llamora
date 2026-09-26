@@ -1,7 +1,7 @@
 """Unsent images are part of the draft: they survive reloads and midnight.
 
 Uploads are stored on the server as soon as they're added, so a draft only
-needs their ids (spec §10.1, "Drafts and midnight").
+needs their ids.
 """
 
 from __future__ import annotations

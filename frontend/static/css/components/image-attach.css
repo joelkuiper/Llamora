@@ -1,4 +1,4 @@
-/* Attaching images: the tray, its tiles and the drop overlay (spec §10.1). */
+/* Attaching images: the tray, its tiles and the drop overlay. */
 
 /* The text box and, in its bottom-right corner, a small attach button.
    (Beats `#entry-form .input-wrapper button`, which sizes the Send button.) */

@@ -1,4 +1,4 @@
-// <image-attach>: attaching images to an entry form (spec §10.1).
+// <image-attach>: attaching images to an entry form.
 //
 // Owns everything about uploads: the file picker, drops and pastes, an
 // upload queue (each image uploads on its own as soon as it is added), the

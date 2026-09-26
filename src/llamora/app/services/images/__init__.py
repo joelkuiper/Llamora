@@ -1,7 +1,16 @@
 """Image attachments: encrypted at rest, linked to entries.
 
-See ``doc/specs/images.md``. Each stored image has three variants, all
-re-encoded without metadata; the original upload is never kept.
+Each stored image has three variants (thumb, display, full), all re-encoded
+without metadata; the original upload is never kept.
+
+- ``processing``: validate an upload and encode the variants (Pillow).
+- ``format``: the encrypted file format (per-image key, secretstream chunks).
+- ``blob_store``: the files on disk under ``IMAGES.path``.
+- ``service``: ``ImageService``, tying these to the rows in ``db.images``
+  (upload, read, delete, sweep).
+
+Routes are in ``app/routes/images.py``; linking images to entries happens in
+the entries repository (``image_ids`` on append/update).
 """
 
 from __future__ import annotations

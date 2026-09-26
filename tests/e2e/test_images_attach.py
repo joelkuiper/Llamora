@@ -1,4 +1,4 @@
-"""Attaching images in the entry form: picker, drops, pastes, the tray (spec §10.1)."""
+"""Attaching images in the entry form: picker, drops, pastes, the tray."""
 
 from __future__ import annotations
 

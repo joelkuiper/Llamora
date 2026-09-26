@@ -1,4 +1,4 @@
-"""Image attachments: upload, view and delete (see doc/specs/images.md)."""
+"""Image attachments: upload, view and delete."""
 
 from __future__ import annotations
 
