@@ -12,6 +12,7 @@ import re
 import time
 from collections.abc import Callable
 
+import pytest
 from playwright.sync_api import Locator, Page, Route, expect
 
 from harness import ApiClient, marker, wait_for_app, wait_for_htmx_idle
@@ -241,3 +242,38 @@ def test_an_entry_of_only_images_can_be_edited(fresh_session: Session) -> None:
     save(entry, page)
 
     assert grid_ids(entry) == ids[:1]
+
+
+def click_outside(page: Page) -> None:
+    """Click on the page away from the entry (the day's heading area)."""
+    page.mouse.click(
+        5, page.viewport_size["height"] // 2 if page.viewport_size else 400
+    )
+
+
+@pytest.mark.parametrize(("existing", "added"), [(0, 1), (0, 2), (1, 1), (1, 3)])
+def test_clicking_outside_after_removing_an_added_image_saves(
+    fresh_session: Session, existing: int, added: int
+) -> None:
+    # Removing a tile moves focus to its neighbour; leaving the form from
+    # there must save just as leaving the textarea does.
+    page, api = fresh_session
+    entry, ids = entry_with_images(page, api, existing)
+    start_editing(entry)
+    entry.locator(".entry-edit-form image-attach input[type=file]").set_input_files(
+        [
+            file(f"{i}.png", png(colour))
+            for i, colour in enumerate(["red", "green", "blue"][:added])
+        ]
+    )
+    done = entry.locator('.entry-edit-form .image-attach__tile[data-state="done"]')
+    expect(done).to_have_count(existing + added)
+    kept = edit_ids(entry)[:-1]
+
+    edit_tray(entry).last.get_by_role("button", name="Remove image").click()
+    expect(edit_tray(entry)).to_have_count(added)
+    click_outside(page)
+
+    expect(entry.locator(".entry-edit-form")).to_have_count(0)  # saved
+    wait_for_htmx_idle(page)
+    assert grid_ids(entry) == kept

@@ -165,8 +165,12 @@ function bindTextarea(textarea) {
     updateSaveState();
   });
   form?.addEventListener("image-attach:change", updateSaveState);
-  textarea.addEventListener("blur", () => {
-    if (!form) return;
+  // Save once focus leaves the edit form (not just the textarea): focus may
+  // be on an image tile or a button inside it when the writer clicks away.
+  form?.addEventListener("focusout", (event) => {
+    if (event.relatedTarget instanceof Node && form.contains(event.relatedTarget)) {
+      return; // still inside the form
+    }
     if (form.classList.contains("htmx-request")) return;
     if (form.getAttribute(SKIP_BLUR_CANCEL_ATTR) === "true") {
       form.removeAttribute(SKIP_BLUR_CANCEL_ATTR);
