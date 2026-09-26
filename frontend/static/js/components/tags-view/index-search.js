@@ -10,7 +10,7 @@ import { sessionStore } from "../../utils/storage.js";
 import { HyperList } from "../../vendor/setup-globals.js";
 import { getSelectedTrace, refreshDetailLinksForNav } from "./detail.js";
 import { findDetail, findList, findListBody, findSidebar } from "./dom.js";
-import { getTagsDay, readTagFromUrl, syncTagsHistoryUrl } from "./router.js";
+import { getTagsDay, readTagFromUrl } from "./router.js";
 import { requestListScroll, state } from "./state.js";
 import { buildTagDetailFragmentUrl, buildTagPageUrl } from "./tags-nav-url.js";
 
@@ -640,7 +640,7 @@ export const updateSortButtons = (root = document) => {
   });
 };
 
-export const applySort = (kind, dir, { updateUrl = true, refreshSearch = true } = {}) => {
+export const applySort = (kind, dir, { refreshSearch = true } = {}) => {
   state.sortKind = normalizeTagsSortKind(kind);
   state.sortDir = normalizeTagsSortDir(dir);
   writeTagsSortState({
@@ -657,9 +657,6 @@ export const applySort = (kind, dir, { updateUrl = true, refreshSearch = true } 
   if (refreshSearch) {
     applySearch(state.query);
   }
-  if (updateUrl) {
-    syncTagsHistoryUrl({ selectedTag: detail?.dataset?.selectedTag });
-  }
 };
 
 export const requestSort = (kind, dir) => {
@@ -669,7 +666,7 @@ export const requestSort = (kind, dir) => {
   const detail = findDetail();
   const list = findList();
   if (!(detail instanceof HTMLElement)) {
-    applySort(nextKind, nextDir, { updateUrl: true });
+    applySort(nextKind, nextDir);
     return;
   }
 
@@ -701,7 +698,6 @@ export const requestSort = (kind, dir) => {
       scrollActiveRowIntoView(document, "smooth");
     }
   });
-  syncTagsHistoryUrl({ selectedTag });
 };
 
 export const captureListPositions = () => {

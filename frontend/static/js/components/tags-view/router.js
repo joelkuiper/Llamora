@@ -27,14 +27,6 @@ export const readTagFromUrl = () => {
   return parseTagFromPath(url.pathname) || String(url.searchParams.get("tag") || "").trim();
 };
 
-export const syncTagsHistoryUrl = ({ selectedTag } = {}) => {
-  const detailTag = String(selectedTag || "").trim();
-  const currentUrl = new URL(window.location.href);
-  const tag = detailTag || parseTagFromPath(currentUrl.pathname) || "";
-  const nextUrl = buildTagPageUrl(tag, { day: getTagsDay() });
-  window.history.replaceState(window.history.state, "", nextUrl);
-};
-
 export const getTagsLocationKey = (tagOverride) => {
   const url = new URL(window.location.href);
   if (!tagOverride && !isTagsPath(url.pathname)) return "";

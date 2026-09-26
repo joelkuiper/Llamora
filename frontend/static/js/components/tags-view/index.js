@@ -1,7 +1,7 @@
 import { getFrameState } from "../../services/app-state.js";
 import { registerHydrationOwner } from "../../services/hydration-owners.js";
 import { applyTagsCatalogCountUpdate } from "../../services/tags-catalog.js";
-import { clearScrollTarget, flashHighlight } from "../../ui.js";
+import { flashHighlight } from "../../ui.js";
 import {
   animateDetailEntries,
   getSelectedTrace,
@@ -319,7 +319,6 @@ document.addEventListener("click", (event) => {
       captureEntriesAnchor();
       setSaveSuppressed(true);
     }
-    clearScrollTarget(null, { emitEvent: false });
     requestDetailScroll();
     return;
   }

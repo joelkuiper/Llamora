@@ -152,11 +152,9 @@ async def render_entries(
     resp = await make_response(html, 200)
     assert isinstance(resp, Response)
     if hx_push_url:
-        push_url = hx_push_url
-        if scroll_target:
-            separator = "&" if "?" in push_url else "?"
-            push_url = f"{push_url}{separator}target={scroll_target}"
-        resp.headers["HX-Push-Url"] = push_url
+        # Push the canonical day URL; the scroll target is a one-shot request
+        # parameter, so back/forward re-renders the day without re-highlighting.
+        resp.headers["HX-Push-Url"] = hx_push_url
     await get_services().db.users.update_state(user["id"], active_date=date)
     return resp
 

@@ -130,73 +130,35 @@ export function flashHighlight(el) {
   highlightAnimations.set(el, cancel);
 }
 
-export function clearScrollTarget(target, options = {}) {
-  const { emitEvent = true, historyState = null } = options;
-  const params = new URLSearchParams(window.location.search);
-  const hadTargetParam = params.has("target");
-  if (hadTargetParam) {
-    params.delete("target");
-  }
-
-  const highlightHash = target ? `#${target}` : "";
-  const shouldClearHash = Boolean(highlightHash) && window.location.hash === highlightHash;
-
-  if (hadTargetParam || shouldClearHash) {
-    const query = params.toString();
-    const baseUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
-    const finalUrl = shouldClearHash ? baseUrl : `${baseUrl}${window.location.hash}`;
-    const state = historyState ?? history.state;
-    history.replaceState(state, "", finalUrl);
-  }
-
-  if (emitEvent) {
-    const consumedTarget = target ?? null;
-    const meta = { source: "ui" };
-    const manager = window.appInit?.scroll ?? null;
-    if (manager && typeof manager.notifyTargetConsumed === "function") {
-      manager.notifyTargetConsumed(consumedTarget, meta);
-    } else {
-      requestScrollTargetConsumed(consumedTarget, meta);
-    }
+function notifyTargetConsumed(target) {
+  const meta = { source: "ui" };
+  const manager = window.appInit?.scroll ?? null;
+  if (manager && typeof manager.notifyTargetConsumed === "function") {
+    manager.notifyTargetConsumed(target, meta);
+  } else {
+    requestScrollTargetConsumed(target, meta);
   }
 }
 
+// Scrolls to and flashes an entry. History is owned by htmx: navigations push
+// the canonical URL and pass the target as a one-shot request parameter, so
+// this never rewrites the URL.
 export function scrollToHighlight(fallbackTarget, options = {}) {
   const {
     targetId = null,
-    pushHistory = false,
     scrollOptions = {
       behavior: motionSafeBehavior("smooth"),
       block: "center",
     },
-    clearOptions = {},
     fallbackCleanupDelay = 1500,
     targetPollTimeout = 3000,
   } = options;
 
-  const params = new URLSearchParams(window.location.search);
-  const initialHash = window.location.hash || "";
-  let target = targetId ?? params.get("target");
-  let consumedFallback = false;
-  let shouldUpdateHistory = Boolean(targetId);
-  const historyState = history.state;
-
-  if (targetId) {
-    params.set("target", targetId);
-  }
-
-  if (!target && initialHash.startsWith("#entry-")) {
-    target = initialHash.substring(1);
-    params.set("target", target);
-    shouldUpdateHistory = true;
-  }
-
-  if (!target && fallbackTarget) {
-    target = fallbackTarget;
-    params.set("target", target);
-    shouldUpdateHistory = true;
-    consumedFallback = true;
-  }
+  const hashTarget = window.location.hash.startsWith("#entry-")
+    ? window.location.hash.substring(1)
+    : null;
+  const target = targetId || fallbackTarget || hashTarget;
+  const consumedFallback = !targetId && Boolean(fallbackTarget);
 
   let cleanupTimeoutId = null;
 
@@ -224,19 +186,6 @@ export function scrollToHighlight(fallbackTarget, options = {}) {
   };
 
   if (target) {
-    if (shouldUpdateHistory || window.location.hash) {
-      const query = params.toString();
-      const baseUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
-      const hash = initialHash || "";
-      const newUrl = hash ? `${baseUrl}${hash}` : baseUrl;
-
-      if (pushHistory && targetId) {
-        history.pushState(historyState, "", newUrl);
-      } else {
-        history.replaceState(historyState, "", newUrl);
-      }
-    }
-
     let resolvedHighlight = false;
     let markdownListener = null;
     let htmxListeners = [];
@@ -278,7 +227,7 @@ export function scrollToHighlight(fallbackTarget, options = {}) {
       teardownRetries();
       requestScrollTarget(target, scrollOptions, { source: "ui" });
       flashHighlight(el);
-      clearScrollTarget(target, { historyState, ...clearOptions });
+      notifyTargetConsumed(target);
       cleanupFallbackTarget();
       return true;
     };

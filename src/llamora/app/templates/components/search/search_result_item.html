@@ -5,6 +5,7 @@
      hx-target="#main-content"
      hx-sync="#main-content:replace"
      hx-swap="outerHTML"
+     hx-push-url="{{ url_for('days.day', date=item_date) }}"
      data-date="{{ item_date }}"
      data-target="entry-{{ item.id }}"
      hx-trigger="click[!document.getElementById('entries') || document.getElementById('entries').dataset.date !== this.dataset.date]">

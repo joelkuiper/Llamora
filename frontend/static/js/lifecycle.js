@@ -25,18 +25,21 @@ function dispatchRehydrate(detail = {}) {
   dispatch("app:rehydrate", { cycle: rehydrateCycle, frame: getFrameState(), ...detail });
 }
 
+function syncView() {
+  const view = getView();
+  if (view === currentView) return;
+  const prev = currentView;
+  currentView = view;
+  dispatch("app:view-changed", { view, previousView: prev });
+}
+
 function dispatchTeardown(detail = {}) {
   teardownCycle += 1;
   dispatch("app:teardown", { cycle: teardownCycle, ...detail });
 }
 
 export function rehydrate(detail = {}) {
-  const view = getView();
-  if (view !== currentView) {
-    const prev = currentView;
-    currentView = view;
-    dispatch("app:view-changed", { view, previousView: prev });
-  }
+  syncView();
   dispatchRehydrate({ reason: "init", ...detail });
 }
 
@@ -76,8 +79,20 @@ export function init() {
   document.body.addEventListener("htmx:beforeHistorySave", () => {
     dispatchTeardown({ reason: "history-save" });
   });
+  // Linking to the page you are on replaces the history entry instead of
+  // stacking a duplicate, matching native browser navigation.
+  document.body.addEventListener("htmx:beforeHistoryUpdate", (e) => {
+    const update = e.detail?.history;
+    if (update?.type !== "push") return;
+    const next = new URL(update.path, window.location.href);
+    if (next.pathname + next.search === window.location.pathname + window.location.search) {
+      update.type = "replace";
+    }
+  });
+  // The snapshot cache is disabled, so back/forward re-renders #content from
+  // the server; the restored #main-content carries its own data-view.
   document.body.addEventListener("htmx:historyRestore", () => {
-    currentView = getView();
+    syncView();
     // Same reason as bfcache: restored HTML may represent a different view than
     // the current module-level _frameRaw; reset so hydrateFrame() re-parses.
     resetFrameCache();
@@ -98,12 +113,7 @@ export function init() {
     if (!rehydrateTargets.has(id)) return;
 
     if (id === "main-content") {
-      const newView = getView();
-      if (newView !== currentView) {
-        const prev = currentView;
-        currentView = newView;
-        dispatch("app:view-changed", { view: newView, previousView: prev });
-      }
+      syncView();
     }
 
     dispatchRehydrate({ reason: "swap", target, context: target });

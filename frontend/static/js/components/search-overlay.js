@@ -558,7 +558,6 @@ export class SearchOverlay extends AutocompleteOverlayMixin(ReactiveElement) {
       if (targetId) {
         scrollToHighlight(null, {
           targetId,
-          pushHistory: true,
         });
       }
     } else {

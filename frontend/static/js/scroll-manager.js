@@ -841,8 +841,11 @@ export class ScrollManager {
     }
 
     const key = this.#getKey();
-    const params = new URLSearchParams(window.location.search);
-    const hasTarget = params.has("target") || window.location.hash?.startsWith("#entry-");
+    // A pending highlight wins over the saved position. The server marks it
+    // on <entry-view> and scrollToHighlight clears it once consumed.
+    const hasTarget =
+      Boolean(document.querySelector("entry-view[data-scroll-target]")) ||
+      window.location.hash?.startsWith("#entry-");
 
     if (hasTarget) {
       return;

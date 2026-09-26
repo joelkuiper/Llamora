@@ -1106,7 +1106,7 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       htmx.ajax("GET", fragmentUrl, {
         target,
         swap: "outerHTML",
-        pushURL: pageUrl || fragmentUrl,
+        push: pageUrl || fragmentUrl,
       });
       return;
     }
@@ -1316,7 +1316,6 @@ export class EntryTags extends AutocompleteOverlayMixin(ReactiveElement) {
       this.#forceHideDetailPopover("detail item click same-day");
       scrollToHighlight(null, {
         targetId,
-        pushHistory: true,
       });
       return;
     }

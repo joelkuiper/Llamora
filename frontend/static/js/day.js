@@ -58,16 +58,15 @@ export function navigateToDate(dateStr) {
   }
   const query = params.toString();
   const htmxUrl = `/e/${dateStr}?${query}`;
-  const pushUrl = `/d/${dateStr}?${query}`;
 
   const targetId = "#content-wrapper";
+  // The /e/ response pushes the canonical /d/<date> URL via HX-Push-Url.
   if (window.htmx) {
     const source =
       document.getElementById("calendar-control") || document.body || document.documentElement;
     const request = window.htmx.ajax("GET", htmxUrl, {
       target: targetId,
       swap: "outerHTML",
-      pushUrl,
       source,
     });
     if (request && typeof request.catch === "function") {
@@ -76,7 +75,7 @@ export function navigateToDate(dateStr) {
     return true;
   }
 
-  window.location.assign(pushUrl);
+  window.location.assign(`/d/${dateStr}?${query}`);
   return true;
 }
 

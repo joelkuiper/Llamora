@@ -1,4 +1,4 @@
-<div id="main-content" data-view="{{ view|default('diary') }}" hx-history-elt>
+<div id="main-content" data-view="{{ view|default('diary') }}">
   {% include "components/shared/view_state.html" %}
   {% if view == "diary" %}
     {% include "views/diary.html" %}
