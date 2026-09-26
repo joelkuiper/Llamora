@@ -14,6 +14,8 @@ import threading
 import time
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timezone
+from urllib.parse import unquote
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 import httpx
@@ -81,13 +83,19 @@ class LiveServer:
                 self.process.wait()
 
 
-def start_server(workdir: Path, *, llm_url: str) -> LiveServer:
+def start_server(
+    workdir: Path, *, llm_url: str, now: datetime | None = None
+) -> LiveServer:
+    """Start an isolated server; ``now`` moves its clock (it keeps ticking)."""
     config_dir = workdir / "config"
     write_config(config_dir, db_path=workdir / "state.sqlite3", llm_url=llm_url)
 
     env = {k: v for k, v in os.environ.items() if not k.startswith("LLAMORA_")}
     env["LLAMORA_CONFIG_DIR"] = str(config_dir)
     env["PYTHONUNBUFFERED"] = "1"
+    if now is not None:
+        assert now.tzinfo is not None, "server clock needs an aware datetime"
+        env["LLAMORA_TEST_NOW"] = now.isoformat()
 
     port = free_port()
     log_path = workdir / "server.log"
@@ -95,8 +103,7 @@ def start_server(workdir: Path, *, llm_url: str) -> LiveServer:
     process = subprocess.Popen(
         [
             sys.executable,
-            "-m",
-            "llamora",
+            str(Path(__file__).with_name("server_bootstrap.py")),
             "--host",
             "127.0.0.1",
             "--port",
@@ -238,8 +245,11 @@ class ApiClient:
     def __init__(self, base_url: str, storage_state_path: Path) -> None:
         state = json.loads(storage_state_path.read_text(encoding="utf-8"))
         cookies = httpx.Cookies()
+        self._tz = "UTC"
         for cookie in state.get("cookies", []):
             cookies.set(cookie["name"], cookie["value"], domain=cookie["domain"])
+            if cookie["name"] == "tz":
+                self._tz = unquote(cookie["value"]) or "UTC"
         self._client = httpx.Client(base_url=base_url, cookies=cookies, timeout=30.0)
         page = self._client.get("/d/today")
         page.raise_for_status()
@@ -251,10 +261,15 @@ class ApiClient:
         self._client.close()
 
     def create_entry(self, day: date, text: str) -> str:
-        """Create a user entry on ``day`` (noon UTC) and return its id."""
+        """Create a user entry at noon on ``day`` in the user's zone; return its id.
+
+        The server files entries by ``user_time`` in the zone from the session's
+        ``tz`` cookie, so noon *local* keeps the entry on ``day`` in any zone.
+        """
+        noon = datetime(day.year, day.month, day.day, 12, tzinfo=ZoneInfo(self._tz))
         resp = self._client.post(
             f"/e/{day.isoformat()}/entry",
-            data={"text": text, "user_time": f"{day.isoformat()}T12:00:00Z"},
+            data={"text": text, "user_time": noon.isoformat()},
             headers=self._headers,
         )
         resp.raise_for_status()

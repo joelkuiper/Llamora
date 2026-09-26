@@ -17,15 +17,18 @@ from __future__ import annotations
 import fcntl
 from collections.abc import Callable, Iterator
 from pathlib import Path
+from datetime import datetime
 from typing import Any
 
 import pytest
 from playwright.sync_api import Browser, BrowserContext, Page
 
 from fake_llm import FakeLLM
+from timekit import Diary
 from harness import (
     ApiClient,
     LiveServer,
+    submit_login,
     User,
     build_assets,
     login,
@@ -185,6 +188,90 @@ def fresh_session(
     client = ApiClient(base_url, state_path)
     yield page, client
     client.close()
+
+
+@pytest.fixture
+def open_page(
+    browser: Browser, browser_context_args: dict[str, Any]
+) -> Iterator[Callable[..., Page]]:
+    """Factory: a page in a new context with its own zone, clock and session.
+
+    pytest-playwright's ``new_context`` can't override ``base_url`` or
+    ``timezone_id`` per call, so these contexts are built on the browser
+    directly (and closed here); they don't get its automatic failure traces.
+    """
+    contexts: list[BrowserContext] = []
+
+    def factory(
+        *,
+        base_url: str,
+        tz: str = "UTC",
+        at: datetime | None = None,
+        storage_state: str | None = None,
+    ) -> Page:
+        args = {**browser_context_args, "base_url": base_url, "timezone_id": tz}
+        if storage_state is not None:
+            args["storage_state"] = storage_state
+        context = browser.new_context(**args)
+        contexts.append(context)
+        page = context.new_page()
+        if at is not None:
+            page.clock.install(time=at)
+        return page
+
+    yield factory
+    for context in contexts:
+        context.close()
+
+
+@pytest.fixture
+def diary_at(
+    open_page: Callable[..., Page],
+    fake_llm: FakeLLM,
+    live_server: LiveServer,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Iterator[Callable[..., Diary]]:
+    """Factory: a fresh user logged in with a pinned browser zone and clock.
+
+    ``tz`` sets the browser's IANA zone; ``at`` (an aware datetime) installs
+    Playwright's clock, which then keeps running from there. ``server_now``
+    starts a dedicated server whose clock starts at that instant, for
+    server/client divergence. ``settle=False`` returns as soon as the diary
+    loads, without waiting for the day opening to finish streaming.
+    """
+    servers: list[LiveServer] = []
+    clients: list[ApiClient] = []
+
+    def open_diary(
+        *,
+        tz: str = "UTC",
+        at: datetime | None = None,
+        server_now: datetime | None = None,
+        settle: bool = True,
+    ) -> Diary:
+        base_url = live_server.url
+        if server_now is not None:
+            server = start_server(
+                tmp_path_factory.mktemp("clocked"), llm_url=fake_llm.url, now=server_now
+            )
+            servers.append(server)
+            base_url = server.url
+        user = register_user(base_url, new_credentials("clock"))
+        page = open_page(base_url=base_url, tz=tz, at=at)
+        submit_login(page, user)
+        if settle:
+            wait_for_app(page)
+        state = tmp_path_factory.mktemp("state") / "user.json"
+        page.context.storage_state(path=str(state))
+        api = ApiClient(base_url, state)
+        clients.append(api)
+        return Diary(page=page, user=user, api=api, base_url=base_url, tz=tz)
+
+    yield open_diary
+    for client in clients:
+        client.close()
+    for server in servers:
+        server.stop()
 
 
 @pytest.fixture

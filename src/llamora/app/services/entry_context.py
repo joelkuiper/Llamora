@@ -137,6 +137,10 @@ async def get_entries_context(
     return {
         "entries": entries,
         "streaming_replies": streaming_replies,
+        # The date this page was judged against (today/past/future). On a full
+        # page load the server can't know the browser's date yet, so the
+        # client re-renders when its own date differs (see entry-view.js).
+        "today": today,
         "is_today": is_today,
         "opening_stream": opening_stream,
         "min_date": min_date,

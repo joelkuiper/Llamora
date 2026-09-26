@@ -1,4 +1,5 @@
 import { createListenerBag } from "../utils/events.js";
+import { draftStore } from "../utils/storage.js";
 import {
   applyTimezoneHeader,
   applyTimezoneSearchParam,
@@ -114,6 +115,42 @@ export function navigateToToday(zone = getTimezone()) {
   }
 }
 
+/**
+ * Move a page that was showing ``fromDay`` to the writer's new today.
+ *
+ * Unsent text in the composer (or ``fromDay``'s saved draft) moves to the new
+ * day's draft, so nothing typed is lost. The page is re-rendered in place via
+ * /e/today, whose push of /d/today becomes a history replace when that is
+ * already the URL: no query string, no extra Back step.
+ */
+export function rollOverToToday(fromDay, today = updateClientToday()) {
+  const composer = document.getElementById("entry-text");
+  const unsent = (composer?.value ?? "") || (fromDay ? draftStore.get(fromDay) : "") || "";
+  if (fromDay && fromDay !== today) {
+    draftStore.delete(fromDay);
+  }
+  if (unsent.trim() && today && !draftStore.get(today)) {
+    draftStore.set(today, unsent);
+  }
+
+  const htmx = globalThis.htmx;
+  const target = document.getElementById("content-wrapper");
+  if (!htmx?.ajax || !target) {
+    navigateToToday(getTimezone());
+    return;
+  }
+  const params = new URLSearchParams();
+  applyTimezoneSearchParam(params, getTimezone());
+  if (today) {
+    params.set("client_today", today);
+  }
+  htmx.ajax("GET", `/e/today?${params.toString()}`, {
+    target,
+    swap: "outerHTML",
+    source: document.body,
+  });
+}
+
 export function scheduleMidnightRollover(entriesElement) {
   if (!entriesElement) return () => {};
 
@@ -130,7 +167,7 @@ export function scheduleMidnightRollover(entriesElement) {
     const today = updateClientToday(document?.body, now);
 
     if (entriesElement.dataset.date !== today) {
-      navigateToToday(getTimezone());
+      rollOverToToday(entriesElement.dataset.date, today);
       return;
     }
 

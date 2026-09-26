@@ -21,6 +21,9 @@ import "../response-stream.js";
 const activateAnimations = armEntryAnimations;
 const activateInitialEntryAnimations = armInitialEntryAnimations;
 
+// Last day re-rendered with the browser's date (see #initialize).
+let lastDayCorrection = null;
+
 export class EntryView extends ReactiveElement {
   #entryForm = null;
   #scrollManager = null;
@@ -223,9 +226,17 @@ export class EntryView extends ReactiveElement {
 
     const isClientToday = activeDay === clientToday;
 
-    if (viewKind === "today" && activeDay && !isClientToday) {
+    // "Today" is the browser's local date. A full page load is rendered with
+    // the server's own date (it can't know ours yet), so if the two differ,
+    // re-render this same day with our date. /e/ responses push the URL we're
+    // already on, which lifecycle.js turns into a history replace: no extra
+    // Back step, and no loop (each page/date pair is corrected once).
+    const serverToday = entries?.dataset?.today || null;
+    const correction = `${viewKind === "today" ? "today" : activeDay}|${clientToday}`;
+    if (serverToday && serverToday !== clientToday && lastDayCorrection !== correction) {
+      lastDayCorrection = correction;
       this.#forceNavFlash = true;
-      navigateToDate(clientToday);
+      navigateToDate(viewKind === "today" ? "today" : activeDay);
       return;
     }
 

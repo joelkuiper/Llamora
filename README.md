@@ -303,11 +303,11 @@ The server uses bundled outputs when `frontend/dist/manifest.json` exists. Remov
 pnpm install && pnpm vendor
 ```
 
-**Tests** — end-to-end tests drive the app in a real browser (Playwright + pytest), simulating how a person uses it: registering, writing entries, streaming replies, navigating with back/forward, searching, tagging and the calendar. Each run starts an isolated server with a temporary database and a fake OpenAI-compatible model, so no GPU, llama.cpp or local config is needed.
+**Tests** — end-to-end tests drive the app in a real browser (Playwright + pytest), simulating how a person uses it: registering, writing entries, streaming replies, navigating with back/forward, searching, tagging, the calendar, and the date logic (day openings, midnight rollover, time zones and server/client clock disagreement, using pinned browser and server clocks). Each run starts an isolated server with a temporary database and a fake OpenAI-compatible model, so no GPU, llama.cpp or local config is needed.
 
 ```bash
 uv run playwright install chromium        # once: download the browser
-uv run pytest tests/e2e -n 3              # full suite, 3 parallel workers (~2 min)
+uv run pytest tests/e2e -n 3              # full suite, 3 parallel workers (~4-5 min)
 uv run pytest tests/e2e/test_diary.py     # one file
 uv run pytest tests/e2e -k search         # tests matching a name
 uv run pytest tests/e2e --headed --slowmo 300   # watch the browser

@@ -1,5 +1,6 @@
 import { isNearBottom } from "../scroll-utils.js";
 import { getClientToday } from "../services/datetime.js";
+import { rollOverToToday } from "../services/time.js";
 import { getAlertContainer } from "../utils/alert-center.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
 import { draftStore } from "../utils/storage.js";
@@ -225,8 +226,24 @@ class EntryFormElement extends ReactiveElement {
 
     const userTimeInput = this.#form.querySelector("#user-time");
     const onConfigRequest = (event) => {
+      // Past midnight on a page that hasn't rolled over yet: move to the new
+      // day (the text comes along as its draft) instead of filing the entry
+      // under a day that has ended.
+      const clientToday = getClientToday();
+      if (this.#date && this.#date !== clientToday) {
+        event.preventDefault();
+        rollOverToToday(this.#date, clientToday);
+        return;
+      }
+      // htmx has already collected the form by now, so the timestamp must go
+      // into the request parameters (setting the input alone sends the
+      // previous request's value, or none at all).
+      const userTime = new Date().toISOString();
+      if (event.detail?.parameters) {
+        event.detail.parameters.user_time = userTime;
+      }
       if (userTimeInput) {
-        userTimeInput.value = new Date().toISOString();
+        userTimeInput.value = userTime;
       }
       if (!this.#textarea.value.trim()) {
         event.preventDefault();

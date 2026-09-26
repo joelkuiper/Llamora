@@ -19,8 +19,7 @@
           hx-post="{{ url_for('entries.request_response', date=day, entry_id=entry_id) }}"
           hx-target="#entry-responses-{{ entry_id }}"
           hx-swap="beforeend"
-          hx-include="#user-time"
-          hx-on::config-request="const t=document.getElementById('user-time'); if(t){t.value=new Date().toISOString();}"
+          hx-on::config-request="event.detail.parameters.user_time = new Date().toISOString();"
           {% endif %}>
     {% if response_active %}
     <span class="icon-mask icon-square entry-action__icon" aria-hidden="true"></span>

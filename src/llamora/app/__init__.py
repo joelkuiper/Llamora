@@ -22,6 +22,7 @@ def create_app():
     from quart import Quart, render_template, make_response, request, g
     from quart import abort, send_from_directory
     from quart_wtf import CSRFProtect
+    from werkzeug.exceptions import HTTPException
     from typing import Any, cast
     from .services.container import AppLifecycle, AppServices
 
@@ -293,28 +294,29 @@ def create_app():
 
     _install_lifecycle()
 
-    @app.errorhandler(404)
-    async def not_found(e):
-        message = getattr(e, "description", "Page not found.")
+    async def _render_error(message: str, status: int):
         if request.headers.get("HX-Request"):
             html = await render_template(
                 "components/errors/error.html", message=message
             )
-            return await make_response(html, 404)
+            return await make_response(html, status)
         html = await render_template("pages/error.html", message=message)
-        return await make_response(html, 404)
+        return await make_response(html, status)
+
+    @app.errorhandler(404)
+    async def not_found(e):
+        return await _render_error(getattr(e, "description", "Page not found."), 404)
 
     @app.errorhandler(Exception)
     async def handle_exception(e):
+        # Deliberate aborts (400, 403, ...) keep their status and message; only
+        # genuinely unexpected errors become a 500.
+        if isinstance(e, HTTPException) and e.code is not None:
+            return await _render_error(e.description or e.name, e.code)
         app.logger.exception("Unhandled exception: %s", e)
-        message = "An unexpected error occurred. Please try again later."
-        if request.headers.get("HX-Request"):
-            html = await render_template(
-                "components/errors/error.html", message=message
-            )
-            return await make_response(html, 500)
-        html = await render_template("pages/error.html", message=message)
-        return await make_response(html, 500)
+        return await _render_error(
+            "An unexpected error occurred. Please try again later.", 500
+        )
 
     app.logger.info("Application initialized")
     return app

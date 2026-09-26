@@ -26,6 +26,7 @@ from llamora.app.services.entry_context import build_entry_context, build_llm_co
 from llamora.app.services.entry_helpers import (
     StreamSession,
     augment_history_with_recall,
+    format_sse_event,
     augment_opening_with_recall,
     build_entry_history,
     history_has_tag_recall,
@@ -38,7 +39,7 @@ from llamora.app.services.response_stream.manager import (
     new_reply_stream_id,
 )
 from llamora.app.services.tag_recall import build_tag_recall_context
-from llamora.app.services.time import get_timezone
+from llamora.app.services.time import get_timezone, local_date
 from llamora.llm.entry_template import (
     build_opening_messages,
     estimate_entry_messages_tokens,
@@ -61,9 +62,24 @@ def _backpressure_response(exc: StreamCapacityError):
     )
 
 
-def _resolve_target_datetime(normalized_date: str, tz: str) -> tuple[datetime, str]:
+def _resolve_target_datetime(
+    normalized_date: str, tz: str, user_time: str | None = None
+) -> tuple[datetime, str]:
     target_date = datetime.fromisoformat(normalized_date).date()
     tz_info = ZoneInfo(tz)
+    # "Now" is the writer's clock when they report it; the server's clock is
+    # only a fallback (it may disagree with the browser about the date).
+    if user_time:
+        try:
+            client_now = datetime.fromisoformat(user_time.replace("Z", "+00:00"))
+        except ValueError:
+            logger.debug("Ignoring invalid opening user_time %r", user_time)
+        else:
+            if client_now.tzinfo is None:
+                client_now = client_now.replace(tzinfo=tz_info)
+            client_now = client_now.astimezone(tz_info)
+            if client_now.date() == target_date:
+                return client_now, target_date.isoformat()
     now = datetime.now(tz_info)
     if target_date == now.date():
         return now, target_date.isoformat()
@@ -86,8 +102,9 @@ async def _build_opening_stream_payload(
     enc_ctx,
     normalized_date: str,
     tz: str,
+    user_time: str | None = None,
 ) -> tuple[datetime, str, list[dict[str, object]]]:
-    target_dt, today_iso = _resolve_target_datetime(normalized_date, tz)
+    target_dt, today_iso = _resolve_target_datetime(normalized_date, tz, user_time)
     target_date = datetime.fromisoformat(today_iso).date()
     llm_ctx = build_llm_context(user_time=target_dt.isoformat(), tz_cookie=tz)
     date_str = str(llm_ctx.get("date") or "")
@@ -309,6 +326,17 @@ async def stop_response(entry_id: str):
     return Response("", status=200)
 
 
+async def _saved_opening(enc_ctx, day: str) -> dict[str, object] | None:
+    """The day's persisted opening, if one exists."""
+    entries = await get_services().db.entries.get_entries_for_date(enc_ctx, day)
+    for item in entries:
+        entry = item.get("entry", {}) if isinstance(item, dict) else {}
+        meta = entry.get("meta") or {}
+        if isinstance(meta, dict) and meta.get("auto_opening"):
+            return {"id": entry.get("id"), "text": entry.get("text", "")}
+    return None
+
+
 @entries_stream_bp.get("/e/opening/<date>")
 @login_required
 async def sse_opening(date: str):
@@ -317,12 +345,23 @@ async def sse_opening(date: str):
     uid = user["id"]
     tz = get_timezone()
     normalized_date = require_iso_date(date)
+
+    # One opening per user per day, and only for the writer's today: a page
+    # rendered for another date (e.g. before the browser's date was known)
+    # must not create one.
+    if normalized_date != local_date().isoformat():
+        return StreamSession.raw(format_sse_event("done", {}))
+    existing = await _saved_opening(enc_ctx, normalized_date)
+    if existing is not None:
+        return StreamSession.saved(existing)
+
     try:
         target_dt, today_iso, opening_messages = await _build_opening_stream_payload(
             user_id=uid,
             enc_ctx=enc_ctx,
             normalized_date=normalized_date,
             tz=tz,
+            user_time=request.args.get("user_time"),
         )
     except Exception:
         logger.exception("Failed to prepare opening prompt")

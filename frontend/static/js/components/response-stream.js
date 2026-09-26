@@ -174,6 +174,10 @@ class ResponseStreamElement extends HTMLElement {
     try {
       const parsed = new URL(url, window.location.origin);
       parsed.searchParams.set("client_today", getClientToday());
+      // The writer's clock, so the server knows their local time of day.
+      if (!parsed.searchParams.get("user_time")) {
+        parsed.searchParams.set("user_time", new Date().toISOString());
+      }
       url = `${parsed.pathname}${parsed.search}`;
     } catch {
       // fall through with tz-only URL
