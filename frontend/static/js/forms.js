@@ -79,9 +79,12 @@ export function initForms(root = document) {
 const onReady = () => {
   // Auth pages (login, register, reset) are rendered outside the app shell.
   // Clear cached stores so a previous user's data doesn't leak via htmx
-  // history cache or llamora session storage.
+  // history cache or llamora session storage. Unsent drafts stay: they are
+  // keyed to their owner (see services/drafts.js), so a forced re-login
+  // brings them back to the same user and no one else; an explicit logout
+  // clears them.
   if (document.body?.dataset?.entry === "auth-forms") {
-    clearAllStores();
+    clearAllStores({ keepDrafts: true });
   }
   initForms(document);
 };

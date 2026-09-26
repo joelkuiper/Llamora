@@ -264,6 +264,26 @@ def create_app():
             app.config["STATIC_MANIFEST_MTIME"] = mtime
 
     app.before_request(load_user)
+
+    @app.context_processor
+    async def _inject_draft_owner() -> dict[str, str]:
+        # An opaque per-user key for unsent drafts in the browser: drafts are
+        # kept across a forced re-login but only shown to the same user.
+        import hashlib
+        import hmac
+
+        from .services.auth_helpers import get_current_user
+
+        user = await get_current_user()
+        if not user:
+            return {"draft_owner": ""}
+        digest = hmac.new(
+            str(settings.SECRET_KEY).encode("utf-8"),
+            f"draft-owner:{user['id']}".encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+        return {"draft_owner": digest[:24]}
+
     app.before_request(_refresh_manifest)
 
     @app.after_request

@@ -57,6 +57,67 @@ def test_draft_does_not_leak_to_the_next_user_in_the_same_tab(
     expect(composer(page)).to_have_value("")
 
 
+def lose_the_session(page: Page) -> None:
+    """What an expired session or a server restart looks like: the next
+    navigation lands on the login page."""
+    page.context.clear_cookies()
+    page.reload()
+    expect(page).to_have_url(re.compile(r"/login"))
+
+
+def test_draft_survives_a_forced_re_login(
+    new_context: Callable[..., BrowserContext], make_user: Callable[..., User]
+) -> None:
+    page = new_context().new_page()
+    writer = make_user("writer")
+    login(page, writer)
+    draft = f"Half-written when the session ended {marker()}"
+    composer(page).fill(draft)
+
+    lose_the_session(page)
+    login(page, writer)
+
+    expect(composer(page)).to_have_value(draft)
+
+
+def test_a_draft_after_a_forced_re_login_is_only_shown_to_its_owner(
+    new_context: Callable[..., BrowserContext], make_user: Callable[..., User]
+) -> None:
+    page = new_context().new_page()
+    writer, other = make_user("writer"), make_user("other")
+    login(page, writer)
+    draft = f"Not for anyone else {marker()}"
+    composer(page).fill(draft)
+
+    lose_the_session(page)
+    login(page, other)
+    expect(composer(page)).to_have_value("")
+    assert draft not in page.content()
+
+    lose_the_session(page)
+    login(page, writer)
+    expect(composer(page)).to_have_value(draft)
+
+
+def test_logging_out_takes_the_draft_along(
+    new_context: Callable[..., BrowserContext], make_user: Callable[..., User]
+) -> None:
+    page = new_context().new_page()
+    writer = make_user("writer")
+    login(page, writer)
+    composer(page).fill(f"Leaving on purpose {marker()}")
+
+    page.get_by_role("button", name="Logout").click()
+    expect(page).to_have_url(re.compile(r"/login"))
+    login(page, writer)
+
+    expect(composer(page)).to_have_value("")
+    stored = page.evaluate(
+        "() => Object.keys(sessionStorage).filter(k => k.startsWith('llamora:draft:'))"
+    )
+    assert stored == []
+
+
 def test_enter_sends_and_shift_enter_adds_a_line(app_page: Page) -> None:
     first, second = f"First line {marker()}", f"second line {marker()}"
     entries = app_page.locator("#entries .entry.user")

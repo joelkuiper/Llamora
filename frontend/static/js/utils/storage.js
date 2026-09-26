@@ -74,12 +74,13 @@ export const sessionStore = new CacheStore({
   prefix: "llamora:session:",
 });
 
-export function clearAllStores() {
+export function clearAllStores({ keepDrafts = false } = {}) {
   try {
     for (const backend of [globalThis.localStorage, globalThis.sessionStorage]) {
       const toRemove = [];
       for (let i = 0; i < backend.length; i++) {
         const k = backend.key(i);
+        if (keepDrafts && k?.startsWith("llamora:draft:")) continue;
         if (k?.startsWith("llamora:") || k === "htmx-history-cache") {
           toRemove.push(k);
         }

@@ -2,12 +2,21 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from quart import Blueprint, Request, jsonify, render_template, request, abort
+from quart import (
+    Blueprint,
+    Request,
+    abort,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from llamora.app.api.search import InvalidSearchQuery
 from llamora.app.services.container import get_search_api, get_services
 from llamora.app.services.auth_helpers import login_required
 from llamora.settings import settings
-from llamora.app.routes.helpers import require_encryption_context
+from llamora.app.routes.helpers import is_htmx_request, require_encryption_context
 from llamora.app.util.tags import replace_emoji_shortcodes
 
 
@@ -111,9 +120,18 @@ async def _run_search(
     return model
 
 
+def _not_a_page():
+    """Search lives in the header's overlay; its routes return fragments for
+    htmx. Opened directly (a bookmark, a typed URL) they'd render a blank
+    page, so go to today's diary instead."""
+    return redirect(url_for("days.day_today"))
+
+
 @search_bp.get("/search")
 @login_required
 async def search():
+    if not is_htmx_request():
+        return _not_a_page()
     context = resolve_search_context(request)
     logger.debug("Route search raw query='%s'", context.query)
     if request.args.get("offset"):

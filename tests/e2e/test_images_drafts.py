@@ -32,8 +32,15 @@ def done_tiles(page: Page) -> Locator:
     return page.locator('image-attach .image-attach__tile[data-state="done"]')
 
 
+def draft_key(page: Page, day: str) -> str:
+    """Drafts are stored per owner (the page's opaque data-draft-owner)."""
+    owner = page.evaluate("() => document.body.dataset.draftOwner")
+    assert owner, "the page has no draft owner"
+    return f"llamora:draft:{owner}:{day}"
+
+
 def stored_draft(page: Page, day: str):
-    raw = page.evaluate("key => sessionStorage.getItem(key)", f"llamora:draft:{day}")
+    raw = page.evaluate("key => sessionStorage.getItem(key)", draft_key(page, day))
     return json.loads(raw)["v"] if raw else None
 
 
@@ -115,8 +122,8 @@ def test_an_image_swept_meanwhile_is_dropped_quietly(fresh_session: Session) -> 
         page.locator('image-attach .image-attach__tile[data-state="failed"]')
     ).to_have_count(0)
     page.wait_for_function(
-        "day => JSON.parse(sessionStorage.getItem('llamora:draft:' + day)).v.images.length === 0",
-        arg=today_of(page),
+        "key => JSON.parse(sessionStorage.getItem(key)).v.images.length === 0",
+        arg=draft_key(page, today_of(page)),
     )
 
 
@@ -125,7 +132,7 @@ def test_drafts_from_before_images_still_restore(fresh_session: Session) -> None
     day = today_of(page)
     page.evaluate(
         """([key, text]) => sessionStorage.setItem(key, JSON.stringify({ v: text, e: null }))""",
-        [f"llamora:draft:{day}", "An old plain-text draft"],
+        [draft_key(page, day), "An old plain-text draft"],
     )
 
     reload(page)

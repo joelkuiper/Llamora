@@ -121,3 +121,12 @@ def test_more_results_load_while_scrolling(
     results.last.scroll_into_view_if_needed()
     expect(matches).to_have_count(total)
     wait_for_htmx_idle(page)
+
+
+def test_opening_the_search_url_directly_goes_to_the_diary(app_page: Page) -> None:
+    # Search lives in the header's overlay; /search only serves its results.
+    app_page.goto("/search?q=anything")
+
+    expect(app_page).to_have_url(re.compile(r"/d/today$"))
+    wait_for_app(app_page)
+    expect(app_page.locator("#entries")).to_be_visible()
