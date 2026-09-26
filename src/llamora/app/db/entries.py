@@ -225,16 +225,14 @@ class EntriesRepository(BaseRepository):
     ) -> None:
         if not created_date or not self._event_bus:
             return
-        kwargs: dict[str, object] = {
-            "user_id": user_id,
-            "created_date": created_date,
-            "entry_id": entry_id,
-        }
+        payload: dict[str, object] = {"entry_id": entry_id}
         if entry is not None:
-            kwargs["entry"] = dict(entry)
+            payload["entry"] = dict(entry)
         if tag_hashes:
-            kwargs["tag_hashes"] = tag_hashes
-        await self._event_bus.emit_for_entry_date(event_name, **kwargs)
+            payload["tag_hashes"] = tag_hashes
+        await self._event_bus.emit_for_entry_date(
+            event_name, user_id=user_id, created_date=created_date, **payload
+        )
 
     async def _get_tag_hashes_for_entry(
         self, user_id: str, entry_id: str

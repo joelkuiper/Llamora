@@ -206,7 +206,8 @@ async def _update_user_password_wrap(
     )
     epoch = await db.users.get_current_epoch(user_id)
     await db.users.update_key_epoch_pw(user_id, epoch, pw_salt, pw_nonce, pw_cipher)
-    invalidate_user_snapshot(user_id)
+    # Snapshot cache keys are string uids; an int would silently miss.
+    invalidate_user_snapshot(str(user_id))
 
 
 async def _hash_password(password: bytes) -> bytes:

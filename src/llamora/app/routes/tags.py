@@ -15,7 +15,11 @@ from llamora.app.services.container import (
     get_tag_service,
 )
 from llamora.app.services.auth_helpers import login_required
-from llamora.app.services.tag_service import TagsViewData
+from llamora.app.services.tag_service import (
+    TagsSortDirection,
+    TagsSortKind,
+    TagsViewData,
+)
 from llamora.app.services.tag_presenter import (
     PresentedTagsViewData,
     present_archive_detail,
@@ -151,7 +155,7 @@ async def _resolve_tags_view(
     ctx: CryptoContext,
     *,
     selected_tag: str | None,
-) -> tuple[TagsViewData, str, str, int, str]:
+) -> tuple[TagsViewData, TagsSortKind, TagsSortDirection, int, str | None]:
     sort_kind, sort_dir = normalize_tags_sort(
         sort_kind=DEFAULT_TAGS_SORT_KIND,
         sort_dir=DEFAULT_TAGS_SORT_DIR,

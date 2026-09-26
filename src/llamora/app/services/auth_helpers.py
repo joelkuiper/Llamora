@@ -51,7 +51,7 @@ class SecureCookieManager:
         self._session_idle_ttl = max(0, int(session_idle_ttl))
         self._cookie_touch_interval = max(0, int(cookie_touch_interval))
         self._sessions_repo: SessionsRepository | None = None
-        self._user_snapshot_cache: TTLCache[tuple[str, str], Any] = TTLCache(
+        self._user_snapshot_cache = TTLCache[tuple[str, str], Any](
             maxsize=user_cache_maxsize,
             ttl=user_cache_ttl,
         )

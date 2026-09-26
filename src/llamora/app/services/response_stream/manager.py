@@ -7,6 +7,7 @@ import time
 from heapq import heappop, heappush
 from itertools import count
 from collections.abc import AsyncIterator, Callable
+from typing import Any
 from contextlib import suppress
 
 from llamora.llm.client import LLMClient
@@ -42,7 +43,7 @@ class PendingResponse(ResponsePipelineCallbacks):
         config: LLMStreamConfig,
         params: dict | None = None,
         context: dict | None = None,
-        messages: list[dict[str, str]] | None = None,
+        messages: list[dict[str, Any]] | None = None,
         reply_to: str | None = None,
         meta_extra: dict | None = None,
         created_at: str | None = None,
@@ -435,7 +436,7 @@ class ResponseStreamManager:
         params: dict | None = None,
         context: dict | None = None,
         *,
-        messages: list[dict[str, str]] | None = None,
+        messages: list[dict[str, Any]] | None = None,
         reply_to: str | None = None,
         meta_extra: dict | None = None,
         created_at: str | None = None,

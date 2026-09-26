@@ -10,7 +10,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from quart import (
     Blueprint,
@@ -62,7 +62,7 @@ def _build_entry_payload(
     entry_id: str,
     entry: Mapping[str, Any],
     *,
-    tags: list[Mapping[str, Any]] | None = None,
+    tags: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "id": entry_id,
@@ -272,6 +272,7 @@ async def update_entry(entry_id: str):
         str(tag.get("hash") or "").strip() for tag in tags if tag.get("hash")
     )
     response = await make_response(html, 200)
+    assert isinstance(response, Response)
     _set_cache_invalidation_header(
         response,
         mutation=MUTATION_ENTRY_CHANGED,
@@ -308,7 +309,7 @@ async def entry_main(entry_id: str):
     uid = user["id"]
     db = get_services().db
     entry = await _load_entry_or_404(db=db, ctx=ctx, user_id=uid, entry_id=entry_id)
-    tags: list[Mapping[str, Any]] = []
+    tags: Sequence[Mapping[str, Any]] = []
     if entry.get("role") == "user":
         tags = await db.tags.get_tags_for_entry(ctx, entry_id)
     today = local_date().isoformat()
@@ -378,6 +379,7 @@ async def send_entry(date):
         is_today=created_date == local_date().isoformat(),
     )
     response = await make_response(html, 200)
+    assert isinstance(response, Response)
     _set_cache_invalidation_header(
         response,
         mutation=MUTATION_ENTRY_CREATED,
