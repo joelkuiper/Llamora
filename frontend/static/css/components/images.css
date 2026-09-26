@@ -85,6 +85,10 @@
 
 /* -- lightbox ------------------------------------------------------------ */
 
+/* Styled like the confirm modal: the same softly dimmed, blurred backdrop,
+   theme-aware controls like its buttons, and the image framed as a glass
+   panel. */
+
 .image-lightbox {
   position: fixed;
   inset: 0;
@@ -92,7 +96,7 @@
   display: block;
   opacity: 0;
   transition: opacity 180ms ease;
-  color: #fff;
+  color: var(--color-text);
   touch-action: pan-y pinch-zoom;
 }
 
@@ -107,8 +111,9 @@
 .image-lightbox__backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(10, 11, 13, 0.88);
-  backdrop-filter: blur(3px);
+  background: rgba(12, 12, 14, 0.32);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 
 .image-lightbox__panel {
@@ -118,8 +123,9 @@
 
 .image-lightbox__stage {
   position: absolute;
+  /* The bottom leaves room for the counter below the image's frame. */
   inset: calc(3.5rem + env(safe-area-inset-top, 0px)) 4.5rem
-    calc(3rem + env(safe-area-inset-bottom, 0px));
+    calc(4.5rem + env(safe-area-inset-bottom, 0px));
   display: grid;
   place-items: center;
 }
@@ -130,9 +136,13 @@
   max-height: 100%;
   /* The box is sized to the image's own shape; never stretch it if not. */
   object-fit: contain;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.04);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  border-radius: 10px;
+  background: var(--color-bg-alt);
+  /* A glass frame drawn outside the image, so it never changes its size. */
+  box-shadow:
+    0 0 0 8px var(--glass-bg-opaque),
+    0 0 0 9px var(--border),
+    0 18px 50px rgba(12, 12, 14, 0.16);
   opacity: 1;
   transition: opacity 150ms ease;
   user-select: none;
@@ -150,14 +160,17 @@
   width: 2.5rem;
   height: 2.5rem;
   padding: 0;
-  border: 0;
+  border: 1px solid var(--border);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.86);
+  background: var(--glass-bg-opaque);
+  color: var(--color-text);
+  box-shadow: var(--raised-shadow);
   cursor: pointer;
   transition:
     background-color 160ms ease,
+    border-color 160ms ease,
     color 160ms ease,
+    box-shadow 160ms ease,
     opacity 160ms ease;
 
   & .icon-mask {
@@ -166,13 +179,16 @@
   }
 
   &:hover {
-    background: rgba(255, 255, 255, 0.2);
-    color: #fff;
+    border-color: var(--border-strong);
+    color: var(--color-heading);
   }
 
   &:focus-visible {
-    outline: 2px solid rgba(255, 255, 255, 0.85);
-    outline-offset: 2px;
+    outline: none;
+    border-color: var(--accent);
+    box-shadow:
+      var(--raised-shadow),
+      0 0 0 2px var(--accent-20);
   }
 }
 
@@ -188,9 +204,9 @@
   }
 
   &:disabled {
-    opacity: 0.25;
+    opacity: 0.35;
     cursor: default;
-    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--border);
   }
 }
 
@@ -210,26 +226,39 @@
   gap: 0.5rem;
 }
 
-.image-lightbox__remove:hover {
-  background: rgba(200, 0, 46, 0.55);
+.image-lightbox__remove:hover,
+.image-lightbox__remove:focus-visible {
+  color: var(--color-danger);
+  border-color: var(--danger-25);
+  box-shadow:
+    var(--raised-shadow),
+    0 0 0 2px var(--danger-15);
 }
 
 .image-lightbox__counter {
   position: absolute;
-  bottom: calc(0.9rem + env(safe-area-inset-bottom, 0px));
+  bottom: calc(1.4rem + env(safe-area-inset-bottom, 0px));
   left: 50%;
   translate: -50% 0;
   margin: 0;
-  font-size: 0.85rem;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--glass-bg-opaque);
+  border: 1px solid var(--border);
+  font-size: 0.8rem;
   letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
+
+  &:empty {
+    display: none;
+  }
 }
 
 @media (max-width: 640px) {
   .image-lightbox__stage {
-    inset: calc(3.5rem + env(safe-area-inset-top, 0px)) 0.5rem
-      calc(4rem + env(safe-area-inset-bottom, 0px));
+    inset: calc(3.5rem + env(safe-area-inset-top, 0px)) 1rem
+      calc(5rem + env(safe-area-inset-bottom, 0px));
   }
 
   .image-lightbox__nav {
