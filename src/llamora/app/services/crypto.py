@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from logging import getLogger
 
@@ -257,6 +258,19 @@ def wrap_key(key: bytes, secret: str):
 def unwrap_key(ct: bytes, salt: bytes, nonce: bytes, secret: str) -> bytes:
     k = derive_key(secret.encode("utf-8"), salt)
     return crypto_aead_xchacha20poly1305_ietf_decrypt(ct, None, nonce, k)
+
+
+# Argon2id at MODERATE costs ~256 MiB and around a second of CPU per call.
+# Async code must use these variants so key derivation runs in a worker
+# thread instead of stalling the event loop (and every other request).
+
+
+async def async_wrap_key(key: bytes, secret: str):
+    return await asyncio.to_thread(wrap_key, key, secret)
+
+
+async def async_unwrap_key(ct: bytes, salt: bytes, nonce: bytes, secret: str) -> bytes:
+    return await asyncio.to_thread(unwrap_key, ct, salt, nonce, secret)
 
 
 # ---------------------------------------------------------------------------

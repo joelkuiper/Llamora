@@ -25,8 +25,8 @@ from llamora.app.services.crypto import (
     CryptoContext,
     CURRENT_SUITE,
     generate_dek,
-    wrap_key,
-    unwrap_key,
+    async_wrap_key,
+    async_unwrap_key,
     generate_recovery_code,
     format_recovery_code,
 )
@@ -200,7 +200,7 @@ async def _update_user_password_wrap(
     password: str,
 ) -> None:
     password_hash = (await _hash_password(password.encode("utf-8"))).decode("utf-8")
-    pw_salt, pw_nonce, pw_cipher = wrap_key(dek, password)
+    pw_salt, pw_nonce, pw_cipher = await async_wrap_key(dek, password)
     await db.users.update_password_wrap(
         user_id, password_hash, pw_salt, pw_nonce, pw_cipher
     )
@@ -346,8 +346,8 @@ async def register():
 
         dek = generate_dek()
         recovery_code = generate_recovery_code()
-        pw_salt, pw_nonce, pw_cipher = wrap_key(dek, password)
-        rc_salt, rc_nonce, rc_cipher = wrap_key(dek, recovery_code)
+        pw_salt, pw_nonce, pw_cipher = await async_wrap_key(dek, password)
+        rc_salt, rc_nonce, rc_cipher = await async_wrap_key(dek, recovery_code)
 
         user_id = await db.users.create_user(
             username,
@@ -431,7 +431,7 @@ async def login():
                     user["password_hash"].encode("utf-8"),
                     password.encode("utf-8"),
                 )
-                dek = unwrap_key(
+                dek = await async_unwrap_key(
                     user["dek_pw_cipher"],
                     user["dek_pw_salt"],
                     user["dek_pw_nonce"],
@@ -524,7 +524,7 @@ async def reset_password():
             return await _render_reset_error("Invalid credentials")
 
         try:
-            dek = unwrap_key(
+            dek = await async_unwrap_key(
                 user["dek_rc_cipher"],
                 user["dek_rc_salt"],
                 user["dek_rc_nonce"],
@@ -641,7 +641,7 @@ async def regen_recovery():
         )
 
     recovery_code = generate_recovery_code()
-    rc_salt, rc_nonce, rc_cipher = wrap_key(dek, recovery_code)
+    rc_salt, rc_nonce, rc_cipher = await async_wrap_key(dek, recovery_code)
     db = get_services().db
     await db.users.update_recovery_wrap(user["id"], rc_salt, rc_nonce, rc_cipher)
     epoch = await db.users.get_current_epoch(user["id"])

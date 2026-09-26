@@ -26,7 +26,7 @@ from llamora.app.services.crypto import (
     CURRENT_SUITE,
     CryptoContext,
     generate_dek,
-    wrap_key,
+    async_wrap_key,
     encrypt_message,
     decrypt_message,
     encrypt_vector,
@@ -68,9 +68,9 @@ async def rotate_dek(
     )
 
     # Wrap new DEK under auth channels
-    pw_salt, pw_nonce, pw_cipher = wrap_key(new_dek, password)
+    pw_salt, pw_nonce, pw_cipher = await async_wrap_key(new_dek, password)
     if recovery_code:
-        rc_salt, rc_nonce, rc_cipher = wrap_key(new_dek, recovery_code)
+        rc_salt, rc_nonce, rc_cipher = await async_wrap_key(new_dek, recovery_code)
     else:
         rc_salt = rc_nonce = rc_cipher = None
 
