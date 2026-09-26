@@ -233,40 +233,72 @@ top_p = 0.8
 ```
 
 <details>
-<summary><strong>Using an external API</strong> (OpenAI, etc.)</summary>
+<summary><strong>Using an external API</strong> (Nous, OpenAI, OpenRouter, …)</summary>
 
-Llamora can connect to any hosted OpenAI-compatible endpoint. Set `base_url` and `api_key`, and enable `skip_health_check` to bypass the llama.cpp-specific probe:
-
-```toml
-[default.LLM.upstream]
-skip_health_check = true
-
-[default.LLM.chat]
-base_url = "https://api.openai.com/v1"
-model = "gpt-4o-mini"
-
-[default.LLM.generation]
-stop = []
-```
-
-Store the API key separately in `config/.secrets.toml` (not committed):
-
-```toml
-[default.LLM.chat]
-api_key = "sk-..."
-```
-
-Or equivalently via environment variables:
+Point `upstream.host` at the provider and give it a `model` and an `api_key`. The key is sent as `Authorization: Bearer <key>`; the model as the `model` field of every request. For example, with Nous Research's inference API:
 
 ```bash
+LLAMORA_LLM__UPSTREAM__HOST=https://inference-api.nousresearch.com \
+LLAMORA_LLM__CHAT__API_KEY=sk-nous-... \
+LLAMORA_LLM__CHAT__MODEL=qwen/qwen3.8-omni-flash \
 LLAMORA_LLM__UPSTREAM__SKIP_HEALTH_CHECK=true \
-LLAMORA_LLM__CHAT__BASE_URL=https://api.openai.com/v1 \
-LLAMORA_LLM__CHAT__MODEL=gpt-4o-mini \
-LLAMORA_LLM__CHAT__API_KEY=sk-... \
 uv run llamora-server dev
 ```
 
-Any OpenAI-compatible provider works — substitute `base_url`, `model`, and `api_key` as appropriate.
+`SKIP_HEALTH_CHECK` is optional: `/health` and `/props` are llama.cpp extensions, and when a provider lacks them Llamora notices once and stops probing; `true` just skips the probe from the start.
+
+The same in `config/settings.local.toml`, with the key kept in `config/.secrets.toml` (not committed):
+
+```toml
+# config/settings.local.toml
+[default.LLM.upstream]
+host = "https://inference-api.nousresearch.com"
+skip_health_check = true  # optional
+
+[default.LLM.chat]
+model = "qwen/qwen3.8-omni-flash"
+```
+
+```toml
+# config/.secrets.toml
+[default.LLM.chat]
+api_key = "sk-nous-..."
+```
+
+**Host or base URL, with or without `/v1`.** `upstream.host` is the server *root*; a trailing `/v1` is tolerated (`https://inference-api.nousresearch.com` and `https://inference-api.nousresearch.com/v1` are the same), and chat requests go to `<root>/v1/chat/completions`. If a provider documents an API base that doesn't follow that pattern, set `chat.base_url` to it exactly as documented instead — it is used as-is:
+
+```bash
+LLAMORA_LLM__CHAT__BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai \
+LLAMORA_LLM__CHAT__API_KEY=... \
+LLAMORA_LLM__CHAT__MODEL=gemini-2.5-flash \
+uv run llamora-server dev
+```
+
+The full rules live in [`src/llamora/llm/endpoints.py`](src/llamora/llm/endpoints.py).
+
+</details>
+
+<details>
+<summary><strong>Protecting llama.cpp with an API key</strong></summary>
+
+Start the server with a key and give Llamora the same one. It is sent as `Authorization: Bearer <key>` on every upstream call — chat requests and the `/health` and `/props` probes alike — and `model` is sent as the `model` field of each request:
+
+```bash
+llama-server --api-key sk-local-secret ...
+```
+
+```toml
+# config/.secrets.toml
+[default.LLM.chat]
+api_key = "sk-local-secret"
+```
+
+```bash
+# or via environment variables
+LLAMORA_LLM__CHAT__API_KEY=sk-local-secret \
+LLAMORA_LLM__CHAT__MODEL=my-model \
+uv run llamora-server dev
+```
 
 </details>
 

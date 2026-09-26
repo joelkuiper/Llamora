@@ -37,7 +37,14 @@ class FakeLLM:
     # this many chunks and then an error event (as llama.cpp does mid-stream).
     fail_status: int | None = None
     fail_after: int | None = None
+    # Like ``llama-server --api-key``: every endpoint but /health needs it.
+    api_key: str | None = None
+    # False mimics a hosted API: no llama.cpp /health or /props (404).
+    llamacpp_endpoints: bool = True
+    health_status: int = 200  # e.g. 503 while llama.cpp loads a model
     requests: list[dict[str, Any]] = field(default_factory=list)
+    # (method, path, Authorization header) for every request received.
+    seen: list[tuple[str, str, str | None]] = field(default_factory=list)
     _server: ThreadingHTTPServer | None = None
     _thread: threading.Thread | None = None
 
@@ -72,7 +79,10 @@ class FakeLLM:
         self.chunk_delay = defaults.chunk_delay
         self.fail_status = None
         self.fail_after = None
+        self.llamacpp_endpoints = True
+        self.health_status = 200
         self.requests.clear()
+        self.seen.clear()
 
     def chat_requests(self, *, structured: bool | None = None) -> list[dict[str, Any]]:
         """Recorded chat requests, optionally only (non-)structured ones."""
@@ -140,15 +150,34 @@ def _make_handler(fake: FakeLLM) -> type[BaseHTTPRequestHandler]:
             self.end_headers()
             self.wfile.write(data)
 
+        def _authorized(self) -> bool:
+            fake.seen.append(
+                (self.command, self.path, self.headers.get("Authorization"))
+            )
+            if fake.api_key is None or self.path == "/health":
+                return True
+            if self.headers.get("Authorization") == f"Bearer {fake.api_key}":
+                return True
+            self._send_json({"error": {"message": "Invalid API Key", "code": 401}}, 401)
+            return False
+
         def do_GET(self) -> None:  # noqa: N802
-            if self.path == "/health":
-                self._send_json({"status": "ok"})
+            if not self._authorized():
+                return
+            if self.path in {"/health", "/props"} and not fake.llamacpp_endpoints:
+                self._send_json({"error": "not found"}, status=404)
+            elif self.path == "/health":
+                self._send_json({"status": "ok"}, status=fake.health_status)
             elif self.path == "/props":
                 self._send_json({"n_ctx": 8192, "total_slots": 4})
             else:
                 self._send_json({"error": "not found"}, status=404)
 
         def do_POST(self) -> None:  # noqa: N802
+            if not self._authorized():
+                length = int(self.headers.get("Content-Length") or 0)
+                self.rfile.read(length)
+                return
             if not self.path.rstrip("/").endswith("/chat/completions"):
                 self._send_json({"error": "not found"}, status=404)
                 return

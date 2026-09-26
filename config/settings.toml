@@ -104,10 +104,14 @@ dtype = "float16"
 
 # --- LLM ---------------------------------------------------------------
 [default.LLM.upstream]
+# The model server's root URL; a trailing /v1 is tolerated. Chat requests go
+# to <host>/v1/chat/completions (see src/llamora/llm/endpoints.py), e.g.
+#   http://127.0.0.1:8081                        (local llama.cpp)
+#   https://inference-api.nousresearch.com       (hosted; also set model/api_key)
 host = ""
 parallel = 1
 ctx_size = 8192
-# skip_health_check = false  # set to true when using an external API
+# skip_health_check = false  # /health and /props are optional; true skips probing entirely
 
 [default.LLM.generation]
 n_predict       = 2084
@@ -152,13 +156,12 @@ ratio = 0.1
 min_tokens = 128
 
 [default.LLM.chat]
-endpoint = "/v1/chat/completions"
+endpoint = "/v1/chat/completions"  # chat path under upstream.host
 model = "local"
-# For local llama.cpp (default):
-# base_url = "http://127.0.0.1:8081/v1"
-# For external APIs, set base_url, model, and api_key (in .secrets.toml or via env):
-# base_url = "https://api.openai.com/v1"
-# model = "gpt-4o-mini"
+# Alternatively, the provider's API base exactly as documented; used as-is
+# for chat (host, if also set, is only used for the llama.cpp probes):
+# base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
+# Sent as "Authorization: Bearer <api_key>" on every upstream request:
 # api_key = ""  # prefer .secrets.toml or LLAMORA_LLM__CHAT__API_KEY
 timeout_seconds = 30.0
 max_retries = 2

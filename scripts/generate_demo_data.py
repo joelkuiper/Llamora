@@ -22,6 +22,7 @@ from openai import AsyncOpenAI
 from rich.box import ROUNDED
 from rich.table import Table
 
+from llamora.llm.endpoints import resolve_endpoints
 from llamora.settings import settings
 from demo_data_utils import (
     coerce_bool,
@@ -606,14 +607,14 @@ async def _generate_narrative_timeline(
 
 
 def _resolve_llm_base_url() -> str:
-    base_url = settings.get("LLM.chat.base_url")
-    if base_url:
-        return str(base_url).rstrip("/")
-    host = settings.get("LLM.upstream.host") or ""
-    host = str(host).strip().rstrip("/")
-    if not host:
-        raise RuntimeError("LLM.chat.base_url or LLM.upstream.host must be set")
-    return f"{host}/v1"
+    try:
+        return resolve_endpoints(
+            host=settings.get("LLM.upstream.host"),
+            base_url=settings.get("LLM.chat.base_url"),
+            endpoint=settings.get("LLM.chat.endpoint"),
+        ).api_base
+    except ValueError as exc:
+        raise RuntimeError(str(exc)) from exc
 
 
 def _build_llm_client() -> AsyncOpenAI:

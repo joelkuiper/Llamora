@@ -34,7 +34,9 @@ def free_port() -> int:
         return sock.getsockname()[1]
 
 
-def write_config(config_dir: Path, *, db_path: Path, llm_url: str) -> None:
+def write_config(
+    config_dir: Path, *, db_path: Path, llm_url: str, extra: str = ""
+) -> None:
     """Build an isolated config dir: repo defaults + test-only overrides.
 
     The developer's ``config/settings.local.toml`` and ``.secrets.toml`` are
@@ -55,7 +57,8 @@ host = "{llm_url}"
 
 [default.AUTH]
 max_login_attempts = 1000
-""",
+"""
+        + extra,
         encoding="utf-8",
     )
 
@@ -84,15 +87,30 @@ class LiveServer:
 
 
 def start_server(
-    workdir: Path, *, llm_url: str, now: datetime | None = None
+    workdir: Path,
+    *,
+    llm_url: str,
+    now: datetime | None = None,
+    extra_config: str = "",
+    extra_env: dict[str, str] | None = None,
 ) -> LiveServer:
-    """Start an isolated server; ``now`` moves its clock (it keeps ticking)."""
+    """Start an isolated server.
+
+    ``now`` moves its clock (it keeps ticking); ``extra_config`` is appended to
+    its settings.local.toml; ``extra_env`` adds (``LLAMORA_*``) variables.
+    """
     config_dir = workdir / "config"
-    write_config(config_dir, db_path=workdir / "state.sqlite3", llm_url=llm_url)
+    write_config(
+        config_dir,
+        db_path=workdir / "state.sqlite3",
+        llm_url=llm_url,
+        extra=extra_config,
+    )
 
     env = {k: v for k, v in os.environ.items() if not k.startswith("LLAMORA_")}
     env["LLAMORA_CONFIG_DIR"] = str(config_dir)
     env["PYTHONUNBUFFERED"] = "1"
+    env.update(extra_env or {})
     if now is not None:
         assert now.tzinfo is not None, "server clock needs an aware datetime"
         env["LLAMORA_TEST_NOW"] = now.isoformat()

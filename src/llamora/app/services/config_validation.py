@@ -8,6 +8,7 @@ from collections.abc import Iterable
 
 from llamora.settings import settings
 from llamora.app.util.number import coerce_float, coerce_int
+from llamora.llm.endpoints import resolve_endpoints
 
 
 def _normalise_text(value: object | None) -> str:
@@ -31,14 +32,14 @@ def _get_value(mapping: object, name: str) -> object | None:
 
 def _validate_llm_upstream() -> Iterable[str]:
     upstream = settings.get("LLM.upstream")
-    host = _normalise_text(_get_value(upstream, "host"))
-    base_url = _normalise_text(settings.get("LLM.chat.base_url"))
-
-    if not host and not base_url:
-        yield (
-            "Configure an OpenAI-compatible upstream by setting "
-            "LLAMORA_LLM__UPSTREAM__HOST (or LLM.upstream.host)."
+    try:
+        resolve_endpoints(
+            host=_normalise_text(_get_value(upstream, "host")),
+            base_url=_normalise_text(settings.get("LLM.chat.base_url")),
+            endpoint=_normalise_text(settings.get("LLM.chat.endpoint")),
         )
+    except ValueError as exc:
+        yield str(exc)
 
 
 def _validate_llm_chat_settings() -> Iterable[str]:

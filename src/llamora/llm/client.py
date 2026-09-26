@@ -108,19 +108,13 @@ class LLMClient:
         }
         self.ctx_size = upstream.ctx_size
         self.upstream_props = upstream.upstream_props
-        self._chat_endpoint = self._normalize_chat_endpoint(
-            settings.get("LLM.chat.endpoint", "/v1/chat/completions")
-        )
-        base_url = settings.get("LLM.chat.base_url")
-        if not base_url:
-            base_url = self._chat_base_url(self.upstream_url, self._chat_endpoint)
         from llamora.app.util.number import parse_positive_int, parse_positive_float
 
         timeout = parse_positive_float(settings.get("LLM.chat.timeout_seconds"))
         max_retries = parse_positive_int(settings.get("LLM.chat.max_retries"))
         self._openai = AsyncOpenAI(
             api_key=settings.get("LLM.chat.api_key") or "local",
-            base_url=str(base_url),
+            base_url=upstream.endpoints.api_base,
             max_retries=max_retries if max_retries is not None else 0,
             timeout=timeout,
         )
@@ -141,23 +135,6 @@ class LLMClient:
         self._history_token_cache: LRUCache[tuple[str, str], tuple[int, ...]] = (
             LRUCache(maxsize=HISTORY_TOKEN_CACHE_SIZE)
         )
-
-    @staticmethod
-    def _normalize_chat_endpoint(raw: Any) -> str:
-        endpoint = str(raw or "/v1/chat/completions").strip()
-        if not endpoint.startswith("/"):
-            endpoint = f"/{endpoint}"
-        return endpoint
-
-    @staticmethod
-    def _chat_base_url(upstream_url: str, endpoint: str) -> str:
-        normalized = endpoint.strip()
-        suffix = "/chat/completions"
-        base_path = normalized
-        if normalized.endswith(suffix):
-            base_path = normalized[: -len(suffix)] or "/v1"
-        upstream = upstream_url.rstrip("/")
-        return f"{upstream}{base_path}"
 
     def _extract_stream_delta(self, chunk: Any) -> str | None:
         choices = getattr(chunk, "choices", None)
