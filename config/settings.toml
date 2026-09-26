@@ -96,6 +96,22 @@ thumb = 480
 display = 2048
 full = 4096
 
+# --- Support ------------------------------------------------------------
+# Where to find help, shown under "Need someone to talk to?" and the only
+# resources the model may mention when an entry signals a crisis (it never
+# invents numbers). Each needs a name and a phone number and/or a URL. Set
+# your own region's lines in settings.local.toml, e.g. for the Netherlands:
+#
+# [[default.SUPPORT.resources]]
+# name = "113 Zelfmoordpreventie"
+# phone = "0800-0113"
+# url = "https://www.113.nl"
+# note = "Free and anonymous, day and night, by phone or chat."
+[[default.SUPPORT.resources]]
+name = "Find A Helpline"
+url = "https://findahelpline.com"
+note = "Free, confidential support lines in your country, by phone, text or chat."
+
 # --- Migrations ---------------------------------------------------------
 [default.MIGRATIONS]
 path = "migrations"

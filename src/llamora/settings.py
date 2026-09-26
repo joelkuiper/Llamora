@@ -117,6 +117,15 @@ DEFAULTS: dict[str, Any] = {
         "busy_timeout": 5000,
         "mmap_size": 10 * 1024 * 1024,
     },
+    "SUPPORT": {
+        "resources": [
+            {
+                "name": "Find A Helpline",
+                "url": "https://findahelpline.com",
+                "note": "Free, confidential support lines in your country, by phone, text or chat.",
+            }
+        ],
+    },
     "IMAGES": {
         "path": "images",
         "max_upload_bytes": 20 * 1024 * 1024,

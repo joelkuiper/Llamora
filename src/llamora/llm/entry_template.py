@@ -9,6 +9,7 @@ from typing import Any, Iterable, Mapping, Sequence
 from llamora.app.services.time import humanize
 
 from .prompt_templates import render_prompt_template
+from .support import support_resources
 from .tokenizers.tokenizer import estimate_tokens
 
 
@@ -171,6 +172,7 @@ def _build_system_message(
     rendered = render_prompt_template(
         "system.txt.j2",
         context_lines=context_lines,
+        support_resources=support_resources(),
     )
     return rendered.strip()
 
@@ -189,6 +191,7 @@ def _build_opening_system_message(
         context_lines=context_lines,
         is_new=is_new,
         has_no_activity=has_no_activity,
+        support_resources=support_resources(),
     )
     return rendered.strip()
 

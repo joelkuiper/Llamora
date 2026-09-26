@@ -1,0 +1,28 @@
+{#- Where to find help (SUPPORT.resources). Always one click away from the
+    header, whatever the model does. -#}
+<div class="profile-section support-section">
+  <h3>Need someone to talk to?</h3>
+  <p class="profile-note">
+    If things feel heavy, you don't have to carry them alone. Reach out to
+    someone you trust, or to one of these. They're free and confidential.
+  </p>
+  <ul class="support-resources" role="list">
+    {% for resource in support_resources %}
+    <li class="support-resource">
+      <span class="support-resource__name">{{ resource.name }}</span>
+      {% if resource.phone %}
+      <span class="support-resource__phone">{{ resource.phone }}</span>
+      {% endif %}
+      {% if resource.url %}
+      <a class="support-resource__link" href="{{ resource.url }}" target="_blank" rel="noopener noreferrer">{{ resource.url | replace('https://', '') | replace('http://', '') }}</a>
+      {% endif %}
+      {% if resource.note %}
+      <span class="support-resource__note">{{ resource.note }}</span>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="profile-note support-emergency">
+    If you are in immediate danger, contact your local emergency number now.
+  </p>
+</div>

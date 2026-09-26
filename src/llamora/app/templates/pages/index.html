@@ -124,6 +124,15 @@
                   data-action="toggle-search-compact">
             <span class="icon-mask icon-search" aria-hidden="true"></span>
           </button>
+          <a id="support-btn"
+             href="{{ url_for('auth.profile', tab='support') }}"
+             hx-get="{{ url_for('auth.profile', tab='support') }}"
+             hx-target="#profile-modal-root"
+             hx-swap="innerHTML"
+             class="icon-btn"
+             aria-label="Need someone to talk to?" data-tooltip-title="Need someone to talk to?">
+            <span class="icon-mask icon-heart-handshake" aria-hidden="true"></span>
+          </a>
           <a id="profile-btn"
              href="{{ url_for('auth.profile') }}"
              hx-get="{{ url_for('auth.profile') }}"

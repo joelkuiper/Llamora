@@ -13,6 +13,7 @@ from quart import (
 )
 from typing import Any, Mapping
 from nacl import pwhash
+from llamora.llm.support import support_resources
 from llamora.app.services.auth_helpers import (
     invalidate_user_snapshot,
     login_required,
@@ -234,6 +235,7 @@ PROFILE_TABS: dict[str, str] = {
     "security": "components/profile/tabs/security.html",
     "data": "components/profile/tabs/data.html",
     "privacy": "components/profile/tabs/privacy.html",
+    "support": "components/profile/tabs/support.html",
 }
 
 
@@ -244,12 +246,14 @@ def _resolve_profile_tab(tab: str | None) -> str:
 
 async def _render_profile_tab(user: Mapping[str, Any], tab: str, **context):
     context["user"] = user
+    context["support_resources"] = support_resources()
     template = PROFILE_TABS[_resolve_profile_tab(tab)]
     return await render_template(template, **context)
 
 
 async def _render_profile_modal(user: Mapping[str, Any], tab: str, **context):
     context["user"] = user
+    context["support_resources"] = support_resources()
     active_tab = _resolve_profile_tab(tab)
     context["active_tab"] = active_tab
     return await render_template("components/profile/profile_modal.html", **context)

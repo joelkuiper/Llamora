@@ -11,6 +11,7 @@ from pathlib import Path
 from llamora.settings import settings
 from llamora.app.util.number import coerce_float, coerce_int
 from llamora.llm.endpoints import resolve_endpoints
+from llamora.llm.support import parse_resources
 from llamora.llm.vision import parse_vision_mode
 
 
@@ -195,6 +196,18 @@ def _validate_llm_vision() -> Iterable[str]:
             yield f"LLM.vision.{name} must be an integer between {low} and {high}."
 
 
+def _validate_support() -> Iterable[str]:
+    raw = settings.get("SUPPORT.resources")
+    if raw is None:
+        return
+    items = list(raw) if isinstance(raw, (list, tuple)) else None
+    if items is None:
+        yield "SUPPORT.resources must be a list of tables."
+        return
+    if len(parse_resources(items)) != len(items):
+        yield "Each SUPPORT.resources entry needs a name and a phone and/or url."
+
+
 def validate_settings() -> list[str]:
     """Return a list of configuration validation error messages."""
 
@@ -206,6 +219,7 @@ def validate_settings() -> list[str]:
     errors.extend(_validate_session_settings())
     errors.extend(_validate_images())
     errors.extend(_validate_llm_vision())
+    errors.extend(_validate_support())
     return errors
 
 

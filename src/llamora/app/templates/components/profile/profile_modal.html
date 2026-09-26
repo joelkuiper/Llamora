@@ -55,6 +55,18 @@
         hx-swap="innerHTML">
         <span class="profile-modal__tab-label">Privacy</span>
       </button>
+      <button
+        class="profile-modal__tab{% if active_tab == 'support' %} is-active{% endif %}"
+        role="tab"
+        aria-selected="{{ 'true' if active_tab == 'support' else 'false' }}"
+        data-profile-tab="support"
+        hx-get="{{ url_for('auth.profile_tab', tab='support') }}"
+        hx-target="#profile-modal-content"
+        hx-sync="#profile-modal-content:replace"
+        hx-indicator="#profile-modal-content"
+        hx-swap="innerHTML">
+        <span class="profile-modal__tab-label">Support</span>
+      </button>
     </nav>
     <section id="profile-modal-content" class="profile-modal__content" role="tabpanel">
       {% include 'components/profile/tabs/' ~ active_tab ~ '.html' %}

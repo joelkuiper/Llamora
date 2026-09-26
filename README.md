@@ -342,6 +342,16 @@ max_edge = 1024
 
 </details>
 
+**Support resources.** "Need someone to talk to?" in the header lists where to find help, and when an entry signals a crisis the model is told to respond plainly, ask whether the writer is safe, and point to these (and only these, so it never invents a number). The default is the international directory [findahelpline.com](https://findahelpline.com); add your region's lines in `config/settings.local.toml`:
+
+```toml
+[[default.SUPPORT.resources]]
+name = "113 Zelfmoordpreventie"
+phone = "0800-0113"
+url = "https://www.113.nl"
+note = "Free and anonymous, day and night, by phone or chat."
+```
+
 **Prompt templates** are Jinja2 files in `src/llamora/llm/templates` (`system.txt.j2`, `opening_system.txt.j2`, `opening_recap.txt.j2`). Edit them directly — no Python changes needed. Changes take effect on restart. Override the directory with `LLAMORA_PROMPTS__TEMPLATE_DIR`.
 
 ---
