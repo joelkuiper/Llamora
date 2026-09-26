@@ -27,8 +27,8 @@ importers:
         specifier: ^2.2.4
         version: 2.2.4
       htmx.org:
-        specifier: ^1.9.12
-        version: 1.9.12
+        specifier: ^2.0.11
+        version: 2.0.11
       hyperlist:
         specifier: ^1.0.0
         version: 1.0.0
@@ -281,11 +281,8 @@ packages:
   htmx-ext-sse@2.2.4:
     resolution: {integrity: sha512-LJmxVhykyflBWgh5PvbRidcyuqMHlgfajmmzumvKctv9puvsufeH6OaejSMZTNTnEI8O2wXXn4ZZtBdpEMqmEQ==}
 
-  htmx.org@1.9.12:
-    resolution: {integrity: sha512-VZAohXyF7xPGS52IM8d1T1283y+X4D+Owf3qY1NZ9RuBypyu9l8cGsxUMAG5fEAb/DhT7rDoJ9Hpu5/HxFD3cw==}
-
-  htmx.org@2.0.8:
-    resolution: {integrity: sha512-fm297iru0iWsNJlBrjvtN7V9zjaxd+69Oqjh4F/Vq9Wwi2kFisLcrLCiv5oBX0KLfOX/zG8AUo9ROMU5XUB44Q==}
+  htmx.org@2.0.11:
+    resolution: {integrity: sha512-Thx/WtpeOQqSrqBCw/A1cwGJGg4UrVa3+sW0GmrM3p4gJgO89ecH4qtbnyzDDWFvBTqjnIMCgELTNt636dtamA==}
 
   hyperlist@1.0.0:
     resolution: {integrity: sha512-1qAjO29EJW/mPyqY+9wFjruD2YWur1dPsPYmt9RvMX6P+8Cr2UmT75MCWjjK+1/4Jxc3sm/G3Kr8DzGgEDRG+Q==}
@@ -474,15 +471,13 @@ snapshots:
 
   htmx-ext-response-targets@2.0.4:
     dependencies:
-      htmx.org: 2.0.8
+      htmx.org: 2.0.11
 
   htmx-ext-sse@2.2.4:
     dependencies:
-      htmx.org: 2.0.8
+      htmx.org: 2.0.11
 
-  htmx.org@1.9.12: {}
-
-  htmx.org@2.0.8: {}
+  htmx.org@2.0.11: {}
 
   hyperlist@1.0.0: {}
 
