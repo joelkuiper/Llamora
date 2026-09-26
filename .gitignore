@@ -229,3 +229,5 @@ frontend/dist/
 scripts/bin/esbuild-*
 
 .claude
+# Playwright artifacts
+test-results/

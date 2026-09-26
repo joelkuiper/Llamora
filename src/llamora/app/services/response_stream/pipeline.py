@@ -311,6 +311,14 @@ class ResponsePipeline:
         """Fetch and parse streamed chunks, notifying visibility updates."""
 
         async def consume() -> str:
+            try:
+                return await consume_chunks()
+            finally:
+                # Close the LLM stream deterministically so its slot is released
+                # now, not whenever the suspended generator is collected.
+                await self._close_stream()
+
+        async def consume_chunks() -> str:
             full_response = ""
             async for chunk in self._fetch_chunks():
                 text = chunk if isinstance(chunk, str) else str(chunk)
@@ -339,6 +347,17 @@ class ResponsePipeline:
                     return await consume()
             return await asyncio.wait_for(consume(), self._timeout)
         return await consume()
+
+    async def _close_stream(self) -> None:
+        aclose = getattr(self._stream_iter, "aclose", None)
+        if aclose is None:
+            return
+        try:
+            await aclose()
+        except Exception:  # pragma: no cover - defensive
+            logger.debug(
+                "Failed to close LLM stream for %s", self._entry_id, exc_info=True
+            )
 
     async def _fetch_chunks(self):
         async for chunk in self._stream_iter:

@@ -30,25 +30,9 @@ function resolveScope(context) {
   return document;
 }
 
+// htmx and its extensions are loaded by <script defer> tags in the layout.
 async function ensureVendors() {
-  const vendorModule = await importOnce("vendors", () => import("../vendor/setup-globals.js"));
-  const htmx = vendorModule?.htmx ?? globalThis.htmx;
-
-  if (htmx) {
-    await importOnce("htmx-ext-sse", async () => {
-      if (htmx.findExtension?.("sse") || htmx.extensions?.sse) return null;
-      return import("../vendor/htmx-ext-sse.js");
-    });
-
-    await importOnce("htmx-ext-response-targets", async () => {
-      if (htmx.findExtension?.("response-targets") || htmx.extensions?.["response-targets"]) {
-        return null;
-      }
-      return import("../vendor/htmx-ext-response-targets.js");
-    });
-  }
-
-  return vendorModule;
+  return importOnce("vendors", () => import("../vendor/setup-globals.js"));
 }
 
 async function ensureShell() {

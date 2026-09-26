@@ -1,4 +1,5 @@
 import { registerHydrationOwner } from "./services/hydration-owners.js";
+import { runWhenDocumentReady } from "./utils/dom-ready.js";
 
 function updateStrength(container) {
   const meter = container.querySelector(".strength-meter");
@@ -21,7 +22,15 @@ function refreshInContext(context = document) {
   scope.querySelectorAll(".password-strength").forEach(updateStrength);
 }
 
-document.addEventListener("DOMContentLoaded", refreshAll);
+runWhenDocumentReady(refreshAll);
+// The strength meter is re-rendered by an htmx swap on every keystroke; auth
+// pages have no app:rehydrate cycle, so react to the swap directly.
+document.addEventListener("htmx:afterSwap", (event) => {
+  const target = event.detail?.target;
+  if (target instanceof Element && target.matches(".password-strength")) {
+    updateStrength(target);
+  }
+});
 registerHydrationOwner({
   id: "password-strength",
   selector: ".password-strength",

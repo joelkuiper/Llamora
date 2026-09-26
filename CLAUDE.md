@@ -25,6 +25,13 @@ uv run pyright                         # type check
 # Tests
 uv run pytest                          # run all tests
 uv run pytest path/to/test.py -k name  # single test
+uv run pytest -m "not e2e"             # skip browser tests
+
+# End-to-end (Playwright; first time: uv run playwright install chromium)
+uv run pytest tests/e2e                # isolated server + temp DB + fake LLM
+uv run pytest tests/e2e --headed --slowmo 300   # watch it run
+uv run pytest tests/e2e --e2e-no-build # skip the prod asset build
+uv run playwright show-trace test-results/<test>/trace.zip  # failure traces
 
 # Frontend assets
 uv run python scripts/build_assets.py watch --mode dev   # dev bundle + watch

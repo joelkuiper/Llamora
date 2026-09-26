@@ -115,7 +115,11 @@ async def get_entries_context(
         is_future = date_cls.fromisoformat(date) > today_date
     except ValueError:
         is_future = False
-    pending_entry_id = None
+    # Replies still generating (e.g. the page was reloaded mid-stream) are
+    # rendered as live streams that reattach to the running generation.
+    streaming_replies = services.llm_service.response_stream_manager.in_flight_replies(
+        str(user["id"]), date
+    )
 
     opening_entries: list[dict[str, Any]] = []
     regular_entries: list[dict[str, Any]] = []
@@ -132,7 +136,7 @@ async def get_entries_context(
 
     return {
         "entries": entries,
-        "pending_entry_id": pending_entry_id,
+        "streaming_replies": streaming_replies,
         "is_today": is_today,
         "opening_stream": opening_stream,
         "min_date": min_date,

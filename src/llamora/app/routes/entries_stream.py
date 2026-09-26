@@ -32,7 +32,11 @@ from llamora.app.services.entry_helpers import (
     normalize_llm_config,
     start_stream_session,
 )
-from llamora.app.services.response_stream.manager import StreamCapacityError
+from llamora.app.services.response_stream.manager import (
+    StreamCapacityError,
+    is_reply_stream_of,
+    new_reply_stream_id,
+)
 from llamora.app.services.tag_recall import build_tag_recall_context
 from llamora.app.services.time import get_timezone
 from llamora.llm.entry_template import (
@@ -211,6 +215,7 @@ async def _get_or_start_pending_response(
     db,
     enc_ctx,
     entry_id: str,
+    stream_id: str,
     actual_date: str,
     normalized_date: str,
     history: list[dict[str, object]],
@@ -218,7 +223,8 @@ async def _get_or_start_pending_response(
     llm_ctx: dict[str, object],
     created_at: str | None,
 ):
-    pending_response = manager.get(entry_id, enc_ctx)
+    # Reattach only to the same generation (e.g. after a reload mid-stream).
+    pending_response = manager.get(stream_id, enc_ctx)
     if pending_response:
         return pending_response
 
@@ -260,7 +266,8 @@ async def _get_or_start_pending_response(
     )
     return await start_stream_session(
         manager=manager,
-        entry_id=entry_id,
+        entry_id=stream_id,
+        reply_to=entry_id,
         date=actual_date or normalized_date,
         history=history_for_stream,
         ctx=enc_ctx,
@@ -286,7 +293,9 @@ async def stop_response(entry_id: str):
         raise
 
     manager = _entry_stream_manager()
-    handled, was_pending = await manager.stop(entry_id, enc_ctx)
+    stream_id = request.args.get("stream")
+    target = stream_id if is_reply_stream_of(stream_id, entry_id) else entry_id
+    handled, was_pending = await manager.stop(str(target), enc_ctx)
     if not was_pending:
         logger.debug("No pending response for %s, aborting active stream", entry_id)
     if not handled:
@@ -363,6 +372,12 @@ async def sse_response(entry_id: str, date: str):
     )
     params = dict(params_raw) if params_raw is not None else None
 
+    # Each Respond mints its own stream id; an unknown or missing one means a
+    # new generation, never a replay of an earlier reply to the same entry.
+    stream_id = request.args.get("stream")
+    if not is_reply_stream_of(stream_id, entry_id):
+        stream_id = new_reply_stream_id(entry_id)
+
     services = get_services()
     db = services.db
     manager = services.llm_service.response_stream_manager
@@ -384,6 +399,7 @@ async def sse_response(entry_id: str, date: str):
             db=db,
             enc_ctx=enc_ctx,
             entry_id=entry_id,
+            stream_id=str(stream_id),
             actual_date=actual_date,
             normalized_date=normalized_date,
             history=history,

@@ -124,10 +124,11 @@ class LLMClient:
             max_retries=max_retries if max_retries is not None else 0,
             timeout=timeout,
         )
-        self._active_streams: dict[str, asyncio.Task[None]] = {}
+        # Keyed by entry id, but tracked per task: two generations for the same
+        # id can overlap (e.g. a day opening reopened while the abandoned one is
+        # still winding down), and each must release only its own resources.
+        self._active_streams: dict[str, set[asyncio.Task[None]]] = {}
         self._streams_lock = asyncio.Lock()
-        self._active_slots: dict[str, int] = {}
-        self._slots_released_by_abort: set[str] = set()
         self.parallel_slots = max(1, getattr(upstream, "parallel_slots", 1))
         self._slot_semaphore = asyncio.Semaphore(self.parallel_slots)
         self._slot_queue: asyncio.LifoQueue[int] = asyncio.LifoQueue()
@@ -195,7 +196,7 @@ class LLMClient:
 
     async def aclose(self) -> None:
         async with self._streams_lock:
-            tasks = list(self._active_streams.values())
+            tasks = [task for group in self._active_streams.values() for task in group]
             self._active_streams.clear()
         for task in tasks:
             task.cancel()
@@ -621,43 +622,38 @@ class LLMClient:
         )
 
     async def abort(self, entry_id: str) -> bool:
-        slot_id: int | None = None
         async with self._streams_lock:
-            task = self._active_streams.pop(entry_id, None)
-            slot_id = self._active_slots.pop(entry_id, None)
-            if slot_id is not None:
-                self._slots_released_by_abort.add(entry_id)
-        if slot_id is not None:
-            self._slot_queue.put_nowait(slot_id)
-            self._slot_semaphore.release()
-        if task is not None:
-            self.logger.info("Aborting stream %s", entry_id)
+            tasks = self._active_streams.pop(entry_id, set())
+        if not tasks:
+            self.logger.debug("No active stream to abort for %s", entry_id)
+            return False
+        self.logger.info("Aborting stream %s", entry_id)
+        for task in tasks:
+            task.cancel()
+        for task in tasks:
             try:
-                task.cancel()
                 with suppress(asyncio.CancelledError):
                     await task
             except Exception:
                 self.logger.exception("Error closing stream %s", entry_id)
-            return True
-        if slot_id is not None:
-            self.logger.info("Cancelled pending slot for %s", entry_id)
-            return True
-        self.logger.debug("No active stream to abort for %s", entry_id)
-        return False
+        # Each stream's slot is released by its own _acquire_slot on unwind.
+        return True
 
     @asynccontextmanager
     async def _track_stream(
         self, entry_id: str, task: asyncio.Task[None]
     ) -> AsyncGenerator[None, None]:
         async with self._streams_lock:
-            self._active_streams[entry_id] = task
+            self._active_streams.setdefault(entry_id, set()).add(task)
         try:
             yield
         finally:
             async with self._streams_lock:
-                current = self._active_streams.get(entry_id)
-                if current is task:
-                    self._active_streams.pop(entry_id, None)
+                group = self._active_streams.get(entry_id)
+                if group is not None:
+                    group.discard(task)
+                    if not group:
+                        self._active_streams.pop(entry_id, None)
 
     @asynccontextmanager
     async def _acquire_slot(self, entry_id: str) -> AsyncGenerator[int, None]:
@@ -665,19 +661,9 @@ class LLMClient:
         slot_id: int | None = None
         try:
             slot_id = await self._slot_queue.get()
-            async with self._streams_lock:
-                self._active_slots[entry_id] = slot_id
             yield slot_id
         finally:
-            release_slot = True
-            async with self._streams_lock:
-                if entry_id in self._slots_released_by_abort:
-                    release_slot = False
-                    self._slots_released_by_abort.discard(entry_id)
-                else:
-                    self._active_slots.pop(entry_id, None)
-            if slot_id is not None and release_slot:
+            # Released exactly once, by the stream that acquired it.
+            if slot_id is not None:
                 self._slot_queue.put_nowait(slot_id)
-                self._slot_semaphore.release()
-            elif release_slot:
-                self._slot_semaphore.release()
+            self._slot_semaphore.release()

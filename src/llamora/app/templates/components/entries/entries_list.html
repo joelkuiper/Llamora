@@ -13,5 +13,5 @@
 </div>
 {% endif %}
 {% for item in entries or [] -%}
-{{ render_entry(item.entry, day, is_today, responses=item.responses, animate_entries=animate_entries) }}
+{{ render_entry(item.entry, day, is_today, responses=item.responses, animate_entries=animate_entries, streaming_stream_id=(streaming_replies|default({})).get(item.entry.id)) }}
 {%- endfor %}

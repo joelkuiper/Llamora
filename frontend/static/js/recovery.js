@@ -1,4 +1,7 @@
-document.addEventListener("DOMContentLoaded", () => {
+import { runWhenDocumentReady } from "./utils/dom-ready.js";
+
+// Loaded via dynamic import, often after DOMContentLoaded has already fired.
+runWhenDocumentReady(() => {
   const codeEl = document.getElementById("recovery");
   const copyBtn = document.getElementById("copy");
   const downloadBtn = document.getElementById("download");

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import secrets
 import time
 from heapq import heappop, heappush
 from itertools import count
-from collections import deque
 from collections.abc import AsyncIterator, Callable
 from contextlib import suppress
 
@@ -38,7 +38,7 @@ class PendingResponse(ResponsePipelineCallbacks):
         history: list[dict],
         llm: LLMClient,
         db,
-        on_cleanup: Callable[[str], None],
+        on_cleanup: Callable[["PendingResponse"], None],
         config: LLMStreamConfig,
         params: dict | None = None,
         context: dict | None = None,
@@ -69,7 +69,8 @@ class PendingResponse(ResponsePipelineCallbacks):
         self.cancelled = False
         self.created_at = time.monotonic()
         self.assistant_entry_id: str | None = None
-        self._chunks: deque[str] = deque()
+        # Append-only record of everything streamed; subscribers read by offset.
+        self._transcript = ""
         self._total_len = 0
         self._cleanup = on_cleanup
         self._cleanup_called = False
@@ -79,17 +80,21 @@ class PendingResponse(ResponsePipelineCallbacks):
 
         async def _stream_response() -> AsyncIterator[str]:
             first_chunk = True
-            async for chunk in llm.stream_response(
+            upstream = llm.stream_response(
                 entry_id,
                 history,
                 params,
                 context,
                 messages=messages,
-            ):
-                if first_chunk and isinstance(chunk, str):
-                    chunk = chunk.lstrip()
-                    first_chunk = False
-                yield chunk
+            )
+            try:
+                async for chunk in upstream:
+                    if first_chunk and isinstance(chunk, str):
+                        chunk = chunk.lstrip()
+                        first_chunk = False
+                    yield chunk
+            finally:
+                await upstream.aclose()
 
         self._stream = _stream_response()
 
@@ -157,7 +162,7 @@ class PendingResponse(ResponsePipelineCallbacks):
         self._visible_total = total
         async with self._cond:
             if chunk:
-                self._chunks.append(chunk)
+                self._transcript += chunk
             self._store_total_text(total)
             self._cond.notify_all()
 
@@ -172,7 +177,7 @@ class PendingResponse(ResponsePipelineCallbacks):
             if final_text:
                 remaining = final_text[self._total_len :]
                 if remaining:
-                    self._chunks.append(remaining)
+                    self._transcript += remaining
             self._store_total_text(final_text)
             self.meta = result.meta
             self.done = True
@@ -182,7 +187,7 @@ class PendingResponse(ResponsePipelineCallbacks):
         if not self._cleanup_called:
             self._cleanup_called = True
             try:
-                self._cleanup(self.entry_id)
+                self._cleanup(self)
             except Exception:  # pragma: no cover - defensive
                 logger.exception("Cleanup callback failed for %s", self.entry_id)
 
@@ -239,22 +244,41 @@ class PendingResponse(ResponsePipelineCallbacks):
             pass
 
     async def stream(self):
+        """Yield the reply from its start, then live chunks until done.
+
+        Any number of subscribers may attach, at any time: a client that
+        reconnects mid-generation first catches up on the text so far.
+        """
+        sent = 0
         while True:
             async with self._cond:
-                while not self._chunks and not self.done:
+                while len(self._transcript) == sent and not self.done:
                     await self._cond.wait()
-                if self._chunks:
-                    chunk = self._chunks.popleft()
-                else:
-                    if self.done:
-                        break
-                    continue
-            yield chunk
+                chunk = self._transcript[sent:]
+                sent = len(self._transcript)
+                finished = self.done
+            if chunk:
+                yield chunk
+            if finished:
+                break
 
     def _store_total_text(self, total: str) -> None:
         self.text = total
         self._total_len = len(total)
         self._visible_total = total
+
+
+def new_reply_stream_id(entry_id: str) -> str:
+    """A fresh id for one reply generation to ``entry_id``.
+
+    Every Respond starts a new generation, so replies are keyed per generation
+    rather than per entry; the entry id prefix ties the stream to its entry.
+    """
+    return f"{entry_id}.{secrets.token_hex(8)}"
+
+
+def is_reply_stream_of(stream_id: str | None, entry_id: str) -> bool:
+    return bool(stream_id) and str(stream_id).startswith(f"{entry_id}.")
 
 
 class StreamCapacityError(RuntimeError):
@@ -290,7 +314,9 @@ class ResponseStreamManager:
         )
         self._queue.add_listener(self._handle_queue_change)
         self._queue_hooks: set[Callable[[dict[str, int]], None]] = set()
-        self._active_ids: set[str] = set()
+        # Tracked by instance, not entry id: two generations for the same id
+        # can overlap, and each occupies (and must release) its own slot.
+        self._active: set[PendingResponse] = set()
         self._queue_consumer: asyncio.Task[None] | None = None
         self._queue_loop: asyncio.AbstractEventLoop | None = None
         self._slot_event: asyncio.Event | None = None
@@ -363,7 +389,7 @@ class ResponseStreamManager:
             except Exception:  # pragma: no cover - defensive
                 logger.exception("Failed to cancel stale pending response %s", entry_id)
             finally:
-                self._on_pending_cleanup(entry_id)
+                pending._invoke_cleanup()
 
         loop = pending._task.get_loop()
         if loop.is_running():
@@ -378,7 +404,27 @@ class ResponseStreamManager:
                 "Event loop already closed while cancelling stale response %s",
                 entry_id,
             )
-            self._on_pending_cleanup(entry_id)
+            pending._invoke_cleanup()
+
+    def in_flight_replies(self, user_id: str, date: str) -> dict[str, str]:
+        """Map entry id -> stream id for replies of ``user_id`` still generating on ``date``.
+
+        Used to render a reattaching stream when a page loads mid-generation.
+        """
+        live = sorted(
+            (
+                pending
+                for pending in self._pending.values()
+                if not pending.done
+                and not pending.cancelled
+                and pending.reply_to
+                and pending.date == date
+                and pending.uid == user_id
+                and not pending.meta_extra.get("auto_opening")
+            ),
+            key=lambda pending: pending.created_at,
+        )
+        return {str(pending.reply_to): pending.entry_id for pending in live}
 
     def start_stream(
         self,
@@ -422,7 +468,7 @@ class ResponseStreamManager:
         max_slots = self._max_slots()
         queue_depth = len(self._queue)
 
-        if len(self._active_ids) >= max_slots:
+        if len(self._active) >= max_slots:
             if self._queue_limit and queue_depth >= self._queue_limit:
                 retry_after = self._estimate_retry_after(queue_depth + 1, max_slots)
                 raise StreamCapacityError(retry_after, queue_depth=queue_depth)
@@ -494,18 +540,34 @@ class ResponseStreamManager:
             logger.debug("Cancelling pending response %s", entry_id)
             await pending.cancel()
             return True, True
+        # No stream id given: stop every in-flight reply to this entry.
+        replies = [
+            candidate
+            for candidate in list(self._pending.values())
+            if candidate.reply_to == entry_id and candidate.uid == ctx.user_id
+        ]
+        for reply in replies:
+            if not reply.activated:
+                self._queue.remove(reply.entry_id)
+            logger.debug("Cancelling reply %s to %s", reply.entry_id, entry_id)
+            await reply.cancel()
+        if replies:
+            return True, True
         handled = await self._llm.abort(entry_id)
         return handled, False
 
-    def _on_pending_cleanup(self, entry_id: str) -> None:
-        pending = self._pending.pop(entry_id, None)
-        if pending and pending.started_at is not None:
+    def _on_pending_cleanup(self, pending: PendingResponse) -> None:
+        entry_id = pending.entry_id
+        # Only forget this instance; a newer generation may own the id by now.
+        if self._pending.get(entry_id) is pending:
+            self._pending.pop(entry_id, None)
+        if pending.started_at is not None:
             duration = max(0.0, time.monotonic() - pending.started_at)
             self._update_stream_duration(duration)
-        if pending is not None:
-            pending.drop_context()
-        self._queue.remove(entry_id)
-        self._active_ids.discard(entry_id)
+        pending.drop_context()
+        if not pending.activated:
+            self._queue.remove(entry_id)
+        self._active.discard(pending)
         self._publish_queue_state()
         self._update_slot_event()
         self._ensure_queue_worker()
@@ -525,7 +587,7 @@ class ResponseStreamManager:
 
     def _activate_pending(self, pending: PendingResponse) -> None:
         if pending.start():
-            self._active_ids.add(pending.entry_id)
+            self._active.add(pending)
             if pending.started_at is not None:
                 wait_time = max(0.0, pending.started_at - pending.created_at)
                 self._update_wait_estimate(wait_time)
@@ -554,7 +616,7 @@ class ResponseStreamManager:
     def _build_queue_snapshot(self) -> dict[str, int]:
         return {
             "depth": len(self._queue),
-            "active": len(self._active_ids),
+            "active": len(self._active),
             "limit": self._queue_limit,
             "slots": self._max_slots(),
         }
@@ -600,7 +662,7 @@ class ResponseStreamManager:
             raise
 
     async def _wait_for_slot(self) -> None:
-        while len(self._active_ids) >= self._max_slots():
+        while len(self._active) >= self._max_slots():
             self._update_slot_event()
             event = self._slot_event
             if event is None:
@@ -613,7 +675,7 @@ class ResponseStreamManager:
         event = self._slot_event
         if event is None:
             return
-        if len(self._active_ids) < self._max_slots():
+        if len(self._active) < self._max_slots():
             event.set()
         else:
             event.clear()
@@ -673,11 +735,13 @@ class ResponseStreamManager:
         self._pending.clear()
         self._pending_heap.clear()
         self._queue.clear()
-        self._active_ids.clear()
+        self._active.clear()
         self._publish_queue_state()
         if self._queue_consumer is not None:
             self._queue_consumer.cancel()
-            with suppress(Exception):
+            # CancelledError is a BaseException; letting it escape aborts the
+            # rest of the app shutdown (search API stop, db close).
+            with suppress(asyncio.CancelledError, Exception):
                 await self._queue_consumer
             self._queue_consumer = None
 

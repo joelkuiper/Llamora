@@ -27,6 +27,7 @@
       </div>
       {% block form %}{% endblock %}
     </div>
+    <script defer src="{{ url_for('static', filename='js/vendor/htmx.min.js') }}"></script>
     {% if entry_js %}
       <script type="module" defer src="{{ url_for('static', filename=entry_js) }}"></script>
     {% else %}

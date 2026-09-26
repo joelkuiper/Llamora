@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 import logging
-from contextlib import suppress
 from types import MappingProxyType
 from typing import Any, Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -469,16 +468,10 @@ class StreamSession(Response):
     def pending(cls, pending_response) -> "StreamSession":
         """Create a streaming response for an in-flight pending reply."""
 
-        async def _body():
-            try:
-                async for event in cls._stream_pending(pending_response):
-                    yield event
-            finally:
-                if not pending_response.done and not pending_response.cancelled:
-                    with suppress(Exception):
-                        await pending_response.cancel()
-
-        return cls(_body())
+        # A client disconnect only ends this subscription: the generation keeps
+        # running, is saved when complete, and a returning client reattaches.
+        # Only an explicit stop (ResponseStreamManager.stop) truncates a reply.
+        return cls(cls._stream_pending(pending_response))
 
     @classmethod
     def saved(cls, message: Mapping[str, Any]) -> "StreamSession":

@@ -2,6 +2,7 @@
 {% from 'components/entries/entry_actions.html' import entry_actions %}
 {% from 'components/entries/entry_edit_button.html' import entry_edit_button %}
 {% from 'components/entries/entry_main.html' import render_entry_main %}
+{% from 'components/entries/entry_response_stream.html' import entry_response_stream %}
 {% macro render_entry(
   e,
   day,
@@ -20,7 +21,8 @@
   entry_open_hx_get=None,
   entry_open_hx_target=None,
   entry_open_hx_swap=None,
-  entry_open_hx_push_url=None
+  entry_open_hx_push_url=None,
+  streaming_stream_id=None
 ) -%}
 {% set entry_meta = e.get('meta', {}) %}
 {% set is_error = entry_meta.get('error') %}
@@ -99,7 +101,11 @@
               data-ready="true">
         <span class="icon-mask icon-trash entry-action__icon" aria-hidden="true"></span>
       </button>
+      {% if streaming_stream_id %}
+      {{ entry_actions(e['id'], day, is_today=is_today, stop_url=url_for('entries_stream.stop_response', entry_id=e['id'], stream=streaming_stream_id), response_active=True) }}
+      {% else %}
       {{ entry_actions(e['id'], day, is_today=is_today) }}
+      {% endif %}
     </div>
   </div>
   {% endif %}
@@ -147,6 +153,10 @@
   {% for response in responses or [] %}
   {{ render_entry(response, day, is_today, animate_entries=animate_entries) }}
   {% endfor %}
+  {% if streaming_stream_id %}
+  {# A reply still generating (page loaded mid-stream): reattach to that generation. #}
+  {{ entry_response_stream(e['id'], day, stream_id=streaming_stream_id, stop_url=url_for('entries_stream.stop_response', entry_id=e['id'], stream=streaming_stream_id)) }}
+  {% endif %}
 </div>
 {% endif %}
 {%- endmacro %}

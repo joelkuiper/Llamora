@@ -40,6 +40,7 @@ from llamora.app.services.auth_helpers import login_required
 from llamora.app.services.container import get_services
 from llamora.app.services.entry_context import get_entries_context
 from llamora.app.services.markdown import render_markdown_to_html
+from llamora.app.services.response_stream import new_reply_stream_id
 from llamora.app.services.time import get_timezone, local_date
 from llamora.app.util.tags import replace_emoji_shortcodes
 from llamora.settings import settings
@@ -401,18 +402,25 @@ async def request_response(date, entry_id: str):
     if actual_date is None:
         abort(404, description="Entry not found.")
 
+    # Every Respond is a new generation with its own stream id.
+    stream_id = new_reply_stream_id(entry_id)
+    stop_url = url_for(
+        "entries_stream.stop_response", entry_id=entry_id, stream=stream_id
+    )
     stream_html = await render_template(
         "components/entries/entry_response_stream_item.html",
         entry_id=entry_id,
         day=actual_date or normalized_date,
         user_time=user_time,
+        stream_id=stream_id,
+        stop_url=stop_url,
     )
     actions_html = await render_template(
         "components/entries/entry_actions_item.html",
         entry_id=entry_id,
         day=actual_date or normalized_date,
         is_today=normalized_date == local_date().isoformat(),
-        stop_url=url_for("entries_stream.stop_response", entry_id=entry_id),
+        stop_url=stop_url,
         response_active=True,
     )
     return Response(

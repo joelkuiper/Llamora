@@ -48,6 +48,7 @@ dev = [
     "mypy>=1.18.2",
     "pyright>=1.1.407",
     "pytest>=8.3.2",
+    "pytest-playwright>=0.9.0",
     "ruff>=0.9.6",
 ]
 
@@ -90,3 +91,11 @@ venv = ".venv"
 include = ["src"]
 ignore = ["frontend", "doc/screenshots"]
 useLibraryCodeForTypes = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "e2e: browser end-to-end tests (Playwright); deselect with -m 'not e2e'",
+]
+# Keep a trace and screenshot for failing browser tests only.
+addopts = "--tracing=retain-on-failure --screenshot=only-on-failure --output=test-results"
