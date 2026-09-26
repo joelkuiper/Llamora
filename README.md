@@ -303,6 +303,19 @@ The server uses bundled outputs when `frontend/dist/manifest.json` exists. Remov
 pnpm install && pnpm vendor
 ```
 
+**Tests** — end-to-end tests drive the app in a real browser (Playwright + pytest), simulating how a person uses it: registering, writing entries, streaming replies, navigating with back/forward, searching, tagging and the calendar. Each run starts an isolated server with a temporary database and a fake OpenAI-compatible model, so no GPU, llama.cpp or local config is needed.
+
+```bash
+uv run playwright install chromium        # once: download the browser
+uv run pytest tests/e2e -n 3              # full suite, 3 parallel workers (~1.5 min)
+uv run pytest tests/e2e/test_diary.py     # one file
+uv run pytest tests/e2e -k search         # tests matching a name
+uv run pytest tests/e2e --headed --slowmo 300   # watch the browser
+uv run pytest tests/e2e --e2e-no-build    # skip the prod asset build
+```
+
+Failing tests keep a Playwright trace and screenshot under `test-results/` (`uv run playwright show-trace test-results/<test>/trace.zip`), and the server log is attached to the failure report. `-n 3` is the sweet spot; more workers contend for memory (each runs its own server and browser).
+
 **Git hooks** — enable with `git config core.hooksPath .githooks` (pre-commit runs Ruff on staged Python files and Biome on staged JS/CSS files).
 
 **Migrations** — applied automatically at startup. Manual inspection:
@@ -316,7 +329,7 @@ uv run python scripts/migrate.py up
 
 ## Production
 
-> **Caveat:** Llamora should work with multiple users but this has not been extensively tested, and there is no two-factor authentication. Keep this in mind before exposing it beyond your local network.
+> **Caveat:** There is no two-factor authentication or admin interface. Keep this in mind before exposing Llamora beyond your local network.
 
 ### 1. Generate secrets
 
@@ -379,7 +392,7 @@ uv run llamora-server prod
 ## Limitations
 
 - No two-factor authentication or captcha protection.
-- Multi-user should work but is not extensively tested. No admin interface.
+- No admin interface for managing users.
 - Requires a running model server. A dedicated GPU makes a significant difference for inference speed.
 - Model weights are several GB, downloaded by llama.cpp on first use. The embedding model (~130 MB) is downloaded separately.
 - Output quality depends entirely on the model. Unreliable instruction-following produces poor results.
