@@ -365,14 +365,14 @@ pnpm install && pnpm vendor
 
 ```bash
 uv run playwright install chromium        # once: download the browser
-uv run pytest tests/e2e -n 3              # full suite, 3 parallel workers (~4-5 min)
+uv run pytest tests/e2e -n 6              # full suite, 6 parallel workers (~1 min)
 uv run pytest tests/e2e/test_diary.py     # one file
 uv run pytest tests/e2e -k search         # tests matching a name
 uv run pytest tests/e2e --headed --slowmo 300   # watch the browser
 uv run pytest tests/e2e --e2e-no-build    # skip the prod asset build
 ```
 
-Failing tests keep a Playwright trace and screenshot under `test-results/` (`uv run playwright show-trace test-results/<test>/trace.zip`), and the server log is attached to the failure report. `-n 3` is the sweet spot; more workers contend for memory (each runs its own server and browser).
+Failing tests keep a Playwright trace and screenshot under `test-results/` (`uv run playwright show-trace test-results/<test>/trace.zip`), and the server log is attached to the failure report. Test servers derive keys with libsodium's minimum Argon2id cost (set `LLAMORA_TEST_REAL_KDF=1` to keep the real one); the key hierarchy and encryption are exercised the same way, but registering and logging in take milliseconds instead of seconds. Beyond `-n 6` there's little gain (each worker runs its own server and browser).
 
 **Git hooks** — enable with `git config core.hooksPath .githooks` (pre-commit runs Ruff on staged Python files and Biome on staged JS/CSS files).
 
