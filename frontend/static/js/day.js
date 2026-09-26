@@ -7,8 +7,8 @@ import {
 
 export { formatIsoDate, parseDateFromSource } from "./services/datetime.js";
 
-import { getFrameState, subscribeFrameState } from "./services/app-state.js";
 import { getCurrentView } from "./lifecycle.js";
+import { getFrameState, subscribeFrameState } from "./services/app-state.js";
 import { registerHydrationOwner } from "./services/hydration-owners.js";
 import { updateClientToday } from "./services/time.js";
 import { triggerLabelFlash } from "./utils/motion.js";

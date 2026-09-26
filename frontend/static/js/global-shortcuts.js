@@ -1,6 +1,6 @@
 import { formatIsoDate, navigateToDate, parseDateFromSource } from "./day.js";
-import { getFrameState } from "./services/app-state.js";
 import { requestScrollForceEdge } from "./scroll-manager.js";
+import { getFrameState } from "./services/app-state.js";
 import { registerShortcut } from "./utils/global-shortcuts.js";
 import { motionSafeBehavior } from "./utils/motion.js";
 

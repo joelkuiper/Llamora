@@ -100,10 +100,10 @@ const applyEdgeMetrics = (button, metrics) => {
 };
 
 export {
-  DEFAULT_EDGE_BUFFER,
-  DEFAULT_EDGE_THRESHOLD,
-  DEFAULT_EDGE_OFFSET,
-  normalizeEdgeDirection,
-  computeEdgeMetrics,
   applyEdgeMetrics,
+  computeEdgeMetrics,
+  DEFAULT_EDGE_BUFFER,
+  DEFAULT_EDGE_OFFSET,
+  DEFAULT_EDGE_THRESHOLD,
+  normalizeEdgeDirection,
 };

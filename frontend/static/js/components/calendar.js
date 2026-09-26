@@ -1,11 +1,11 @@
 /* global htmx */
 
 import { createPopover } from "../popover.js";
+import { getFrameState } from "../services/app-state.js";
 import { cacheLoader } from "../services/cache-loader.js";
 import { registerHydrationOwner } from "../services/hydration-owners.js";
 import { triggerLabelFlash } from "../utils/motion.js";
 import { transitionHide, transitionShow } from "../utils/transition.js";
-import { getFrameState } from "../services/app-state.js";
 
 const makeDaySummaryKey = (date) => `day:${String(date || "").trim()}`;
 

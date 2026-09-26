@@ -10,8 +10,7 @@ import {
   setTagsSort,
 } from "./app-state.js";
 
-export { normalizeTagsSortDir, normalizeTagsSortKind };
-export { setTagsSort as writeTagsSortState };
+export { normalizeTagsSortDir, normalizeTagsSortKind, setTagsSort as writeTagsSortState };
 
 export const readTagsSortState = ({ fallbackKind = "count", fallbackDir = "desc" } = {}) => {
   const { sortKind, sortDir } = getTagsSort();
