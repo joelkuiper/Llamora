@@ -222,6 +222,11 @@ async def _load_response_history_or_error(enc_ctx, uid: str, entry_id: str):
     if not entries:
         logger.warning("Entries not found for entry %s", entry_id)
         return None, None
+    # Entries carry their image ids; the reply's messages decide what to send.
+    await get_services().images.attach_refs(
+        enc_ctx,
+        [item["entry"] for item in entries if isinstance(item.get("entry"), dict)],
+    )
     return actual_date, build_entry_history(entries, entry_id)
 
 

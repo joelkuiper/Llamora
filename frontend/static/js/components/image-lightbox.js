@@ -7,6 +7,7 @@
 // so entries swapped in by htmx need no setup; the gallery is always the
 // clicked entry's own thumbnails, in order.
 
+import { createInlineSpinner } from "../ui.js";
 import { nextModalZ } from "../utils/modal-stack.js";
 import { prefersReducedMotion } from "../utils/motion.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
@@ -15,6 +16,8 @@ import { transitionHide, transitionShow } from "../utils/transition.js";
 const ITEM_SELECTOR = "[data-lightbox-item]";
 const SWIPE_DISTANCE = 50;
 const CROSSFADE_MS = 150;
+// Only show the spinner for images that take a moment (cached ones don't).
+const SPINNER_DELAY_MS = 150;
 
 function variantUrl(item, variant) {
   const src = item.querySelector("img")?.getAttribute("src") || "";
@@ -55,6 +58,9 @@ class ImageLightboxElement extends ReactiveElement {
   #inerted = [];
   #cancelHide = null;
   #swapTimer = null;
+  #spinner = null;
+  #spinnerTimer = null;
+  #error = null;
   #pointer = null;
   #suppressClick = false;
 
@@ -77,6 +83,9 @@ class ImageLightboxElement extends ReactiveElement {
     this.#counter = this.querySelector(".image-lightbox__counter");
     this.#full = this.querySelector(".image-lightbox__full");
     this.#remove = this.querySelector("[data-lightbox-action='remove']");
+    this.#error = this.querySelector(".image-lightbox__error");
+    const spinnerEl = this.querySelector(".image-lightbox__spinner");
+    this.#spinner = spinnerEl ? createInlineSpinner(spinnerEl) : null;
 
     this.addListener(this, "click", (event) => this.#onClick(event));
     this.addListener(this, "pointerdown", (event) => this.#onPointerDown(event));
@@ -89,6 +98,7 @@ class ImageLightboxElement extends ReactiveElement {
     this.addListener(document, "keydown", (event) => this.#onKeydown(event), true);
     this.addListener(window, "resize", () => this.#fit());
     this.addListener(this.#image, "load", () => this.#onImageLoad());
+    this.addListener(this.#image, "error", () => this.#onImageError());
     this.addListener(document.body, "htmx:beforeSwap", (event) => {
       const target = event.detail?.target;
       if (this.isOpen && target instanceof Element && target.id === "content-wrapper") {
@@ -125,6 +135,7 @@ class ImageLightboxElement extends ReactiveElement {
 
   close({ restoreFocus = true } = {}) {
     if (this.hidden) return;
+    this.#setLoading(false);
     this.setAttribute("aria-hidden", "true");
     this.#setInert(false);
     this.#cancelHide = transitionHide(this, "is-open", prefersReducedMotion() ? 0 : 180);
@@ -164,6 +175,9 @@ class ImageLightboxElement extends ReactiveElement {
       this.#image.setAttribute("width", String(this.#size.width));
       this.#image.setAttribute("height", String(this.#size.height));
       this.#fit();
+      // A new src keeps painting the previous picture until it loads: hide
+      // the image until then (and show the spinner if that takes a moment).
+      this.#setLoading(true);
       this.#image.src = variantUrl(item, "display");
       if (this.#image.complete && this.#image.naturalWidth) {
         this.#onImageLoad();
@@ -192,7 +206,35 @@ class ImageLightboxElement extends ReactiveElement {
 
   // The image itself is the truth once it has loaded (data-width/height only
   // size the box beforehand).
+  #setLoading(loading) {
+    if (this.#spinnerTimer) {
+      clearTimeout(this.#spinnerTimer);
+      this.#spinnerTimer = null;
+    }
+    this.classList.toggle("is-loading", loading);
+    if (this.#error) this.#error.hidden = true;
+    if (!loading) {
+      this.classList.remove("is-spinning");
+      this.#spinner?.stop();
+      return;
+    }
+    this.#spinnerTimer = setTimeout(() => {
+      this.#spinnerTimer = null;
+      this.classList.add("is-spinning");
+      this.#spinner?.start();
+    }, SPINNER_DELAY_MS);
+  }
+
+  #onImageError() {
+    if (!this.isOpen) return;
+    this.#setLoading(false);
+    this.#image.classList.remove("is-changing");
+    this.classList.add("is-loading"); // keep the broken image hidden
+    if (this.#error) this.#error.hidden = false;
+  }
+
   #onImageLoad() {
+    this.#setLoading(false);
     const { naturalWidth, naturalHeight } = this.#image;
     if (
       naturalWidth &&

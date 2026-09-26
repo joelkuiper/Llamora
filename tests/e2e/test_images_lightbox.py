@@ -471,3 +471,57 @@ def test_removing_works_on_a_past_day(app_page: Page, api: ApiClient) -> None:
 
     expect_showing(app_page, ids[1], None)
     expect(thumbs(app_page, entry_id)).to_have_count(1)
+
+
+# -- loading --------------------------------------------------------------
+
+
+def test_the_next_image_loads_behind_a_spinner(app_page: Page, api: ApiClient) -> None:
+    # Never the previous picture while the next one is on its way.
+    entry_id, ids = seed(api, [WIDE, TALL])
+    held: list = []
+    app_page.route(f"**/i/{ids[1]}/display", lambda route: held.append(route))
+    open_day(app_page)
+    thumbs(app_page, entry_id).first.click()
+    box = lightbox(app_page)
+    image = box.locator(".image-lightbox__image")
+    spinner = box.locator(".image-lightbox__spinner")
+    expect_showing(app_page, ids[0], "1 / 2")
+    expect(box).not_to_have_class(re.compile(r"\bis-loading\b"))
+
+    box.get_by_role("button", name="Next image").click()
+
+    expect(box).to_have_class(re.compile(r"\bis-loading\b"))
+    expect(image).to_have_css("opacity", "0")
+    expect(spinner).to_have_css("opacity", "1")
+    expect(spinner).not_to_have_text("")  # the app's animated spinner
+    for _ in range(50):
+        if held:
+            break
+        app_page.wait_for_timeout(100)
+    for route in held:
+        route.continue_()
+
+    expect(box).not_to_have_class(re.compile(r"\bis-loading\b"))
+    expect(image).to_have_css("opacity", "1")
+    expect(spinner).to_have_css("opacity", "0")
+    expect(spinner).to_have_text("")
+    expect_showing(app_page, ids[1], "2 / 2")
+    assert abs(ratio(image) - 1 / 3) < 0.03
+
+
+def test_an_image_that_fails_to_load_says_so(app_page: Page, api: ApiClient) -> None:
+    entry_id, ids = seed(api, [WIDE])
+    app_page.route(
+        f"**/i/{ids[0]}/display", lambda route: route.fulfill(status=404, body="")
+    )
+    open_day(app_page)
+
+    thumbs(app_page, entry_id).first.click()
+
+    box = lightbox(app_page)
+    expect(box.locator(".image-lightbox__error")).to_have_text(
+        "This image couldn't be loaded."
+    )
+    expect(box.locator(".image-lightbox__image")).to_have_css("opacity", "0")
+    expect(box.locator(".image-lightbox__spinner")).to_have_css("opacity", "0")

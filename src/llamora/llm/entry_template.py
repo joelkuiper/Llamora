@@ -12,6 +12,20 @@ from .prompt_templates import render_prompt_template
 from .tokenizers.tokenizer import estimate_tokens
 
 
+# A Llamora-internal content part: an entry image by id. The client resolves
+# it to the image itself (an ``image_url`` part) just before sending, so
+# prompts, token caches and logs only ever hold ids.
+IMAGE_REF = "image_ref"
+
+
+@dataclass(frozen=True, slots=True)
+class ImagePolicy:
+    """Whether entry images go to the model, and how many per reply."""
+
+    send: bool = False
+    max_images: int = 4
+
+
 @dataclass(frozen=True, slots=True)
 class EntryPromptSeries:
     """Collection of token estimates for the base and history suffixes."""
@@ -32,6 +46,23 @@ def _normalise_text(value: Any) -> str:
     return str(value or "").strip()
 
 
+def content_text(content: Any) -> str:
+    """The text of a message's content; images in a content list show as
+    ``[image]`` (for estimates and logs, never the image data)."""
+
+    if not isinstance(content, list):
+        return _normalise_text(content)
+    pieces: list[str] = []
+    for part in content:
+        if not isinstance(part, Mapping):
+            continue
+        if part.get("type") == "text":
+            pieces.append(_normalise_text(part.get("text")))
+        elif part.get("type") in (IMAGE_REF, "image_url"):
+            pieces.append("[image]")
+    return "\n".join(piece for piece in pieces if piece)
+
+
 def _coerce_entry_messages(
     messages: Sequence[Mapping[str, Any] | dict[str, Any]],
 ) -> list[dict[str, str]]:
@@ -41,7 +72,7 @@ def _coerce_entry_messages(
         content_source = raw.get("content")
         if content_source is None:
             content_source = raw.get("text")
-        content = _normalise_text(content_source)
+        content = content_text(content_source)
         normalised.append(
             {
                 "role": role,
@@ -156,11 +187,88 @@ def _build_opening_recap_message(
     return rendered.strip()
 
 
+def entry_image_ids(entry: Mapping[str, Any]) -> list[str]:
+    """Ids of an entry's images, in order (history entries carry ``images``)."""
+
+    ids: list[str] = []
+    for image in entry.get("images") or []:
+        image_id = image.get("id") if isinstance(image, Mapping) else image
+        if image_id:
+            ids.append(str(image_id))
+    return ids
+
+
+def select_images(
+    history: Sequence[Mapping[str, Any] | dict[str, Any]], max_images: int
+) -> set[str]:
+    """The images a reply shows the model: the entry being answered (the last
+    user entry) first, then the most recent images of earlier entries."""
+
+    if max_images <= 0:
+        return set()
+    user_entries = [e for e in history if (e.get("role") or "user") == "user"]
+    chosen: list[str] = []
+    for entry in reversed(user_entries):
+        ids = entry_image_ids(entry)
+        # The replied-to entry in its own order; earlier ones newest first.
+        ordered = ids if entry is user_entries[-1] else ids[::-1]
+        for image_id in ordered:
+            if len(chosen) >= max_images:
+                return set(chosen)
+            chosen.append(image_id)
+    return set(chosen)
+
+
+def _photos(count: int) -> str:
+    return "1 photo" if count == 1 else f"{count} photos"
+
+
+def photos_note(count: int, *, shown: int = 0) -> str:
+    """What the model is told about images it doesn't get to see."""
+
+    if shown:
+        more = "1 more photo" if count == 1 else f"{count} more photos"
+        return f"[{more} attached to this entry, not shown.]"
+    pronoun = "it" if count == 1 else "them"
+    return f"[The writer attached {_photos(count)} to this entry; you can't see {pronoun}.]"
+
+
+def _user_content(
+    entry: Mapping[str, Any], policy: ImagePolicy, shown: set[str]
+) -> str | list[dict[str, Any]]:
+    text = _normalise_text(entry.get("text"))
+    ids = entry_image_ids(entry)
+    if not ids:
+        return text
+    visible = [image_id for image_id in ids if policy.send and image_id in shown]
+    hidden = len(ids) - len(visible)
+    if not visible:
+        note = photos_note(len(ids))
+        return f"{text}\n\n{note}" if text else note
+    parts: list[dict[str, Any]] = []
+    if text:
+        parts.append({"type": "text", "text": text})
+    parts.extend({"type": IMAGE_REF, "image_id": image_id} for image_id in visible)
+    if hidden:
+        parts.append({"type": "text", "text": photos_note(hidden, shown=len(visible))})
+    return parts
+
+
 def build_entry_messages(
     history: Sequence[Mapping[str, Any] | dict[str, Any]],
+    *,
+    image_policy: ImagePolicy | None = None,
     **context: Any,
-) -> list[dict[str, str]]:
-    """Return entry messages representing ``history`` and ``context``."""
+) -> list[dict[str, Any]]:
+    """Return entry messages representing ``history`` and ``context``.
+
+    Entries with images get either image references (``image_policy.send``;
+    at most ``max_images`` per reply) or a note saying photos are attached,
+    so an entry of only images never reaches the model as nothing.
+    """
+
+    policy = image_policy or ImagePolicy()
+    shown = select_images(history, policy.max_images) if policy.send else set()
 
     system_message = _build_system_message(
         date=_normalise_text(context.get("date")) or None,
@@ -168,11 +276,14 @@ def build_entry_messages(
         history=history,
     )
 
-    messages: list[dict[str, str]] = [{"role": "system", "content": system_message}]
+    messages: list[dict[str, Any]] = [{"role": "system", "content": system_message}]
 
     for entry in history:
         role = _normalise_text(entry.get("role")) or "user"
-        content = _normalise_text(entry.get("text"))
+        if role == "user":
+            content: str | list[dict[str, Any]] = _user_content(entry, policy, shown)
+        else:
+            content = _normalise_text(entry.get("text"))
         messages.append({"role": role, "content": content})
 
     return messages

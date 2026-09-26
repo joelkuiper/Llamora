@@ -153,6 +153,44 @@
   }
 }
 
+/* While the next image loads it stays hidden (never the previous one), and
+   after a moment the app's spinner shows in its place. */
+.image-lightbox.is-loading .image-lightbox__image {
+  opacity: 0;
+  box-shadow: none;
+  transition: none;
+}
+
+.image-lightbox__spinner,
+.image-lightbox__error {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  margin: 0;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.image-lightbox__spinner {
+  font-size: 1.6rem;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity var(--motion-gentle) ease;
+}
+
+.image-lightbox.is-spinning .image-lightbox__spinner {
+  opacity: 1;
+}
+
+.image-lightbox__error {
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  background: var(--glass-bg-opaque);
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
 .image-lightbox__nav,
 .image-lightbox__button {
   display: inline-grid;

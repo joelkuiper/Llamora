@@ -130,7 +130,9 @@ def test_the_attach_button_opens_the_picker_and_images_are_sent(session: Page) -
     thumbs = entry.locator(".entry-images img")
     expect(thumbs).to_have_count(2)
     expect(thumbs.first).to_have_attribute("src", re.compile(rf"/i/{ids[0]}/thumb$"))
-    assert thumbs.first.evaluate("img => img.complete && img.naturalWidth > 0")
+    page.wait_for_function(
+        "img => img.complete && img.naturalWidth > 0", arg=thumbs.first.element_handle()
+    )
     expect(tray(page)).to_have_count(0)  # the tray empties after sending
     assert attached_ids(page) == []
 

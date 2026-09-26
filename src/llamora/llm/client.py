@@ -14,7 +14,14 @@ from llamora.app.util import canonicalize
 from llamora.llm.budget import PromptBudget
 from llamora.settings import settings
 
-from .entry_template import build_entry_messages, estimate_entry_messages_tokens
+from .entry_template import (
+    IMAGE_REF,
+    ImagePolicy,
+    build_entry_messages,
+    content_text,
+    estimate_entry_messages_tokens,
+    photos_note,
+)
 from .tokenizers.tokenizer import history_suffix_token_totals
 from .upstream_manager import UpstreamProcessManager
 
@@ -129,6 +136,9 @@ class LLMClient:
         for slot_id in range(self.parallel_slots):
             self._slot_queue.put_nowait(slot_id)
         self.prompt_budget = PromptBudget(self, service_pulse=service_pulse)
+        # Whether entry images go to the model. Off until vision support is
+        # resolved (LLM.vision); entries with images then carry a note.
+        self.image_policy = ImagePolicy()
         # Cached cumulative token counts keyed by (history_hash, context_hash).
         # The cache lets adjacent requests within the same stream reuse
         # tokenisation results instead of repeatedly calling the HTTP endpoint.
@@ -453,7 +463,9 @@ class LLMClient:
                 yield {"type": "error", "data": f"Prompt error: {e}"}
                 return
             try:
-                messages = build_entry_messages(history, **ctx)
+                messages = build_entry_messages(
+                    history, image_policy=self.image_policy, **ctx
+                )
             except Exception as e:
                 self.logger.exception("Failed to build prompt messages")
                 yield {"type": "error", "data": f"Prompt error: {e}"}
@@ -535,6 +547,8 @@ class LLMClient:
             entry = dict(message)
             if "content" not in entry and "text" in entry:
                 entry["content"] = entry.pop("text")
+            if isinstance(entry.get("content"), list):
+                entry["content"] = self._without_image_refs(entry["content"])
             normalized.append(entry)
 
         payload: dict[str, Any] = {
@@ -578,6 +592,25 @@ class LLMClient:
 
         return payload
 
+    def _without_image_refs(self, parts: list[Any]) -> list[Any]:
+        """Internal image references must be resolved before sending; any
+        left over become a note rather than reaching the model server."""
+
+        refs = [
+            p for p in parts if isinstance(p, Mapping) and p.get("type") == IMAGE_REF
+        ]
+        if not refs:
+            return parts
+        self.logger.error(
+            "Sending %d unresolved image reference(s) as a note", len(refs)
+        )
+        kept = [
+            p
+            for p in parts
+            if not (isinstance(p, Mapping) and p.get("type") == IMAGE_REF)
+        ]
+        return [*kept, {"type": "text", "text": photos_note(len(refs))}]
+
     def _log_prompt(
         self,
         entry_id: str | None,
@@ -592,7 +625,8 @@ class LLMClient:
             [
                 {
                     "role": msg.get("role"),
-                    "content": msg.get("content") or msg.get("text"),
+                    # Images appear as "[image]", never as their data.
+                    "content": content_text(msg.get("content") or msg.get("text")),
                 }
                 for msg in messages
             ],
