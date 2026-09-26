@@ -2,9 +2,10 @@
 
 Fixture graph (session scoped unless noted):
 
-    fake_llm ─┐
-              ├─ live_server ─ base_url ─ user ─ user_state ─ app_page (function)
-    assets ───┘
+    fake_llm ─ live_server ─ base_url ─ user ─ user_state ─ app_page (function)
+
+Every xdist worker gets its own fake LLM, server, database and users; the
+prod asset bundle is built once per run (see the ``assets`` fixture).
 
 ``page`` (from pytest-playwright) is an unauthenticated page; ``app_page`` is
 logged in as the shared session user and already on /d/today. ``api`` seeds
@@ -13,6 +14,7 @@ data for that same user through the app's own HTTP endpoints.
 
 from __future__ import annotations
 
+import fcntl
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
@@ -60,9 +62,24 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]):
 
 
 @pytest.fixture(scope="session")
-def assets(pytestconfig: pytest.Config) -> None:
-    if not pytestconfig.getoption("--e2e-no-build"):
-        build_assets()
+def assets(
+    pytestconfig: pytest.Config, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """Build the prod bundle once per run, even with several xdist workers.
+
+    Workers share the run's temp root (``basetemp.parent`` under xdist), so a
+    lock there lets the first worker build while the others wait and skip.
+    """
+    if pytestconfig.getoption("--e2e-no-build"):
+        return
+    basetemp = tmp_path_factory.getbasetemp()
+    run_root = basetemp.parent if hasattr(pytestconfig, "workerinput") else basetemp
+    built = run_root / "e2e-assets.built"
+    with (run_root / "e2e-assets.lock").open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if not built.exists():
+            build_assets()
+            built.touch()
 
 
 @pytest.fixture(scope="session")
