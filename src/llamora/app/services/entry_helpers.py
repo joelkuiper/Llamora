@@ -495,11 +495,10 @@ class StreamSession(Response):
 
         retry_seconds = max(1, int(math.ceil(float(retry_after))))
         headers = {"Retry-After": str(retry_seconds)}
-        return cls(
-            cls._error_stream(message),
-            status=429,
-            headers=headers,
-        )
+        # Status 200, not 429: EventSource never exposes the body of a non-200
+        # response, so the client would only see a generic connection error
+        # instead of this message.
+        return cls(cls._error_stream(message), headers=headers)
 
     @classmethod
     def raw(cls, payload: str) -> "StreamSession":

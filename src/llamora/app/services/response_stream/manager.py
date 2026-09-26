@@ -319,6 +319,8 @@ class ResponseStreamManager:
         # can overlap, and each occupies (and must release) its own slot.
         self._active: set[PendingResponse] = set()
         self._queue_consumer: asyncio.Task[None] | None = None
+        # Taken off the queue by the consumer, waiting for a free slot.
+        self._awaiting_slot: PendingResponse | None = None
         self._queue_loop: asyncio.AbstractEventLoop | None = None
         self._slot_event: asyncio.Event | None = None
         self._service_pulse = service_pulse
@@ -467,7 +469,7 @@ class ResponseStreamManager:
             raise RuntimeError("ResponseStreamManager database is not configured")
 
         max_slots = self._max_slots()
-        queue_depth = len(self._queue)
+        queue_depth = self._queued_count()
 
         if len(self._active) >= max_slots:
             if self._queue_limit and queue_depth >= self._queue_limit:
@@ -595,6 +597,10 @@ class ResponseStreamManager:
         self._update_slot_event()
         self._publish_queue_state()
 
+    def _queued_count(self) -> int:
+        """Replies waiting for a slot, including one held by the consumer."""
+        return len(self._queue) + (1 if self._awaiting_slot is not None else 0)
+
     def _max_slots(self) -> int:
         return max(1, int(getattr(self._llm, "parallel_slots", 1)))
 
@@ -616,7 +622,7 @@ class ResponseStreamManager:
 
     def _build_queue_snapshot(self) -> dict[str, int]:
         return {
-            "depth": len(self._queue),
+            "depth": self._queued_count(),
             "active": len(self._active),
             "limit": self._queue_limit,
             "slots": self._max_slots(),
@@ -653,8 +659,15 @@ class ResponseStreamManager:
     async def _queue_consumer_loop(self) -> None:
         try:
             while True:
-                await self._wait_for_slot()
                 pending = await self._queue.async_pop()
+                # Check for a slot *after* taking the item: checking first let
+                # an item enqueued while this loop was parked in async_pop() be
+                # activated even though every slot was taken.
+                self._awaiting_slot = pending
+                try:
+                    await self._wait_for_slot()
+                finally:
+                    self._awaiting_slot = None
                 self._activate_pending(pending)
         except asyncio.CancelledError:
             raise

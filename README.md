@@ -307,7 +307,7 @@ pnpm install && pnpm vendor
 
 ```bash
 uv run playwright install chromium        # once: download the browser
-uv run pytest tests/e2e -n 3              # full suite, 3 parallel workers (~1.5 min)
+uv run pytest tests/e2e -n 3              # full suite, 3 parallel workers (~2 min)
 uv run pytest tests/e2e/test_diary.py     # one file
 uv run pytest tests/e2e -k search         # tests matching a name
 uv run pytest tests/e2e --headed --slowmo 300   # watch the browser

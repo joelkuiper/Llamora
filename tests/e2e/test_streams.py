@@ -159,3 +159,73 @@ def test_abandoned_replies_do_not_exhaust_llm_slots(
     expect(app_page.locator(f"#entry-responses-{fresh_id}")).to_contain_text(
         reply, timeout=10_000
     )
+
+
+# --- failures ---------------------------------------------------------------
+
+
+def test_upstream_failure_shows_an_error_and_respond_recovers(
+    app_page: Page, fake_llm: FakeLLM
+) -> None:
+    fake_llm.fail_status = 500
+    entry = write_entry(app_page, f"The model is down {marker()}")
+    entry_id = entry.get_attribute("data-entry-id")
+    responses = app_page.locator(f"#entry-responses-{entry_id}")
+
+    entry.get_by_role("button", name="Respond").click()
+
+    expect(responses.locator(".entry--error")).to_be_visible(timeout=15_000)
+    wait_for_app(app_page)
+    expect(entry.get_by_role("button", name="Respond")).to_be_enabled()
+    expect(app_page.locator("#entry-text")).to_be_enabled()
+
+    # Once the model is back, responding again works.
+    fake_llm.fail_status = None
+    fake_llm.reply = f"Back online {marker('ok')}"
+    entry.get_by_role("button", name="Respond").click()
+    expect(responses).to_contain_text(fake_llm.reply)
+
+
+def test_failure_mid_reply_keeps_the_partial_text_and_flags_it(
+    app_page: Page, fake_llm: FakeLLM
+) -> None:
+    fake_llm.reply = "Alpha bravo charlie delta echo foxtrot"
+    fake_llm.fail_after = 3
+    entry = write_entry(app_page, f"Cut me off {marker()}")
+    entry_id = entry.get_attribute("data-entry-id")
+
+    entry.get_by_role("button", name="Respond").click()
+
+    responses = app_page.locator(f"#entry-responses-{entry_id}")
+    expect(responses.locator(".entry--error")).to_be_visible(timeout=15_000)
+    expect(responses).to_contain_text("Alpha bravo charlie")
+    expect(responses).not_to_contain_text("delta")
+    wait_for_app(app_page)
+
+    app_page.reload()
+    wait_for_app(app_page)
+    saved = app_page.locator(f"#entry-responses-{entry_id}")
+    expect(saved).to_contain_text("Alpha bravo charlie")
+
+
+def test_busy_assistant_says_so(
+    app_page: Page, api: ApiClient, fake_llm: FakeLLM
+) -> None:
+    # 4 slots + a queue of 4: eight slow replies saturate the stream manager.
+    fake_llm.chunk_delay = 1.0
+    fake_llm.reply = "one two three four five six seven eight nine ten"
+    today = today_utc()
+    busy = [api.create_entry(today, f"Busy {marker()}") for _ in range(8)]
+    try:
+        for entry_id in busy:
+            assert api.start_reply(entry_id, today) == 200
+        entry = write_entry(app_page, f"One more please {marker()}")
+        entry_id = entry.get_attribute("data-entry-id")
+
+        entry.get_by_role("button", name="Respond").click()
+
+        responses = app_page.locator(f"#entry-responses-{entry_id}")
+        expect(responses).to_contain_text("The assistant is busy", timeout=10_000)
+    finally:
+        for entry_id in busy:
+            api.stop_replies(entry_id)

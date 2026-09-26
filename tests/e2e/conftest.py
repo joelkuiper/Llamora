@@ -128,9 +128,7 @@ def make_user(base_url: str) -> Callable[..., User]:
     """Factory: register a fresh user over HTTP. Use when a test needs isolation."""
 
     def factory(prefix: str = "e2e") -> User:
-        user = new_credentials(prefix)
-        register_user(base_url, user)
-        return user
+        return register_user(base_url, new_credentials(prefix))
 
     return factory
 

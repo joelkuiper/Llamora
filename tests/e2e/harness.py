@@ -10,8 +10,9 @@ import shutil
 import socket
 import subprocess
 import sys
+import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -22,6 +23,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 STARTUP_TIMEOUT = 90.0
 
 _CSRF_INPUT_RE = re.compile(r'name="csrf_token"\s+value="([^"]+)"')
+_RECOVERY_RE = re.compile(r'<pre id="recovery">([^<]+)</pre>')
 
 
 def free_port() -> int:
@@ -146,6 +148,7 @@ def build_assets() -> None:
 class User:
     username: str
     password: str
+    recovery_code: str = ""  # shown once at registration
 
 
 def new_credentials(prefix: str = "e2e") -> User:
@@ -156,8 +159,8 @@ def new_credentials(prefix: str = "e2e") -> User:
     )
 
 
-def register_user(base_url: str, user: User) -> None:
-    """Register through the real /register form (CSRF included)."""
+def register_user(base_url: str, user: User) -> User:
+    """Register through the real /register form; return the user with its recovery code."""
     with httpx.Client(base_url=base_url, timeout=30.0) as client:
         form_page = client.get("/register")
         form_page.raise_for_status()
@@ -173,7 +176,9 @@ def register_user(base_url: str, user: User) -> None:
             },
         )
         resp.raise_for_status()
-        assert 'id="recovery"' in resp.text, "registration did not reach recovery page"
+        code = _RECOVERY_RE.search(resp.text)
+        assert code, "registration did not reach recovery page"
+        return replace(user, recovery_code=code.group(1).strip())
 
 
 def login(page: Page, user: User) -> None:
@@ -256,6 +261,37 @@ class ApiClient:
         match = _ENTRY_ID_RE.search(resp.text)
         assert match, f"entry id not found in response: {resp.text[:200]}"
         return match.group(1)
+
+    def start_reply(self, entry_id: str, day: date) -> int:
+        """Start a model reply and keep watching it, like an open browser tab.
+
+        The SSE stream is consumed on a background thread so several replies
+        can be in flight at once; returns the stream's HTTP status as soon as
+        the response starts. ``stop_replies`` (or completion) ends it.
+        """
+        started = threading.Event()
+        status: list[int] = []
+        url = f"/e/{day.isoformat()}/response/stream/{entry_id}"
+
+        def watch() -> None:
+            with httpx.Client(
+                base_url=str(self._client.base_url),
+                cookies=self._client.cookies,
+                timeout=None,
+            ) as client:
+                with client.stream("GET", url) as resp:
+                    status.append(resp.status_code)
+                    started.set()
+                    for _ in resp.iter_bytes():
+                        pass
+
+        threading.Thread(target=watch, name=f"reply-{entry_id}", daemon=True).start()
+        started.wait(timeout=30)
+        return status[0] if status else 0
+
+    def stop_replies(self, entry_id: str) -> None:
+        """Stop every in-flight reply to ``entry_id`` (the Stop button, per entry)."""
+        self._client.post(f"/e/response/stop/{entry_id}", headers=self._headers)
 
     def add_tag(self, entry_id: str, tag: str) -> None:
         resp = self._client.post(

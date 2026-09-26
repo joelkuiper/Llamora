@@ -263,9 +263,12 @@ class ResponsePipeline:
         except LLMStreamError as exc:
             self._error = True
             self._error_message = str(exc) or "Unknown error"
+            # Keep what was already streamed: the user has been reading it.
             result = await self._finalize_with_text(
                 self._append_status_line(
-                    "", self._error_message, prefix=self._status_prefix
+                    self._visible_total,
+                    self._error_message,
+                    prefix=self._status_prefix,
                 ),
                 error_meta=True,
             )

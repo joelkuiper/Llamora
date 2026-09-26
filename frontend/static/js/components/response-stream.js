@@ -117,11 +117,12 @@ class ResponseStreamElement extends HTMLElement {
     return this.dataset.sseUrl || this.getAttribute("sse-url") || "";
   }
 
+  get #isOpeningStream() {
+    return this.classList.contains("opening-stream") || (this.entryId || "").startsWith("opening-");
+  }
+
   #suppressOpeningStream() {
-    const entryId = this.entryId || "";
-    const isOpeningStream =
-      this.classList.contains("opening-stream") || entryId.startsWith("opening-");
-    if (!isOpeningStream) return false;
+    if (!this.#isOpeningStream) return false;
     const entries = this.closest?.("#entries") || document;
     const hasPersistedOpening = Boolean(
       entries.querySelector(".entry--opening:not(.opening-stream)"),
@@ -400,7 +401,8 @@ class ResponseStreamElement extends HTMLElement {
     );
 
     const htmxRef = (typeof window !== "undefined" && window.htmx) || null;
-    if (htmxRef?.ajax && this.entryId) {
+    // Day openings have no entry actions to refresh (the route would 404).
+    if (htmxRef?.ajax && this.entryId && !this.#isOpeningStream) {
       htmxRef.ajax("GET", `/e/actions/${this.entryId}`, { swap: "none" });
     }
   }

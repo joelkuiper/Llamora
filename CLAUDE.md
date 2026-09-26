@@ -32,7 +32,7 @@ uv run pytest tests/e2e -n 3           # isolated server + temp DB + fake LLM pe
 uv run pytest tests/e2e --headed --slowmo 300   # watch it run
 uv run pytest tests/e2e --e2e-no-build # skip the prod asset build
 uv run playwright show-trace test-results/<test>/trace.zip  # failure traces
-# -n 3 is the sweet spot (~85s vs ~200s serial); more workers contend on
+# -n 3 is the sweet spot (~2.3x faster than serial); more workers contend on
 # Argon2 (256 MiB per derivation) and each worker's embedding model.
 
 # Frontend assets

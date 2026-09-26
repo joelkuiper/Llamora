@@ -33,6 +33,10 @@ class FakeLLM:
     tags: list[str] = field(default_factory=lambda: list(DEFAULT_TAGS))
     summary: str = DEFAULT_SUMMARY
     chunk_delay: float = 0.01
+    # Failure modes: answer chat requests with this HTTP status, or stream
+    # this many chunks and then an error event (as llama.cpp does mid-stream).
+    fail_status: int | None = None
+    fail_after: int | None = None
     requests: list[dict[str, Any]] = field(default_factory=list)
     _server: ThreadingHTTPServer | None = None
     _thread: threading.Thread | None = None
@@ -66,6 +70,8 @@ class FakeLLM:
         self.tags = defaults.tags
         self.summary = defaults.summary
         self.chunk_delay = defaults.chunk_delay
+        self.fail_status = None
+        self.fail_after = None
         self.requests.clear()
 
     def chat_requests(self, *, structured: bool | None = None) -> list[dict[str, Any]]:
@@ -149,6 +155,17 @@ def _make_handler(fake: FakeLLM) -> type[BaseHTTPRequestHandler]:
             length = int(self.headers.get("Content-Length") or 0)
             body = json.loads(self.rfile.read(length) or b"{}")
             fake.requests.append(body)
+            if fake.fail_status is not None:
+                self._send_json(
+                    {
+                        "error": {
+                            "message": "fake upstream failure",
+                            "code": fake.fail_status,
+                        }
+                    },
+                    status=fake.fail_status,
+                )
+                return
             content = fake.build_content(body)
             if body.get("stream"):
                 self._stream(content)
@@ -161,7 +178,14 @@ def _make_handler(fake: FakeLLM) -> type[BaseHTTPRequestHandler]:
             self.send_header("Cache-Control", "no-cache")
             self.send_header("Connection", "close")
             self.end_headers()
-            for piece in _chunks(content):
+            for index, piece in enumerate(_chunks(content)):
+                if fake.fail_after is not None and index >= fake.fail_after:
+                    self._event(
+                        {"error": {"message": "fake stream failure", "code": 500}}
+                    )
+                    self.wfile.flush()
+                    self.close_connection = True
+                    return
                 self._event(_chunk(piece))
                 if fake.chunk_delay:
                     time.sleep(fake.chunk_delay)
