@@ -42,6 +42,8 @@ class FakeLLM:
     # False mimics a hosted API: no llama.cpp /health or /props (404).
     llamacpp_endpoints: bool = True
     health_status: int = 200  # e.g. 503 while llama.cpp loads a model
+    # Like llama-server with a vision projector (--mmproj): /props reports it.
+    vision: bool = False
     requests: list[dict[str, Any]] = field(default_factory=list)
     # (method, path, Authorization header) for every request received.
     seen: list[tuple[str, str, str | None]] = field(default_factory=list)
@@ -81,6 +83,7 @@ class FakeLLM:
         self.fail_after = None
         self.llamacpp_endpoints = True
         self.health_status = 200
+        self.vision = False
         self.requests.clear()
         self.seen.clear()
 
@@ -169,7 +172,13 @@ def _make_handler(fake: FakeLLM) -> type[BaseHTTPRequestHandler]:
             elif self.path == "/health":
                 self._send_json({"status": "ok"}, status=fake.health_status)
             elif self.path == "/props":
-                self._send_json({"n_ctx": 8192, "total_slots": 4})
+                self._send_json(
+                    {
+                        "n_ctx": 8192,
+                        "total_slots": 4,
+                        "modalities": {"vision": fake.vision, "audio": False},
+                    }
+                )
             else:
                 self._send_json({"error": "not found"}, status=404)
 

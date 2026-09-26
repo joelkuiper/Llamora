@@ -4,7 +4,15 @@ import asyncio
 import hashlib
 import logging
 from contextlib import asynccontextmanager, suppress
-from typing import TYPE_CHECKING, Any, AsyncGenerator, Mapping, Sequence
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncGenerator,
+    Awaitable,
+    Callable,
+    Mapping,
+    Sequence,
+)
 
 import orjson
 from cachetools import LRUCache
@@ -24,12 +32,18 @@ from .entry_template import (
 )
 from .tokenizers.tokenizer import history_suffix_token_totals
 from .upstream_manager import UpstreamProcessManager
+from .vision import VisionConfig, vision_enabled
 
 if TYPE_CHECKING:
     from llamora.app.services.service_pulse import ServicePulse
 
 DEFAULT_LLM_GENERATION = dict(settings.LLM.generation)
 HISTORY_TOKEN_CACHE_SIZE = 32
+
+# Turns an entry image id into what the model receives (a data URI), or None
+# when the image can't be had (deleted, unreadable). Bound to the user's key
+# by the caller; the client itself never touches images.
+ImageResolver = Callable[[str], Awaitable[str | None]]
 
 
 class _ChatStream:
@@ -136,9 +150,7 @@ class LLMClient:
         for slot_id in range(self.parallel_slots):
             self._slot_queue.put_nowait(slot_id)
         self.prompt_budget = PromptBudget(self, service_pulse=service_pulse)
-        # Whether entry images go to the model. Off until vision support is
-        # resolved (LLM.vision); entries with images then carry a note.
-        self.image_policy = ImagePolicy()
+        self.vision = VisionConfig.from_settings(settings)
         # Cached cumulative token counts keyed by (history_hash, context_hash).
         # The cache lets adjacent requests within the same stream reuse
         # tokenisation results instead of repeatedly calling the HTTP endpoint.
@@ -173,6 +185,60 @@ class LLMClient:
                 return str(content).strip()
         text = getattr(choice, "text", None)
         return str(text).strip() if text else ""
+
+    @property
+    def image_policy(self) -> ImagePolicy:
+        """Whether replies send entry images (LLM.vision and, for "auto", the
+        upstream's /props), and how many."""
+
+        send = vision_enabled(self.vision.mode, self.upstream.upstream_props)
+        return ImagePolicy(
+            send=send,
+            max_images=self.vision.max_images,
+            tokens_per_image=self.vision.tokens_per_image,
+        )
+
+    async def _resolve_images(
+        self,
+        messages: list[dict[str, Any]],
+        resolver: ImageResolver | None,
+    ) -> list[dict[str, Any]]:
+        """Replace image references with the images themselves. Images that
+        can't be had become a note; without a resolver, none can."""
+
+        resolved: dict[str, str | None] = {}
+        out: list[dict[str, Any]] = []
+        for message in messages:
+            content = message.get("content")
+            if not isinstance(content, list) or not any(
+                isinstance(p, Mapping) and p.get("type") == IMAGE_REF for p in content
+            ):
+                out.append(message)
+                continue
+            parts: list[Any] = []
+            missing = 0
+            for part in content:
+                if not (isinstance(part, Mapping) and part.get("type") == IMAGE_REF):
+                    parts.append(part)
+                    continue
+                image_id = str(part.get("image_id") or "")
+                if image_id not in resolved:
+                    try:
+                        resolved[image_id] = (
+                            await resolver(image_id) if resolver and image_id else None
+                        )
+                    except Exception:
+                        self.logger.exception("Failed to prepare image %s", image_id)
+                        resolved[image_id] = None
+                uri = resolved[image_id]
+                if uri:
+                    parts.append({"type": "image_url", "image_url": {"url": uri}})
+                else:
+                    missing += 1
+            if missing:
+                parts.append({"type": "text", "text": photos_note(missing)})
+            out.append({**message, "content": parts})
+        return out
 
     @property
     def upstream_url(self) -> str:
@@ -446,15 +512,23 @@ class LLMClient:
         params: dict[str, Any] | None = None,
         context: dict[str, Any] | None = None,
         messages: list[dict[str, Any]] | None = None,
+        image_resolver: ImageResolver | None = None,
     ) -> AsyncGenerator[Any, None]:
         await self.upstream.async_ensure_upstream_ready()
         cfg = {**self.default_generation, **(params or {})}
         cfg["stream"] = True
 
+        policy = self.image_policy
         if messages is None:
             history = history or []
             ctx = context or {}
             try:
+                # Images first give way to fit (see PromptBudget.fit_images),
+                # then entries are trimmed counting the images that remain.
+                policy = await self.prompt_budget.fit_images(
+                    history, policy, params=cfg, context=ctx
+                )
+                ctx = {**ctx, "image_policy": policy}
                 history = await self.prompt_budget.trim_history(
                     history, params=cfg, context=ctx
                 )
@@ -463,14 +537,14 @@ class LLMClient:
                 yield {"type": "error", "data": f"Prompt error: {e}"}
                 return
             try:
-                messages = build_entry_messages(
-                    history, image_policy=self.image_policy, **ctx
-                )
+                messages = build_entry_messages(history, **ctx)
             except Exception as e:
                 self.logger.exception("Failed to build prompt messages")
                 yield {"type": "error", "data": f"Prompt error: {e}"}
                 return
-        prompt_tokens = estimate_entry_messages_tokens(messages)
+        prompt_tokens = estimate_entry_messages_tokens(
+            messages, tokens_per_image=policy.tokens_per_image
+        )
         self.prompt_budget.diagnostics(
             prompt_tokens=prompt_tokens,
             params=cfg,
@@ -480,6 +554,8 @@ class LLMClient:
                 "prompt_messages": len(messages or []),
             },
         )
+        # Images are prepared only now, and never hold a generation slot.
+        messages = await self._resolve_images(messages, image_resolver)
         self._log_prompt(entry_id, messages, cfg)
         payload = self._build_chat_payload(messages, cfg)
         async with self._acquire_slot(entry_id) as _slot_id:

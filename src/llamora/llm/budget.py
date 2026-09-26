@@ -7,10 +7,11 @@ limits are reached.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Mapping, Sequence
 
+from llamora.llm.entry_template import ImagePolicy, entry_image_ids, select_images
 from llamora.settings import settings
 
 if TYPE_CHECKING:
@@ -135,6 +136,51 @@ class PromptBudget:
 
         ctx = dict(context or {})
         return await self._client._trim_history(history_list, max_input, ctx)
+
+    async def fit_images(
+        self,
+        history: Sequence[Mapping[str, Any] | dict[str, Any]],
+        policy: ImagePolicy,
+        *,
+        params: Mapping[str, Any] | None = None,
+        context: Mapping[str, Any] | None = None,
+    ) -> ImagePolicy:
+        """How many images a reply can afford (``policy`` with a lower
+        ``max_images`` when they don't all fit).
+
+        Earlier entries' images go first, oldest first; then earlier entries
+        themselves (trimming, afterwards); the replied-to entry's own images
+        only if that entry can't fit with them on its own.
+        """
+
+        if not policy.send or policy.max_images <= 0 or not history:
+            return policy
+        max_input = self.max_prompt_tokens(params)
+        if max_input is None or max_input <= 0:
+            return policy
+
+        history_list = [dict(entry) for entry in history]
+        ctx = dict(context or {})
+
+        async def fits(entries: list[dict[str, Any]], count: int) -> bool:
+            candidate = replace(policy, max_images=count)
+            totals = await self._client._get_token_counts(
+                entries, {**ctx, "image_policy": candidate}
+            )
+            return bool(totals) and totals[0] <= max_input
+
+        users = [e for e in history_list if (e.get("role") or "user") == "user"]
+        own = min(len(entry_image_ids(users[-1])), policy.max_images) if users else 0
+        selected = len(select_images(history_list, policy.max_images))
+        for count in range(selected, own, -1):
+            if await fits(history_list, count):
+                return replace(policy, max_images=count)
+        # Earlier images are gone; earlier entries are trimmed next. The
+        # entry's own images stay unless it can't fit with them by itself.
+        for count in range(own, 0, -1):
+            if await fits(users[-1:], count):
+                return replace(policy, max_images=count)
+        return replace(policy, max_images=0)
 
     def diagnostics(
         self,

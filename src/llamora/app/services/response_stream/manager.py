@@ -6,7 +6,7 @@ import secrets
 import time
 from heapq import heappop, heappush
 from itertools import count
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 from contextlib import suppress
 
@@ -26,6 +26,9 @@ from .pipeline import (
 
 
 logger = logging.getLogger(__name__)
+
+# (user's key, image id) -> the image as the model receives it, or None.
+ImageSource = Callable[[CryptoContext, str], Awaitable[str | None]]
 
 
 class PendingResponse(ResponsePipelineCallbacks):
@@ -50,6 +53,7 @@ class PendingResponse(ResponsePipelineCallbacks):
         *,
         use_default_reply_to: bool = True,
         auto_start: bool = True,
+        image_source: ImageSource | None = None,
     ) -> None:
         self.entry_id = entry_id
         self._ctx = ctx
@@ -79,6 +83,12 @@ class PendingResponse(ResponsePipelineCallbacks):
         self._activated = False
         self.started_at: float | None = None
 
+        async def _resolve_image(image_id: str) -> str | None:
+            # This generation's own key copy; alive until the pipeline ends.
+            if image_source is None:
+                return None
+            return await image_source(self._ctx, image_id)
+
         async def _stream_response() -> AsyncIterator[str]:
             first_chunk = True
             upstream = llm.stream_response(
@@ -87,6 +97,7 @@ class PendingResponse(ResponsePipelineCallbacks):
                 params,
                 context,
                 messages=messages,
+                image_resolver=_resolve_image if image_source else None,
             )
             try:
                 async for chunk in upstream:
@@ -326,9 +337,14 @@ class ResponseStreamManager:
         self._service_pulse = service_pulse
         self._avg_stream_duration: float | None = None
         self._avg_queue_wait: float | None = None
+        self._image_source: ImageSource | None = None
 
     def set_db(self, db) -> None:
         self._db = db
+
+    def set_image_source(self, source: ImageSource | None) -> None:
+        """How replies turn entry images into what the model receives."""
+        self._image_source = source
 
     def get(self, entry_id: str, ctx: CryptoContext) -> PendingResponse | None:
         pending = self._pending.get(entry_id)
@@ -494,6 +510,7 @@ class ResponseStreamManager:
                 created_at,
                 use_default_reply_to=use_default_reply_to,
                 auto_start=False,
+                image_source=self._image_source,
             )
             self._register_pending(pending)
             self._queue.enqueue(ctx.user_id, pending)
@@ -518,6 +535,7 @@ class ResponseStreamManager:
             created_at,
             use_default_reply_to=use_default_reply_to,
             auto_start=False,
+            image_source=self._image_source,
         )
         self._register_pending(pending)
         self._activate_pending(pending)

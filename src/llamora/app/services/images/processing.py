@@ -162,3 +162,24 @@ def _encode(image: Image.Image, *, quality: int) -> EncodedVariant:
         height=image.height,
         data=buffer.getvalue(),
     )
+
+
+def encode_for_model(data: bytes, *, max_edge: int, quality: int = 85) -> bytes:
+    """A stored variant, re-encoded for a vision model: JPEG (the format every
+    provider takes), at most ``max_edge`` on the long side; transparency is
+    flattened onto white. Input is already a clean, metadata-free variant."""
+
+    image = Image.open(io.BytesIO(data))
+    image.load()
+    if image.mode in ("RGBA", "LA", "PA") or "transparency" in image.info:
+        rgba = image.convert("RGBA")
+        flat = Image.new("RGB", rgba.size, (255, 255, 255))
+        flat.paste(rgba, mask=rgba.getchannel("A"))
+        image = flat
+    elif image.mode != "RGB":
+        image = image.convert("RGB")
+    if max(image.size) > max_edge:
+        image.thumbnail((max_edge, max_edge), Image.Resampling.LANCZOS)
+    buffer = io.BytesIO()
+    image.save(buffer, "JPEG", quality=int(quality), optimize=True)
+    return buffer.getvalue()

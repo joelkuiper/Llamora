@@ -34,6 +34,14 @@ class LLMService:
         self._lock = asyncio.Lock()
         self._stream_config = stream_config
         self._service_pulse = service_pulse
+        self._image_source: Any = None
+
+    def set_image_source(self, source: Any) -> None:
+        """How replies turn entry images into what the model receives
+        (``(ctx, image_id) -> data URI | None``)."""
+        self._image_source = source
+        if self._response_stream_manager is not None:
+            self._response_stream_manager.set_image_source(source)
 
     async def start(self) -> None:
         """Initialise the LLM stack if it is not already running."""
@@ -74,6 +82,7 @@ class LLMService:
                     service_pulse=self._service_pulse,
                 )
                 response_stream_manager.set_db(self._db)
+                response_stream_manager.set_image_source(self._image_source)
             except Exception:
                 logger.exception("Failed to initialise LLM service stack")
 

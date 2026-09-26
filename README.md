@@ -280,6 +280,8 @@ uv run llamora-server dev
 
 The full rules live in [`src/llamora/llm/endpoints.py`](src/llamora/llm/endpoints.py).
 
+**Images.** Replies to entries with photos can show the photos to the model, but a hosted API never receives them unless you ask: add `LLAMORA_LLM__VISION__ENABLED=true` when the provider's model can see images. Your photos are then sent to that provider with each reply.
+
 </details>
 
 <details>
@@ -324,6 +326,16 @@ pending_ttl = 86400          # seconds an upload may wait to be sent with an ent
 thumb = 480
 display = 2048
 full = 4096
+```
+
+**Replies and images.** When replying, the model is shown the entry's images (and the day's most recent earlier ones, up to `max_images`, which defaults to the per-entry limit `IMAGES.max_per_entry`), shrunk to `max_edge` pixels, if it can see them. With the default `enabled = "auto"`, that means a llama.cpp server running a vision model (started with `--mmproj`); a hosted API gets images only with `enabled = true`. Images count towards the model's context (`tokens_per_image` each): when a reply doesn't fit, earlier images give way first, then earlier entries, and the entry's own images only if it can't fit with them. Images the model doesn't see are mentioned to it in text.
+
+```toml
+[default.LLM.vision]
+enabled = "auto"   # "auto" | true | false
+# max_images = 8     # unset: IMAGES.max_per_entry
+tokens_per_image = 300  # prompt cost of one image (Gemma ~270; Qwen-VL grows with size)
+max_edge = 1024
 ```
 
 **Back up the images directory together with the database.** The files are useless without the database (their keys live there), and the database's images are gone without the files. Uploads that are never sent, and images of deleted entries, are removed by a periodic sweep (`sweep_interval`). The remaining options are in [`config/settings.toml`](config/settings.toml).

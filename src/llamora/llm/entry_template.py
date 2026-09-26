@@ -23,7 +23,9 @@ class ImagePolicy:
     """Whether entry images go to the model, and how many per reply."""
 
     send: bool = False
-    max_images: int = 4
+    max_images: int = 8
+    # Prompt tokens one image costs (LLM.vision.tokens_per_image).
+    tokens_per_image: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,15 +102,35 @@ def _serialize_messages_for_estimate(
     return "\n\n".join(parts).strip()
 
 
+def count_images(messages: Sequence[Mapping[str, Any] | dict[str, Any]]) -> int:
+    """Images in ``messages`` (references or resolved)."""
+
+    total = 0
+    for message in messages:
+        content = message.get("content")
+        if isinstance(content, list):
+            total += sum(
+                1
+                for part in content
+                if isinstance(part, Mapping)
+                and part.get("type") in (IMAGE_REF, "image_url")
+            )
+    return total
+
+
 def estimate_entry_messages_tokens(
     messages: Sequence[Mapping[str, Any] | dict[str, Any]],
     *,
     add_generation_prompt: bool = True,
+    tokens_per_image: int = 0,
 ) -> int:
+    """Estimated prompt tokens: the text, plus ``tokens_per_image`` for every
+    image (a model decides the real cost; the setting approximates it)."""
+
     serialized = _serialize_messages_for_estimate(
         messages, add_generation_prompt=add_generation_prompt
     )
-    return estimate_tokens(serialized)
+    return estimate_tokens(serialized) + tokens_per_image * count_images(messages)
 
 
 def _context_lines(date: str | None, part_of_day: str | None) -> list[str]:
@@ -324,6 +346,9 @@ def render_entry_prompt_series(
     """Return token estimates for the base system message and each suffix."""
 
     ctx_history = list(history)
+    # An ``image_policy`` in the context counts the images each suffix sends.
+    policy = context.get("image_policy")
+    per_image = policy.tokens_per_image if isinstance(policy, ImagePolicy) else 0
     base_messages = build_entry_messages((), **context)
     base_tokens = estimate_entry_messages_tokens(base_messages)
 
@@ -331,7 +356,9 @@ def render_entry_prompt_series(
     for idx in range(len(ctx_history)):
         suffix_history = ctx_history[idx:]
         messages = build_entry_messages(suffix_history, **context)
-        suffix_tokens.append(estimate_entry_messages_tokens(messages))
+        suffix_tokens.append(
+            estimate_entry_messages_tokens(messages, tokens_per_image=per_image)
+        )
 
     return EntryPromptSeries(
         base_tokens=base_tokens, suffix_tokens=tuple(suffix_tokens)

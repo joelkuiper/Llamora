@@ -11,6 +11,7 @@ from pathlib import Path
 from llamora.settings import settings
 from llamora.app.util.number import coerce_float, coerce_int
 from llamora.llm.endpoints import resolve_endpoints
+from llamora.llm.vision import parse_vision_mode
 
 
 def _normalise_text(value: object | None) -> str:
@@ -176,6 +177,24 @@ def _validate_images() -> Iterable[str]:
         yield "IMAGES.sizes must grow: thumb <= display <= full."
 
 
+def _validate_llm_vision() -> Iterable[str]:
+    vision = settings.get("LLM.vision") or {}
+    if parse_vision_mode(_get_value(vision, "enabled")) is None:
+        yield 'LLM.vision.enabled must be "auto", true or false.'
+    if _get_value(vision, "max_images") is not None:
+        value = coerce_int(_get_value(vision, "max_images"))
+        if value is None or not 0 <= value <= 32:
+            yield "LLM.vision.max_images must be an integer between 0 and 32."
+    for name, low, high in (
+        ("max_edge", 64, 4096),
+        ("quality", 1, 100),
+        ("tokens_per_image", 1, 20000),
+    ):
+        value = coerce_int(_get_value(vision, name))
+        if value is None or not low <= value <= high:
+            yield f"LLM.vision.{name} must be an integer between {low} and {high}."
+
+
 def validate_settings() -> list[str]:
     """Return a list of configuration validation error messages."""
 
@@ -186,6 +205,7 @@ def validate_settings() -> list[str]:
     errors.extend(_validate_secrets())
     errors.extend(_validate_session_settings())
     errors.extend(_validate_images())
+    errors.extend(_validate_llm_vision())
     return errors
 
 

@@ -29,6 +29,8 @@ from llamora.app.services.vector_search import VectorSearchService
 from llamora.app.services.invalidation_coordinator import InvalidationCoordinator
 from llamora.app.services.images.blob_store import BlobStore
 from llamora.app.services.images.service import ImageConfig, ImageService
+from llamora.app.services.crypto import CryptoContext
+from llamora.llm.vision import VisionConfig
 from llamora.app.services.digest_policy import (
     DIGEST_POLICY_VERSION,
     ENTRY_DIGEST_VERSION,
@@ -83,6 +85,14 @@ class AppServices:
         db.set_search_api(search_api)
         image_config = ImageConfig.from_settings(settings)
         images = ImageService(db, BlobStore(image_config.root), image_config)
+        vision = VisionConfig.from_settings(settings)
+
+        async def model_image(ctx: CryptoContext, image_id: str) -> str | None:
+            return await images.model_image_uri(
+                ctx, image_id, max_edge=vision.max_edge, quality=vision.quality
+            )
+
+        llm_service.set_image_source(model_image)
         return cls(
             db=db,
             vector_search=vector_search,

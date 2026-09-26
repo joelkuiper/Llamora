@@ -9,6 +9,7 @@ entries happens in the entries repository (``image_ids`` on append/update).
 from __future__ import annotations
 
 import asyncio
+import base64
 import unicodedata
 from collections.abc import AsyncIterator, Iterable, Mapping, MutableMapping
 from dataclasses import dataclass, field
@@ -30,7 +31,11 @@ from llamora.app.services.images import (
     ImageRejected,
 )
 from llamora.app.services.images.blob_store import BlobStore
-from llamora.app.services.images.processing import ProcessedImage, process
+from llamora.app.services.images.processing import (
+    ProcessedImage,
+    encode_for_model,
+    process,
+)
 
 if TYPE_CHECKING:
     from llamora.persistence.local_db import LocalDB
@@ -301,6 +306,26 @@ class ImageService:
         finally:
             file_key[:] = bytes(len(file_key))
         return variant_meta, stream
+
+    async def model_image_uri(
+        self, ctx: CryptoContext, image_id: str, *, max_edge: int, quality: int = 85
+    ) -> str | None:
+        """An image as a vision model receives it: a JPEG data URI, shrunk
+        to ``max_edge``. None when it isn't the user's or can't be read."""
+
+        try:
+            opened = await self.open_variant(ctx, image_id, "display")
+            if opened is None:
+                return None
+            _, stream = opened
+            data = b"".join([chunk async for chunk in stream])
+            jpeg = await asyncio.to_thread(
+                encode_for_model, data, max_edge=max_edge, quality=quality
+            )
+        except ImageDecryptError:
+            logger.warning("Image %s can't be read for the model", image_id)
+            return None
+        return "data:image/jpeg;base64," + base64.b64encode(jpeg).decode("ascii")
 
     async def refs_for_entries(
         self, ctx: CryptoContext, entry_ids: list[str]

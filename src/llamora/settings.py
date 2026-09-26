@@ -161,6 +161,13 @@ DEFAULTS: dict[str, Any] = {
             "repeat_guard_min_length": 12,
         },
         "allowed_config_keys": ["temperature"],
+        "vision": {
+            "enabled": "auto",
+            "max_images": None,  # unset: IMAGES.max_per_entry
+            "max_edge": 1024,
+            "quality": 85,
+            "tokens_per_image": 300,
+        },
         "tokenizer": {
             "encoding": "cl100k_base",
             "safety_margin": {

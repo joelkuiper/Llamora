@@ -196,6 +196,24 @@ parameter_allowlist = [
 ]
 parameters = {}
 
+# Entry images in replies. "auto": send them when the model server says it
+# can see (llama.cpp's /props reports modalities.vision); a hosted API has no
+# /props, so auto means off there. true: always send them (e.g. a hosted
+# vision model; your photos then go to that provider); false: never.
+# Images that aren't sent are mentioned to the model in text instead.
+[default.LLM.vision]
+enabled = "auto"        # "auto" | true | false
+# Images per reply: the entry's own first, then earlier ones. Unset, it is
+# IMAGES.max_per_entry, so a full entry is always seen whole.
+# max_images = 8
+max_edge = 1024         # images are shrunk to this longest edge (px) first
+quality = 85            # JPEG quality of what is sent
+# What one image costs in prompt tokens, for fitting replies into the model's
+# context (Gemma: ~270 whatever the size; Qwen2.5-VL grows with resolution).
+# When a reply doesn't fit, earlier images go first, then earlier entries,
+# and the entry's own images only if it can't fit with them.
+tokens_per_image = 300
+
 # --- Prompt templates ---------------------------------------------------
 [default.PROMPTS]
 template_dir = "../src/llamora/llm/templates"
