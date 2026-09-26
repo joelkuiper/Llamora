@@ -1,9 +1,9 @@
 import { isNearBottom } from "../scroll-utils.js";
 import { getClientToday } from "../services/datetime.js";
+import { clearDraft, readDraft, writeDraft } from "../services/drafts.js";
 import { rollOverToToday } from "../services/time.js";
 import { getAlertContainer } from "../utils/alert-center.js";
 import { ReactiveElement } from "../utils/reactive-element.js";
-import { draftStore } from "../utils/storage.js";
 
 class EntryFormElement extends ReactiveElement {
   #entries = null;
@@ -12,6 +12,7 @@ class EntryFormElement extends ReactiveElement {
   #form = null;
   #textarea = null;
   #button = null;
+  #attach = null;
   #errors = null;
   #isToday = false;
   #listeners = null;
@@ -31,7 +32,8 @@ class EntryFormElement extends ReactiveElement {
     this.#connected = true;
     this.#form = this.querySelector("form");
     this.#textarea = this.#form?.querySelector("textarea");
-    this.#button = this.#form?.querySelector("button");
+    this.#button = this.#form?.querySelector('button[type="submit"]');
+    this.#attach = this.#form?.querySelector("image-attach") ?? null;
     this.#errors = getAlertContainer();
     if (!this.#date && this.dataset.date) {
       this.#date = this.dataset.date;
@@ -56,6 +58,7 @@ class EntryFormElement extends ReactiveElement {
     this.#form = null;
     this.#textarea = null;
     this.#button = null;
+    this.#attach = null;
     super.disconnectedCallback();
   }
 
@@ -167,12 +170,26 @@ class EntryFormElement extends ReactiveElement {
 
   #restoreDraft() {
     if (!this.#textarea || !this.#date) return;
-    this.#textarea.value = draftStore.get(this.#date) || "";
+    const draft = readDraft(this.#date);
+    this.#textarea.value = draft.text;
     if (this.#textarea.value) {
       this.#resizeTextarea();
     } else {
       this.#textarea.style.height = "";
     }
+    const attach = this.#attach;
+    if (attach && draft.images.length) {
+      // The tray's module may still be loading; it rebuilds the tiles from
+      // the stored ids (dropping any the server has swept since).
+      customElements.whenDefined("image-attach").then(() => {
+        if (attach.isConnected) attach.restore(draft.images);
+      });
+    }
+  }
+
+  #saveDraft() {
+    if (!this.#date || !this.#textarea) return;
+    writeDraft(this.#date, { text: this.#textarea.value, images: this.#images().ids });
   }
 
   #configureForm() {
@@ -182,6 +199,33 @@ class EntryFormElement extends ReactiveElement {
       this.#textarea.disabled = true;
       this.#button.disabled = true;
       this.#textarea.placeholder = "This day has passed.";
+      if (this.#attach) this.#attach.disabled = true;
+    }
+  }
+
+  // Images being attached (the <image-attach> tray; it may not be upgraded
+  // yet while its module loads, hence the defaults).
+  #images() {
+    return {
+      ids: this.#attach?.ids ?? [],
+      busy: this.#attach?.busy ?? false,
+    };
+  }
+
+  /** Text, images or both, and no image still uploading. */
+  #canSend() {
+    const { ids, busy } = this.#images();
+    const hasContent = Boolean(this.#textarea?.value.trim()) || ids.length > 0;
+    return hasContent && !busy;
+  }
+
+  #updateSendState() {
+    if (!this.#button || !this.#isToday || this.#isStreaming || this.#isSubmitting) return;
+    this.#button.disabled = !this.#canSend();
+    if (this.#images().busy) {
+      this.#button.dataset.tooltipTitle = "Waiting for images…";
+    } else {
+      delete this.#button.dataset.tooltipTitle;
     }
   }
 
@@ -191,11 +235,15 @@ class EntryFormElement extends ReactiveElement {
     this.#listeners = this.resetListenerBag(this.#listeners);
     const bag = this.#listeners;
 
-    const onAfterRequest = () => {
+    const onAfterRequest = (event) => {
       if (!this.#date) return;
+      if (event?.detail?.successful && event.detail.elt === this.#form) {
+        // Sent: the images belong to the entry now.
+        this.#attach?.clear?.();
+      }
       requestAnimationFrame(() => {
         if (!this.#date) return;
-        draftStore.delete(this.#date);
+        clearDraft(this.#date);
         if (this.#textarea?.value) {
           this.#resizeTextarea({ forceScroll: true });
         } else if (this.#textarea) {
@@ -245,22 +293,23 @@ class EntryFormElement extends ReactiveElement {
       if (userTimeInput) {
         userTimeInput.value = userTime;
       }
-      if (!this.#textarea.value.trim()) {
+      if (!this.#canSend()) {
         event.preventDefault();
         this.#textarea.focus({ preventScroll: true });
       }
     };
     bag.add(this.#form, "htmx:configRequest", onConfigRequest);
 
+    bag.add(this.#form, "image-attach:change", () => {
+      this.#updateSendState();
+      if (this.#initialized) this.#saveDraft();
+    });
+
     const onInput = () => {
       const shouldForceScroll = this.#container ? isNearBottom(this.#container, 16) : false;
       this.#resizeTextarea({ forceScroll: shouldForceScroll });
-      if (this.#date) {
-        draftStore.set(this.#date, this.#textarea.value);
-      }
-      if (!this.#isStreaming && !this.#isSubmitting) {
-        this.#button.disabled = !this.#textarea.value.trim();
-      }
+      this.#saveDraft();
+      this.#updateSendState();
     };
     bag.add(this.#textarea, "input", onInput);
 
@@ -270,7 +319,7 @@ class EntryFormElement extends ReactiveElement {
       }
       if (e.key === "Enter" && !e.shiftKey && !this.#isSubmitting && !this.#isStreaming) {
         e.preventDefault();
-        if (this.#textarea.value.trim()) {
+        if (this.#canSend()) {
           this.#form.requestSubmit();
           this.#textarea.style.height = "auto";
         }
@@ -356,7 +405,7 @@ class EntryFormElement extends ReactiveElement {
     } else {
       this.#streamFocusListeners = this.disposeListenerBag(this.#streamFocusListeners);
       this.#textarea.disabled = false;
-      this.#button.disabled = !this.#textarea.value.trim();
+      this.#button.disabled = !this.#canSend();
       const active = document.activeElement;
       if (
         this.#shouldRestoreFocus &&
@@ -397,7 +446,7 @@ class EntryFormElement extends ReactiveElement {
         return;
       }
       this.#textarea.disabled = false;
-      this.#button.disabled = !this.#textarea.value.trim();
+      this.#button.disabled = !this.#canSend();
     }
   }
 

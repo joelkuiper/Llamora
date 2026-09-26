@@ -1,0 +1,56 @@
+{#- The image lightbox (image-lightbox.js). A fixed overlay stacked with
+    nextModalZ(), like the confirm modal, rather than a native <dialog>: the
+    remove confirmation must be able to open above it. -#}
+<image-lightbox id="image-lightbox" class="image-lightbox" hidden aria-hidden="true">
+  <div class="image-lightbox__backdrop" data-lightbox-action="close"></div>
+  <div class="image-lightbox__panel"
+       role="dialog"
+       aria-modal="true"
+       aria-label="Image"
+       data-lightbox-action="close">
+    <div class="image-lightbox__stage" data-lightbox-action="close">
+      <img class="image-lightbox__image" alt="" decoding="async" draggable="false">
+    </div>
+
+    <button type="button"
+            class="image-lightbox__nav image-lightbox__nav--prev"
+            data-lightbox-action="prev"
+            aria-label="Previous image">
+      <span class="icon-mask icon-chevron-left" aria-hidden="true"></span>
+    </button>
+    <button type="button"
+            class="image-lightbox__nav image-lightbox__nav--next"
+            data-lightbox-action="next"
+            aria-label="Next image">
+      <span class="icon-mask icon-chevron-right" aria-hidden="true"></span>
+    </button>
+
+    <div class="image-lightbox__bar">
+      <a class="image-lightbox__button image-lightbox__full"
+         href="#"
+         target="_blank"
+         rel="noopener"
+         aria-label="Open full size"
+         data-tooltip-title="Open full size">
+        <span class="icon-mask icon-maximize" aria-hidden="true"></span>
+      </a>
+      <button type="button"
+              class="image-lightbox__button image-lightbox__remove"
+              data-lightbox-action="remove"
+              data-confirm-variant="danger"
+              data-confirm-cancel="Keep"
+              aria-label="Remove image from entry"
+              data-tooltip-title="Remove image">
+        <span class="icon-mask icon-trash" aria-hidden="true"></span>
+      </button>
+      <button type="button"
+              class="image-lightbox__button image-lightbox__close"
+              data-lightbox-action="close"
+              aria-label="Close">
+        <span class="icon-mask icon-x" aria-hidden="true"></span>
+      </button>
+    </div>
+
+    <p class="image-lightbox__counter" aria-live="polite" aria-atomic="true"></p>
+  </div>
+</image-lightbox>

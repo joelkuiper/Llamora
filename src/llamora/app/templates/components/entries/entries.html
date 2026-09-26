@@ -15,13 +15,23 @@
             hx-swap="beforeend">
         <div class="input-wrapper">
           <label class="visually-hidden" for="entry-text">Entry for {{ day|long_date }}</label>
-          <textarea class="input"
-                    id="entry-text"
-                    name="text"
-                    rows="3"
-                    placeholder="{{ 'Write your thoughts here…' if is_today else 'This day has passed.' }}"
-                    cols="40"
-                    maxlength="{{ config.MAX_MESSAGE_LENGTH }}"></textarea>
+          {# The attach button sits in the text box's bottom-right corner. #}
+          <div class="entry-text-field">
+            <textarea class="input"
+                      id="entry-text"
+                      name="text"
+                      rows="3"
+                      placeholder="{{ 'Write your thoughts here…' if is_today else 'This day has passed.' }}"
+                      cols="40"
+                      maxlength="{{ config.MAX_MESSAGE_LENGTH }}"></textarea>
+            <button type="button"
+                    class="image-attach__pick"
+                    data-image-attach-pick
+                    aria-label="Attach images"
+                    data-tooltip-title="Attach images"{% if not is_today %} disabled{% endif %}>
+              <span class="icon-mask icon-image-plus" aria-hidden="true"></span>
+            </button>
+          </div>
           <input type="hidden" name="user_time" id="user-time" />
           <div class="entry-submit-stack">
             <button id="send-btn" class="btn" type="submit" aria-label="Send"{% if not is_today %} disabled{% endif %}>
@@ -35,6 +45,11 @@
                   aria-atomic="true">{{ config.MAX_MESSAGE_LENGTH }} left</span>
           </div>
         </div>
+        <image-attach data-drop-zone="page"
+                      data-max-bytes="{{ config.IMAGE_MAX_UPLOAD_BYTES }}"
+                      data-max-count="{{ config.IMAGE_MAX_PER_ENTRY }}"
+                      data-upload-url="{{ url_for('images.upload_image') }}">
+        </image-attach>
       </form>
     </entry-form>
 

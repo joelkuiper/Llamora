@@ -660,7 +660,10 @@ async def delete_profile():
     session = get_session_context()
     manager = session.manager
     user = await session.require_user()
-    await get_services().db.users.delete_user(user["id"])
+    services = get_services()
+    await services.db.users.delete_user(user["id"])
+    # Rows are gone (cascade); now the encrypted files.
+    await services.images.delete_user_files(str(user["id"]))
     resp = await _issue_logged_out_response(body="", status=204, hx_redirect="/login")
     if manager.dek_storage == "session":
         current_app.logger.debug(

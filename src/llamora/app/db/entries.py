@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import re
 from datetime import date as _date_type
-from typing import Awaitable, Callable, Iterable, Mapping
+from typing import Awaitable, Callable, Iterable, Mapping, Sequence
 
 import orjson
 from aiosqlitepool import SQLiteConnectionPool
@@ -15,6 +15,7 @@ from llamora.app.services.crypto import CryptoContext
 from llamora.app.services.digest_policy import ENTRY_DIGEST_VERSION, day_digest
 
 from .base import BaseRepository
+from .images import ImageAttachError, attach_on, replace_on
 from .events import (
     ENTRY_DELETED_EVENT,
     ENTRY_INSERTED_EVENT,
@@ -294,8 +295,15 @@ class EntriesRepository(BaseRepository):
         reply_to: str | None = None,
         created_at: str | None = None,
         created_date: str | None = None,
+        image_ids: Sequence[str] | None = None,
+        max_images: int | None = None,
     ) -> str:
+        """Save a new entry; ``image_ids`` (pending images) are linked to it
+        in the same transaction, so a bad image list saves nothing."""
+
         ctx.require_write(operation="entries.append_entry")
+        if image_ids and role != "user":
+            raise ImageAttachError("only user entries can have images")
         entry_id = str(ULID())
         record = {"text": content, "meta": meta or {}}
         plaintext = orjson.dumps(record).decode()
@@ -353,6 +361,14 @@ class EntriesRepository(BaseRepository):
                 cursor = await conn.execute(sql, tuple(params))
                 row = await cursor.fetchone()
                 await cursor.close()
+                if image_ids:
+                    await attach_on(
+                        conn,
+                        user_id=ctx.user_id,
+                        entry_id=entry_id,
+                        image_ids=image_ids,
+                        max_per_entry=max_images,
+                    )
                 return row
 
             row = await self._run_in_transaction(conn, _execute_and_fetch)
@@ -478,7 +494,12 @@ class EntriesRepository(BaseRepository):
         text: str,
         *,
         meta: dict | None = None,
+        image_ids: Sequence[str] | None = None,
+        max_images: int | None = None,
     ) -> dict | None:
+        """Replace an entry's text; with ``image_ids`` (None leaves them be)
+        also its images and their order, in the same transaction."""
+
         ctx.require_write(operation="entries.update_entry_text")
         tag_hashes: tuple[str, ...] = ()
         async with self.pool.connection() as conn:
@@ -494,6 +515,8 @@ class EntriesRepository(BaseRepository):
             await cursor.close()
             if not row:
                 return None
+            if image_ids is not None and row["role"] != "user":
+                raise ImageAttachError("only user entries can have images")
 
             if meta is None:
                 existing_record = self._decrypt_row_to_record(ctx, row)
@@ -541,6 +564,14 @@ class EntriesRepository(BaseRepository):
                 )
                 updated_row = await cursor.fetchone()
                 await cursor.close()
+                if image_ids is not None:
+                    await replace_on(
+                        conn,
+                        user_id=ctx.user_id,
+                        entry_id=entry_id,
+                        image_ids=image_ids,
+                        max_per_entry=max_images,
+                    )
                 return updated_row
 
             updated_row = await self._run_in_transaction(conn, _execute_update)

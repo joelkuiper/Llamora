@@ -135,6 +135,11 @@ def create_app():
         MAX_PASSWORD_LENGTH=int(settings.LIMITS.max_password_length),
         MIN_PASSWORD_LENGTH=int(settings.LIMITS.min_password_length),
         MAX_MESSAGE_LENGTH=int(settings.LIMITS.max_message_length),
+        # Image uploads are the largest bodies; leave room for the multipart
+        # envelope. (Quart's own default, 16 MB, would cut uploads short.)
+        MAX_CONTENT_LENGTH=int(settings.IMAGES.max_upload_bytes) + 64 * 1024,
+        IMAGE_MAX_UPLOAD_BYTES=int(settings.IMAGES.max_upload_bytes),
+        IMAGE_MAX_PER_ENTRY=int(settings.IMAGES.max_per_entry),
         MAX_TAG_LENGTH=int(settings.LIMITS.max_tag_length),
         MAX_SEARCH_QUERY_LENGTH=int(settings.LIMITS.max_search_query_length),
         ALLOWED_LLM_CONFIG_KEYS=set(settings.LLM.allowed_config_keys),
@@ -190,6 +195,7 @@ def create_app():
     from .routes.entries_stream import entries_stream_bp
     from .routes.search import search_bp
     from .routes.tags import tags_bp
+    from .routes.images import images_bp
     from .api.lockbox_api import lockbox_bp
 
     app.register_blueprint(auth_bp)
@@ -198,6 +204,7 @@ def create_app():
     app.register_blueprint(entries_stream_bp)
     app.register_blueprint(search_bp)
     app.register_blueprint(tags_bp)
+    app.register_blueprint(images_bp)
     app.register_blueprint(lockbox_bp)
 
     from datetime import datetime

@@ -1,0 +1,36 @@
+{#- An entry's images as square thumbnails; the lightbox (image-lightbox.js)
+    opens the display variant, with data-width/height reserving its box. The
+    wrapper always exists on user entries so removals can swap it
+    out-of-band. data-textless marks an entry without text: removing its last
+    image deletes the entry, and the lightbox asks accordingly. -#}
+{% macro render_entry_images(e, oob=False) -%}
+{% set images = e.get('images') or [] %}
+{% set textless = not (e.get('text') or '')|trim %}
+<div id="entry-images-{{ e['id'] }}"
+     class="entry-images-slot"
+     data-entry-id="{{ e['id'] }}"
+     data-textless="{{ 'true' if textless else 'false' }}"{% if oob %}
+     hx-swap-oob="outerHTML"{% endif %}>
+  {% if images %}
+  <ul class="entry-images" role="list" aria-label="Images">
+    {% for image in images %}
+    <li>
+      <button type="button"
+              class="entry-image"
+              data-lightbox-item
+              data-image-id="{{ image.id }}"
+              data-width="{{ image.width }}"
+              data-height="{{ image.height }}"
+              aria-label="Open image {{ loop.index }} of {{ images|length }}">
+        <img src="{{ url_for('images.image_variant', image_id=image.id, variant='thumb') }}"
+             alt=""
+             loading="lazy"
+             decoding="async">
+      </button>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>
+{%- endmacro %}
+{% if entry is defined %}{{ render_entry_images(entry, oob=oob|default(False)) }}{% endif %}

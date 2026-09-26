@@ -1,5 +1,4 @@
 import { createListenerBag } from "../utils/events.js";
-import { draftStore } from "../utils/storage.js";
 import {
   applyTimezoneHeader,
   applyTimezoneSearchParam,
@@ -12,6 +11,7 @@ import {
   getTimezone,
   TIMEZONE_QUERY_PARAM,
 } from "./datetime.js";
+import { clearDraft, isEmptyDraft, readDraft, writeDraft } from "./drafts.js";
 
 const ESCAPED_TIMEZONE_PARAM = TIMEZONE_QUERY_PARAM.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const TIMEZONE_QUERY_PARAM_PATTERN = new RegExp(`[?&]${ESCAPED_TIMEZONE_PARAM}=`);
@@ -124,13 +124,19 @@ export function navigateToToday(zone = getTimezone()) {
  * already the URL: no query string, no extra Back step.
  */
 export function rollOverToToday(fromDay, today = updateClientToday()) {
+  // The unsent draft (text and uploaded images) moves to the new day.
   const composer = document.getElementById("entry-text");
-  const unsent = (composer?.value ?? "") || (fromDay ? draftStore.get(fromDay) : "") || "";
+  const attach = document.querySelector("#entry-form image-attach");
+  const saved = readDraft(fromDay);
+  const unsent = {
+    text: composer?.value || saved.text,
+    images: attach?.ids?.length ? attach.ids : saved.images,
+  };
   if (fromDay && fromDay !== today) {
-    draftStore.delete(fromDay);
+    clearDraft(fromDay);
   }
-  if (unsent.trim() && today && !draftStore.get(today)) {
-    draftStore.set(today, unsent);
+  if (!isEmptyDraft(unsent) && today && isEmptyDraft(readDraft(today))) {
+    writeDraft(today, unsent);
   }
 
   const htmx = globalThis.htmx;

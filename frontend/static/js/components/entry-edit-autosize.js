@@ -97,13 +97,30 @@ function scheduleCaretPlacement(textarea, force = false) {
   });
 }
 
+// An edit can be saved with text, images or both, but not while an image is
+// still uploading. (The <image-attach> tray may not be upgraded yet while its
+// module loads; its images then count as they were rendered.)
+function editState(form) {
+  const textarea = form?.querySelector(".entry-edit-area");
+  const attach = form?.querySelector("image-attach");
+  let images = attach?.ids?.length;
+  if (images === undefined) {
+    try {
+      images = JSON.parse(attach?.dataset.initialIds || "[]").length;
+    } catch {
+      images = 0;
+    }
+  }
+  const hasText = textarea instanceof HTMLTextAreaElement && Boolean(textarea.value.trim());
+  const empty = !hasText && !images;
+  const busy = Boolean(attach?.busy);
+  return { empty, busy, canSave: !empty && !busy };
+}
+
 function submitEdit(form) {
   if (!form || form.classList.contains("htmx-request")) return;
-  const textarea = form.querySelector(".entry-edit-area");
-  if (textarea instanceof HTMLTextAreaElement) {
-    if (!textarea.value.trim()) {
-      return;
-    }
+  if (!editState(form).canSave) {
+    return;
   }
   if (typeof form.requestSubmit === "function") {
     form.requestSubmit();
@@ -127,14 +144,14 @@ function bindTextarea(textarea) {
   const form = textarea.closest("form[data-entry-edit-form]");
   const saveButton = form?.querySelector(".entry-edit-save");
   const updateSaveState = () => {
-    const isEmpty = !textarea.value.trim();
+    const { empty, canSave } = editState(form);
     if (form) {
-      form.classList.toggle(EMPTY_EDIT_CLASS, isEmpty);
+      form.classList.toggle(EMPTY_EDIT_CLASS, empty);
     }
     if (saveButton instanceof HTMLButtonElement) {
-      saveButton.disabled = isEmpty;
-      saveButton.setAttribute(SAVE_DISABLED_ATTR, isEmpty ? "true" : "false");
-      saveButton.toggleAttribute(SAVE_DISABLED_DATA, isEmpty);
+      saveButton.disabled = !canSave;
+      saveButton.setAttribute(SAVE_DISABLED_ATTR, canSave ? "false" : "true");
+      saveButton.toggleAttribute(SAVE_DISABLED_DATA, !canSave);
     }
   };
   updateSaveState();
@@ -147,6 +164,7 @@ function bindTextarea(textarea) {
     resizeTextarea(textarea);
     updateSaveState();
   });
+  form?.addEventListener("image-attach:change", updateSaveState);
   textarea.addEventListener("blur", () => {
     if (!form) return;
     if (form.classList.contains("htmx-request")) return;
@@ -154,7 +172,7 @@ function bindTextarea(textarea) {
       form.removeAttribute(SKIP_BLUR_CANCEL_ATTR);
       return;
     }
-    if (!textarea.value.trim()) {
+    if (!editState(form).canSave) {
       updateSaveState();
       return;
     }
@@ -185,7 +203,7 @@ function bindTextarea(textarea) {
     if (event.key !== "Enter") return;
     if (!(event.metaKey || event.ctrlKey)) return;
     event.preventDefault();
-    if (!textarea.value.trim()) {
+    if (!editState(form).canSave) {
       updateSaveState();
       return;
     }
@@ -196,7 +214,7 @@ function bindTextarea(textarea) {
 
   if (form) {
     form.addEventListener("submit", (event) => {
-      if (!textarea.value.trim()) {
+      if (!editState(form).canSave) {
         event.preventDefault();
         updateSaveState();
       }

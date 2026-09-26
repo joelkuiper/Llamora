@@ -23,6 +23,7 @@ from llamora.app.db.entries import EntriesRepository
 from llamora.app.db.tags import TagsRepository
 from llamora.app.db.vectors import VectorsRepository
 from llamora.app.db.search_history import SearchHistoryRepository
+from llamora.app.db.images import ImagesRepository
 
 
 RepositoryT = TypeVar("RepositoryT")
@@ -44,6 +45,7 @@ class LocalDB:
         self._tags: TagsRepository | None = None
         self._vectors: VectorsRepository | None = None
         self._search_history: SearchHistoryRepository | None = None
+        self._images: ImagesRepository | None = None
         self._events: RepositoryEventBus | None = None
         self._init_lock = asyncio.Lock()
         self._sync_lock = threading.Lock()
@@ -107,6 +109,7 @@ class LocalDB:
                 self._tags = None
                 self._vectors = None
                 self._search_history = None
+                self._images = None
                 self._events = None
                 raise
 
@@ -122,6 +125,7 @@ class LocalDB:
             self._tags = None
             self._vectors = None
             self._search_history = None
+            self._images = None
             self._events = None
 
     async def _create_connection(self) -> aiosqlite.Connection:
@@ -169,6 +173,7 @@ class LocalDB:
         )
         self._vectors = VectorsRepository(self.pool)
         self._search_history = SearchHistoryRepository(self.pool)
+        self._images = ImagesRepository(self.pool)
         self._entries.set_on_entry_appended(self._on_entry_appended)
 
     def _require_repository(
@@ -213,6 +218,12 @@ class LocalDB:
         """Return the search history repository."""
 
         return self._require_repository(self._search_history, "Search history")
+
+    @property
+    def images(self) -> ImagesRepository:
+        """Return the images repository."""
+
+        return self._require_repository(self._images, "Images")
 
     async def _on_entry_appended(
         self, ctx: CryptoContext, entry_id: str, plaintext: str

@@ -231,6 +231,56 @@ async def reencrypt_entries(
     return total
 
 
+async def reencrypt_images(
+    db: LocalDB,
+    user_id: str,
+    old_dek: bytes,
+    new_dek: bytes,
+    new_epoch: int,
+    *,
+    batch_size: int = 100,
+) -> int:
+    """Re-wrap image file keys and metadata from *old_dek* to *new_dek*.
+
+    The encrypted files on disk are left alone: each has its own file key,
+    and only that key's wrapping changes.
+    """
+
+    if new_epoch <= 1:
+        return 0  # epoch 1 is the first; there is nothing older to move from
+    old_ctx = CryptoContext(user_id=user_id, dek=old_dek, epoch=max(new_epoch - 1, 1))
+    new_ctx = CryptoContext(user_id=user_id, dek=new_dek, epoch=new_epoch)
+    total = 0
+    try:
+        while True:
+            rows = await db.images.rows_not_at_epoch(
+                user_id, new_epoch, limit=batch_size
+            )
+            if not rows:
+                break
+            updates = []
+            for row in rows:
+                file_key = old_ctx.unwrap_image_key(
+                    row.id, row.key_nonce, row.key_cipher, row.alg
+                )
+                meta = old_ctx.decrypt_image_meta(
+                    row.id, row.meta_nonce, row.meta_cipher, row.alg
+                )
+                key_nonce, key_cipher, alg = new_ctx.wrap_image_key(row.id, file_key)
+                meta_nonce, meta_cipher = new_ctx.encrypt_image_meta(row.id, meta)
+                updates.append(
+                    (row.id, key_nonce, key_cipher, meta_nonce, meta_cipher, alg)
+                )
+            await db.images.update_wraps(user_id, updates)
+            total += len(updates)
+    finally:
+        old_ctx.drop()
+        new_ctx.drop()
+
+    logger.info("Re-wrapped %d image keys for user %s", total, user_id)
+    return total
+
+
 async def reencrypt_vectors(
     db: LocalDB,
     user_id: str,
@@ -527,6 +577,7 @@ async def full_reencryption(
     await reencrypt_vectors(db, user_id, old_dek, current_dek, current_epoch)
     await reencrypt_tags(db, user_id, old_dek, current_dek, current_epoch)
     await reencrypt_search_history(db, user_id, old_dek, current_dek, current_epoch)
+    await reencrypt_images(db, user_id, old_dek, current_dek, current_epoch)
     await purge_lockbox(db, user_id)
 
     # Mark all epochs before the current one as retired

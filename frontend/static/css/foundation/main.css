@@ -623,6 +623,15 @@ input[type="checkbox"]:focus {
 .icon-trash {
   --icon: url("../../icons/trash.svg");
 }
+.icon-x {
+  --icon: url("../../icons/x.svg");
+}
+.icon-image-plus {
+  --icon: url("../../icons/image-plus.svg");
+}
+.icon-maximize {
+  --icon: url("../../icons/maximize.svg");
+}
 .icon-reply {
   --icon: url("../../icons/reply.svg");
 }

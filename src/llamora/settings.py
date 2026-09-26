@@ -117,6 +117,17 @@ DEFAULTS: dict[str, Any] = {
         "busy_timeout": 5000,
         "mmap_size": 10 * 1024 * 1024,
     },
+    "IMAGES": {
+        "path": "images",
+        "max_upload_bytes": 20 * 1024 * 1024,
+        "max_pixels": 50_000_000,
+        "max_per_entry": 8,
+        "quality": 85,
+        "processing_concurrency": 2,
+        "pending_ttl": 24 * 60 * 60,
+        "sweep_interval": 60 * 60,
+        "sizes": {"thumb": 480, "display": 2048, "full": 4096},
+    },
     "MIGRATIONS": {
         "path": "migrations",
         "baseline_version": 1,
@@ -317,6 +328,13 @@ def _normalise_byte_budgets() -> None:
 
     settings.set("SEARCH.stream_global_memory_budget_bytes", stream_budget)
     settings.set("EMBEDDING.global_memory_budget_bytes", embedding_budget)
+    settings.set(
+        "IMAGES.max_upload_bytes",
+        _parse_byte_size(
+            settings.get("IMAGES.max_upload_bytes"),
+            default=int(DEFAULTS["IMAGES"]["max_upload_bytes"]),
+        ),
+    )
 
 
 def _normalise_secret_key() -> None:

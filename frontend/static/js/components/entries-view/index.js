@@ -6,6 +6,7 @@ import "../scroll-edge-button.js";
 import "../entry-tags.js";
 import "../entry-edit-autosize.js";
 import "../char-counter.js";
+import "../image-attach.js";
 
 function registerEntryElements() {
   if (!customElements.get("entry-view")) {

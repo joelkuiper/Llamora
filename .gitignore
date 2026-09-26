@@ -13,6 +13,8 @@ node_modules/
 .DS_Store
 *.sqlite
 *.sqlite3
+# Encrypted image attachments (IMAGES.path default)
+/images/
 
 # Created by GitHub
 # Byte-compiled / optimized / DLL files

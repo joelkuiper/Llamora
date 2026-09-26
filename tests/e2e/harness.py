@@ -52,6 +52,9 @@ LOG_LEVEL = "INFO"
 [default.DATABASE]
 path = "{db_path}"
 
+[default.IMAGES]
+path = "{db_path.parent / "images"}"
+
 [default.LLM.upstream]
 host = "{llm_url}"
 
@@ -68,6 +71,7 @@ class LiveServer:
     url: str
     process: subprocess.Popen[bytes]
     log_path: Path
+    images_dir: Path
 
     def log_tail(self, lines: int = 60) -> str:
         try:
@@ -134,7 +138,10 @@ def start_server(
         stderr=subprocess.STDOUT,
     )
     server = LiveServer(
-        url=f"http://127.0.0.1:{port}", process=process, log_path=log_path
+        url=f"http://127.0.0.1:{port}",
+        process=process,
+        log_path=log_path,
+        images_dir=workdir / "images",  # IMAGES.path in write_config
     )
 
     deadline = time.monotonic() + STARTUP_TIMEOUT
@@ -263,37 +270,129 @@ class ApiClient:
     def __init__(self, base_url: str, storage_state_path: Path) -> None:
         state = json.loads(storage_state_path.read_text(encoding="utf-8"))
         cookies = httpx.Cookies()
-        self._tz = "UTC"
+        tz = "UTC"
         for cookie in state.get("cookies", []):
             cookies.set(cookie["name"], cookie["value"], domain=cookie["domain"])
             if cookie["name"] == "tz":
-                self._tz = unquote(cookie["value"]) or "UTC"
-        self._client = httpx.Client(base_url=base_url, cookies=cookies, timeout=30.0)
+                tz = unquote(cookie["value"]) or "UTC"
+        self._start(httpx.Client(base_url=base_url, cookies=cookies, timeout=30.0), tz)
+
+    @classmethod
+    def logged_in(cls, base_url: str, user: User) -> ApiClient:
+        """Log in through the /login form over plain HTTP (no browser)."""
+        client = httpx.Client(base_url=base_url, timeout=30.0)
+        form_page = client.get("/login")
+        form_page.raise_for_status()
+        match = _CSRF_INPUT_RE.search(form_page.text)
+        assert match, "csrf_token not found on /login"
+        resp = client.post(
+            "/login",
+            data={
+                "username": user.username,
+                "password": user.password,
+                "csrf_token": match.group(1),
+            },
+        )
+        assert resp.status_code < 400, f"login failed: {resp.status_code}"
+        self = cls.__new__(cls)
+        self._start(client, "UTC")
+        return self
+
+    def _start(self, client: httpx.Client, tz: str) -> None:
+        self._tz = tz
+        self._client = client
         page = self._client.get("/d/today")
         page.raise_for_status()
         match = _BODY_CSRF_RE.search(page.text)
         assert match, "csrf token not found on /d/today; is the session logged in?"
         self._headers = {"X-CSRFToken": match.group(1), "HX-Request": "true"}
 
+    @property
+    def http(self) -> httpx.Client:
+        """The logged-in client, for requests the helpers don't cover."""
+        return self._client
+
+    @property
+    def headers(self) -> dict[str, str]:
+        """CSRF and htmx headers, as the app's own requests send them."""
+        return dict(self._headers)
+
     def close(self) -> None:
         self._client.close()
 
-    def create_entry(self, day: date, text: str) -> str:
+    def create_entry(
+        self, day: date, text: str, *, image_ids: list[str] | None = None
+    ) -> str:
         """Create a user entry at noon on ``day`` in the user's zone; return its id.
 
         The server files entries by ``user_time`` in the zone from the session's
         ``tz`` cookie, so noon *local* keeps the entry on ``day`` in any zone.
         """
-        noon = datetime(day.year, day.month, day.day, 12, tzinfo=ZoneInfo(self._tz))
-        resp = self._client.post(
-            f"/e/{day.isoformat()}/entry",
-            data={"text": text, "user_time": noon.isoformat()},
-            headers=self._headers,
-        )
+        resp = self.post_entry(day, text, image_ids=image_ids)
         resp.raise_for_status()
         match = _ENTRY_ID_RE.search(resp.text)
         assert match, f"entry id not found in response: {resp.text[:200]}"
         return match.group(1)
+
+    def post_entry(
+        self, day: date, text: str, *, image_ids: list[str] | None = None
+    ) -> httpx.Response:
+        """The raw entry-form POST (for asserting on refusals)."""
+        noon = datetime(day.year, day.month, day.day, 12, tzinfo=ZoneInfo(self._tz))
+        data: dict[str, str | list[str]] = {"text": text, "user_time": noon.isoformat()}
+        if image_ids:
+            data["image_ids"] = list(image_ids)
+        return self._client.post(
+            f"/e/{day.isoformat()}/entry", data=data, headers=self._headers
+        )
+
+    def update_entry(
+        self, entry_id: str, text: str, *, image_ids: list[str] | None = None
+    ) -> httpx.Response:
+        """Edit an entry; ``image_ids=[]`` clears its images, None keeps them."""
+        data: dict[str, str | list[str]] = {"text": text}
+        if image_ids is not None:
+            # A single empty value is how a form says "no images".
+            data["image_ids"] = list(image_ids) or [""]
+        return self._client.put(
+            f"/e/entry/{entry_id}", data=data, headers=self._headers
+        )
+
+    def delete_entry(self, entry_id: str) -> httpx.Response:
+        return self._client.delete(f"/e/entry/{entry_id}", headers=self._headers)
+
+    def upload_image(
+        self,
+        data: bytes,
+        *,
+        filename: str = "photo.jpg",
+        content_type: str = "image/jpeg",
+        csrf: bool = True,
+    ) -> httpx.Response:
+        headers = self._headers if csrf else {"HX-Request": "true"}
+        return self._client.post(
+            "/i",
+            files={"image": (filename, data, content_type)},
+            headers=headers,
+        )
+
+    def upload_image_id(self, data: bytes, **kwargs) -> str:
+        resp = self.upload_image(data, **kwargs)
+        assert resp.status_code == 201, f"{resp.status_code}: {resp.text[:200]}"
+        return resp.json()["id"]
+
+    def get_image(
+        self, image_id: str, variant: str = "display", **kwargs
+    ) -> httpx.Response:
+        return self._client.get(f"/i/{image_id}/{variant}", **kwargs)
+
+    def delete_image(
+        self, image_id: str, *, with_entry: bool = False
+    ) -> httpx.Response:
+        params = {"with_entry": "1"} if with_entry else None
+        return self._client.delete(
+            f"/i/{image_id}", params=params, headers=self._headers
+        )
 
     def start_reply(self, entry_id: str, day: date) -> int:
         """Start a model reply and keep watching it, like an open browser tab.

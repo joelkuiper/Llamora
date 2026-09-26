@@ -105,6 +105,9 @@ async def get_entries_context(
     services = get_services()
     entries = await services.db.entries.get_entries_for_date(ctx, date)
     _render_entries_markdown(entries)
+    await services.images.attach_refs(
+        ctx, [item["entry"] for item in entries if isinstance(item.get("entry"), dict)]
+    )
 
     today_date = local_date()
     today = today_date.isoformat()

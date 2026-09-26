@@ -77,6 +77,14 @@ const FEATURE_IMPORTS = {
     selector: "scroll-edge-button",
     loader: () => import("../components/scroll-edge-button.js"),
   },
+  imageLightbox: {
+    selector: "[data-lightbox-item]",
+    loader: () => import("../components/image-lightbox.js"),
+  },
+  imageAttach: {
+    selector: "image-attach",
+    loader: () => import("../components/image-attach.js"),
+  },
   profile: {
     selector: "[data-profile-modal]",
     loader: () =>

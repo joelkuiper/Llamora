@@ -63,6 +63,7 @@ git config core.hooksPath .githooks    # pre-commit: ruff + biome on staged file
 - **Persistence:** `persistence/local_db.py` → `LocalDB` facade. Repositories: `db.users`, `db.entries`, `db.tags`, `db.vectors`, `db.search_history`, `db.sessions`, `db.ttl_store`. Raw SQL, no ORM.
 - **LLM:** `llm/` — prompt templates (Jinja2 in `llm/templates/`), tokenizer configs, OpenAI client wrapper. Upstream URLs (`LLM.upstream.host`, `LLM.chat.base_url`, `/v1`) are resolved only in `llm/endpoints.py`.
 - **Config:** Dynaconf. `config/settings.toml` (defaults) → `config/settings.local.toml` (overrides) → env vars (`LLAMORA_LLM__UPSTREAM__HOST` style). Read via `settings`, never `os.environ`.
+- **Images:** `app/services/images/` (processing, file format, blob store, `ImageService`), rows in `db.images`, routes in `routes/images.py`. Files live under `IMAGES.path`, encrypted with per-image keys wrapped by the DEK; spec in `doc/specs/images.md`.
 - **Encryption:** All content encrypted at rest (XChaCha20-Poly1305 + AAD, per-record nonce). Password → Argon2ID → wrapping key → DEK (in-memory only). Migrations must never break encrypted content.
 
 ### Frontend (`frontend/`)

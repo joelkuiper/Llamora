@@ -55,6 +55,13 @@ from llamora.app.util.tags import emoji_shortcode, suggest_emoji_shortcodes
 
 
 tags_bp = Blueprint("tags", __name__)
+
+
+async def _with_images(ctx: CryptoContext, entries) -> None:
+    """Give presented archive entries their image refs (one query)."""
+    await get_services().images.attach_refs(ctx, [item.entry for item in entries])
+
+
 DEFAULT_TAG_ENTRIES_LIMIT = 12
 
 
@@ -278,6 +285,8 @@ async def _render_tags_page(selected_tag: str | None):
         selected_tag=selected_tag or (request.args.get("tag") or ""),
     )
     presented_tags_view = present_tags_view_data(tags_view_data)
+    if presented_tags_view.detail:
+        await _with_images(ctx, presented_tags_view.detail.entries)
     selected = tags_view_data.selected_tag or selected
     heatmap_offset = 0
     activity_heatmap = await _build_activity_heatmap(
@@ -376,6 +385,8 @@ async def _render_tags_detail_and_list_oob_updates(
         ctx, context
     )
     presented_tags_view = present_tags_view_data(tags_view)
+    if presented_tags_view.detail:
+        await _with_images(ctx, presented_tags_view.detail.entries)
     return await render_template(
         "components/tags/detail.html",
         day=str(context["day"]),
@@ -656,6 +667,8 @@ async def delete_trace(tag_hash: str):
     )
     selected_tag = tags_view.selected_tag
     presented_tags_view = present_tags_view_data(tags_view)
+    if presented_tags_view.detail:
+        await _with_images(ctx, presented_tags_view.detail.entries)
     html = await render_template(
         "components/tags/detail.html",
         day=day,
@@ -826,6 +839,8 @@ async def tags_view_detail_fragment(date: str):
         around_entry_id=restore_entry,
     )
     presented_detail = present_archive_detail(detail) if detail else None
+    if presented_detail:
+        await _with_images(ctx, presented_detail.entries)
     selected_tag = detail.name if detail else (tag_name or "")
     heatmap_offset = 0
     activity_heatmap = await _build_activity_heatmap(
@@ -920,10 +935,12 @@ async def tags_view_detail_entries_chunk(date: str, tag_hash: str):
     )
     if not entries:
         return ""
+    presented_entries = present_archive_entries(entries)
+    await _with_images(ctx, presented_entries)
     return await render_template(
         "components/tags/entries_chunk.html",
         day=normalized_date,
-        entries=present_archive_entries(entries),
+        entries=presented_entries,
         selected_tag=selected_tag,
         tag_hash=tag_hash,
         has_more=has_more,

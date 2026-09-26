@@ -1,0 +1,326 @@
+/* Attaching images: the tray, its tiles and the drop overlay (spec §10.1). */
+
+/* The text box and, in its bottom-right corner, a small attach button.
+   (Beats `#entry-form .input-wrapper button`, which sizes the Send button.) */
+#entry-form .input-wrapper .entry-text-field {
+  position: relative;
+  flex: 1;
+  display: flex;
+  min-width: 0;
+
+  textarea {
+    /* Keep the last line clear of the button. */
+    padding-right: 2.4rem;
+  }
+}
+
+#entry-form .input-wrapper .image-attach__pick {
+  position: absolute;
+  right: 0.45rem;
+  bottom: 0.45rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-text-muted);
+  opacity: 0.7;
+  cursor: pointer;
+  transition:
+    color var(--motion-gentle) ease,
+    opacity var(--motion-gentle) ease,
+    background-color var(--motion-gentle) ease;
+
+  .icon-mask {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  &:hover:not(:disabled) {
+    opacity: 1;
+    color: var(--color-text);
+    background: var(--accent-05);
+  }
+
+  &:focus-visible {
+    outline: none;
+    opacity: 1;
+    box-shadow: 0 0 0 2px var(--accent-20);
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+}
+
+image-attach {
+  display: block;
+}
+
+image-attach:not([data-has-images]) .image-attach__tray {
+  display: none;
+}
+
+.image-attach__tray {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.image-attach__tile {
+  position: relative;
+  width: 4rem;
+  height: 4rem;
+  flex: none;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-alt);
+  box-shadow: inset 0 0 0 1px var(--border);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease,
+    width 160ms ease,
+    margin 160ms ease;
+
+  &:focus-visible {
+    outline: none;
+    box-shadow:
+      inset 0 0 0 1px var(--border),
+      0 0 0 2px var(--accent-30);
+  }
+
+  &.is-leaving {
+    opacity: 0;
+    transform: scale(0.9);
+    width: 0;
+    margin-right: calc(-1 * var(--spacing-sm));
+  }
+}
+
+.image-attach__preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  transition: opacity var(--motion-gentle) ease;
+}
+
+.image-attach__tile[data-state="queued"] .image-attach__preview,
+.image-attach__tile[data-state="uploading"] .image-attach__preview {
+  opacity: 0.55;
+}
+
+/* A thin bar along the bottom edge while uploading: no spinners. */
+.image-attach__progress {
+  position: absolute;
+  left: 0.35rem;
+  right: 0.35rem;
+  bottom: 0.3rem;
+  height: 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-surface), transparent 35%);
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity var(--motion-gentle) ease;
+
+  > span {
+    display: block;
+    height: 100%;
+    width: calc(var(--progress, 0) * 100%);
+    background: var(--accent);
+    transition: width 120ms linear;
+  }
+}
+
+.image-attach__tile[data-state="queued"] .image-attach__progress,
+.image-attach__tile[data-state="uploading"] .image-attach__progress {
+  opacity: 1;
+}
+
+.image-attach__tile[data-state="failed"] {
+  background: var(--color-error-bg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-error-border), transparent 55%);
+
+  /* The preview of a refused file may not even be an image. */
+  .image-attach__preview {
+    visibility: hidden;
+  }
+}
+
+.image-attach__message {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem;
+  text-align: center;
+  font-size: 0.62rem;
+  line-height: 1.15;
+  color: var(--color-error-text);
+  pointer-events: none;
+}
+
+.image-attach__message:empty {
+  display: none;
+}
+
+/* Always visible (touch screens can't hover); a small disc overlapping the
+   top-right corner, with a larger hit area than it looks. */
+.image-attach__remove {
+  position: absolute;
+  top: -0.45rem;
+  right: -0.45rem;
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--color-black), transparent 25%);
+  color: var(--color-white);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition:
+    transform var(--motion-press) ease,
+    background-color var(--motion-gentle) ease;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: -0.3rem;
+  }
+
+  .icon-mask {
+    width: 0.8rem;
+    height: 0.8rem;
+  }
+
+  &:hover {
+    background: var(--color-black);
+  }
+
+  &:active {
+    transform: scale(0.92);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--accent-30);
+  }
+}
+
+.image-attach__note {
+  margin: var(--spacing-xs) 0 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* Drop overlay: covers the entry form while files are dragged over the page. */
+.image-attach__overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  border-radius: inherit;
+  border: 2px dashed color-mix(in srgb, var(--accent), transparent 30%);
+  background: color-mix(in srgb, var(--glass-bg-opaque), var(--accent) 8%);
+  color: var(--color-text);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 150ms ease,
+    visibility 0s linear 150ms;
+
+  &.is-visible {
+    opacity: 1;
+    visibility: visible;
+    transition:
+      opacity 150ms ease,
+      visibility 0s;
+  }
+}
+
+.image-attach__overlay-icon {
+  width: 1.75rem;
+  height: 1.75rem;
+  color: var(--accent);
+}
+
+.image-attach__overlay-label {
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image-attach__tile,
+  .image-attach__overlay,
+  .image-attach__overlay.is-visible,
+  .image-attach__progress > span {
+    transition: none;
+  }
+}
+
+/* -- editing an entry ------------------------------------------------------ */
+
+/* The tray takes over while editing; the entry's own grid returns on save. */
+.entry:has(.entry-main--editing) .entry-images-slot {
+  display: none;
+}
+
+#entries .entry-edit-form[data-image-drop-form] {
+  position: relative;
+}
+
+#entries .entry-edit-form image-attach .image-attach__tray {
+  margin-top: var(--spacing-xs);
+}
+
+#entries .entry-edit-form .image-attach__overlay {
+  inset: -0.5rem;
+  border-radius: var(--radius-md);
+}
+
+/* "Attach image" in the edit strip: an icon-only pill outlined like Save and
+   Cancel, but with no fill: a gray outline at rest, a blue glow on hover. */
+#entries .entry-edit-strip .entry-edit-attach {
+  padding: 4px 8px;
+  color: var(--color-text-muted);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-text-muted) 22%, transparent);
+
+  .icon-mask {
+    width: 0.95rem;
+    height: 0.95rem;
+  }
+
+  &:hover,
+  &:focus-visible {
+    color: var(--accent);
+    background: transparent;
+    box-shadow:
+      0 0 0 2px var(--accent-20),
+      0 0 18px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+
+  &:active {
+    background: transparent;
+    box-shadow: 0 0 0 2px var(--accent-30);
+  }
+}

@@ -159,6 +159,52 @@ class CryptoContext:
             ct, aad, nonce, self._require_key()
         )
 
+    def wrap_image_key(self, image_id: str, file_key: bytes):
+        """Encrypt an image's file key under the DEK; returns (nonce, ct, alg)."""
+
+        epoch = _require_epoch(self.epoch, operation="wrap_image_key")
+        if len(file_key) != 32:
+            raise ValueError("image file keys are 32 bytes")
+        nonce = utils.random(24)
+        aad = f"{self.user_id}|{image_id}|image-key|{ALG.decode()}".encode("utf-8")
+        ct = crypto_aead_xchacha20poly1305_ietf_encrypt(
+            file_key, aad, nonce, self._require_key()
+        )
+        descriptor = CryptoDescriptor(algorithm=ALG.decode(), epoch=epoch)
+        return nonce, ct, descriptor.encode_bytes()
+
+    def unwrap_image_key(
+        self, image_id: str, nonce: bytes, ct: bytes, alg: bytes
+    ) -> bytes:
+        alg_name = CryptoDescriptor.parse(alg).algorithm
+        aad = f"{self.user_id}|{image_id}|image-key|{alg_name}".encode("utf-8")
+        return crypto_aead_xchacha20poly1305_ietf_decrypt(
+            ct, aad, nonce, self._require_key()
+        )
+
+    def encrypt_image_meta(self, image_id: str, meta: bytes):
+        """Encrypt an image's metadata JSON; returns (nonce, ct).
+
+        The row's ``alg`` (from :meth:`wrap_image_key`) covers both values.
+        """
+
+        _require_epoch(self.epoch, operation="encrypt_image_meta")
+        nonce = utils.random(24)
+        aad = f"{self.user_id}|{image_id}|image-meta|{ALG.decode()}".encode("utf-8")
+        ct = crypto_aead_xchacha20poly1305_ietf_encrypt(
+            meta, aad, nonce, self._require_key()
+        )
+        return nonce, ct
+
+    def decrypt_image_meta(
+        self, image_id: str, nonce: bytes, ct: bytes, alg: bytes
+    ) -> bytes:
+        alg_name = CryptoDescriptor.parse(alg).algorithm
+        aad = f"{self.user_id}|{image_id}|image-meta|{alg_name}".encode("utf-8")
+        return crypto_aead_xchacha20poly1305_ietf_decrypt(
+            ct, aad, nonce, self._require_key()
+        )
+
     def encrypt_lockbox(self, namespace: str, key: str, plaintext: bytes) -> bytes:
         nonce = utils.random(24)
         aad = f"{self.user_id}:{namespace}:{key}".encode("utf-8")

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import base64
 import binascii
+import os
 from collections.abc import Iterable
+from pathlib import Path
 
 from llamora.settings import settings
 from llamora.app.util.number import coerce_float, coerce_int
@@ -121,6 +123,59 @@ def _validate_session_settings() -> Iterable[str]:
         yield "SESSION.cookie_touch_interval must not exceed SESSION.idle_ttl."
 
 
+# WebP (every stored image variant) cannot be larger than this on either side.
+_WEBP_MAX_EDGE = 16383
+
+
+def _validate_images() -> Iterable[str]:
+    images = settings.get("IMAGES") or {}
+
+    raw_path = _normalise_text(_get_value(images, "path"))
+    if not raw_path:
+        yield "IMAGES.path must name a directory for encrypted image files."
+    else:
+        path = Path(raw_path).expanduser().resolve()
+        if path.exists() and not path.is_dir():
+            yield f"IMAGES.path ({path}) exists but is not a directory."
+        else:
+            # The directory is created on startup: its nearest existing
+            # ancestor must be writable.
+            existing = path
+            while not existing.exists() and existing != existing.parent:
+                existing = existing.parent
+            if not os.access(existing, os.W_OK | os.X_OK):
+                yield f"IMAGES.path ({path}) is not writable."
+
+    limits: tuple[tuple[str, int, int | None], ...] = (
+        ("max_upload_bytes", 1024, None),
+        ("max_pixels", 1, None),
+        ("max_per_entry", 1, 100),
+        ("quality", 1, 100),
+        ("processing_concurrency", 1, 64),
+        ("pending_ttl", 60, None),
+        ("sweep_interval", 60, None),
+    )
+    for name, low, high in limits:
+        value = coerce_int(_get_value(images, name))
+        if value is None or value < low or (high is not None and value > high):
+            bounds = f"between {low} and {high}" if high else f"at least {low}"
+            yield f"IMAGES.{name} must be an integer {bounds}."
+
+    sizes = _get_value(images, "sizes") or {}
+    edges: list[int] = []
+    for variant in ("thumb", "display", "full"):
+        edge = coerce_int(_get_value(sizes, variant))
+        if edge is None or not 1 <= edge <= _WEBP_MAX_EDGE:
+            yield (
+                f"IMAGES.sizes.{variant} must be an integer between 1 and "
+                f"{_WEBP_MAX_EDGE} (pixels)."
+            )
+            return
+        edges.append(edge)
+    if edges != sorted(edges):
+        yield "IMAGES.sizes must grow: thumb <= display <= full."
+
+
 def validate_settings() -> list[str]:
     """Return a list of configuration validation error messages."""
 
@@ -130,6 +185,7 @@ def validate_settings() -> list[str]:
     errors.extend(_validate_llm_summary_settings())
     errors.extend(_validate_secrets())
     errors.extend(_validate_session_settings())
+    errors.extend(_validate_images())
     return errors
 
 

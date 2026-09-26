@@ -200,9 +200,13 @@ flowchart LR
 | Embeddings | XChaCha20-Poly1305 + AAD | Ciphertext only |
 | Tag names | XChaCha20-Poly1305 + AAD | Deterministic hash (for grouping) |
 | Search queries | XChaCha20-Poly1305 + AAD | Deterministic hash (for dedup) |
+| Images | Own key per image (wrapped by the DEK), libsodium secretstream on disk | File sizes, which entry, timestamps |
+| Image filenames & dimensions | XChaCha20-Poly1305 + AAD | Ciphertext only |
 | Passwords | Argon2ID hash | Non-reversible hash |
 
 Each record carries its own random nonce and authenticated additional data (AAD) binding it to the user and entry, preventing ciphertext reuse across contexts.
+
+**Images** are decoded and re-encoded before they are stored, so EXIF (including GPS location), colour profiles and anything appended to the file are dropped; the original upload is never kept. Each image is stored in three sizes (thumbnail, display, full) as WebP files under `IMAGES.path`, each encrypted in 64 KiB chunks with a random per-image key. Only that key, wrapped by the DEK, lives in the database, so a DEK rotation re-wraps keys without rewriting files. A file moved to another image, truncated or altered fails to decrypt.
 
 **Digests** — each entry stores an HMAC-SHA256 digest derived from the DEK, entry ID, role, and plaintext. The server can compare digests for caching and deduplication without decrypting content.
 
@@ -303,6 +307,28 @@ uv run llamora-server dev
 </details>
 
 All available sections and their defaults are documented inline in [`config/settings.toml`](config/settings.toml). llama.cpp-specific parameters (`top_k`, `mirostat`, etc.) can be passed via `LLM.chat.parameters`, but only keys in `LLM.chat.parameter_allowlist` are forwarded upstream.
+
+<details>
+<summary><strong>Images</strong></summary>
+
+Images attached to entries are stored encrypted in a directory of their own, next to (not inside) the database:
+
+```toml
+[default.IMAGES]
+path = "images"              # relative to the working directory, like DATABASE.path
+max_upload_bytes = "20MiB"
+max_per_entry = 8
+pending_ttl = 86400          # seconds an upload may wait to be sent with an entry
+
+[default.IMAGES.sizes]       # longest edge in pixels; never upscaled
+thumb = 480
+display = 2048
+full = 4096
+```
+
+**Back up the images directory together with the database.** The files are useless without the database (their keys live there), and the database's images are gone without the files. Uploads that are never sent, and images of deleted entries, are removed by a periodic sweep (`sweep_interval`). The remaining options are in [`config/settings.toml`](config/settings.toml).
+
+</details>
 
 **Prompt templates** are Jinja2 files in `src/llamora/llm/templates` (`system.txt.j2`, `opening_system.txt.j2`, `opening_recap.txt.j2`). Edit them directly — no Python changes needed. Changes take effect on restart. Override the directory with `LLAMORA_PROMPTS__TEMPLATE_DIR`.
 

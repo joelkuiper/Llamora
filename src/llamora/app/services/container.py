@@ -27,6 +27,8 @@ from llamora.app.services.service_pulse import ServicePulse
 from llamora.app.services.search_config import SearchConfig
 from llamora.app.services.vector_search import VectorSearchService
 from llamora.app.services.invalidation_coordinator import InvalidationCoordinator
+from llamora.app.services.images.blob_store import BlobStore
+from llamora.app.services.images.service import ImageConfig, ImageService
 from llamora.app.services.digest_policy import (
     DIGEST_POLICY_VERSION,
     ENTRY_DIGEST_VERSION,
@@ -48,6 +50,7 @@ class AppServices:
     search_api: SearchAPI
     llm_service: LLMService
     service_pulse: ServicePulse
+    images: ImageService
     ttl_store: TTLStore | None = None
     login_failures: LoginFailuresRepository | None = None
 
@@ -78,6 +81,8 @@ class AppServices:
             service_pulse=service_pulse,
         )
         db.set_search_api(search_api)
+        image_config = ImageConfig.from_settings(settings)
+        images = ImageService(db, BlobStore(image_config.root), image_config)
         return cls(
             db=db,
             vector_search=vector_search,
@@ -86,6 +91,7 @@ class AppServices:
             search_api=search_api,
             llm_service=llm_service,
             service_pulse=service_pulse,
+            images=images,
         )
 
 
@@ -135,6 +141,7 @@ class AppLifecycle:
             try:
                 await self._services.db.init()
                 db_initialised = True
+                await self._services.images.start()
 
                 assert self._services.db.pool is not None
                 ttl_store = TTLStore(self._services.db.pool)
@@ -229,6 +236,12 @@ class AppLifecycle:
         errors: list[Exception] = []
 
         try:
+            await self._services.images.stop()
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.exception("Failed to stop image sweeps cleanly")
+            errors.append(exc)
+
+        try:
             await self._services.llm_service.ensure_stopped()
         except Exception as exc:  # pragma: no cover - defensive logging occurs below
             logger.exception("Failed to stop LLM service cleanly")
@@ -281,6 +294,10 @@ class AppLifecycle:
                         if removed:
                             logger.debug("Purged %d expired TTL store entries", removed)
                 try:
+                    await self._services.images.maybe_sweep()
+                except Exception:  # pragma: no cover - defensive logging
+                    logger.exception("Image sweep scheduling failed")
+                try:
                     await self._services.search_api.maintenance_tick()
                 except Exception:  # pragma: no cover - defensive logging
                     logger.exception("Search maintenance tick failed")
@@ -302,6 +319,10 @@ def get_services() -> AppServices:
     if services is None:
         raise RuntimeError("App services container is not initialised")
     return services
+
+
+def get_image_service() -> ImageService:
+    return get_services().images
 
 
 def get_db() -> LocalDB:

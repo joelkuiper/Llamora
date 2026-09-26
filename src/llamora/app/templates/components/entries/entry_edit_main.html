@@ -15,6 +15,15 @@
                 spellcheck="true"
                 maxlength="{{ config.MAX_MESSAGE_LENGTH }}"
                 autofocus>{{- e.get('text', '') | e -}}</textarea>
+      {# The entry's images, editable like the entry form's tray. Always sent
+         (an empty value when none are left), so saving replaces the set. #}
+      <image-attach data-drop-zone="form"
+                    data-send-empty
+                    data-initial-ids="{{ (e.get('images') or []) | map(attribute='id') | list | tojson | forceescape }}"
+                    data-max-bytes="{{ config.IMAGE_MAX_UPLOAD_BYTES }}"
+                    data-max-count="{{ config.IMAGE_MAX_PER_ENTRY }}"
+                    data-upload-url="{{ url_for('images.upload_image') }}">
+      </image-attach>
       <div class="entry-edit-strip">
         <button type="submit"
                 class="entry-edit-save"
@@ -36,6 +45,13 @@
                 hx-swap="outerHTML transition:true">
           <span aria-hidden="true">×</span>
           <span class="entry-edit-label">Cancel</span>
+        </button>
+        <button type="button"
+                class="entry-edit-attach"
+                data-image-attach-pick
+                aria-label="Attach image"
+                data-tooltip-title="Attach image">
+          <span class="icon-mask icon-image-plus" aria-hidden="true"></span>
         </button>
         <span class="entry-char-counter"
               data-char-counter

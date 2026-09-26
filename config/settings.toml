@@ -78,6 +78,24 @@ timeout = 5.0
 busy_timeout = 5000
 mmap_size = 10485760
 
+# --- Images -------------------------------------------------------------
+# Encrypted image attachments. The directory is useless without the database
+# (the keys live there): back both up together.
+[default.IMAGES]
+path = "images"                 # relative to the working directory, like DATABASE.path
+max_upload_bytes = "20MiB"
+max_pixels = 50_000_000         # decoded width x height; larger uploads are refused
+max_per_entry = 8
+quality = 85                    # WebP quality for photos (transparency is lossless)
+processing_concurrency = 2      # images decoded at once (memory-bound)
+pending_ttl = 86400             # seconds an upload may wait to be sent with an entry
+sweep_interval = 3600           # seconds between cleanups of unused image files
+
+[default.IMAGES.sizes]          # longest edge in pixels; never upscaled
+thumb = 480
+display = 2048
+full = 4096
+
 # --- Migrations ---------------------------------------------------------
 [default.MIGRATIONS]
 path = "migrations"

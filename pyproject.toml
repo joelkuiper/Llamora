@@ -34,6 +34,10 @@ dependencies = [
     "beautifulsoup4>=4.12.3",
     "typer>=0.12.5",
     "rich>=14.3.2",
+    "pillow>=11.3.0",
+    # 3.1.8 fixes multipart uploads occasionally gaining a leading "\r\n"
+    # (pallets/werkzeug#3088), which corrupts uploaded images.
+    "werkzeug>=3.1.8",
 ]
 
 [project.scripts]
@@ -96,6 +100,8 @@ useLibraryCodeForTypes = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Shared test helpers (e.g. `from imaging import ...`).
+pythonpath = ["tests/support"]
 markers = [
     "e2e: browser end-to-end tests (Playwright); deselect with -m 'not e2e'",
 ]

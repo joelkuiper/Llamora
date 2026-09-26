@@ -37,6 +37,7 @@ from llamora.app.services.cache_registry import (
     MUTATION_ENTRY_CREATED,
 )
 from llamora.app.services.auth_helpers import login_required
+from llamora.app.db.images import ImageAttachError
 from llamora.app.services.container import get_services
 from llamora.app.services.entry_context import get_entries_context
 from llamora.app.services.markdown import render_markdown_to_html
@@ -101,6 +102,16 @@ def _require_user_entry(
         day = _entry_day(entry, today=today)
         if day != today:
             abort_http(403, "Editing is available on the current day only.")
+
+
+def _form_image_ids(form: Any) -> list[str] | None:
+    """``image_ids`` from a form: None when absent (leave images alone).
+
+    A single empty value means "no images", so a form can clear them.
+    """
+    if "image_ids" not in form:
+        return None
+    return [value.strip() for value in form.getlist("image_ids") if value.strip()]
 
 
 def _set_cache_invalidation_header(
@@ -210,14 +221,23 @@ async def entry_tags(entry_id: str):
 @login_required
 async def delete_entry(entry_id: str):
     _, user, _ctx = await require_encryption_context()
-    db = get_services().db
-    await ensure_entry_exists(db, user["id"], entry_id)
-    deleted_ids, root_role = await db.entries.delete_entry(user["id"], entry_id)
+    return await delete_entry_response(str(user["id"]), entry_id)
+
+
+async def delete_entry_response(user_id: str, entry_id: str) -> Response:
+    """Delete an entry (and its replies); the htmx response for the page."""
+
+    services = get_services()
+    db = services.db
+    await ensure_entry_exists(db, user_id, entry_id)
+    deleted_ids, root_role = await db.entries.delete_entry(user_id, entry_id)
     if deleted_ids:
         asyncio.create_task(
-            _safe_search_delete(user["id"], deleted_ids),
+            _safe_search_delete(user_id, deleted_ids),
             name=f"search-delete-{entry_id}",
         )
+    # Its images are now orphans; remove their files soon.
+    services.images.nudge()
     if root_role == "user":
         oob_targets = [f"entry-responses-{entry_id}"]
     else:
@@ -227,6 +247,7 @@ async def delete_entry(entry_id: str):
         for target_id in oob_targets
     )
     response = await make_response(oob_deletes, 200)
+    assert isinstance(response, Response)
     response.headers["HX-Trigger"] = json.dumps({"entries:changed": True})
     return response
 
@@ -236,22 +257,44 @@ async def delete_entry(entry_id: str):
 async def update_entry(entry_id: str):
     form = await request.form
     text = replace_emoji_shortcodes(form.get("text", ""))
+    image_ids = _form_image_ids(form)
     _, user, ctx = await require_encryption_context()
     uid = user["id"]
-    db = get_services().db
+    services = get_services()
+    db = services.db
 
     max_len = int(settings.LIMITS.max_message_length)
-    if not text.strip() or len(text) > max_len:
-        abort(400, description="Entry is empty or too long.")
+    if len(text) > max_len:
+        abort(400, description="Entry is too long.")
 
     current = await _load_entry_or_404(db=db, ctx=ctx, user_id=uid, entry_id=entry_id)
     _require_user_entry(current)
 
-    updated = await db.entries.update_entry_text(
-        ctx, entry_id, text, meta=current.get("meta", {})
-    )
+    if not text.strip():
+        # An entry may be only images, but never nothing at all.
+        has_images = (
+            bool(image_ids)
+            if image_ids is not None
+            else await db.images.count_for_entry(uid, entry_id) > 0
+        )
+        if not has_images:
+            abort(400, description="Entry is empty.")
+
+    try:
+        updated = await db.entries.update_entry_text(
+            ctx,
+            entry_id,
+            text,
+            meta=current.get("meta", {}),
+            image_ids=image_ids,
+            max_images=services.images.config.max_per_entry,
+        )
+    except ImageAttachError as exc:
+        abort_http(400, str(exc))
     if not updated:
         abort(404, description="Entry not found.")
+    if image_ids is not None:
+        services.images.nudge()  # images left out are orphans now
 
     asyncio.create_task(
         _safe_search_reindex(ctx, entry_id, text),
@@ -268,6 +311,13 @@ async def update_entry(entry_id: str):
         day=day,
         is_today=day == today,
     )
+    if image_ids is not None:
+        await services.images.attach_refs(ctx, [entry_payload])
+        html += await render_template(
+            "components/entries/entry_images.html",
+            entry=entry_payload,
+            oob=True,
+        )
     tag_hashes = tuple(
         str(tag.get("hash") or "").strip() for tag in tags if tag.get("hash")
     )
@@ -294,6 +344,7 @@ async def entry_edit(entry_id: str):
     today = local_date().isoformat()
     day = _entry_day(entry, today=today)
     entry_payload = _build_entry_payload(entry_id, entry)
+    await get_services().images.attach_refs(ctx, [entry_payload])
     return await render_template(
         "components/entries/entry_edit_main_only.html",
         entry=entry_payload,
@@ -329,11 +380,14 @@ async def send_entry(date):
     form = await request.form
     user_text = replace_emoji_shortcodes(form.get("text", "")).strip()
     user_time = form.get("user_time")
+    image_ids = _form_image_ids(form) or []
     _, user, ctx = await require_encryption_context()
+    images = get_services().images
 
     max_len = int(settings.LIMITS.max_message_length)
 
-    if not user_text or len(user_text) > max_len:
+    # An entry may be only images, but never nothing at all.
+    if (not user_text and not image_ids) or len(user_text) > max_len:
         abort(400, description="Entry is empty or too long.")
 
     tz = get_timezone()
@@ -356,8 +410,12 @@ async def send_entry(date):
             user_text,
             created_at=created_at,
             created_date=created_date,
+            image_ids=image_ids,
+            max_images=images.config.max_per_entry,
         )
         logger.debug("Saved entry %s", entry_id)
+    except ImageAttachError as exc:
+        abort_http(400, str(exc))
     except Exception:
         logger.exception("Failed to save entry")
         raise
@@ -372,6 +430,7 @@ async def send_entry(date):
         "tags": [],
         "created_at": created_at,
     }
+    await images.attach_refs(ctx, [entry_payload])
     html = await render_template(
         "components/entries/entries_list.html",
         entries=[{"entry": entry_payload, "responses": []}],
