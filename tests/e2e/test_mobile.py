@@ -266,3 +266,38 @@ def test_the_entry_box_uses_the_screen_width(phone: Page) -> None:
     no_sideways_scrolling(phone)
     send = phone.get_by_role("button", name="Send").bounding_box()
     assert send and send["width"] >= 44 and send["height"] >= 44, send
+
+
+def scroll_diary(page: Page, where: str) -> None:
+    """Scroll the diary's own scroll container (not the window) to an end."""
+    page.evaluate(
+        """where => {
+          const scrollers = [...document.querySelectorAll('*')].filter(el =>
+            el.scrollHeight > el.clientHeight + 40 &&
+            /auto|scroll/.test(getComputedStyle(el).overflowY));
+          const el = scrollers.sort((a, b) => b.scrollHeight - a.scrollHeight)[0];
+          el.scrollTop = where === 'top' ? 0 : el.scrollHeight;
+          el.dispatchEvent(new Event('scroll'));
+        }""",
+        where,
+    )
+
+
+def test_the_scroll_button_sits_low_on_wide_screens(
+    app_page: Page, api: ApiClient
+) -> None:
+    # Low in the window, but hidden near the bottom so it never covers the form.
+    for i in range(10):
+        api.create_entry(today_utc(), f"Filler {i} " + "a line of words. " * 12)
+    app_page.reload()
+    wait_for_app(app_page)
+    scroll_diary(app_page, "top")
+    button = app_page.locator('scroll-edge-button[data-direction="down"]')
+    expect(button).to_have_class(re.compile(r"\bvisible\b"))
+    box = button.locator(".scroll-btn").bounding_box()
+    assert box
+    from_bottom = app_page.viewport_size["height"] - (box["y"] + box["height"])
+    assert 80 <= from_bottom <= 110, from_bottom
+
+    scroll_diary(app_page, "bottom")
+    expect(button).not_to_have_class(re.compile(r"\bvisible\b"))

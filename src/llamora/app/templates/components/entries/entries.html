@@ -77,7 +77,8 @@
     </div>
     {% endif %}
 
-    <scroll-edge-button data-direction="down" data-edge-avoid="entry-form"></scroll-edge-button>
+    {# Hides near the bottom (clear of the entry form); otherwise sits low. #}
+    <scroll-edge-button data-direction="down" data-edge-avoid="entry-form" data-edge-offset="96"></scroll-edge-button>
   </entry-view>
   {% include 'components/shared/shared_popovers.html' %}
 </main>
