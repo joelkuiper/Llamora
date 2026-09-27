@@ -201,8 +201,8 @@
         OpenAI-compatible API, such as <a href="https://github.com/ggml-org/llama.cpp">llama.cpp</a>.
       </p>
       <pre><code><span class="comment"># 1. Start a local model</span>
-llama-server -hf bartowski/Meta-Llama-3.1-8B-Instruct-GGUF:Q4_K_M \
-  --port 8081 --jinja
+llama-server -hf unsloth/Qwen3-4B-Instruct-2507-GGUF \
+  --port 8081 -c 40000 --jinja
 
 <span class="comment"># 2. Install and run Llamora</span>
 uv sync

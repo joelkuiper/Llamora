@@ -124,11 +124,11 @@ More screenshots in [`doc/screenshots/`](doc/screenshots/).
 
 ```bash
 llama-server \
-  -hf bartowski/Meta-Llama-3.1-8B-Instruct-GGUF:Q4_K_M \
-  --port 8081 --jinja
+  -hf unsloth/Qwen3-4B-Instruct-2507-GGUF \
+  --port 8081 -c 40000 --jinja
 ```
 
-The Q4_K_M quantisation (~5 GB) is the current baseline. Weights are downloaded on first run. The `--jinja` flag is required for chat-template rendering. Any instruction-tuned model works — see the [bartowski recommended small models](https://huggingface.co/collections/bartowski/recommended-small-models) for alternatives.
+Qwen3 4B Instruct is the current baseline; `-c 40000` gives it room for a day's entries and their context. Weights are downloaded on first run. The `--jinja` flag is required for chat-template rendering. Any instruction-tuned model works — see the [bartowski recommended small models](https://huggingface.co/collections/bartowski/recommended-small-models) for alternatives.
 
 ### 2. Install and run
 
