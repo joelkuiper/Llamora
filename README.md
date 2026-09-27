@@ -206,7 +206,7 @@ flowchart LR
 
 Each record carries its own random nonce and authenticated additional data (AAD) binding it to the user and entry, preventing ciphertext reuse across contexts.
 
-**Images** are decoded and re-encoded before they are stored, so EXIF (including GPS location), colour profiles and anything appended to the file are dropped; the original upload is never kept. Each image is stored in three sizes (thumbnail, display, full) as WebP files under `IMAGES.path`, each encrypted in 64 KiB chunks with a random per-image key. Only that key, wrapped by the DEK, lives in the database, so a DEK rotation re-wraps keys without rewriting files. A file moved to another image, truncated or altered fails to decrypt.
+**Images** (JPEG, PNG, WebP, GIF and HEIC from iPhones) are decoded and re-encoded before they are stored, so EXIF (including GPS location), colour profiles and anything appended to the file are dropped; the original upload is never kept. Each image is stored in three sizes (thumbnail, display, full) as WebP files under `IMAGES.path`, each encrypted in 64 KiB chunks with a random per-image key. Only that key, wrapped by the DEK, lives in the database, so a DEK rotation re-wraps keys without rewriting files. A file moved to another image, truncated or altered fails to decrypt.
 
 **Digests** — each entry stores an HMAC-SHA256 digest derived from the DEK, entry ID, role, and plaintext. The server can compare digests for caching and deduplication without decrypting content.
 

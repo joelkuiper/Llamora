@@ -82,3 +82,11 @@ def decode(data: bytes) -> Image.Image:
 def noise(size=(256, 256)) -> Image.Image:
     """Random pixels: compresses badly, so encoded files span several chunks."""
     return Image.frombytes("RGB", size, os.urandom(size[0] * size[1] * 3))
+
+
+def heic(image: Image.Image | None = None, **params) -> bytes:
+    """An HEIC file (the iPhone's format), via pillow-heif."""
+    import pillow_heif
+
+    pillow_heif.register_heif_opener()
+    return encode(image or halves(), "HEIF", quality=80, **params)

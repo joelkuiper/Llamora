@@ -18,7 +18,16 @@
 
 import { ReactiveElement } from "../utils/reactive-element.js";
 
-const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const ACCEPTED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/heic",
+  "image/heif",
+];
+// Browsers often don't know HEIC's type, so the picker also offers them by name.
+const ACCEPTED_EXTENSIONS = [".heic", ".heif"];
 const MAX_PARALLEL_UPLOADS = 3;
 const COLLAPSE_MS = 160;
 
@@ -35,7 +44,10 @@ function isImageFile(file) {
   if (!file) return false;
   if (ACCEPTED_TYPES.includes(file.type)) return true;
   // Some platforms leave the type empty; the server decides in the end.
-  return !file.type && /\.(jpe?g|png|webp|gif)$/i.test(file.name || "");
+  const name = file.name || "";
+  // HEIC's type varies by browser (image/heic, none, octet-stream): go by name.
+  if (/\.(heic|heif)$/i.test(name)) return true;
+  return !file.type && /\.(jpe?g|png|webp|gif)$/i.test(name);
 }
 
 function hasFiles(event) {
@@ -208,7 +220,7 @@ class ImageAttachElement extends ReactiveElement {
 
     this.#input = document.createElement("input");
     this.#input.type = "file";
-    this.#input.accept = ACCEPTED_TYPES.join(",");
+    this.#input.accept = [...ACCEPTED_TYPES, ...ACCEPTED_EXTENSIONS].join(",");
     this.#input.multiple = true;
     this.#input.hidden = true;
     this.#input.className = "image-attach__input";

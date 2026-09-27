@@ -38,6 +38,7 @@ dependencies = [
     # 3.1.8 fixes multipart uploads occasionally gaining a leading "\r\n"
     # (pallets/werkzeug#3088), which corrupts uploaded images.
     "werkzeug>=3.1.8",
+    "pillow-heif>=1.8.0",
 ]
 
 [project.scripts]

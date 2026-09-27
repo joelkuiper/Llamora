@@ -371,3 +371,28 @@ def test_attaching_leaves_the_rest_of_the_page_working(session: Page) -> None:
     wait_for_app(page)
     expect(page.locator("#entry-text")).to_be_enabled()
     expect(page.get_by_role("button", name="Attach images")).to_be_enabled()
+
+
+@pytest.mark.parametrize(
+    "mime",
+    ["image/heic", "", "application/octet-stream"],
+    ids=["typed", "untyped", "octet"],
+)
+def test_heic_photos_can_be_attached(session: Page, mime: str) -> None:
+    # Browsers disagree about HEIC's type; the name is enough, the server decides.
+    from imaging import heic
+
+    page = session
+    pick(page, file("IMG_0001.HEIC", heic(), mime))
+
+    wait_uploaded(page, 1)
+    expect(page.locator(".image-attach__note")).to_be_hidden()
+    entry = send(page, f"From the phone {marker()}")
+    expect(entry.locator(".entry-images img")).to_have_count(1)
+
+
+def test_the_picker_offers_heic(session: Page) -> None:
+    accept = (
+        session.locator("image-attach input[type=file]").get_attribute("accept") or ""
+    )
+    assert {"image/heic", "image/heif", ".heic", ".heif"} <= set(accept.split(","))

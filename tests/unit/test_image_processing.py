@@ -179,3 +179,25 @@ def test_polyglot_payload_does_not_survive() -> None:
     data = encode(halves((120, 80)), "JPEG") + payload
     for variant in run(data).variants.values():
         assert b"<script" not in variant.data and b"<html" not in variant.data
+
+
+def test_heic_from_an_iphone_is_accepted_and_cleaned() -> None:
+    from PIL import ExifTags, ImageCms
+
+    from imaging import heic
+
+    exif = Image.Exif()
+    exif[ExifTags.Base.Make] = CAMERA
+    p3ish = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
+    source = heic(halves((600, 400)), exif=exif, icc_profile=p3ish)
+    assert source[4:12] == b"ftypheic" and CAMERA.encode() in source
+
+    result = run(source)
+
+    assert result.source_format == "HEIF"
+    full = decode(result.variants["full"].data)
+    assert full.format == "WEBP" and (full.width, full.height) == (256, 171)
+    assert not full.getexif() and "icc_profile" not in full.info
+    assert all(CAMERA.encode() not in v.data for v in result.variants.values())
+    red = full.convert("RGB").getpixel((20, 80))
+    assert red[0] > 200 and red[2] < 60  # colours survive decoding

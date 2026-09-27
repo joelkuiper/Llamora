@@ -18,13 +18,23 @@ from logging import getLogger
 
 from PIL import Image, ImageCms, ImageOps, UnidentifiedImageError
 
+try:  # HEIC/HEIF (iPhone photos); decoding only, everything is re-encoded.
+    import pillow_heif
+
+    pillow_heif.register_heif_opener()
+    _HEIF = frozenset({"HEIF"})
+except ImportError:  # pragma: no cover - pillow-heif is a dependency
+    _HEIF = frozenset()
+
 from llamora.app.services.images import VARIANTS, ImageRejected, Variant
 
 logger = getLogger(__name__)
 
 # Pillow format names. iPhone and many cameras write MPO: a JPEG with extra
-# (depth/preview) pictures appended; the first picture is the photo.
-ALLOWED_FORMATS = frozenset({"JPEG", "MPO", "PNG", "WEBP", "GIF"})
+# (depth/preview) pictures appended; the first picture is the photo. HEIF
+# covers HEIC, the iPhone's own format (its rotation is applied on decoding,
+# and its Display P3 profile converted to sRGB like any other).
+ALLOWED_FORMATS = frozenset({"JPEG", "MPO", "PNG", "WEBP", "GIF"}) | _HEIF
 OUTPUT_MIME = "image/webp"
 
 _SRGB = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB"))

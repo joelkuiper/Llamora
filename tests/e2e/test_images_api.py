@@ -405,3 +405,15 @@ def test_a_tampered_file_is_refused_and_logged(
         )
     )
     assert alice.get_image(image_id, "thumb").status_code == 200  # others unharmed
+
+
+def test_heic_photos_are_accepted(person: Person) -> None:
+    from imaging import heic
+
+    alice = person()
+    resp = alice.upload_image(
+        heic(halves((600, 400))), filename="IMG_0001.HEIC", content_type="image/heic"
+    )
+    assert resp.status_code == 201
+    image = decode(alice.get_image(resp.json()["id"], "full").content)
+    assert image.format == "WEBP" and image.size == (600, 400)
