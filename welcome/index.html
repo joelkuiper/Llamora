@@ -27,12 +27,19 @@
       <a class="button" href="https://github.com/joelkuiper/Llamora">Source on GitHub</a>
     </nav>
     <p class="hero__note">Registration at llamora.app is closed for now. You can run your own.</p>
-    <figure class="shot shot--hero">
-      <picture>
-        <source srcset="img/page-dark.webp" media="(prefers-color-scheme: dark)">
-        <img src="img/page-light.webp" width="2880" height="1800"
-             alt="Llamora showing a daily page: the day opening, entries with their traces, and the model's response.">
-      </picture>
+    <figure class="shot shot--hero" data-hero-video>
+      <div class="shot__frame">
+        <picture>
+          <source srcset="img/page-dark.webp" media="(prefers-color-scheme: dark)">
+          <img src="img/page-light.webp" width="2880" height="1800"
+               alt="Llamora showing a daily page: the day opening, an entry with photos, and the model's response.">
+        </picture>
+        <video muted loop playsinline preload="auto" aria-hidden="true"></video>
+        <button class="shot__toggle" type="button" aria-label="Pause the video" hidden>
+          <svg class="icon-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9M11 3.5v9"/></svg>
+          <svg class="icon-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 3.5 12 8l-6.5 4.5z"/></svg>
+        </button>
+      </div>
     </figure>
   </header>
 
@@ -208,5 +215,49 @@ LLAMORA_LLM__UPSTREAM__HOST=http://127.0.0.1:8081 uv run llamora-server dev</cod
   <footer class="footer">
     <p>Llamora is free software under the GPL-3.0 licence.</p>
   </footer>
+  <script>
+    // The hero plays a short walk through the app over its still, in the
+    // current theme. Reduced motion (or no script) keeps the still.
+    (() => {
+      const figure = document.querySelector("[data-hero-video]");
+      const video = figure?.querySelector("video");
+      const toggle = figure?.querySelector(".shot__toggle");
+      if (!video || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+      const dark = matchMedia("(prefers-color-scheme: dark)");
+      let skipFade = true;
+
+      const load = () => {
+        const theme = dark.matches ? "dark" : "light";
+        figure.classList.remove("is-playing");
+        skipFade = true;
+        video.innerHTML =
+          `<source src="img/hero-${theme}.webm" type="video/webm">` +
+          `<source src="img/hero-${theme}.mp4" type="video/mp4">`;
+        video.load();
+      };
+
+      video.addEventListener("loadeddata", () => {
+        // Start past the fade-in so the video takes over from the still
+        // without dipping; later loops fade in and out as recorded.
+        if (skipFade) video.currentTime = 0.6;
+        skipFade = false;
+        video.play().catch(() => {});
+      });
+      video.addEventListener("playing", () => {
+        figure.classList.add("is-playing");
+        toggle.hidden = false;
+      });
+      toggle.addEventListener("click", () => {
+        if (video.paused) video.play();
+        else video.pause();
+        const paused = video.paused;
+        toggle.classList.toggle("is-paused", paused);
+        toggle.setAttribute("aria-label", paused ? "Play the video" : "Pause the video");
+      });
+      dark.addEventListener("change", load);
+      load();
+    })();
+  </script>
 </body>
 </html>

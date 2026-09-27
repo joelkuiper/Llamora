@@ -195,6 +195,83 @@ p {
   margin: 0 auto;
 }
 
+/* The hero: a still, with the video laid over it once it plays. */
+.shot__frame {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.shot .shot__frame picture {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.shot__frame video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 500ms ease;
+}
+
+.is-playing .shot__frame video {
+  opacity: 1;
+}
+
+.shot__toggle {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 160ms ease, color 160ms ease;
+}
+
+.shot__toggle[hidden] {
+  display: none;
+}
+
+.shot__toggle:hover,
+.shot__toggle:focus-visible {
+  opacity: 1;
+  color: var(--heading);
+}
+
+.shot__toggle svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.shot__toggle .icon-play,
+.shot__toggle.is-paused .icon-pause {
+  display: none;
+}
+
+.shot__toggle.is-paused .icon-play {
+  display: block;
+}
+
 .shot--phone {
   justify-self: center;
   width: min(19rem, 72vw);
