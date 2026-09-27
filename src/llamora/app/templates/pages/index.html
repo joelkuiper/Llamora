@@ -40,6 +40,7 @@
                 class="icon-btn view-mode-toggle view-mode-{{ view|default('diary') }}"
                 aria-haspopup="menu"
                 aria-expanded="false"
+                aria-label="Change view"
                 data-tooltip-title="Change view">
           <span class="icon-mask icon-eye view-icon-eye" aria-hidden="true"></span>
           <span class="icon-mask icon-book-open view-icon-mode view-icon-diary" aria-hidden="true"></span>
@@ -124,30 +125,71 @@
                   data-action="toggle-search-compact">
             <span class="icon-mask icon-search" aria-hidden="true"></span>
           </button>
-          <a id="support-btn"
-             href="{{ url_for('auth.profile', tab='support') }}"
-             hx-get="{{ url_for('auth.profile', tab='support') }}"
-             hx-target="#profile-modal-root"
-             hx-swap="innerHTML"
-             class="icon-btn"
-             aria-label="Need someone to talk to?" data-tooltip-title="Need someone to talk to?">
-            <span class="icon-mask icon-heart-handshake" aria-hidden="true"></span>
-          </a>
-          <a id="profile-btn"
-             href="{{ url_for('auth.profile') }}"
-             hx-get="{{ url_for('auth.profile') }}"
-             hx-target="#profile-modal-root"
-             hx-swap="innerHTML"
-             class="icon-btn"
-             aria-label="Profile" data-tooltip-title="Profile">
-            <span class="icon-mask icon-user-round" aria-hidden="true"></span>
-          </a>
-          <form method="post" action="{{ url_for('auth.logout') }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="icon-btn" aria-label="Logout" data-tooltip-title="Logout">
-              <span class="icon-mask icon-log-out" aria-hidden="true"></span>
+          {# Support, profile and logout: separate icons on wide screens, one
+             menu (a native popover: light dismiss, no script) on phones. #}
+          <div class="account-actions">
+            <a id="support-btn"
+               href="{{ url_for('auth.profile', tab='support') }}"
+               hx-get="{{ url_for('auth.profile', tab='support') }}"
+               hx-target="#profile-modal-root"
+               hx-swap="innerHTML"
+               class="icon-btn"
+               aria-label="Need someone to talk to?" data-tooltip-title="Need someone to talk to?">
+              <span class="icon-mask icon-heart-handshake" aria-hidden="true"></span>
+            </a>
+            <a id="profile-btn"
+               href="{{ url_for('auth.profile') }}"
+               hx-get="{{ url_for('auth.profile') }}"
+               hx-target="#profile-modal-root"
+               hx-swap="innerHTML"
+               class="icon-btn"
+               aria-label="Profile" data-tooltip-title="Profile">
+              <span class="icon-mask icon-user-round" aria-hidden="true"></span>
+            </a>
+            <form method="post" action="{{ url_for('auth.logout') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="icon-btn" aria-label="Logout" data-tooltip-title="Logout">
+                <span class="icon-mask icon-log-out" aria-hidden="true"></span>
+              </button>
+            </form>
+          </div>
+          <button type="button"
+                  class="icon-btn account-menu-toggle"
+                  popovertarget="account-menu"
+                  aria-label="Menu">
+            <span class="icon-mask icon-menu" aria-hidden="true"></span>
+          </button>
+          <div id="account-menu" class="account-menu glass-panel" popover role="menu" aria-label="Menu">
+            <button type="button"
+                    class="account-menu__item"
+                    role="menuitem"
+                    hx-get="{{ url_for('auth.profile', tab='support') }}"
+                    hx-target="#profile-modal-root"
+                    hx-swap="innerHTML"
+                    popovertarget="account-menu"
+                    popovertargetaction="hide">
+              <span class="icon-mask icon-heart-handshake" aria-hidden="true"></span>
+              Need someone to talk to?
             </button>
-          </form>
+            <button type="button"
+                    class="account-menu__item"
+                    role="menuitem"
+                    hx-get="{{ url_for('auth.profile') }}"
+                    hx-target="#profile-modal-root"
+                    hx-swap="innerHTML"
+                    popovertarget="account-menu"
+                    popovertargetaction="hide">
+              <span class="icon-mask icon-user-round" aria-hidden="true"></span>
+              Profile
+            </button>
+            <form method="post" action="{{ url_for('auth.logout') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="account-menu__item" role="menuitem">
+                <span class="icon-mask icon-log-out" aria-hidden="true"></span>
+                Logout
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </div>

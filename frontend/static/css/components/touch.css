@@ -1,0 +1,79 @@
+/* Touch screens: what hover and a fine pointer provide on a desktop.
+   Kept last among the imports so it wins over the components it adjusts. */
+
+/* No hover on touch, so actions that fade in on hover are simply shown. */
+@media (hover: none) {
+  #entries .entry.user .entry-actions-row,
+  #entries .entry-actions-inline {
+    opacity: 1;
+  }
+}
+
+@media (pointer: coarse) {
+  /* iOS zooms the page into any field under 16px when it's focused. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select,
+  #search-input,
+  #tags-view-filter {
+    font-size: max(16px, 1em);
+  }
+
+  /* Tap areas of about 44px around small controls, without changing how
+     they look: an invisible layer extends each hit box. */
+  .icon-btn,
+  .add-tag-btn,
+  .opening-toggle,
+  .entry-tag .tag-label {
+    position: relative;
+  }
+
+  /* Entry actions sit in their row; the offsets of their standalone
+     (absolutely positioned) layout must not apply once they're relative. */
+  #entries .entry.user .entry-actions-row .entry-action,
+  #entries .entry-actions-inline .entry-action {
+    position: relative;
+    inset: auto;
+  }
+
+  .icon-btn::after,
+  #entries .entry-action::after,
+  .add-tag-btn::after,
+  .opening-toggle::after,
+  .image-attach__pick::after,
+  .entry-tag .tag-label::after {
+    content: "";
+    position: absolute;
+  }
+
+  /* Header icons sit close together: taller more than wider. */
+  .icon-btn::after {
+    inset: -6px -3px;
+  }
+
+  #entries .entry-action::after {
+    inset: -7px -3px;
+  }
+
+  .add-tag-btn::after,
+  .opening-toggle::after,
+  .image-attach__pick::after {
+    inset: -9px;
+  }
+
+  /* Tag chips stack with little space between them. */
+  .entry-tag .tag-label::after {
+    inset: -4px -2px;
+  }
+}
+
+/* On phones the scroll button waits in the corner instead of floating over
+   the middle of the page (where it covered photos and the edit tray). */
+@media (max-width: 640px) {
+  scroll-edge-button[data-direction="down"] {
+    left: auto;
+    right: 1rem;
+    transform: none;
+    bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  }
+}

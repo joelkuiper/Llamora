@@ -629,6 +629,9 @@ input[type="checkbox"]:focus {
 .icon-heart-handshake {
   --icon: url("../../icons/heart-handshake.svg");
 }
+.icon-menu {
+  --icon: url("../../icons/menu.svg");
+}
 .icon-image-plus {
   --icon: url("../../icons/image-plus.svg");
 }

@@ -1368,9 +1368,13 @@
     position: static;
   }
 
+  /* The desktop minimum height (for the fixed, full-height sidebar) must go:
+     the list below is capped, and the card would keep its height anyway,
+     leaving an empty band under the list. The card fits its content. */
   .tags-view__sidebar-fixed {
     position: static;
     width: 100%;
+    min-height: 0;
     max-height: none;
     overflow: visible;
   }
@@ -1379,6 +1383,12 @@
   .tags-view__list-body {
     max-height: 40vh;
     overflow-y: auto;
+  }
+
+  /* A short list is only as tall as its traces. */
+  .tags-view__list {
+    min-height: 0;
+    padding-bottom: 0.5rem;
   }
 
   /* Collapse the sidebar when a tag is selected (detail is visible). */

@@ -253,3 +253,33 @@
     background-position: 0% 50%;
   }
 }
+
+/* Phones: writing room first. The form reaches almost to the screen edges
+   (past the page's side padding), with tighter padding and a smaller Send. */
+@media (max-width: 640px) {
+  #entry-form {
+    margin-inline: calc(var(--spacing-xs) * 1.25 - var(--spacing-xl));
+    padding: var(--spacing-sm);
+
+    .input-wrapper {
+      gap: var(--spacing-xs);
+
+      textarea {
+        padding-top: var(--spacing-md);
+        padding-bottom: var(--spacing-md);
+        padding-left: var(--spacing-md);
+      }
+    }
+
+    .entry-submit-stack .btn {
+      width: 2.75rem;
+      height: 2.75rem;
+      padding: 0;
+    }
+  }
+
+  /* Keep the attach icon's clearance, just a little tighter. */
+  #entry-form .input-wrapper .entry-text-field textarea {
+    padding-right: 2.2rem;
+  }
+}
