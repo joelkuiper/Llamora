@@ -7,6 +7,8 @@
 > Write in daily pages. A model running on your machine produces day openings, recaps, and reflective responses.
 > It's not a chat wrapper, but a navigable archive built around time and return.
 
+**See it in action at [welcome.llamora.app](https://welcome.llamora.app).**
+
 ![Llamora diary view with trace popover](./doc/screenshots/diary-tags2.png)
 
 ---
@@ -341,16 +343,6 @@ max_edge = 1024
 **Back up the images directory together with the database.** The files are useless without the database (their keys live there), and the database's images are gone without the files. Uploads that are never sent, and images of deleted entries, are removed by a periodic sweep (`sweep_interval`). The remaining options are in [`config/settings.toml`](config/settings.toml).
 
 </details>
-
-**Support resources.** "Need someone to talk to?" in the header lists where to find help, and when an entry signals a crisis the model is told to respond plainly, ask whether the writer is safe, and point to these (and only these, so it never invents a number). The default is the international directory [findahelpline.com](https://findahelpline.com); add your region's lines in `config/settings.local.toml`:
-
-```toml
-[[default.SUPPORT.resources]]
-name = "113 Zelfmoordpreventie"
-phone = "0800-0113"
-url = "https://www.113.nl"
-note = "Free and anonymous, day and night, by phone or chat."
-```
 
 **Prompt templates** are Jinja2 files in `src/llamora/llm/templates` (`system.txt.j2`, `opening_system.txt.j2`, `opening_recap.txt.j2`). Edit them directly — no Python changes needed. Changes take effect on restart. Override the directory with `LLAMORA_PROMPTS__TEMPLATE_DIR`.
 
