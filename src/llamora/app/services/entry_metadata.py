@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from typing import Any, Mapping
 
 import orjson
 
+from llamora.llm.entry_template import IMAGE_REF
 from llamora.llm.prompt_templates import render_prompt_template
 from llamora.app.util.tags import canonicalize
 
@@ -102,16 +104,38 @@ def _sanitise_metadata(payload: Mapping[str, Any] | None) -> dict[str, Any]:
     return {"emoji": emoji, "tags": tags}
 
 
-async def generate_metadata(llm, text: str) -> dict[str, Any]:
-    """Generate metadata for ``text`` using a single LLM pass."""
+async def generate_metadata(
+    llm,
+    text: str,
+    *,
+    image_ids: Sequence[str] = (),
+    image_resolver: Any = None,
+) -> dict[str, Any]:
+    """Generate metadata (emoji and tags) for an entry in a single LLM pass.
 
-    if not text or not str(text).strip():
+    The entry's images are shown to the model too when it may see them (the
+    ``LLM.vision`` policy) and a resolver is given, so an entry of only
+    images still gets suggestions.
+    """
+
+    text = str(text or "").strip()
+    policy = getattr(llm, "image_policy", None)
+    ids: list[str] = []
+    if image_ids and image_resolver is not None and policy is not None and policy.send:
+        ids = [str(image_id) for image_id in image_ids][: policy.max_images]
+    if not text and not ids:
         return {"emoji": DEFAULT_METADATA_EMOJI, "tags": []}
+
+    content: str | list[dict[str, Any]] = text
+    if ids:
+        parts: list[dict[str, Any]] = [{"type": "text", "text": text}] if text else []
+        parts.extend({"type": IMAGE_REF, "image_id": image_id} for image_id in ids)
+        content = parts
 
     system_prompt = _metadata_system_prompt()
     messages = [
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": str(text)},
+        {"role": "user", "content": content},
     ]
 
     try:
@@ -122,6 +146,7 @@ async def generate_metadata(llm, text: str) -> dict[str, Any]:
                 "n_predict": 140,
                 "response_format": _metadata_response_format(),
             },
+            image_resolver=image_resolver if ids else None,
         )
     except Exception:
         logger.exception("Metadata generation request failed")

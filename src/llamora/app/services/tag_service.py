@@ -803,8 +803,13 @@ class TagService:
         limit: int | None = None,
         frecency_limit: int = 3,
         decay_constant: float | None = None,
+        image_source: Any = None,
     ) -> list[str] | None:
-        """Return suggested tags for an entry."""
+        """Return suggested tags for an entry.
+
+        ``image_source`` (``(ctx, image_id) -> data URI``) lets the model see
+        the entry's images too, when the vision policy allows it.
+        """
 
         entries = await self._db.entries.get_entries_by_ids(ctx, [entry_id])
         if not entries:
@@ -817,9 +822,22 @@ class TagService:
         meta = entry.get("meta") or {}
         tags: Iterable[Any] = meta.get("tags") or []
         if (not tags) and entry.get("role") == "user":
-            cached = self._get_cached_suggestions(ctx.user_id, entry_id)
+            images = await self._db.images.get_for_entries(ctx.user_id, [entry_id])
+            image_ids = [row.id for row in images.get(entry_id, [])]
+            # Suggestions depend on the images too: changing them is a new key.
+            cache_key = f"{entry_id}:{','.join(image_ids)}" if image_ids else entry_id
+            cached = self._get_cached_suggestions(ctx.user_id, cache_key)
             if cached is None:
-                meta_payload = await generate_metadata(llm, entry.get("text", ""))
+
+                async def resolve(image_id: str) -> str | None:
+                    return await image_source(ctx, image_id)
+
+                meta_payload = await generate_metadata(
+                    llm,
+                    entry.get("text", ""),
+                    image_ids=image_ids,
+                    image_resolver=resolve if image_source else None,
+                )
                 tags_list = list(meta_payload.get("tags") or [])
                 emoji_raw = meta_payload.get("emoji")
                 emoji_value = (
@@ -834,7 +852,7 @@ class TagService:
                 if include_emoji and emoji_value:
                     tags_list.insert(0, emoji_value)
                 tags = tags_list
-                self._set_cached_suggestions(ctx.user_id, entry_id, list(tags_list))
+                self._set_cached_suggestions(ctx.user_id, cache_key, list(tags_list))
             else:
                 tags = cached
 

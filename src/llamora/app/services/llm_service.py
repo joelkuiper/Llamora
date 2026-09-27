@@ -36,6 +36,11 @@ class LLMService:
         self._service_pulse = service_pulse
         self._image_source: Any = None
 
+    @property
+    def image_source(self) -> Any:
+        """``(ctx, image_id) -> data URI | None`` for requests with images."""
+        return self._image_source
+
     def set_image_source(self, source: Any) -> None:
         """How replies turn entry images into what the model receives
         (``(ctx, image_id) -> data URI | None``)."""

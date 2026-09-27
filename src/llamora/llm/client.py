@@ -573,22 +573,30 @@ class LLMClient:
         messages: Sequence[Mapping[str, Any]] | list[dict[str, Any]],
         *,
         params: Mapping[str, Any] | None = None,
+        image_resolver: ImageResolver | None = None,
     ) -> str:
-        """Request a non-streamed chat completion for ``messages``."""
+        """Request a non-streamed chat completion for ``messages``.
+
+        Image references in ``messages`` are resolved with ``image_resolver``
+        just before sending (as for replies); without one they become a note.
+        """
 
         await self.upstream.async_ensure_upstream_ready()
 
         cfg = {**self.default_generation, **(params or {})}
         cfg["stream"] = False
 
-        message_list = list(messages)
-        prompt_tokens = estimate_entry_messages_tokens(message_list)
+        message_list = [dict(message) for message in messages]
+        prompt_tokens = estimate_entry_messages_tokens(
+            message_list, tokens_per_image=self.vision.tokens_per_image
+        )
         self.prompt_budget.diagnostics(
             prompt_tokens=prompt_tokens,
             params=cfg,
             label="entry:complete",
             extra={"prompt_messages": len(message_list)},
         )
+        message_list = await self._resolve_images(message_list, image_resolver)
 
         payload = self._build_chat_payload(message_list, cfg)
         self._log_prompt("complete", message_list, cfg)

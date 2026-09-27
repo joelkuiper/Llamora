@@ -219,3 +219,79 @@ def test_by_default_a_full_entry_is_seen_whole(
     content = user_turns(reply_to(client, model, entry_id))[-1]
 
     assert len(images_in(content)) == 8  # max_images follows the per-entry limit
+
+
+# -- tag suggestions ("Add traces") -------------------------------------------
+
+
+def suggest(
+    client: ApiClient, model: FakeLLM, entry_id: str
+) -> tuple[str, dict | None]:
+    """Open an entry's tag suggestions; return the HTML and the model request."""
+    before = len(model.chat_requests(structured=True))
+    resp = client.http.get(f"/t/entry/{entry_id}/suggestions", headers=client.headers)
+    resp.raise_for_status()
+    structured = model.chat_requests(structured=True)
+    return resp.text, (structured[-1] if len(structured) > before else None)
+
+
+def test_tag_suggestions_see_the_images(
+    diary: Callable[..., ApiClient], model: FakeLLM
+) -> None:
+    client = diary(vision=True)
+    entry_id = seed(client, "At the harbour", SMALL)
+
+    html, request = suggest(client, model, entry_id)
+
+    assert request is not None
+    content = user_turns(request)[-1]
+    assert texts_in(content) == ["At the harbour"]
+    assert len(images_in(content)) == 1
+    assert (
+        "let what they show inform the emoji and tags"
+        in request["messages"][0]["content"]
+    )
+    assert 'data-tag="morning"' in html  # the fake model's tags reach the popover
+
+
+def test_an_entry_of_only_images_gets_tag_suggestions(
+    diary: Callable[..., ApiClient], model: FakeLLM
+) -> None:
+    client = diary(vision=True)
+    entry_id = seed(client, "", SMALL)
+
+    html, request = suggest(client, model, entry_id)
+
+    assert request is not None and len(images_in(user_turns(request)[-1])) == 1
+    assert 'data-tag="coffee"' in html
+
+
+def test_without_vision_tag_suggestions_are_text_only(
+    diary: Callable[..., ApiClient], model: FakeLLM
+) -> None:
+    client = diary(vision=False)
+    entry_id = seed(client, "At the harbour", SMALL)
+    only_images = seed(client, "", SMALL)
+
+    _, request = suggest(client, model, entry_id)
+    assert request is not None and user_turns(request)[-1] == "At the harbour"
+
+    _, request = suggest(client, model, only_images)
+    assert request is None  # nothing to ask the model about
+
+
+def test_changing_the_images_refreshes_suggestions(
+    diary: Callable[..., ApiClient], model: FakeLLM
+) -> None:
+    client = diary(vision=True)
+    entry_id = seed(client, "At the harbour", SMALL)
+    suggest(client, model, entry_id)
+    _, again = suggest(client, model, entry_id)
+    assert again is None  # cached
+
+    new_image = client.upload_image_id(WIDE)
+    client.update_entry(entry_id, "At the harbour", image_ids=[new_image])
+    _, refreshed = suggest(client, model, entry_id)
+
+    assert refreshed is not None
+    assert images_in(user_turns(refreshed)[-1])[0].size == (1024, 512)

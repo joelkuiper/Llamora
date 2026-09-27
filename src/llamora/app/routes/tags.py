@@ -522,7 +522,8 @@ async def add_tag(entry_id: str):
 @login_required
 async def get_tag_suggestions(entry_id: str):
     _, _user, ctx = await require_encryption_context()
-    llm = get_services().llm_service.llm
+    llm_service = get_services().llm_service
+    llm = llm_service.llm
 
     limit = request.args.get("limit")
     clamped_limit: int | None = None
@@ -539,6 +540,7 @@ async def get_tag_suggestions(entry_id: str):
         llm=llm,
         limit=clamped_limit,
         frecency_limit=3,
+        image_source=llm_service.image_source,
     )
     if suggestions is None:
         abort_http(404, "entry not found")
