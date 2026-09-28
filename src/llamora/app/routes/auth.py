@@ -98,6 +98,9 @@ async def _issue_authenticated_response(
     manager = session.manager
     manager.set_secure_cookie(resp, "uid", str(user_id))
     await manager.set_dek(resp, dek)
+    user = await get_services().db.users.get_user_by_id(str(user_id))
+    if user is not None:
+        manager.set_credential_stamp(resp, user)
     return resp
 
 
@@ -630,7 +633,15 @@ async def change_password():
     db = get_services().db
     await _update_user_password_wrap(db, user_id=user["id"], dek=dek, password=new)
 
-    return await _render_profile_tab(user, "security", pw_success=True)
+    # Other sessions (signed in with the old password) end; this one carries on.
+    resp = await make_response(
+        await _render_profile_tab(user, "security", pw_success=True)
+    )
+    assert isinstance(resp, Response)
+    updated = await db.users.get_user_by_id(str(user["id"]))
+    if updated is not None:
+        session.manager.set_credential_stamp(resp, updated)
+    return resp
 
 
 @auth_bp.route("/profile/recovery", methods=["POST"])

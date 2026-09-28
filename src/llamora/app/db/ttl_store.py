@@ -53,7 +53,7 @@ class TTLStore(BaseRepository):
                 (namespace, key, now),
             )
             row = await cursor.fetchone()
-        return bytes(row["value"]) if row else None
+        return _as_bytes(row["value"]) if row else None
 
     async def get_and_refresh(
         self,
@@ -77,7 +77,7 @@ class TTLStore(BaseRepository):
                 (now + ttl, namespace, key),
             )
             await conn.commit()
-        return bytes(row["value"])
+        return _as_bytes(row["value"])
 
     async def remove(self, namespace: str, key: str) -> None:
         """Delete a specific entry."""
@@ -125,7 +125,9 @@ class TTLStore(BaseRepository):
                     value = CASE
                         WHEN ttl_store.expires_at <= ?
                             THEN ?
-                        ELSE CAST(CAST(ttl_store.value AS INTEGER) + 1 AS TEXT)
+                        -- BLOB, like every other value: a TEXT value comes
+                        -- back as str and broke reads from the second failure.
+                        ELSE CAST(CAST(ttl_store.value AS INTEGER) + 1 AS BLOB)
                     END,
                     expires_at = excluded.expires_at
                 """,
@@ -161,3 +163,10 @@ class TTLStore(BaseRepository):
             )
             await conn.commit()
             return cursor.rowcount or 0
+
+
+def _as_bytes(value: object) -> bytes:
+    """Stored values are BLOBs; older counters were written as TEXT."""
+    if isinstance(value, str):
+        return value.encode("utf-8")
+    return bytes(value)  # type: ignore[arg-type]

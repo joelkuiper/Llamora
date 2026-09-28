@@ -17,6 +17,13 @@ if TYPE_CHECKING:  # pragma: no cover - import for static analysis only
 
 logger = logging.getLogger(__name__)
 
+# Sent with every response that has no policy of its own. It restricts what
+# can't break the app (framing, plugins, <base>, form targets); scripts and
+# styles are not restricted yet.
+PAGE_CSP = (
+    "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
+)
+
 
 def create_app():
     from quart import Quart, render_template, make_response, request, g
@@ -289,6 +296,19 @@ def create_app():
     @app.after_request
     async def _finalize_auth_session(response):
         return await finalize_auth_session(response)
+
+    @app.after_request
+    async def _security_headers(response):
+        # Never framed (clickjacking), no plugins, no <base> hijack; responses
+        # with a stricter policy of their own (images) keep it.
+        headers = response.headers
+        headers.setdefault("Content-Security-Policy", PAGE_CSP)
+        headers.setdefault("X-Frame-Options", "DENY")
+        headers.setdefault("X-Content-Type-Options", "nosniff")
+        # Same-origin keeps the Referer CSRF checks rely on, and diary URLs
+        # (dates, traces) away from linked sites.
+        headers.setdefault("Referrer-Policy", "same-origin")
+        return response
 
     @app.teardown_request
     async def _drop_crypto_context(_exc=None):  # type: ignore[override]

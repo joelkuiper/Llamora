@@ -134,7 +134,11 @@ def test_truncation_after_a_full_final_chunk_boundary() -> None:
         decrypt(KEY, AAD, blob[: PREFIX_BYTES + SEALED_CHUNK])
 
 
-@pytest.mark.parametrize("extra", [b"x", os.urandom(SEALED_CHUNK)])
+@pytest.mark.parametrize(
+    "extra",
+    [b"x", os.urandom(SEALED_CHUNK)],
+    ids=["one-byte", "a-whole-chunk"],  # stable ids: xdist workers must agree
+)
 def test_trailing_bytes_after_the_final_chunk_are_rejected(extra: bytes) -> None:
     with pytest.raises(ImageDecryptError):
         decrypt(KEY, AAD, sealed(CHUNK) + extra)

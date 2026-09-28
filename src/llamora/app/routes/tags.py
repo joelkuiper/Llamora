@@ -435,6 +435,8 @@ async def remove_tag(entry_id: str, tag_hash: str):
     context = _parse_view_context()
 
     created_date = await db.entries.get_entry_date(user["id"], entry_id)
+    if created_date is None:  # not the caller's entry (or gone)
+        abort_http(404, "entry not found")
     await db.tags.unlink_tag_entry(
         user["id"],
         tag_hash_bytes,

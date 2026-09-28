@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import base64
+import hashlib
+import hmac
 import secrets
 import time
 from datetime import datetime, timedelta, timezone
@@ -20,6 +22,18 @@ if TYPE_CHECKING:
 
 SECURE_COOKIE_MANAGER_KEY = "llamora_secure_cookie_manager"
 _MISSING_USER = object()
+# Cookie key holding the credential stamp a session was signed in with.
+CREDENTIAL_STAMP_KEY = "pwv"
+
+
+def credential_stamp(user: Mapping[str, Any]) -> str:
+    """A short fingerprint of the user's current password hash.
+
+    Every password change or recovery reset makes a new (salted) hash, so a
+    session whose stamp no longer matches was signed in with old credentials.
+    """
+    password_hash = str(user.get("password_hash") or "")
+    return hashlib.sha256(password_hash.encode("utf-8")).hexdigest()[:32]
 
 
 class SecureCookieManager:
@@ -275,8 +289,24 @@ class SecureCookieManager:
                     user if user is not None else _MISSING_USER
                 )
 
+        if user is not None and not self._stamp_matches(user):
+            # Signed in before a password change or reset: no longer valid.
+            current_app.logger.info(
+                "Ending a session of user %s signed in with old credentials", uid
+            )
+            await self.clear_session_dek()
+            self.request_cookie_clear()
+            user = None
+
         setattr(g, self._current_user_attr, user)
         return user
+
+    def _stamp_matches(self, user: Mapping[str, Any]) -> bool:
+        stamp = self.get_secure_cookie(CREDENTIAL_STAMP_KEY) or ""
+        return hmac.compare_digest(stamp, credential_stamp(user))
+
+    def set_credential_stamp(self, response: Response, user: Mapping[str, Any]) -> None:
+        self.set_secure_cookie(response, CREDENTIAL_STAMP_KEY, credential_stamp(user))
 
     async def get_dek(self) -> bytes | None:
         if self.dek_storage == "session":
@@ -388,9 +418,17 @@ async def get_dek() -> bytes | None:
 
 
 def sanitize_return_path(raw: str | None) -> str | None:
-    if raw and raw.startswith("/") and not raw.startswith("//"):
-        return raw
-    return None
+    """A same-site path to return to after login, or None.
+
+    Browsers read a backslash as a slash and drop tabs and newlines, so
+    ``/\\evil.example`` or ``/<tab>/evil.example`` would leave the site just
+    like ``//evil.example``; none of those appear in a real path here.
+    """
+    if not raw or not raw.startswith("/") or raw.startswith("//"):
+        return None
+    if "\\" in raw or any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in raw):
+        return None
+    return raw
 
 
 def _safe_return_path() -> str:
