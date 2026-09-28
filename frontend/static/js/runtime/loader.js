@@ -73,6 +73,10 @@ const FEATURE_IMPORTS = {
     selector: "#view-mode-toggle",
     loader: () => import("../components/view-mode.js"),
   },
+  activityHeatmap: {
+    selector: "activity-heatmap",
+    loader: () => import("../components/activity-heatmap.js"),
+  },
   scrollEdge: {
     selector: "scroll-edge-button",
     loader: () => import("../components/scroll-edge-button.js"),

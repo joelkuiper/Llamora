@@ -5,10 +5,11 @@ from __future__ import annotations
 import re
 from datetime import timedelta
 
-from playwright.sync_api import Locator, Page, expect
+import pytest
+from playwright.sync_api import Browser, Locator, Page, expect
 
 from fake_llm import FakeLLM
-from harness import ApiClient, marker, today_utc, wait_for_app
+from harness import ApiClient, LiveServer, login, marker, today_utc, wait_for_app
 
 
 def today_entry(page: Page, api: ApiClient) -> tuple[Locator, str]:
@@ -129,3 +130,51 @@ def test_traces_view_links_to_the_entry_and_back(
     app_page.go_back()
     expect(app_page).to_have_url(re.compile(rf"/t/{tag}(\?|$)"))
     expect(app_page.locator(".tags-view__entry-item", has_text=text)).to_be_visible()
+
+
+# -- the heatmap's layout ---------------------------------------------------------
+
+MONTH_BOXES = """() => [...document.querySelectorAll('.activity-heatmap__month')]
+  .map(m => { const r = m.getBoundingClientRect();
+              return {label: m.querySelector('.activity-heatmap__month-label').textContent.trim(),
+                      top: Math.round(r.top), left: r.left, right: r.right}; })"""
+
+
+@pytest.mark.parametrize("width", [1600, 1440, 1280, 1000, 760, 390])
+def test_the_heatmap_wraps_onto_the_same_columns(
+    browser: Browser, live_server: LiveServer, make_user, width: int
+) -> None:
+    # Months that don't fit carry on in the next row from the left, on the
+    # columns of the rows above: Aug under Oct, Sep under Nov; never spread.
+    user = make_user("snake")
+    api = ApiClient.logged_in(live_server.url, user)
+    trace = marker("snake")
+    api.add_tag(api.create_entry(today_utc(), "A day to trace"), trace)
+    api.close()
+    context = browser.new_context(
+        viewport={"width": width, "height": 900}, base_url=live_server.url
+    )
+    page = context.new_page()
+    login(page, user)
+    page.goto(f"/t/{trace}")
+    wait_for_app(page)
+    expect(page.locator(".activity-heatmap__month").first).to_be_visible()
+    page.wait_for_timeout(200)  # one layout frame
+
+    months = page.evaluate(MONTH_BOXES)
+    rows: list[list[dict]] = []
+    for month in months:  # in calendar order
+        if rows and abs(rows[-1][0]["top"] - month["top"]) <= 2:
+            rows[-1].append(month)
+        else:
+            rows.append([month])
+    context.close()
+
+    if width >= 1440:  # there's room for the whole year on one row
+        assert len(rows) == 1, [[m["label"] for m in row] for row in rows]
+    columns = [m["left"] for m in rows[0]]
+    for row in rows:
+        lefts = [m["left"] for m in row]
+        assert lefts == sorted(lefts), (width, row)  # left to right
+        for left, column in zip(lefts, columns):
+            assert abs(left - column) <= 2, (width, row)  # under the row above

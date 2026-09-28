@@ -1,6 +1,6 @@
 {% if activity_heatmap %}
   {% set selected_day = selected_day|default(day|default("")) %}
-  <div class="activity-heatmap"
+  <activity-heatmap class="activity-heatmap"
        hx-boost="true"
        hx-target="#main-content"
        hx-sync="#main-content:replace"
@@ -52,5 +52,5 @@
         </div>
       </section>
     {% endfor %}
-  </div>
+  </activity-heatmap>
 {% endif %}

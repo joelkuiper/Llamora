@@ -818,6 +818,14 @@
   justify-content: space-between;
 }
 
+/* Wrapping (activity-heatmap.js): rows fill from the left on aligned columns. */
+.activity-heatmap.is-wrapped {
+  display: grid;
+  grid-template-columns: repeat(var(--heatmap-columns), max-content);
+  justify-content: space-between;
+  justify-items: start;
+}
+
 .activity-heatmap__month {
   display: flex;
   flex-direction: column;
