@@ -1,0 +1,69 @@
+<!doctype html>
+<!-- The link-preview card (og:image). Not part of the site: render it with
+     `uv run python welcome/og_card.py`, which writes img/og-card.jpg. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      width: 1200px;
+      height: 630px;
+      overflow: hidden;
+      position: relative;
+      background: #fafafa;
+      color: #222;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .text {
+      position: absolute;
+      left: 72px;
+      top: 76px;
+      width: 470px;
+    }
+    .logo { width: 250px; display: block; }
+    h1 {
+      margin: 44px 0 18px;
+      font-size: 50px;
+      line-height: 1.12;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    p {
+      margin: 0;
+      font-size: 23px;
+      line-height: 1.45;
+      color: #666;
+    }
+    .url {
+      position: absolute;
+      left: 72px;
+      bottom: 58px;
+      font-size: 20px;
+      letter-spacing: 0.02em;
+      color: #36a6f4;
+    }
+    .shot {
+      position: absolute;
+      left: 590px;
+      top: 70px;
+      width: 900px;
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      box-shadow: 0 24px 60px rgba(20, 30, 45, 0.14), 0 2px 6px rgba(0, 0, 0, 0.05);
+    }
+    .shot img { display: block; width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="text">
+    <img class="logo" src="img/logo.svg" alt="">
+    <h1>A private journal that remembers with you.</h1>
+    <p>Daily pages, a model that responds when you ask, and traces of what keeps coming back.</p>
+  </div>
+  <div class="url">welcome.llamora.app</div>
+  <div class="shot"><img src="img/page-light.webp" alt=""></div>
+</body>
+</html>
