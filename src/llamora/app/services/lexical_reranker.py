@@ -9,6 +9,20 @@ from llamora.settings import settings
 
 TOKEN_PATTERN = re.compile(r"\w+")
 
+# Words below this length only match whole words; longer ones may also match
+# the start of a longer word ("walk" in "walking", "light" in "lights").
+PREFIX_MIN_LENGTH = 4
+
+# Too common to say anything about a match; ignored unless the query is only these.
+STOPWORDS = frozenset(
+    """
+    a an and are as at be but by do for from had has have he her his i if in
+    into is it its me my no not of on or our she so than that the their them
+    then there they this to too up us was we were what when where which who
+    will with you your
+    """.split()
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,9 +42,10 @@ class LexicalReranker:
         lower_query = query.lower()
         automaton = ahocorasick.Automaton()
         automaton.add_word(lower_query, ("E", lower_query))
-        tokens = [
+        words = [
             t for t in dict.fromkeys(TOKEN_PATTERN.findall(lower_query)) if len(t) >= 2
         ]
+        tokens = [t for t in words if t not in STOPWORDS] or words
         for tok in tokens:
             automaton.add_word(tok, ("T", tok))
         automaton.make_automaton()
@@ -45,6 +60,8 @@ class LexicalReranker:
             exact = False
             for end, (kind, word) in automaton.iter(text_lower):
                 start = end - len(word) + 1
+                if not self._at_word_boundary(text_lower, start, end + 1, word):
+                    continue
                 spans.append({"start": start, "end": end + 1, "kind": kind})
                 if kind == "T":
                     matched_tokens.add(word)
@@ -233,6 +250,21 @@ class LexicalReranker:
         while idx > 0 and text[idx - 1].isspace():
             idx -= 1
         return idx
+
+    @staticmethod
+    def _at_word_boundary(text: str, start: int, end: int, word: str) -> bool:
+        """Whether text[start:end] (a match of ``word``) starts a word, and,
+        for short words, also ends one: "light" is not in "twilight", and
+        "at" is not in "that" or "attic"."""
+
+        def is_word(ch: str) -> bool:
+            return ch.isalnum() or ch == "_"
+
+        if start > 0 and is_word(text[start - 1]) and is_word(text[start]):
+            return False
+        if len(word) >= PREFIX_MIN_LENGTH:
+            return True
+        return not (end < len(text) and is_word(text[end - 1]) and is_word(text[end]))
 
     @staticmethod
     def _is_word_char(ch: str) -> bool:
