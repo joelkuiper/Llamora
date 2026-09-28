@@ -848,6 +848,15 @@
   opacity: 0.5;
 }
 
+/* A year break at the start of a row has nothing to its left to divide. */
+.activity-heatmap.is-wrapped .activity-heatmap__month.is-year-break.is-row-start {
+  padding-left: 0;
+
+  &::before {
+    display: none;
+  }
+}
+
 .activity-heatmap__month-label {
   font-size: 0.56rem;
   letter-spacing: 0.18em;

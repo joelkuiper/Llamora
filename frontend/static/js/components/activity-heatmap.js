@@ -41,8 +41,12 @@ export class ActivityHeatmapElement extends HTMLElement {
     if (columns === this.#columns) return;
     this.#columns = columns;
 
-    this.classList.toggle("is-wrapped", columns < months.length);
+    const wrapped = columns < months.length;
+    this.classList.toggle("is-wrapped", wrapped);
     this.style.setProperty("--heatmap-columns", String(columns));
+    months.forEach((month, index) => {
+      month.classList.toggle("is-row-start", wrapped && index % columns === 0);
+    });
   }
 }
 

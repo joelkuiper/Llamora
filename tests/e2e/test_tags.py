@@ -137,7 +137,9 @@ def test_traces_view_links_to_the_entry_and_back(
 MONTH_BOXES = """() => [...document.querySelectorAll('.activity-heatmap__month')]
   .map(m => { const r = m.getBoundingClientRect();
               return {label: m.querySelector('.activity-heatmap__month-label').textContent.trim(),
-                      top: Math.round(r.top), left: r.left, right: r.right}; })"""
+                      top: Math.round(r.top), left: r.left, right: r.right,
+                      label_left: m.querySelector('.activity-heatmap__month-label')
+                        .getBoundingClientRect().left}; })"""
 
 
 @pytest.mark.parametrize("width", [1600, 1440, 1280, 1000, 760, 390])
@@ -178,3 +180,6 @@ def test_the_heatmap_wraps_onto_the_same_columns(
         assert lefts == sorted(lefts), (width, row)  # left to right
         for left, column in zip(lefts, columns):
             assert abs(left - column) <= 2, (width, row)  # under the row above
+    # Labels line up too: a year break starting a row isn't indented.
+    firsts = [row[0]["label_left"] for row in rows]
+    assert max(firsts) - min(firsts) <= 2, (width, firsts)
