@@ -16,7 +16,7 @@ from playwright.sync_api import BrowserContext, Locator, Page, expect
 
 from harness import User, login, marker, wait_for_app, write_entry
 
-INVALID = "Invalid credentials"
+INVALID = "That username and password don't match."
 
 
 def new_password() -> str:

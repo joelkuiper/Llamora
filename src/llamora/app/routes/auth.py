@@ -1,4 +1,5 @@
 import asyncio
+import math
 
 from quart import (
     Blueprint,
@@ -122,6 +123,56 @@ async def _issue_logged_out_response(
     manager.clear_secure_cookie(resp)
     if hx_redirect:
         resp.headers["HX-Redirect"] = hx_redirect
+    return resp
+
+
+LOGIN_MISMATCH = "That username and password don't match."
+
+
+def _in_minutes(seconds: int) -> str:
+    if seconds < 60:
+        return "under a minute"
+    minutes = math.ceil(seconds / 60)
+    return "about a minute" if minutes == 1 else f"about {minutes} minutes"
+
+
+def _for_minutes(seconds: int) -> str:
+    minutes = max(round(seconds / 60), 1)
+    return "a minute" if minutes == 1 else f"{minutes} minutes"
+
+
+async def _refuse_login(
+    login_failures: Any, cache_key: str, username: str, return_url: str | None
+):
+    """Count a failed login; warn as the last tries approach, pause after."""
+    count = await login_failures.record_failure(cache_key)
+    max_attempts = int(settings.AUTH.max_login_attempts)
+    if count >= max_attempts:
+        return await _paused_login(login_failures, cache_key, username, return_url)
+    message = LOGIN_MISMATCH
+    remaining = max_attempts - count
+    if remaining <= 2:
+        tries = "1 more try" if remaining == 1 else f"{remaining} more tries"
+        pause = _for_minutes(int(settings.AUTH.login_lockout_ttl))
+        message += f" {tries} before sign-in pauses for {pause}."
+    return await _render_login_error(username, return_url, message)
+
+
+async def _paused_login(
+    login_failures: Any, cache_key: str, username: str, return_url: str | None
+) -> Response:
+    """The login page, explaining the pause and when it ends (429)."""
+    seconds = max(await login_failures.seconds_left(cache_key), 1)
+    message = (
+        "Sign-in for this account is paused after too many attempts. "
+        f"Try again in {_in_minutes(seconds)}, or reset your password "
+        "if you've forgotten it."
+    )
+    resp = await make_response(
+        await _render_login_error(username, return_url, message), 429
+    )
+    assert isinstance(resp, Response)
+    resp.headers["Retry-After"] = str(seconds)
     return resp
 
 
@@ -416,7 +467,7 @@ async def login():
                 client_ip,
                 attempts,
             )
-            return Response("Too many login attempts. Try again later.", status=429)
+            return await _paused_login(login_failures, cache_key, username, return_url)
 
         max_user = int(settings.LIMITS.max_username_length)
         max_pass = int(settings.LIMITS.max_password_length)
@@ -425,10 +476,7 @@ async def login():
             username, password, max_user=max_user, max_pass=max_pass
         )
         if length_error:
-            await login_failures.record_failure(cache_key)
-            return await _render_login_error(
-                username, return_url, "Invalid credentials"
-            )
+            return await _refuse_login(login_failures, cache_key, username, return_url)
 
         db = services.db
         user = await db.users.get_user_by_username(username)
@@ -463,14 +511,13 @@ async def login():
                 return resp
             except Exception:
                 # Log at WARNING level so cryptographic failures are visible in production,
-                # but continue to show generic "Invalid credentials" to user to prevent
+                # but continue to show the generic mismatch message to user to prevent
                 # timing attacks and username enumeration.
                 current_app.logger.warning(
                     "Login verification failed for %s", username, exc_info=True
                 )
         current_app.logger.debug("Login failed for %s", username)
-        await login_failures.record_failure(cache_key)
-        return await _render_login_error(username, return_url, "Invalid credentials")
+        return await _refuse_login(login_failures, cache_key, username, return_url)
 
     # Already authenticated — redirect rather than showing the login form.
     # This covers the browser-back-after-login case: if bfcache is bypassed

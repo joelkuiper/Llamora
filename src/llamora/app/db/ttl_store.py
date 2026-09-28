@@ -79,6 +79,18 @@ class TTLStore(BaseRepository):
             await conn.commit()
         return _as_bytes(row["value"])
 
+    async def seconds_left(self, namespace: str, key: str) -> int:
+        """Seconds until the entry expires, or 0 if it's absent or expired."""
+
+        now = int(time.time())
+        async with self.pool.connection() as conn:
+            cursor = await conn.execute(
+                "SELECT expires_at FROM ttl_store WHERE namespace = ? AND key = ? AND expires_at > ?",
+                (namespace, key, now),
+            )
+            row = await cursor.fetchone()
+        return max(int(row["expires_at"]) - now, 0) if row else 0
+
     async def remove(self, namespace: str, key: str) -> None:
         """Delete a specific entry."""
 

@@ -68,5 +68,5 @@ def test_wrong_password_is_rejected(page: Page, make_user: Callable[..., User]) 
     page.locator('input[name="password"]').fill("not-the-password")
     page.get_by_role("button", name="Login").click()
 
-    expect(page.get_by_text("Invalid credentials")).to_be_visible()
+    expect(page.get_by_text("That username and password don't match.")).to_be_visible()
     expect(page).to_have_url(re.compile(r"/login"))

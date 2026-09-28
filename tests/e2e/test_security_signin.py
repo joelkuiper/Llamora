@@ -131,13 +131,44 @@ def test_a_successful_login_resets_the_count(guarded: Guarded) -> None:
         assert attempt(guarded, guarded.password).status_code == 302
 
 
-def test_failed_logins_lock_the_username_for_a_while(guarded: Guarded) -> None:
-    for _ in range(MAX_ATTEMPTS):
-        assert attempt(guarded, "wrong password").status_code == 200
+def alert_text(resp: httpx.Response) -> str:
+    found = re.search(r'<div class="alert__message">(.*?)</div>', resp.text, re.S)
+    assert found, "no message on the login page"
+    return " ".join(found.group(1).split())
 
-    # Locked: even the right password is refused, and a forged client address
-    # (no trusted proxy is configured) doesn't get around it.
-    assert attempt(guarded, guarded.password).status_code == 429
+
+def test_the_last_tries_are_counted_down(guarded: Guarded) -> None:
+    first = attempt(guarded, "wrong password")
+    second = attempt(guarded, "wrong password")
+
+    assert first.status_code == second.status_code == 200
+    assert "2 more tries before sign-in pauses" in alert_text(first)
+    assert "1 more try before sign-in pauses" in alert_text(second)
+    assert attempt(guarded, guarded.password).status_code == 302  # resets
+
+
+def test_failed_logins_pause_sign_in_and_say_for_how_long(guarded: Guarded) -> None:
+    for _ in range(MAX_ATTEMPTS - 1):
+        assert attempt(guarded, "wrong password").status_code == 200
+    last = attempt(guarded, "wrong password")
+
+    # The try that uses up the last attempt already explains the pause.
+    assert last.status_code == 429
+    assert "paused" in alert_text(last)
+
+    # While paused, even the right password is refused, on the login page
+    # itself: the username is kept, and it says when to try again.
+    locked = attempt(guarded, guarded.password)
+    assert locked.status_code == 429
+    message = alert_text(locked)
+    assert "Sign-in for this account is paused" in message
+    assert "Try again in under a minute" in message
+    assert "reset your password" in message
+    assert f'value="{guarded.username}"' in locked.text
+    assert 'name="password"' in locked.text
+    assert 0 < int(locked.headers["retry-after"]) <= LOCKOUT_SECONDS
+
+    # A forged client address (no trusted proxy is configured) doesn't help.
     spoofed = attempt(
         guarded, guarded.password, headers={"X-Forwarded-For": "203.0.113.9"}
     )

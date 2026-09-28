@@ -28,6 +28,11 @@ class LoginFailuresRepository:
 
         return await self._store.increment(NAMESPACE, cache_key, self._ttl)
 
+    async def seconds_left(self, cache_key: str) -> int:
+        """Seconds until the count (and any pause it caused) runs out."""
+
+        return await self._store.seconds_left(NAMESPACE, cache_key)
+
     async def clear(self, cache_key: str) -> None:
         """Remove failure tracking for a key (e.g. after successful login)."""
 
