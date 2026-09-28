@@ -18,6 +18,7 @@ from ..vector_search import VectorSearchService
 logger = logging.getLogger(__name__)
 
 _TOKEN_PATTERN = re.compile(r"\S+")
+_SHORTCODE_PATTERN = re.compile(r":[\w+-]+:")
 
 
 @dataclass(slots=True)
@@ -90,7 +91,16 @@ class DefaultTagEnricher:
                 continue
             seen_tokens.add(canonical_lower)
             tokens.append(canonical)
-        if raw_query and (any(ch.isspace() for ch in raw_query) or "_" in raw_query):
+        # The whole query may name one trace too ("golden hour" -> golden-hour),
+        # but not a repeated word or a phrase around an emoji shortcode.
+        words = {w.lower() for w in _TOKEN_PATTERN.findall(raw_query)}
+        is_phrase = any(ch.isspace() for ch in raw_query) or "_" in raw_query
+        if (
+            raw_query
+            and is_phrase
+            and not _SHORTCODE_PATTERN.search(raw_query)
+            and (len(words) > 1 or "_" in raw_query)
+        ):
             try:
                 canonical = self._tag_service.canonicalize(raw_query)
             except ValueError:

@@ -215,6 +215,9 @@ class LexicalReranker:
             adjusted = self._seek_forward_boundary(content, start)
             if adjusted > start:
                 start = min(adjusted, length)
+        # "…word", not "… word": a cut that lands on spaces skips them.
+        while leading and 0 < start < length and content[start].isspace():
+            start += 1
 
         if (
             trailing

@@ -264,10 +264,15 @@ class SearchStreamManager:
             )
 
         showing_count = len(session.delivered_ids)
+        # More either waits among the fetched candidates (a large k2 may fetch
+        # everything at once) or can still be fetched from the index.
+        unshown = len(session.candidate_map) - showing_count
+        can_fetch_more = (
+            not session.exhausted and len(session.candidate_map) >= desired_limit
+        )
         has_more = (
-            not session.exhausted
-            and len(session.candidate_map) >= desired_limit
-            and desired_limit < result_window
+            (unshown > 0 or can_fetch_more)
+            and showing_count < result_window
             and len(page_results) > 0
             and len(page_results) >= page_limit
         )

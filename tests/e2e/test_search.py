@@ -7,7 +7,14 @@ from datetime import timedelta
 
 from playwright.sync_api import Locator, Page, expect
 
-from harness import ApiClient, marker, today_utc, wait_for_app, wait_for_htmx_idle
+from harness import (
+    ApiClient,
+    login,
+    marker,
+    today_utc,
+    wait_for_app,
+    wait_for_htmx_idle,
+)
 
 INDEX_TIMEOUT = 20_000  # entries are indexed asynchronously after they are saved
 
@@ -130,3 +137,154 @@ def test_opening_the_search_url_directly_goes_to_the_diary(app_page: Page) -> No
     expect(app_page).to_have_url(re.compile(r"/d/today$"))
     wait_for_app(app_page)
     expect(app_page.locator("#entries")).to_be_visible()
+
+
+# -- the index keeps up -----------------------------------------------------------
+
+
+def test_an_edited_entry_is_found_by_its_new_words(
+    fresh_session: tuple[Page, ApiClient],
+) -> None:
+    page, api = fresh_session
+    old, new = marker("marsh"), marker("meadow")
+    entry_id = api.create_entry(today_utc() - timedelta(days=1), f"Walked the {old}")
+    expect(search(page, old).first).to_be_visible(timeout=INDEX_TIMEOUT)
+
+    api.update_entry(entry_id, f"Walked the {new}").raise_for_status()
+
+    search(page, new)
+    expect(result_for(page, entry_id).locator("mark")).to_contain_text(
+        new, timeout=INDEX_TIMEOUT
+    )
+    search(page, old)
+    expect(result_for(page, entry_id).locator("mark")).to_have_count(
+        0, timeout=INDEX_TIMEOUT
+    )
+
+
+def test_a_deleted_entry_is_not_found(fresh_session: tuple[Page, ApiClient]) -> None:
+    page, api = fresh_session
+    token = marker("lichen")
+    entry_id = api.create_entry(today_utc() - timedelta(days=1), f"Grey {token}")
+    expect(search(page, token).first).to_be_visible(timeout=INDEX_TIMEOUT)
+
+    api.delete_entry(entry_id).raise_for_status()
+
+    search(page, "")
+    search(page, token)
+    expect(result_for(page, entry_id)).to_have_count(0, timeout=INDEX_TIMEOUT)
+
+
+# -- traces -------------------------------------------------------------------------
+
+
+def test_a_trace_finds_entries_that_never_mention_it(
+    fresh_session: tuple[Page, ApiClient],
+) -> None:
+    page, api = fresh_session
+    trace = marker("tidepool")
+    entry_id = api.create_entry(today_utc() - timedelta(days=4), "A quiet walk.")
+    api.add_tag(entry_id, trace)
+
+    search(page, trace)
+
+    result = result_for(page, entry_id)
+    expect(result).to_be_visible(timeout=INDEX_TIMEOUT)
+    expect(result.locator(".entry-tag.is-highlighted")).to_have_text(trace)
+
+
+def test_an_emoji_shortcode_finds_the_traced_emoji(
+    fresh_session: tuple[Page, ApiClient],
+) -> None:
+    page, api = fresh_session
+    entry_id = api.create_entry(today_utc() - timedelta(days=4), "Heard it at dusk.")
+    api.add_tag(entry_id, "🦉")
+
+    search(page, ":owl:")
+
+    result = result_for(page, entry_id)
+    expect(result).to_be_visible(timeout=INDEX_TIMEOUT)
+    expect(result.locator(".entry-tag.is-highlighted")).to_contain_text("🦉")
+
+
+# -- highlighting -------------------------------------------------------------------
+
+
+def test_a_long_query_highlights_whole_words_only(
+    fresh_session: tuple[Page, ApiClient],
+) -> None:
+    page, api = fresh_session
+    token = marker("gale")
+    entry_id = api.create_entry(
+        today_utc() - timedelta(days=1),
+        f"I kept thinking that there is {token}, and this window rattles all night.",
+    )
+
+    search(page, f"the {token} at the window in the night")
+
+    marks = result_for(page, entry_id).locator("mark")
+    expect(marks.first).to_be_visible(timeout=INDEX_TIMEOUT)
+    expect(marks).to_have_text([token, "window", "night"])
+
+
+def test_a_query_over_the_limit_is_shortened_and_says_so(
+    fresh_session: tuple[Page, ApiClient],
+) -> None:
+    page, api = fresh_session
+    token = marker("heath")
+    api.create_entry(today_utc() - timedelta(days=1), f"Out on the {token}")
+    field = page.locator("#search-input")
+
+    field.fill(token + " " + "x" * 600)
+    field.press("Enter")
+
+    notice = page.locator(".search-results-notice")
+    expect(notice).to_contain_text("truncated to the first 512 characters")
+    # The kept part still searches: the marker is found and marked.
+    expect(page.locator("#search-results mark").first).to_have_text(
+        token, timeout=INDEX_TIMEOUT
+    )
+
+
+# -- recent searches ---------------------------------------------------------------
+
+
+def test_recent_searches_complete_what_you_type(
+    fresh_session: tuple[Page, ApiClient],
+) -> None:
+    page, api = fresh_session
+    token = marker("kingfisher")
+    api.create_entry(today_utc() - timedelta(days=1), f"A {token} by the bridge")
+    expect(search(page, token).first).to_be_visible(timeout=INDEX_TIMEOUT)
+
+    page.reload()  # from the server's (encrypted) history, not this page's memory
+    wait_for_app(page)
+    field = page.locator("#search-input")
+    field.click()
+    field.press_sequentially(token[:6])
+
+    expect(field).to_have_value(token)
+
+
+def test_recent_searches_are_private(
+    fresh_session: tuple[Page, ApiClient],
+    new_context,
+    make_user,
+) -> None:
+    page, api = fresh_session
+    token = marker("nightjar")
+    api.create_entry(today_utc() - timedelta(days=1), f"A {token} churring")
+    expect(search(page, token).first).to_be_visible(timeout=INDEX_TIMEOUT)
+
+    other = new_context().new_page()
+    login(other, make_user("other"))
+    field = other.locator("#search-input")
+    field.click()
+    field.press_sequentially(token[:6])
+    other.wait_for_timeout(500)
+    expect(field).to_have_value(token[:6])
+    # Nor does searching for it find the first user's entry.
+    field.fill(token)
+    field.press("Enter")
+    other.wait_for_timeout(1500)
+    expect(other.locator("#search-results mark")).to_have_count(0)
