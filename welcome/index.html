@@ -30,50 +30,64 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="hero">
-    <picture class="hero__logo">
-      <source srcset="img/logo-dark.svg" media="(prefers-color-scheme: dark)">
-      <img src="img/logo.svg" width="1400" height="512" alt="Llamora">
-    </picture>
-    <p class="hero__tagline">A private journal that remembers with you.</p>
+  <nav class="topbar" aria-label="Llamora">
+    <a class="topbar__brand" href="#top" aria-label="Llamora, back to top">
+      <picture>
+        <source srcset="img/logo-dark.svg" media="(prefers-color-scheme: dark)">
+        <img src="img/logo.svg" width="1400" height="512" alt="Llamora">
+      </picture>
+    </a>
+    <div class="topbar__links">
+      <a href="https://llamora.app/login">Log in</a>
+      <a class="topbar__source" href="https://github.com/joelkuiper/Llamora">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        Source
+      </a>
+    </div>
+  </nav>
+
+  <header class="hero" id="top">
+    <p class="label" data-today>Today</p>
+    <h1 class="hero__title">A private journal that remembers with you.</h1>
     <p class="hero__lede">
       Write a little every day. Each morning, Llamora opens the page with a few
       lines about the day before. Ask, and it responds to what you wrote. Over
       weeks it notices what keeps coming back, and helps you find your way to it
       again.
     </p>
-    <nav class="hero__actions">
-      <a class="button button--primary" href="#start">Get started</a>
-      <a class="button" href="https://llamora.app/login">Log in</a>
-      <a class="button" href="https://github.com/joelkuiper/Llamora">Source on GitHub</a>
-    </nav>
-    <p class="hero__note">Registration at llamora.app is closed for now. You can run your own.</p>
-    <figure class="shot shot--hero" data-hero-video>
-      <div class="shot__frame">
-        <picture>
-          <source srcset="img/page-dark.webp" media="(prefers-color-scheme: dark)">
-          <img src="img/page-light.webp" width="2880" height="1800"
-               alt="Llamora showing a daily page: the day opening, an entry with photos, and the model's response.">
-        </picture>
-        <video muted loop playsinline preload="auto" aria-hidden="true"></video>
-        <button class="shot__toggle" type="button" aria-label="Pause the video" hidden>
-          <svg class="icon-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9M11 3.5v9"/></svg>
-          <svg class="icon-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 3.5 12 8l-6.5 4.5z"/></svg>
-        </button>
-      </div>
-    </figure>
+    <div class="hero__actions">
+      <a class="button" href="#start">Run your own</a>
+      <a class="link" href="https://llamora.app/login">Log in at llamora.app <span aria-hidden="true">→</span></a>
+    </div>
+    <p class="hero__note">Registration at llamora.app is closed for now.</p>
   </header>
 
-  <main>
-    <section class="feature">
-      <div class="feature__text">
-        <h2>Daily pages</h2>
-        <p>
-          A new page opens each day. You write; the model responds only when asked.
-          Each morning it opens the day with a few lines drawn from recent entries
-          and a digest of the day before. Everything stays anchored to its date.
-        </p>
-      </div>
+  <div class="year" aria-hidden="true" data-year></div>
+
+  <figure class="shot shot--hero" data-hero-video>
+    <div class="shot__frame">
+      <picture>
+        <source srcset="img/page-dark.webp" media="(prefers-color-scheme: dark)">
+        <img src="img/page-light.webp" width="2880" height="1800"
+             alt="Llamora showing a daily page: the day opening, an entry with photos, and the model's response.">
+      </picture>
+      <video muted loop playsinline preload="auto" aria-hidden="true"></video>
+      <button class="shot__toggle" type="button" aria-label="Pause the video" hidden>
+        <svg class="icon-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9M11 3.5v9"/></svg>
+        <svg class="icon-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 3.5 12 8l-6.5 4.5z"/></svg>
+      </button>
+    </div>
+  </figure>
+
+  <main class="timeline">
+    <section class="moment" style="--level: 1">
+      <p class="label">Every day</p>
+      <h2>Daily pages</h2>
+      <p>
+        A new page opens each day. You write; the model responds only when asked.
+        Each morning it opens the day with a few lines drawn from recent entries
+        and a digest of the day before. Everything stays anchored to its date.
+      </p>
       <figure class="shot">
         <picture>
           <source srcset="img/calendar-dark.webp" media="(prefers-color-scheme: dark)">
@@ -84,16 +98,15 @@
       </figure>
     </section>
 
-    <section class="feature feature--flip">
-      <div class="feature__text">
-        <h2>Photos, too</h2>
-        <p>
-          Drop images onto an entry, or pick them from your phone,
-          and open them full size to look back. They are stripped of location and
-          other metadata, then stored encrypted. With a model that can see, replies
-          take them into account.
-        </p>
-      </div>
+    <section class="moment" style="--level: 1">
+      <p class="label">As it happens</p>
+      <h2>Photos, too</h2>
+      <p>
+        Drop images onto an entry, or pick them from your phone,
+        and open them full size to look back. They are stripped of location and
+        other metadata, then stored encrypted. With a model that can see, replies
+        take them into account.
+      </p>
       <figure class="shot">
         <picture>
           <source srcset="img/lightbox-dark.webp" media="(prefers-color-scheme: dark)">
@@ -103,15 +116,14 @@
       </figure>
     </section>
 
-    <section class="feature">
-      <div class="feature__text">
-        <h2>Markdown supported</h2>
-        <p>
-          Write in Markdown when a longer entry wants some shape. Headings, lists,
-          quotes and emphasis render as you would expect, and stay plain text
-          underneath.
-        </p>
-      </div>
+    <section class="moment" style="--level: 2">
+      <p class="label">When it runs long</p>
+      <h2>Markdown supported</h2>
+      <p>
+        Write in Markdown when a longer entry wants some shape. Headings, lists,
+        quotes and emphasis render as you would expect, and stay plain text
+        underneath.
+      </p>
       <figure class="shot">
         <picture>
           <source srcset="img/markdown-dark.webp" media="(prefers-color-scheme: dark)">
@@ -121,15 +133,14 @@
       </figure>
     </section>
 
-    <section class="feature feature--flip">
-      <div class="feature__text">
-        <h2>Traces</h2>
-        <p>
-          After you write, the model can suggest a few traces: light labels that make
-          it easier to return later. Keep the ones that fit. Over time they show where
-          something recurs, what it appears alongside, and which days it touches.
-        </p>
-      </div>
+    <section class="moment" style="--level: 3">
+      <p class="label">Over weeks</p>
+      <h2>Traces</h2>
+      <p>
+        After you write, the model can suggest a few traces: light labels that make
+        it easier to return later. Keep the ones that fit. Over time they show where
+        something recurs, what it appears alongside, and which days it touches.
+      </p>
       <figure class="shot">
         <picture>
           <source srcset="img/suggest-dark.webp" media="(prefers-color-scheme: dark)">
@@ -137,9 +148,6 @@
                alt="Suggested traces for an entry: mindfulness, peace, solitude, stillness.">
         </picture>
       </figure>
-    </section>
-
-    <section class="feature feature--wide">
       <figure class="shot">
         <picture>
           <source srcset="img/traces-dark.webp" media="(prefers-color-scheme: dark)">
@@ -150,15 +158,14 @@
       </figure>
     </section>
 
-    <section class="feature">
-      <div class="feature__text">
-        <h2>Search by meaning</h2>
-        <p>
-          Find past entries by what they were about, not only the words you used.
-          Results are ranked across your whole journal, with matching traces
-          highlighted.
-        </p>
-      </div>
+    <section class="moment" style="--level: 4">
+      <p class="label">When you look back</p>
+      <h2>Search by meaning</h2>
+      <p>
+        Find past entries by what they were about, not only the words you used.
+        Results are ranked across your whole journal, with matching traces
+        highlighted.
+      </p>
       <figure class="shot">
         <picture>
           <source srcset="img/search-dark.webp" media="(prefers-color-scheme: dark)">
@@ -168,8 +175,9 @@
       </figure>
     </section>
 
-    <section class="feature feature--flip feature--phone">
-      <div class="feature__text">
+    <section class="moment moment--phone" style="--level: 4">
+      <div>
+        <p class="label">Wherever you are</p>
         <h2>On your phone</h2>
         <p>
           The same journal, laid out for a small screen and a thumb. Write on the way,
@@ -184,59 +192,88 @@
         </picture>
       </figure>
     </section>
+  </main>
 
-    <section class="principles" aria-labelledby="principles-title">
-      <h2 id="principles-title">Private by design</h2>
-      <div class="principles__grid">
-        <article>
-          <h3>Yours to run</h3>
-          <p>
-            Run it yourself with a local model and nothing leaves your machine.
-            Llamora itself makes no outbound requests: no telemetry, no analytics,
-            no phoning home.
-          </p>
-        </article>
-        <article>
-          <h3>Encrypted at rest</h3>
-          <p>
-            Entries, responses, traces, search and photos are encrypted before they
-            are stored. Your password unlocks a key that lives only in memory while
-            you are signed in.
-          </p>
-        </article>
-        <article>
-          <h3>No evaluation</h3>
-          <p>
-            The model can respond and suggest, but it never scores entries, infers
-            traits or builds a profile of you. The record is yours to interpret.
-          </p>
-        </article>
+  <section class="opening" aria-labelledby="private-title">
+    <p class="label" id="private-title">Private by design</p>
+    <dl class="opening__list">
+      <div>
+        <dt>Yours to run.</dt>
+        <dd>
+          Run it yourself with a local model and nothing leaves your machine.
+          Llamora itself makes no outbound requests: no telemetry, no analytics,
+          no phoning home.
+        </dd>
       </div>
-    </section>
+      <div>
+        <dt>Encrypted at rest.</dt>
+        <dd>
+          Entries, responses, traces, search and photos are encrypted before they
+          are stored. Your password unlocks a key that lives only in memory while
+          you are signed in.
+        </dd>
+      </div>
+      <div>
+        <dt>No evaluation.</dt>
+        <dd>
+          The model can respond and suggest, but it never scores entries, infers
+          traits or builds a profile of you. The record is yours to interpret.
+        </dd>
+      </div>
+    </dl>
+  </section>
 
-    <section class="start" id="start" aria-labelledby="start-title">
-      <h2 id="start-title">Get started</h2>
-      <p>
-        You need <a href="https://docs.astral.sh/uv/">uv</a> and a model server with an
-        OpenAI-compatible API, such as <a href="https://github.com/ggml-org/llama.cpp">llama.cpp</a>.
-      </p>
-      <pre><code><span class="comment"># 1. Start a local model</span>
+  <section class="start" id="start" aria-labelledby="start-title">
+    <p class="label">Run your own</p>
+    <h2 id="start-title">Get started</h2>
+    <p>
+      You need <a href="https://docs.astral.sh/uv/">uv</a> and a model server with an
+      OpenAI-compatible API, such as <a href="https://github.com/ggml-org/llama.cpp">llama.cpp</a>.
+    </p>
+    <pre><code><span class="comment"># 1. Start a local model</span>
 llama-server -hf unsloth/Qwen3-4B-Instruct-2507-GGUF \
   --port 8081 -c 40000 --jinja
 
 <span class="comment"># 2. Install and run Llamora</span>
 uv sync
 LLAMORA_LLM__UPSTREAM__HOST=http://127.0.0.1:8081 uv run llamora-server dev</code></pre>
-      <p>
-        Then open <code>http://localhost:5000</code> and create an account. The <a href="https://github.com/joelkuiper/Llamora#readme">README</a>
-        covers the demo journal, configuration and running in production.
-      </p>
-    </section>
-  </main>
+    <p>
+      Then open <code>http://localhost:5000</code> and create an account. The <a href="https://github.com/joelkuiper/Llamora#readme">README</a>
+      covers the demo journal, configuration and running in production.
+    </p>
+  </section>
 
   <footer class="footer">
-    <p>Llamora is free software under the GPL-3.0 licence.</p>
+    <p class="footer__rule"><span>Llamora</span></p>
+    <p>Free software under the GPL-3.0 licence · <a href="https://github.com/joelkuiper/Llamora">Source on GitHub</a></p>
   </footer>
+  <script>
+    // A year of days in the heatmap's golds: sparse early on, fuller later,
+    // the way a kept trace fills in. Decorative; the same pattern every visit.
+    (() => {
+      const year = document.querySelector("[data-year]");
+      if (!year) return;
+      let seed = 7;
+      const next = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      const cells = [];
+      for (let week = 0; week < 52; week += 1) {
+        const chance = 0.08 + (week / 52) * 0.42;
+        const level = next() < chance ? 1 + Math.floor(next() * (1 + (week / 52) * 3)) : 0;
+        cells.push(`<span class="year__day" data-level="${Math.min(level, 4)}"></span>`);
+      }
+      year.innerHTML = cells.join("");
+
+      // Like a page in the app, the hero is headed by today's date.
+      const today = document.querySelector("[data-today]");
+      if (today) {
+        today.textContent = new Date().toLocaleDateString("en-GB", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+        });
+      }
+    })();
+  </script>
   <script>
     // The hero plays a short walk through the app over its still, in the
     // current theme. Reduced motion (or no script) keeps the still.

@@ -1,24 +1,36 @@
-/* Llamora welcome page. Colours follow the app's own tokens. */
+/* Llamora welcome page, in the app's own vocabulary: its colour tokens, the
+   small letter-spaced labels of a day opening, hairline cards, and the gold of
+   the traces heatmap as the one warm accent. */
 
 :root {
   color-scheme: light dark;
 
   --bg: #fafafa;
-  --bg-alt: #f3f4f6;
+  --bg-alt: #f6f6f6;
   --surface: #ffffff;
   --text: #343434;
   --heading: #222222;
   --muted: #666666;
+  --faint: color-mix(in srgb, var(--muted) 70%, transparent);
   --accent: #36a6f4;
   --accent-hover: #1f97f2;
   --accent-soft: rgba(54, 166, 244, 0.1);
+  --accent-line: rgba(54, 166, 244, 0.3);
   --border: rgba(0, 0, 0, 0.1);
-  --shadow: 0 18px 48px rgba(20, 30, 45, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05);
-  --code-bg: #f1f3f5;
+  --hairline: rgba(0, 0, 0, 0.07);
+  --shadow: 0 4px 10px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-lift: 0 18px 44px rgba(20, 30, 45, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05);
+
+  /* The traces heatmap. */
+  --day-0: color-mix(in srgb, var(--text) 6%, transparent);
+  --day-1: color-mix(in srgb, #f8dda8 72%, transparent);
+  --day-2: color-mix(in srgb, #f5c874 82%, transparent);
+  --day-3: color-mix(in srgb, #f0ab4f 88%, transparent);
+  --day-4: color-mix(in srgb, #e28c2f 92%, transparent);
 
   --radius: 1.2rem;
-  --measure: 34rem;
-  --page: 72rem;
+  --column: 40rem;
+  --wide: 60rem;
   --font: system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
@@ -29,14 +41,16 @@
     --bg-alt: #12151a;
     --surface: #0f1318;
     --text: #d8dbe0;
-    --heading: #fafbfc;
+    --heading: #f0f1f4;
     --muted: #b3b8c0;
     --accent: #6fb7e6;
     --accent-hover: #86c3ea;
-    --accent-soft: rgba(111, 183, 230, 0.14);
+    --accent-soft: rgba(111, 183, 230, 0.12);
+    --accent-line: rgba(120, 180, 220, 0.32);
     --border: rgba(230, 231, 234, 0.14);
-    --shadow: 0 18px 48px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.04);
-    --code-bg: #161a20;
+    --hairline: rgba(230, 231, 234, 0.09);
+    --shadow: 0 4px 10px rgba(0, 0, 0, 0.42), 0 2px 6px rgba(0, 0, 0, 0.26);
+    --shadow-lift: 0 18px 44px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.03);
   }
 }
 
@@ -61,7 +75,7 @@ body {
   padding-inline: 1.25rem;
   background: var(--bg);
   color: var(--text);
-  font: 400 1.0625rem / 1.65 var(--font);
+  font: 400 1.0625rem / 1.7 var(--font);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -74,135 +88,221 @@ img {
 a {
   color: var(--accent);
   text-decoration-thickness: 1px;
-  text-underline-offset: 0.2em;
+  text-underline-offset: 0.22em;
 }
 
 a:hover {
   color: var(--accent-hover);
 }
 
-h2,
-h3 {
-  color: var(--heading);
-  line-height: 1.25;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
+h1,
 h2 {
-  margin: 0 0 0.75rem;
-  font-size: clamp(1.5rem, 1.2rem + 1vw, 1.9rem);
-}
-
-h3 {
-  margin: 0 0 0.4rem;
-  font-size: 1.1rem;
+  color: var(--heading);
+  font-weight: 500;
+  letter-spacing: -0.015em;
 }
 
 p {
   margin: 0 0 1rem;
 }
 
-/* -- hero ---------------------------------------------------------------- */
+/* The day opening's header: small, spaced, uppercase. */
+.label {
+  margin: 0 0 0.9rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* -- top bar ------------------------------------------------------------------ */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: var(--wide);
+  margin: 0 auto;
+  padding-block: 1.4rem;
+}
+
+.topbar__brand img {
+  width: 8.5rem;
+}
+
+.topbar__links {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  font-size: 0.95rem;
+}
+
+.topbar__links a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.topbar__links a:hover {
+  color: var(--heading);
+}
+
+/* The project's home: a hairline pill with the GitHub mark, quieter than the
+   hero's button but clearly a destination. */
+.topbar__links .topbar__source {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--heading);
+  font-weight: 500;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.topbar__links .topbar__source:hover {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+.topbar__source svg {
+  width: 1rem;
+  height: 1rem;
+  fill: currentColor;
+}
+
+/* -- hero ---------------------------------------------------------------------- */
 
 .hero {
-  max-width: var(--page);
+  max-width: var(--wide);
   margin: 0 auto;
-  padding-block: clamp(3rem, 8vw, 6rem) 0;
-  text-align: center;
+  padding-block: clamp(3rem, 9vw, 6.5rem) 0;
 }
 
-.hero__logo img {
-  width: min(22rem, 80vw);
-  margin: 0 auto;
-}
-
-.hero__tagline {
-  margin: 1.5rem auto 0.75rem;
-  color: var(--heading);
-  font-size: clamp(1.35rem, 1.1rem + 1.2vw, 1.85rem);
-  font-weight: 500;
-  line-height: 1.3;
-  letter-spacing: -0.01em;
+.hero__title {
+  max-width: 14em;
+  margin: 0 0 1.4rem;
+  font-size: clamp(2.2rem, 1.3rem + 3.6vw, 3.9rem);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
 }
 
 .hero__lede {
-  max-width: var(--measure);
-  margin: 0 auto 2rem;
+  max-width: 34rem;
+  margin-bottom: 2.2rem;
   color: var(--muted);
+  font-size: 1.15rem;
 }
 
 .hero__actions {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+  align-items: center;
+  gap: 1.1rem 1.6rem;
 }
 
-.hero__note {
-  margin: 0 auto clamp(2.5rem, 6vw, 4rem);
-  color: var(--muted);
-  font-size: 0.875rem;
-}
-
+/* The app's primary button: a soft, tinted pill. */
 .button {
   display: inline-block;
-  padding: 0.6rem 1.25rem;
-  border: 1px solid var(--border);
+  padding: 0.62rem 1.35rem;
+  border: 1px solid var(--accent-line);
   border-radius: 999px;
+  background: var(--accent-soft);
   color: var(--heading);
   font-size: 0.975rem;
   font-weight: 500;
   text-decoration: none;
-  transition: border-color 160ms ease, background-color 160ms ease;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .button:hover {
   border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
   color: var(--heading);
 }
 
-.button--primary {
-  background: var(--accent-soft);
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+.link {
+  font-size: 0.975rem;
+  text-decoration: none;
 }
 
-/* -- screenshots ---------------------------------------------------------- */
+.hero__note {
+  margin: 0.9rem 0 0;
+  color: var(--faint);
+  font-size: 0.85rem;
+}
+
+/* A year of days in heatmap gold: continuity, made visible. */
+.year {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.2rem;
+  max-width: var(--wide);
+  margin: clamp(2.5rem, 6vw, 4rem) auto 1.4rem;
+  overflow: hidden;
+}
+
+.year__day {
+  flex: 0 0 auto;
+  width: 0.54rem;
+  height: 0.54rem;
+  border-radius: 0.24rem;
+  background: var(--day-0);
+}
+
+.year__day[data-level="1"] {
+  background: var(--day-1);
+}
+
+.year__day[data-level="2"] {
+  background: var(--day-2);
+}
+
+.year__day[data-level="3"] {
+  background: var(--day-3);
+}
+
+.year__day[data-level="4"] {
+  background: var(--day-4);
+}
+
+/* -- screenshots ------------------------------------------------------------------ */
 
 .shot {
-  margin: 0;
+  margin: 1.8rem 0 0;
 }
 
-.shot picture {
+.shot picture,
+.shot__frame {
   display: block;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-lift);
 }
 
 .shot figcaption {
-  margin-top: 0.9rem;
-  color: var(--muted);
-  font-size: 0.925rem;
-  text-align: center;
+  margin-top: 0.8rem;
+  color: var(--faint);
+  font-size: 0.875rem;
 }
 
 .shot--hero {
-  max-width: var(--page);
+  max-width: var(--wide);
   margin: 0 auto;
 }
 
 /* The hero: a still, with the video laid over it once it plays. */
 .shot__frame {
   position: relative;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: var(--shadow);
 }
 
 .shot .shot__frame picture {
@@ -240,7 +340,9 @@ p {
   color: var(--muted);
   cursor: pointer;
   opacity: 0.55;
-  transition: opacity 160ms ease, color 160ms ease;
+  transition:
+    opacity 160ms ease,
+    color 160ms ease;
 }
 
 .shot__toggle[hidden] {
@@ -273,118 +375,162 @@ p {
 }
 
 .shot--phone {
+  width: min(17rem, 70vw);
+  margin: 0;
   justify-self: center;
-  width: min(19rem, 72vw);
 }
 
 .shot--phone picture {
-  border-radius: 2.25rem;
-  border-width: 6px;
-  border-color: color-mix(in srgb, var(--heading) 12%, transparent);
+  border-radius: 2.2rem;
+  border: 6px solid color-mix(in srgb, var(--heading) 10%, transparent);
 }
 
-/* -- features ------------------------------------------------------------- */
+/* -- the timeline: one reading column along a hairline, a gold day per moment,
+      deeper down the page as a kept trace fills in ------------------------------- */
 
-main {
-  max-width: var(--page);
-  margin: 0 auto;
+.timeline {
+  position: relative;
+  max-width: var(--wide);
+  margin: clamp(4rem, 10vw, 7rem) auto 0;
+  padding-left: 2.4rem;
 }
 
-.feature {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
-  gap: clamp(2rem, 5vw, 4rem);
-  align-items: center;
-  padding-block: clamp(3.5rem, 9vw, 7rem) 0;
+.timeline::before {
+  content: "";
+  position: absolute;
+  left: 0.26rem;
+  top: 0.5rem;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(var(--hairline), var(--border) 20%, var(--border) 80%, transparent);
 }
 
-.feature__text {
-  max-width: var(--measure);
+.moment {
+  position: relative;
+  padding-bottom: clamp(3.5rem, 9vw, 6rem);
 }
 
-.feature__text p {
+.moment::before {
+  content: "";
+  position: absolute;
+  left: -2.4rem;
+  top: 0.32rem;
+  width: 0.54rem;
+  height: 0.54rem;
+  border-radius: 0.24rem;
+  background: var(--day-1);
+  box-shadow: 0 0 0 5px var(--bg);
+}
+
+.moment[style*="--level: 2"]::before {
+  background: var(--day-2);
+}
+
+.moment[style*="--level: 3"]::before {
+  background: var(--day-3);
+}
+
+.moment[style*="--level: 4"]::before {
+  background: var(--day-4);
+}
+
+.moment > h2,
+.moment > p,
+.moment--phone > div {
+  max-width: var(--column);
+}
+
+.moment h2 {
+  margin: 0 0 0.7rem;
+  font-size: clamp(1.45rem, 1.2rem + 0.9vw, 1.9rem);
+  line-height: 1.2;
+}
+
+.moment p:not(.label) {
   color: var(--muted);
 }
 
-.feature--flip {
-  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+.moment--phone {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2.5rem;
+  align-items: start;
 }
 
-.feature--flip .feature__text {
-  order: 2;
-}
+@media (max-width: 720px) {
+  .timeline {
+    padding-left: 1.6rem;
+  }
 
-.feature--wide {
-  display: block;
-  padding-top: clamp(2rem, 5vw, 3.5rem);
-}
+  .moment::before {
+    left: -1.6rem;
+  }
 
-.feature--phone {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-}
-
-@media (max-width: 800px) {
-  .feature,
-  .feature--phone {
+  .moment--phone {
     grid-template-columns: minmax(0, 1fr);
   }
-
-  .feature--flip .feature__text {
-    order: 0;
-  }
 }
 
-/* -- principles ----------------------------------------------------------- */
+/* -- private by design: one card, like a day opening -------------------------------- */
 
-.principles {
-  margin-top: clamp(4rem, 10vw, 8rem);
-  padding: clamp(2rem, 5vw, 3.5rem);
+.opening {
+  max-width: var(--wide);
+  margin: clamp(1rem, 4vw, 2rem) auto 0;
+  padding: clamp(1.6rem, 4vw, 2.6rem);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--bg-alt);
+  background: var(--surface);
+  box-shadow: var(--shadow);
 }
 
-.principles > h2 {
-  margin-bottom: 2rem;
-  text-align: center;
-}
-
-.principles__grid {
+.opening__list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-  gap: 1.75rem 2.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1.4rem 2.6rem;
+  margin: 0;
 }
 
-.principles p {
+.opening__list dt {
+  margin-bottom: 0.35rem;
+  color: var(--heading);
+  font-weight: 500;
+}
+
+.opening__list dd {
   margin: 0;
   color: var(--muted);
   font-size: 0.975rem;
+  line-height: 1.65;
 }
 
-/* -- getting started ------------------------------------------------------ */
+/* -- getting started ------------------------------------------------------------------ */
 
 .start {
-  max-width: 44rem;
+  max-width: var(--wide);
   margin: clamp(4rem, 10vw, 7rem) auto 0;
 }
 
 .start > h2 {
-  text-align: center;
+  margin: 0 0 0.8rem;
+  font-size: clamp(1.45rem, 1.2rem + 0.9vw, 1.9rem);
 }
 
 .start > p {
+  max-width: var(--column);
   color: var(--muted);
 }
 
+/* Like the app's composer: a soft, inset field. */
 pre {
   overflow-x: auto;
-  margin: 1.5rem 0;
-  padding: 1.1rem 1.25rem;
+  margin: 1.6rem 0;
+  padding: 1.2rem 1.4rem;
   border: 1px solid var(--border);
-  border-radius: 0.8rem;
-  background: var(--code-bg);
+  border-radius: 0.9rem;
+  background: var(--bg-alt);
+  box-shadow: inset 1px 1px 3px rgba(0, 0, 0, 0.05);
   color: var(--heading);
-  font: 0.875rem / 1.6 var(--mono);
+  font: 0.875rem / 1.65 var(--mono);
 }
 
 code {
@@ -397,21 +543,43 @@ pre code {
 }
 
 pre .comment {
-  color: var(--muted);
+  color: var(--faint);
 }
 
-/* -- footer --------------------------------------------------------------- */
+/* -- footer: a date divider --------------------------------------------------------- */
 
 .footer {
-  max-width: var(--page);
+  max-width: var(--wide);
   margin: clamp(4rem, 10vw, 6rem) auto 0;
-  padding-block: 2rem 3rem;
-  border-top: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 0.9rem;
+  padding-bottom: 3rem;
+  color: var(--faint);
+  font-size: 0.875rem;
   text-align: center;
 }
 
 .footer p {
   margin: 0;
+}
+
+.footer__rule {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.8rem !important;
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.footer__rule::before,
+.footer__rule::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--hairline);
+}
+
+.footer a {
+  color: inherit;
 }
